@@ -1,11 +1,10 @@
-// RUN: %target-run-simple-swift( -Xfrontend -sil-verify-all -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -sil-verify-all -target %target-swift-5.1-abi-triple %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -sil-verify-all -target %target-swift-5.1-abi-triple %import-libdispatch -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: freestanding
-
-// rdar://101938326
-// UNSUPPORTED: freestanding
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime

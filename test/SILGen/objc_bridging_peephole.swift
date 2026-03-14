@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -module-name objc_bridging_peephole %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -module-name objc_bridging_peephole %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -579,15 +579,15 @@ func testOptionalToNonOptionalBridge() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s22objc_bridging_peephole34testBlockToOptionalAnyObjectBridge5blockyyyXB_tF
 func testBlockToOptionalAnyObjectBridge(block: @escaping @convention(block) () -> ()) {
-  // CHECK:      [[T0:%.*]] = begin_borrow [lexical] {{%.*}} : $@convention(block) () -> ()
-  // CHECK-NEXT: debug_value
+  // CHECK:      debug_value
+  // CHECK-NEXT: [[T0:%.*]] = begin_borrow {{%.*}} : $@convention(block) () -> ()
   // CHECK-NEXT: [[T1:%.*]] = copy_value [[T0]]
   // CHECK-NEXT: [[REF:%.*]] = unchecked_ref_cast [[T1]] : $@convention(block) () -> () to $AnyObject
   // CHECK-NEXT: [[OPTREF:%.*]] = enum $Optional<AnyObject>, #Optional.some!enumelt, [[REF]] : $AnyObject
+  // CHECK-NEXT: end_borrow [[T0]]
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[FN:%.*]] = function_ref @takeNullableId : $@convention(c) (Optional<AnyObject>) -> ()
+  // CHECK-NEXT: [[FN:%.*]] = function_ref @$sSo14takeNullableIdyyypSgFTo : $@convention(c) (Optional<AnyObject>) -> ()
   // CHECK-NEXT: apply [[FN]]([[OPTREF]])
   // CHECK-NEXT: destroy_value [[OPTREF]]
-  // CHECK-NEXT: end_borrow [[T0]]
   takeNullableId(block as Any)
 }

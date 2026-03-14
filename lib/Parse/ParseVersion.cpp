@@ -12,6 +12,7 @@
 
 #include "swift/Parse/ParseVersion.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/FormatVariadic.h"
 
 using namespace swift;
@@ -21,10 +22,10 @@ swift::version::Version version::getCurrentCompilerVersion() {
 #ifdef SWIFT_COMPILER_VERSION
   auto currentVersion = VersionParser::parseVersionString(
       SWIFT_COMPILER_VERSION, SourceLoc(), nullptr);
-  assert(currentVersion.hasValue() &&
+  assert(static_cast<bool>(currentVersion) &&
          "Embedded Swift language version couldn't be parsed: "
          "'" SWIFT_COMPILER_VERSION "'");
-  return currentVersion.getValue();
+  return *currentVersion;
 #else
   return Version();
 #endif
@@ -53,7 +54,7 @@ static void splitVersionComponents(
   }
 }
 
-Optional<Version> VersionParser::parseCompilerVersionString(
+std::optional<Version> VersionParser::parseCompilerVersionString(
     StringRef VersionString, SourceLoc Loc, DiagnosticEngine *Diags) {
 
   Version CV;
@@ -93,7 +94,7 @@ Optional<Version> VersionParser::parseCompilerVersionString(
 
     // The second version component isn't used for comparison.
     if (i == 1) {
-      if (!SplitComponent.equals("*")) {
+      if (SplitComponent != "*") {
         if (Diags) {
           // Majors 600-1300 were used for Swift 1.0-5.5 (based on clang
           // versions), but then we reset the numbering based on Swift versions,
@@ -173,12 +174,12 @@ Optional<Version> VersionParser::parseCompilerVersionString(
     CV.Components[0] = CV.Components[0] / 1000;
   }
 
-  return isValidVersion ? Optional<Version>(CV) : None;
+  return isValidVersion ? std::optional<Version>(CV) : std::nullopt;
 }
 
-Optional<Version> VersionParser::parseVersionString(StringRef VersionString,
-                                                    SourceLoc Loc,
-                                                    DiagnosticEngine *Diags) {
+std::optional<Version>
+VersionParser::parseVersionString(StringRef VersionString, SourceLoc Loc,
+                                  DiagnosticEngine *Diags) {
   Version TheVersion;
   SmallString<16> digits;
   llvm::raw_svector_ostream OS(digits);
@@ -188,7 +189,7 @@ Optional<Version> VersionParser::parseVersionString(StringRef VersionString,
   if (VersionString.empty()) {
     if (Diags)
       Diags->diagnose(Loc, diag::empty_version_string);
-    return None;
+    return std::nullopt;
   }
 
   splitVersionComponents(SplitComponents, VersionString, Loc, Diags);
@@ -221,5 +222,5 @@ Optional<Version> VersionParser::parseVersionString(StringRef VersionString,
     }
   }
 
-  return isValidVersion ? Optional<Version>(TheVersion) : None;
+  return isValidVersion ? std::optional<Version>(TheVersion) : std::nullopt;
 }

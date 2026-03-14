@@ -119,10 +119,11 @@ struct ScopedAddressValue {
   ///
   /// Valid for any type of liveness, SSA or MultiDef, that may be used by a
   /// scoped address.
-  AddressUseKind updateTransitiveLiveness(PrunedLiveness &liveness) const;
+  AddressUseKind updateTransitiveLiveness(SSAPrunedLiveness &liveness) const;
 
   /// Create appropriate scope ending instruction at \p insertPt.
-  void createScopeEnd(SILBasicBlock::iterator insertPt, SILLocation loc) const;
+  SILInstruction *createScopeEnd(SILBasicBlock::iterator insertPt,
+                                 SILLocation loc) const;
 
   /// Create scope ending instructions at \p liveness boundary.
   void endScopeAtLivenessBoundary(SSAPrunedLiveness *liveness) const;

@@ -6,7 +6,7 @@
 
 // RUN: %empty-directory(%t/usr/bin/)
 // RUN: %empty-directory(%t/usr/lib/)
-// RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/usr/bin/swift)
+// RUN: %hardlink-or-copy(from: %swift_driver_plain-legacy-driver, to: %t/usr/bin/swift)
 
 // RUN: %host-library-env %t/usr/bin/swift -repl -### | %FileCheck -check-prefix=INTEGRATED %s
 // RUN: %host-library-env %t/usr/bin/swift -### | %FileCheck -check-prefix=INTEGRATED %s

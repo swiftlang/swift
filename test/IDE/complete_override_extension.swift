@@ -25,7 +25,6 @@ extension P {
 struct S: P {
   #^CONFORMANCE_EXT^#
 
-// CONFORMANCE_EXT: Begin completions
 // CONFORMANCE_EXT-NOT: nonRequirement
 // CONFORMANCE_EXT-DAG: Decl[Constructor]/Super:            init(requirement: Int) {|};
 // CONFORMANCE_EXT-DAG: Decl[Constructor]/Super:            init(customizable: Int) {|};
@@ -34,5 +33,4 @@ struct S: P {
 // CONFORMANCE_EXT-DAG: Decl[InstanceMethod]/Super:         func requirementMethod() {|};
 // CONFORMANCE_EXT-DAG: Decl[InstanceMethod]/Super:         func customizableMethod() {|};
 // CONFORMANCE_EXT-NOT: nonRequirement
-// CONFORMANCE_EXT: End completions
 }

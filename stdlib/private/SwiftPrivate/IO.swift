@@ -13,16 +13,23 @@
 import Swift
 import SwiftShims
 
-#if canImport(Darwin)
-import Darwin
-let (platform_read, platform_write, platform_close) = (read, write, close)
-#elseif canImport(Glibc)
-import Glibc
-let (platform_read, platform_write, platform_close) = (read, write, close)
-#elseif os(Windows)
+#if os(Windows)
 import CRT
 import WinSDK
+#else
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #endif
+let (platform_read, platform_write, platform_close) = (read, write, close)
+#endif 
 
 #if os(Windows)
 public struct _FDInputStream {
@@ -58,18 +65,16 @@ public struct _FDInputStream {
   }
 
   public mutating func read() {
-    var space = _buffer.count - _offset
-    if space < 128 {
-      let capacity = _buffer.count + (128 - space)
-      _buffer.reserveCapacity(capacity)
-      for _ in _buffer.count..<capacity {
-        _buffer.append(0)
-      }
-      space = 128
+    let minFree = 128
+    var bufferFree = _buffer.count - _offset
+    if bufferFree < minFree {
+      let toAdd = minFree - bufferFree
+      _buffer.append(contentsOf: repeatElement(0, count: toAdd))
+      bufferFree = minFree
     }
     let read: Int = _buffer.withUnsafeMutableBufferPointer { buffer in
       var read: DWORD = 0
-      ReadFile(handle, buffer.baseAddress! + _offset, DWORD(space), &read, nil)
+      ReadFile(handle, buffer.baseAddress! + _offset, DWORD(bufferFree), &read, nil)
       return Int(read)
     }
     if read == 0 {
@@ -118,11 +123,9 @@ public struct _FDInputStream {
     let minFree = 128
     var bufferFree = _buffer.count - _bufferUsed
     if bufferFree < minFree {
-      _buffer.reserveCapacity(minFree - bufferFree)
-      while bufferFree < minFree {
-        _buffer.append(0)
-        bufferFree += 1
-      }
+      let toAdd = minFree - bufferFree
+      _buffer.append(contentsOf: repeatElement(0, count: toAdd))
+      bufferFree = minFree
     }
     let fd = self.fd
     let readResult: Int = _buffer.withUnsafeMutableBufferPointer {

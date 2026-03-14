@@ -337,3 +337,101 @@ bb3:
   return %8 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_store_borrow_use_in_block_without_alloc_stack_use : {{.*}} {
+// CHECK:         [[OWNED:%[^,]+]] = apply
+// CHECK:         [[GUARANTEED:%[^,]+]] = begin_borrow [[OWNED]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[GUARANTEED]]
+// CHECK:         apply undef([[LIFETIME]]) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:         br [[MIDDLE:bb[0-9]+]]
+// CHECK:       [[MIDDLE]]:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         end_borrow [[GUARANTEED]]
+// CHECK:         destroy_value [[OWNED]]
+// CHECK-LABEL: } // end sil function 'test_store_borrow_use_in_block_without_alloc_stack_use'
+sil [ossa] @test_store_borrow_use_in_block_without_alloc_stack_use : $@convention(thin) () -> () {
+bb0:
+  %owned = apply undef() : $@convention(thin) () -> (@owned Klass)
+  %guaranteed = begin_borrow %owned : $Klass
+  %stack = alloc_stack [lexical] $Klass
+  %stored = store_borrow %guaranteed to %stack : $*Klass
+  %load = load_borrow %stored : $*Klass
+  apply undef(%load) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %load : $Klass
+  br bb1
+
+bb1:
+  end_borrow %stored : $*Klass
+  br bb3
+
+bb3:
+  dealloc_stack %stack : $*Klass
+  end_borrow %guaranteed : $Klass
+  destroy_value %owned : $Klass
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Ensure we don't have an ownership verification error
+sil [ossa] @test_store_borrow_phi : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %1 = apply undef() : $@convention(thin) () -> @owned Klass
+  %2 = begin_borrow %1 : $Klass
+  %3 = alloc_stack $Klass
+  %4 = store_borrow %2 to %3 : $*Klass
+  %5 = load_borrow %4 : $*Klass
+  %6 = apply undef(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %5 : $Klass
+  end_borrow %4 : $*Klass
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  dealloc_stack %3 : $*Klass
+  end_borrow %2 : $Klass
+  destroy_value %1 : $Klass
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_load_borrow_with_reborrow :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_load_borrow_with_reborrow'
+sil [ossa] @test_load_borrow_with_reborrow : $@convention(thin) () -> () {
+bb0:
+  %owned = apply undef() : $@convention(thin) () -> (@owned Klass)
+  %stack = alloc_stack [lexical] $Klass
+  store %owned to [init] %stack : $*Klass
+  br bb1
+
+bb1:
+  %ld = load [take] %stack : $*Klass
+  destroy_value %ld
+  %owned_other = apply undef() : $@convention(thin) () -> (@owned Klass)
+  store %owned_other to [init] %stack : $*Klass
+  %lb = load_borrow %stack
+  br bb2(%lb)
+
+bb2(%reborrow : @reborrow $Klass):
+  end_borrow %reborrow : $Klass
+  destroy_addr %stack : $*Klass
+  dealloc_stack %stack : $*Klass
+  %retval = tuple ()
+  return %retval : $()
+}
+

@@ -32,27 +32,28 @@ enum class MacroSyntax: uint8_t {
   Attached,
 };
 
+enum class MacroRoleBits: uint8_t {
+#define MACRO_ROLE(Name, Description) Name,
+#include "swift/Basic/MacroRoles.def"
+};
+
 /// The context in which a macro can be used, which determines the syntax it
 /// uses.
 enum class MacroRole: uint32_t {
-  /// An expression macro, referenced explicitly via "#stringify" or similar
-  /// in the source code.
-  Expression = 0x01,
-  /// A freestanding declaration macro.
-  Declaration = 0x02,
-  /// An attached macro that declares accessors for a variable or subscript
-  /// declaration.
-  Accessor = 0x04,
-  /// An attached macro that generates attributes for the
-  /// members inside the declaration.
-  MemberAttribute = 0x08,
-  /// An attached macro that generates synthesized members
-  /// inside the declaration.
-  SynthesizedMembers = 0x10,
+#define MACRO_ROLE(Name, Description) \
+    Name = 1 << static_cast<uint8_t>(MacroRoleBits::Name),
+#include "swift/Basic/MacroRoles.def"
 };
+
+/// Returns an enumeratable list of all macro roles.
+std::vector<MacroRole> getAllMacroRoles();
 
 /// The contexts in which a particular macro declaration can be used.
 using MacroRoles = OptionSet<MacroRole>;
+
+void simple_display(llvm::raw_ostream &out, MacroRoles roles);
+bool operator==(MacroRoles lhs, MacroRoles rhs);
+llvm::hash_code hash_value(MacroRoles roles);
 
 /// Retrieve the string form of the given macro role, as written on the
 /// corresponding attribute.
@@ -62,9 +63,16 @@ StringRef getMacroRoleString(MacroRole role);
 /// written in the source code with the `#` syntax.
 bool isFreestandingMacro(MacroRoles contexts);
 
+MacroRoles getFreestandingMacroRoles();
+
 /// Whether a macro with the given set of macro contexts is attached, i.e.,
 /// written in the source code as an attribute with the `@` syntax.
 bool isAttachedMacro(MacroRoles contexts);
+
+MacroRoles getAttachedMacroRoles();
+
+/// Checks if the macro is supported or guarded behind an experimental flag.
+bool isMacroSupported(MacroRole role, ASTContext &ctx);
 
 enum class MacroIntroducedDeclNameKind {
   Named,
@@ -72,7 +80,13 @@ enum class MacroIntroducedDeclNameKind {
   Prefixed,
   Suffixed,
   Arbitrary,
+
+  // NOTE: When adding a new name kind, also add it to
+  // `getAllMacroIntroducedDeclNameKinds`.
 };
+
+/// Returns an enumeratable list of all macro introduced decl name kinds.
+std::vector<MacroIntroducedDeclNameKind> getAllMacroIntroducedDeclNameKinds();
 
 /// Whether a macro-introduced name of this kind requires an argument.
 bool macroIntroducedNameRequiresArgument(MacroIntroducedDeclNameKind kind);
@@ -82,25 +96,19 @@ StringRef getMacroIntroducedDeclNameString(
 
 class CustomAttr;
 
-/// Perform lookup to determine whether the given custom attribute refers to
-/// a macro declaration, and populate the \c macros vector with the lookup
-/// results that are attached macros.
-void findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc,
-                            llvm::TinyPtrVector<ValueDecl *> &macros);
-
 class MacroIntroducedDeclName {
 public:
   using Kind = MacroIntroducedDeclNameKind;
 
 private:
   Kind kind;
-  Identifier identifier;
+  DeclName name;
 
 public:
-  MacroIntroducedDeclName(Kind kind, Identifier identifier = Identifier())
-      : kind(kind), identifier(identifier) {};
+  MacroIntroducedDeclName(Kind kind, DeclName name = DeclName())
+      : kind(kind), name(name) {};
 
-  static MacroIntroducedDeclName getNamed(Identifier name) {
+  static MacroIntroducedDeclName getNamed(DeclName name) {
     return MacroIntroducedDeclName(Kind::Named, name);
   }
 
@@ -121,7 +129,7 @@ public:
   }
 
   Kind getKind() const { return kind; }
-  Identifier getIdentifier() const { return identifier; }
+  DeclName getName() const { return name; }
 };
 
 }

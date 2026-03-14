@@ -20,7 +20,7 @@ extension P where T : Q {
 }
 
 class C : P {}
-// expected-warning@-1 {{non-final class 'C' cannot safely conform to protocol 'P', which requires that 'Self.T' is exactly equal to 'Self'; this is an error in Swift 6}}
+// expected-warning@-1 {{non-final class 'C' cannot safely conform to protocol 'P', which requires that 'Self.T' is exactly equal to 'Self'; this is an error in the Swift 6 language mode}}
 
 extension P where T : C {
   // CHECK-LABEL: Generic signature: <Self where Self : C>

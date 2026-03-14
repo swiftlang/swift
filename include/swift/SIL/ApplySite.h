@@ -21,6 +21,7 @@
 #ifndef SWIFT_SIL_APPLYSITE_H
 #define SWIFT_SIL_APPLYSITE_H
 
+#include "swift/AST/ExtInfo.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -53,14 +54,14 @@ struct ApplySiteKind {
   ApplySiteKind(innerty value) : value(value) {}
   operator innerty() const { return value; }
 
-  static Optional<ApplySiteKind> fromNodeKind(SILInstructionKind kind) {
+  static std::optional<ApplySiteKind> fromNodeKind(SILInstructionKind kind) {
     if (auto innerTyOpt = ApplySiteKind::fromNodeKindHelper(kind))
       return ApplySiteKind(*innerTyOpt);
-    return None;
+    return std::nullopt;
   }
 
 private:
-  static Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
+  static std::optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
     switch (kind) {
     case SILInstructionKind::ApplyInst:
       return ApplySiteKind::ApplyInst;
@@ -71,7 +72,7 @@ private:
     case SILInstructionKind::BeginApplyInst:
       return ApplySiteKind::BeginApplyInst;
     default:
-      return None;
+      return std::nullopt;
     }
   }
 };
@@ -169,6 +170,12 @@ public:
     FOREACH_IMPL_RETURN(getCalleeFunction());
   }
 
+  /// Gets the referenced function by looking through partial apply,
+  /// convert_function, and thin to thick function until we find a function_ref.
+  SILDeclRef getCalleeDeclRef() const {
+    FOREACH_IMPL_RETURN(getCalleeDeclRef());
+  }
+
   bool isCalleeDynamicallyReplaceable() const {
     FOREACH_IMPL_RETURN(isCalleeDynamicallyReplaceable());
   }
@@ -241,6 +248,12 @@ public:
     FOREACH_IMPL_RETURN(isCalleeKnownProgramTerminationPoint());
   }
 
+  /// Returns true if the callee function is annotated with
+  /// @_semantics("unavailable_code_reached")
+  bool isCalleeUnavailableCodeReached() const {
+    FOREACH_IMPL_RETURN(isCalleeUnavailableCodeReached());
+  }
+
   /// Check if this is a call of a never-returning function.
   bool isCalleeNoReturn() const { FOREACH_IMPL_RETURN(isCalleeNoReturn()); }
 
@@ -253,6 +266,10 @@ public:
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::WitnessMethod:
     case SILFunctionTypeRepresentation::Closure:
+    case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+    case SILFunctionTypeRepresentation::KeyPathAccessorHash:
       return true;
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::Thick:
@@ -289,8 +306,19 @@ public:
   /// Return the apply operand for the given applied argument index.
   Operand &getArgumentRef(unsigned i) const { return getArgumentOperands()[i]; }
 
+  // The apply operand at the given index into the callee's function's
+  // arguments.
+  Operand &getArgumentRefAtCalleeArgIndex(unsigned i) const {
+    return getArgumentRef(i - getCalleeArgIndexOfFirstAppliedArg());
+  }
+
   /// Return the ith applied argument.
   SILValue getArgument(unsigned i) const { return getArguments()[i]; }
+
+  // The argument at the given index into the callee's function's arguments.
+  SILValue getArgumentAtCalleeArgIndex(unsigned i) const {
+    return getArgument(i - getCalleeArgIndexOfFirstAppliedArg());
+  }
 
   /// Set the ith applied argument.
   void setArgument(unsigned i, SILValue V) const {
@@ -316,11 +344,43 @@ public:
   }
 
   /// Return the applied argument index for the given operand.
+  ///
+  /// This corresponds to the index of the operand in the actual
+  /// SILFunctionType.
+  ///
+  /// As a result this does not include indirect parameters, but it does include
+  /// implicit parameters (e.x.: the implicit isolated(any) parameter) that are
+  /// in the SIL type but are not in the AST type. To ignore such implicit
+  /// parameters, use getASTAppliedArgIndex.
   unsigned getAppliedArgIndex(const Operand &oper) const {
     assert(oper.getUser() == Inst);
     assert(isArgumentOperand(oper));
 
     return oper.getOperandNumber() - getOperandIndexOfFirstArgument();
+  }
+
+  /// Returns the applied AST argument index for the given operand.
+  ///
+  /// This is guaranteed to return an index that can be used with AST function
+  /// types. This means it looks past the callee, indirect function types, as
+  /// well as any other implicit parameters like isolated(any).
+  ///
+  /// NOTE: If we add more implicit parameters to SILFunction types that do not
+  /// appear at the AST level, this code needs to be updated.
+  unsigned getASTAppliedArgIndex(const Operand &oper) const {
+    // We rely on the assertions in getAppliedArgIndex to allow for us to assume
+    // that we have an argument operand. We check later that we do not have an
+    // isolated(any) parameter.
+    unsigned appliedArgIndex = getAppliedArgIndex(oper);
+    if (auto *pai = dyn_cast<PartialApplyInst>(Inst)) {
+      if (pai->getFunctionType()->getIsolation() ==
+          SILFunctionTypeIsolation::forErased()) {
+        assert(appliedArgIndex != 0 &&
+               "isolation(any) does not correspond to an AST argument");
+        appliedArgIndex -= 1;
+      }
+    }
+    return appliedArgIndex;
   }
 
   /// Return the callee's function argument index corresponding to the first
@@ -369,9 +429,11 @@ public:
   ///
   /// For full applies, this is equivalent to `getArgumentConvention`. But for
   /// a partial_apply, the argument ownership convention at the partial_apply
-  /// instruction itself is different from the argument convention of the callee.
+  /// instruction itself is different from the argument convention of the
+  /// callee.
+  /// 
   /// For details see the partial_apply documentation in SIL.rst.
-  SILArgumentConvention getArgumentOperandConvention(const Operand &oper) const {
+  SILArgumentConvention getCaptureConvention(const Operand &oper) const {
     SILArgumentConvention conv = getArgumentConvention(oper);
     auto *pai = dyn_cast<PartialApplyInst>(Inst);
     if (!pai)
@@ -379,6 +441,7 @@ public:
     switch (conv) {
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Pack_Inout:
       return conv;
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:
@@ -387,9 +450,15 @@ public:
                               : SILArgumentConvention::Direct_Owned;
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_In_CXX:
       return pai->isOnStack() ? SILArgumentConvention::Indirect_In_Guaranteed
                               : SILArgumentConvention::Indirect_In;
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Owned:
+      return pai->isOnStack() ? SILArgumentConvention::Pack_Guaranteed
+                              : SILArgumentConvention::Pack_Owned;
     case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Pack_Out:
       llvm_unreachable("partial_apply cannot have an @out operand");
     }
     llvm_unreachable("covered switch");
@@ -440,6 +509,21 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  /// Return the sil_isolated operand if we have one.
+  Operand *getIsolatedArgumentOperandOrNullPtr() {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getIsolatedArgumentOperandOrNullPtr();
+    case ApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getIsolatedArgumentOperandOrNullPtr();
+    case ApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getIsolatedArgumentOperandOrNullPtr();
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("Unhandled case");
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Return a list of applied arguments without self.
   OperandValueArrayRef getArgumentsWithoutSelf() const {
     switch (ApplySiteKind(Inst->getKind())) {
@@ -455,9 +539,54 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  /// Return a list of applied operands of the apply without self.
+  ArrayRef<Operand> getOperandsWithoutSelf() const {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("Unhandled case");
+    }
+    llvm_unreachable("covered switch");
+  }
+
+  MutableArrayRef<Operand> getOperandsWithoutSelf() {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("Unhandled case");
+    }
+    llvm_unreachable("covered switch");
+  }
+
+  bool hasGuaranteedResult() const {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->hasGuaranteedResult();
+    case ApplySiteKind::BeginApplyInst:
+    case ApplySiteKind::TryApplyInst:
+    case ApplySiteKind::PartialApplyInst:
+      return false;
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;
+
+  /// Returns true if \p op is an operand that is passed as an indirect error
+  /// result.
+  bool isIndirectErrorResultOperand(const Operand &op) const;
 
   ApplyOptions getApplyOptions() const {
     switch (ApplySiteKind(getInstruction()->getKind())) {
@@ -512,6 +641,41 @@ public:
     return getApplyOptions().contains(ApplyFlags::DoesNotAwait);
   }
 
+  /// Return the SILParameterInfo for this operand in the callee function.
+  SILParameterInfo getArgumentParameterInfo(const Operand &oper) const {
+    assert(!getArgumentConvention(oper).isIndirectOutParameter() &&
+           "Can only be applied to non-out parameters");
+
+    // The ParameterInfo is going to be the parameter in the caller.
+    unsigned calleeArgIndex = getCalleeArgIndex(oper);
+    return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
+  }
+
+  /// Returns true if \p op is the callee operand of this apply site
+  /// and not an argument operand.
+  ///
+  /// If this instruction is not a full apply site, this always returns false.
+  bool isCalleeOperand(const Operand &op) const;
+
+  /// Returns true if this is an 'out' parameter.
+  bool isSending(const Operand &oper) const {
+    if (isIndirectErrorResultOperand(oper) || oper.isTypeDependent() ||
+        isCalleeOperand(oper))
+      return false;
+    if (isIndirectResultOperand(oper))
+      return getSubstCalleeType()->hasSendingResult();
+    return getArgumentParameterInfo(oper).hasOption(SILParameterInfo::Sending);
+  }
+
+  /// Returns true if this operand is an 'inout sending' parameter.
+  bool isInOutSending(const Operand &oper) const {
+    return isSending(oper) && getArgumentConvention(oper).isInoutConvention();
+  }
+
+  /// Return true if 'operand' is addressable after type substitution in the
+  /// caller's context.
+  bool isAddressable(const Operand &operand) const;
+
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }
 
   friend bool operator==(ApplySite lhs, ApplySite rhs) {
@@ -527,9 +691,9 @@ public:
 
   void dump() const LLVM_ATTRIBUTE_USED { getInstruction()->dump(); }
 
-  /// Attempt to cast this apply site to a full apply site, returning None on
-  /// failure.
-  Optional<FullApplySite> asFullApplySite() const;
+  /// Form a FullApplySite.  Note that it will be null if this apply site is not
+  /// in fact a FullApplySite.
+  FullApplySite asFullApplySite() const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -552,14 +716,15 @@ struct FullApplySiteKind {
   FullApplySiteKind(innerty value) : value(value) {}
   operator innerty() const { return value; }
 
-  static Optional<FullApplySiteKind> fromNodeKind(SILInstructionKind kind) {
+  static std::optional<FullApplySiteKind>
+  fromNodeKind(SILInstructionKind kind) {
     if (auto innerOpt = FullApplySiteKind::fromNodeKindHelper(kind))
       return FullApplySiteKind(*innerOpt);
-    return None;
+    return std::nullopt;
   }
 
 private:
-  static Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
+  static std::optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
     switch (kind) {
     case SILInstructionKind::ApplyInst:
       return FullApplySiteKind::ApplyInst;
@@ -568,7 +733,7 @@ private:
     case SILInstructionKind::BeginApplyInst:
       return FullApplySiteKind::BeginApplyInst;
     default:
-      return None;
+      return std::nullopt;
     }
   }
 };
@@ -644,16 +809,57 @@ public:
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
+  // For a direct error result, as a result of an @error convention, if any.
+  SILValue getDirectErrorResult() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+    case FullApplySiteKind::BeginApplyInst:
+      return SILValue();
+    case FullApplySiteKind::TryApplyInst: {
+      if (getNumIndirectSILErrorResults())
+        return SILValue(); // Not a direct @error convention.
+
+      auto *errBlock = cast<TryApplyInst>(getInstruction())->getErrorBB();
+      assert(errBlock->getNumArguments() == 1 &&
+             "Expected this try_apply to have a single direct error result");
+      return errBlock->getArgument(0);
+    }
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
   unsigned getNumIndirectSILResults() const {
     return getSubstCalleeConv().getNumIndirectSILResults();
+  }
+
+  unsigned getNumIndirectSILErrorResults() const {
+    return getSubstCalleeConv().getNumIndirectSILErrorResults();
   }
 
   OperandValueArrayRef getIndirectSILResults() const {
     return getArguments().slice(0, getNumIndirectSILResults());
   }
 
+  OperandValueArrayRef getIndirectSILErrorResults() const {
+    return getArguments().slice(getNumIndirectSILResults(),
+                                getNumIndirectSILErrorResults());
+  }
+
   OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
-    return getArguments().slice(getNumIndirectSILResults());
+    return getArguments().slice(getNumIndirectSILResults() +
+                                getNumIndirectSILErrorResults());
+  }
+
+  MutableArrayRef<Operand> getOperandsWithoutIndirectResults() const {
+    return getArgumentOperands().slice(getNumIndirectSILResults() +
+                                       getNumIndirectSILErrorResults());
+  }
+
+  MutableArrayRef<Operand> getOperandsWithoutIndirectResultsOrSelf() const {
+    auto ops = getOperandsWithoutIndirectResults();
+    if (!hasSelfArgument())
+      return ops;
+    return ops.drop_back();
   }
 
   InoutArgumentRange getInoutArguments() const {
@@ -664,6 +870,18 @@ public:
       return cast<TryApplyInst>(getInstruction())->getInoutArguments();
     case FullApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(getInstruction())->getInoutArguments();
+    }
+    llvm_unreachable("invalid apply kind");
+  }
+
+  AutoDiffSemanticResultArgumentRange getAutoDiffSemanticResultArguments() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(getInstruction())->getAutoDiffSemanticResultArguments();
+    case FullApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(getInstruction())->getAutoDiffSemanticResultArguments();
+    case FullApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(getInstruction())->getAutoDiffSemanticResultArguments();
     }
     llvm_unreachable("invalid apply kind");
   }
@@ -691,6 +909,54 @@ public:
   bool isIndirectResultOperand(const Operand &op) const {
     return isArgumentOperand(op)
       && (getCalleeArgIndex(op) < getNumIndirectSILResults());
+  }
+
+  /// Returns true if \p op is an operand that passes an indirect
+  /// result argument to the apply site.
+  bool isIndirectErrorResultOperand(const Operand &op) const {
+    return isArgumentOperand(op)
+      && (getCalleeArgIndex(op) >= getNumIndirectSILResults())
+      && (getCalleeArgIndex(op) < getNumIndirectSILResults() + getNumIndirectSILErrorResults());
+  }
+
+  std::optional<ApplyIsolationCrossing> getIsolationCrossing() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(**this)->getIsolationCrossing();
+    case FullApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(**this)->getIsolationCrossing();
+    case FullApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(**this)->getIsolationCrossing();
+    }
+  }
+
+  /// Return the applied argument index for the given operand ignoring indirect
+  /// results.
+  ///
+  /// So for instance:
+  ///
+  /// apply %f(%result, %0, %1, %2, ...).
+  unsigned getAppliedArgIndexWithoutIndirectResults(const Operand &oper) const {
+    assert(oper.getUser() == **this);
+    assert(isArgumentOperand(oper));
+
+    return getAppliedArgIndex(oper) - getNumIndirectSILResults() -
+           getNumIndirectSILErrorResults();
+  }
+
+  std::optional<ActorIsolation> getActorIsolation() const {
+    if (auto isolation = getIsolationCrossing();
+        isolation && isolation->getCalleeIsolation())
+      return isolation->getCalleeIsolation();
+    auto *calleeFunction = getCalleeFunction();
+    if (!calleeFunction)
+      return {};
+    return calleeFunction->getActorIsolation();
+  }
+
+  bool isCallerIsolationInheriting() const {
+    auto isolation = getActorIsolation();
+    return isolation && isolation->isCallerIsolationInheriting();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
@@ -791,7 +1057,7 @@ template <> struct DenseMapInfo<::swift::FullApplySite> {
 
 namespace swift {
 
-inline Optional<FullApplySite> ApplySite::asFullApplySite() const {
+inline FullApplySite ApplySite::asFullApplySite() const {
   return FullApplySite::isa(getInstruction());
 }
 
@@ -799,7 +1065,21 @@ inline bool ApplySite::isIndirectResultOperand(const Operand &op) const {
   auto fas = asFullApplySite();
   if (!fas)
     return false;
-  return fas->isIndirectResultOperand(op);
+  return fas.isIndirectResultOperand(op);
+}
+
+inline bool ApplySite::isIndirectErrorResultOperand(const Operand &op) const {
+  auto fas = asFullApplySite();
+  if (!fas)
+    return false;
+  return fas.isIndirectErrorResultOperand(op);
+}
+
+inline bool ApplySite::isCalleeOperand(const Operand &op) const {
+  auto fas = asFullApplySite();
+  if (!fas)
+    return false;
+  return fas.isCalleeOperand(op);
 }
 
 } // namespace swift

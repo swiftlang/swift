@@ -472,7 +472,7 @@ their naming:
 Prefix and suffix operations should be migrated to be subscripting operations
 with one-sided ranges i.e. `s.prefix(upTo: i)` should become `s[..<i]`, as
 in
-[this proposal](https://github.com/apple/swift-evolution/blob/9cf2685293108ea3efcbebb7ee6a8618b83d4a90/proposals/0132-sequence-end-ops.md).
+[this proposal](https://github.com/swiftlang/swift-evolution/blob/9cf2685293108ea3efcbebb7ee6a8618b83d4a90/proposals/0132-sequence-end-ops.md).
 With generic subscripting in the language, that will allow us to collapse a wide
 variety of methods and subscript overloads into a single implementation, and
 give users an easy-to-use and composable way to describe subranges.
@@ -845,7 +845,7 @@ logical operations in different ways, with the following axes:
 
 We should represent these aspects as orthogonal, composable components,
 abstracting pattern matchers into a protocol like
-[this one](https://github.com/apple/swift/blob/main/test/Prototypes/PatternMatching.swift#L33),
+[this one](https://github.com/swiftlang/swift/blob/main/test/Prototypes/PatternMatching.swift#L33),
 that can allow us to define logical operations once, without introducing
 overloads, and massively reducing API surface area.
 
@@ -1022,9 +1022,9 @@ domain-specific language (just write ordinary swift code!) and its type safety
 problems (put the data right where it belongs!) but the following issues prevent
 it from being useful for localized formatting (among other jobs):
 
-  * [#44910](https://github.com/apple/swift/issues/44910): We are unable to
+  * [#44910](https://github.com/swiftlang/swift/issues/44910): We are unable to
     restrict types used in string interpolation.
-  * [#43868](https://github.com/apple/swift/issues/43868): String interpolation
+  * [#43868](https://github.com/swiftlang/swift/issues/43868): String interpolation
     can't distinguish (fragments of) the base string
     from the string substitutions.
 

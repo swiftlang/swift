@@ -20,19 +20,20 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <optional>
 
 namespace swift {
 namespace ide {
 
-class CodeCompletionResultBuilder;
+class CodeCompletionStringBuilder;
 
 namespace detail {
 class CodeCompletionStringChunk {
-  friend class swift::ide::CodeCompletionResultBuilder;
+  friend class swift::ide::CodeCompletionStringBuilder;
 
 public:
   enum class ChunkKind {
-    /// "open", "public", "internal", "fileprivate", or "private".
+    /// "open", "public", "package", "internal", "fileprivate", or "private".
     AccessControlKeyword,
 
     /// such as @"available".
@@ -328,7 +329,6 @@ public:
 class alignas(detail::CodeCompletionStringChunk) CodeCompletionString final
     : private llvm::TrailingObjects<CodeCompletionString,
                                     detail::CodeCompletionStringChunk> {
-  friend class CodeCompletionResultBuilder;
   friend TrailingObjects;
 
 public:
@@ -347,12 +347,10 @@ public:
   static CodeCompletionString *create(llvm::BumpPtrAllocator &Allocator,
                                       ArrayRef<Chunk> Chunks);
 
-  ArrayRef<Chunk> getChunks() const {
-    return {getTrailingObjects<Chunk>(), NumChunks};
-  }
+  ArrayRef<Chunk> getChunks() const { return getTrailingObjects(NumChunks); }
 
   StringRef getFirstTextChunk(bool includeLeadingPunctuation = false) const;
-  Optional<unsigned>
+  std::optional<unsigned>
   getFirstTextChunkIndex(bool includeLeadingPunctuation = false) const;
 
   /// Print a debug representation of the code completion string to \p OS.

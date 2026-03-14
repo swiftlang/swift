@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) 2>&1 | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library) 2>&1 | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  2>&1 | %FileCheck %s --dump-input=always
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: swift_task_debug_log
@@ -10,6 +12,8 @@
 import Glibc
 #elseif os(Windows)
 import MSVCRT
+#elseif canImport(Android)
+import Android
 #else
 import Darwin
 #endif

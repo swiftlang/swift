@@ -50,24 +50,21 @@ using RequirementCallback =
 void enumerateGenericSignatureRequirements(CanGenericSignature signature,
                                            const RequirementCallback &callback);
 
-/// Given an array of substitutions that parallel the dependent
-/// signature for which a requirement was emitted, emit the required
-/// value.
+/// Given a substitution map and a generic requirement for the
+/// substitution map's input generic signature, emit the required value.
 llvm::Value *
 emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                         GenericRequirement requirement,
+                                        MetadataState metadataState,
                                         SubstitutionMap subs,
-                                        DynamicMetadataRequest request);
+                                        bool onHeapPacks=false);
 
-using EmitGenericRequirementFn =
-  llvm::function_ref<llvm::Value*(GenericRequirement reqt)>;
 void emitInitOfGenericRequirementsBuffer(IRGenFunction &IGF,
                                          ArrayRef<GenericRequirement> reqts,
                                          Address buffer,
-                                      EmitGenericRequirementFn emitRequirement);
-
-using GetTypeParameterInContextFn =
-  llvm::function_ref<CanType(CanType type)>;
+                                         MetadataState metadataState,
+                                         SubstitutionMap subs,
+                                         bool onHeapPacks=false);
 
 /// Given a required value, map the requirement into the given
 /// context and bind the value.
@@ -75,13 +72,20 @@ void bindGenericRequirement(IRGenFunction &IGF,
                             GenericRequirement requirement,
                             llvm::Value *requiredValue,
                             MetadataState metadataState,
-                            GetTypeParameterInContextFn getInContext);
+                            SubstitutionMap subs);
 
 void bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
                                        ArrayRef<GenericRequirement> reqts,
                                        Address buffer,
                                        MetadataState metadataState,
-                                       GetTypeParameterInContextFn getInContext);
+                                       SubstitutionMap subs);
+
+void bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
+                                                  GenericEnvironment *genericEnv,
+                                                  ArrayRef<GenericRequirement> requirements,
+                                                  llvm::Value *args,
+                                                  llvm::Value *size,
+                                                  bool hasSubscriptIndices);
 
 
 /// A class describing the layout of the generic requirements of a
@@ -107,7 +111,7 @@ public:
                         Address buffer);
 
   void bindFromBuffer(IRGenFunction &IGF, Address buffer, MetadataState state,
-                      GetTypeParameterInContextFn getInContext);
+                      SubstitutionMap subs);
 };
 
 } // end namespace irgen

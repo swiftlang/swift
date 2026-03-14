@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-lexical-borrow-scopes=false -enable-copy-propagation %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -enable-copy-propagation %s -o /dev/null -verify
 
 class Delegate {
   func foo() { }
@@ -21,7 +21,7 @@ final class Container {
 
 func warningForDeadDelegate(container: Container) {
   let delegate = Delegate()
-  container.delegate = delegate  // expected-warning {{weak reference will always be nil because the referenced object is deallocated here}}
+  container.delegate = delegate
   container.callDelegate()
 }
 
@@ -41,7 +41,7 @@ func noWarningWithFixLifetime(container: Container) {
 
 func warningWithControlFlow(container: Container, _ b: Bool) {
   let delegate = Delegate()
-  container.delegate = delegate  // expected-warning {{weak reference will always be nil because the referenced object is deallocated here}}
+  container.delegate = delegate
   if b {
     container.callDelegate()
   }
@@ -55,7 +55,7 @@ func storeClosure(_ c: @escaping () -> ()) {
 
 func warningForDeadClosureCapture() {
   let k = Delegate()
-  storeClosure({ [weak k] in  // expected-warning {{weak reference will always be nil because the referenced object is deallocated here}}
+  storeClosure({ [weak k] in
                  k!.foo()
                })
 }
@@ -70,7 +70,7 @@ func noWarningWithFixLifetime2() {
 
 func warningWithStoreWeakInCalledFunction() {
   let d = Delegate()
-  let c = Container(weakDelegate: d, strongDelegate: Delegate())  // expected-warning {{weak reference will always be nil because the referenced object is deallocated here}}
+  let c = Container(weakDelegate: d, strongDelegate: Delegate())
   c.callDelegate()
 }
 
@@ -93,7 +93,7 @@ final class Testcl {
   func test_noset(_ c: StrongContainer) {
     let k = Delegate()
     c.noset(k)
-    wk = k // expected-warning {{weak reference will always be nil because the referenced object is deallocated here}}
+    wk = k 
   }
 }
 

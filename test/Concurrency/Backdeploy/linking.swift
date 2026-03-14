@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -target %target-cpu-apple-macosx12 %s -o %t/linking_direct
 // RUN: %target-build-swift -target %target-cpu-apple-macosx11 %s -o %t/linking_rpath
-// RUN: %target-build-swift -target %target-cpu-apple-macosx10.10 %s -o %t/linking_rpath_old
+// RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 %s -o %t/linking_rpath_old
 
 // RUN: otool -L %t/linking_direct | %FileCheck -check-prefix CHECK-DIRECT %s
 // RUN: otool -L %t/linking_rpath | %FileCheck -check-prefix CHECK-RPATH %s

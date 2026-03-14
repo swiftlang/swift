@@ -112,6 +112,10 @@ class LayoutConstraintInfo
     return isNativeRefCounted(Kind);
   }
 
+  bool isBridgeObject() const { return isBridgeObject(Kind); }
+
+  bool isTrivialStride() const { return isTrivialStride(Kind); }
+
   unsigned getTrivialSizeInBytes() const {
     assert(isKnownSizeTrivial());
     return (SizeInBits + 7) / 8;
@@ -153,6 +157,16 @@ class LayoutConstraintInfo
     return 8*8;
   }
 
+  unsigned getTrivialStride() const {
+    assert(isTrivialStride());
+    return (SizeInBits + 7) / 8;
+  }
+
+  unsigned getTrivialStrideInBits() const {
+    assert(isTrivialStride());
+    return SizeInBits;
+  }
+
   operator bool() const {
     return isKnownLayout();
   }
@@ -171,10 +185,10 @@ class LayoutConstraintInfo
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
 
   /// Return the name of this layout constraint.
-  StringRef getName(bool useClassLayoutName = false) const;
+  StringRef getName(bool internalName = false) const;
 
   /// Return the name of a layout constraint with a given kind.
-  static StringRef getName(LayoutConstraintKind Kind, bool useClassLayoutName = false);
+  static StringRef getName(LayoutConstraintKind Kind, bool internalName = false);
 
   static bool isKnownLayout(LayoutConstraintKind Kind);
 
@@ -200,6 +214,10 @@ class LayoutConstraintInfo
 
   static bool isNativeRefCounted(LayoutConstraintKind Kind);
 
+  static bool isBridgeObject(LayoutConstraintKind Kind);
+
+  static bool isTrivialStride(LayoutConstraintKind Kind);
+
   /// Uniquing for the LayoutConstraintInfo.
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Kind, SizeInBits, Alignment);
@@ -217,6 +235,7 @@ class LayoutConstraintInfo
   static LayoutConstraintInfo ClassConstraintInfo;
   static LayoutConstraintInfo NativeClassConstraintInfo;
   static LayoutConstraintInfo TrivialConstraintInfo;
+  static LayoutConstraintInfo BridgeObjectConstraintInfo;
 };
 
 /// A wrapper class containing a reference to the actual LayoutConstraintInfo

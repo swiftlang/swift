@@ -21,6 +21,33 @@ func optional_nil_coalescing(_ maybeX: Float?) -> Float {
 }
 */
 
+OptionalTests.test("Active") {
+  @differentiable(reverse)
+  func id(y: Float) -> Float? {
+    return y
+  }
+
+  @differentiable(reverse)
+  func id2(y: Float?) -> Float {
+    return y!
+  }
+
+  @differentiable(reverse)
+  func square(y: Float) -> Float? {
+    return y * y
+  }
+
+  @differentiable(reverse)
+  func square2(y: Float?) -> Float {
+    return y! * y!
+  }
+
+  expectEqual(gradient(at: 10, of: {y in id(y:y)!}), .init(1.0))
+  expectEqual(gradient(at: 10, of: {y in id2(y:y)}), .init(1.0))
+  expectEqual(gradient(at: 10, of: {y in square(y:y)!}), .init(20.0))
+  expectEqual(gradient(at: 10, of: {y in square2(y:y)}), .init(20.0))
+}
+
 OptionalTests.test("Let") {
   @differentiable(reverse)
   func optional_let(_ maybeX: Float?) -> Float {

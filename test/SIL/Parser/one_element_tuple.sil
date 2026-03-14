@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s | %target-sil-opt -sil-print-types | %FileCheck %s
 
 sil_stage canonical
 

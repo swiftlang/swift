@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
 sil_stage raw
 
@@ -93,10 +93,15 @@ enum X {
   case C(Int32)
 }
 
-// CHECK-LABEL: simplify_switch_include_args
+// CHECK-LABEL: sil [ossa] @simplify_switch_include_args :
+// CHECK:         tuple
+// CHECK-NEXT:    enum $X
+// CHECK-NEXT:    unchecked_enum_data
+// CHECK-NEXT:    tuple_extract
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'simplify_switch_include_args'
 sil [ossa] @simplify_switch_include_args : $@convention(thin) (Int32, Int32) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32):
-// CHECK: return %0 : $Int32
   %2 = tuple (%0 : $Int32, %1 : $Int32)
   %3 = enum $X, #X.B!enumelt, %2 : $(Int32, Int32)
   switch_enum %3 : $X, case #X.A!enumelt: bb1, case #X.B!enumelt: bb3, case #X.C!enumelt: bb5
@@ -723,14 +728,14 @@ enum ThreeWay {
 
 // CHECK-LABEL: sil hidden [noinline] [ossa] @testUnwrapEnumArg : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   br bb1(undef : $Builtin.Int64, %{{.*}} : $Payload)
-// CHECK: bb1(%{{.*}} : $Builtin.Int64, %{{.*}} : $Payload):
+// CHECK:   br bb1(%{{.*}} : $Payload)
+// CHECK: bb1(%{{.*}} : $Payload):
 // CHECK:   alloc_stack $Payload
 // CHECK:   switch_enum undef : $ThreeWay, case #ThreeWay.one!enumelt: bb4, case #ThreeWay.two!enumelt: bb2, case #ThreeWay.three!enumelt: bb3
 // CHECK: bb2:
 // CHECK:   [[P2:%.*]] = load [trivial] %{{.*}} : $*Payload
 // CHECK:   dealloc_stack %{{.*}} : $*Payload
-// CHECK:   br bb1(undef : $Builtin.Int64, [[P2]] : $Payload)
+// CHECK:   br bb1([[P2]] : $Payload)
 // CHECK: bb3:
 // CHECK:   [[P3:%.*]] = load [trivial] %{{.*}} : $*Payload
 // CHECK:   dealloc_stack %{{.*}} : $*Payload
@@ -740,7 +745,7 @@ enum ThreeWay {
 // CHECK:   dealloc_stack %{{.*}} : $*Payload
 // CHECK:   cond_br undef, bb6, bb5
 // CHECK: bb5:
-// CHECK:   br bb1(undef : $Builtin.Int64, [[P4]] : $Payload)
+// CHECK:   br bb1([[P4]] : $Payload)
 // CHECK: bb6:
 // CHECK:   br bb7
 // CHECK: bb7:
@@ -789,4 +794,23 @@ bb7:
 bb8:
   %25 = tuple ()
   return %25 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_with_incoming_value : $@convention(thin) () -> () {
+// CHECK: bb1:
+// CHECK-LABEL: } // end sil function 'replace_with_incoming_value'
+sil [ossa] @replace_with_incoming_value : $@convention(thin) () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int32, 37
+  br bb1(%1 : $Builtin.Int32)
+
+bb1(%3 : $Builtin.Int32):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%3 : $Builtin.Int32)
+
+bb3:
+  %r = tuple()
+  return %r : $()
 }

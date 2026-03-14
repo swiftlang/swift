@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -32,17 +32,17 @@
 #include <system_error>
 
 static constexpr const char *const diagnosticID[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) #ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) #ID,
 #include "swift/AST/DiagnosticsAll.def"
 };
 
 static constexpr const char *const diagnosticMessages[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) Text,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) Text,
 #include "swift/AST/DiagnosticsAll.def"
 };
 
 enum LocalDiagID : uint32_t {
-#define DIAG(KIND, ID, Options, Text, Signature) ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
 };

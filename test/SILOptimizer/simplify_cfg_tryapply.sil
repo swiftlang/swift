@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -62,6 +64,7 @@ bb1(%5 : $Int):
 
 bb2(%8 : @owned $Error):
   dealloc_stack %as: $*Builtin.Int32
+  destroy_value [dead_end] %8
   unreachable
 }
 
@@ -91,6 +94,7 @@ bb1(%8 : @owned $Optional<BB>):
   return %8 : $Optional<BB>
 
 bb2(%10 : @owned $Error):
+  destroy_value [dead_end] %10
   unreachable
 }
 
@@ -116,6 +120,7 @@ bb2(%10 : @owned $Error):
   // Prevent that the conversion is done because the error block is empty and unreachable.
   %12 = function_ref @unknown : $@convention(thin) () -> ()
   apply %12() : $@convention(thin) () -> ()
+  destroy_value [dead_end] %10
   unreachable
 }
 
@@ -141,6 +146,7 @@ bb2(%10 : @owned $Error):
   // Prevent that the conversion is done because the error block is empty and unreachable.
   %12 = function_ref @unknown : $@convention(thin) () -> ()
   apply %12() : $@convention(thin) () -> ()
+  destroy_value [dead_end] %10
   unreachable
 }
 
@@ -258,6 +264,7 @@ bb1(%12 : $()):
   return %13 : $UP<()>
 
 bb2(%16 : @owned $Error):
+  destroy_value [dead_end] %16
   unreachable
 }
 
@@ -333,6 +340,7 @@ bb2(%e : $Error):
 	br bb3(%r1 : $Builtin.Int32)
 
 bb3(%res : $Builtin.Int32):
+  destroy_value %ne : $@noescape @callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error)
   destroy_value %conv : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error)
   return  %res : $Builtin.Int32
 }
@@ -354,8 +362,9 @@ bb3(%res : $Builtin.Int32):
 // CHECK:   [[NONE:%.*]] = enum $Optional<B>, #Optional.none!enumelt
 // CHECK:   br bb3([[NONE]] : $Optional<B>)
 // CHECK: bb3([[REWRAP:%.*]] : @guaranteed $Optional<B>):
+// CHECK:   [[BF:%.*]] = borrowed [[REWRAP]] : $Optional<B> from (%1 : $E, %0 : $Optional<B>)
 // CHECK:   [[ECAST:%.*]] = upcast [[EXTR1]] : $E to $B
-// CHECK:   [[OUTTUP:%.*]] = tuple ([[REWRAP]] : $Optional<B>, [[ECAST]] : $B)
+// CHECK:   [[OUTTUP:%.*]] = tuple ([[BF]] : $Optional<B>, [[ECAST]] : $B)
 // CHECK:   apply %{{.*}}([[OUTTUP]]) : $@convention(thin) (@guaranteed (Optional<B>, B)) -> Int
 // CHECK:   return
 // CHECK-LABEL: } // end sil function 'replaceTryApplyGuaranteedTuple'
@@ -371,6 +380,7 @@ bb1(%5 : $Int):
   return %5 : $Int
 
 bb2(%8 : @owned $Error):
+  destroy_value [dead_end] %8
   unreachable
 }
 
@@ -408,6 +418,27 @@ bb1(%5 : $Int):
   return %5 : $Int
 
 bb2(%8 : @owned $Error):
+  destroy_value [dead_end] %8
+  unreachable
+}
+
+sil [ossa] @optional_non_throwing : $@convention(thin) (@guaranteed Optional<AnyObject>) -> Bool 
+
+// CHECK-LABEL: sil [ossa] @replaceTryApplyOwnedTuple2 : $@convention(thin) (@owned B) -> Bool {
+sil [ossa] @replaceTryApplyOwnedTuple2 : $@convention(thin) (@owned B) -> Bool {
+bb0(%0 : @owned $B):
+  %1 = move_value [lexical] %0
+  %f = function_ref @optional_non_throwing : $@convention(thin) (@guaranteed Optional<AnyObject>) -> Bool
+  %conv = convert_function %f to $@convention(thin) (@guaranteed B) -> (Bool, @error any Error)
+  try_apply %conv(%1) : $@convention(thin) (@guaranteed B) -> (Bool, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Bool):
+  destroy_value %1
+  return %5 : $Bool
+
+bb2(%8 : @owned $Error):
+  destroy_value [dead_end] %8
+  destroy_value [dead_end] %1
   unreachable
 }
 

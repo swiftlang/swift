@@ -8,8 +8,23 @@ module ClassTemplateWithPrimitiveArgument {
   requires cplusplus
 }
 
+module ClassTemplateWithEnumParameter {
+  header "class-template-with-enum-parameter.h"
+  requires cplusplus
+}
+
+module ClassTemplateWithFunctionParameter {
+  header "class-template-with-function-parameter.h"
+  requires cplusplus
+}
+
 module ClassTemplateWithOutOfLineMember {
   header "class-template-with-static-out-of-line-member.h"
+  requires cplusplus
+}
+
+module ClassTemplateWithSIMDParameter {
+  header "class-template-with-simd-parameter.h"
   requires cplusplus
 }
 
@@ -133,6 +148,11 @@ module TemplateTypeParameterNotInSignature {
   requires cplusplus
 }
 
+module EnableIf {
+  header "enable-if.h"
+  requires cplusplus
+}
+
 module DefineReferencedInline {
   header "define-referenced-inline.h"
   requires cplusplus
@@ -145,5 +165,30 @@ module DependentTypes {
 
 module UnevaluatedContext {
   header "unevaluated-context.h"
+  requires cplusplus
+}
+
+module ManySpecializations {
+  header "many-specializations.h"
+  requires cplusplus
+}
+
+module UninstantiatableSpecialMembers {
+  header "uninstantiatable-special-members.h"
+  requires cplusplus
+}
+
+module VariableTemplate {
+  header "variable-template.h"
+  requires cplusplus
+}
+
+module ForwardDeclaredSpecialization {
+  header "ForwardDeclaredSpecialization.h"
+  requires cplusplus
+}
+
+module ClassTemplateWithFrt {
+  header "class-template-with-frt.h"
   requires cplusplus
 }

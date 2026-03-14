@@ -16,13 +16,14 @@ target_sources(swiftSILOptimizer PRIVATE
   EpilogueARCAnalysis.cpp
   FunctionOrder.cpp
   IVAnalysis.cpp
+  IsSelfRecursiveAnalysis.cpp
   LoopAnalysis.cpp
   LoopRegionAnalysis.cpp
-  MemoryBehavior.cpp
   NonLocalAccessBlockAnalysis.cpp
   PassManagerVerifierAnalysis.cpp
   ProtocolConformanceAnalysis.cpp
+  Reachability.cpp
+  RegionAnalysis.cpp
   RCIdentityAnalysis.cpp
   SimplifyInstruction.cpp
-  TypeExpansionAnalysis.cpp
   ValueTracking.cpp)

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -dead-store-elim -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -dead-store-elimination -enable-sil-verify-all | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -132,9 +132,9 @@ bb0:
   %16 = function_ref @takeRawPtr : $@convention(thin) (UnsafeMutableRawPointer) -> Bool
   %17 = apply %16(%15) : $@convention(thin) (UnsafeMutableRawPointer) -> Bool
   fix_lifetime %0 : $TestArrayContainer
-  set_deallocating %0 : $TestArrayContainer
+  %19 = begin_dealloc_ref %0 : $TestArrayContainer of %0 : $TestArrayContainer
   strong_release %9 : $__ContiguousArrayStorageBase
-  dealloc_ref %0 : $TestArrayContainer
+  dealloc_ref %19 : $TestArrayContainer
   dealloc_stack_ref %0 : $TestArrayContainer
   return %17 : $Bool
 }

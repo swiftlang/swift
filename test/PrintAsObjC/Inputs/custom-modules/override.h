@@ -16,3 +16,11 @@
 - (BOOL)doAnotherThingWithError:(NSError **)error;
 
 @end
+
+@protocol Proto <NSObject>
+
+- (NSUInteger)proto;
+- (NSUInteger)proto:(NSUInteger)ignored;
+- (NSUInteger)proto:(NSUInteger)x y:(NSUInteger)y;
+
+@end

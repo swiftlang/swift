@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %empty-directory(%t/cache)
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -module-cache-path %t/cache
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -134,7 +135,7 @@ func useRenamedValues() {
   let _ = SCNSceneSource.LoadingOption.createNormalsIfAbsent
   let _ = SCNSceneSource.LoadingOption.checkConsistency
   let _ = SCNSceneSource.LoadingOption.flattenScene
-  let _ = SCNSceneSource.LoadingOption.useSafeMode
+  let _ = SCNSceneSource.LoadingOption.useSafeMode // expected-warning {{'useSafeMode' was deprecated in macOS 10.13: No longer supported}}
   let _ = SCNSceneSource.LoadingOption.assetDirectoryURLs
   let _ = SCNSceneSource.LoadingOption.overrideAssetURLs
   let _ = SCNSceneSource.LoadingOption.strictConformance
@@ -183,8 +184,8 @@ func useRenamedAPIs(actionable: SCNActionable, action: SCNAction, data: Data,
   let _ = SCNAction.playAudio(audioSource, waitForCompletion: false)
 
   animatable.addAnimation(animation, forKey: "key")
-  let _ = animatable.isAnimationPaused(forKey: "key")
-  let _ = animatable.setAnimationSpeed(1.0, forKey: "key")
+  let _ = animatable.isAnimationPaused(forKey: "key") // expected-warning {{'isAnimationPaused(forKey:)' was deprecated in macOS 10.13: Use -[SCNAnimationPlayer paused] instead}}
+  let _ = animatable.setAnimationSpeed(1.0, forKey: "key") // expected-warning {{'setAnimationSpeed(_:forKey:)' was deprecated in macOS 10.13: Use -[SCNAnimationPlayer setSpeed:] instead}}
 
   let _ = lookAtConstraint.isGimbalLockEnabled
   let _ = SCNIKConstraint.inverseKinematicsConstraint(chainRootNode: node)

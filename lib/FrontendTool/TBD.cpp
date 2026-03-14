@@ -15,9 +15,11 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TBDGenRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -29,6 +31,7 @@
 #include "llvm/IR/Mangler.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include <vector>
 
 using namespace swift;
@@ -42,40 +45,13 @@ static std::vector<StringRef> sortSymbols(llvm::StringSet<> &symbols) {
 }
 
 bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename,
+                     llvm::vfs::OutputBackend &Backend,
                      const TBDGenOptions &Opts) {
-  std::error_code EC;
-  llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::OF_None);
-  if (EC) {
-    M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                      OutputFilename, EC.message());
-    return true;
-  }
-
-  writeTBDFile(M, OS, Opts);
-
-  return false;
-}
-
-/// Determine if a symbol name is ignored when validating the TBD's contents
-/// against the IR's.
-///
-/// \param name The name of the symbol in question.
-/// \param IRModule The module being validated.
-///
-/// \returns Whether or not the presence or absence of the symbol named \a name
-///   should be ignored (instead of potentially producing a diagnostic.)
-static bool isSymbolIgnored(const StringRef& name,
-                            const llvm::Module &IRModule) {
-  if (llvm::Triple(IRModule.getTargetTriple()).isOSWindows()) {
-    // https://github.com/apple/swift/issues/58199
-    // Error when referencing #dsohandle in a Swift test on Windows.
-    // On Windows, ignore the lack of __ImageBase in the TBD file.
-    if (name == "__ImageBase") {
-      return true;
-    }
-  }
-
-  return false;
+  return withOutputPath(M->getDiags(), Backend, OutputFilename,
+                        [&](raw_ostream &OS) -> bool {
+                          writeTBDFile(M, OS, Opts);
+                          return false;
+                        });
 }
 
 static bool validateSymbols(DiagnosticEngine &diags,
@@ -98,11 +74,6 @@ static bool validateSymbols(DiagnosticEngine &diags,
     // symbol table, so make sure to mangle IRGen names before comparing them
     // with what TBDGen created.
     auto unmangledName = nameValue.getKey();
-
-    if (isSymbolIgnored(unmangledName, IRModule)) {
-      // This symbol should not affect validation. Skip it.
-      continue;
-    }
 
     SmallString<128> name;
     llvm::Mangler::getNameWithPrefix(name, unmangledName,

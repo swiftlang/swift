@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %s -module-name Functions -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
-// CHECK-LABEL: namespace Functions __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Functions") {
+// CHECK-LABEL: namespace Functions SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Functions") {
 
 // CHECK-LABEL: namespace _impl {
 
@@ -16,22 +16,22 @@
 
 // CHECK: }
 
-// CHECK: inline void alwaysDeprecated() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_DEPRECATED {
+// CHECK: SWIFT_INLINE_THUNK void alwaysDeprecated() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_DEPRECATED {
 @available(*, deprecated)
 public func alwaysDeprecated() {}
 
-// CHECK: inline void alwaysDeprecatedTwo() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_DEPRECATED_MSG("it should not be used")
+// CHECK: SWIFT_INLINE_THUNK void alwaysDeprecatedTwo() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_DEPRECATED_MSG("it should not be used")
 @available(*, deprecated, message: "it should not be used")
 public func alwaysDeprecatedTwo() {}
 
-// CHECK: inline void alwaysUnavailable() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_UNAVAILABLE
+// CHECK: SWIFT_INLINE_THUNK void alwaysUnavailable() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_UNAVAILABLE
 @available(*, unavailable)
 public func alwaysUnavailable() {}
 
-// CHECK: inline void alwaysUnavailableMessage() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_UNAVAILABLE_MSG("stuff happened")
+// CHECK: SWIFT_INLINE_THUNK void alwaysUnavailableMessage() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_UNAVAILABLE_MSG("stuff happened")
 @available(*, unavailable, message: "stuff happened")
 public func alwaysUnavailableMessage() {}
 
-// CHECK: inline void singlePlatAvailability() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_AVAILABILITY(macos,introduced=11)
+// CHECK: SWIFT_INLINE_THUNK void singlePlatAvailability() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_AVAILABILITY(macos,introduced=11)
 @available(macOS 11, *)
 public func singlePlatAvailability() {}

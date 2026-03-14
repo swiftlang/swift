@@ -13,9 +13,9 @@
 
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -I %S/Inputs/custom-modules -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes.swiftmodule -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
-// RUN: %FileCheck %s < %t/classes.h
-// RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes.swiftmodule -typecheck -verify -emit-objc-header-path %t/classes.h -I %S/Inputs/custom-modules -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %FileCheck %s --input-file %t/classes.h
+// RUN: %FileCheck --check-prefix=NEGATIVE %s --input-file %t/classes.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/classes.h
 // RUN: not %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h -include CoreFoundation.h -include objc_generics.h -include SingleGenericClass.h -include CompatibilityAlias.h
@@ -204,7 +204,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testSelector:(SEL _Nonnull)sel boolean:(BOOL)b;
 // CHECK-NEXT: - (void)testCSignedTypes:(signed char)a b:(short)b c:(int)c d:(long)d e:(long long)e;
 // CHECK-NEXT: - (void)testCUnsignedTypes:(unsigned char)a b:(unsigned short)b c:(unsigned int)c d:(unsigned long)d e:(unsigned long long)e;
-// CHECK-NEXT: - (void)testCChars:(char)basic wchar:(wchar_t)wide char16:(char16_t)char16 char32:(char32_t)char32;
+// CHECK-NEXT: - (void)testCChars:(char)basic wchar:(wchar_t)wide char8:(char8_t)char8 char16:(char16_t)char16 char32:(char32_t)char32;
 // CHECK-NEXT: - (void)testCFloats:(float)a b:(double)b;
 // CHECK-NEXT: - (void)testCBool:(bool)a;
 // CHECK-NEXT: - (void)testSizedSignedTypes:(int8_t)a b:(int16_t)b c:(int32_t)c d:(int64_t)d;
@@ -250,7 +250,7 @@ class NotObjC {}
 
   @objc func testCSignedTypes(_ a: CSignedChar, b: CShort, c: CInt, d: CLong, e: CLongLong) {}
   @objc func testCUnsignedTypes(_ a: CUnsignedChar, b: CUnsignedShort, c: CUnsignedInt, d: CUnsignedLong, e: CUnsignedLongLong) {}
-  @objc func testCChars(_ basic: CChar, wchar wide: CWideChar, char16: CChar16, char32: CChar32) {}
+  @objc func testCChars(_ basic: CChar, wchar wide: CWideChar, char8: CChar8, char16: CChar16, char32: CChar32) {}
   @objc func testCFloats(_ a: CFloat, b: CDouble) {}
   @objc func testCBool(_ a: CBool) {}
 
@@ -409,6 +409,12 @@ class MyObject : NSObject {}
     @objc @objcMembers class DeeperIn {}
   }
 
+  // CHECK-LABEL: SWIFT_CLASS_NAMED("CustomNameInner")
+  // CHECK-NEXT: @interface MyInnerClass
+  // CHECK-NEXT: init
+  // CHECK-NEXT: @end
+  @objc(MyInnerClass) @objcMembers class CustomNameInner {}
+
   // CHECK-LABEL: @interface AnotherInner : A1
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
@@ -419,6 +425,28 @@ class MyObject : NSObject {}
 
   // NEGATIVE-NOT: ImplicitObjCInner
   class ImplicitObjCInner : A1 {}
+}
+
+// CHECK-LABEL: @interface NestedCollision1Identical
+// CHECK-NEXT: - (void)before
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+// CHECK: @interface NestedCollision2Identical
+// CHECK-NEXT: - (void)after
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+
+// We're intentionally declaring NestedCollision2 before NestedCollision1 to
+// make sure they're being sorted based on their names, not their source order.
+@objc @objcMembers class NestedCollision2 {
+  @objc(NestedCollision2Identical) @objcMembers class Identical: NSObject {
+    @objc func after() {}
+  }
+}
+@objc @objcMembers class NestedCollision1 {
+  @objc(NestedCollision1Identical) @objcMembers class Identical: NSObject {
+    @objc func before() {}
+  }
 }
 
 // CHECK-LABEL: @class Inner2;

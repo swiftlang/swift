@@ -1,6 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
-//
-// XFAIL: OS=linux-android, OS=linux-androideabi
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -I %S/Inputs -enable-experimental-cxx-interop -disable-availability-checking | %FileCheck %s
 
 import POD
 import ReferenceCounted
@@ -9,7 +7,6 @@ import ReferenceCounted
 // CHECK-NOT: retain
 // CHECK-NOT: release
 // CHECK-NOT: copy_value
-// CHECK-NOT: destroy_value
 // CHECK-NOT: begin_borrow
 // CHECK-NOT: end_borrow
 // CHECK: return

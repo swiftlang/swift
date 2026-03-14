@@ -15,14 +15,14 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/NullablePtr.h"
-#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
 #include <map>
+#include <optional>
 #include <set>
 
 using namespace swift;
@@ -320,7 +320,7 @@ template <typename T> class BlotMapVectorTest : public ::testing::Test {
 protected:
   T Map;
 
-  Optional<unsigned> NumExpectedLiveTesters;
+  std::optional<unsigned> NumExpectedLiveTesters;
 
   static typename T::key_type *const dummy_key_ptr;
   static typename T::mapped_type *const dummy_value_ptr;

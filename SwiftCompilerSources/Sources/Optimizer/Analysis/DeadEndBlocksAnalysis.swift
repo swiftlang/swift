@@ -13,10 +13,10 @@
 import OptimizerBridging
 import SIL
 
-public struct DeadEndBlocksAnalysis {
+struct DeadEndBlocksAnalysis {
   let bridged: BridgedDeadEndBlocksAnalysis
 
-  public func isDeadEnd(_ block: BasicBlock) -> Bool {
-    return DeadEndBlocksAnalysis_isDeadEnd(bridged, block.bridged) != 0
+  func isDeadEnd(_ block: BasicBlock) -> Bool {
+    return bridged.isDeadEnd(block.bridged)
   }
 }

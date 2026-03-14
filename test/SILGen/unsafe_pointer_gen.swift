@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -O -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -O -parse-as-library %s | %FileCheck %s
 
 // Test the absence of a 'strict' flag.
 // Test the absence of an 'align' flag.

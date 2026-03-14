@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Driver/Job.h"
@@ -484,22 +485,4 @@ StringRef Job::getFirstSwiftPrimaryInput() const {
   if (auto *inputInput = dyn_cast<InputAction>(firstInput))
     return inputInput->getInputArg().getValue();
   return StringRef();
-}
-
-BatchJob::BatchJob(const JobAction &Source,
-                   SmallVectorImpl<const Job *> &&Inputs,
-                   std::unique_ptr<CommandOutput> Output,
-                   const char *Executable, llvm::opt::ArgStringList Arguments,
-                   EnvironmentVector ExtraEnvironment,
-                   std::vector<FilelistInfo> Infos,
-                   ArrayRef<const Job *> Combined, int64_t &NextQuasiPID,
-                   Optional<ResponseFileInfo> ResponseFile)
-    : Job(Source, std::move(Inputs), std::move(Output), Executable, Arguments,
-          ExtraEnvironment, Infos, ResponseFile),
-      CombinedJobs(Combined.begin(), Combined.end()),
-      QuasiPIDBase(NextQuasiPID) {
-
-  assert(QuasiPIDBase < 0);
-  NextQuasiPID -= CombinedJobs.size();
-  assert(NextQuasiPID < 0);
 }

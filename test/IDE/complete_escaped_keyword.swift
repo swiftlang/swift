@@ -34,7 +34,6 @@ enum MyEnum {
 // STATIC_PRIMARY: End completion
 
     let _ = self#^STATIC_SELF_NODOT^#
-// STATIC_SELF_NODOT: Begin completions
 // STATIC_SELF_NODOT-DAG: Keyword[self]/CurrNominal:          .self[#MyEnum.Type#]; name=self
 // STATIC_SELF_NODOT-DAG: Decl[EnumElement]/CurrNominal:      .class({#struct: String#})[#MyEnum#]; name=class(struct:)
 // STATIC_SELF_NODOT-DAG: Decl[EnumElement]/CurrNominal:      .let({#var: String#})[#MyEnum#]; name=let(var:)
@@ -45,7 +44,6 @@ enum MyEnum {
 // STATIC_SELF_NODOT: End completion
 
     let _ = self.#^STATIC_SELF_DOT^#
-// STATIC_SELF_DOT: Begin completions
 // STATIC_SELF_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyEnum.Type#]; name=self
 // STATIC_SELF_DOT-DAG: Decl[EnumElement]/CurrNominal:      class({#struct: String#})[#MyEnum#]; name=class(struct:)
 // STATIC_SELF_DOT-DAG: Decl[EnumElement]/CurrNominal:      let({#var: String#})[#MyEnum#]; name=let(var:)
@@ -73,21 +71,17 @@ enum MyEnum {
 // INSTANCE_PRIMARY: End completion
 
     let _ = self#^INSTANCE_SELF_NODOT^#
-// INSTANCE_SELF_NODOT: Begin completions
 // INSTANCE_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .`init`({#deinit: String#})[#Int#]; name=`init`(deinit:)
 // INSTANCE_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .if({#else: String#})[#Int#]; name=if(else:)
 // INSTANCE_SELF_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .`self`[#Int#]; name=`self`
 // INSTANCE_SELF_NODOT-DAG: Keyword[self]/CurrNominal:          .self[#MyEnum#]; name=self
 
-// INSTANCE_SELF_NODOT: End completions
 
     let _ = self.#^INSTANCE_SELF_DOT^#
-// INSTANCE_SELF_DOT: Begin completions
 // INSTANCE_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#deinit: String#})[#Int#]; name=`init`(deinit:)
 // INSTANCE_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   if({#else: String#})[#Int#]; name=if(else:)
 // INSTANCE_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal:      `self`[#Int#]; name=`self`
 // INSTANCE_SELF_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyEnum#]; name=self
-// INSTANCE_SELF_DOT: End completions
 
     let _ = val#^VALUE_NODOT^#
 // SAME AS 'INSTANCE_SELF_NODOT'.

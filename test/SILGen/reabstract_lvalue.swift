@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name reabstract_lvalue %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name reabstract_lvalue %s | %FileCheck %s
 
 struct MyMetatypeIsThin {}
 
@@ -14,7 +14,7 @@ func transform(_ i: Int) -> Double {
 // CHECK-LABEL: sil hidden [ossa] @$s17reabstract_lvalue0A13FunctionInOutyyF : $@convention(thin) () -> ()
 func reabstractFunctionInOut() {
   // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_guaranteed (Int) -> Double }
-  // CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
+  // CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[BOX]]
   // CHECK: [[PB:%.*]] = project_box [[LIFETIME]]
   // CHECK: [[ARG:%.*]] = function_ref @$s17reabstract_lvalue9transformySdSiF
   // CHECK: [[THICK_ARG:%.*]] = thin_to_thick_function [[ARG]]

@@ -5,16 +5,16 @@ import Mangling
 public func recvInstantiation(_ i: inout WrappedMagicInt) {}
 
 // CHECK: // recvInstantiation(_:)
-// CHECK: sil @$s4main17recvInstantiationyySo34__CxxTemplateInst12MagicWrapperIiEVzF : $@convention(thin) (@inout __CxxTemplateInst12MagicWrapperIiE) -> ()
+// CHECK: sil @$s4main17recvInstantiationyySo0024MagicWrapperCInt_npAIefbVzF : $@convention(thin) (@inout MagicWrapper<CInt>) -> ()
 
 public func recvInstantiation(_ i: inout WrappedMagicBool) {}
 
 // CHECK: // recvInstantiation(_:)
-// CHECK: sil @$s4main17recvInstantiationyySo34__CxxTemplateInst12MagicWrapperIbEVzF : $@convention(thin) (@inout __CxxTemplateInst12MagicWrapperIbE) -> ()
+// CHECK: sil @$s4main17recvInstantiationyySo0025MagicWrapperCBool_lsFCfibVzF : $@convention(thin) (@inout MagicWrapper<CBool>) -> ()
 
 public func returnInstantiation() -> WrappedMagicInt {
   return WrappedMagicInt()
 }
 
 // CHECK: // returnInstantiation()
-// CHECK: sil @$s4main19returnInstantiationSo34__CxxTemplateInst12MagicWrapperIiEVyF : $@convention(thin) () -> __CxxTemplateInst12MagicWrapperIiE
+// CHECK: sil @$s4main19returnInstantiationSo0024MagicWrapperCInt_npAIefbVyF : $@convention(thin) () -> MagicWrapper<CInt>

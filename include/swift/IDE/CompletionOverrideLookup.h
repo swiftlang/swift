@@ -21,6 +21,8 @@
 namespace swift {
 namespace ide {
 
+class CodeCompletionResultBuilder;
+
 class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
   ASTContext &Ctx;
@@ -53,6 +55,7 @@ public:
     hasAccessModifier = isKeywordSpecified("private") ||
                         isKeywordSpecified("fileprivate") ||
                         isKeywordSpecified("internal") ||
+                        isKeywordSpecified("package") ||
                         isKeywordSpecified("public") ||
                         isKeywordSpecified("open");
     hasOverride = isKeywordSpecified("override");

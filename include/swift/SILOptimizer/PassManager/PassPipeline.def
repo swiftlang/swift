@@ -22,6 +22,7 @@
 #define PASSPIPELINE(NAME, DESCRIPTION)
 #endif
 
+PASSPIPELINE(SILGen, "SILGen Passes")
 PASSPIPELINE(Diagnostic, "Guaranteed Passes")
 PASSPIPELINE(LowerHopToActor, "Lower Hop to Actor")
 PASSPIPELINE(OwnershipEliminator, "Utility pass to just run the ownership eliminator pass")

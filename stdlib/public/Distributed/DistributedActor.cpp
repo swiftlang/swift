@@ -14,9 +14,10 @@
 ///
 ///===----------------------------------------------------------------------===///
 
-#include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/Metadata.h"
+#include "swift/ABI/Task.h"
+#include "swift/Basic/Casting.h"
 #include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Concurrency.h"
 
@@ -31,6 +32,7 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
   }
   return nullptr;
 }
+
 
 SWIFT_CC(swift)
 SWIFT_EXPORT_FROM(swiftDistributed)
@@ -101,7 +103,7 @@ static void swift_distributed_execute_target_resume(
     SWIFT_CONTEXT SwiftError *error) {
   auto parentCtx = context->Parent;
   auto resumeInParent =
-      reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
+      function_cast<TargetExecutorSignature::ContinuationType *>(
           parentCtx->ResumeParent);
   swift_task_dealloc(context);
   // See `swift_distributed_execute_target` - `parentCtx` in this case
@@ -114,8 +116,7 @@ SwiftError* swift_distributed_makeDistributedTargetAccessorNotFoundError();
 
 SWIFT_CC(swiftasync)
 void swift_distributed_execute_target(
-    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-    DefaultActor *actor,
+    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext, DefaultActor *actor,
     const char *targetNameStart, size_t targetNameLength,
     HeapObject *argumentDecoder,
     const Metadata *const *argumentTypes,
@@ -124,15 +125,17 @@ void swift_distributed_execute_target(
     void **witnessTables,
     size_t numWitnessTables,
     Metadata *decoderType,
-    void **decoderWitnessTable) {
+    void **decoderWitnessTable
+    ) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
     SwiftError *error =
         swift_distributed_makeDistributedTargetAccessorNotFoundError();
     auto resumeInParent =
-        reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
+        function_cast<TargetExecutorSignature::ContinuationType *>(
             callerContext->ResumeParent);
-    return resumeInParent(callerContext, error);
+    resumeInParent(callerContext, error);
+    return;
   }
 
   auto *asyncFnPtr = reinterpret_cast<
@@ -147,17 +150,10 @@ void swift_distributed_execute_target(
       swift_task_alloc(asyncFnPtr->ExpectedContextSize));
 
   calleeContext->Parent = callerContext;
-  calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
-      swift_distributed_execute_target_resume);
+  calleeContext->ResumeParent = function_cast<TaskContinuationFunction *>(
+      &swift_distributed_execute_target_resume);
 
-  accessorEntry(calleeContext,
-                argumentDecoder,
-                argumentTypes,
-                resultBuffer,
-                substitutions,
-                witnessTables,
-                numWitnessTables,
-                actor,
-                decoderType,
-                decoderWitnessTable);
+  accessorEntry(calleeContext, argumentDecoder, argumentTypes, resultBuffer,
+                substitutions, witnessTables, numWitnessTables, actor,
+                decoderType, decoderWitnessTable);
 }

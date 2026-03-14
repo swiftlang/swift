@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 
 protocol P1 { associatedtype AssocType }
 protocol P2 : P1 { }
@@ -23,7 +23,7 @@ extension X<Int, Double, String> {
   // expected-error@-1 {{extensions must not contain stored properties}}
   static let x = 0
   func f() -> Int {}
-  class C<T> {}
+  class C<W> {}
 }
 
 typealias GGG = X<Int, Double, String>
@@ -148,7 +148,6 @@ extension GenericClass : P3 where T : P3 { }
 
 extension GenericClass where Self : P3 { }
 // expected-error@-1{{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'GenericClass'?}} {{30-34=GenericClass}}
-// expected-warning@-2{{redundant conformance constraint 'GenericClass<T>' : 'P3'}}
 
 protocol P4 {
   associatedtype T
@@ -222,3 +221,33 @@ extension NewGeneric {
     return NewGeneric()
   }
 }
+extension (NewGeneric) {
+  static func oldMember2() -> OldGeneric {
+    return OldGeneric()
+  }
+
+  static func newMember2() -> NewGeneric {
+    return NewGeneric()
+  }
+}
+
+protocol P7 {}
+extension Float: P7 {}
+
+protocol Q1 {
+  associatedtype X
+  func foo(_ x: X)
+}
+struct S7<T: P7>: Q1 {
+  func foo(_ x: T) {}
+}
+
+// Make sure we reject these extensions.
+extension S7<Int> {} // expected-error {{type 'Int' does not conform to protocol 'P7'}}
+extension [S7<Int>] {} // expected-error {{type 'Int' does not conform to protocol 'P7'}}
+extension Array<S7<Int>> {} // expected-error {{type 'Int' does not conform to protocol 'P7'}}
+extension S7<Int>? {} // expected-error {{type 'Int' does not conform to protocol 'P7'}}
+extension S7<Int>.X {} // expected-error {{type 'Int' does not conform to protocol 'P7'}}
+extension S7<Float>.X {} // expected-error {{extension of type 'S7<Float>.X' (aka 'Float') must be declared as an extension of 'Float'}}
+// expected-note@-1 {{did you mean to extend 'Float' instead?}}
+extension S7<T> {} // expected-error {{cannot find type 'T' in scope}}

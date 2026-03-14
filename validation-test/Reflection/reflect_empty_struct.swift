@@ -8,6 +8,7 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: asan
 
 import SwiftReflectionTest
 

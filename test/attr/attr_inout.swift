@@ -7,7 +7,7 @@ func h(_ : inout Int) -> (inout Int) -> (inout Int) -> Int { }
 func ff(x: (inout Int, inout Float)) { } //  expected-error 2{{'inout' may only be used on parameters}}
 
 enum inout_carrier {
-  case carry(inout Int) // expected-error {{'inout' may only be used on parameters}}
+  case carry(inout Int) // expected-error {{'inout' may only be used on function or initializer parameters}}
 }
 
 func deprecated(inout x: Int) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}

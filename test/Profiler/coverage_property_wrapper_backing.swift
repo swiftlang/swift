@@ -25,6 +25,29 @@ struct PassThroughWrapper<T> {
 // CHECK:       [[BB]]:
 // CHECK-NEXT:  increment_profiler_counter 1
 
+// CHECK-LABEL: sil hidden @$s33coverage_property_wrapper_backing1UV1xSivpfP : $@convention(thin) (Int) -> Wrapper<Int>
+// CHECK:       function_ref @$sSb6randomSbyFZ : $@convention(method) (@thin Bool.Type) -> Bool
+// CHECK:       cond_br {{%[0-9]+}}, [[BB_TRUE:bb[0-9]+]], [[BB_FALSE:bb[0-9]+]]
+//
+// CHECK:       [[BB_FALSE]]:
+// CHECK:       integer_literal {{.*}}, 2
+//
+// CHECK:       [[BB_TRUE]]:
+// CHECK:       increment_profiler_counter 1
+// CHECK:       integer_literal {{.*}}, 1
+
+// CHECK-LABEL: sil hidden [transparent] @$s33coverage_property_wrapper_backing1UV2_{{.*}}7WrapperVySiGvpfi : $@convention(thin) () -> Int
+// CHECK:       increment_profiler_counter 0
+// CHECK:       function_ref @$sSb6randomSbyFZ : $@convention(method) (@thin Bool.Type) -> Bool
+// CHECK:       cond_br {{%[0-9]+}}, [[BB_TRUE:bb[0-9]+]], [[BB_FALSE:bb[0-9]+]]
+
+// CHECK:       [[BB_FALSE]]:
+// CHECK:       integer_literal {{.*}}, 4
+//
+// CHECK:       [[BB_TRUE]]:
+// CHECK:       increment_profiler_counter 1
+// CHECK:       integer_literal {{.*}}, 3
+
 struct S {
   // CHECK-LABEL: sil_coverage_map {{.*}} "$s33coverage_property_wrapper_backing1SV1iSivpfP" {{.*}} // property wrapper backing initializer of coverage_property_wrapper_backing.S.i
   // CHECK-NEXT:  [[@LINE+4]]:4 -> [[@LINE+4]]:30 : 0
@@ -54,4 +77,36 @@ struct T {
   @PassThroughWrapper
   @Wrapper(.random() ? 1 : 2)
   var k = 3
+}
+
+// rdar://118939162 - Make sure we don't include the initialization expression
+// in the backing initializer.
+struct U {
+  // CHECK-LABEL: sil_coverage_map {{.*}} // property wrapper backing initializer of coverage_property_wrapper_backing.U.x
+  // CHECK-NEXT:  [[@LINE+4]]:4  -> [[@LINE+4]]:30 : 0
+  // CHECK-NEXT:  [[@LINE+3]]:24 -> [[@LINE+3]]:25 : 1
+  // CHECK-NEXT:  [[@LINE+2]]:28 -> [[@LINE+2]]:29 : (0 - 1)
+  // CHECK-NEXT:  }
+  @Wrapper(.random() ? 1 : 2)
+  var x = if .random() { 3 } else { 4 }
+  // CHECK-LABEL: sil_coverage_map {{.*}} // variable initialization expression of coverage_property_wrapper_backing.U.(_x
+  // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:40 : 0
+  // CHECK-NEXT:  [[@LINE-3]]:14 -> [[@LINE-3]]:23 : 0
+  // CHECK-NEXT:  [[@LINE-4]]:24 -> [[@LINE-4]]:29 : 1
+  // CHECK-NEXT:  [[@LINE-5]]:35 -> [[@LINE-5]]:40 : (0 - 1)
+  // CHECK-NEXT:  }
+}
+
+struct V {
+  // CHECK-LABEL: sil_coverage_map {{.*}} // property wrapper backing initializer of coverage_property_wrapper_backing.V.x
+  // CHECK-NEXT:  [[@LINE+2]]:4  -> [[@LINE+2]]:14 : 0
+  // CHECK-NEXT:  }
+  @Wrapper(0)
+  var x = switch Bool.random() { case true: 0 case false: 0 }
+  // CHECK-LABEL: sil_coverage_map {{.*}} // variable initialization expression of coverage_property_wrapper_backing.V.(_x
+  // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:62 : 0
+  // CHECK-NEXT:  [[@LINE-3]]:18 -> [[@LINE-3]]:31 : 0
+  // CHECK-NEXT:  [[@LINE-4]]:34 -> [[@LINE-4]]:46 : 1
+  // CHECK-NEXT:  [[@LINE-5]]:47 -> [[@LINE-5]]:60 : 2
+  // CHECK-NEXT:  }
 }

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend  -primary-file %s -swift-version 6 -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
 
 // Also do an end-to-end test to check if the generated code is correct.
 // RUN: %empty-directory(%t) 
@@ -28,7 +29,23 @@ struct GenStr<T> {
   }
 }
 
+struct GetID<C: RandomAccessCollection, ID> {
+  var getID: (C.Element) -> ID
 
+  @inline(__always)
+  init(id: KeyPath<C.Element, ID>) {
+    getID = { $0[keyPath: id] }
+  }
+}
+
+struct GetInt<C: RandomAccessCollection>  {
+  var getInt: (C.Element) -> Int
+
+  @inline(__always)
+  init(keyPath: KeyPath<C.Element, Int>, i: Int) {
+    getInt = { $0[keyPath: keyPath] + i }
+  }
+}
 
 // CHECK-LABEL: sil {{.*}} @$s4test0A6SimpleyyySiAA3StrVXEXEF :
 // CHECK-NOT:     keypath
@@ -50,6 +67,27 @@ func testGenStr(_ mymap: ((GenStr<Int>)->Int) -> ()) {
   mymap(\.c)
 }
 
+// CHECK-LABEL: sil {{.*}} @$s4test0A22GenericEscapingClosureAA5GetIDVySayAA3StrVGSiGyF :
+// CHECK-NOT:     keypath
+// CHECK:         = function_ref @[[SPECIALIZED_CLOSURE:.*]] : $@convention(thin) (@in_guaranteed Str) -> @out Int
+// CHECK-NOT:     keypath
+// CHECK-LABEL:  } // end sil function '$s4test0A22GenericEscapingClosureAA5GetIDVySayAA3StrVGSiGyF'
+@inline(never)
+func testGenericEscapingClosure() -> GetID<[Str], Int> {
+    GetID(id: \.i)
+} 
+
+// CHECK-LABEL: sil {{.*}} @$s4test0A22KeypathWithNonConstInt1iAA03GetF0VySayAA3StrVGGSi_tF :
+// CHECK-NOT:     keypath
+// CHECK:         [[C:%.*]] = function_ref @[[SPECIALIZED_CLOSURE2:.*]] : $@convention(thin) (@in_guaranteed Str, Int) -> Int
+// CHECK-NEXT:    partial_apply [callee_guaranteed] [[C]](%0) : $@convention(thin) (@in_guaranteed Str, Int) -> Int
+// CHECK-NOT:     keypath
+// CHECK-LABEL:  } // end sil function '$s4test0A22KeypathWithNonConstInt1iAA03GetF0VySayAA3StrVGGSi_tF'
+@inline(never)
+func testKeypathWithNonConstInt(i: Int) -> GetInt<[Str]> {
+  GetInt(keyPath: \.j, i: i)
+} 
+
 // CHECK-LABEL: sil {{.*}} @$s4test0A7GenericyyyxAA6GenStrVyxGXEXElF :
 // CHECK:         keypath
 // CHECK:         keypath
@@ -68,6 +106,14 @@ func testGeneric<T>(_ mymap: ((GenStr<T>)->T) -> ()) {
 public func _opaqueIdentity<T>(_ x: T) -> T {
   return x
 }
+
+// CHECK:       sil shared {{.*}}@[[SPECIALIZED_CLOSURE]] :
+// CHECK-NOT:     keypath
+// CHECK:       } // end sil function '[[SPECIALIZED_CLOSURE]]'
+
+// CHECK:       sil shared {{.*}}@[[SPECIALIZED_CLOSURE2]] :
+// CHECK-NOT:     keypath
+// CHECK:       } // end sil function '[[SPECIALIZED_CLOSURE2]]'
 
 func calltests() {
   // CHECK-OUTPUT-LABEL: testSimple:
@@ -103,6 +149,17 @@ func calltests() {
     print(c(s))
   }
 
+  // CHECK-OUTPUT-LABEL: testGenericEscapingClosure:
+  print("testGenericEscapingClosure:")
+
+  // CHECK-OUTPUT-NEXT:  27
+  print(testGenericEscapingClosure().getID(Str()))
+
+  // CHECK-OUTPUT-LABEL: testKeypathWithNonConstInt:
+  print("testKeypathWithNonConstInt:")
+
+  // CHECK-OUTPUT-NEXT:  38
+  print(testKeypathWithNonConstInt(i: 10).getInt(Str()))
 }
 
 calltests()

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify-cfg"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/BasicBlockBits.h"
@@ -49,6 +50,8 @@ class CheckedCastBrJumpThreading {
   // TODO: incrementally update dead-end blocks during SimplifyCFG so it doesn't
   // need to be recomputed each time tryCheckedCastBrJumpThreading is called.
   DeadEndBlocks *deBlocks;
+
+  SILPassManager *pm;
 
   // Enable non-trivial terminator rewriting in OSSA.
   bool EnableOSSARewriteTerminator;
@@ -141,10 +144,10 @@ class CheckedCastBrJumpThreading {
 
 public:
   CheckedCastBrJumpThreading(
-      SILFunction *Fn, DominanceInfo *DT, DeadEndBlocks *deBlocks,
+      SILFunction *Fn, SILPassManager *pm, DominanceInfo *DT, DeadEndBlocks *deBlocks,
       SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist,
       bool EnableOSSARewriteTerminator)
-      : Fn(Fn), DT(DT), deBlocks(deBlocks),
+      : Fn(Fn), DT(DT), deBlocks(deBlocks), pm(pm),
         EnableOSSARewriteTerminator(EnableOSSARewriteTerminator),
         rauwContext(callbacks, *deBlocks),
         BlocksForWorklist(BlocksForWorklist), BlocksToEdit(Fn),
@@ -267,7 +270,8 @@ canRAUW(OwnershipFixupContext &rauwContext) {
   // a phi in the successor. It is always valid to replace a phi use, because
   // phi itself already guarantees that lifetime extends over its own uses.
   return OwnershipRAUWHelper::hasValidNonLexicalRAUWOwnership(oldSuccessArg,
-                                                              SuccessArg);
+                                                              SuccessArg,
+                                                              /*respectLexicalFlags=*/ false);
 }
 
 // Erase the checked_cast_br that terminates this block. The caller must replace
@@ -349,7 +353,8 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
 
     // Replace uses with SuccessArg from the dominating BB. Do this while it is
     // still a valid terminator result, before erasing the cast.
-    OwnershipRAUWHelper rauwTransform(rauwContext, oldSuccessArg, SuccessArg);
+    OwnershipRAUWHelper rauwTransform(rauwContext, oldSuccessArg, SuccessArg,
+                                      /*respectLexicalFlags=*/ false);
     assert(rauwTransform.isValid() && "sufficiently checked by canRAUW");
     rauwTransform.perform();
 
@@ -396,7 +401,8 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
   Cloner.updateSSAAfterCloning();
 
   auto *clonedSuccessArg = successBB->getArgument(0);
-  OwnershipRAUWHelper rauwUtil(rauwContext, clonedSuccessArg, SuccessArg);
+  OwnershipRAUWHelper rauwUtil(rauwContext, clonedSuccessArg, SuccessArg,
+                               /*respectLexicalFlags=*/ false);
   assert(rauwUtil.isValid() && "sufficiently checked by canRAUW");
   rauwUtil.perform();
 
@@ -772,7 +778,7 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     if (edit->SuccessArg->isErased())
       continue;
 
-    BasicBlockCloner Cloner(edit->CCBBlock, deBlocks);
+    BasicBlockCloner Cloner(edit->CCBBlock, pm, deBlocks);
     if (!Cloner.canCloneBlock())
       continue;
 
@@ -800,11 +806,16 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
 namespace swift {
 
 bool tryCheckedCastBrJumpThreading(
-    SILFunction *Fn, DominanceInfo *DT, DeadEndBlocks *deBlocks,
+    SILFunction *Fn, SILPassManager *pm, DominanceInfo *DT, DeadEndBlocks *deBlocks,
     SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist,
     bool EnableOSSARewriteTerminator) {
 
-  CheckedCastBrJumpThreading CCBJumpThreading(Fn, DT, deBlocks,
+  // TODO: Disable for OSSA temporarily
+  if (Fn->hasOwnership()) {
+    return false;
+  }
+
+  CheckedCastBrJumpThreading CCBJumpThreading(Fn, pm, DT, deBlocks,
                                               BlocksForWorklist,
                                               EnableOSSARewriteTerminator);
   CCBJumpThreading.optimizeFunction();

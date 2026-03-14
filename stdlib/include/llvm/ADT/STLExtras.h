@@ -16,7 +16,6 @@
 #ifndef LLVM_ADT_STLEXTRAS_H
 #define LLVM_ADT_STLEXTRAS_H
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/iterator.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -30,6 +29,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -529,8 +529,8 @@ make_filter_range(RangeT &&Range, PredicateT Pred) {
 /// somewhere between them. The constraints of these iterators are:
 ///
 /// - On construction or after being incremented, it is comparable and
-///   dereferencable. It is *not* incrementable.
-/// - After being dereferenced, it is neither comparable nor dereferencable, it
+///   dereferenceable. It is *not* incrementable.
+/// - After being dereferenced, it is neither comparable nor dereferenceable, it
 ///   is only incrementable.
 ///
 /// This means you can only dereference the iterator once, and you can only
@@ -749,17 +749,16 @@ Iter next_or_end(const Iter &I, const Iter &End) {
 }
 
 template <typename Iter>
-auto deref_or_none(const Iter &I, const Iter &End)
-    -> __swift::__runtime::llvm::Optional<
+auto deref_or_none(const Iter &I, const Iter &End) -> std::optional<
     std::remove_const_t<std::remove_reference_t<decltype(*I)>>> {
   if (I == End)
-    return None;
+    return std::nullopt;
   return *I;
 }
 
 template <typename Iter> struct ZipLongestItemType {
   using type =
-      llvm::Optional<typename std::remove_const<typename std::remove_reference<
+      std::optional<typename std::remove_const<typename std::remove_reference<
           decltype(*std::declval<Iter>())>::type>::type>;
 };
 
@@ -862,7 +861,7 @@ public:
 } // namespace detail
 
 /// Iterate over two or more iterators at the same time. Iteration continues
-/// until all iterators reach the end. The llvm::Optional only contains a value
+/// until all iterators reach the end. The std::optional only contains a value
 /// if the iterator has not reached the end.
 template <typename T, typename U, typename... Args>
 detail::zip_longest_range<T, U, Args...> zip_longest(T &&t, U &&u,

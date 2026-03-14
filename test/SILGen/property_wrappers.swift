@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/property_wrapper_defs.swift
-// RUN: %target-swift-emit-silgen -primary-file %s -I %t | %FileCheck %s
+// RUN: %target-swift-emit-silgen -sil-verify-all -Xllvm -sil-print-types -primary-file %s -I %t | %FileCheck %s --check-prefixes CHECK,ADR
+
+// RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/property_wrapper_defs.swift -enable-sil-opaque-values
+// RUN: %target-swift-emit-silgen -sil-verify-all -Xllvm -sil-print-types -primary-file %s -I %t -enable-sil-opaque-values | %FileCheck %s --check-prefixes CHECK,OV
+
 import property_wrapper_defs
 
 @propertyWrapper
@@ -58,18 +62,22 @@ func forceHasMemberwiseInit() {
 
 // variable initialization expression of HasMemberwiseInit._x
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_x33_{{.*}}AA7WrapperVySbGvpfi : $@convention(thin) <T where T : DefaultInit> () -> Wrapper<Bool> {
+// CHECK: bb0:
 // CHECK: integer_literal $Builtin.Int1, 0
 // CHECK-NOT: return
 // CHECK: function_ref @$sSb22_builtinBooleanLiteralSbBi1__tcfC : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
 // CHECK-NOT: return
-// CHECK: function_ref @$s17property_wrappers7WrapperV5valueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0> // user: %9
+// CHECK: function_ref @$s17property_wrappers7WrapperV5valueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
 // CHECK: return {{%.*}} : $Wrapper<Bool>
 
 // variable initialization expression of HasMemberwiseInit.$y
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_y33_{{.*}}23WrapperWithInitialValueVyxGvpfi : $@convention(thin) <T where T : DefaultInit> () -> @out 
-// CHECK: bb0(%0 : $*T):
+// ADR: bb0(%0 : $*T):
+// OV: bb0:
 // CHECK-NOT: return
 // CHECK: witness_method $T, #DefaultInit.init!allocator : <Self where Self : DefaultInit> (Self.Type) -> () -> Self : $@convention(witness_method: DefaultInit) <τ_0_0 where τ_0_0 : DefaultInit> (@thick τ_0_0.Type) -> @out τ_0_0
+// ADR:    return {{%.*}} : $()
+// OV:     return {{%.*}} : $T
 
 // variable initialization expression of HasMemberwiseInit._z
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_z33_{{.*}}23WrapperWithInitialValueVySiGvpfi : $@convention(thin) <T where T : DefaultInit> () -> WrapperWithInitialValue<Int> {
@@ -78,6 +86,7 @@ func forceHasMemberwiseInit() {
 // CHECK: integer_literal $Builtin.IntLiteral, 17
 // CHECK-NOT: return
 // CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07wrappedF0ACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin WrapperWithInitialValue<τ_0_0>.Type) -> @out WrapperWithInitialValue<τ_0_0>
+// CHECK: return {{%.*}} : $WrapperWithInitialValue<Int>
 
 // variable initialization expression of HasMemberwiseInit._p
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_p33_{{.*}}23WrapperWithInitialValueVySbGvpfi : $@convention(thin) <T where T : DefaultInit> () -> Bool {
@@ -314,10 +323,10 @@ struct UseWrapperWithNonEscapingAutoclosure {
   @WrapperWithNonEscapingAutoclosure var p2: UInt = 10
 
   // property wrapper backing initializer of UseWrapperWithNonEscapingAutoclosure.p1
-  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p1SivpfP : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> WrapperWithNonEscapingAutoclosure<Int>
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p1SivpfP : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> WrapperWithNonEscapingAutoclosure<Int>
 
   // property wrapper backing initializer of UseWrapperWithNonEscapingAutoclosure.p2
-  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p2SuvpfP : $@convention(thin) (@noescape @callee_guaranteed () -> UInt) -> WrapperWithNonEscapingAutoclosure<UInt>
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p2SuvpfP : $@convention(thin) (@owned @noescape @callee_guaranteed () -> UInt) -> WrapperWithNonEscapingAutoclosure<UInt>
 
   // variable initialization expression of UseWrapperWithNonEscapingAutoclosure._p2
   // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV3_p233_F728088E0028E14D18C6A10CF68512E8LLAA0defgH0VySuGvpfi : $@convention(thin) () -> @owned @callee_guaranteed () -> UInt
@@ -328,7 +337,7 @@ struct UseWrapperWithNonEscapingAutoclosure {
   // CHECK: return %1 : $@callee_guaranteed () -> UInt
 
   // UseWrapperWithNonEscapingAutoclosure.init(p1:p2:)
-  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p12p2ACSiyXK_SuyXKtcfC : $@convention(method) (@noescape @callee_guaranteed () -> Int, @noescape @callee_guaranteed () -> UInt, @thin UseWrapperWithNonEscapingAutoclosure.Type) -> UseWrapperWithNonEscapingAutoclosure
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p12p2ACSiyXK_SuyXKtcfC : $@convention(method) (@guaranteed @noescape @callee_guaranteed () -> Int, @guaranteed @noescape @callee_guaranteed () -> UInt, @thin UseWrapperWithNonEscapingAutoclosure.Type) -> UseWrapperWithNonEscapingAutoclosure
 }
 
 struct UseStatic {
@@ -738,8 +747,9 @@ public class TestClass<T> {
   // CHECK-LABEL: sil [ossa] @$s17property_wrappers9TestClassC5valuexvpfP : $@convention(thin) <T> (@in T) -> @out WrapperWithInitialValue<T>
 
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers9TestClassC5value8protocolACyxGx_qd__tcAA0C8ProtocolRd__lufc
-  // CHECK: [[BACKING_INIT:%.*]] = function_ref @$s17property_wrappers9TestClassC5valuexvpfP : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out WrapperWithInitialValue<τ_0_0>
-  // CHECK-NEXT: partial_apply [callee_guaranteed] [[BACKING_INIT]]<T>()
+  // CHECK: [[BACKING_INIT:%.*]] = function_ref @$s17property_wrappers9TestClassC5valuexvpfF : $@convention(thin) <τ_0_0> (@in τ_0_0, @thick TestClass<τ_0_0>.Type) -> @out WrapperWithInitialValue<τ_0_0>
+  // CHECK: [[METATYPE:%.*]] = value_metatype $@thick TestClass<T>.Type 
+  // CHECK: partial_apply [callee_guaranteed] [[BACKING_INIT]]<T>([[METATYPE]])
   init<U: TestProtocol>(value: T, protocol: U) {
     self.value = value
   }
@@ -796,7 +806,7 @@ open class TestMyWrapper {
 extension UsesMyPublished {
   // CHECK-LABEL: sil hidden [ossa] @$s21property_wrapper_defs15UsesMyPublishedC0A9_wrappersE6setFooyySiF : $@convention(method) (Int, @guaranteed UsesMyPublished) -> ()
   // CHECK: class_method %1 : $UsesMyPublished, #UsesMyPublished.foo!setter
-  // CHECK-NOT: assign_by_wrapper
+  // CHECK-NOT: assign_or_init
   // CHECK: return
   func setFoo(_ x: Int) {
     foo = x
@@ -883,7 +893,7 @@ struct ObservedObject<ObjectType : AnyObject > {
 
 
 // rdar://problem/60600911
-// Ensure assign_by_wrapper is emitted for initialization
+// Ensure assign_or_init is emitted for initialization
 // of a property wrapper with a nonmutating set. Even though such setters
 // take `self` by-value.
 @propertyWrapper
@@ -903,8 +913,8 @@ struct NonMutatingSetterWrapper<Value> {
 struct NonMutatingWrapperTestStruct {
     // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers28NonMutatingWrapperTestStructV3valACSi_tcfC : $@convention(method) (Int, @thin NonMutatingWrapperTestStruct.Type) -> NonMutatingWrapperTestStruct {
     // CHECK: %[[LOAD:[0-9]+]] = load [trivial] %[[SRC:[0-9]+]] : $*NonMutatingWrapperTestStruct
-    // CHECK-NEXT: %[[SET_PA:[0-9]+]] = partial_apply [callee_guaranteed] %[[PW_SETTER:[0-9]+]](%[[LOAD]]) : $@convention(method) (Int, NonMutatingWrapperTestStruct) -> ()
-    // CHECK-NEXT: assign_by_wrapper origin property_wrapper, %[[SETVAL:[0-9]+]] : $Int to %[[ADDR:[0-9]+]] : $*NonMutatingSetterWrapper<Int>, init %[[INIT_PA:[0-9]+]] : $@callee_guaranteed (Int) -> NonMutatingSetterWrapper<Int>, set %[[SET_PA]] : $@callee_guaranteed (Int) -> ()
+    // CHECK-NEXT: %[[SET_PA:[0-9]+]] = partial_apply [callee_guaranteed] [on_stack] %[[PW_SETTER:[0-9]+]](%[[LOAD]]) : $@convention(method) (Int, NonMutatingWrapperTestStruct) -> ()
+    // CHECK-NEXT: assign_or_init #NonMutatingWrapperTestStruct.SomeProp, self %[[ADDR:[0-9]+]] : $*NonMutatingWrapperTestStruct, value %[[SETVAL:[0-9]+]] : $Int, init %[[INIT_PA:[0-9]+]] : $@callee_guaranteed (Int) -> @out NonMutatingSetterWrapper<Int>, set %[[SET_PA]] : $@noescape @callee_guaranteed (Int) -> ()    
     @NonMutatingSetterWrapper var SomeProp: Int
     init(val: Int) {
         SomeProp = val
@@ -978,14 +988,16 @@ struct S_58201 {
 
 // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers7S_58201V1ayyF : $@convention(method) (S_58201) -> () {
 // CHECK: bb0(%0 : $S_58201):
-// CHECK-NEXT:  debug_value %0 : $S_58201, let, name "self", argno 1, implicit
+// CHECK-NEXT:  debug_value %0 : $S_58201, let, name "self", argno 1
 // CHECK-NEXT:  [[BOX:%.*]] = alloc_box ${ var BasicComputedIntWrapper }, var, name "_b"
-// CHECK-NEXT:  [[BOXADDR:%.*]] = project_box [[BOX]] : ${ var BasicComputedIntWrapper }, 0
+// CHECK-NEXT:  [[BOX_LIFETIME:%[^,]+]] = begin_borrow [var_decl] [[BOX]]
+// CHECK-NEXT:  [[BOXADDR:%.*]] = project_box [[BOX_LIFETIME]] : ${ var BasicComputedIntWrapper }, 0
 // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin BasicComputedIntWrapper.Type
 // CHECK-NEXT:  // function_ref BasicComputedIntWrapper.init()
 // CHECK-NEXT:  [[DEFAULTVALUE_FN:%.*]] = function_ref @$s17property_wrappers23BasicComputedIntWrapperVACycfC : $@convention(method) (@thin BasicComputedIntWrapper.Type) -> BasicComputedIntWrapper
 // CHECK-NEXT:  [[DEFAULTRESULT:%.*]] = apply [[DEFAULTVALUE_FN]]([[METATYPE]]) : $@convention(method) (@thin BasicComputedIntWrapper.Type) -> BasicComputedIntWrapper
 // CHECK-NEXT:  store [[DEFAULTRESULT]] to [trivial] [[BOXADDR]] : $*BasicComputedIntWrapper
+// CHECK-NEXT:  end_borrow [[BOX_LIFETIME]] : ${ var BasicComputedIntWrapper }
 // CHECK-NEXT:  destroy_value [[BOX]] : ${ var BasicComputedIntWrapper }
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()

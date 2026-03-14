@@ -17,7 +17,7 @@
 #ifndef SWIFT_THREADING_IMPL_NOTHREADS_H
 #define SWIFT_THREADING_IMPL_NOTHREADS_H
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 #include "chrono_utils.h"
 
@@ -31,7 +31,7 @@ using thread_id = unsigned;
 inline thread_id thread_get_current() { return 0; }
 inline bool thread_is_main() { return true; }
 inline bool threads_same(thread_id a, thread_id b) { return a == b; }
-inline llvm::Optional<stack_bounds> thread_get_current_stack_bounds() {
+inline std::optional<stack_bounds> thread_get_current_stack_bounds() {
   return {};
 }
 
@@ -50,7 +50,8 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {}
 
 using lazy_mutex_handle = unsigned;
 
-inline constexpr lazy_mutex_handle lazy_mutex_initializer() { return 0; }
+#define SWIFT_LAZY_MUTEX_INITIALIZER 0
+
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {}
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {}
 inline void lazy_mutex_unlock(lazy_mutex_handle &handle) {}
@@ -58,6 +59,16 @@ inline bool lazy_mutex_try_lock(lazy_mutex_handle &handle) { return true; }
 
 inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {}
 inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {}
+
+// .. Recursive mutex support .................................................
+
+using recursive_mutex_handle = unsigned;
+
+inline void recursive_mutex_init(recursive_mutex_handle &handle,
+                                 bool checked = false) {}
+inline void recursive_mutex_destroy(recursive_mutex_handle &handle) {}
+inline void recursive_mutex_lock(recursive_mutex_handle &handle) {}
+inline void recursive_mutex_unlock(recursive_mutex_handle &handle) {}
 
 // .. ConditionVariable support ..............................................
 

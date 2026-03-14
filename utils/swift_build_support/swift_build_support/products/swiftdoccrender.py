@@ -48,7 +48,9 @@ class SwiftDocCRender(product.Product):
 
     def should_install(self, host_target):
         # Swift-DocC-Render should always be installed if Swift-DocC is being installed
-        return self.args.install_swiftdocc
+        return self.args.install_swiftdocc or (
+            self.args.install_all and self.args.build_swiftdocc
+        )
 
     def install(self, host_target):
         # Swift-DocC-Render is installed at '/usr/share/docc/render' in the built

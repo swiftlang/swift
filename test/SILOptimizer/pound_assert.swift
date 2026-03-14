@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
-// RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
 // REQUIRES: asserts
+// REQUIRES: swift_in_compiler
 
 //===----------------------------------------------------------------------===//
 // Basic function calls and control flow
@@ -44,10 +44,8 @@ func loops2(a: Int) -> Int {
 }
 
 func infiniteLoop() -> Int {
-  // expected-note @+2 {{condition always evaluates to true}}
   // expected-note @+1 {{found loop here}}
   while true {}
-  // expected-warning @+1 {{will never be executed}}
   return 1
 }
 
@@ -96,11 +94,11 @@ func test_topLevelEvaluation(topLevelArgument: Int) {
   var topLevelVar = 1 // expected-warning {{never mutated}}
   #assert(topLevelVar == 1)
 
-  // expected-note @+1 {{cannot evaluate top-level value as constant here}}
   var topLevelVarConditionallyMutated = 1
-  if topLevelVarConditionallyMutated < 0 {
+  if topLevelArgument < 0 {
     topLevelVarConditionallyMutated += 1
   }
+  // expected-note @+2 {{cannot evaluate expression as constant here}}
   // expected-error @+1 {{#assert condition not constant}}
   #assert(topLevelVarConditionallyMutated == 1)
 

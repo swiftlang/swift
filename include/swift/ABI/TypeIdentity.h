@@ -19,11 +19,13 @@
 #define SWIFT_ABI_TYPEIDENTITY_H
 
 #include "swift/Basic/LLVM.h"
-#include <llvm/ADT/Optional.h>
+#include "swift/Runtime/Config.h"
 #include <llvm/ADT/StringRef.h>
 
 namespace swift {
-template <class> class TargetTypeContextDescriptor;
+template <typename Runtime>
+class swift_ptrauth_struct_context_descriptor(TypeContextDescriptor)
+    TargetTypeContextDescriptor;
 struct InProcess;
 using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
 
@@ -185,7 +187,7 @@ public:
   llvm::StringRef FullIdentity;
 
   /// Any extended information that type might have.
-  llvm::Optional<TypeImportInfo<llvm::StringRef>> ImportInfo;
+  std::optional<TypeImportInfo<llvm::StringRef>> ImportInfo;
 
   /// The ABI name of the type.
   llvm::StringRef getABIName() const {

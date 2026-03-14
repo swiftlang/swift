@@ -68,9 +68,6 @@ class CMakeTestCase(unittest.TestCase):
                          build_ninja=False)
 
     def which_ninja(self, args):
-        toolchain = host_toolchain()
-        if toolchain.ninja is not None:
-            return '/path/to/installed/ninja'
         # Maybe we'll build a ninja, maybe we wont.
         # Fake it anyway for the tests.
         return '/path/to/built/ninja'
@@ -308,22 +305,6 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
-    def test_common_options_xcode(self):
-        args = self.default_args()
-        args.cmake_generator = 'Xcode'
-        cmake = self.cmake(args)
-        self.assertEqual(
-            list(cmake.common_options()),
-            ["-G", "Xcode",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
-             "-DCMAKE_Swift_COMPILER:PATH=/path/to/swiftc",
-             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
-             "-DCMAKE_AR:PATH=/path/to/ar",
-             "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
-             "-DCMAKE_CONFIGURATION_TYPES=" +
-             "Debug;Release;MinSizeRel;RelWithDebInfo"])
-
     def test_common_options_clang_compiler_version(self):
         args = self.default_args()
         args.clang_compiler_version = Version("999.0.999")
@@ -381,14 +362,13 @@ class CMakeTestCase(unittest.TestCase):
         args.enable_ubsan = True
         args.export_compile_commands = True
         args.distcc = True
-        args.cmake_generator = 'Xcode'
         args.clang_user_visible_version = Version("9.0.0")
         args.clang_compiler_version = Version("999.0.900")
         args.build_ninja = True
         cmake = self.cmake(args)
         self.assertEqual(
             list(cmake.common_options()),
-            ["-G", "Xcode",
+            ["-G", "Ninja",
              "-DLLVM_USE_SANITIZER=Address;Undefined",
              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
              "-DCMAKE_C_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
@@ -399,16 +379,13 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
-             "-DCMAKE_CONFIGURATION_TYPES=" +
-             "Debug;Release;MinSizeRel;RelWithDebInfo",
              "-DLLVM_VERSION_MAJOR:STRING=9",
              "-DLLVM_VERSION_MINOR:STRING=0",
              "-DLLVM_VERSION_PATCH:STRING=0",
              "-DCLANG_VERSION_MAJOR:STRING=9",
              "-DCLANG_VERSION_MINOR:STRING=0",
-             "-DCLANG_VERSION_PATCH:STRING=0"])
-        # NOTE: No "-DCMAKE_MAKE_PROGRAM=/path/to/built/ninja" because
-        #       cmake_generator is 'Xcode'
+             "-DCLANG_VERSION_PATCH:STRING=0",
+             "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_build_args_ninja(self):
         args = self.default_args()
@@ -436,21 +413,6 @@ class CMakeTestCase(unittest.TestCase):
         self.assertEqual(
             list(cmake.build_args()),
             ["-j8", "VERBOSE=1"])
-
-    def test_build_args_xcode(self):
-        args = self.default_args()
-        args.cmake_generator = "Xcode"
-        cmake = self.cmake(args)
-        self.assertEqual(
-            list(cmake.build_args()),
-            ["-parallelizeTargets", "-jobs", "8"])
-
-        # NOTE: Xcode generator DOES NOT take 'verbose-build' into account.
-        args.verbose_build = True
-        cmake = self.cmake(args)
-        self.assertEqual(
-            list(cmake.build_args()),
-            ["-parallelizeTargets", "-jobs", "8"])
 
     def test_build_args_eclipse_ninja(self):
         # NOTE: Eclipse generator DOES NOT take 'build-jobs' into account,

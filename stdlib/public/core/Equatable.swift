@@ -164,7 +164,7 @@
 ///     let c = a
 ///     print(c === a, c === b, separator: ", ")
 ///     // Prints "true, false"
-public protocol Equatable {
+public protocol Equatable: ~Copyable, ~Escapable {
   /// Returns a Boolean value indicating whether two values are equal.
   ///
   /// Equality is the inverse of inequality. For any values `a` and `b`,
@@ -173,10 +173,10 @@ public protocol Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  static func == (lhs: Self, rhs: Self) -> Bool
+  static func == (lhs: borrowing Self, rhs: borrowing Self) -> Bool
 }
 
-extension Equatable {
+extension Equatable where Self: ~Copyable & ~Escapable {
   /// Returns a Boolean value indicating whether two values are not equal.
   ///
   /// Inequality is the inverse of equality. For any values `a` and `b`, `a != b`
@@ -190,11 +190,22 @@ extension Equatable {
   ///   - rhs: Another value to compare.
   // transparent because sometimes types that use this generate compile-time
   // warnings, e.g. that an expression always evaluates to true
+  @_preInverseGenerics
   @_transparent
-  public static func != (lhs: Self, rhs: Self) -> Bool {
+  public static func != (lhs: borrowing Self, rhs: borrowing Self) -> Bool {
     return !(lhs == rhs)
   }
 }
+
+// Called by the SwiftValue implementation.
+@_silgen_name("_swift_stdlib_Equatable_isEqual_indirect")
+internal func Equatable_isEqual_indirect<T: Equatable>(
+  _ lhs: UnsafePointer<T>,
+  _ rhs: UnsafePointer<T>
+) -> Bool {
+  return unsafe lhs.pointee == rhs.pointee
+}
+
 
 //===----------------------------------------------------------------------===//
 // Reference comparison
@@ -246,6 +257,7 @@ extension Equatable {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
+#if !$Embedded
 @inlinable // trivial-implementation
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
@@ -257,6 +269,20 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
     return false
   }
 }
+#else
+@inlinable // trivial-implementation
+@safe
+public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
+  switch (lhs, rhs) {
+  case let (l?, r?):
+    return Builtin.bridgeToRawPointer(l) == Builtin.bridgeToRawPointer(r)
+  case (nil, nil):
+    return true
+  default:
+    return false
+  }
+}
+#endif
 
 /// Returns a Boolean value indicating whether two references point to
 /// different object instances.
@@ -272,5 +298,3 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }
-
-

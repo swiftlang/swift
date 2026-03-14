@@ -192,7 +192,7 @@ void SmallPtrSetImplBase::MoveHelper(unsigned SmallSize,
   if (RHS.isSmall()) {
     // Copy a small RHS rather than moving.
     CurArray = SmallArray;
-    std::copy(RHS.CurArray, RHS.CurArray + RHS.NumNonEmpty, CurArray);
+    std::copy_n(RHS.CurArray, RHS.NumNonEmpty, CurArray);
   } else {
     CurArray = RHS.CurArray;
     RHS.CurArray = RHS.SmallArray;
@@ -228,7 +228,7 @@ void SmallPtrSetImplBase::swap(SmallPtrSetImplBase &RHS) {
   // from LHS to RHS.
   if (!this->isSmall() && RHS.isSmall()) {
     assert(RHS.CurArray == RHS.SmallArray);
-    std::copy(RHS.CurArray, RHS.CurArray + RHS.NumNonEmpty, this->SmallArray);
+    std::copy_n(RHS.CurArray, RHS.NumNonEmpty, this->SmallArray);
     std::swap(RHS.CurArraySize, this->CurArraySize);
     std::swap(this->NumNonEmpty, RHS.NumNonEmpty);
     std::swap(this->NumTombstones, RHS.NumTombstones);
@@ -241,7 +241,7 @@ void SmallPtrSetImplBase::swap(SmallPtrSetImplBase &RHS) {
   // from RHS to LHS.
   if (this->isSmall() && !RHS.isSmall()) {
     assert(this->CurArray == this->SmallArray);
-    std::copy(this->CurArray, this->CurArray + this->NumNonEmpty,
+    std::copy_n(this->CurArray, this->NumNonEmpty,
               RHS.SmallArray);
     std::swap(RHS.CurArraySize, this->CurArraySize);
     std::swap(RHS.NumNonEmpty, this->NumNonEmpty);

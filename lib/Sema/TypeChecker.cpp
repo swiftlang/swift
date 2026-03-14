@@ -15,32 +15,40 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "CodeSynthesis.h"
+#include "LiteralExpressionFolding.h"
+#include "MiscDiagnostics.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
-#include "CodeSynthesis.h"
-#include "MiscDiagnostics.h"
-#include "swift/AST/ASTWalker.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Statistic.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/Strings.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallSet.h"
@@ -120,20 +128,20 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
 
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
-#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
-      return TypeChecker::getProtocol( \
-          Context, expr->getLoc(), \
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING)                                  \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
+      return TypeChecker::getProtocol(                                         \
+          Context, expr->getLoc(),                                             \
           KnownProtocolKind::ExpressibleByStringLiteral);
 
-#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
-      return TypeChecker::getProtocol( \
-          Context, expr->getLoc(), \
+#define MAGIC_INT_IDENTIFIER(NAME, STRING)                                     \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
+      return TypeChecker::getProtocol(                                         \
+          Context, expr->getLoc(),                                             \
           KnownProtocolKind::ExpressibleByIntegerLiteral);
 
-#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING)                                 \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
       return nullptr;
 
 #include "swift/AST/MagicIdentifierKinds.def"
@@ -183,13 +191,17 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   return dc->getParentModule();
 }
 
-void swift::bindExtensions(ModuleDecl &mod) {
+evaluator::SideEffect
+BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
+  bool excludeMacroExpansions = true;
+
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
     assert(!ext->canNeverBeBound() &&
            "Only extensions that can ever be bound get here.");
-    if (auto nominal = ext->computeExtendedNominal()) {
+    if (auto nominal = ext->computeExtendedNominal(excludeMacroExpansions)) {
+      ext->setExtendedNominal(nominal);
       nominal->addExtension(ext);
       return true;
     }
@@ -201,7 +213,7 @@ void swift::bindExtensions(ModuleDecl &mod) {
   // resolved to a worklist.
   SmallVector<ExtensionDecl *, 8> worklist;
 
-  for (auto file : mod.getFiles()) {
+  for (auto file : M->getFiles()) {
     auto *SF = dyn_cast<SourceFile>(file);
     if (!SF)
       continue;
@@ -221,76 +233,54 @@ void swift::bindExtensions(ModuleDecl &mod) {
       visitTopLevelDecl(D);
   }
 
-  // Phase 2 - repeatedly go through the worklist and attempt to bind each
-  // extension there, removing it from the worklist if we succeed.
-  bool changed;
-  do {
-    changed = false;
+  auto tryBindExtensions = [&]() {
+    // Phase 2 - repeatedly go through the worklist and attempt to bind each
+    // extension there, removing it from the worklist if we succeed.
+    bool changed;
+    do {
+      changed = false;
 
-    auto last = std::remove_if(worklist.begin(), worklist.end(),
-                               tryBindExtension);
-    if (last != worklist.end()) {
-      worklist.erase(last, worklist.end());
-      changed = true;
-    }
-  } while(changed);
+      auto last = std::remove_if(worklist.begin(), worklist.end(),
+                                 tryBindExtension);
+      if (last != worklist.end()) {
+        worklist.erase(last, worklist.end());
+        changed = true;
+      }
+    } while(changed);
+  };
 
+  tryBindExtensions();
+
+  // If that fails, try again, but this time expand macros.
+  excludeMacroExpansions = false;
+  tryBindExtensions();
+  
   // Any remaining extensions are invalid. They will be diagnosed later by
   // typeCheckDecl().
+  for (auto *ext : worklist)
+    ext->setExtendedNominal(nullptr);
+
+  return {};
 }
 
-static void typeCheckDelayedFunctions(SourceFile &SF) {
-  unsigned currentFunctionIdx = 0;
-
-  while (currentFunctionIdx < SF.DelayedFunctions.size()) {
-    auto *AFD = SF.DelayedFunctions[currentFunctionIdx];
-    assert(!AFD->getDeclContext()->isLocalContext());
-    (void) AFD->getTypecheckedBody();
-    ++currentFunctionIdx;
-  }
-
-  SF.DelayedFunctions.clear();
+void swift::bindExtensions(ModuleDecl &mod) {
+  auto &eval = mod.getASTContext().evaluator;
+  (void)evaluateOrDefault(eval, BindExtensionsRequest{&mod}, {});
 }
 
 void swift::performTypeChecking(SourceFile &SF) {
+  if (SF.getASTContext().TypeCheckerOpts.EnableLazyTypecheck) {
+    // Skip eager type checking. Instead, let later stages of compilation drive
+    // type checking as needed through request evaluation.
+    return;
+  }
+
   return (void)evaluateOrDefault(SF.getASTContext().evaluator,
-                                 TypeCheckSourceFileRequest{&SF}, {});
-}
-
-/// If any of the imports in this source file was @preconcurrency but
-/// there were no diagnostics downgraded or suppressed due to that
-/// @preconcurrency, suggest that the attribute be removed.
-static void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
-  switch (sf.Kind) {
-  case SourceFileKind::Interface:
-  case SourceFileKind::SIL:
-    return;
-
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::MacroExpansion:
-    break;
-  }
-
-  ASTContext &ctx = sf.getASTContext();
-
-  if (ctx.TypeCheckerOpts.SkipFunctionBodies != FunctionBodySkipping::None)
-    return;
-
-  for (const auto &import : sf.getImports()) {
-    if (import.options.contains(ImportFlags::Preconcurrency) &&
-        import.importLoc.isValid() &&
-        !sf.hasImportUsedPreconcurrency(import)) {
-      ctx.Diags.diagnose(
-          import.importLoc, diag::remove_predates_concurrency_import,
-          import.module.importedModule->getName())
-        .fixItRemove(import.preconcurrencyRange);
-    }
-  }
+                                 TypeCheckPrimaryFileRequest{&SF}, {});
 }
 
 evaluator::SideEffect
-TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
+TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   assert(SF && "Source file cannot be null!");
   assert(SF->ASTStage != SourceFile::TypeChecked &&
          "Should not be re-typechecking this file!");
@@ -311,41 +301,93 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     FrontendStatsTracer tracer(Ctx.Stats,
                                "Type checking and Semantic analysis");
 
-    if (!Ctx.LangOpts.DisableAvailabilityChecking) {
-      // Build the type refinement hierarchy for the primary
-      // file before type checking.
-      TypeChecker::buildTypeRefinementContextHierarchy(*SF);
-    }
+    // Build the availability scope tree for the primary file before type
+    // checking.
+    (void)AvailabilityScope::getOrBuildForSourceFile(*SF);
 
     // Type check the top-level elements of the source file.
     for (auto D : SF->getTopLevelDecls()) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
-        TypeChecker::contextualizeTopLevelCode(TLCD);
       } else {
         TypeChecker::typeCheckDecl(D);
       }
     }
 
-    typeCheckDelayedFunctions(*SF);
+    // Type-check macro-generated or implicitly-synthesized decls.
+    if (auto *synthesizedSF = SF->getSynthesizedFile()) {
+      for (auto *decl : synthesizedSF->getTopLevelDecls()) {
+        assert(isa<ExtensionDecl>(decl) || isa<ProtocolDecl>(decl));
+
+        // Limit typechecking of synthesized _implicit_ extensions to
+        // conformance checking. This is done because a conditional
+        // conformance to Copyable is synthesized as an extension, based on
+        // the markings of ~Copyable in a value type. This call to
+        // checkConformancesInContext will the actual check to verify that
+        // the conditional extension is correct, as it may be an invalid
+        // conformance.
+        if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+          if (extension->isImplicit()) {
+            TypeChecker::checkConformancesInContext(extension);
+            continue;
+          }
+        }
+
+        // For other kinds of decls, do normal typechecking.
+        TypeChecker::typeCheckDecl(decl);
+      }
+    }
+    SF->typeCheckDelayedFunctions();
+
+    for (auto *opaqueDecl : SF->getOpaqueReturnTypeDecls()) {
+      TypeChecker::checkCircularOpaqueReturnTypeDecl(opaqueDecl);
+    }
   }
 
-  diagnoseUnnecessaryPreconcurrencyImports(*SF);
+  // If region-based isolation is enabled, we diagnose unnecessary
+  // preconcurrency imports in the SIL pipeline in the
+  // DiagnoseUnnecessaryPreconcurrencyImports pass.
+  if (!Ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation))
+    diagnoseUnnecessaryPreconcurrencyImports(*SF);
+  diagnoseUnnecessaryPublicImports(*SF);
+  diagnoseMissingImports(*SF);
 
   // Check to see if there are any inconsistent imports.
+  // Whole-module @_implementationOnly imports.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentImplementationOnlyImportsRequest{SF->getParentModule()},
       {});
 
+  // Whole-module @_spiOnly imports.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentSPIOnlyImportsRequest{SF},
       {});
 
+  // Whole-module ambiguous bare imports defaulting to public, when other
+  // imports are marked 'internal'.
+  if (!Ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
+    evaluateOrDefault(
+      Ctx.evaluator,
+      CheckInconsistentAccessLevelOnImport{SF},
+      {});
+  }
+
+  // Per-file inconsistent access-levels on imports of the same module.
+  evaluateOrDefault(
+    Ctx.evaluator,
+    CheckInconsistentAccessLevelOnImportSameFileRequest{SF},
+    {});
+
+  // Whole-module inconsistent @_weakLinked.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
+
+  // Opt-in performance hint diagnostics for performance-critical code.
+  if (performanceHintDiagnosticsEnabled(Ctx, SF))
+    evaluateOrDefault(Ctx.evaluator, EmitPerformanceHints{SF}, {});
 
   // Perform various AST transforms we've been asked to perform.
   if (!Ctx.hadError() && Ctx.LangOpts.DebuggerTestingTransform)
@@ -357,7 +399,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   // Playground transform knows to look out for PCMacro's changes and not
   // to playground log them.
   if (!Ctx.hadError() && Ctx.LangOpts.PlaygroundTransform)
-    performPlaygroundTransform(*SF, Ctx.LangOpts.PlaygroundHighPerformance);
+    performPlaygroundTransform(*SF, Ctx.LangOpts.PlaygroundOptions);
 
   return std::make_tuple<>();
 }
@@ -367,10 +409,12 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   FrontendStatsTracer tracer(Ctx.Stats,
                              "perform-whole-module-type-checking");
   switch (SF.Kind) {
+  case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
     diagnoseObjCMethodConflicts(SF);
+    diagnoseObjCCategoryConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
     diagnoseUnintendedObjCMethodOverrides(SF);
     diagnoseAttrsAddedByAccessNote(SF);
@@ -391,35 +435,55 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   FrontendStatsTracer tracer(Ctx.Stats,
                              "load-derivative-configurations");
 
-  class DerivativeFinder : public ASTWalker {
-  public:
-    DerivativeFinder() {}
-
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-        for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
-          // Resolve derivative function configurations from `@derivative`
-          // attributes by type-checking them.
-          (void)derAttr->getOriginalFunction(D->getASTContext());
-        }
-      }
-
-      return Action::Continue();
-    }
-  };
-
   switch (SF.Kind) {
+  case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {
-    DerivativeFinder finder;
-    SF.walkContext(finder);
+    CustomDerivativesRequest request(&SF);
+    evaluateOrDefault(SF.getASTContext().evaluator, request, {});
     return;
   }
   case SourceFileKind::SIL:
   case SourceFileKind::Interface:
     return;
   }
+}
+
+void swift::handleOSLogStringSectionName(ModuleDecl &module) {
+  /// We only care about the OSLog module.
+  if (!module.getName().is("OSLog"))
+    return;
+
+  /// The name of the variable that defines the section name.
+  static const StringRef sectionVarName = "osLogStringSectionName";
+
+  ASTContext &ctx = module.getASTContext();
+  SmallVector<ValueDecl *, 1> results;
+  module.lookupValue(ctx.getIdentifier(sectionVarName), {}, results);
+  for (const auto& result: results) {
+    auto var = dyn_cast<VarDecl>(result);
+    if (!var)
+      continue;
+
+    if (auto init = var->getParentInitializer()) {
+      if (auto folded = foldLiteralExpression(init, &ctx)) {
+        if (auto literal = dyn_cast<StringLiteralExpr>(folded)) {
+          ctx.LangOpts.OSLogStringSectionName = literal->getValue().str();
+          return;
+        }
+      }
+
+      ctx.Diags.diagnose(init->getLoc(), diag::oslog_string_section_not_literal)
+        .highlight(init->getSourceRange());
+      return;
+    }
+
+    ctx.Diags.diagnose(var, diag::oslog_string_section_not_literal);
+    return;
+  }
+
+  ctx.Diags.diagnose(SourceLoc(), diag::oslog_missing_string_section);
 }
 
 bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
@@ -435,17 +499,17 @@ bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
 }
 
 Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
-                                  bool isSILMode, bool isSILType,
                                   GenericSignature GenericSig,
-                                  GenericParamList *GenericParams,
+                                  SILTypeResolutionContext *SILContext,
                                   DeclContext *DC, bool ProduceDiagnostics) {
-  TypeResolutionOptions options = None;
-  if (isSILMode)
+  TypeResolutionOptions options = std::nullopt;
+  if (SILContext) {
     options |= TypeResolutionFlags::SILMode;
-  if (isSILType)
-    options |= TypeResolutionFlags::SILType;
+    if (SILContext->IsSILType)
+      options |= TypeResolutionFlags::SILType;
+  }
 
-  Optional<DiagnosticSuppression> suppression;
+  std::optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
 
@@ -460,7 +524,7 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
              // For now, just return the placeholder type.
              PlaceholderType::get,
              /*packElementOpener*/ nullptr)
-      .resolveType(TyR, GenericParams);
+      .resolveType(TyR, SILContext);
 }
 
 namespace {
@@ -473,15 +537,19 @@ namespace {
                             GenericParamList *params)
         : dc(dc), params(params) {}
 
-    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T)) {
-      if (auto *identBase =
-              dyn_cast<IdentTypeRepr>(declRefTR->getBaseComponent())) {
-        auto name = identBase->getNameRef().getBaseIdentifier();
-        if (auto *paramDecl = params->lookUpGenericParam(name))
-          identBase->setValue(paramDecl, dc);
-      }
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
     }
+
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      // Only unqualified identifiers can reference generic parameters.
+      auto *unqualIdentTR = dyn_cast<UnqualifiedIdentTypeRepr>(T);
+      if (unqualIdentTR && !unqualIdentTR->hasGenericArgList()) {
+        auto name = unqualIdentTR->getNameRef().getBaseIdentifier();
+        if (auto *paramDecl = params->lookUpGenericParam(name)) {
+          unqualIdentTR->setValue(paramDecl, dc);
+        }
+      }
 
       return Action::Continue();
     }
@@ -491,7 +559,7 @@ namespace {
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericSignature
 swift::handleSILGenericParams(GenericParamList *genericParams,
-                              DeclContext *DC) {
+                              DeclContext *DC, bool allowInverses) {
   if (genericParams == nullptr)
     return nullptr;
 
@@ -516,26 +584,23 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
   auto request = InferredGenericSignatureRequest{
       /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
-      {}, {}, /*allowConcreteGenericParams=*/true};
+      {}, {}, genericParams->getLAngleLoc(),
+      /*forExtension=*/nullptr,
+      allowInverses};
   return evaluateOrDefault(DC->getASTContext().evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
-                                    unsigned bindingIndex,
-                                    bool leaveClosureBodiesUnchecked) {
+                                    unsigned bindingIndex) {
   assert(!PBD->isInitializerChecked(bindingIndex) &&
          PBD->getInit(bindingIndex));
 
   auto &Ctx = PBD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
 
-  TypeCheckExprOptions options;
-  if (leaveClosureBodiesUnchecked)
-    options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex,
-                                       /*patternType=*/Type(), options);
+                                       /*patternType=*/Type());
 }
 
 bool swift::typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
@@ -547,20 +612,13 @@ bool swift::typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
       true);
 }
 
-bool swift::typeCheckForCodeCompletion(
-    constraints::SolutionApplicationTarget &target, bool needsPrecheck,
-    llvm::function_ref<void(const constraints::Solution &)> callback) {
-  return TypeChecker::typeCheckForCodeCompletion(target, needsPrecheck,
-                                                 callback);
-}
-
-Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
-                                bool replaceInvalidRefsWithErrors) {
-  return TypeChecker::resolveDeclRefExpr(UDRE, Context, replaceInvalidRefsWithErrors);
+Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
+                                DeclContext *Context) {
+  return TypeChecker::resolveDeclRefExpr(UDRE, Context);
 }
 
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
-  if (C.TypeCheckerOpts.DebugForbidTypecheckPrefix.empty())
+  if (C.TypeCheckerOpts.DebugForbidTypecheckPrefixes.empty())
     return;
 
   // Don't touch special names or empty names.
@@ -568,8 +626,10 @@ void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
     return;
 
   StringRef Str = Name.getIdentifier().str();
-  if (Str.startswith(C.TypeCheckerOpts.DebugForbidTypecheckPrefix)) {
-    llvm::report_fatal_error(Twine("forbidden typecheck occurred: ") + Str);
+  for (auto forbiddenPrefix : C.TypeCheckerOpts.DebugForbidTypecheckPrefixes) {
+    if (Str.starts_with(forbiddenPrefix)) {
+      llvm::report_fatal_error(Twine("forbidden typecheck occurred: ") + Str);
+    }
   }
 }
 
@@ -577,11 +637,11 @@ DeclTypeCheckingSemantics
 TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
   // Check for a @_semantics attribute.
   if (auto semantics = decl->getAttrs().getAttribute<SemanticsAttr>()) {
-    if (semantics->Value.equals("typechecker.type(of:)"))
+    if (semantics->Value == "typechecker.type(of:)")
       return DeclTypeCheckingSemantics::TypeOf;
-    if (semantics->Value.equals("typechecker.withoutActuallyEscaping(_:do:)"))
+    if (semantics->Value == "typechecker.withoutActuallyEscaping(_:do:)")
       return DeclTypeCheckingSemantics::WithoutActuallyEscaping;
-    if (semantics->Value.equals("typechecker._openExistential(_:do:)"))
+    if (semantics->Value == "typechecker._openExistential(_:do:)")
       return DeclTypeCheckingSemantics::OpenExistential;
   }
   return DeclTypeCheckingSemantics::Normal;
@@ -589,11 +649,11 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
 
 bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
                                    DeclContext *dc,
-                                   Optional<TypeResolutionStage> stage) {
+                                   std::optional<TypeResolutionStage> stage) {
   if (stage)
-    type = dc->mapTypeIntoContext(type);
+    type = dc->mapTypeIntoEnvironment(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
-      LookUpConformanceInModule(dc->getParentModule()));
+      LookUpConformanceInModule());
   if (!tanSpace)
     return false;
   // If no `Self == Self.TangentVector` requirement, return true.
@@ -603,10 +663,9 @@ bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
   return type->getCanonicalType() == tanSpace->getCanonicalType();
 }
 
-bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
-                                              Optional<FunctionTypeRepr *>repr,
-                                              DeclContext *dc,
-                                              Optional<TypeResolutionStage> stage) {
+bool TypeChecker::diagnoseInvalidFunctionType(
+    FunctionType *fnTy, SourceLoc loc, std::optional<FunctionTypeRepr *> repr,
+    DeclContext *dc, std::optional<TypeResolutionStage> stage) {
   // Some of the below checks trigger cycles if we don't have a generic
   // signature yet; we'll run the checks again in
   // TypeResolutionStage::Interface.
@@ -745,4 +804,41 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
   }
 
   return hadAnyError;
+}
+
+extern "C" intptr_t swift_ASTGen_evaluatePoundIfCondition(
+                        BridgedASTContext astContext,
+                        void *_Nonnull diagEngine,
+                        BridgedStringRef sourceFileBuffer,
+                        BridgedStringRef conditionText,
+                        bool);
+
+std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
+    Evaluator &evaluator, SourceFile *sourceFile, SourceRange conditionRange,
+    bool shouldEvaluate
+) const {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // FIXME: When we migrate to SwiftParser, use the parsed syntax tree.
+  ASTContext &ctx = sourceFile->getASTContext();
+  auto &sourceMgr = ctx.SourceMgr;
+
+  // Extract the full buffer containing the condition.
+  auto bufferID = sourceMgr.findBufferContainingLoc(conditionRange.Start);
+  StringRef sourceFileText = sourceMgr.getEntireTextForBuffer(bufferID);
+
+  // Extract the condition text from that buffer.
+  auto conditionCharRange = Lexer::getCharSourceRangeFromSourceRange(sourceMgr, conditionRange);
+  StringRef conditionText = sourceMgr.extractText(conditionCharRange, bufferID);
+
+  // Evaluate the condition.
+  intptr_t evalResult = swift_ASTGen_evaluatePoundIfCondition(
+      ctx, &ctx.Diags, sourceFileText, conditionText, shouldEvaluate
+  );
+
+  bool isActive = (evalResult & 0x01) != 0;
+  bool allowSyntaxErrors = (evalResult & 0x02) != 0;
+  return std::pair(isActive, allowSyntaxErrors);
+#else
+  llvm_unreachable("Must not be used in C++-only build");
+#endif
 }

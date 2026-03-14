@@ -1,0 +1,21 @@
+// RUN: not --crash %target-swift-frontend %s -sil-verify-all -g -emit-sil
+import Builtin
+import Swift
+
+struct MyStruct {
+  var x: Builtin.Int64
+  var y: Builtin.Int64
+}
+
+sil_scope 1 { loc "file.swift":7:6 parent @test_fragment : $@convention(thin) () -> () }
+
+sil hidden @test_fragment : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $MyStruct, var, name "my_struct", loc "file.swift":8:9, scope 1
+  %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.x, loc "file.swift":9:17, scope 1
+  // every op_fragment should be the last di-expression operand
+  debug_value %1 : $*Builtin.Int64, var, name "my_struct", expr op_deref:op_fragment:#MyStruct.y:op_constu:42:op_plus
+  dealloc_stack %0 : $*MyStruct
+  %r = tuple()
+  return %r : $()
+}

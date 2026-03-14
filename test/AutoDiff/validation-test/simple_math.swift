@@ -4,7 +4,7 @@
 // Temporarily disabled because forward-mode is not at feature parity with reverse-mode.
 // UN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
 
-// RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null -module-name null 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null -module-name null 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
 
@@ -121,6 +121,69 @@ SimpleMathTests.test("MultipleResults") {
   expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapAndReturnProduct))
 }
 
+// Test function with multiple `inout` parameters and a custom pullback.
+@differentiable(reverse)
+func swapCustom(_ x: inout Float, _ y: inout Float) {
+  let tmp = x; x = y; y = tmp
+}
+@derivative(of: swapCustom)
+func vjpSwapCustom(_ x: inout Float, _ y: inout Float) -> (
+  value: Void, pullback: (inout Float, inout Float) -> Void
+) {
+  swapCustom(&x, &y)
+  return ((), {v1, v2 in
+    let tmp = v1; v1 = v2; v2 = tmp
+  })
+}
+
+SimpleMathTests.test("MultipleResultsWithCustomPullback") {
+  func multiply_swapCustom(_ x: Float, _ y: Float) -> Float {
+    var tuple = (x, y)
+    swapCustom(&tuple.0, &tuple.1)
+    return tuple.0 * tuple.1
+  }
+
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapCustom))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapCustom))
+}
+
+// Test functions returning tuples.
+@differentiable(reverse)
+func swapTuple(_ x: Float, _ y: Float) -> (Float, Float) {
+  return (y, x)
+}
+
+@differentiable(reverse)
+func swapTupleCustom(_ x: Float, _ y: Float) -> (Float, Float) {
+  return (y, x)
+}
+@derivative(of: swapTupleCustom)
+func vjpSwapTupleCustom(_ x: Float, _ y: Float) -> (
+  value: (Float, Float), pullback: (Float, Float) -> (Float, Float)
+) {
+  return (swapTupleCustom(x, y), {v1, v2 in
+    return (v2, v1)
+  })
+}
+
+SimpleMathTests.test("ReturningTuples") {
+  func multiply_swapTuple(_ x: Float, _ y: Float) -> Float {
+    let result = swapTuple(x, y)
+    return result.0 * result.1
+  }
+
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapTuple))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapTuple))
+
+  func multiply_swapTupleCustom(_ x: Float, _ y: Float) -> Float {
+    let result = swapTupleCustom(x, y)
+    return result.0 * result.1
+  }
+
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapTupleCustom))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapTupleCustom))
+}
+
 SimpleMathTests.test("CaptureLocal") {
   let z: Float = 10
   func foo(_ x: Float) -> Float {
@@ -203,6 +266,9 @@ SimpleMathTests.test("TupleMutation") {
 }
 
 // Tests TF-321.
+
+/* Temporary disabled until https://github.com/swiftlang/swift/issues/84840 is fixed
+   We cannot use `Tracked<T>` :(
 SimpleMathTests.test("TupleNonDifferentiableElements") {
   // TF-964: Test tuple with non-tuple-typed adjoint value.
   func tupleLet(_ x: Tracked<Float>) -> Tracked<Float> {
@@ -242,6 +308,51 @@ SimpleMathTests.test("TupleNonDifferentiableElements") {
   }
   func wrapper(_ x: Tracked<Float>) -> Tracked<Float> {
     let w = Wrapper<Tracked<Float>>()
+    return w.baz(x)
+  }
+  expectEqual((3, 1), valueWithGradient(at: 3, of: wrapper))
+}
+*/
+
+SimpleMathTests.test("TupleNonDifferentiableElementsNotTracked") {
+  // TF-964: Test tuple with non-tuple-typed adjoint value.
+  func tupleLet(_ x: Float) -> Float {
+    let tuple = (2 * x, 1)
+    return tuple.0
+  }
+  expectEqual((8, 2), valueWithGradient(at: 4, of: tupleLet))
+
+  func tupleVar(_ x: Float) -> Float {
+    var tuple = (x, 1)
+    tuple.0 = x
+    tuple.1 = 1
+    return tuple.0
+  }
+  expectEqual((3, 1), valueWithGradient(at: 3, of: tupleVar))
+
+  func nested(_ x: Float) -> Float {
+    // Convoluted function computing `x * x`.
+    var tuple: (Int, (Int, Float), Float) = (1, (1, 0), 0)
+    tuple.0 = 1
+    tuple.1.0 = 1
+    tuple.1.1 = x
+    tuple.2 = x
+    return tuple.1.1 * tuple.2
+  }
+  expectEqual((16, 8), valueWithGradient(at: 4, of: nested))
+
+  struct Wrapper<T> {
+    @differentiable(reverse where T : Differentiable)
+    func baz(_ x: T) -> T {
+      var tuple = (1, 1, x, 1)
+      tuple.0 = 1
+      tuple.2 = x
+      tuple.3 = 1
+      return tuple.2
+    }
+  }
+  func wrapper(_ x: Float) -> Float {
+    let w = Wrapper<Float>()
     return w.baz(x)
   }
   expectEqual((3, 1), valueWithGradient(at: 3, of: wrapper))
@@ -437,22 +548,18 @@ SimpleMathTests.test("Adjoint value accumulation for aggregate lhs and concrete 
 }
 
 // CHECK-LABEL: sil private [ossa] @${{.*}}doubled{{.*}}TJp{{.*}} : $@convention(thin) (Float, @owned {{.*}}) -> SmallTestModel.TangentVector {
-// CHECK: bb0([[DX:%.*]] : $Float, [[PB_STRUCT:%.*]] : {{.*}}):
-// CHECK:   ([[PB0:%.*]], [[PB1:%.*]]) = destructure_struct [[PB_STRUCT]]
-// CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
-// CHECK:   ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
-// CHECK:   [[TMP1:%.*]] = apply [[PB0]]([[TMP0]]) : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector
-// CHECK:   [[ADJ_STRUCT_FIELD:%.*]] = destructure_struct [[TMP1]] : $SmallTestModel.TangentVector
-// CHECK:   [[TMP_RES:%.*]] = alloc_stack $Float
-// CHECK:   [[TMP_ADJ_STRUCT_FIELD:%.*]] = alloc_stack $Float
-// CHECK:   [[TMP_ADJ_CONCRETE:%.*]] = alloc_stack $Float
-// CHECK:   store [[ADJ_STRUCT_FIELD]] to [trivial] [[TMP_ADJ_STRUCT_FIELD]] : $*Float
-// CHECK:   store [[ADJ_CONCRETE]] to [trivial] [[TMP_ADJ_CONCRETE]] : $*Float
-// CHECK:   [[PLUS_EQUAL:%.*]] = witness_method $Float, #AdditiveArithmetic."+"
-// CHECK:   %{{.*}} = apply [[PLUS_EQUAL]]<Float>([[TMP_RES]], [[TMP_ADJ_CONCRETE]], [[TMP_ADJ_STRUCT_FIELD]], {{.*}})
-// CHECK:   [[RES:%.*]] = load [trivial] [[TMP_RES]] : $*Float
-// CHECK:   [[RES_STRUCT:%.*]] = struct $SmallTestModel.TangentVector ([[RES]] : $Float)
-// CHECK:   return [[RES_STRUCT]] : $SmallTestModel.TangentVector
-// CHECK: }
+// CHECK: bb0([[DX:%.*]] : $Float, [[PB0:%.*]] : {{.*}}, [[PB1:%.*]] : {{.*}}):
+// CHECK: [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
+// CHECK: ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
+// CHECK: [[TMP1:%.*]] = apply [[PB0]]([[TMP0]]) : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector
+// CHECK: [[TMP_RES_ADJ_STRUCT:%.*]] = alloc_stack $SmallTestModel.TangentVector 
+// CHECK: store [[TMP1]] to [trivial] [[TMP_RES_ADJ_STRUCT]] : $*SmallTestModel.TangentVector
+// CHECK: [[TMP_RES_ADJ_STRUCT_FIELD:%.*]] = struct_element_addr [[TMP_RES_ADJ_STRUCT]] : $*SmallTestModel.TangentVector, #{{.*}}SmallTestModel.TangentVector.stored 
+// CHECK: [[TMP_RES_ADJ_STRUCT_ADD_ELT:%.*]] = alloc_stack $Float                        
+// CHECK: store [[ADJ_CONCRETE]] to [trivial] [[TMP_RES_ADJ_STRUCT_ADD_ELT]] : $*Float             
+// CHECK: [[PLUS_EQUAL:%.*]] = witness_method $Float, #AdditiveArithmetic."+=" : <Self where Self : AdditiveArithmetic> (Self.Type) -> (inout Self, Self) -> () : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()                
+// CHECK: {{.*}} = apply [[PLUS_EQUAL]]<Float>([[TMP_RES_ADJ_STRUCT_FIELD]], [[TMP_RES_ADJ_STRUCT_ADD_ELT]], {{.*}}) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()
+// CHECK: [[RES_STRUCT:%.*]] = load [trivial] [[TMP_RES_ADJ_STRUCT]] : $*SmallTestModel.TangentVector 
+// CHECK: return [[RES_STRUCT]] : $SmallTestModel.TangentVector
 
 runAllTests()

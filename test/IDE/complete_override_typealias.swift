@@ -35,16 +35,13 @@ struct MyStruct3 : MyProtocol {
 // OVERRIDE_1-DAG: Decl[InstanceMethod]/Super: foo<U>(arg1: Arg1, arg2: Arg2<U>, arg3: Arg2<Int>, arg4: [Arg1], arg5: Arg2<U>?, arg6: Generic<Arg2<Generic<Arg2<Int>>>>) -> Result {|};
 // OVERRIDE_1-DAG: Decl[InstanceMethod]/Super: bar() -> Result {|};
 // OVERRIDE_1-DAG: Decl[InstanceMethod]/Super: baz(arg: @escaping Func) {|};
-// OVERRIDE_1: End completions
 
 // OVERRIDE_2: Begin completions, 3 items
 // OVERRIDE_2-DAG: Decl[InstanceMethod]/Super: foo<U>(arg1: Arg1, arg2: Arg2<U>, arg3: Arg2<Int>, arg4: [Arg1], arg5: Arg2<U>?, arg6: Generic<Arg2<Generic<Arg2<Int>>>>) -> String {|};
 // OVERRIDE_2-DAG: Decl[InstanceMethod]/Super: bar() -> String {|};
 // OVERRIDE_2-DAG: Decl[InstanceMethod]/Super: baz(arg: @escaping Func) {|};
-// OVERRIDE_2: End completions
 
 // OVERRIDE_3-DAG: Begin completions, 2 items
 // OVERRIDE_3-DAG: Decl[InstanceMethod]/Super: foo<U>(arg1: Arg1, arg2: Arg2<U>, arg3: Arg2<Int>, arg4: [Arg1], arg5: Arg2<U>?, arg6: Generic<Arg2<Generic<Arg2<Int>>>>) -> String {|};
 // OVERRIDE_3-DAG: Decl[InstanceMethod]/Super: baz(arg: @escaping Func) {|};
-// OVERRIDE_3-DAG: End completions
 

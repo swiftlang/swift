@@ -26,7 +26,8 @@
 import _Differentiation
 
 // Error: conformance is in different file than witnesses.
-// expected-error @+1 {{type 'ConformingStruct' does not conform to protocol 'Protocol1'}}
+// expected-error@+2 {{type 'ConformingStruct' does not conform to protocol 'Protocol1'}}
+// expected-note@+1 {{add stubs for conformance}}
 extension ConformingStruct: Protocol1 {}
 
 // No error: conformance is in same file as witnesses.

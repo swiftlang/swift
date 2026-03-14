@@ -9,6 +9,12 @@
 // RUN: %target-build-swift %s -emit-module -emit-library -module-name capture_descriptors -o %t/capture_descriptors%{target-shared-library-suffix} -L%t/../../.. -lBlocksRuntime
 // RUN: %target-swift-reflection-dump %t/capture_descriptors%{target-shared-library-suffix} | %FileCheck %s
 
+// lld on FreeBSD relocates some of the metadata sections resulting in invalid
+// offsets in section headers, breaking the Swift reflection data ELF parser
+// resulting in missing metadata.
+// rdar://159139154
+// UNSUPPORTED: OS=freebsd
+
 sil_stage canonical
 
 import Builtin
@@ -137,10 +143,14 @@ bb0(%0 : @owned $Optional<@callee_guaranteed @substituted <X, Y> (@in_guaranteed
 // CHECK-NEXT:     (result
 // CHECK-NEXT:       (generic_type_parameter depth=0 index=1)))
 // CHECK-NEXT: (closure_binding index=0)
-// CHECK-NEXT: (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT: (tuple
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT:   (function
+// CHECK-NEXT:     (parameters
+// CHECK-NEXT:       (generic_type_parameter depth=0 index=2)
+// CHECK-NEXT:     (result
+// CHECK-NEXT:       (struct Swift.Int)))
 // CHECK-NEXT: (closure_binding index=1)
-// CHECK-NEXT: (generic_type_parameter depth=0 index=2)
-// CHECK-NEXT: (closure_binding index=2)
 
 
 // Generic caller and generic callee -- and one of the type parameters is
@@ -208,10 +218,10 @@ sil_vtable GenericClass {}
 // CHECK-NEXT:     (generic_type_parameter depth=0 index=1)
 // CHECK-NEXT:     (generic_type_parameter depth=0 index=2)))
 // CHECK-NEXT: - Metadata sources:
-// CHECK-NEXT: (generic_type_parameter depth=0 index=2)
+// CHECK-NEXT: (tuple
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=2)
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=0))
 // CHECK-NEXT: (closure_binding index=0)
-// CHECK-NEXT: (generic_type_parameter depth=0 index=0)
-// CHECK-NEXT: (closure_binding index=1)
 // CHECK-NEXT: (tuple
 // CHECK-NEXT:   (generic_type_parameter depth=0 index=0)
 // CHECK-NEXT:   (generic_type_parameter depth=0 index=1))

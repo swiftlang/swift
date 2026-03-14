@@ -27,11 +27,15 @@ class UnresolvedMemberTypeCheckCompletionCallback
     : public TypeCheckCompletionCallback {
   struct Result {
     Type ExpectedTy;
-    bool IsImplicitSingleExpressionReturn;
+    bool IsImpliedResult;
 
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.
     bool IsInAsyncContext;
+
+    /// Attempts to merge this result with \p Other, returning \c true if
+    /// successful, else \c false.
+    bool tryMerge(const Result &Other, DeclContext *DC);
   };
 
   CodeCompletionExpr *CompletionExpr;
@@ -40,6 +44,10 @@ class UnresolvedMemberTypeCheckCompletionCallback
   SmallVector<Result, 4> ExprResults;
   SmallVector<Result, 1> EnumPatternTypes;
 
+  /// Add a result to \c Results, merging it with an existing result, if
+  /// possible.
+  void addExprResult(const Result &Res);
+
   void sawSolutionImpl(const constraints::Solution &solution) override;
 
 public:
@@ -47,9 +55,8 @@ public:
       CodeCompletionExpr *CompletionExpr, DeclContext *DC)
       : CompletionExpr(CompletionExpr), DC(DC) {}
 
-  void deliverResults(DeclContext *DC, SourceLoc DotLoc,
-                      ide::CodeCompletionContext &CompletionCtx,
-                      CodeCompletionConsumer &Consumer);
+  void collectResults(DeclContext *DC, SourceLoc DotLoc,
+                      ide::CodeCompletionContext &CompletionCtx);
 };
 
 } // end namespace ide

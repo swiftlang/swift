@@ -35,6 +35,8 @@ public struct _UIntBuffer<Element: UnsignedInteger & FixedWidthInteger> {
   }
 }
 
+extension _UIntBuffer: Sendable where Element: Sendable {}
+
 extension _UIntBuffer: Sequence {
   public typealias SubSequence = Slice<_UIntBuffer>
 
@@ -64,6 +66,8 @@ extension _UIntBuffer: Sequence {
     return Iterator(self)
   }
 }
+
+extension _UIntBuffer.Iterator: Sendable where Element: Sendable {}
 
 extension _UIntBuffer: Collection {
   @frozen
@@ -230,5 +234,3 @@ extension _UIntBuffer: RangeReplaceableCollection {
       truncatingIfNeeded: Int(_bitCount) &+ growth &* w)
   }
 }
-
-extension _UIntBuffer: Sendable where Element: Sendable { }

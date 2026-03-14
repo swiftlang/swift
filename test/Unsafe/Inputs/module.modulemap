@@ -1,0 +1,3 @@
+module unsafe_decls {
+  header "unsafe_decls.h"
+}

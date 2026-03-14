@@ -8,12 +8,12 @@ struct User_D: Decodable {
   let firstName: String
   let lastName: String?
 
-  enum CodingKeys: CodingKey {
+  private enum CodingKeys: CodingKey {
     case firstName
     case lastName
   }
 
-  init(from decoder: Decoder) throws {
+  init(from decoder: any Decoder) throws {
     let container: KeyedDecodingContainer<User_D.CodingKeys> = try decoder.container(keyedBy: User_D.CodingKeys.self)
 
     self.firstName = try container.decode(String.self, forKey: User_D.CodingKeys.firstName)

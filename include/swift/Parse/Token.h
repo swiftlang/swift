@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,7 +19,6 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Parse/Token.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -108,7 +107,38 @@ public:
   bool isBinaryOperator() const {
     return Kind == tok::oper_binary_spaced || Kind == tok::oper_binary_unspaced;
   }
-  
+
+  /// Checks whether the token is either a binary operator, or is a token that
+  /// acts like a binary operator (e.g infix '=', '?', '->').
+  bool isBinaryOperatorLike() const {
+    if (isBinaryOperator())
+      return true;
+
+    switch (Kind) {
+    case tok::equal:
+    case tok::arrow:
+    case tok::question_infix:
+      return true;
+    default:
+      return false;
+    }
+    llvm_unreachable("Unhandled case in switch!");
+  }
+
+  /// Checks whether the token is either a postfix operator, or is a token that
+  /// acts like a postfix operator (e.g postfix '!' and '?').
+  bool isPostfixOperatorLike() const {
+    switch (Kind) {
+    case tok::oper_postfix:
+    case tok::exclaim_postfix:
+    case tok::question_postfix:
+      return true;
+    default:
+      return false;
+    }
+    llvm_unreachable("Unhandled case in switch!");
+  }
+
   bool isAnyOperator() const {
     return isBinaryOperator() || Kind == tok::oper_postfix ||
            Kind == tok::oper_prefix;
@@ -122,6 +152,14 @@ public:
   }
   bool isNotEllipsis() const {
     return !isEllipsis();
+  }
+
+  bool isTilde() const {
+    return isAnyOperator() && Text == "~";
+  }
+
+  bool isMinus() const {
+    return isAnyOperator() && Text == "-";
   }
 
   /// Determine whether this token occurred at the start of a line.
@@ -155,10 +193,11 @@ public:
 #define CONTEXTUAL_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(KW, ...) CONTEXTUAL_CASE(KW)
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 #undef CONTEXTUAL_CASE
-      .Case("macro", true)
-      .Default(false);
+        .Case("macro", true)
+        .Case("using", true)
+        .Default(false);
   }
 
   bool isContextualPunctuator(StringRef ContextPunc) const {
@@ -172,15 +211,6 @@ public:
   bool canBeArgumentLabel() const {
     // Identifiers, escaped identifiers, and '_' can be argument labels.
     if (is(tok::identifier) || isEscapedIdentifier() || is(tok::kw__)) {
-      // ... except for '__shared' and '__owned'.
-      if (getRawText().equals("__shared") ||
-          getRawText().equals("__owned"))
-        return false;
-      
-/*      // ...or some
-      if (getRawText().equals("some"))
-        return false;*/
-
       return true;
     }
 
@@ -236,10 +266,14 @@ public:
     }
   }
 
+  /// True if the token is an editor placeholder.
+  bool isEditorPlaceholder() const;
+
   /// True if the string literal token is multiline.
   bool isMultilineString() const {
     return MultilineString;
   }
+
   /// Count of extending escaping '#'.
   unsigned getCustomDelimiterLen() const {
     return CustomDelimiterLen;
@@ -253,9 +287,7 @@ public:
   
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
-  SourceLoc getLoc() const {
-    return SourceLoc(llvm::SMLoc::getFromPointer(Text.begin()));
-  }
+  SourceLoc getLoc() const { return SourceLoc::getFromPointer(Text.begin()); }
 
   unsigned getLength() const { return Text.size(); }
 
@@ -269,17 +301,15 @@ public:
 
   CharSourceRange getCommentRange() const {
     if (CommentLength == 0)
-      return CharSourceRange(SourceLoc(llvm::SMLoc::getFromPointer(Text.begin())),
-                             0);
+      return CharSourceRange(SourceLoc::getFromPointer(Text.begin()), 0);
     auto TrimedComment = trimComment();
-    return CharSourceRange(
-      SourceLoc(llvm::SMLoc::getFromPointer(TrimedComment.begin())),
-      TrimedComment.size());
+    return CharSourceRange(SourceLoc::getFromPointer(TrimedComment.begin()),
+                           TrimedComment.size());
   }
   
   SourceLoc getCommentStart() const {
     if (CommentLength == 0) return SourceLoc();
-    return SourceLoc(llvm::SMLoc::getFromPointer(trimComment().begin()));
+    return SourceLoc::getFromPointer(trimComment().begin());
   }
 
   StringRef getRawText() const {

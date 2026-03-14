@@ -28,3 +28,9 @@ bb0(%instance : @_lexical @owned $C):
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [serialized] [lexical_lifetimes] [ossa] @force_lexical_function : {{.*}} {
+// CHECK-LABEL: } // end sil function 'force_lexical_function'
+sil [serialized] [lexical_lifetimes] [ossa] @force_lexical_function : $@convention(thin) () -> () {
+  %retval = tuple()
+  return %retval : $()
+}

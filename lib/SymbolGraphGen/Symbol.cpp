@@ -16,6 +16,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
@@ -30,23 +31,27 @@
 #include "SymbolGraphASTWalker.h"
 #include "DeclarationFragmentPrinter.h"
 
+#include <queue>
+
 using namespace swift;
 using namespace symbolgraphgen;
 
 Symbol::Symbol(SymbolGraph *Graph, const ExtensionDecl *ED,
-               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
+               const ValueDecl *SynthesizedBaseTypeDecl, Type BaseType)
     : Symbol::Symbol(Graph, nullptr, ED, SynthesizedBaseTypeDecl, BaseType) {}
 
 Symbol::Symbol(SymbolGraph *Graph, const ValueDecl *VD,
-               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
+               const ValueDecl *SynthesizedBaseTypeDecl, Type BaseType)
     : Symbol::Symbol(Graph, VD, nullptr, SynthesizedBaseTypeDecl, BaseType) {}
 
 Symbol::Symbol(SymbolGraph *Graph, const ValueDecl *VD, const ExtensionDecl *ED,
-               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
+               const ValueDecl *SynthesizedBaseTypeDecl, Type BaseType)
     : Graph(Graph), D(VD), BaseType(BaseType),
       SynthesizedBaseTypeDecl(SynthesizedBaseTypeDecl) {
-  if (!BaseType && SynthesizedBaseTypeDecl)
-    BaseType = SynthesizedBaseTypeDecl->getDeclaredInterfaceType();
+  if (!BaseType && SynthesizedBaseTypeDecl) {
+    if (const auto *NTD = dyn_cast<NominalTypeDecl>(SynthesizedBaseTypeDecl))
+      BaseType = NTD->getDeclaredInterfaceType();
+  }
   if (D == nullptr) {
     D = ED;
   }
@@ -89,6 +94,7 @@ std::pair<StringRef, StringRef> Symbol::getKind(const Decl *D) {
       return {"swift.method", "Instance Method"};
     return {"swift.func", "Function"};
   }
+  case swift::DeclKind::Param: LLVM_FALLTHROUGH;
   case swift::DeclKind::Var: {
     const auto *VD = cast<ValueDecl>(D);
 
@@ -111,6 +117,8 @@ std::pair<StringRef, StringRef> Symbol::getKind(const Decl *D) {
     return {"swift.associatedtype", "Associated Type"};
   case swift::DeclKind::Extension:
     return {"swift.extension", "Extension"};
+  case swift::DeclKind::Macro:
+    return {"swift.macro", "Macro"};
   default:
     llvm::errs() << "Unsupported kind: " << D->getKindName(D->getKind());
     llvm_unreachable("Unsupported declaration kind for symbol graph");
@@ -206,8 +214,8 @@ void Symbol::serializeRange(size_t InitialIndentation,
 
 const ValueDecl *Symbol::getDeclInheritingDocs() const {
   // get the decl that would provide docs for this symbol
-  const auto *DocCommentProvidingDecl = dyn_cast_or_null<ValueDecl>(
-      getDocCommentProvidingDecl(D, /*AllowSerialized=*/true));
+  const auto *DocCommentProvidingDecl =
+      dyn_cast_or_null<ValueDecl>(D->getDocCommentProvidingDecl());
 
   // if the decl is the same as the one for this symbol, we're not
   // inheriting docs, so return null. however, if this symbol is
@@ -221,6 +229,60 @@ const ValueDecl *Symbol::getDeclInheritingDocs() const {
     // symbol.
     return DocCommentProvidingDecl;
   }
+}
+
+const ValueDecl *Symbol::getForeignProtocolRequirement() const {
+  if (const auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
+    std::queue<const ValueDecl *> requirements;
+    while (true) {
+      for (auto *req : VD->getSatisfiedProtocolRequirements()) {
+        if (req->getModuleContext()->getNameStr() != Graph->M.getNameStr())
+          return req;
+        else
+          requirements.push(req);
+      }
+      if (requirements.empty())
+        return nullptr;
+      VD = requirements.front();
+      requirements.pop();
+    }
+  }
+
+  return nullptr;
+}
+
+const ValueDecl *Symbol::getProtocolRequirement() const {
+  if (const auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
+    auto reqs = VD->getSatisfiedProtocolRequirements();
+
+    if (!reqs.empty())
+      return reqs.front();
+    else
+      return nullptr;
+  }
+
+  return nullptr;
+}
+
+const ValueDecl *Symbol::getInheritedDecl() const {
+  const ValueDecl *InheritingDecl = nullptr;
+  if (const auto *ID = getDeclInheritingDocs())
+    InheritingDecl = ID;
+
+  if (!InheritingDecl && getSynthesizedBaseTypeDecl())
+    InheritingDecl = getSymbolDecl();
+
+  if (!InheritingDecl) {
+    if (const auto *ID = getForeignProtocolRequirement())
+      InheritingDecl = ID;
+  }
+
+  if (!InheritingDecl) {
+    if (const auto *ID = getProtocolRequirement())
+      InheritingDecl = ID;
+  }
+
+  return InheritingDecl;
 }
 
 namespace {
@@ -298,13 +360,13 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
 
   const auto *DocCommentProvidingDecl = D;
   if (!Graph->Walker.Options.SkipInheritedDocs) {
-    DocCommentProvidingDecl = dyn_cast_or_null<ValueDecl>(
-        getDocCommentProvidingDecl(D, /*AllowSerialized=*/true));
+    DocCommentProvidingDecl =
+        dyn_cast_or_null<ValueDecl>(D->getDocCommentProvidingDecl());
     if (!DocCommentProvidingDecl) {
       DocCommentProvidingDecl = D;
     }
   }
-  auto RC = DocCommentProvidingDecl->getRawComment(/*SerializedOK=*/true);
+  auto RC = DocCommentProvidingDecl->getRawComment();
   if (RC.isEmpty()) {
     return;
   }
@@ -348,39 +410,63 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
 }
 
 void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
-  if (const auto *FD = dyn_cast_or_null<FuncDecl>(D)) {
-    OS.attributeObject("functionSignature", [&](){
+  auto serializeParameterList = [&](const swift::ParameterList *ParamList) {
+    if (ParamList->size()) {
+      OS.attributeArray("parameters", [&]() {
+        for (const auto *Param : *ParamList) {
+          auto ExternalName = Param->getArgumentName().str();
+          // `getNameStr()` returns "_" if the parameter is unnamed.
+          auto InternalName = Param->getNameStr();
 
+          OS.object([&]() {
+            if (ExternalName.empty()) {
+              OS.attribute("name", InternalName);
+            } else {
+              OS.attribute("name", ExternalName);
+              if (ExternalName != InternalName && !InternalName.empty()) {
+                OS.attribute("internalName", InternalName);
+              }
+            }
+            Graph->serializeDeclarationFragments(
+                "declarationFragments",
+                Symbol(Graph, Param, getSynthesizedBaseTypeDecl(),
+                       getBaseType()),
+                OS);
+          }); // end parameter object
+        }
+      }); // end parameters:
+    }
+  };
+
+  if (const auto *FD = dyn_cast_or_null<FuncDecl>(D)) {
+    OS.attributeObject("functionSignature", [&]() {
       // Parameters
       if (const auto *ParamList = FD->getParameters()) {
-        if (ParamList->size()) {
-          OS.attributeArray("parameters", [&](){
-            for (const auto *Param : *ParamList) {
-              auto ExternalName = Param->getArgumentName().str();
-              auto InternalName = Param->getParameterName().str();
-
-              OS.object([&](){
-                if (ExternalName.empty()) {
-                  OS.attribute("name", InternalName);
-                } else {
-                  OS.attribute("name", ExternalName);
-                  if (ExternalName != InternalName &&
-                      !InternalName.empty()) {
-                    OS.attribute("internalName", InternalName);
-                  }
-                }
-                Graph->serializeDeclarationFragments("declarationFragments",
-                                                     Symbol(Graph, Param,
-                                                            getSynthesizedBaseTypeDecl(),
-                                                            getBaseType()), OS);
-              }); // end parameter object
-            }
-          }); // end parameters:
-        }
+        serializeParameterList(ParamList);
       }
 
       // Returns
       if (const auto ReturnType = FD->getResultInterfaceType()) {
+        Graph->serializeDeclarationFragments("returns", ReturnType, BaseType,
+                                             OS);
+      }
+    });
+  } else if (const auto *CD = dyn_cast_or_null<ConstructorDecl>(D)) {
+    OS.attributeObject("functionSignature", [&]() {
+      // Parameters
+      if (const auto *ParamList = CD->getParameters()) {
+        serializeParameterList(ParamList);
+      }
+    });
+  } else if (const auto *SD = dyn_cast_or_null<SubscriptDecl>(D)) {
+    OS.attributeObject("functionSignature", [&]() {
+      // Parameters
+      if (const auto *ParamList = SD->getIndices()) {
+        serializeParameterList(ParamList);
+      }
+
+      // Returns
+      if (const auto ReturnType = SD->getElementInterfaceType()) {
         Graph->serializeDeclarationFragments("returns", ReturnType, BaseType,
                                              OS);
       }
@@ -402,9 +488,8 @@ static SubstitutionMap getSubMapForDecl(const ValueDecl *D, Type BaseType) {
   else
     DC = D->getInnermostDeclContext()->getInnermostTypeContext();
 
-  swift::ModuleDecl *M = DC->getParentModule();
   if (isa<swift::NominalTypeDecl>(D) || isa<swift::ExtensionDecl>(D)) {
-    return BaseType->getContextSubstitutionMap(M, DC);
+    return BaseType->getContextSubstitutionMap(DC);
   }
 
   const swift::ValueDecl *SubTarget = D;
@@ -413,7 +498,7 @@ static SubstitutionMap getSubMapForDecl(const ValueDecl *D, Type BaseType) {
     if (auto *FD = dyn_cast<swift::AbstractFunctionDecl>(DC))
       SubTarget = FD;
   }
-  return BaseType->getMemberSubstitutionMap(M, SubTarget);
+  return BaseType->getMemberSubstitutionMap(SubTarget);
 }
 
 void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
@@ -434,12 +519,18 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
       filterGenericParams(Generics.getGenericParams(), FilteredParams,
                           SubMap);
 
-      const auto *Self = dyn_cast<NominalTypeDecl>(D);
+      const auto *Self = dyn_cast<ProtocolDecl>(D);
       if (!Self) {
-        Self = D->getDeclContext()->getSelfNominalTypeDecl();
+        Self = D->getDeclContext()->getSelfProtocolDecl();
       }
 
-      filterGenericRequirements(Generics.getRequirements(), Self,
+      SmallVector<Requirement, 2> Reqs;
+      SmallVector<InverseRequirement, 2> InverseReqs;
+      Generics->getRequirementsWithInverses(Reqs, InverseReqs);
+      // FIXME(noncopyable_generics): Do something with InverseReqs, or just use
+      // getRequirements() above and update the tests.
+
+      filterGenericRequirements(Reqs, Self,
                                 FilteredRequirements, SubMap, FilteredParams);
 
       if (FilteredParams.empty() && FilteredRequirements.empty()) {
@@ -548,17 +639,15 @@ void getAvailabilities(const Decl *D,
                        bool IsParent) {
   // DeclAttributes is a linked list in reverse order from where they
   // appeared in the source. Let's re-reverse them.
-  SmallVector<const AvailableAttr *, 4> AvAttrs;
-  for (const auto *Attr : D->getAttrs()) {
-    if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      AvAttrs.push_back(AvAttr);
-    }
+  SmallVector<SemanticAvailableAttr, 4> AvAttrs;
+  for (auto Attr : D->getSemanticAvailableAttrs(/*includeInactive=*/true)) {
+    AvAttrs.push_back(Attr);
   }
   std::reverse(AvAttrs.begin(), AvAttrs.end());
 
   // Now go through them in source order.
-  for (auto *AvAttr : AvAttrs) {
-    Availability NewAvailability(*AvAttr);
+  for (auto AvAttr : AvAttrs) {
+    Availability NewAvailability(AvAttr);
     if (NewAvailability.empty()) {
       continue;
     }
@@ -607,6 +696,26 @@ llvm::StringMap<Availability> &Availabilities) {
 void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
   llvm::StringMap<Availability> Availabilities;
   getInheritedAvailabilities(D, Availabilities);
+
+  // If we were asked to filter the availability platforms for the output graph,
+  // perform that filtering here.
+  if (Graph->Walker.Options.AvailabilityPlatforms) {
+    auto AvailabilityPlatforms =
+        Graph->Walker.Options.AvailabilityPlatforms.value();
+    if (Graph->Walker.Options.AvailabilityIsBlockList) {
+      for (const auto Availability : Availabilities.keys()) {
+        if (Availability != "*" && AvailabilityPlatforms.contains(Availability)) {
+          Availabilities.erase(Availability);
+        }
+      }
+    } else {
+      for (const auto Availability : Availabilities.keys()) {
+        if (Availability != "*" && !AvailabilityPlatforms.contains(Availability)) {
+          Availabilities.erase(Availability);
+        }
+      }
+    }
+  }
 
   if (Availabilities.empty()) {
     return;
@@ -763,7 +872,7 @@ void Symbol::printPath(llvm::raw_ostream &OS) const {
 
 void Symbol::getUSR(SmallVectorImpl<char> &USR) const {
   llvm::raw_svector_ostream OS(USR);
-  ide::printDeclUSR(D, OS);
+  ide::printDeclUSR(D, OS, /*distinguishSynthesizedDecls*/ true);
   if (SynthesizedBaseTypeDecl) {
     OS << "::SYNTHESIZED::";
     ide::printDeclUSR(SynthesizedBaseTypeDecl, OS);
@@ -781,10 +890,12 @@ bool Symbol::supportsKind(DeclKind Kind) {
   case DeclKind::Destructor: LLVM_FALLTHROUGH;
   case DeclKind::Func: LLVM_FALLTHROUGH;
   case DeclKind::Var: LLVM_FALLTHROUGH;
+  case DeclKind::Param: LLVM_FALLTHROUGH;
   case DeclKind::Subscript: LLVM_FALLTHROUGH;
   case DeclKind::TypeAlias: LLVM_FALLTHROUGH;
   case DeclKind::AssociatedType: LLVM_FALLTHROUGH;
-  case DeclKind::Extension:
+  case DeclKind::Extension: LLVM_FALLTHROUGH;
+  case DeclKind::Macro:
     return true;
   default:
     return false;
@@ -800,7 +911,7 @@ AccessLevel Symbol::getEffectiveAccessLevel(const ExtensionDecl *ED) {
   }
 
   AccessLevel maxInheritedAL = AccessLevel::Private;
-  for (auto Inherited : ED->getInherited()) {
+  for (auto Inherited : ED->getInherited().getEntries()) {
     if (const auto Type = Inherited.getType()) {
       if (const auto *Proto = dyn_cast_or_null<ProtocolDecl>(
               Type->getAnyNominal())) {

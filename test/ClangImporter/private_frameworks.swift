@@ -1,3 +1,5 @@
+// REQUIRES: rdar113413583
+
 // RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround

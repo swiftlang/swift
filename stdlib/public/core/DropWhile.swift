@@ -21,15 +21,17 @@ public struct LazyDropWhileSequence<Base: Sequence> {
   @usableFromInline // lazy-performance
   internal let _predicate: (Element) -> Bool
 
-  /// Create an instance with elements `transform(x)` for each element
+  /// Create an instance with elements `predicate(x)` for each element
   /// `x` of base.
   @inlinable // lazy-performance
   internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
-
 }
+
+@available(*, unavailable)
+extension LazyDropWhileSequence: Sendable {}
 
 extension LazyDropWhileSequence {
   /// An iterator over the elements traversed by a base iterator that follow the
@@ -56,6 +58,9 @@ extension LazyDropWhileSequence {
     }
   }
 }
+
+@available(*, unavailable)
+extension LazyDropWhileSequence.Iterator: Sendable {}
 
 extension LazyDropWhileSequence.Iterator: IteratorProtocol {
   @inlinable // lazy-performance

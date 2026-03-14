@@ -72,16 +72,26 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///   `unsafeBitCast(_:to:)` with class or pointer types; doing so may
 ///   introduce undefined behavior.
 ///
-/// - Warning: Calling this function breaks the guarantees of the Swift type
-///   system; use with extreme care.
+/// Warning: Calling this function breaks the guarantees of the Swift type
+/// system; use with extreme care.
 ///
-/// - Parameters:
+/// Warning: Casting from an integer or a pointer type to a reference type
+/// is undefined behavior. It may result in incorrect code in any future
+/// compiler release. To convert a bit pattern to a reference type:
+/// 1. convert the bit pattern to an UnsafeRawPointer.
+/// 2. create an unmanaged reference using Unmanaged.fromOpaque()
+/// 3. obtain a managed reference using Unmanaged.takeUnretainedValue()
+/// The programmer must ensure that the resulting reference has already been
+/// manually retained.
+///
+/// Parameters:
 ///   - x: The instance to cast to `type`.
 ///   - type: The type to cast `x` to. `type` and the type of `x` must have the
 ///     same size of memory representation and compatible memory layout.
-/// - Returns: A new instance of type `U`, cast from `x`.
+/// Returns: A new instance of type `U`, cast from `x`.
 @inlinable // unsafe-performance
 @_transparent
+@unsafe
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
     "Can't unsafeBitCast between types of different sizes")
@@ -100,17 +110,33 @@ public func _identityCast<T, U>(_ x: T, to expectedType: U.Type) -> U {
   return Builtin.reinterpretCast(x)
 }
 
+/// Returns `x` as its concrete type `U`, or `nil` if `x` has a different
+/// concrete type.
+///
+/// This cast can be useful for dispatching to specializations of generic
+/// functions.
+@_alwaysEmitIntoClient
+@_transparent
+public func _specialize<T, U>(_ x: T, for: U.Type) -> U? {
+  guard T.self == U.self else {
+    return nil
+  }
+
+  let result: U = Builtin.reinterpretCast(x)
+  return result
+}
+
 /// `unsafeBitCast` something to `AnyObject`.
 @usableFromInline @_transparent
 internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
-  return unsafeBitCast(x, to: AnyObject.self)
+  return unsafe unsafeBitCast(x, to: AnyObject.self)
 }
 
 @usableFromInline @_transparent
 internal func == (
   lhs: Builtin.NativeObject, rhs: Builtin.NativeObject
 ) -> Bool {
-  return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
+  return unsafe unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @usableFromInline @_transparent
@@ -124,7 +150,7 @@ internal func != (
 internal func == (
   lhs: Builtin.RawPointer, rhs: Builtin.RawPointer
 ) -> Bool {
-  return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
+  return unsafe unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @usableFromInline @_transparent
@@ -139,13 +165,27 @@ internal func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
 ///   - t1: Another type to compare.
 /// - Returns: `true` if both `t0` and `t1` are `nil` or if they represent the
 ///   same type; otherwise, `false`.
-@inlinable
-public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
+@_alwaysEmitIntoClient
+@_transparent
+public func == (
+  t0: (any (~Copyable & ~Escapable).Type)?,
+  t1: (any (~Copyable & ~Escapable).Type)?
+) -> Bool {
   switch (t0, t1) {
-  case (.none, .none): return true
+  case (.none, .none):
+    return true
   case let (.some(ty0), .some(ty1)):
+#if compiler(>=5.3) && $GeneralizedIsSameMetaTypeBuiltin
     return Bool(Builtin.is_same_metatype(ty0, ty1))
-  default: return false
+#else
+    // FIXME: Remove this branch once all supported compilers understand the
+    // generalized is_same_metatype builtin
+    let p1 = unsafeBitCast(ty0, to: UnsafeRawPointer.self)
+    let p2 = unsafeBitCast(ty1, to: UnsafeRawPointer.self)
+    return p1 == p2
+#endif
+  default:
+    return false
   }
 }
 
@@ -156,11 +196,35 @@ public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
 ///   - t1: Another type to compare.
 /// - Returns: `true` if one, but not both, of `t0` and `t1` are `nil`, or if
 ///   they represent different types; otherwise, `false`.
-@inlinable
-public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
-  return !(t0 == t1)
+@_alwaysEmitIntoClient
+@_transparent
+public func != (
+  t0: (any (~Copyable & ~Escapable).Type)?,
+  t1: (any (~Copyable & ~Escapable).Type)?
+) -> Bool {
+  !(t0 == t1)
 }
 
+#if !$Embedded
+// Embedded Swift is unhappy about conversions from `Any.Type` to
+// `any (~Copyable & ~Escapable).Type` (rdar://145706221)
+@usableFromInline
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+internal func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
+  switch (t0, t1) {
+  case (.none, .none): return true
+  case let (.some(ty0), .some(ty1)):
+    return Bool(Builtin.is_same_metatype(ty0, ty1))
+  default: return false
+  }
+}
+
+@usableFromInline
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+internal func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
+  !(t0 == t1)
+}
+#endif
 
 /// Tell the optimizer that this code is unreachable if condition is
 /// known at compile-time to be true.  If condition is false, or true
@@ -217,6 +281,7 @@ internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
 /// be either a class or a class protocol. Either T, U, or both may be
 /// optional references.
 @_transparent
+@unsafe
 public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
   return Builtin.castReference(x)
 }
@@ -240,12 +305,14 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
 ///   - type: The type `T` to which `x` is cast.
 /// - Returns: The instance `x`, cast to type `T`.
 @_transparent
+@unsafe
 public func unsafeDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
 
 @_transparent
+@unsafe
 public func _unsafeUncheckedDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
   _internalInvariant(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
@@ -255,10 +322,10 @@ public func _unsafeUncheckedDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Ty
 @inline(__always)
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
   -> UnsafeMutableRawPointer {
-  let storedPropertyOffset = _roundUp(
+  let storedPropertyOffset = unsafe _roundUp(
     MemoryLayout<SwiftShims.HeapObject>.size,
     toAlignment: MemoryLayout<Optional<AnyObject>>.alignment)
-  return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(x)) +
+  return unsafe UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(x)) +
     storedPropertyOffset
 }
 
@@ -306,6 +373,7 @@ public func _onFastPath() {
 // Optimizer hint that the condition is true. The condition is unchecked.
 // The builtin acts as an opaque instruction with side-effects.
 @usableFromInline @_transparent
+@unsafe
 func _uncheckedUnsafeAssume(_ condition: Bool) {
   _ = Builtin.assume_Int1(condition._value)
 }
@@ -397,18 +465,20 @@ internal var _objectPointerLowSpareBitShift: UInt {
     }
 }
 
-#if arch(i386) || arch(arm) || arch(wasm32) || arch(powerpc) || arch(powerpc64) || arch(
-  powerpc64le) || arch(s390x) || arch(arm64_32)
 @inlinable
 internal var _objectPointerIsObjCBit: UInt {
-    @inline(__always) get { return 0x0000_0002 }
-}
+  @inline(__always) get {
+#if _pointerBitWidth(_64)
+    return 0x4000_0000_0000_0000
+#elseif _pointerBitWidth(_32)
+    return 0x0000_0002
+#elseif _pointerBitWidth(_16)
+    return 0x0000
 #else
-@inlinable
-internal var _objectPointerIsObjCBit: UInt {
-  @inline(__always) get { return 0x4000_0000_0000_0000 }
-}
+#error("Unknown platform")
 #endif
+  }
+}
 
 /// Extract the raw bits of `x`.
 @inlinable
@@ -464,6 +534,7 @@ func _getNonTagBits(_ x: Builtin.BridgeObject) -> UInt {
 // Values -> BridgeObject
 @inline(__always)
 @inlinable
+@_unavailableInEmbedded
 public func _bridgeObject(fromNative x: AnyObject) -> Builtin.BridgeObject {
   _internalInvariant(!_isObjCTaggedPointer(x))
   let object = Builtin.castToBridgeObject(x, 0._builtinWordValue)
@@ -473,6 +544,7 @@ public func _bridgeObject(fromNative x: AnyObject) -> Builtin.BridgeObject {
 
 @inline(__always)
 @inlinable
+@_unavailableInEmbedded
 public func _bridgeObject(
   fromNonTaggedObjC x: AnyObject
 ) -> Builtin.BridgeObject {
@@ -535,6 +607,7 @@ public func _bridgeObject(toTagPayload x: Builtin.BridgeObject) -> UInt {
 
 @inline(__always)
 @inlinable
+@_unavailableInEmbedded
 public func _bridgeObject(
   fromNativeObject x: Builtin.NativeObject
 ) -> Builtin.BridgeObject {
@@ -547,6 +620,7 @@ public func _bridgeObject(
 
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 public func _nativeObject(fromNative x: AnyObject) -> Builtin.NativeObject {
   _internalInvariant(!_isObjCTaggedPointer(x))
   let native = Builtin.unsafeCastToNativeObject(x)
@@ -556,6 +630,7 @@ public func _nativeObject(fromNative x: AnyObject) -> Builtin.NativeObject {
 
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 public func _nativeObject(
   fromBridge x: Builtin.BridgeObject
 ) -> Builtin.NativeObject {
@@ -588,6 +663,7 @@ extension ManagedBufferPointer {
 ///   `bits & _objectPointerSpareBits == bits`.
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 internal func _makeNativeBridgeObject(
   _ nativeObject: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
@@ -601,6 +677,7 @@ internal func _makeNativeBridgeObject(
 /// Create a `BridgeObject` around the given `objCObject`.
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 public // @testable
 func _makeObjCBridgeObject(
   _ objCObject: AnyObject
@@ -621,6 +698,7 @@ func _makeObjCBridgeObject(
 ///      _objectPointerIsObjCBit`.
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 internal func _makeBridgeObject(
   _ object: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
@@ -687,18 +765,20 @@ internal func _isUnique<T>(_ object: inout T) -> Bool {
 }
 
 /// Returns `true` if `object` is uniquely referenced.
-/// This provides sanity checks on top of the Builtin.
+/// This provides soundness checks on top of the Builtin.
 @_transparent
 public // @testable
 func _isUnique_native<T>(_ object: inout T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
   // reference. Any case it's non pointer bits must be zero, so
   // force cast it to BridgeObject and check the spare bits.
+  #if !$Embedded
   _internalInvariant(
     (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
     == 0)
   _internalInvariant(_usesNativeSwiftReferenceCounting(
       type(of: Builtin.reinterpretCast(object) as AnyObject)))
+  #endif
   return Bool(Builtin.isUnique_native(&object))
 }
 
@@ -712,9 +792,10 @@ func _COWBufferForReading<T: AnyObject>(_ object: T) -> T {
 /// Returns `true` if type is a POD type. A POD type is a type that does not
 /// require any special handling on copying or destruction.
 @_transparent
+@_preInverseGenerics
 public // @testable
-func _isPOD<T>(_ type: T.Type) -> Bool {
-  return Bool(Builtin.ispod(type))
+func _isPOD<T: ~Copyable & ~Escapable>(_ type: T.Type) -> Bool {
+  Bool(Builtin.ispod(type))
 }
 
 /// Returns `true` if `type` is known to refer to a concrete type once all
@@ -761,6 +842,7 @@ internal func _isComputed(_ value: Int) -> Bool {
 
 /// Extract an object reference from an Any known to contain an object.
 @inlinable
+@_unavailableInEmbedded
 internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
   _internalInvariant(type(of: any) is AnyObject.Type
                || type(of: any) is AnyObject.Protocol,
@@ -896,14 +978,27 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 ///
 /// - Parameter value: The value for which to find the dynamic type.
 /// - Returns: The dynamic type, which is a metatype instance.
-@_transparent
+@_alwaysEmitIntoClient
 @_semantics("typechecker.type(of:)")
-public func type<T, Metatype>(of value: T) -> Metatype {
+public func type<T: ~Copyable & ~Escapable, Metatype>(
+  of value: borrowing T
+) -> Metatype {
   // This implementation is never used, since calls to `Swift.type(of:)` are
   // resolved as a special case by the type checker.
-  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+  unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
     ("internal consistency error: 'type(of:)' operation failed to resolve"
      as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss4type2ofq_x_tr0_lF")
+@usableFromInline
+func __abi_type<T, Metatype>(of value: T) -> Metatype {
+  // This is a legacy entry point for the original definition of `type(of:)`
+  // that the stdlib originally exported for no good reason. The current
+  // definition no longer exports a symbol, and nothing is expected to link to
+  // it, but we keep it around anyway.
   Builtin.unreachable()
 }
 
@@ -988,31 +1083,63 @@ public func type<T, Metatype>(of value: T) -> Metatype {
 ///   - body: A closure that is executed immediately with an escapable copy of
 ///     `closure` as its argument.
 /// - Returns: The return value, if any, of the `body` closure.
+@_alwaysEmitIntoClient
 @_transparent
 @_semantics("typechecker.withoutActuallyEscaping(_:do:)")
-public func withoutActuallyEscaping<ClosureType, ResultType>(
+public func withoutActuallyEscaping<ClosureType, ResultType, Failure>(
   _ closure: ClosureType,
-  do body: (_ escapingClosure: ClosureType) throws -> ResultType
-) rethrows -> ResultType {
+  do body: (_ escapingClosure: ClosureType) throws(Failure) -> ResultType
+) throws(Failure) -> ResultType {
   // This implementation is never used, since calls to
   // `Swift.withoutActuallyEscaping(_:do:)` are resolved as a special case by
   // the type checker.
-  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+  unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
     ("internal consistency error: 'withoutActuallyEscaping(_:do:)' operation failed to resolve"
      as StaticString).utf8Start._rawValue)
   Builtin.unreachable()
 }
 
+@_silgen_name("$ss23withoutActuallyEscaping_2doq_x_q_xKXEtKr0_lF")
+@usableFromInline
+func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
+  _ closure: ClosureType,
+  do body: (_ escapingClosure: ClosureType) throws -> ResultType
+) throws -> ResultType {
+  // This implementation is never used, since calls to
+  // `Swift.withoutActuallyEscaping(_:do:)` are resolved as a special case by
+  // the type checker.
+  unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: 'withoutActuallyEscaping(_:do:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
+@_alwaysEmitIntoClient
 @_transparent
 @_semantics("typechecker._openExistential(_:do:)")
-public func _openExistential<ExistentialType, ContainedType, ResultType>(
+public func _openExistential<ExistentialType, ContainedType, ResultType, Failure>(
   _ existential: ExistentialType,
-  do body: (_ escapingClosure: ContainedType) throws -> ResultType
-) rethrows -> ResultType {
+  do body: (_ escapingClosure: ContainedType) throws(Failure) -> ResultType
+) throws(Failure) -> ResultType {
   // This implementation is never used, since calls to
   // `Swift._openExistential(_:do:)` are resolved as a special case by
   // the type checker.
-  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+  unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: '_openExistential(_:do:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
+@usableFromInline
+@_silgen_name("$ss16_openExistential_2doq0_x_q0_q_KXEtKr1_lF")
+func __abi_openExistential<ExistentialType, ContainedType, ResultType>(
+  _ existential: ExistentialType,
+  do body: (_ escapingClosure: ContainedType) throws -> ResultType
+) throws -> ResultType {
+  // This implementation is never used, since calls to
+  // `Swift._openExistential(_:do:)` are resolved as a special case by
+  // the type checker.
+  unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
     ("internal consistency error: '_openExistential(_:do:)' operation failed to resolve"
      as StaticString).utf8Start._rawValue)
   Builtin.unreachable()
@@ -1027,5 +1154,5 @@ public func _openExistential<ExistentialType, ContainedType, ResultType>(
 @_alwaysEmitIntoClient
 public // @SPI(OSLog)
 func _getGlobalStringTablePointer(_ constant: String) -> UnsafePointer<CChar> {
-  return UnsafePointer<CChar>(Builtin.globalStringTablePointer(constant));
+  return unsafe UnsafePointer<CChar>(Builtin.globalStringTablePointer(constant));
 }

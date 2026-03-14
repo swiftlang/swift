@@ -1,11 +1,12 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/Runtime.swift
-// RUN: %target-build-swift -parse-stdlib -module-name a %t/Runtime.swift -o %t.out
+// RUN: %target-build-swift -parse-stdlib -module-name a -enable-experimental-feature Extern %t/Runtime.swift -o %t.out
 // RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 // REQUIRES: reflection
+// REQUIRES: swift_feature_Extern
 
 import Swift
 import StdlibUnittest
@@ -17,6 +18,8 @@ import SwiftShims
   import Glibc
 #elseif os(WASI)
   import WASILibc
+#elseif canImport(Android)
+  import Android
 #elseif os(Windows)
   import CRT
   import WinSDK
@@ -24,8 +27,7 @@ import SwiftShims
 #error("Unsupported platform")
 #endif
 
-@_silgen_name("swift_demangle")
-public
+@_extern(c, "swift_demangle")
 func _stdlib_demangleImpl(
   mangledName: UnsafePointer<CChar>?,
   mangledNameLength: UInt,
@@ -378,7 +380,7 @@ Runtime.test("demangleName") {
   expectEqual("Foobar", _stdlib_demangleName("$s13__lldb_expr_46FoobarCD"))
 }
 
-if #available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *) {
+if #available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, visionOS 1.0, *) {
   Runtime.test("demangleTruncate") {
     // Swift.Int requires 10 bytes to be fully demangled.
     let buffer = UnsafeMutableBufferPointer<Int8>.allocate(capacity: 10)
@@ -689,9 +691,9 @@ Reflection.test("multiprotocolTypes") {
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 BitTwiddlingTestSuite.test("_pointerSize") {
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
+#if _pointerBitWidth(_32)
   expectEqual(4, MemoryLayout<Optional<AnyObject>>.size)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x) || arch(riscv64)
+#elseif _pointerBitWidth(_64)
   expectEqual(8, MemoryLayout<Optional<AnyObject>>.size)
 #else
   fatalError("implement")
@@ -713,9 +715,9 @@ BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
   expectTrue(_isPowerOf2(asInt(2)))
   expectFalse(_isPowerOf2(asInt(3)))
   expectTrue(_isPowerOf2(asInt(1024)))
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
+#if _pointerBitWidth(_32)
   // Not applicable to 32-bit architectures.
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x) || arch(riscv64)
+#elseif _pointerBitWidth(_64)
   expectTrue(_isPowerOf2(asInt(0x8000_0000)))
 #else
   fatalError("implement")
@@ -746,6 +748,16 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
                                           patch._builtinWordValue))
   }
 
+  // For calling the alternate entrypoint for macCatalyst versioning.
+#if os(iOS) && targetEnvironment(macCatalyst)
+  func isVariantAtLeastOS(_ major: Int, _ minor: Int, _ patch: Int) -> Bool {
+    return Bool(_builtinBooleanLiteral: _stdlib_isVariantOSVersionAtLeast(
+                                          major._builtinWordValue,
+                                          minor._builtinWordValue,
+                                          patch._builtinWordValue))
+  }
+#endif
+
 // _stdlib_isOSVersionAtLeast is broken for
 // watchOS. rdar://problem/20234735
 #if canImport(Darwin) && _runtime(_ObjC)
@@ -766,6 +778,11 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
   let _swift_classIsSwiftMaskPtr = dlsym(RTLD_DEFAULT, "_swift_classIsSwiftMask")
   if _swift_classIsSwiftMaskPtr != nil {
     expectTrue(isAtLeastOS(9999, 0, 0))
+#if os(iOS) && targetEnvironment(macCatalyst)
+    // On macCatalyst we need to check the variant (iOS) version rather than
+    // the macOS version.
+    expectTrue(isVariantAtLeastOS(9999, 0, 0))
+#endif
   }
 #endif
 }

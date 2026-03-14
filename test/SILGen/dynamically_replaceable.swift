@@ -1,6 +1,12 @@
-// RUN: %target-swift-emit-silgen -swift-version 5 %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -swift-version 5 %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
-// RUN: %target-swift-emit-silgen -swift-version 5 %s -disable-previous-implementation-calls-in-dynamic-replacements | %FileCheck %s --check-prefix=NOPREVIOUS
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -disable-previous-implementation-calls-in-dynamic-replacements | %FileCheck %s --check-prefix=NOPREVIOUS
+
+// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable6$deferL_yyF
+var x = 10
+defer {
+  let y = x
+}
 
 // CHECK-LABEL: sil hidden [ossa] @$s23dynamically_replaceable014maybe_dynamic_B0yyF : $@convention(thin) () -> () {
 // IMPLICIT-LABEL: sil hidden [dynamically_replacable] [ossa] @$s23dynamically_replaceable014maybe_dynamic_B0yyF : $@convention(thin) () -> () {
@@ -379,15 +385,9 @@ dynamic func funcWithDefaultArg(_ arg : String = String("hello")) {
   print("hello")
 }
 
-// IMPLICIT-LABEL: sil hidden [thunk] [ossa] @barfoo
+// IMPLICIT-LABEL: sil hidden [thunk] [asmname "barfoo"] [ossa] @$s23dynamically_replaceable6foobaryyFTo
 @_cdecl("barfoo")
 func foobar() {
-}
-
-// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable6$deferL_yyF
-var x = 10
-defer {
-  let y = x
 }
 
 // IMPLICIT-LABEL: sil [dynamically_replacable] [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF
@@ -401,8 +401,8 @@ public func testWithLocalFun() {
     localLocalFun()
   }
   localFun()
-  let unamedClosure = { print("foo") }
-  unamedClosure()
+  let unnamedClosure = { print("foo") }
+  unnamedClosure()
 }
 
 @propertyWrapper

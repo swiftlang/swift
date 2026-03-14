@@ -89,6 +89,11 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
   /// The flat map sequence produces the type of element in the asynchronous
   /// sequence produced by the `transform` closure.
   public typealias Element = SegmentOfResult.Element
+  /// The type of error produced by this asynchronous sequence.
+  ///
+  /// The flat map sequence produces errors from either the base
+  /// sequence or the `transform` closure.
+  public typealias Failure = any Error
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
@@ -149,6 +154,57 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
             segment = try await transform(item)
             var iterator = segment.makeAsyncIterator()
             guard let element = try await iterator.next() else {
+              currentIterator = nil
+              continue
+            }
+            currentIterator = iterator
+            return element
+          } catch {
+            finished = true
+            currentIterator = nil
+            throw error
+          }
+        }
+      }
+      return nil
+    }
+
+    /// Produces the next element in the flat map sequence.
+    ///
+    /// This iterator calls `next(isolation:)` on its base iterator; if this
+    /// call returns `nil`, `next(isolation:)` returns `nil`. Otherwise,
+    /// `next(isolation:)` calls the transforming closure on the received
+    /// element, takes the resulting asynchronous sequence, and creates an
+    /// asynchronous iterator from it.  `next(isolation:)` then consumes values
+    /// from this iterator until it terminates.  At this point,
+    /// `next(isolation:)` is ready to receive the next value from the base
+    /// sequence. If `transform` throws an error, the sequence terminates.
+    @available(SwiftStdlib 6.0, *)
+    @inlinable
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> SegmentOfResult.Element? {
+      while !finished {
+        if var iterator = currentIterator {
+          do {
+            guard let element = try await iterator.next(isolation: actor) else {
+              currentIterator = nil
+              continue
+            }
+            // restore the iterator since we just mutated it with next
+            currentIterator = iterator
+            return element
+          } catch {
+            finished = true
+            throw error
+          }
+        } else {
+          guard let item = try await baseIterator.next(isolation: actor) else {
+            return nil
+          }
+          let segment: SegmentOfResult
+          do {
+            segment = try await transform(item)
+            var iterator = segment.makeAsyncIterator()
+            guard let element = try await iterator.next(isolation: actor) else {
               currentIterator = nil
               continue
             }

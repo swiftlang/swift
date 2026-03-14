@@ -15,30 +15,85 @@
 //===----------------------------------------------------------------------===//
 // Standardized uninhabited type
 //===----------------------------------------------------------------------===//
-/// The return type of functions that do not return normally, that is, a type
-/// with no values.
+/// A type that has no values and can't be constructed.
 ///
-/// Use `Never` as the return type when declaring a closure, function, or
-/// method that unconditionally throws an error, traps, or otherwise does
-/// not terminate.
+/// Use `Never` as the return type of a function
+/// that doesn't return normally --- for example,
+/// because it runs forever or terminates the program.
 ///
+///     // An infinite loop never returns.
+///     func forever() -> Never {
+///         while true {
+///             print("I will print forever.")
+///         }
+///     }
+///
+///     // Calling fatalError(_:file:line:) unconditionally stops the program.
 ///     func crashAndBurn() -> Never {
 ///         fatalError("Something very, very bad happened")
 ///     }
+///
+/// A function that returns `Never` is called a _nonreturning_ function.
+/// Closures, methods, computed properties, and subscripts
+/// can also be nonreturning.
+///
+/// There's no way to create an instance of `Never`;
+/// this characteristic makes it an _uninhabited_ type.
+/// You can use an uninhabited type like `Never`
+/// to represent states in your program
+/// that are impossible to reach during execution.
+/// Swift's type system uses this information ---
+/// for example, to reason about control statements
+/// in cases that are known to be unreachable.
+///
+///     let favoriteNumber: Result<Int, Never> = .success(42)
+///     switch favoriteNumber {
+///     case .success(let value):
+///         print("My favorite number is", value)
+///     }
+///
+/// In the code above,
+/// `favoriteNumber` has a failure type of `Never`,
+/// indicating that it always succeeds.
+/// The switch statement is therefore exhaustive,
+/// even though it doesn't contain a `.failure` case,
+/// because that case could never be reached.
 @frozen
 public enum Never {}
 
-extension Never: Sendable { }
+extension Never: BitwiseCopyable {}
+
+extension Never: Sendable {}
 
 extension Never: Error {}
 
 extension Never: Equatable, Comparable, Hashable {}
 
 @available(SwiftStdlib 5.5, *)
+@_unavailableInEmbedded
 extension Never: Identifiable {
   @available(SwiftStdlib 5.5, *)
   public var id: Never {
     switch self {}
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+@_unavailableInEmbedded
+extension Never: Encodable {
+  @available(SwiftStdlib 5.9, *)
+  public func encode(to encoder: any Encoder) throws {}
+}
+
+@available(SwiftStdlib 5.9, *)
+@_unavailableInEmbedded
+extension Never: Decodable {
+  @available(SwiftStdlib 5.9, *)
+  public init(from decoder: any Decoder) throws {
+    let context = DecodingError.Context(
+      codingPath: decoder.codingPath,
+      debugDescription: "Unable to decode an instance of Never.")
+    throw DecodingError.typeMismatch(Never.self, context)
   }
 }
 
@@ -100,17 +155,20 @@ public typealias FloatLiteralType = Double
 public typealias BooleanLiteralType = Bool
 
 /// The default type for an otherwise-unconstrained unicode scalar literal.
+@_unavailableInEmbedded
 public typealias UnicodeScalarType = String
 /// The default type for an otherwise-unconstrained Unicode extended
 /// grapheme cluster literal.
+@_unavailableInEmbedded
 public typealias ExtendedGraphemeClusterType = String
 /// The default type for an otherwise-unconstrained string literal.
+@_unavailableInEmbedded
 public typealias StringLiteralType = String
 
 //===----------------------------------------------------------------------===//
 // Default types for unconstrained number literals
 //===----------------------------------------------------------------------===//
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE80
 #else
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64

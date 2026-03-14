@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -target %target-swift-5.1-abi-triple -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -target %target-swift-5.1-abi-triple -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -7,6 +9,9 @@
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+
+// rdar://105496007
+// UNSUPPORTED: CPU=arm64e
 
 @available(SwiftStdlib 5.1, *)
 enum TL {

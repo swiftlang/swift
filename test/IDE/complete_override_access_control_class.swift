@@ -98,7 +98,6 @@ public class TestPublicAD : ProtocolAPrivate, ProtocolD {
 // TEST_PRIVATE_AD-DAG: Decl[InstanceMethod]/Super:         override func colliding() {|}; name=colliding()
 // TEST_PRIVATE_AD-DAG: Decl[InstanceMethod]/Super:         override func collidingGeneric<T>(x: T) {|}; name=collidingGeneric(x:)
 // TEST_PRIVATE_AD-DAG: Decl[Constructor]/Super:            override init(fromBase: TagPA) {|}; name=init(fromBase:)
-// TEST_PRIVATE_AD: End completions
 
 // TEST_INTERNAL_AD: Begin completions, 6 items
 // TEST_INTERNAL_AD-DAG: Decl[InstanceMethod]/Super:         override func baseAFunc(x: TagPA) {|}; name=baseAFunc(x:)
@@ -107,12 +106,10 @@ public class TestPublicAD : ProtocolAPrivate, ProtocolD {
 // TEST_INTERNAL_AD-DAG: Decl[InstanceMethod]/Super:         override func colliding() {|}; name=colliding()
 // TEST_INTERNAL_AD-DAG: Decl[InstanceMethod]/Super:         override func collidingGeneric<T>(x: T) {|}; name=collidingGeneric(x:)
 // TEST_INTERNAL_AD-DAG: Decl[Constructor]/Super:            override init(fromBase: TagPA) {|}; name=init(fromBase:)
-// TEST_INTERNAL_AD: End completions
 
 // TEST_PUBLIC_AD: Begin completions, 2 items
 // TEST_PUBLIC_AD-DAG: Decl[InstanceMethod]/Super:         public func colliding() {|}; name=colliding()
 // TEST_PUBLIC_AD-DAG: Decl[InstanceMethod]/Super:         public func collidingGeneric<T>(x: T) {|}; name=collidingGeneric(x:)
-// TEST_PUBLIC_AD: End completions
 
 private class TestPrivateBD : BaseBInternal, ProtocolD {
   #^TEST_PRIVATE_BD^#
@@ -135,7 +132,6 @@ public class TestPublicBD : BaseBInternal, ProtocolD {
 // TEST_PRIVATE_BD-DAG: Decl[InstanceMethod]/Super:         override func colliding() {|}; name=colliding()
 // TEST_PRIVATE_BD-DAG: Decl[InstanceMethod]/Super:         override func collidingGeneric<T>(x: T) {|}; name=collidingGeneric(x:)
 // TEST_PRIVATE_BD-DAG: Decl[Constructor]/Super:            override init(fromBaseB: TagPB) {|}; name=init(fromBaseB:)
-// TEST_PRIVATE_BD: End completions
 
 // TEST_INTERNAL_BD: Begin completions, 6 items
 // TEST_INTERNAL_BD-DAG: Decl[InstanceMethod]/Super:         override func baseBFunc(x: TagPB) {|}; name=baseBFunc(x:)
@@ -144,7 +140,6 @@ public class TestPublicBD : BaseBInternal, ProtocolD {
 // TEST_INTERNAL_BD-DAG: Decl[InstanceMethod]/Super:         override func colliding() {|}; name=colliding()
 // TEST_INTERNAL_BD-DAG: Decl[InstanceMethod]/Super:         override func collidingGeneric<T>(x: T) {|}; name=collidingGeneric(x:)
 // TEST_INTERNAL_BD-DAG: Decl[Constructor]/Super:            override init(fromBaseB: TagPB) {|}; name=init(fromBaseB:)
-// TEST_INTERNAL_BD: End completions
 
 // TEST_PUBLIC_BD: Begin completions, 6 items
 // TEST_PUBLIC_BD-DAG: Decl[InstanceMethod]/Super:         override func baseBFunc(x: TagPB) {|}; name=baseBFunc(x:)
@@ -153,7 +148,6 @@ public class TestPublicBD : BaseBInternal, ProtocolD {
 // TEST_PUBLIC_BD-DAG: Decl[InstanceMethod]/Super:         public override func colliding() {|}; name=colliding()
 // TEST_PUBLIC_BD-DAG: Decl[InstanceMethod]/Super:         public override func collidingGeneric<T>(x: T) {|}; name=collidingGeneric(x:)
 // TEST_PUBLIC_BD-DAG: Decl[Constructor]/Super:            override init(fromBaseB: TagPB) {|}; name=init(fromBaseB:)
-// TEST_PUBLIC_BD: End completions
 
 private class TestPrivateCD : BaseCPublic, ProtocolD {
   #^TEST_PRIVATE_CD^#
@@ -176,7 +170,6 @@ public class TestPublicCD : BaseCPublic, ProtocolD {
 // TEST_PRIVATE_CD-DAG: Decl[InstanceMethod]/Super:         override func colliding() {|}; name=colliding()
 // TEST_PRIVATE_CD-DAG: Decl[InstanceMethod]/Super:         override func collidingGeneric<T>(x: T) {|}; name=collidingGeneric(x:)
 // TEST_PRIVATE_CD-DAG: Decl[Constructor]/Super:            override init(fromBaseC: TagPC) {|}; name=init(fromBaseC:)
-// TEST_PRIVATE_CD: End completions
 
 // TEST_INTERNAL_CD: Begin completions, 6 items
 // TEST_INTERNAL_CD-DAG: Decl[InstanceMethod]/Super:         override func baseCFunc(x: TagPC) {|}; name=baseCFunc(x:)
@@ -185,7 +178,6 @@ public class TestPublicCD : BaseCPublic, ProtocolD {
 // TEST_INTERNAL_CD-DAG: Decl[InstanceMethod]/Super:         override func colliding() {|}; name=colliding()
 // TEST_INTERNAL_CD-DAG: Decl[InstanceMethod]/Super:         override func collidingGeneric<T>(x: T) {|}; name=collidingGeneric(x:)
 // TEST_INTERNAL_CD-DAG: Decl[Constructor]/Super:            override init(fromBaseC: TagPC) {|}; name=init(fromBaseC:)
-// TEST_INTERNAL_CD: End completions
 
 // TEST_PUBLIC_CD: Begin completions, 6 items
 // TEST_PUBLIC_CD-DAG: Decl[InstanceMethod]/Super:         public override func baseCFunc(x: TagPC) {|}; name=baseCFunc(x:)
@@ -194,5 +186,4 @@ public class TestPublicCD : BaseCPublic, ProtocolD {
 // TEST_PUBLIC_CD-DAG: Decl[InstanceMethod]/Super:         public override func colliding() {|}; name=colliding()
 // TEST_PUBLIC_CD-DAG: Decl[InstanceMethod]/Super:         public override func collidingGeneric<T>(x: T) {|}; name=collidingGeneric(x:)
 // TEST_PUBLIC_CD-DAG: Decl[Constructor]/Super:            public override init(fromBaseC: TagPC) {|}; name=init(fromBaseC:)
-// TEST_PUBLIC_CD: End completions
 

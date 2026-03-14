@@ -38,6 +38,13 @@
 #define CONTEXT_DECL(Id, Parent) DECL(Id, Parent)
 #endif
 
+/// ABSTRACT_CONTEXT_DECL(Id, Parent)
+///   Used for abstract Decls that are also DeclContexts.
+///
+#ifndef ABSTRACT_CONTEXT_DECL
+#define ABSTRACT_CONTEXT_DECL(Id, Parent) ABSTRACT_DECL(Id, Parent)
+#endif
+
 /// ITERABLE_NONGENERIC_DECL(Id, Parent)
 ///   Used for Decls that are also IterableDeclContexts and DeclContexts. The
 ///   default behavior is to do the same as for CONTEXT_DECL. This combination
@@ -145,8 +152,8 @@
 
 ABSTRACT_DECL(Value, Decl)
   ABSTRACT_DECL(Type, ValueDecl)
-    ABSTRACT_DECL(GenericType, TypeDecl)
-      ABSTRACT_DECL(NominalType, GenericTypeDecl)
+    ABSTRACT_CONTEXT_DECL(GenericType, TypeDecl)
+      ABSTRACT_CONTEXT_DECL(NominalType, GenericTypeDecl)
         NOMINAL_TYPE_DECL(Enum, NominalTypeDecl)
         NOMINAL_TYPE_DECL(Struct, NominalTypeDecl)
         NOMINAL_TYPE_DECL(Class, NominalTypeDecl)
@@ -165,7 +172,7 @@ ABSTRACT_DECL(Value, Decl)
       VALUE_DECL(Param, VarDecl)
     GENERIC_VALUE_DECL(Subscript, AbstractStorageDecl)
     DECL_RANGE(AbstractStorage, Var, Subscript)
-  ABSTRACT_DECL(AbstractFunction, ValueDecl)
+  ABSTRACT_CONTEXT_DECL(AbstractFunction, ValueDecl)
     ABSTRACT_FUNCTION_DECL(Constructor, AbstractFunctionDecl)
     ABSTRACT_FUNCTION_DECL(Destructor, AbstractFunctionDecl)
     ABSTRACT_FUNCTION_DECL(Func, AbstractFunctionDecl)
@@ -178,13 +185,12 @@ ABSTRACT_DECL(Value, Decl)
 ITERABLE_GENERIC_DECL(Extension, Decl)
 CONTEXT_DECL(TopLevelCode, Decl)
 DECL(Import, Decl)
-DECL(IfConfig, Decl)
-DECL(PoundDiagnostic, Decl)
 DECL(PrecedenceGroup, Decl)
 DECL(Missing, Decl)
 DECL(MissingMember, Decl)
 DECL(PatternBinding, Decl)
 DECL(EnumCase, Decl)
+DECL(Using, Decl)
 
 ABSTRACT_DECL(Operator, Decl)
   OPERATOR_DECL(InfixOperator, OperatorDecl)
@@ -208,6 +214,7 @@ LAST_DECL(MacroExpansion)
 #undef ABSTRACT_FUNCTION_DECL
 #undef VALUE_DECL
 #undef DECL_RANGE
+#undef ABSTRACT_CONTEXT_DECL
 #undef ABSTRACT_DECL
 #undef OPERATOR_DECL
 #undef DECL

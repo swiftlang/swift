@@ -16,6 +16,14 @@ void setConstStaticIntRvalueRef(const int &&);
 auto getFuncRef() -> int (&)();
 auto getFuncRvalueRef() -> int (&&)();
 
+using ConstIntRefTypealias = const int &;
+
+void setConstStaticIntRefTypealias(ConstIntRefTypealias ref);
+
+using IntRefTypealias = int &;
+
+void setStaticIntRefTypealias(IntRefTypealias ref);
+
 template<class T>
 struct ClassTemplate {};
 
@@ -27,6 +35,8 @@ const ClassTemplate<T> &refToDependent() { return ClassTemplate<T>(); }
 void dontImportAtomicRef(_Atomic(int)&) { }
 
 void takeConstRef(const int &);
+inline bool takeConstRefBool(const bool &b) { return b; }
+inline void takeRefBool(bool &b) { b = true; }
 
 template<class T>
 T &refToTemplate(T &t) { return t; }

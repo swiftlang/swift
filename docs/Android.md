@@ -8,7 +8,7 @@ device running Android or an emulator. This guide explains:
 2. How to run the Swift test suite on an Android device.
 
 If you encounter any problems following the instructions below, please
-[file an issue](https://github.com/apple/swift/issues) and apply the "Android"
+[file an issue](https://github.com/swiftlang/swift/issues) and apply the "Android"
 label.
 
 ## FAQ
@@ -22,21 +22,17 @@ on an Android device, it takes a lot more than just the Swift stdlib to write
 an app. You'd need some sort of framework to build a user interface for your
 application, which the Swift stdlib does not provide.
 
-Alternatively, one could theoretically call into Java interfaces from Swift,
-but unlike as with Objective-C, the Swift compiler does nothing to facilitate
-Swift-to-Java bridging.
-
 ## Prerequisites
 
 To follow along with this guide, you'll need:
 
 1. A Linux environment capable of building Swift from source, preferably
-   Ubuntu 20.04 or Ubuntu 18.04. Before attempting to build for Android,
+   Ubuntu 24.04 or Ubuntu 22.04. Before attempting to build for Android,
    please make sure you are able to build for Linux by following the
    instructions in the Swift project README.
 2. The latest build of the Swift compiler for your Linux distro, available at
-   https://www.swift.org/download/ or sometimes your distro package manager.
-3. The latest version of the Android LTS NDK (r25b at the time of this writing),
+   https://www.swift.org/install/linux/ or sometimes your distro package manager.
+3. The latest version of the Android LTS NDK (r27d at the time of this writing),
    available to download here:
    https://developer.android.com/ndk/downloads
 4. An Android device with remote debugging enabled or the emulator. We require
@@ -54,9 +50,9 @@ and the prebuilt Swift toolchain (add --skip-early-swift-driver if you already
 have a Swift toolchain in your path):
 
 ```
-$ NDK_PATH=path/to/android-ndk-r25b
-$ SWIFT_PATH=path/to/swift-DEVELOPMENT-SNAPSHOT-2022-05-31-a-ubuntu20.04/usr/bin
-$ git checkout swift-DEVELOPMENT-SNAPSHOT-2022-05-31-a
+$ NDK_PATH=path/to/android-ndk-r27d
+$ SWIFT_PATH=path/to/swift-DEVELOPMENT-SNAPSHOT-2025-08-07-a-ubuntu24.04/usr/bin
+$ git checkout swift-DEVELOPMENT-SNAPSHOT-2025-08-07-a
 $ utils/build-script \
     -R \                                       # Build in ReleaseAssert mode.
     --android \                                # Build for Android.
@@ -83,11 +79,12 @@ Then use the standalone Swift stdlib from the previous step to compile a Swift
 source file, targeting Android:
 
 ```
-$ NDK_PATH="path/to/android-ndk-r25b"
-$ SWIFT_PATH=path/to/swift-DEVELOPMENT-SNAPSHOT-2022-05-31-a-ubuntu20.04/usr/bin
+$ NDK_PATH="path/to/android-ndk-r27d"
+$ SWIFT_PATH=path/to/swift-DEVELOPMENT-SNAPSHOT-2025-08-07-a-ubuntu24.04/usr/bin
 $ $SWIFT_PATH/swiftc \                                               # The prebuilt Swift compiler you downloaded
                                                                      # The location of the tools used to build Android binaries
     -tools-directory ${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/bin/ \
+    -disallow-use-new-driver \                                       # Work around a bug in the driver, a fix is in the works
     -target aarch64-unknown-linux-android21 \                        # Targeting Android aarch64 at API 21
     -sdk ${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/sysroot \ # The SDK is the Android unified sysroot and the resource-dir is where you just built the Swift stdlib.
     -resource-dir build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift
@@ -122,10 +119,12 @@ commands to copy the Swift Android stdlib:
 
 ```
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftCore.so /data/local/tmp
-$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftGlibc.so /data/local/tmp
+$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftAndroid.so /data/local/tmp
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftSwiftOnoneSupport.so /data/local/tmp
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftRemoteMirror.so /data/local/tmp
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswift_Concurrency.so /data/local/tmp
+$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswift_RegexParser.so /data/local/tmp
+$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswift_StringProcessing.so /data/local/tmp
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libdispatch.so /data/local/tmp
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libBlocksRuntime.so /data/local/tmp
 ```
@@ -133,7 +132,7 @@ $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libBlo
 In addition, you'll also need to copy the Android NDK's libc++:
 
 ```
-$ adb push /path/to/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so /data/local/tmp
+$ adb push /path/to/android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so /data/local/tmp
 ```
 
 Finally, you'll need to copy the `hello` executable you built in the
@@ -176,8 +175,8 @@ $ utils/build-script \
   -R \                               # Build in ReleaseAssert mode.
   -T \                               # Run all tests, including on the Android device (add --host-test to only run Android tests on the Linux host).
   --android \                        # Build for Android.
-  --android-ndk ~/android-ndk-r25b \  # Path to an Android NDK.
-  --android-arch aarch64 \           # Optionally specify Android architecture, alternately armv7
+  --android-ndk ~/android-ndk-r27d \  # Path to an Android NDK.
+  --android-arch aarch64 \           # Optionally specify Android architecture, alternately armv7 or x86_64
   --android-api-level 21
 ```
 

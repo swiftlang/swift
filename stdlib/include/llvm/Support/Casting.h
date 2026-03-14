@@ -139,13 +139,13 @@ struct isa_impl_wrap<To, FromTy, FromTy> {
 //  if (isa<Type>(myVal)) { ... }
 //  if (isa<Type0, Type1, Type2>(myVal)) { ... }
 //
-template <class X, class Y> LLVM_NODISCARD inline bool isa(const Y &Val) {
+template <class X, class Y> [[nodiscard]] inline bool isa(const Y &Val) {
   return isa_impl_wrap<X, const Y,
                        typename simplify_type<const Y>::SimpleType>::doit(Val);
 }
 
 template <typename First, typename Second, typename... Rest, typename Y>
-LLVM_NODISCARD inline bool isa(const Y &Val) {
+[[nodiscard]] inline bool isa(const Y &Val) {
   return isa<First>(Val) || isa<Second, Rest...>(Val);
 }
 
@@ -153,7 +153,7 @@ LLVM_NODISCARD inline bool isa(const Y &Val) {
 // is accepted.
 //
 template <typename... X, class Y>
-LLVM_NODISCARD inline bool isa_and_nonnull(const Y &Val) {
+[[nodiscard]] inline bool isa_and_nonnull(const Y &Val) {
   if (!Val)
     return false;
   return isa<X...>(Val);
@@ -286,7 +286,7 @@ cast(std::unique_ptr<Y> &&Val) {
 // accepted.
 //
 template <class X, class Y>
-LLVM_NODISCARD inline std::enable_if_t<
+[[nodiscard]] inline std::enable_if_t<
     !is_simple_type<Y>::value, typename cast_retty<X, const Y>::ret_type>
 cast_or_null(const Y &Val) {
   if (!Val)
@@ -296,7 +296,7 @@ cast_or_null(const Y &Val) {
 }
 
 template <class X, class Y>
-LLVM_NODISCARD inline std::enable_if_t<!is_simple_type<Y>::value,
+[[nodiscard]] inline std::enable_if_t<!is_simple_type<Y>::value,
                                        typename cast_retty<X, Y>::ret_type>
 cast_or_null(Y &Val) {
   if (!Val)
@@ -306,7 +306,7 @@ cast_or_null(Y &Val) {
 }
 
 template <class X, class Y>
-LLVM_NODISCARD inline typename cast_retty<X, Y *>::ret_type
+[[nodiscard]] inline typename cast_retty<X, Y *>::ret_type
 cast_or_null(Y *Val) {
   if (!Val) return nullptr;
   assert(isa<X>(Val) && "cast_or_null<Ty>() argument of incompatible type!");
@@ -330,19 +330,19 @@ cast_or_null(std::unique_ptr<Y> &&Val) {
 //
 
 template <class X, class Y>
-LLVM_NODISCARD inline std::enable_if_t<
+[[nodiscard]] inline std::enable_if_t<
     !is_simple_type<Y>::value, typename cast_retty<X, const Y>::ret_type>
 dyn_cast(const Y &Val) {
   return isa<X>(Val) ? cast<X>(Val) : nullptr;
 }
 
 template <class X, class Y>
-LLVM_NODISCARD inline typename cast_retty<X, Y>::ret_type dyn_cast(Y &Val) {
+[[nodiscard]] inline typename cast_retty<X, Y>::ret_type dyn_cast(Y &Val) {
   return isa<X>(Val) ? cast<X>(Val) : nullptr;
 }
 
 template <class X, class Y>
-LLVM_NODISCARD inline typename cast_retty<X, Y *>::ret_type dyn_cast(Y *Val) {
+[[nodiscard]] inline typename cast_retty<X, Y *>::ret_type dyn_cast(Y *Val) {
   return isa<X>(Val) ? cast<X>(Val) : nullptr;
 }
 
@@ -350,21 +350,21 @@ LLVM_NODISCARD inline typename cast_retty<X, Y *>::ret_type dyn_cast(Y *Val) {
 // value is accepted.
 //
 template <class X, class Y>
-LLVM_NODISCARD inline std::enable_if_t<
+[[nodiscard]] inline std::enable_if_t<
     !is_simple_type<Y>::value, typename cast_retty<X, const Y>::ret_type>
 dyn_cast_or_null(const Y &Val) {
   return (Val && isa<X>(Val)) ? cast<X>(Val) : nullptr;
 }
 
 template <class X, class Y>
-LLVM_NODISCARD inline std::enable_if_t<!is_simple_type<Y>::value,
+[[nodiscard]] inline std::enable_if_t<!is_simple_type<Y>::value,
                                        typename cast_retty<X, Y>::ret_type>
 dyn_cast_or_null(Y &Val) {
   return (Val && isa<X>(Val)) ? cast<X>(Val) : nullptr;
 }
 
 template <class X, class Y>
-LLVM_NODISCARD inline typename cast_retty<X, Y *>::ret_type
+[[nodiscard]] inline typename cast_retty<X, Y *>::ret_type
 dyn_cast_or_null(Y *Val) {
   return (Val && isa<X>(Val)) ? cast<X>(Val) : nullptr;
 }
@@ -375,7 +375,7 @@ dyn_cast_or_null(Y *Val) {
 // is returned.  If the cast is unsuccessful, the function returns nullptr
 // and From is unchanged.
 template <class X, class Y>
-LLVM_NODISCARD inline auto unique_dyn_cast(std::unique_ptr<Y> &Val)
+[[nodiscard]] inline auto unique_dyn_cast(std::unique_ptr<Y> &Val)
     -> decltype(cast<X>(Val)) {
   if (!isa<X>(Val))
     return nullptr;
@@ -383,14 +383,14 @@ LLVM_NODISCARD inline auto unique_dyn_cast(std::unique_ptr<Y> &Val)
 }
 
 template <class X, class Y>
-LLVM_NODISCARD inline auto unique_dyn_cast(std::unique_ptr<Y> &&Val) {
+[[nodiscard]] inline auto unique_dyn_cast(std::unique_ptr<Y> &&Val) {
   return unique_dyn_cast<X, Y>(Val);
 }
 
 // dyn_cast_or_null<X> - Functionally identical to unique_dyn_cast, except that
 // a null value is accepted.
 template <class X, class Y>
-LLVM_NODISCARD inline auto unique_dyn_cast_or_null(std::unique_ptr<Y> &Val)
+[[nodiscard]] inline auto unique_dyn_cast_or_null(std::unique_ptr<Y> &Val)
     -> decltype(cast<X>(Val)) {
   if (!Val)
     return nullptr;
@@ -398,7 +398,7 @@ LLVM_NODISCARD inline auto unique_dyn_cast_or_null(std::unique_ptr<Y> &Val)
 }
 
 template <class X, class Y>
-LLVM_NODISCARD inline auto unique_dyn_cast_or_null(std::unique_ptr<Y> &&Val) {
+[[nodiscard]] inline auto unique_dyn_cast_or_null(std::unique_ptr<Y> &&Val) {
   return unique_dyn_cast_or_null<X, Y>(Val);
 }
 

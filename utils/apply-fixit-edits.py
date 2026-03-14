@@ -34,8 +34,6 @@ def apply_edits(path):
     for remap_file in remap_files:
         with open(remap_file) as f:
             json_data = f.read()
-        json_data = json_data.replace(",\n }", "\n }")
-        json_data = json_data.replace(",\n]", "\n]")
         curr_edits = json.loads(json_data)
         for ed in curr_edits:
             fname = ed["file"]

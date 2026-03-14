@@ -50,7 +50,13 @@ enum class CompletionResult {
   MaxRuleLength,
 
   /// Maximum concrete type nesting depth exceeded.
-  MaxConcreteNesting
+  MaxConcreteNesting,
+
+  /// Maximum concrete type size exceeded.
+  MaxConcreteSize,
+
+  /// Maximum type difference count exceeded.
+  MaxTypeDifferences,
 };
 
 /// A term rewrite system for working with types in a generic signature.
@@ -65,14 +71,9 @@ class RewriteSystem final {
   /// top-level generic signature and this array is empty.
   ArrayRef<const ProtocolDecl *> Protos;
 
-  /// The requirements written in source code.
-  std::vector<StructuralRequirement> WrittenRequirements;
-
   /// The rules added so far, including rules from our client, as well
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
-
-  unsigned FirstLocalRule = 0;
 
   /// A prefix trie of rule left hand sides to optimize lookup. The value
   /// type is an index into the Rules array defined above.
@@ -89,6 +90,8 @@ class RewriteSystem final {
   llvm::DenseSet<const ProtocolDecl *> ReferencedProtocols;
 
   DebugOptions Debug;
+
+  unsigned FirstLocalRule = 0;
 
   /// Whether we've initialized the rewrite system with a call to initialize().
   unsigned Initialized : 1;
@@ -110,9 +113,16 @@ class RewriteSystem final {
   /// identities among rewrite rules discovered while resolving critical pairs.
   unsigned RecordLoops : 1;
 
-  /// The length of the longest initial rule, used for the MaxRuleLength
-  /// completion non-termination heuristic.
+  /// The length of the longest initial rule, for the MaxRuleLength limit.
   unsigned LongestInitialRule : 16;
+
+  /// The most deeply nested concrete type appearing in an initial rule,
+  /// for the MaxConcreteNesting limit.
+  unsigned MaxNestingOfInitialRule : 16;
+
+  /// The largest concrete type by total tree node count that appears in an
+  /// initial rule, for the MaxConcreteSize limit.
+  unsigned MaxSizeOfInitialRule : 16;
 
 public:
   explicit RewriteSystem(RewriteContext &ctx);
@@ -132,15 +142,22 @@ public:
 
   DebugOptions getDebugOptions() const { return Debug; }
 
-  void initialize(bool recordLoops,
-                  ArrayRef<const ProtocolDecl *> protos,
-                  std::vector<StructuralRequirement> &&writtenRequirements,
-                  std::vector<Rule> &&importedRules,
-                  std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-                  std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
+  void initialize(
+      bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
+      std::vector<Rule> &&importedRules,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
   unsigned getLongestInitialRule() const {
     return LongestInitialRule;
+  }
+
+  unsigned getMaxNestingOfInitialRule() const {
+    return MaxNestingOfInitialRule;
+  }
+
+  unsigned getMaxSizeOfInitialRule() const {
+    return MaxSizeOfInitialRule;
   }
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
@@ -152,7 +169,7 @@ public:
   }
 
   unsigned getRuleID(const Rule &rule) const {
-    assert((unsigned)(&rule - &*Rules.begin()) < Rules.size());
+    ASSERT((unsigned)(&rule - &*Rules.begin()) < Rules.size());
     return (unsigned)(&rule - &*Rules.begin());
   }
 
@@ -182,18 +199,18 @@ public:
 
   bool addPermanentRule(MutableTerm lhs, MutableTerm rhs);
 
-  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs,
-                       Optional<unsigned> requirementID);
+  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs);
 
-  void addRules(std::vector<Rule> &&importedRules,
-                std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-                std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
+  void addRules(
+      std::vector<Rule> &&importedRules,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
-  Optional<unsigned>
-  simplifySubstitutions(Term baseTerm, Symbol symbol, const PropertyMap *map,
-                        RewritePath *path=nullptr);
+  std::optional<unsigned> simplifySubstitutions(Term baseTerm, Symbol symbol,
+                                                const PropertyMap *map,
+                                                RewritePath *path = nullptr);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
@@ -202,11 +219,10 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   /// Pairs of rules which have already been checked for overlap.
-  llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
+  llvm::DenseSet<std::tuple<unsigned, unsigned, unsigned>> CheckedOverlaps;
 
   std::pair<CompletionResult, unsigned>
-  computeConfluentCompletion(unsigned maxRuleCount,
-                             unsigned maxRuleLength);
+  performKnuthBendix(unsigned maxRuleCount, unsigned maxRuleLength);
 
   void simplifyLeftHandSides();
 
@@ -227,17 +243,15 @@ public:
   ///
   //////////////////////////////////////////////////////////////////////////////
 
-  void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
-
   void computeConflictingRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
                                                 SourceLoc signatureLoc,
                                                 const PropertyMap &map,
-                                                TypeArrayView<GenericTypeParamType> genericParams);
+                                                ArrayRef<GenericTypeParamType *> genericParams);
 
   void computeRecursiveRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
                                               SourceLoc signatureLoc,
                                               const PropertyMap &map,
-                                              TypeArrayView<GenericTypeParamType> genericParams);
+                                              ArrayRef<GenericTypeParamType *> genericParams);
 
 private:
   struct CriticalPair {
@@ -306,10 +320,13 @@ private:
 public:
   unsigned recordTypeDifference(const TypeDifference &difference);
 
-  bool
-  computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
-                        Optional<unsigned> &lhsDifferenceID,
-                        Optional<unsigned> &rhsDifferenceID);
+  bool computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
+                             std::optional<unsigned> &lhsDifferenceID,
+                             std::optional<unsigned> &rhsDifferenceID);
+
+  unsigned getTypeDifferenceCount() const {
+    return Differences.size();
+  }
 
   const TypeDifference &getTypeDifference(unsigned index) const;
 
@@ -377,7 +394,7 @@ private:
   using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
                                                        unsigned ruleID)>;
 
-  Optional<std::pair<unsigned, unsigned>>
+  std::optional<std::pair<unsigned, unsigned>>
   findRuleToDelete(EliminationPredicate isRedundantRuleFn);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);

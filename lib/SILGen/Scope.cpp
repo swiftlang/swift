@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Scope.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 
 using namespace swift;
@@ -61,8 +62,7 @@ static void lifetimeExtendAddressOnlyRValueSubValues(
     //       be lexical?
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
       if (v->getType().getLifetime(SGF.F).isLexical()) {
-        box = SGF.B.createBeginBorrow(loc, box,
-                                      /*isLexical=*/true);
+        box = SGF.B.createBeginBorrow(loc, box, IsLexical);
       }
     }
     SILValue addr = SGF.B.createProjectBox(loc, box, 0);
@@ -77,7 +77,8 @@ static void lifetimeExtendAddressOnlyRValueSubValues(
 
 RValue Scope::popPreservingValue(RValue &&rv) {
   auto &SGF = cleanups.SGF;
-  assert(rv.isPlusOne(SGF) && "Can only push plus one rvalues through a scope");
+  assert(rv.isPlusOneOrTrivial(SGF) &&
+         "Can only push plus one rvalues through a scope");
 
   // Perform a quick check if we have an incontext value. If so, just pop and
   // return rv.

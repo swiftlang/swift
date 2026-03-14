@@ -12,10 +12,12 @@
 
 SPI_AVAILABLE(macos(10.7))
 @interface SPIInterface1
+- (instancetype)init;
 @end
 
 __SPI_AVAILABLE(macos(10.7))
 @interface SPIInterface2
+- (instancetype)init;
 @end
 
 @interface SharedInterface

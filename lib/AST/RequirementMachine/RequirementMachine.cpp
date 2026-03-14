@@ -126,16 +126,10 @@
 // redundant rules. This is implemented in HomotopyReduction.cpp and
 // MinimalConformances.cpp.
 //
-// Minimization emits warnings about redundant rules by producing that
-// correspond to user-written requirements by producing RequirementError
-// values.
-//
 // After minimization, the remaining non-redundant rules are converted into
-// the Requirements of a minimal generic signature using the
-// RequirementBuilder.
-//
-// After minimization, the requirement machine undergoes a final state
-// transition into the immutable "frozen" state:
+// the Requirements of a minimal generic signature by the RequirementBuilder.
+// Then, the requirement machine undergoes a final state transition into the
+// immutable "frozen" state:
 //
 //   /-----------------------------\
 //  |  Complete RequirementMachine  |
@@ -204,6 +198,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Requirement.h"
+#include "swift/Basic/Assertions.h"
 #include "RequirementLowering.h"
 #include "RuleBuilder.h"
 
@@ -217,6 +212,8 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
   MaxRuleCount = langOpts.RequirementMachineMaxRuleCount;
   MaxRuleLength = langOpts.RequirementMachineMaxRuleLength;
   MaxConcreteNesting = langOpts.RequirementMachineMaxConcreteNesting;
+  MaxConcreteSize = langOpts.RequirementMachineMaxConcreteSize;
+  MaxTypeDifferences = langOpts.RequirementMachineMaxTypeDifferences;
   Stats = ctx.getASTContext().Stats;
 
   if (Stats)
@@ -236,19 +233,34 @@ void RequirementMachine::checkCompletionResult(CompletionResult result) const {
     break;
 
   case CompletionResult::MaxRuleCount:
-    llvm::errs() << "Rewrite system exceeded maximum rule count\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded maximum rule count\n";
+      dump(out);
+    });
 
   case CompletionResult::MaxRuleLength:
-    llvm::errs() << "Rewrite system exceeded rule length limit\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded rule length limit\n";
+      dump(out);
+    });
 
   case CompletionResult::MaxConcreteNesting:
-    llvm::errs() << "Rewrite system exceeded concrete type nesting depth limit\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type nesting depth limit\n";
+      dump(out);
+    });
+
+  case CompletionResult::MaxConcreteSize:
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type size limit\n";
+      dump(out);
+    });
+
+  case CompletionResult::MaxTypeDifferences:
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type difference limit\n";
+      dump(out);
+    });
   }
 }
 
@@ -277,9 +289,11 @@ RequirementMachine::initWithProtocolSignatureRequirements(
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithProtocolSignatureRequirements(protos);
 
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
+
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false, protos,
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -307,7 +321,7 @@ RequirementMachine::initWithProtocolSignatureRequirements(
 ///
 /// Returns failure if completion fails within the configured number of steps.
 std::pair<CompletionResult, unsigned>
-RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
+RequirementMachine::initWithGenericSignature(GenericSignature sig) {
   Sig = sig;
   Params.append(sig.getGenericParams().begin(),
                 sig.getGenericParams().end());
@@ -323,12 +337,15 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   // Collect the top-level requirements, and all transitively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
-  builder.initWithGenericSignatureRequirements(sig.getRequirements());
+  builder.initWithGenericSignature(sig.getGenericParams(),
+                                   sig.getRequirements());
+
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -366,7 +383,7 @@ RequirementMachine::initWithProtocolWrittenRequirements(
 
   // For RequirementMachine::verify() when called by generic signature queries;
   // We have a single valid generic parameter at depth 0, index 0.
-  Params.push_back(component[0]->getSelfInterfaceType());
+  Params.push_back(component[0]->getSelfInterfaceType()->castTo<GenericTypeParamType>());
 
   if (Dump) {
     llvm::dbgs() << "Adding protocols";
@@ -379,9 +396,11 @@ RequirementMachine::initWithProtocolWrittenRequirements(
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithProtocolWrittenRequirements(component, protos);
 
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
+
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true, component,
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -425,12 +444,14 @@ RequirementMachine::initWithWrittenRequirements(
   // Collect the top-level requirements, and all transitively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
-  builder.initWithWrittenRequirements(requirements);
+  builder.initWithWrittenRequirements(genericParams, requirements);
+
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -458,7 +479,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
       unsigned ruleCount = System.getRules().size();
 
       // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
-      auto result = System.computeConfluentCompletion(MaxRuleCount, MaxRuleLength);
+      auto result = System.performKnuthBendix(MaxRuleCount, MaxRuleLength);
 
       unsigned rulesAdded = (System.getRules().size() - ruleCount);
 
@@ -501,14 +522,24 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
           return std::make_pair(CompletionResult::MaxRuleLength,
                                 ruleCount + i);
         }
-        if (newRule.getNesting() > MaxConcreteNesting) {
+        auto nestingAndSize = newRule.getNestingAndSize();
+        if (nestingAndSize.first > MaxConcreteNesting + System.getMaxNestingOfInitialRule()) {
           return std::make_pair(CompletionResult::MaxConcreteNesting,
+                                ruleCount + i);
+        }
+        if (nestingAndSize.second > MaxConcreteSize + System.getMaxSizeOfInitialRule()) {
+          return std::make_pair(CompletionResult::MaxConcreteSize,
                                 ruleCount + i);
         }
       }
 
       if (System.getLocalRules().size() > MaxRuleCount) {
         return std::make_pair(CompletionResult::MaxRuleCount,
+                              System.getRules().size() - 1);
+      }
+
+      if (System.getTypeDifferenceCount() > MaxTypeDifferences) {
+        return std::make_pair(CompletionResult::MaxTypeDifferences,
                               System.getRules().size() - 1);
       }
     }
@@ -518,7 +549,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
     dump(llvm::dbgs());
   }
 
-  assert(!Complete);
+  ASSERT(!Complete);
   Complete = true;
 
   return std::make_pair(CompletionResult::Success, 0);
@@ -532,10 +563,6 @@ void RequirementMachine::freeze() {
 
 ArrayRef<Rule> RequirementMachine::getLocalRules() const {
   return System.getLocalRules();
-}
-
-bool RequirementMachine::isComplete() const {
-  return Complete;
 }
 
 GenericSignatureErrors RequirementMachine::getErrors() const {
@@ -557,9 +584,9 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   } else {
     out << "fresh signature <";
     for (auto paramTy : Params) {
-      out << " " << paramTy;
-      if (paramTy->castTo<GenericTypeParamType>()->isParameterPack())
-        out << "…";
+      out << " " << Type(paramTy);
+      if (paramTy->isParameterPack())
+        out << " " << paramTy;
     }
     out << " >";
   }

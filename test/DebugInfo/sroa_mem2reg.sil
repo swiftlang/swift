@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo -sroa %s | %FileCheck --check-prefix=CHECK-SROA %s
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo -sroa -mem2reg %s -o %t.sil
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-print-debuginfo -sroa %s | %FileCheck --check-prefix=CHECK-SROA %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-print-debuginfo -sroa -mem2reg %s -o %t.sil
 // RUN: %FileCheck --check-prefix=CHECK-MEM2REG %s --input-file=%t.sil
 // RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -g -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IR %s
 // RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -g -c %t.sil -o %t.o
@@ -35,11 +35,11 @@ bb0(%0 : $Int64, %1 : $Int64):
   // Make sure SROA propagate the debug info to the splitted alloc_stack instructions
   // CHECK-SROA: alloc_stack $Int64, var
   // CHECK-SROA-SAME:        (name "my_struct", loc "sroa.swift":8:9
-  // CHECK-SROA-SAME:        type $*MyStruct, expr op_fragment:#MyStruct.x
+  // CHECK-SROA-SAME:        type $MyStruct, expr op_fragment:#MyStruct.x
   // CHECK-SROA-SAME:        loc * "<compiler-generated>":0:0
   // CHECK-SROA: alloc_stack $Int64, var
   // CHECK-SROA-SAME:        (name "my_struct", loc "sroa.swift":8:9
-  // CHECK-SROA-SAME:        type $*MyStruct, expr op_fragment:#MyStruct.y
+  // CHECK-SROA-SAME:        type $MyStruct, expr op_fragment:#MyStruct.y
   // CHECK-SROA-SAME:        loc * "<compiler-generated>":0:0
   %5 = metatype $@thin MyStruct.Type, loc "sroa.swift":8:21, scope 2
   %6 = integer_literal $Builtin.Int64, 0, loc "sroa.swift":8:33, scope 2
@@ -57,19 +57,19 @@ bb0(%0 : $Int64, %1 : $Int64):
   // CHECK-MEM2REG: %[[FIELD_Y:[0-9]+]] = struct_extract %[[STRUCT]] : $MyStruct, #MyStruct.y, loc "sroa.swift":8:21
   store %1 to %15 : $*Int64, loc "sroa.swift":10:17, scope 2
   // Make sure the struct fields' SSA values are properly connected to the source variables via op_fragment
-  // CHECK-MEM2REG: debug_value %[[FIELD_X]] : $Int64, var, (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*MyStruct, expr op_fragment:#MyStruct.x
-  // CHECK-MEM2REG: debug_value %[[FIELD_Y]] : $Int64, var, (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*MyStruct, expr op_fragment:#MyStruct.y
-  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %0
-  // CHECK-IR-SAME:                      metadata ![[STRUCT_MD:[0-9]+]]
+  // CHECK-MEM2REG: debug_value %[[FIELD_X]] : $Int64, var, (name "my_struct", loc "sroa.swift":8:9), type $MyStruct, expr op_fragment:#MyStruct.x
+  // CHECK-MEM2REG: debug_value %[[FIELD_Y]] : $Int64, var, (name "my_struct", loc "sroa.swift":8:9), type $MyStruct, expr op_fragment:#MyStruct.y
+  // CHECK-IR: #dbg_value(i64 %0
+  // CHECK-IR-SAME:                      ![[STRUCT_MD:[0-9]+]]
   // CHECK-IR-SAME:                      !DIExpression(DW_OP_LLVM_fragment, 0, 64)
-  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %1
-  // CHECK-IR-SAME:                      metadata ![[STRUCT_MD]]
+  // CHECK-IR: #dbg_value(i64 %1
+  // CHECK-IR-SAME:                      ![[STRUCT_MD]]
   // CHECK-IR-SAME:                      !DIExpression(DW_OP_LLVM_fragment, 64, 64)
   // Make sure function arguments' SSA values are also properly connected to the source variables
-  // CHECK-MEM2REG: debug_value %0 : $Int64, var, (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*MyStruct, expr op_fragment:#MyStruct.x
-  // CHECK-MEM2REG: debug_value %1 : $Int64, var, (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*MyStruct, expr op_fragment:#MyStruct.y
-  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %0, metadata ![[ARG1_MD:[0-9]+]]
-  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %1, metadata ![[ARG2_MD:[0-9]+]]
+  // CHECK-MEM2REG: debug_value %0 : $Int64, var, (name "my_struct", loc "sroa.swift":8:9), type $MyStruct, expr op_fragment:#MyStruct.x
+  // CHECK-MEM2REG: debug_value %1 : $Int64, var, (name "my_struct", loc "sroa.swift":8:9), type $MyStruct, expr op_fragment:#MyStruct.y
+  // CHECK-IR: #dbg_value(i64 %0, ![[ARG1_MD:[0-9]+]]
+  // CHECK-IR: #dbg_value(i64 %1, ![[ARG2_MD:[0-9]+]]
   dealloc_stack %4 : $*MyStruct, loc "sroa.swift":8:9, scope 2
   return %0 : $Int64, loc "sroa.swift":11:5, scope 2
 } // end sil function 'foo'

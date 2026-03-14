@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -outliner %s -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -outliner %s -enable-sil-verify-all | %FileCheck %s
 
 // REQUIRES: OS=macosx
 
@@ -16,6 +16,7 @@ import Foundation
 
 struct DataWrapper {
   let data: Data
+  let otherData: Data
 }
 
 sil @getData : $@convention(thin) () -> @owned Data
@@ -74,9 +75,9 @@ bb7(%64 : @owned $Optional<Data>):
   return %102 : $()
 }
 
+// Not optimized
 // CHECK-LABEL: sil [Osize] [ossa] @test2 :
-// CHECK:  [[FUNC:%.*]] = function_ref @$s4main8MyObjectC4take3arg10Foundation4DataVSgAI_tFZToTembgnn_ :
-// CHECK:  apply [[FUNC]]
+// CHECK: objc_method
 // CHECK-LABEL: } // end sil function 'test2'
 sil [Osize] [ossa] @test2 : $@convention(thin) (@owned MyObject) -> @owned Optional<NSData> {
 bb0(%0: @owned $MyObject):
@@ -96,9 +97,9 @@ bb0(%0: @owned $MyObject):
   return %51 : $Optional<NSData>
 }
 
+// Not optimized
 // CHECK-LABEL: sil [Osize] [ossa] @test3 :
-// CHECK:  [[FUNC:%.*]] = function_ref @$s4main8MyObjectC4take3arg10Foundation4DataVSgAI_tFZToTembgnn_ :
-// CHECK:  apply [[FUNC]]
+// CHECK: objc_method
 // CHECK-LABEL: } // end sil function 'test3'
 sil [Osize] [ossa] @test3 : $@convention(thin) (@owned MyObject, @in Data) -> @owned Optional<NSData> {
 bb0(%0: @owned $MyObject, %1 : $*Data):
@@ -116,9 +117,9 @@ bb0(%0: @owned $MyObject, %1 : $*Data):
   return %51 : $Optional<NSData>
 }
 
+// Not optimized
 // CHECK-LABEL: sil [Osize] [ossa] @test4 : 
-// CHECK:  [[FUNC:%.*]] = function_ref @$s4main8MyObjectC8take_two4arg14arg210Foundation4DataVSgAJ_AJtFZToTembgbgnn_ :
-// CHECK:  apply [[FUNC]]
+// CHECK: objc_method
 // CHECK-LABEL: } // end sil function 'test4'
 sil [Osize] [ossa] @test4 : $@convention(thin) (@owned MyObject) -> @owned Optional<NSData> {
 bb0(%0: @owned $MyObject):
@@ -177,9 +178,9 @@ bb3:
   return %51 : $Optional<NSData>
 }
 
+// Not optimized
 // CHECK-LABEL: sil [Osize] [ossa] @test6 :
-// CHECK:  [[FUNC:%.*]] = function_ref @$s4main8MyObjectC4take3arg10Foundation4DataVSgAI_tFZToTembgnn_ :
-// CHECK:  apply [[FUNC]]
+// CHECK:  objc_method
 // CHECK-LABEL: } // end sil function 'test6'
 sil [Osize] [ossa] @test6 : $@convention(thin) (@owned MyObject) -> @owned Optional<NSData> {
 bb0(%0: @owned $MyObject):
@@ -198,6 +199,30 @@ bb0(%0: @owned $MyObject):
   %51 = apply %50(%46, %35) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
   destroy_value %46 : $Optional<NSData>
   return %51 : $Optional<NSData>
+}
+
+// Not optimized
+// CHECK-LABEL: sil [Osize] [ossa] @test_struct_guaranteed :
+// CHECK: objc_method
+// CHECK-LABEL: } // end sil function 'test_struct_guaranteed'
+sil [Osize] [ossa] @test_struct_guaranteed : $@convention(thin) (@owned MyObject) -> @owned Optional<NSData> {
+bb0(%0 : @owned $MyObject):
+  %1 = metatype $@objc_metatype MyObject.Type
+  %2 = function_ref @getData : $@convention(thin) () -> @owned Data
+  %3 = apply %2() : $@convention(thin) () -> @owned Data
+  %4 = begin_borrow %3
+  %5 = struct $DataWrapper (%4, %4)
+  %6 = struct_extract %5, #DataWrapper.data
+  %7 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %8 = apply %7(%6) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %9 = enum $Optional<NSData>, #Optional.some!enumelt, %8
+  end_borrow %4
+  %13 = objc_method %1, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %14 = apply %13(%9, %1) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %0
+  destroy_value %3
+  destroy_value %9
+  return %14
 }
 
 sil [Osize] [ossa] @test_dont_crash : $@convention(thin) (@owned MyObject) -> () {
@@ -305,3 +330,23 @@ sil [Osize] [ossa] @destroy_after_borrow : $@convention(thin) () -> @owned Sub {
   apply undef(%162) : $@convention(thin) (Int) -> ()
   return %107 : $Sub
 }
+
+// CHECK-LABEL: sil [Osize] [ossa] @test_consume :
+// CHECK: objc_method 
+// CHECK-LABEL: } // end sil function 'test_consume'
+sil [Osize] [ossa] @test_consume : $@convention(thin) (@owned MyObject) -> @owned Optional<NSData> {
+bb0(%0: @owned $MyObject):
+  %35 = metatype $@objc_metatype MyObject.Type
+  %41 = function_ref @getData : $@convention(thin) () -> @owned Data
+  %43 = apply %41() : $@convention(thin) () -> @owned Data
+  %44 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45 = apply %44(%43) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46 = enum $Optional<NSData>, #Optional.some!enumelt, %45 : $NSData
+  destroy_value %0 : $MyObject
+  %48 = apply undef(%43) : $@convention(method) (@owned Data) -> ()
+  %50 = objc_method %35 : $@objc_metatype MyObject.Type, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51 = apply %50(%46, %35) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  destroy_value %46 : $Optional<NSData>
+  return %51 : $Optional<NSData>
+}
+

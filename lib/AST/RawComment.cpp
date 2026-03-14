@@ -23,7 +23,9 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
@@ -102,12 +104,8 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
       End--;
 
     if (SRC.isOrdinary()) {
-      // If there's a normal comment then reset the current group, unless it's
-      // a gyb comment in which case we should just skip it.
-      if (SRC.isGyb())
-        LastEnd = End;
-      else
-        Comments.clear();
+      // If there's a regular comment just skip it
+      LastEnd = End;
       continue;
     }
 
@@ -130,60 +128,43 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   return Result;
 }
 
-RawComment Decl::getRawComment(bool SerializedOK) const {
-  if (!this->canHaveComment())
-    return RawComment();
-
-  // Check the cache in ASTContext.
-  auto &Context = getASTContext();
-  if (Optional<std::pair<RawComment, bool>> RC = Context.getRawComment(this)) {
-    auto P = RC.value();
-    if (!SerializedOK || P.second)
-      return P.first;
-  }
+RawComment RawCommentRequest::evaluate(Evaluator &eval, const Decl *D) const {
+  auto *DC = D->getDeclContext();
+  auto &ctx = DC->getASTContext();
 
   // Check the declaration itself.
-  if (auto *Attr = getAttrs().getAttribute<RawDocCommentAttr>()) {
-    RawComment Result = toRawComment(Context, Attr->getCommentRange());
-    Context.setRawComment(this, Result, true);
-    return Result;
-  }
+  if (auto *Attr = D->getAttrs().getAttribute<RawDocCommentAttr>())
+    return toRawComment(ctx, Attr->getCommentRange());
 
-  if (!getDeclContext())
-    return RawComment();
-  auto *Unit = dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  auto *Unit = dyn_cast<FileUnit>(DC->getModuleScopeContext());
   if (!Unit)
     return RawComment();
 
   switch (Unit->getKind()) {
   case FileUnitKind::SerializedAST: {
-    if (SerializedOK) {
-      auto *CachedLocs = getSerializedLocs();
-      if (!CachedLocs->DocRanges.empty()) {
-        SmallVector<SingleRawComment, 4> SRCs;
-        for (const auto &Range : CachedLocs->DocRanges) {
-          if (Range.isValid()) {
-            SRCs.push_back({Range, Context.SourceMgr});
-          } else {
-            // if we've run into an invalid range, don't bother trying to load
-            // any of the other comments
-            SRCs.clear();
-            break;
-          }
-        }
-
-        if (!SRCs.empty()) {
-          auto RC = RawComment(Context.AllocateCopy(llvm::makeArrayRef(SRCs)));
-          Context.setRawComment(this, RC, true);
-          return RC;
+    // First check to see if we have the comment location available in the
+    // swiftsourceinfo, allowing us to grab it from the original file.
+    auto *CachedLocs = D->getSerializedLocs();
+    if (!CachedLocs->DocRanges.empty()) {
+      SmallVector<SingleRawComment, 4> SRCs;
+      for (const auto &Range : CachedLocs->DocRanges) {
+        if (Range.isValid()) {
+          SRCs.push_back({Range, ctx.SourceMgr});
+        } else {
+          // if we've run into an invalid range, don't bother trying to load
+          // any of the other comments
+          SRCs.clear();
+          break;
         }
       }
+
+      if (!SRCs.empty())
+        return RawComment(ctx.AllocateCopy(llvm::ArrayRef(SRCs)));
     }
 
-    if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
-      Context.setRawComment(this, C->Raw, false);
+    // Otherwise check to see if we have a comment available in the swiftdoc.
+    if (auto C = Unit->getCommentForDecl(D))
       return C->Raw;
-    }
 
     return RawComment();
   }
@@ -197,37 +178,45 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
   llvm_unreachable("invalid file kind");
 }
 
-Optional<StringRef> Decl::getGroupName() const {
+RawComment Decl::getRawComment() const {
+  if (!this->canHaveComment())
+    return RawComment();
+
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, RawCommentRequest{this}, RawComment());
+}
+
+std::optional<StringRef> Decl::getGroupName() const {
   if (hasClangNode())
-    return None;
+    return std::nullopt;
   if (auto *Unit =
           dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext())) {
     // We can only get group information from deserialized module files.
     return Unit->getGroupNameForDecl(this);
   }
-  return None;
+  return std::nullopt;
 }
 
-Optional<StringRef> Decl::getSourceFileName() const {
+std::optional<StringRef> Decl::getSourceFileName() const {
   if (hasClangNode())
-    return None;
+    return std::nullopt;
   if (auto *Unit =
           dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext())) {
     // We can only get group information from deserialized module files.
     return Unit->getSourceFileNameForDecl(this);
   }
-  return None;
+  return std::nullopt;
 }
 
-Optional<unsigned> Decl::getSourceOrder() const {
+std::optional<unsigned> Decl::getSourceOrder() const {
   if (hasClangNode())
-    return None;
+    return std::nullopt;
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
     // We can only get source orders from deserialized module files.
     return Unit->getSourceOrderForDecl(this);
   }
-  return None;
+  return std::nullopt;
 }
 
 CharSourceRange RawComment::getCharSourceRange() {
@@ -243,4 +232,79 @@ CharSourceRange RawComment::getCharSourceRange() {
   auto Length = static_cast<const char *>(End.getOpaquePointerValue()) -
                 static_cast<const char *>(Start.getOpaquePointerValue());
   return CharSourceRange(Start, Length);
+}
+
+static bool hasDoubleUnderscore(const Decl *D) {
+  // Exclude decls with double-underscored names, either in arguments or
+  // base names.
+  static StringRef Prefix = "__";
+
+  // If it's a function or subscript with a parameter with leading
+  // double underscore, it's a private function or subscript.
+  if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
+    auto *params = cast<ValueDecl>(D)->getParameterList();
+    if (params->hasInternalParameter(Prefix))
+      return true;
+  }
+
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    auto Name = VD->getBaseName();
+    if (!Name.isSpecial() && Name.getIdentifier().str().starts_with(Prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static DocCommentSerializationTarget
+getDocCommentSerializationTargetImpl(const Decl *D) {
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    auto *extended = ED->getExtendedNominal();
+    if (!extended)
+      return DocCommentSerializationTarget::None;
+
+    return getDocCommentSerializationTargetFor(extended);
+  }
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return DocCommentSerializationTarget::None;
+
+  // The use of getEffectiveAccess is unusual here; we want to take the
+  // testability state into account and emit documentation if and only if they
+  // are visible to clients (which means public ordinarily, but public+internal
+  // when testing enabled).
+  switch (VD->getEffectiveAccess()) {
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
+  case AccessLevel::Internal:
+    // There's no point serializing anything internal or below, as they are not
+    // accessible outside their defining module.
+    return DocCommentSerializationTarget::None;
+  case AccessLevel::Package:
+    // Package doc comments can be referenced outside their module, but only
+    // locally, so can't be included in swiftdoc.
+    return DocCommentSerializationTarget::SourceInfoOnly;
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    return DocCommentSerializationTarget::SwiftDocAndSourceInfo;
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
+DocCommentSerializationTarget
+swift::getDocCommentSerializationTargetFor(const Decl *D) {
+  auto Limit = DocCommentSerializationTarget::SwiftDocAndSourceInfo;
+
+  // We can't include SPI decls in swiftdoc.
+  if (D->isSPI())
+    Limit = DocCommentSerializationTarget::SourceInfoOnly;
+
+  // .swiftdoc doesn't include comments for double underscored symbols, but
+  // for .swiftsourceinfo, having the source location for these symbols isn't
+  // a concern because these symbols are in .swiftinterface anyway.
+  if (hasDoubleUnderscore(D))
+    Limit = DocCommentSerializationTarget::SourceInfoOnly;
+
+  auto Result = getDocCommentSerializationTargetImpl(D);
+  return std::min(Result, Limit);
 }

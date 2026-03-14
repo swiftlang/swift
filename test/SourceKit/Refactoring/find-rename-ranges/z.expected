@@ -2,5 +2,4 @@ source.edit.kind.active:
   8:9-8:10 source.refactoring.range.kind.basename
 source.edit.kind.inactive:
   10:16-10:17 source.refactoring.range.kind.basename
-source.edit.kind.inactive:
-  12:16-12:17 source.refactoring.range.kind.basename
+source.edit.kind.unknown:

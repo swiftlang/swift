@@ -13,8 +13,9 @@
 #ifndef SWIFT_SERIALIZATION_MODULEFILECORETABLEINFO_H
 #define SWIFT_SERIALIZATION_MODULEFILECORETABLEINFO_H
 
-#include "ModuleFileSharedCore.h"
 #include "DocFormat.h"
+#include "ModuleFileSharedCore.h"
+#include "SerializationFormat.h"
 #include "SourceInfoFormat.h"
 #include "swift/AST/RawComment.h"
 #include "llvm/Support/DJB.h"
@@ -51,16 +52,14 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace llvm::support;
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned keyLength = readNext<uint16_t>(data);
+    unsigned dataLength = readNext<uint16_t>(data);
     return { keyLength, dataLength };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
     using namespace swift::serialization;
-    using namespace llvm::support;
-    uint8_t kind = endian::readNext<uint8_t, little, unaligned>(data);
+    uint8_t kind = readNext<uint8_t>(data);
     switch (kind) {
     case static_cast<uint8_t>(DeclNameKind::Normal): {
       StringRef str(reinterpret_cast<const char *>(data),
@@ -78,11 +77,10 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    using namespace llvm::support;
     data_type result;
     while (length > 0) {
       uint8_t kind = *data++;
-      DeclID offset = endian::readNext<uint32_t, little, unaligned>(data);
+      DeclID offset = readNext<uint32_t>(data);
       result.push_back({ kind, offset });
       length -= 5;
     }
@@ -114,9 +112,8 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace llvm::support;
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned keyLength = readNext<uint16_t>(data);
+    unsigned dataLength = readNext<uint16_t>(data);
     return { keyLength, dataLength };
   }
 
@@ -126,14 +123,12 @@ public:
 
   data_type ReadData(internal_key_type key, const uint8_t *data,
                      unsigned length) {
-    using namespace llvm::support;
     data_type result;
     const uint8_t *limit = data + length;
     while (data < limit) {
-      DeclID offset = endian::readNext<uint32_t, little, unaligned>(data);
+      DeclID offset = readNext<uint32_t>(data);
 
-      int32_t nameIDOrLength =
-          endian::readNext<int32_t, little, unaligned>(data);
+      int32_t nameIDOrLength = readNext<int32_t>(data);
       StringRef moduleNameOrMangledBase;
       if (nameIDOrLength < 0) {
         StringRef moduleName = Core.getModuleNameFromID(-nameIDOrLength);
@@ -180,8 +175,7 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace llvm::support;
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned keyLength = readNext<uint16_t>(data);
     return { keyLength, sizeof(uint32_t) };
   }
 
@@ -191,8 +185,7 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    using namespace llvm::support;
-    return endian::readNext<uint32_t, little, unaligned>(data);
+    return readNext<uint32_t>(data);
   }
 };
 
@@ -217,9 +210,8 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace llvm::support;
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned keyLength = readNext<uint16_t>(data);
+    unsigned dataLength = readNext<uint16_t>(data);
     return { keyLength, dataLength };
   }
 
@@ -229,11 +221,10 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    using namespace llvm::support;
     data_type result;
     while (length > 0) {
-      DeclID parentID = endian::readNext<uint32_t, little, unaligned>(data);
-      DeclID childID = endian::readNext<uint32_t, little, unaligned>(data);
+      DeclID parentID = readNext<uint32_t>(data);
+      DeclID childID = readNext<uint32_t>(data);
       result.push_back({ parentID, childID });
       length -= sizeof(uint32_t) * 2;
     }
@@ -277,15 +268,13 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace llvm::support;
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned keyLength = readNext<uint16_t>(data);
     return { keyLength, sizeof(uint32_t) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
     using namespace swift::serialization;
-    using namespace llvm::support;
-    uint8_t kind = endian::readNext<uint8_t, little, unaligned>(data);
+    uint8_t kind = readNext<uint8_t>(data);
     switch (kind) {
     case static_cast<uint8_t>(DeclNameKind::Normal): {
       StringRef str(reinterpret_cast<const char *>(data),
@@ -305,9 +294,8 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    using namespace llvm::support;
     assert(length == sizeof(uint32_t));
-    return endian::readNext<uint32_t, little, unaligned>(data);
+    return readNext<uint32_t>(data);
   }
 };
 
@@ -330,7 +318,7 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::hash_value(key);
+    return key;
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -338,22 +326,19 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace llvm::support;
-    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned dataLength = readNext<uint16_t>(data);
     return { sizeof(uint32_t), dataLength };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
-    using namespace llvm::support;
-    return endian::readNext<uint32_t, little, unaligned>(data);
+    return readNext<uint32_t>(data);
   }
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    using namespace llvm::support;
     data_type result;
     while (length > 0) {
-      DeclID declID = endian::readNext<uint32_t, little, unaligned>(data);
+      DeclID declID = readNext<uint32_t>(data);
       result.push_back(declID);
       length -= sizeof(uint32_t);
     }
@@ -384,9 +369,8 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace llvm::support;
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
+    unsigned keyLength = readNext<uint16_t>(data);
+    unsigned dataLength = readNext<uint32_t>(data);
     return { keyLength, dataLength };
   }
 
@@ -396,13 +380,12 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    using namespace llvm::support;
     const constexpr auto recordSize = sizeof(uint32_t) + 1 + sizeof(uint32_t);
     data_type result;
     while (length > 0) {
-      unsigned ownerLen = endian::readNext<uint32_t, little, unaligned>(data);
+      unsigned ownerLen = readNext<uint32_t>(data);
       bool isInstanceMethod = *data++ != 0;
-      DeclID methodID = endian::readNext<uint32_t, little, unaligned>(data);
+      DeclID methodID = readNext<uint32_t>(data);
       std::string ownerName((const char *)data, ownerLen);
       result.push_back(
         std::make_tuple(std::move(ownerName), isInstanceMethod, methodID));
@@ -438,9 +421,8 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace llvm::support;
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned keyLength = readNext<uint16_t>(data);
+    unsigned dataLength = readNext<uint16_t>(data);
     return {keyLength, dataLength};
   }
 
@@ -450,12 +432,11 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    using namespace llvm::support;
     data_type result;
     const uint8_t *limit = data + length;
     while (data < limit) {
-      DeclID genSigId = endian::readNext<uint32_t, little, unaligned>(data);
-      int32_t nameLength = endian::readNext<int32_t, little, unaligned>(data);
+      DeclID genSigId = readNext<uint32_t>(data);
+      int32_t nameLength = readNext<int32_t>(data);
       std::string mangledName(reinterpret_cast<const char *>(data), nameLength);
       data += nameLength;
       result.push_back({std::string(mangledName), genSigId});
@@ -491,9 +472,8 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace llvm::support;
-    unsigned keyLength = endian::readNext<uint32_t, little, unaligned>(data);
-    unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
+    unsigned keyLength = readNext<uint32_t>(data);
+    unsigned dataLength = readNext<uint32_t>(data);
     return { keyLength, dataLength };
   }
 
@@ -503,29 +483,27 @@ public:
 
   data_type ReadData(internal_key_type key, const uint8_t *data,
                      unsigned length) {
-    using namespace llvm::support;
     data_type result = std::make_unique<DeserializedCommentInfo>();
 
     {
-      unsigned BriefSize = endian::readNext<uint32_t, little, unaligned>(data);
+      unsigned BriefSize = readNext<uint32_t>(data);
       result->Info.Brief = StringRef(reinterpret_cast<const char *>(data), BriefSize);
       data += BriefSize;
     }
 
-    unsigned NumComments = endian::readNext<uint32_t, little, unaligned>(data);
+    unsigned NumComments = readNext<uint32_t>(data);
 
     for (unsigned i = 0; i != NumComments; ++i) {
-      unsigned StartColumn =
-          endian::readNext<uint32_t, little, unaligned>(data);
-      unsigned RawSize = endian::readNext<uint32_t, little, unaligned>(data);
+      unsigned StartColumn = readNext<uint32_t>(data);
+      unsigned RawSize = readNext<uint32_t>(data);
       auto RawText = StringRef(reinterpret_cast<const char *>(data), RawSize);
       data += RawSize;
 
       result->RawCommentStore.emplace_back(RawText, StartColumn);
     }
     result->Info.Raw = RawComment(result->RawCommentStore);
-    result->Info.Group = endian::readNext<uint32_t, little, unaligned>(data);
-    result->Info.SourceOrder = endian::readNext<uint32_t, little, unaligned>(data);
+    result->Info.Group = readNext<uint32_t>(data);
+    result->Info.SourceOrder = readNext<uint32_t>(data);
     return result;
   }
 };
@@ -550,8 +528,7 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace llvm::support;
-    unsigned keyLength = endian::readNext<uint32_t, little, unaligned>(data);
+    unsigned keyLength = readNext<uint32_t>(data);
     unsigned dataLength = 4;
     return { keyLength, dataLength };
   }
@@ -560,10 +537,10 @@ public:
     return StringRef(reinterpret_cast<const char*>(data), length);
   }
 
-  data_type ReadData(internal_key_type key, const uint8_t *data, unsigned length) {
-    using namespace llvm::support;
+  data_type ReadData(internal_key_type key, const uint8_t *data,
+                     unsigned length) {
     assert(length == 4);
-    return endian::readNext<uint32_t, little, unaligned>(data);
+    return readNext<uint32_t>(data);
   }
 };
 
@@ -580,7 +557,7 @@ public:
   internal_key_type GetInternalKey(external_key_type ID) { return ID; }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::hash_value(key);
+    return key;
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -588,25 +565,24 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace llvm::support;
     const unsigned dataLen = Fingerprint::DIGEST_LENGTH;
     return {sizeof(uint32_t), dataLen};
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
-    using namespace llvm::support;
-    return endian::readNext<uint32_t, little, unaligned>(data);
+    return readNext<uint32_t>(data);
   }
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    using namespace llvm::support;
     auto str = llvm::StringRef{reinterpret_cast<const char *>(data),
                                Fingerprint::DIGEST_LENGTH};
     if (auto fp = Fingerprint::fromString(str))
       return fp.value();
-    llvm::errs() << "Unconvertable fingerprint '" << str << "'\n";
-    abort();
+
+    ABORT([&](auto &out) {
+      out << "Unconvertable fingerprint '" << str << "'";
+    });
   }
 };
 

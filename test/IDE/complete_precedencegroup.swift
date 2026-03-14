@@ -107,12 +107,10 @@ func testType() {
 // ASSIGNMENT: Keyword[false]/None: false; name=false
 // ASSIGNMENT: Keyword[true]/None: true;   name=true
 
-// PRECEDENCE_GROUP: Begin completions
 // PRECEDENCE_GROUP-DAG: Decl[PrecedenceGroup]/OtherModule[Swift]/IsSystem: AssignmentPrecedence; name=AssignmentPrecedence
 // PRECEDENCE_GROUP-DAG: Decl[PrecedenceGroup]/OtherModule[Swift]/IsSystem: ComparisonPrecedence; name=ComparisonPrecedence
 
 /* FIXME: (https://github.com/apple/swift/issues/51404) We only see precedence groups that are earlier in life! */
-// PRECEDENCE_GROUP_CURRFILE-DAG: Begin completions
 // PRECEDENCE_GROUP_CURRFILE-DAG: Decl[PrecedenceGroup]/CurrModule: MyPrecedence{{[0-9]+}};
 // PRECEDENCE_GROUP_CURRFILE-DAG: Decl[PrecedenceGroup]/CurrModule: MyPrecedence{{[0-9]+}};
 // PRECEDENCE_GROUP_CURRFILE-DAG: Decl[PrecedenceGroup]/CurrModule: MyPrecedence{{[0-9]+}};
@@ -128,6 +126,4 @@ func testType() {
 
 // PRECEDENCE_GROUP_MULTIFILE: Decl[PrecedenceGroup]/CurrModule: PrecedenceGroupOtherFile; name=PrecedenceGroupOtherFile
 
-// PRECEDENCE_GROUP_NEGATIVE: Begin completions
 // PRECEDENCE_GROUP_NEGATIVE-NOT: Decl[PrecedenceGroup]
-// PRECEDENCE_GROUP_NEGATIVE: End completions

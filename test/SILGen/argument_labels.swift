@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name argument_labels %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name argument_labels %s | %FileCheck %s
 
 public struct X { }
 public struct Y { }

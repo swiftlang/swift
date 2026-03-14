@@ -13,7 +13,7 @@
 #ifndef SWIFT_SIL_SILFUNCTIONBUILDER_H
 #define SWIFT_SIL_SILFUNCTIONBUILDER_H
 
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/SIL/SILModule.h"
 
 namespace swift {
@@ -43,7 +43,7 @@ class SILGenFunctionBuilder;
 ///    code-reuse in between these different SILFunction creation sites.
 class SILFunctionBuilder {
   SILModule &mod;
-  AvailabilityContext availCtx;
+  AvailabilityRange availCtx;
 
   friend class SILParserFunctionBuilder;
   friend class SILSerializationFunctionBuilder;
@@ -51,33 +51,27 @@ class SILFunctionBuilder {
   friend class Lowering::SILGenFunctionBuilder;
 
   SILFunctionBuilder(SILModule &mod)
-      : SILFunctionBuilder(mod,
-                           AvailabilityContext::forDeploymentTarget(
-                             mod.getASTContext())) {}
+      : SILFunctionBuilder(
+            mod, AvailabilityRange::forDeploymentTarget(mod.getASTContext())) {}
 
-  SILFunctionBuilder(SILModule &mod, AvailabilityContext availCtx)
+  SILFunctionBuilder(SILModule &mod, AvailabilityRange availCtx)
       : mod(mod), availCtx(availCtx) {}
 
   /// Return the declaration of a utility function that can, but needn't, be
   /// shared between different parts of a program.
-  SILFunction *getOrCreateSharedFunction(SILLocation loc, StringRef name,
-                                         CanSILFunctionType type,
-                                         IsBare_t isBareSILFunction,
-                                         IsTransparent_t isTransparent,
-                                         IsSerialized_t isSerialized,
-                                         ProfileCounter entryCount,
-                                         IsThunk_t isThunk,
-                                         IsDynamicallyReplaceable_t isDynamic,
-                                         IsDistributed_t isDistributed,
-                                         IsRuntimeAccessible_t isRuntimeAccessible);
+  SILFunction *getOrCreateSharedFunction(
+      SILLocation loc, StringRef name, CanSILFunctionType type,
+      IsBare_t isBareSILFunction, IsTransparent_t isTransparent,
+      SerializedKind_t serializedKind, ProfileCounter entryCount,
+      IsThunk_t isThunk, IsDynamicallyReplaceable_t isDynamic,
+      IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible);
 
   /// Return the declaration of a function, or create it if it doesn't exist.
   SILFunction *getOrCreateFunction(
       SILLocation loc, StringRef name, SILLinkage linkage,
       CanSILFunctionType type, IsBare_t isBareSILFunction,
-      IsTransparent_t isTransparent, IsSerialized_t isSerialized,
-      IsDynamicallyReplaceable_t isDynamic,
-      IsDistributed_t isDistributed,
+      IsTransparent_t isTransparent, SerializedKind_t serializedKind,
+      IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
       IsRuntimeAccessible_t isRuntimeAccessible,
       ProfileCounter entryCount = ProfileCounter(),
       IsThunk_t isThunk = IsNotThunk,
@@ -100,21 +94,19 @@ class SILFunctionBuilder {
   /// This signature is a direct copy of the signature of SILFunction::create()
   /// in order to simplify refactoring all SILFunction creation use-sites to use
   /// SILFunctionBuilder. Eventually the uses should probably be refactored.
-  SILFunction *
-  createFunction(SILLinkage linkage, StringRef name,
-                 CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-                 Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-                 IsTransparent_t isTrans, IsSerialized_t isSerialized,
-                 IsDynamicallyReplaceable_t isDynamic,
-                 IsDistributed_t isDistributed,
-                 IsRuntimeAccessible_t isRuntimeAccessible,
-                 ProfileCounter entryCount = ProfileCounter(),
-                 IsThunk_t isThunk = IsNotThunk,
-                 SubclassScope subclassScope = SubclassScope::NotApplicable,
-                 Inline_t inlineStrategy = InlineDefault,
-                 EffectsKind EK = EffectsKind::Unspecified,
-                 SILFunction *InsertBefore = nullptr,
-                 const SILDebugScope *DebugScope = nullptr);
+  SILFunction *createFunction(
+      SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
+      GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
+      IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+      SerializedKind_t serializedKind, IsDynamicallyReplaceable_t isDynamic,
+      IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
+      ProfileCounter entryCount = ProfileCounter(),
+      IsThunk_t isThunk = IsNotThunk,
+      SubclassScope subclassScope = SubclassScope::NotApplicable,
+      Inline_t inlineStrategy = InlineDefault,
+      EffectsKind EK = EffectsKind::Unspecified,
+      SILFunction *InsertBefore = nullptr,
+      const SILDebugScope *DebugScope = nullptr);
 
   void addFunctionAttributes(
       SILFunction *F, DeclAttributes &Attrs, SILModule &M,

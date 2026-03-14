@@ -12,17 +12,17 @@ let DemangleToMetadataMovedSymbolsTests = TestSuite("DemangleToMetadataMovedSymb
 
 @available(OSX 10.9, *)
 @_originallyDefinedIn(module: "foo", OSX 10.13)
-struct MovedS {
+public struct MovedS {
   struct Nested { }
 }
 
 @available(OSX 10.9, *)
 @_originallyDefinedIn(module: "foo", OSX 10.13)
-enum MovedE { case e }
+public enum MovedE { case e }
 
 @available(OSX 10.9, *)
 @_originallyDefinedIn(module: "bar", OSX 10.13)
-class MovedC {}
+public class MovedC {}
 
 DemangleToMetadataMovedSymbolsTests.test("Moved Nominals") {
   // Simple Struct

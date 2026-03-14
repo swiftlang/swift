@@ -71,10 +71,23 @@ SEMANTICS_ATTR(TYPENAME, "typeName")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_NEVER, "optimize.sil.specialize.generic.never")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER,
           "optimize.sil.specialize.generic.partial.never")
+SEMANTICS_ATTR(OPTIMIZE_SIL_INLINE_CONSTANT_ARGUMENTS,
+          "optimize.sil.inline.constant.arguments")
+SEMANTICS_ATTR(DERIVED_ENUM_EQUALS,
+          "derived_enum_equals")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER,
           "optimize.sil.specialize.generic.size.never")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_OWNED2GUARANTEE_NEVER,
           "optimize.sil.specialize.owned2guarantee.never")
+SEMANTICS_ATTR(OPTIMIZE_SIL_INLINE_AGGRESSIVE,
+          "optimize.sil.inline.aggressive")
+
+// To be used on a nominal type declaration.
+// Assumes that a class (or class references inside a nominal type) are immortal.
+// ARC operations on such types can be eliminated.
+// If specified on a protocol declaration, all types which conform to that protocol
+// are assumed to be immortal.
+SEMANTICS_ATTR(ARC_IMMORTAL, "arc.immortal")
 
 SEMANTICS_ATTR(OSLOG_MESSAGE_TYPE, "oslog.message.type")
 SEMANTICS_ATTR(OSLOG_MESSAGE_INIT_INTERPOLATION, "oslog.message.init_interpolation")
@@ -116,9 +129,45 @@ SEMANTICS_ATTR(FORCE_EMIT_OPT_REMARK_PREFIX, "optremark")
 SEMANTICS_ATTR(OBJC_FORBID_ASSOCIATED_OBJECTS, "objc.forbidAssociatedObjects")
 
 SEMANTICS_ATTR(LIFETIMEMANAGEMENT_MOVE, "lifetimemanagement.move")
-SEMANTICS_ATTR(LIFETIMEMANAGEMENT_COPY, "lifetimemanagement.copy")
 
 SEMANTICS_ATTR(NO_PERFORMANCE_ANALYSIS, "no_performance_analysis")
+
+// A flag used to turn off moveonly diagnostics on a function due to an earlier
+// pass that ran. If we emit a diagnose invalid escaping captures error due to
+// an inout being escaped into an escaping closure, we do not want to emit move
+// errors in the closure. This is because SILGen today assumes that we will error
+// in such cases and thus does not emit markers in said function for the inout.
+// This then causes us to emit spurious "found a copy of a noncopyable value"
+// errors that may cause the user to think there is a bug in the compiler.
+SEMANTICS_ATTR(NO_MOVEONLY_DIAGNOSTICS, "sil.optimizer.moveonly.diagnostic.ignore")
+
+// Tell the compiler that it can delete this function body instead of performing
+// diagnostics if the function is not used at the time of checking.
+//
+// This is currently used by allocbox to stack and capture promotion.
+//
+// MoveOnlyChecker and TransferNonSendable both potentially delete functions.
+//
+// DISCUSSION: We want to make sure that in cases where we may emit diagnostics
+// twice, we just delete the original function. When running alloc box to stack
+// and capture promotion, we may not have eliminated all of the relevant uses so
+// we may not know to eliminate them.
+//
+// When allocbox to stack specializes a function, we do not want to emit move
+// errors twice, once on the specialized and once on the original function. The
+// semantics of the closure with regards to move-only values may also be
+// dependent on stack promotion. Therefore, we mark the original with this
+// attribute, so that after it's promoted, the original function gets deleted
+// instead of raising spurious diagnostics.
+SEMANTICS_ATTR(DELETE_IF_UNUSED, "sil.optimizer.delete_if_unused")
+
+// Force the use of the frame pointer for the specified function
+SEMANTICS_ATTR(USE_FRAME_POINTER, "use_frame_pointer")
+
+SEMANTICS_ATTR(FIXED_STORAGE_CHECK_INDEX, "fixed_storage.check_index")
+SEMANTICS_ATTR(FIXED_STORAGE_GET_COUNT, "fixed_storage.get_count")
+
+SEMANTICS_ATTR(NO_SIL_VERIFICATION, "sil.verify_none")
 
 #undef SEMANTICS_ATTR
 

@@ -115,7 +115,7 @@ if #available(SwiftStdlib 5.8, *) {
   }
 }
 
-if #available(SwiftStdlib 5.8, *) {
+if #available(SwiftStdlib 5.9, *) {
   suite.test("Equatable") {
     var r1 = Unicode._CharacterRecognizer()
     var r2 = Unicode._CharacterRecognizer()
@@ -135,7 +135,7 @@ if #available(SwiftStdlib 5.8, *) {
   }
 }
 
-if #available(SwiftStdlib 5.8, *) {
+if #available(SwiftStdlib 5.9, *) {
   suite.test("CustomStringConvertible") {
     var r = Unicode._CharacterRecognizer()
     expectEqual("\(r)", "[]U+0")

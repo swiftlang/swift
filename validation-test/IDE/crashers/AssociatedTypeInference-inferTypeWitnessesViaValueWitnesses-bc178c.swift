@@ -1,0 +1,3 @@
+// {"kind":"complete","original":"3946e52f","signature":"(anonymous namespace)::AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(llvm::SetVector<swift::AssociatedTypeDecl*, llvm::SmallVector<swift::AssociatedTypeDecl*, 0u>, llvm::DenseSet<swift::AssociatedTypeDecl*, llvm::DenseMapInfo<swift::AssociatedTypeDecl*, void>>, 0u> const&)","signatureAssert":"Assertion failed: (false && \"Should be exhaustive\"), function checkForPotentialCycle"}
+// RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
+struct a : RandomAccessCollection { class endIndex { b -> Element #^^#

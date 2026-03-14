@@ -17,3 +17,4 @@ class C {
 // RUN: diff -u %S/Outputs/static/L3-5.swift.expected %t.result/L3-5.swift
 // RUN: %refactor -extract-function -source-filename %s -pos=9:1 -end-pos=11:13 >> %t.result/L9-11.swift
 // RUN: diff -u %S/Outputs/static/L9-11.swift.expected %t.result/L9-11.swift
+// REQUIRES: swift_swift_parser

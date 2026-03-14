@@ -16,6 +16,7 @@
 #include "sourcekitd/RequestResponsePrinterBase.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
+#include "swift/Basic/LoadDynamicLibrary.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -26,6 +27,13 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/YAMLParser.h"
 #include <mutex>
+
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#define NOMINMAX
+#include <Windows.h>
+#else
+#include <dlfcn.h>
+#endif
 
 using namespace SourceKit;
 using namespace sourcekitd;
@@ -63,6 +71,47 @@ bool sourcekitd::compareDictKeys(UIdent LHS, UIdent RHS) {
   return LHSOrder < RHSOrder;
 }
 
+namespace {
+
+/// This a near-copy of llvm::function_ref, but that exposes its members
+/// publicly so we can efficiently wrap the applier functions below.
+template <typename Fn>
+class applier_function_ref;
+
+template <typename Ret, typename... Params>
+class applier_function_ref<Ret(Params...)> {
+public:
+  Ret (*callback)(Params... params, void *context) = nullptr;
+  void *context;
+
+  template <typename Callable>
+  static Ret callback_fn(Params... params, void *context) {
+    return (*reinterpret_cast<Callable *>(context))(
+        std::forward<Params>(params)...);
+  }
+
+  template <typename Callable>
+  applier_function_ref(
+      Callable &&callable,
+      std::enable_if_t<
+          !std::is_same<std::remove_cv_t<std::remove_reference_t<Callable>>,
+                        applier_function_ref>::value> * = nullptr)
+      : callback(callback_fn<typename std::remove_reference<Callable>::type>),
+        context(reinterpret_cast<void *>(&callable)) {}
+
+  Ret operator()(Params... params) const {
+    return callback(std::forward<Params>(params)..., context);
+  }
+};
+} // end anonymous namespace
+
+static bool variant_dictionary_apply(
+    sourcekitd_variant_t dict,
+    applier_function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)>
+        applier) {
+  return sourcekitd_variant_dictionary_apply_impl(dict, applier.callback,
+                                                  applier.context);
+}
 
 namespace {
 template <typename ImplClass,
@@ -83,9 +132,8 @@ public:
     case SOURCEKITD_VARIANT_TYPE_DICTIONARY: {
       DictMap Dict;
       DictMap &DictRef = Dict;
-      sourcekitd_variant_dictionary_apply_impl(
-          Obj,
-          [&](sourcekitd_uid_t key, sourcekitd_variant_t value) {
+      variant_dictionary_apply(
+          Obj, [&](sourcekitd_uid_t key, sourcekitd_variant_t value) {
             DictRef.push_back({UIdentFromSKDUID(key), value});
             return true;
           });
@@ -105,6 +153,9 @@ public:
     case SOURCEKITD_VARIANT_TYPE_BOOL:
       return static_cast<ImplClass*>(this)->visitBool(
                                        sourcekitd_variant_bool_get_value(Obj));
+    case SOURCEKITD_VARIANT_TYPE_DOUBLE:
+      return static_cast<ImplClass *>(this)->visitDouble(
+          sourcekitd_variant_double_get_value(Obj));
     case SOURCEKITD_VARIANT_TYPE_STRING: {
       size_t Len = sourcekitd_variant_string_get_length(Obj);
       const char *Ptr = sourcekitd_variant_string_get_ptr(Obj);
@@ -224,6 +275,82 @@ bool sourcekitd::shutdownClient() {
   return true;
 }
 
+extern "C" const char __dso_handle[];
+
+static void withCurrentLibraryPath(llvm::function_ref<void(const char *)> body) {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  char path[MAX_PATH];
+  HMODULE currentModule = NULL;
+
+  if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+          GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+          (LPCWSTR) &withCurrentLibraryPath, &currentModule) == 0) {
+      int error = GetLastError();
+      LOG_WARN("plugin-loading", "failed to determine current Windows module. Error: " << error);
+      return body(nullptr);
+  }
+  if (GetModuleFileNameA(currentModule, path, sizeof(path)) == 0) {
+      int error = GetLastError();
+      LOG_WARN("plugin-loading", "failed to path of current Windows module. Error: " << error);
+      return body(nullptr);
+  }
+  return body(path);
+#else
+  Dl_info dlinfo;
+  dladdr(__dso_handle, &dlinfo);
+  return body(dlinfo.dli_fname);
+#endif
+}
+
+static void loadPlugin(StringRef plugin, PluginInitParams &pluginParams) {
+  std::string err;
+  auto *handle = swift::loadLibrary(plugin.str().c_str(), &err);
+  if (!handle) {
+    LOG_WARN("plugin-loading",
+             "failed to load plugin '" << plugin << "': " << err);
+    return;
+  }
+
+  auto *plugin_init_2 = (sourcekitd_plugin_initialize_2_t)swift::getAddressOfSymbol(
+      handle, "sourcekitd_plugin_initialize_2");
+  if (plugin_init_2) {
+    withCurrentLibraryPath([&](const char *currentLibraryPath) {
+      plugin_init_2(&pluginParams, currentLibraryPath);
+    });
+    return;
+  }
+
+  // Fall back to the legacy sourcekitd_plugin_initialize function.
+  auto *plugin_init = (sourcekitd_plugin_initialize_t)swift::getAddressOfSymbol(
+      handle, "sourcekitd_plugin_initialize");
+  if (plugin_init) {
+    plugin_init(&pluginParams);
+    return;
+  }
+
+  LOG_WARN("plugin-loading",
+           "plugin '"
+              << plugin
+              << "' missing expected symbol: sourcekitd_plugin_initialize_2 or sourcekitd_plugin_initialize");
+}
+
+void sourcekitd::loadPlugins(ArrayRef<std::string> registeredPlugins,
+                             PluginInitParams &pluginParams) {
+  // Load from environment variable first so that it will override registered
+  // plugins.
+  StringRef envPlugins = getenv("SOURCEKIT_PLUGINS");
+  while (!envPlugins.empty()) {
+    StringRef plugin;
+    std::tie(plugin, envPlugins) = envPlugins.split(":");
+    assert(!plugin.empty());
+    loadPlugin(plugin, pluginParams);
+  }
+
+  // Load registered plugins.
+  for (const auto &path : registeredPlugins)
+    loadPlugin(path, pluginParams);
+}
+
 void
 sourcekitd_response_description_dump(sourcekitd_response_t resp) {
   // Avoid colors here, we don't properly detect that the debug window inside
@@ -319,7 +446,7 @@ sourcekitd_variant_dictionary_get_value(sourcekitd_variant_t dict,
   // Default implementation:
   // Linear search for the key/value pair via sourcekitd_variant_dictionary_apply.
   sourcekitd_variant_t result = makeNullVariant();
-  sourcekitd_variant_dictionary_apply_impl(
+  variant_dictionary_apply(
       dict, [&](sourcekitd_uid_t curr_key, sourcekitd_variant_t curr_value) {
         if (curr_key == key) {
           result = curr_value;
@@ -341,6 +468,13 @@ sourcekitd_variant_dictionary_get_string(sourcekitd_variant_t dict,
   // Get the value via sourcekitd_variant_dictionary_get_value.
   return sourcekitd_variant_string_get_ptr(
              sourcekitd_variant_dictionary_get_value(dict, key));
+}
+
+static bool variant_dictionary_applier_block_f(sourcekitd_uid_t key,
+                                               sourcekitd_variant_t value,
+                                               void *context) {
+  auto *block = (sourcekitd_variant_dictionary_applier_t *)context;
+  return (*block)(key, value);
 }
 
 int64_t
@@ -367,6 +501,17 @@ sourcekitd_variant_dictionary_get_bool(sourcekitd_variant_t dict,
              sourcekitd_variant_dictionary_get_value(dict, key));
 }
 
+double sourcekitd_variant_dictionary_get_double(sourcekitd_variant_t dict,
+                                                sourcekitd_uid_t key) {
+  if (auto fn = VAR_FN(dict, dictionary_get_double))
+    return fn(dict, key);
+
+  // Default implementation:
+  // Get the value via sourcekitd_variant_dictionary_get_value.
+  return sourcekitd_variant_double_get_value(
+      sourcekitd_variant_dictionary_get_value(dict, key));
+}
+
 sourcekitd_uid_t
 sourcekitd_variant_dictionary_get_uid(sourcekitd_variant_t dict,
                                       sourcekitd_uid_t key) {
@@ -383,16 +528,16 @@ sourcekitd_variant_dictionary_get_uid(sourcekitd_variant_t dict,
 bool
 sourcekitd_variant_dictionary_apply(sourcekitd_variant_t dict,
                               sourcekitd_variant_dictionary_applier_t applier) {
-  return sourcekitd_variant_dictionary_apply_impl(dict, applier);
+  return sourcekitd_variant_dictionary_apply_impl(
+      dict, variant_dictionary_applier_block_f, &applier);
 }
 #endif
 
-bool
-sourcekitd_variant_dictionary_apply_impl(
-  sourcekitd_variant_t dict,
-  llvm::function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)> applier) {
+bool sourcekitd_variant_dictionary_apply_impl(
+    sourcekitd_variant_t dict,
+    sourcekitd_variant_dictionary_applier_f_t applier, void *context) {
   if (auto fn = VAR_FN(dict, dictionary_apply))
-    return fn(dict, applier);
+    return fn(dict, applier, context);
 
   // Default implementation:
   // Treat as empty container.
@@ -403,11 +548,7 @@ bool
 sourcekitd_variant_dictionary_apply_f(sourcekitd_variant_t dict,
                               sourcekitd_variant_dictionary_applier_f_t applier,
                               void *context) {
-  return sourcekitd_variant_dictionary_apply_impl(
-      dict,
-      [&](sourcekitd_uid_t key, sourcekitd_variant_t value) {
-          return applier(key, value, context);
-  });
+  return sourcekitd_variant_dictionary_apply_impl(dict, applier, context);
 }
 
 size_t
@@ -461,6 +602,17 @@ sourcekitd_variant_array_get_bool(sourcekitd_variant_t array, size_t index) {
              sourcekitd_variant_array_get_value(array, index));
 }
 
+double sourcekitd_variant_array_get_double(sourcekitd_variant_t array,
+                                           size_t index) {
+  if (auto fn = VAR_FN(array, array_get_double))
+    return fn(array, index);
+
+  // Default implementation:
+  // Get the value via sourcekitd_variant_array_get_value.
+  return sourcekitd_variant_double_get_value(
+      sourcekitd_variant_array_get_value(array, index));
+}
+
 sourcekitd_uid_t
 sourcekitd_variant_array_get_uid(sourcekitd_variant_t array, size_t index) {
   if (auto fn = VAR_FN(array, array_get_uid))
@@ -472,24 +624,33 @@ sourcekitd_variant_array_get_uid(sourcekitd_variant_t array, size_t index) {
              sourcekitd_variant_array_get_value(array, index));
 }
 
+static bool variant_array_applier_block_f(size_t index,
+                                          sourcekitd_variant_t obj,
+                                          void *context) {
+  auto *block = (sourcekitd_variant_array_applier_t *)context;
+  return (*block)(index, obj);
+}
+
 #if SOURCEKITD_HAS_BLOCKS
 bool
 sourcekitd_variant_array_apply(sourcekitd_variant_t array,
                                sourcekitd_variant_array_applier_t applier) {
-  return sourcekitd_variant_array_apply_impl(array, applier);
+  return sourcekitd_variant_array_apply_impl(
+      array, variant_array_applier_block_f, &applier);
 }
 #endif
 
 bool sourcekitd_variant_array_apply_impl(
-    sourcekitd_variant_t array,
-    llvm::function_ref<bool(size_t, sourcekitd_variant_t)> applier) {
+    sourcekitd_variant_t array, sourcekitd_variant_array_applier_f_t applier,
+    void *context) {
   if (auto fn = VAR_FN(array, array_apply))
-    return fn(array, applier);
+    return fn(array, applier, context);
 
   // Default implementation:
   // Iterate over elements via a for-loop.
   for (size_t i = 0, e = sourcekitd_variant_array_get_count(array); i != e; ++i) {
-    bool Continue = applier(i, sourcekitd_variant_array_get_value(array, i));
+    bool Continue =
+        applier(i, sourcekitd_variant_array_get_value(array, i), context);
     if (!Continue)
       return false;
   }
@@ -499,10 +660,7 @@ bool sourcekitd_variant_array_apply_impl(
 bool sourcekitd_variant_array_apply_f(
     sourcekitd_variant_t array, sourcekitd_variant_array_applier_f_t applier,
     void *context) {
-  return sourcekitd_variant_array_apply_impl(
-      array, [&](size_t index, sourcekitd_variant_t value) {
-        return applier(index, value, context);
-      });
+  return sourcekitd_variant_array_apply_impl(array, applier, context);
 }
 
 int64_t
@@ -523,6 +681,17 @@ sourcekitd_variant_bool_get_value(sourcekitd_variant_t obj) {
   // Default implementation:
   // Assume this is a variant encapsulating the basic type.
   return obj.data[1];
+}
+
+double sourcekitd_variant_double_get_value(sourcekitd_variant_t obj) {
+  if (auto fn = VAR_FN(obj, double_get_value))
+    return fn(obj);
+
+  // Default implementation:
+  // Assume this is a variant encapsulating the basic type.
+  double result;
+  std::memcpy(&result, &obj.data[1], sizeof(double));
+  return result;
 }
 
 size_t
@@ -766,4 +935,272 @@ void YAMLRequestParser::initError(StringRef Desc, llvm::yaml::Node *Node,
   StringRef Text(Range.Start.getPointer(),
                  Range.End.getPointer() - Range.Start.getPointer());
   Error.append(Text.begin(), Text.end());
+}
+
+sourcekitd_variant_functions_t sourcekitd_variant_functions_create() {
+  auto *vfuncs = new VariantFunctions();
+  // Zero-initialize.
+  memset(vfuncs, 0, sizeof(VariantFunctions));
+  return vfuncs;
+}
+
+void sourcekitd_variant_functions_set_get_type(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_get_type_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->get_type = f;
+}
+void sourcekitd_variant_functions_set_array_apply(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_array_apply_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->array_apply = f;
+}
+void sourcekitd_variant_functions_set_array_get_bool(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_array_get_bool_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->array_get_bool = f;
+}
+void sourcekitd_variant_functions_set_array_get_double(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_array_get_double_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->array_get_double = f;
+}
+void sourcekitd_variant_functions_set_array_get_count(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_array_get_count_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->array_get_count = f;
+}
+void sourcekitd_variant_functions_set_array_get_int64(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_array_get_int64_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->array_get_int64 = f;
+}
+void sourcekitd_variant_functions_set_array_get_string(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_array_get_string_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->array_get_string = f;
+}
+void sourcekitd_variant_functions_set_array_get_uid(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_array_get_uid_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->array_get_uid = f;
+}
+void sourcekitd_variant_functions_set_array_get_value(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_array_get_value_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->array_get_value = f;
+}
+void sourcekitd_variant_functions_set_bool_get_value(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_bool_get_value_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->bool_get_value = f;
+}
+void sourcekitd_variant_functions_set_double_get_value(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_double_get_value_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->double_get_value = f;
+}
+void sourcekitd_variant_functions_set_dictionary_apply(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_dictionary_apply_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->dictionary_apply = f;
+}
+void sourcekitd_variant_functions_set_dictionary_get_bool(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_dictionary_get_bool_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->dictionary_get_bool = f;
+}
+void sourcekitd_variant_functions_set_dictionary_get_double(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_dictionary_get_double_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->dictionary_get_double = f;
+}
+void sourcekitd_variant_functions_set_dictionary_get_int64(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_dictionary_get_int64_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->dictionary_get_int64 = f;
+}
+void sourcekitd_variant_functions_set_dictionary_get_string(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_dictionary_get_string_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->dictionary_get_string = f;
+}
+void sourcekitd_variant_functions_set_dictionary_get_value(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_dictionary_get_value_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->dictionary_get_value = f;
+}
+void sourcekitd_variant_functions_set_dictionary_get_uid(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_dictionary_get_uid_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->dictionary_get_uid = f;
+}
+void sourcekitd_variant_functions_set_string_get_length(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_string_get_length_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->string_get_length = f;
+}
+void sourcekitd_variant_functions_set_string_get_ptr(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_string_get_ptr_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->string_get_ptr = f;
+}
+void sourcekitd_variant_functions_set_int64_get_value(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_int64_get_value_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->int64_get_value = f;
+}
+void sourcekitd_variant_functions_set_uid_get_value(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_uid_get_value_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->uid_get_value = f;
+}
+void sourcekitd_variant_functions_set_data_get_size(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_data_get_size_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->data_get_size = f;
+}
+void sourcekitd_variant_functions_set_data_get_ptr(
+    sourcekitd_variant_functions_t funcs,
+    sourcekitd_variant_functions_data_get_ptr_t f) {
+  auto *vfuncs = static_cast<VariantFunctions *>(funcs);
+  vfuncs->data_get_ptr = f;
+}
+
+bool sourcekitd_plugin_initialize_is_client_only(
+    sourcekitd_plugin_initialize_params_t _params) {
+  auto &params = *static_cast<sourcekitd::PluginInitParams *>(_params);
+  return params.isClientOnly;
+}
+
+uint64_t sourcekitd_plugin_initialize_custom_buffer_start(
+    sourcekitd_plugin_initialize_params_t _params) {
+  auto &params = *static_cast<sourcekitd::PluginInitParams *>(_params);
+  return params.customBufferStart;
+}
+
+sourcekitd_uid_get_from_cstr_t sourcekitd_plugin_initialize_uid_get_from_cstr(
+    sourcekitd_plugin_initialize_params_t _params) {
+  auto &params = *static_cast<sourcekitd::PluginInitParams *>(_params);
+  return params.uidGetFromCstr;
+}
+
+sourcekitd_uid_get_string_ptr_t sourcekitd_plugin_initialize_uid_get_string_ptr(
+    sourcekitd_plugin_initialize_params_t _params) {
+  auto &params = *static_cast<sourcekitd::PluginInitParams *>(_params);
+  return params.uidGetStringPtr;
+}
+
+void sourcekitd_plugin_initialize_register_request_handler(
+    sourcekitd_plugin_initialize_params_t _params,
+    sourcekitd_request_handler_t handler) {
+  auto &params = *static_cast<sourcekitd::PluginInitParams *>(_params);
+  auto handler_wrapper =
+      ^bool(sourcekitd_object_t req, sourcekitd_request_handle_t,
+            void (^resp)(sourcekitd_response_t)) {
+        return handler(req, resp);
+      };
+  params.registerRequestHandler(handler_wrapper);
+}
+
+void sourcekitd_plugin_initialize_register_cancellable_request_handler(
+    sourcekitd_plugin_initialize_params_t _params,
+    sourcekitd_cancellable_request_handler_t handler) {
+  auto &params = *static_cast<sourcekitd::PluginInitParams *>(_params);
+  params.registerRequestHandler(handler);
+}
+
+void sourcekitd_plugin_initialize_register_cancellation_handler(
+    sourcekitd_plugin_initialize_params_t _params,
+    sourcekitd_cancellation_handler_t handler) {
+  auto &params = *static_cast<sourcekitd::PluginInitParams *>(_params);
+  params.registerCancellationHandler(handler);
+}
+
+void sourcekitd_plugin_initialize_register_custom_buffer(
+    sourcekitd_plugin_initialize_params_t _params, uint64_t kind,
+    sourcekitd_variant_functions_t funcs) {
+  auto &params = *static_cast<sourcekitd::PluginInitParams *>(_params);
+  params.registerCustomBuffer(kind, funcs);
+}
+
+void *sourcekitd_plugin_initialize_get_swift_ide_inspection_instance(
+    sourcekitd_plugin_initialize_params_t _params) {
+  auto &params = *static_cast<sourcekitd::PluginInitParams *>(_params);
+  return params.opaqueIDEInspectionInstance;
+}
+
+PluginInitParams::PluginInitParams(
+    bool isClientOnly,
+    std::function<void(sourcekitd_cancellable_request_handler_t)>
+        registerRequestHandler,
+    std::function<void(sourcekitd_cancellation_handler_t)>
+        registerCancellationHandler,
+    void *opaqueIDEInspectionInstance)
+    : isClientOnly(isClientOnly) {
+  assert(isClientOnly || (registerRequestHandler != nullptr &&
+                          registerCancellationHandler != nullptr));
+  // Note: we pass in registerRequestHandler rather than accessing
+  // sourcekitd::pluginRegisterRequestHandler so that when constructing
+  // parameters from the sourcekitd client library it does not pull in all of
+  // request handling when linking.
+  if (!isClientOnly) {
+    this->registerRequestHandler = registerRequestHandler;
+    this->registerCancellationHandler = registerCancellationHandler;
+  }
+  registerCustomBuffer = [this](uint64_t kind,
+                                sourcekitd_variant_functions_t funcs) {
+    sourcekitd::pluginRegisterCustomBufferKind(kind, funcs);
+    customBufferStart = std::max(customBufferStart, kind + 1);
+  };
+  this->opaqueIDEInspectionInstance = opaqueIDEInspectionInstance;
+}
+
+// MARK: Plugin variant functions
+
+// Note: only modified during plugin loading.
+static std::vector<VariantFunctions *> PluginVariantFunctions;
+
+VariantFunctions *sourcekitd::getPluginVariantFunctions(size_t BufKind) {
+  size_t index = BufKind - (size_t)CustomBufferKind::CustomBufferKind_End;
+  if (index >= PluginVariantFunctions.size() ||
+      PluginVariantFunctions[index] == nullptr) {
+    llvm::report_fatal_error(
+        "unknown custom buffer kind; possible plugin loading failure");
+  }
+  return PluginVariantFunctions[index];
+}
+
+void sourcekitd::pluginRegisterCustomBufferKind(
+    uint64_t kind, sourcekitd_variant_functions_t funcs) {
+  auto index = kind - (uint64_t)CustomBufferKind::CustomBufferKind_End;
+  if (index < PluginVariantFunctions.size()) {
+    assert(PluginVariantFunctions[index] == nullptr &&
+           "overwriting existing buffer");
+  } else {
+    PluginVariantFunctions.resize(index + 1);
+  }
+  PluginVariantFunctions[index] = static_cast<VariantFunctions *>(funcs);
 }

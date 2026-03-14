@@ -3,84 +3,84 @@
     {
       key.kind: source.lang.swift.decl.function.subscript,
       key.name: "[:]",
-      key.sourcetext: "[<#T##param: Int##Int#>]",
       key.description: "[<callarg><callarg.label>_</callarg.label> <callarg.param>param</callarg.param>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>]",
       key.typename: "<typeid.sys>Int</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructVyS2icip",
-      key.modulename: "complete_annotateddescription"
+      key.modulename: "complete_annotateddescription",
+      key.sourcetext: "[<#T##param: Int##Int#>]"
     },
     {
       key.kind: source.lang.swift.decl.function.subscript,
       key.name: "[label:]",
-      key.sourcetext: "[label: <#T##Int#>]",
       key.description: "[<callarg><callarg.label>label</callarg.label> <callarg.param>param</callarg.param>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>]",
       key.typename: "<typeid.sys>Int</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV5labelS2i_tcip",
-      key.modulename: "complete_annotateddescription"
+      key.modulename: "complete_annotateddescription",
+      key.sourcetext: "[label: <#T##Int#>]"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "labelName(label:)",
-      key.sourcetext: ".labelName(label: <#T##(@autoclosure () -> Int) -> Int#>)",
       key.description: "<name>labelName</name>(<callarg><callarg.label>label</callarg.label>: <callarg.type>(<attribute>@autoclosure</attribute> () -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Int</typeid.sys></callarg.type></callarg>)",
       key.typename: "<typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV9labelName0E0yS2iyXKXE_tF",
-      key.modulename: "complete_annotateddescription"
+      key.modulename: "complete_annotateddescription",
+      key.sourcetext: ".labelName(label: <#T##(@autoclosure () -> Int) -> Int#>)"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "labelNameParamName(label:)",
-      key.sourcetext: ".labelNameParamName(label: <#T##(inout Int) throws -> MyStruct#>)",
       key.description: "<name>labelNameParamName</name>(<callarg><callarg.label>label</callarg.label> <callarg.param>param</callarg.param>: <callarg.type>(<keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) <keyword>throws</keyword> -&gt; <typeid.user>MyStruct</typeid.user></callarg.type></callarg>) <keyword>rethrows</keyword>",
       key.typename: "<typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV014labelNameParamF00E0yACSizKXE_tKF",
-      key.modulename: "complete_annotateddescription"
+      key.modulename: "complete_annotateddescription",
+      key.sourcetext: ".labelNameParamName(label: <#T##(inout Int) throws -> MyStruct#>)"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "paramName(:)",
-      key.sourcetext: ".paramName(<#T##param: Int##Int#>)",
       key.description: "<name>paramName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>param</callarg.param>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>)",
       key.typename: "<typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV9paramNameyySiF",
-      key.modulename: "complete_annotateddescription"
+      key.modulename: "complete_annotateddescription",
+      key.sourcetext: ".paramName(<#T##param: Int##Int#>)"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "sameName(label:)",
-      key.sourcetext: ".sameName(label: <#T##Int#>)",
       key.description: "<name>sameName</name>(<callarg><callarg.label>label</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>)",
       key.typename: "<typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV8sameName5labelySi_tF",
-      key.modulename: "complete_annotateddescription"
+      key.modulename: "complete_annotateddescription",
+      key.sourcetext: ".sameName(label: <#T##Int#>)"
     },
     {
       key.kind: source.lang.swift.keyword,
       key.name: "self",
-      key.sourcetext: ".self",
       key.description: "<keyword>self</keyword>",
       key.typename: "<typeid.user>MyStruct</typeid.user>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
-      key.num_bytes_to_erase: 0
+      key.num_bytes_to_erase: 0,
+      key.sourcetext: ".self"
     }
   ],
   key.annotated.typename: 1
@@ -90,82 +90,82 @@
     {
       key.kind: source.lang.swift.decl.function.constructor,
       key.name: "init()",
-      key.sourcetext: "init()",
       key.description: "<name>init</name>()",
       key.typename: "<typeid.user>MyStruct</typeid.user>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructVACycfc",
-      key.modulename: "complete_annotateddescription"
+      key.modulename: "complete_annotateddescription",
+      key.sourcetext: "init()"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "labelName(:)",
-      key.sourcetext: "labelName(<#T##self: MyStruct##MyStruct#>)",
       key.description: "<name>labelName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>)",
       key.typename: "(label: (<attribute>@autoclosure</attribute> () -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV9labelName0E0yS2iyXKXE_tF",
-      key.modulename: "complete_annotateddescription"
+      key.modulename: "complete_annotateddescription",
+      key.sourcetext: "labelName(<#T##self: MyStruct##MyStruct#>)"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "labelNameParamName(:)",
-      key.sourcetext: "labelNameParamName(<#T##self: MyStruct##MyStruct#>)",
       key.description: "<name>labelNameParamName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>)",
       key.typename: "(label: (<keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) <keyword>throws</keyword> -&gt; <typeid.user>MyStruct</typeid.user>) -&gt; <typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV014labelNameParamF00E0yACSizKXE_tKF",
-      key.modulename: "complete_annotateddescription"
+      key.modulename: "complete_annotateddescription",
+      key.sourcetext: "labelNameParamName(<#T##self: MyStruct##MyStruct#>)"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "paramName(:)",
-      key.sourcetext: "paramName(<#T##self: MyStruct##MyStruct#>)",
       key.description: "<name>paramName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>)",
       key.typename: "(<typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV9paramNameyySiF",
-      key.modulename: "complete_annotateddescription"
+      key.modulename: "complete_annotateddescription",
+      key.sourcetext: "paramName(<#T##self: MyStruct##MyStruct#>)"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "sameName(:)",
-      key.sourcetext: "sameName(<#T##self: MyStruct##MyStruct#>)",
       key.description: "<name>sameName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>)",
       key.typename: "(label: <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV8sameName5labelySi_tF",
-      key.modulename: "complete_annotateddescription"
+      key.modulename: "complete_annotateddescription",
+      key.sourcetext: "sameName(<#T##self: MyStruct##MyStruct#>)"
     },
     {
       key.kind: source.lang.swift.keyword,
       key.name: "self",
-      key.sourcetext: "self",
       key.description: "<keyword>self</keyword>",
       key.typename: "<typeid.user>MyStruct</typeid.user>.Type",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
-      key.num_bytes_to_erase: 0
+      key.num_bytes_to_erase: 0,
+      key.sourcetext: "self"
     },
     {
       key.kind: source.lang.swift.keyword,
       key.name: "Type",
-      key.sourcetext: "Type",
       key.description: "<keyword>Type</keyword>",
       key.typename: "<typeid.user>MyStruct</typeid.user>.Type",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
-      key.num_bytes_to_erase: 0
+      key.num_bytes_to_erase: 0,
+      key.sourcetext: "Type"
     }
   ],
   key.reusingastcontext: 1,

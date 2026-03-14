@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init -verify | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -definite-init -verify | %FileCheck %s
 
 // This file contains tests that test diagnostics emitted for var initialization
 // by DI.
@@ -11,7 +11,7 @@ import Swift
 sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
 sil @makesInt : $@convention(thin) () -> Int
 
-// CHECK-LABEL: sil [ossa] @use_before_init
+// CHECK-LABEL: sil [_semantics "sil.optimizer.moveonly.diagnostic.ignore"] [ossa] @use_before_init
 sil [ossa] @use_before_init : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
@@ -85,7 +85,7 @@ bb0:
   return %5 : $Int
 }
 
-// CHECK-LABEL: sil [ossa] @tuple_elements1
+// CHECK-LABEL: sil [_semantics "sil.optimizer.moveonly.diagnostic.ignore"] [ossa] @tuple_elements1
 sil [ossa] @tuple_elements1 : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
@@ -101,7 +101,7 @@ bb0(%0 : $Int):
   return %99 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @tuple_elements2
+// CHECK-LABEL: sil [_semantics "sil.optimizer.moveonly.diagnostic.ignore"] [ossa] @tuple_elements2
 sil [ossa] @tuple_elements2 : $@convention(thin) (Int) -> (Int, Int) {
 bb0(%0 : $Int):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
@@ -130,7 +130,7 @@ bb0(%0 : $*T, %1 : $*T):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @copy_addr2
+// CHECK-LABEL: sil [_semantics "sil.optimizer.moveonly.diagnostic.ignore"] [ossa] @copy_addr2
 sil [ossa] @copy_addr2 : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
@@ -145,7 +145,7 @@ bb0(%0 : $*T, %1 : $*T):
 sil [ossa] @takes_closure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 sil [ossa] @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
 
-// CHECK-LABEL: sil [ossa] @closure_test
+// CHECK-LABEL: sil [_semantics "sil.optimizer.moveonly.diagnostic.ignore"] [ossa] @closure_test
 sil [ossa] @closure_test : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
@@ -244,7 +244,7 @@ bb0(%0 : $*T, %1 : $*T):
   // CHECK-NEXT: copy_addr [[PB]] to [init] %0 : $*T
 
   destroy_value %ba : $<τ_0_0> { var τ_0_0 } <T>
-  // CHECK-NEXT: destroy_value %2
+  // CHECK-NEXT: destroy_value %3
   %9 = tuple ()
   return %9 : $()
 }
@@ -266,7 +266,7 @@ bb0:
 
   // This should become an initialization.
   store_weak %4 to %c : $*@sil_weak Optional<SomeClass>
-  // CHECK-NEXT: store_weak [[C1]] to [init] %1
+  // CHECK-NEXT: store_weak [[C1]] to [init] %2
 
   destroy_value %4 : $Optional<SomeClass>
   // CHECK-NEXT: destroy_value [[C1]]
@@ -275,7 +275,7 @@ bb0:
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   store_weak %8 to %c : $*@sil_weak Optional<SomeClass>
-  // CHECK-NEXT: store_weak [[C2]] to %1
+  // CHECK-NEXT: store_weak [[C2]] to %2
 
   destroy_value %8 : $Optional<SomeClass>
   // CHECK-NEXT: destroy_value [[C2]]
@@ -376,7 +376,7 @@ bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
 sil_global @int_global : $Int
 
 // CHECK-LABEL: sil [ossa] @test_tlc
-// CHECK-NOT: mark_uninitialized
+// CHECK:         mark_uninitialized
 // CHECK: return
 sil [ossa] @test_tlc : $() -> () {
   %0 = global_addr @int_global : $*Int
@@ -395,8 +395,9 @@ sil [ossa] @use : $@convention(thin) (@in P) -> ()
 // CHECK-LABEL: sil [ossa] @release_not_constructed
 sil [ossa] @release_not_constructed : $@convention(thin) () -> () {
 bb0:  // CHECK: bb0:
-  %3 = alloc_stack $SomeClass
   // CHECK-NEXT: alloc_stack
+  %3 = alloc_stack $SomeClass
+  // CHECK-NEXT: mark_uninitialized
   %c = mark_uninitialized [var] %3 : $*SomeClass
 
 
@@ -445,7 +446,7 @@ entry(%a : $*C):
 
   %q = init_existential_addr %b : $*P, $C
 
-  // CHECK: copy_addr {{.*}} to [init] %2 : $*C
+  // CHECK: copy_addr {{.*}} to [init] %3 : $*C
   copy_addr %a to [init] %q : $*C
   %u = function_ref @use : $@convention(thin) (@in P) -> ()
   %v = apply %u(%b) : $@convention(thin) (@in P) -> ()
@@ -495,6 +496,7 @@ sil [ossa] @conditionalInitOrAssign : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   // CHECK: [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
   // CHECK: [[CLASSVAL:%[0-9]+]] = alloc_stack [dynamic_lifetime] $SomeClass
+  // CHECK: [[MU:%[0-9]+]] = mark_uninitialized [var] [[CLASSVAL]]
   // CHECK: integer_literal $Builtin.Int1, 0
   // CHECK: store
   %5 = alloc_stack $SomeClass
@@ -511,7 +513,7 @@ bb1:
   // updates the control variable to say that it is initialized.
   // CHECK: integer_literal $Builtin.Int1, -1
   // CHECK: store {{.*}} to [trivial] [[CONTROL]]
-  // CHECK: assign [[V1]] to [init] [[CLASSVAL]]
+  // CHECK: assign [[V1]] to [init] [[MU]]
   assign %12 to %6 : $*SomeClass                // id: %13
   br bb3                                          // id: %14
 
@@ -529,10 +531,10 @@ bb3:
   // CHECK:   load [trivial] [[CONTROL]]
   // CHECK:   cond_br
   // CHECK: bb4:
-  // CHECK:   destroy_addr [[CLASSVAL]]
+  // CHECK:   destroy_addr [[MU]]
   // CHECK:   br bb6
   // CHECK: bb6:
-  // CHECK: assign [[V2]] to [init] [[CLASSVAL]]
+  // CHECK: assign [[V2]] to [init] [[MU]]
   assign %17 to %6 : $*SomeClass                // id: %18
   destroy_addr %6 : $*SomeClass                 // id: %19
   dealloc_stack %5 : $*SomeClass // id: %20
@@ -546,13 +548,14 @@ bb3:
 // CHECK-LABEL: sil [ossa] @conditionalInitOrAssignAllocBox : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK: [[BOX:%.*]] = alloc_box
+// CHECK: [[MU:%.*]] = mark_uninitialized [var] [[BOX]]
 //
 // CHECK: bb1:
-// CHECK:   destroy_value [[BOX]]
+// CHECK:   destroy_value [[MU]]
 // CHECK:   br bb3
 //
 // CHECK: bb2:
-// CHECK:   dealloc_box [[BOX]]
+// CHECK:   dealloc_box [[MU]]
 // CHECK:   br bb3
 //
 // CHECK: bb3:
@@ -587,7 +590,7 @@ bb3:
 // pointer. LLDB shouldn't do this, but until it is removed and validated we
 // need a test for this.
 // CHECK-LABEL: sil [ossa] @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
-// CHECK-NOT: mark_uninitialized [var]
+// CHECK:    mark_uninitialized [var]
 // CHECK: } // end sil function 'lldb_unsupported_markuninitialized_testcase'
 sil [ossa] @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
 bb0(%0 : $UnsafeMutablePointer<Any>):

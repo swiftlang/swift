@@ -23,7 +23,7 @@
 /// resource or memory.  Concurrent executors are usually used to
 /// manage a pool of threads and prevent the number of allocated
 /// threads from growing without limit.
-/// 
+///
 /// Second, executors may own dedicated threads, or they may schedule
 /// work onto some underlying executor.  Dedicated threads can
 /// improve the responsiveness of a subsystem *locally*, but they impose
@@ -41,7 +41,7 @@
 /// of threads.  Having multiple independent concurrent executors
 /// with their own dedicated threads would undermine that.
 /// Therefore, it is sensible to have a single, global executor
-/// that will ultimately schedule most of the work in the system.  
+/// that will ultimately schedule most of the work in the system.
 /// With that as a baseline, special needs can be recognized and
 /// carved out from the global executor with its cooperation.
 ///
@@ -58,101 +58,142 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "TaskPrivate.h"
 #include "Error.h"
+#include "ExecutorImpl.h"
 
 using namespace swift;
 
-SWIFT_CC(swift)
-void (*swift::swift_task_enqueueGlobal_hook)(
-    Job *job, swift_task_enqueueGlobal_original original) = nullptr;
+extern "C" SWIFT_CC(swift)
+void _task_serialExecutor_checkIsolated(
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
 
 SWIFT_CC(swift)
-void (*swift::swift_task_enqueueGlobalWithDelay_hook)(
-    JobDelay delay, Job *job,
-    swift_task_enqueueGlobalWithDelay_original original) = nullptr;
+bool swift::swift_task_invokeSwiftCheckIsolated(SerialExecutorRef executor)
+{
+  if (!executor.hasSerialExecutorWitnessTable())
+    return false;
 
-SWIFT_CC(swift)
-void (*swift::swift_task_enqueueGlobalWithDeadline_hook)(
-    long long sec,
-    long long nsec,
-    long long tsec,
-    long long tnsec,
-    int clock, Job *job,
-    swift_task_enqueueGlobalWithDeadline_original original) = nullptr;
+  _task_serialExecutor_checkIsolated(
+        executor.getIdentity(), swift_getObjectType(executor.getIdentity()),
+        executor.getSerialExecutorWitnessTable());
 
-SWIFT_CC(swift)
-void (*swift::swift_task_enqueueMainExecutor_hook)(
-    Job *job, swift_task_enqueueMainExecutor_original original) = nullptr;
-
-#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-#include "CooperativeGlobalExecutor.inc"
-#elif SWIFT_CONCURRENCY_ENABLE_DISPATCH
-#include "DispatchGlobalExecutor.inc"
-#else
-#include "NonDispatchGlobalExecutor.inc"
-#endif
-
-void swift::swift_task_enqueueGlobal(Job *job) {
-  _swift_tsan_release(job);
-
-  concurrency::trace::job_enqueue_global(job);
-
-  if (swift_task_enqueueGlobal_hook)
-    swift_task_enqueueGlobal_hook(job, swift_task_enqueueGlobalImpl);
-  else
-    swift_task_enqueueGlobalImpl(job);
+  return true;
 }
 
-void swift::swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job) {
-  concurrency::trace::job_enqueue_global_with_delay(delay, job);
-
-  if (swift_task_enqueueGlobalWithDelay_hook)
-    swift_task_enqueueGlobalWithDelay_hook(
-        delay, job, swift_task_enqueueGlobalWithDelayImpl);
-  else
-    swift_task_enqueueGlobalWithDelayImpl(delay, job);
+extern "C" bool _swift_task_invokeSwiftCheckIsolated_c(SwiftExecutorRef executor)
+{
+  return swift_task_invokeSwiftCheckIsolated(*reinterpret_cast<SerialExecutorRef *>(&executor));
 }
 
-void swift::swift_task_enqueueGlobalWithDeadline(
-    long long sec,
-    long long nsec,
-    long long tsec,
-    long long tnsec,
-    int clock, Job *job) {
-  if (swift_task_enqueueGlobalWithDeadline_hook)
-    swift_task_enqueueGlobalWithDeadline_hook(
-        sec, nsec, tsec, tnsec, clock, job, swift_task_enqueueGlobalWithDeadlineImpl);
-  else
-    swift_task_enqueueGlobalWithDeadlineImpl(sec, nsec, tsec, tnsec, clock, job);
+
+extern "C" SWIFT_CC(swift)
+int8_t _task_serialExecutor_isIsolatingCurrentContext(
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
+
+SWIFT_CC(swift) int8_t
+swift::swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor)
+{
+  if (!executor.hasSerialExecutorWitnessTable()) {
+    return static_cast<int8_t>(IsIsolatingCurrentContextDecision::NotIsolated);
+  }
+
+  auto decision = _task_serialExecutor_isIsolatingCurrentContext(
+        executor.getIdentity(), swift_getObjectType(executor.getIdentity()),
+        executor.getSerialExecutorWitnessTable());
+
+  return decision;
 }
 
-void swift::swift_task_enqueueMainExecutor(Job *job) {
-  concurrency::trace::job_enqueue_main_executor(job);
-  if (swift_task_enqueueMainExecutor_hook)
-    swift_task_enqueueMainExecutor_hook(job,
-                                        swift_task_enqueueMainExecutorImpl);
-  else
-    swift_task_enqueueMainExecutorImpl(job);
+extern "C" int8_t
+_swift_task_invokeSwiftIsIsolatingCurrentContext_c(SwiftExecutorRef executor)
+{
+  return
+      static_cast<int8_t>(swift_task_invokeSwiftIsIsolatingCurrentContext(
+      *reinterpret_cast<SerialExecutorRef *>(&executor)));
 }
 
-ExecutorRef swift::swift_task_getMainExecutor() {
-#if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
-  // FIXME: this isn't right for the non-cooperative environment
-  return ExecutorRef::generic();
-#else
-  return ExecutorRef::forOrdinary(
-           reinterpret_cast<HeapObject*>(&_dispatch_main_q),
-           _swift_task_getDispatchQueueSerialExecutorWitnessTable());
-#endif
+extern "C" void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor)
+{
+  swift_job_run(reinterpret_cast<Job *>(job),
+                *reinterpret_cast<SerialExecutorRef *>(&executor));
 }
 
-bool ExecutorRef::isMainExecutor() const {
-#if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
-  // FIXME: this isn't right for the non-cooperative environment
-  return isGeneric();
-#else
-  return Identity == reinterpret_cast<HeapObject*>(&_dispatch_main_q);
-#endif
+extern "C" SwiftTime swift_time_now(SwiftClockId clock)
+{
+  SwiftTime result;
+  swift_get_time(&result.seconds, &result.nanoseconds, (swift_clock_id)clock);
+  return result;
+}
+
+extern "C" SwiftTime swift_time_getResolution(SwiftClockId clock)
+{
+  SwiftTime result;
+  swift_get_clock_res(&result.seconds, &result.nanoseconds,
+                      (swift_clock_id)clock);
+  return result;
+}
+
+bool swift::swift_executor_isComplexEquality(SerialExecutorRef ref) {
+  return ref.isComplexEquality();
+}
+
+uint64_t swift::swift_task_getJobTaskId(Job *job) {
+  if (auto task = dyn_cast<AsyncTask>(job)) {
+    // TaskID is actually:
+    //   32bits of Job's Id
+    // + 32bits stored in the AsyncTask
+    return task->getTaskId();
+  } else {
+    return job->getJobId();
+  }
+}
+
+extern "C" void *swift_job_alloc(SwiftJob *job, size_t size) {
+  auto task = cast<AsyncTask>(reinterpret_cast<Job *>(job));
+  return _swift_task_alloc_specific(task, size);
+}
+
+extern "C" void swift_job_dealloc(SwiftJob *job, void *ptr) {
+  auto task = cast<AsyncTask>(reinterpret_cast<Job *>(job));
+  return _swift_task_dealloc_specific(task, ptr);
+}
+
+IsIsolatingCurrentContextDecision
+swift::getIsIsolatingCurrentContextDecisionFromInt(int8_t value) {
+  switch (value) {
+  case -1: return IsIsolatingCurrentContextDecision::Unknown;
+  case 0: return IsIsolatingCurrentContextDecision::NotIsolated;
+  case 1: return IsIsolatingCurrentContextDecision::Isolated;
+  default:
+    swift_Concurrency_fatalError(0, "Unexpected IsIsolatingCurrentContextDecision value");
+  }
+}
+
+StringRef
+swift::getIsIsolatingCurrentContextDecisionNameStr(IsIsolatingCurrentContextDecision decision) {
+  switch (decision) {
+  case IsIsolatingCurrentContextDecision::Unknown: return "Unknown";
+  case IsIsolatingCurrentContextDecision::NotIsolated: return "NotIsolated";
+  case IsIsolatingCurrentContextDecision::Isolated: return "Isolated";
+  }
+  swift_Concurrency_fatalError(0, "Unexpected IsIsolatingCurrentContextDecision value");
+}
+
+/*****************************************************************************/
+/****************************** MAIN EXECUTOR  *******************************/
+/*****************************************************************************/
+
+bool SerialExecutorRef::isMainExecutor() const {
+  return swift_task_isMainExecutor(*this);
+}
+
+extern "C" bool _swift_task_isMainExecutor_c(SwiftExecutorRef executor) {
+  SerialExecutorRef ref = *reinterpret_cast<SerialExecutorRef *>(&executor);
+  return swift_task_isMainExecutor(ref);
 }
 
 #define OVERRIDE_GLOBAL_EXECUTOR COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

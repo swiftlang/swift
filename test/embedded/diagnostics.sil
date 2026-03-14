@@ -1,0 +1,26 @@
+// RUN: %target-sil-opt -enable-experimental-feature Embedded -embedded-swift-diagnostics -I %test-resource-dir/embedded %s -o /dev/null
+
+// REQUIRES: swift_feature_Embedded
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct MyStruct: ~Copyable {
+  deinit
+}
+
+sil [ossa] @testit : $@convention(thin) (@owned MyStruct) -> @owned MyStruct {
+bb0(%0 : @owned $MyStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value [dead_end] %0
+  unreachable
+
+bb2:
+  return %0
+}
+

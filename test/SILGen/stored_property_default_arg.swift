@@ -1,8 +1,9 @@
-// RUN: %target-swift-emit-silgen -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s | %FileCheck %s
 
 // Currently, this only appears for memberwise initializers.
 
 // CHECK: default argument 0 of A.init(b:c:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s27stored_property_default_arg1AV1b1cACSi_SbtcfcfA_ : $@convention(thin) () -> Int {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   function_ref variable initialization expression of A.b
@@ -12,6 +13,7 @@
 // CHECK-NEXT: }
 
 // CHECK: default argument 1 of A.init(b:c:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s27stored_property_default_arg1AV1b1cACSi_SbtcfcfA0_ : $@convention(thin) () -> Bool {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   function_ref variable initialization expression of A.c
@@ -45,6 +47,7 @@ func checkConcreteType() {
 }
 
 // CHECK: default argument 1 of F.init(g:h:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s27stored_property_default_arg1FV1g1hACyxGx_SitcfcfA0_ : $@convention(thin) <T> () -> Int {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   function_ref variable initialization expression of F.h
@@ -90,6 +93,7 @@ func checkOptionalNil() {
 }
 
 // CHECK: default argument 0 of O.init(p:q:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s27stored_property_default_arg1OV1p1qACyxGx_x_SittcfcfA_ : $@convention(thin) <T where T : ExpressibleByIntegerLiteral> () -> @out T {
 // CHECK:      bb0([[PARAM_0:.*]] : $*T):
 // CHECK-NEXT:   function_ref variable initialization expression of O.p
@@ -100,6 +104,7 @@ func checkOptionalNil() {
 // CHECK-NEXT: }
 
 // CHECK: default argument 1 of O.init(p:q:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s27stored_property_default_arg1OV1p1qACyxGx_x_SittcfcfA0_ : $@convention(thin) <T where T : ExpressibleByIntegerLiteral> () -> (@out T, Int) {
 // CHECK:      bb0([[PARAM_0:.*]] : $*T):
 // CHECK-NEXT:   function_ref variable initialization expression of O.q
@@ -135,6 +140,7 @@ func checkIndirect() {
 }
 
 // CHECK: default argument 0 of U.init(v:w:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s27stored_property_default_arg1UV1v1wAcA1TCSg_AGtcfcfA_ : $@convention(thin) () -> @owned Optional<T> {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   function_ref variable initialization expression of U.v
@@ -144,6 +150,7 @@ func checkIndirect() {
 // CHECK-NEXT: }
 
 // CHECK: default argument 1 of U.init(v:w:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s27stored_property_default_arg1UV1v1wAcA1TCSg_AGtcfcfA0_ : $@convention(thin) () -> @owned T {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   function_ref variable initialization expression of U.w
@@ -179,6 +186,7 @@ func checkReferenceTypes() {
 }
 
 // CHECK: default argument 0 of AA.init(ab:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil hidden [ossa] @$s27stored_property_default_arg2AAV2abAcA1ZCSg2ac_AG2adt_tcfcfA_ : $@convention(thin) () -> (@owned Optional<Z>, @owned Optional<Z>) {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   function_ref variable initialization expression of AA.ab

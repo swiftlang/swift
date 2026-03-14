@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,12 +18,10 @@
 #ifndef __SWIFT_MODULE_DIFFER_DIAGS_CONSUMER_H__
 #define __SWIFT_MODULE_DIFFER_DIAGS_CONSUMER_H__
 
-#include "llvm/ADT/MapVector.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/StringSet.h"
 #include <set>
 
 namespace swift {
@@ -46,12 +44,15 @@ class FilteringDiagnosticConsumer: public DiagnosticConsumer {
   bool HasError = false;
   std::vector<std::unique_ptr<DiagnosticConsumer>> subConsumers;
   std::unique_ptr<llvm::StringSet<>> allowedBreakages;
+  bool DowngradeToWarning;
   bool shouldProceed(const DiagnosticInfo &Info);
 public:
   FilteringDiagnosticConsumer(std::vector<std::unique_ptr<DiagnosticConsumer>> subConsumers,
-                              std::unique_ptr<llvm::StringSet<>> allowedBreakages):
+                              std::unique_ptr<llvm::StringSet<>> allowedBreakages,
+                              bool DowngradeToWarning):
     subConsumers(std::move(subConsumers)),
-    allowedBreakages(std::move(allowedBreakages)) {}
+    allowedBreakages(std::move(allowedBreakages)),
+    DowngradeToWarning(DowngradeToWarning) {}
   ~FilteringDiagnosticConsumer() = default;
 
   void flush() override;

@@ -10,13 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IDE_REFACTORING_H
-#define SWIFT_IDE_REFACTORING_H
+#ifndef SWIFT_REFACTORING_REFACTORING_H
+#define SWIFT_REFACTORING_REFACTORING_H
 
-#include "llvm/ADT/StringRef.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/StringExtras.h"
+#include "swift/IDE/CancellableResult.h"
 #include "swift/IDE/Utils.h"
+#include "swift/Refactoring/RenameLoc.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
   class ModuleDecl;
@@ -32,30 +35,84 @@ enum class RefactoringKind : int8_t {
 #include "RefactoringKinds.def"
 };
 
+enum class RefactorAvailableKind {
+  Available,
+  Unavailable_system_symbol,
+  Unavailable_has_no_location,
+  Unavailable_has_no_name,
+  Unavailable_has_no_accessibility,
+  Unavailable_decl_from_clang,
+  Unavailable_decl_in_macro,
+};
+
+struct RefactorAvailabilityInfo {
+  RefactoringKind Kind;
+  RefactorAvailableKind AvailableKind;
+  RefactorAvailabilityInfo(RefactoringKind Kind,
+                           RefactorAvailableKind AvailableKind)
+      : Kind(Kind), AvailableKind(AvailableKind) {}
+  RefactorAvailabilityInfo(RefactoringKind Kind)
+      : RefactorAvailabilityInfo(Kind, RefactorAvailableKind::Available) {}
+};
+
+struct RenameInfo {
+  ValueDecl *VD;
+  RefactorAvailabilityInfo Availability;
+};
+
+std::optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo);
+
+/// An array of \c RenameLoc that also keeps the underlying string storage of
+/// the \c StringRef inside the \c RenameLoc alive.
+class RenameLocs {
+  std::vector<RenameLoc> locs;
+  std::unique_ptr<StringScratchSpace> stringStorage;
+
+public:
+  ArrayRef<RenameLoc> getLocations() { return locs; }
+
+  RenameLocs(std::vector<RenameLoc> locs,
+             std::unique_ptr<StringScratchSpace> stringStorage)
+      : locs(locs), stringStorage(std::move(stringStorage)) {}
+
+  RenameLocs() {}
+};
+
+/// Return the locations to rename when renaming the \p valueDecl
+/// in \p sourceFile.
+///
+/// - Parameters:
+///   - sourceFile: The source file in which to perform local rename
+///   - valueDecl: The declaration that should be renamed
+RenameLocs localRenameLocs(SourceFile *sourceFile, const ValueDecl *valueDecl);
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+/// A `RenameLoc` together with the `ResolvedLoc` that it resolved to.
+struct ResolvedAndRenameLoc {
+  RenameLoc renameLoc;
+  ResolvedLoc resolved;
+};
+
+/// Given a list of `RenameLoc`s, get the corresponding `ResolveLoc`s.
+///
+/// These resolve locations contain more structured information, such as the
+/// range of the base name to rename and the ranges of the argument labels.
+///
+/// If a \p newName is passed, it is used to verify that all \p renameLocs can
+/// be renamed to this name. If any the names cannot be renamed, an empty vector
+/// is returned and the issue is diagnosed via \p diags.
+std::vector<ResolvedAndRenameLoc>
+resolveRenameLocations(ArrayRef<RenameLoc> renameLocs, StringRef newName,
+                       SourceFile &sourceFile, DiagnosticEngine &diags);
+#endif
+
 struct RangeConfig {
-  unsigned BufferId;
+  unsigned BufferID;
   unsigned Line;
   unsigned Column;
   unsigned Length;
   SourceLoc getStart(SourceManager &SM);
   SourceLoc getEnd(SourceManager &SM);
-};
-
-enum class NameUsage {
-  Unknown,
-  Reference,
-  Definition,
-  Call
-};
-
-struct RenameLoc {
-  unsigned Line;
-  unsigned Column;
-  NameUsage Usage;
-  StringRef OldName;
-  StringRef NewName; // May be empty.
-  const bool IsFunctionLike;
-  const bool IsNonProtocolType;
 };
 
 struct RefactoringOptions {
@@ -69,90 +126,53 @@ struct RefactoringOptions {
 struct RenameRangeDetail {
   CharSourceRange Range;
   RefactoringRangeKind RangeKind;
-  Optional<unsigned> Index;
-};
-
-enum class RenameAvailableKind {
-  Available,
-  Unavailable_system_symbol,
-  Unavailable_has_no_location,
-  Unavailable_has_no_name,
-  Unavailable_has_no_accessibility,
-  Unavailable_decl_from_clang,
-};
-
-struct RenameAvailabilityInfo {
-  RefactoringKind Kind;
-  RenameAvailableKind AvailableKind;
-  RenameAvailabilityInfo(RefactoringKind Kind,
-                         RenameAvailableKind AvailableKind)
-      : Kind(Kind), AvailableKind(AvailableKind) {}
-  RenameAvailabilityInfo(RefactoringKind Kind)
-      : RenameAvailabilityInfo(Kind, RenameAvailableKind::Available) {}
-};
-
-class FindRenameRangesConsumer {
-public:
-  virtual void accept(SourceManager &SM, RegionType RegionType,
-                      ArrayRef<RenameRangeDetail> Ranges) = 0;
-  virtual ~FindRenameRangesConsumer() = default;
-};
-
-class FindRenameRangesAnnotatingConsumer : public FindRenameRangesConsumer {
-  struct Implementation;
-  Implementation &Impl;
-
-public:
-  FindRenameRangesAnnotatingConsumer(SourceManager &SM, unsigned BufferId,
-                                     llvm::raw_ostream &OS);
-  ~FindRenameRangesAnnotatingConsumer();
-  void accept(SourceManager &SM, RegionType RegionType,
-              ArrayRef<RenameRangeDetail> Ranges) override;
+  std::optional<unsigned> Index;
 };
 
 StringRef getDescriptiveRefactoringKindName(RefactoringKind Kind);
 
-StringRef getDescriptiveRenameUnavailableReason(RenameAvailableKind Kind);
+StringRef getDescriptiveRenameUnavailableReason(RefactorAvailableKind Kind);
 
 bool refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
                          SourceEditConsumer &EditConsumer,
                          DiagnosticConsumer &DiagConsumer);
 
-int syntacticRename(SourceFile *SF, llvm::ArrayRef<RenameLoc> RenameLocs,
-                    SourceEditConsumer &EditConsumer,
-                    DiagnosticConsumer &DiagConsumer);
-
-int findSyntacticRenameRanges(SourceFile *SF,
-                              llvm::ArrayRef<RenameLoc> RenameLocs,
-                              FindRenameRangesConsumer &RenameConsumer,
-                              DiagnosticConsumer &DiagConsumer);
-
-int findLocalRenameRanges(SourceFile *SF, RangeConfig Range,
-                          FindRenameRangesConsumer &RenameConsumer,
-                          DiagnosticConsumer &DiagConsumer);
-
-void collectAvailableRefactorings(
-    SourceFile *SF, RangeConfig Range, bool &RangeStartMayNeedRename,
-    llvm::SmallVectorImpl<RefactoringKind> &Kinds,
-    llvm::ArrayRef<DiagnosticConsumer *> DiagConsumers);
-
-void collectAvailableRefactorings(const ResolvedCursorInfo &CursorInfo,
-                                  llvm::SmallVectorImpl<RefactoringKind> &Kinds,
-                                  bool ExcludeRename);
-
-/// Stores information about the reference that rename availability is being
-/// queried on.
-struct RenameRefInfo {
-  SourceFile *SF; ///< The source file containing the reference.
-  SourceLoc Loc; ///< The reference's source location.
-  bool IsArgLabel; ///< Whether Loc is on an arg label, rather than base name.
+/// Describes the different ranges that need to be renamed during a rename
+/// operation. For a function these are the base name and the argument labels.
+struct SyntacticRenameRangeDetails {
+  RegionType Type;
+  std::vector<RenameRangeDetail> Ranges;
 };
 
-void collectRenameAvailabilityInfo(
-    const ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
-    llvm::SmallVectorImpl<RenameAvailabilityInfo> &Infos);
+/// Return the \c SyntacticRenameRangeDetails for the given \c ResolvedLoc and
+/// \c RenameLoc.
+SyntacticRenameRangeDetails
+getSyntacticRenameRangeDetails(const SourceManager &SM, StringRef OldName,
+                               const ResolvedLoc &Resolved,
+                               const RenameLoc &Config);
+
+/// Based on the given \p RenameLocs, finds the ranges (including argument
+/// labels) that need to be renamed.
+///
+/// If \p NewName is passed, it is validated that all locations can be renamed
+/// to that new name. If not, no ranges are reported and an error is emitted
+/// via \p DiagConsumer.
+CancellableResult<std::vector<SyntacticRenameRangeDetails>>
+findSyntacticRenameRanges(SourceFile *SF, llvm::ArrayRef<RenameLoc> RenameLocs,
+                          StringRef NewName);
+
+CancellableResult<std::vector<SyntacticRenameRangeDetails>>
+findLocalRenameRanges(SourceFile *SF, RangeConfig Range);
+
+SmallVector<RefactorAvailabilityInfo, 0>
+collectRefactorings(SourceFile *SF, RangeConfig Range,
+                    bool &RangeStartMayNeedRename,
+                    llvm::ArrayRef<DiagnosticConsumer *> DiagConsumers);
+
+SmallVector<RefactorAvailabilityInfo, 0>
+collectRefactorings(ResolvedCursorInfoPtr CursorInfo, bool ExcludeRename);
 
 } // namespace ide
 } // namespace swift
 
-#endif // SWIFT_IDE_REFACTORING_H
+#endif // SWIFT_REFACTORING_REFACTORING_H

@@ -36,7 +36,14 @@ typedef unsigned char BYTE;
 typedef BYTE BOOLEAN;
 typedef int BOOL;
 typedef unsigned long DWORD;
+typedef long LONG;
 typedef unsigned long ULONG;
+#if defined(_WIN64)
+typedef unsigned __int64 ULONG_PTR;
+#else
+typedef unsigned long ULONG_PTR;
+#endif
+typedef PVOID HANDLE;
 
 typedef VOID(NTAPI *PFLS_CALLBACK_FUNCTION)(PVOID lpFlsData);
 
@@ -46,9 +53,13 @@ typedef PRTL_SRWLOCK PSRWLOCK;
 typedef struct _RTL_CONDITION_VARIABLE *PRTL_CONDITION_VARIABLE;
 typedef PRTL_CONDITION_VARIABLE PCONDITION_VARIABLE;
 
+typedef struct _RTL_CRITICAL_SECTION_DEBUG *PRTL_CRITICAL_SECTION_DEBUG;
+typedef struct _RTL_CRITICAL_SECTION *PRTL_CRITICAL_SECTION;
+typedef PRTL_CRITICAL_SECTION PCRITICAL_SECTION;
+typedef PRTL_CRITICAL_SECTION LPCRITICAL_SECTION;
+
 // These have to be #defines, to avoid problems with <windows.h>
-#define RTL_SRWLOCK_INIT                                                       \
-  { 0 }
+#define RTL_SRWLOCK_INIT {0}
 #define SRWLOCK_INIT RTL_SRWLOCK_INIT
 #define FLS_OUT_OF_INDEXES ((DWORD)0xFFFFFFFF)
 
@@ -82,6 +93,19 @@ WINBASEAPI BOOL WINAPI SleepConditionVariableSRW(
   PSRWLOCK SRWLock,
   DWORD dwMilliseconds,
   ULONG Flags
+);
+
+WINBASEAPI VOID WINAPI InitializeCriticalSection(
+  LPCRITICAL_SECTION lpCriticalSection
+);
+WINBASEAPI VOID WINAPI DeleteCriticalSection(
+  LPCRITICAL_SECTION lpCriticalSection
+);
+WINBASEAPI VOID WINAPI EnterCriticalSection(
+  LPCRITICAL_SECTION lpCriticalSection
+);
+WINBASEAPI VOID WINAPI LeaveCriticalSection(
+  LPCRITICAL_SECTION lpCriticalSection
 );
 
 WINBASEAPI DWORD WINAPI FlsAlloc(PFLS_CALLBACK_FUNCTION lpCallback);
@@ -139,6 +163,34 @@ inline BOOL SleepConditionVariableSRW(PSWIFT_CONDITION_VARIABLE CondVar,
     reinterpret_cast<PSRWLOCK>(SRWLock),
     dwMilliseconds,
     Flags);
+}
+
+// And with CRITICAL_SECTION
+#pragma pack(push, 8)
+typedef struct SWIFT_CRITICAL_SECTION {
+  PRTL_CRITICAL_SECTION_DEBUG DebugInfo;
+  LONG LockCount;
+  LONG RecursionCount;
+  HANDLE OwningThread;
+  HANDLE LockSemaphore;
+  ULONG_PTR SpinCount;
+} SWIFT_CRITICAL_SECTION, *PSWIFT_CRITICAL_SECTION;
+#pragma pack(pop)
+
+inline VOID InitializeCriticalSection(PSWIFT_CRITICAL_SECTION CritSec) {
+  ::InitializeCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(CritSec));
+}
+
+inline VOID DeleteCriticalSection(PSWIFT_CRITICAL_SECTION CritSec) {
+  ::DeleteCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(CritSec));
+}
+
+inline VOID EnterCriticalSection(PSWIFT_CRITICAL_SECTION CritSec) {
+  ::EnterCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(CritSec));
+}
+
+inline VOID LeaveCriticalSection(PSWIFT_CRITICAL_SECTION CritSec) {
+  ::LeaveCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(CritSec));
 }
 
 } // namespace threading_impl

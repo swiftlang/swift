@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -module-name "Mod"
+// RUN: %batch-code-completion -module-name "Mod"
 
 protocol BaseP1 {}
 protocol BaseP2 {}
@@ -16,12 +15,12 @@ protocol DerivedPComp: BaseP1, BaseP2 {}
 
 func testInheritedArchetype(arg: some DerivedP1) {
   arg.#^TestDerivedP1^#
-// TestDerivedP1: LookedupTypeNames: ['Mod.DerivedP1', 'Mod.BaseP1']
+// TestDerivedP1: LookedupTypeNames: ['Mod.BaseP1', 'Mod.DerivedP1']
 }
 
 func testMultiInheritedArchetype(arg: some DerivedPComp) {
   arg.#^TestDerivedPComp^#
-// TestDerivedPComp: LookedupTypeNames: ['Mod.DerivedPComp', 'Mod.BaseP1', 'Mod.BaseP2']
+// TestDerivedPComp: LookedupTypeNames: ['Mod.BaseP1', 'Mod.BaseP2', 'Mod.DerivedPComp']
 }
 
 func testCompositionArchetype(arg: some BaseP1 & BaseP2) {
@@ -36,12 +35,12 @@ protocol DiamondTop: DiamondEdge1, DiamondEdge2 {}
 
 func testDiamondProtocol(arg: some DiamondTop) {
   arg.#^TestDiamondTop^#
-// TestDiamondTop: LookedupTypeNames: ['Mod.DiamondTop', 'Mod.DiamondEdge1', 'Mod.DiamondRoot', 'Mod.DiamondEdge2']
+// TestDiamondTop: LookedupTypeNames: ['Mod.DiamondEdge1', 'Mod.DiamondEdge2', 'Mod.DiamondRoot', 'Mod.DiamondTop']
 }
 
 func testExistential(arg: any DiamondTop) {
   arg.#^TestAnyDiamondTop^#
-// TestAnyDiamondTop: LookedupTypeNames: ['Mod.DiamondTop', 'Mod.DiamondEdge1', 'Mod.DiamondRoot', 'Mod.DiamondEdge2']
+// TestAnyDiamondTop: LookedupTypeNames: ['Mod.DiamondEdge1', 'Mod.DiamondEdge2', 'Mod.DiamondRoot', 'Mod.DiamondTop']
 }
 
 class BaseClass {}
@@ -54,7 +53,7 @@ func testBasicClass(arg: BaseClass) {
 
 func testSubClass(arg: DerivedClass) {
   arg.#^TestDerivedClass^#
-// TestDerivedClass: LookedupTypeNames: ['Mod.DerivedClass', 'Mod.BaseClass']
+// TestDerivedClass: LookedupTypeNames: ['Mod.BaseClass', 'Mod.DerivedClass']
 }
 
 protocol BaseClassConstrainedP: BaseClass {}
@@ -62,11 +61,11 @@ protocol DerivedClassConstrainedP: DerivedClass {}
 
 func testClassConstrainedProto(arg: some BaseClassConstrainedP) {
   arg.#^TestBaseClassConstrainedP^#
-// TestBaseClassConstrainedP: LookedupTypeNames: ['Mod.BaseClassConstrainedP', 'Mod.BaseClass']
+// TestBaseClassConstrainedP: LookedupTypeNames: ['Mod.BaseClass', 'Mod.BaseClassConstrainedP']
 }
 func testClassConstriainedProto2(arg: some DerivedClassConstrainedP) {
   arg.#^TestDerivedClassConstrainedP^#
-// TestDerivedClassConstrainedP: LookedupTypeNames: ['Mod.DerivedClassConstrainedP', 'Mod.DerivedClass', 'Mod.BaseClass']
+// TestDerivedClassConstrainedP: LookedupTypeNames: ['Mod.BaseClass', 'Mod.DerivedClass', 'Mod.DerivedClassConstrainedP']
 }
 
 class BaseClassWithProto: BaseP1 {}
@@ -79,7 +78,7 @@ func testBaseClassWithProto(arg: BaseClassWithProto) {
 
 func testDerivedClassWithProto(arg: DerivedClassWithProto) {
   arg.#^TestDerivedClassWithProto^#
-// TestDerivedClassWithProto: LookedupTypeNames: ['Mod.DerivedClassWithProto', 'Mod.BaseP2', 'Mod.BaseP1', 'Mod.BaseClassWithProto']
+// TestDerivedClassWithProto: LookedupTypeNames: ['Mod.BaseClassWithProto', 'Mod.BaseP1', 'Mod.BaseP2', 'Mod.DerivedClassWithProto']
 }
 
 struct GenericS<T> {}
@@ -87,10 +86,11 @@ extension GenericS: BaseP1 where T == Int {}
 
 func testConditionalConformanceNo(arg: GenericS<String>) {
   arg.#^TestConditionalConformanceNo^#
-// TestConditionalConformanceNo: LookedupTypeNames: ['Mod.GenericS']
+// TestConditionalConformanceNo: LookedupTypeNames: ['Mod.GenericS', 'Swift.BitwiseCopyable', 'Swift.Sendable']
 }
 
 func testConditionalConformanceYes(arg: GenericS<Int>) {
   arg.#^TestConditionalConformanceYes^#
-// TestConditionalConformanceYes: LookedupTypeNames: ['Mod.GenericS', 'Mod.BaseP1']
+// TestConditionalConformanceYes: LookedupTypeNames: ['Mod.BaseP1', 'Mod.GenericS', 'Swift.BitwiseCopyable', 'Swift.Sendable']
+
 }

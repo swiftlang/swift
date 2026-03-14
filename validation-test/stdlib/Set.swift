@@ -16,6 +16,7 @@ import Foundation
 
 extension Set {
   func _rawIdentifier() -> Int {
+    _blackHole(self)
     return unsafeBitCast(self, to: Int.self)
   }
 }
@@ -284,7 +285,7 @@ SetTestSuite.test("AssociatedTypes") {
 
 SetTestSuite.test("sizeof") {
   var s = Set(["Hello", "world"])
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if _pointerBitWidth(_32)
   expectEqual(4, MemoryLayout.size(ofValue: s))
 #else
   expectEqual(8, MemoryLayout.size(ofValue: s))
@@ -4893,5 +4894,20 @@ if #available(SwiftStdlib 5.1, *) {
   }
 }
 #endif
+
+SetTestSuite.test("Identical") {
+  let s1: Set = [0, 1, 2, 3]
+  expectTrue(s1.isTriviallyIdentical(to: s1))
+
+  let s2: Set = s1
+  expectTrue(s1.isTriviallyIdentical(to: s2))
+
+  var s3: Set = s2
+  s3.reserveCapacity(0)
+  expectFalse(s1.isTriviallyIdentical(to: s3))
+
+  let s4: Set = [0, 1, 2, 3]
+  expectFalse(s1.isTriviallyIdentical(to: s4))
+}
 
 runAllTests()

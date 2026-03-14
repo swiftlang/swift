@@ -1,25 +1,25 @@
 import SwiftSyntax
 import SwiftSyntaxBuilder
-import _SwiftSyntaxMacros
+import SwiftSyntaxMacros
 
 public struct StringifyMacro: ExpressionMacro {
   public static func expansion(
-    of macro: MacroExpansionExprSyntax, in context: inout MacroExpansionContext
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
   ) -> ExprSyntax {
     guard let argument = macro.argumentList.first?.expression else {
-      // FIXME: Create a diagnostic for the missing argument?
-      return ExprSyntax(macro)
+      fatalError("Boom")
     }
 
     return "(\(argument), \(StringLiteralExprSyntax(content: argument.description)))"
   }
 }
 
-public struct MyWrapperMacro: AccessorDeclarationMacro {
-    public static func expansion(
+public struct MyWrapperMacro: AccessorMacro {
+  public static func expansion(
     of node: AttributeSyntax,
-    attachedTo declaration: DeclSyntax,
-    in context: inout MacroExpansionContext
+    providingAccessorsOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
   ) throws -> [AccessorDeclSyntax] {
     return []
   }
@@ -28,11 +28,51 @@ public struct MyWrapperMacro: AccessorDeclarationMacro {
 public struct WrapAllProperties: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
-    attachedTo parent: DeclSyntax,
-    annotating member: DeclSyntax,
-    in context: inout MacroExpansionContext
+    attachedTo parent: some DeclGroupSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
   ) throws -> [AttributeSyntax] {
     return []
   }
 }
 
+public struct ArbitraryMembersMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      """
+      init(coding: String) {
+        fatalError("boom")
+      }
+      """
+    ]
+  }
+}
+
+public struct SendableMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if (protocols.isEmpty) {
+      return []
+    }
+
+    let sendableExtension: DeclSyntax =
+      """
+      extension \(type.trimmed): Sendable {}
+      """
+
+    guard let extensionDecl = sendableExtension.as(ExtensionDeclSyntax.self) else {
+      return []
+    }
+
+    return [extensionDecl]
+  }
+}

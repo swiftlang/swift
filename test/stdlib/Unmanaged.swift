@@ -71,4 +71,26 @@ UnmanagedTests.test("Opaque") {
   _fixLifetime(ref)
 }
 
+UnmanagedTests.test("Opaque avoid retain/release") {
+  // The purpose of this test is to ensure that the fromOpaque/toOpaque calls do
+  // NOT attempt to retain/release the class instance at the passed pointer.
+  // Here we're simulating a dangling pointer referencing a class who has
+  // already been released (the allocated pointer points at nothing) and
+  // attempting to create an Unmanaged instance from it and get back the
+  // pointer. This test's expectEqual is kind of bogus, we're just checking that
+  // it doesn't crash.
+
+  // Create a dangling pointer, usually to unmapped memory.
+  let ref = UnsafeRawPointer(bitPattern: 1)!
+  // Turn it into a dangling unmanaged reference.
+  // We expect this not to crash, as this operation isn't 
+  // supposed to dereference the pointer in any way.
+  let unmanaged = Unmanaged<Foobar>.fromOpaque(ref)
+  // Similarly, converting the unmanaged reference back to a 
+  // pointer should not ever try to dereference it either.
+  let ref2 = unmanaged.toOpaque()
+  // ...and we must get back the same pointer.
+  expectEqual(ref, ref2)
+}
+
 runAllTests()

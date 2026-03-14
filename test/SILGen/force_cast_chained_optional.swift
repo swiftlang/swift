@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name force_cast_chained_optional %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name force_cast_chained_optional %s | %FileCheck %s
 
 class Foo {
   var bar: Bar!

@@ -1,0 +1,31 @@
+//===--- InvertibleProtocols.def - invertible protocol meta -*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with ABI-defined
+// invertible protocols.
+//
+// The INVERTIBLE_PROTOCOL(Name, Bit) macro is used to specify each
+// each invertible protocol that's conceptually part of the ABI. The
+// arguments are:
+//   Name: The name of the protocol, e.g., Copyable
+//   Bit: The bit in the set bitset of invertible protocols that is used
+//        to indicate this.
+//===----------------------------------------------------------------------===//
+
+#ifndef INVERTIBLE_PROTOCOL
+#  error Must define INVERTIBLE_PROTOCOL macro before including this file
+#endif
+
+INVERTIBLE_PROTOCOL(Copyable, 0)
+INVERTIBLE_PROTOCOL(Escapable, 1)
+
+#undef INVERTIBLE_PROTOCOL

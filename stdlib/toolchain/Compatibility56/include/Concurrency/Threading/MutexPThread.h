@@ -56,6 +56,7 @@ typedef pthread_mutex_t MutexHandle;
 ///
 /// See ConditionVariable
 struct ConditionPlatformHelper {
+  __attribute__((visibility("hidden")))
 #if SWIFT_CONDITION_SUPPORTS_CONSTEXPR
   static constexpr
 #else
@@ -65,10 +66,15 @@ struct ConditionPlatformHelper {
       staticInit() {
     return PTHREAD_COND_INITIALIZER;
   };
+  __attribute__((visibility("hidden")))
   static void init(ConditionHandle &condition);
+  __attribute__((visibility("hidden")))
   static void destroy(ConditionHandle &condition);
+  __attribute__((visibility("hidden")))
   static void notifyOne(ConditionHandle &condition);
+  __attribute__((visibility("hidden")))
   static void notifyAll(ConditionHandle &condition);
+  __attribute__((visibility("hidden")))
   static void wait(ConditionHandle &condition, ConditionMutexHandle &mutex);
 };
 
@@ -77,6 +83,7 @@ struct ConditionPlatformHelper {
 ///
 /// See Mutex
 struct MutexPlatformHelper {
+  __attribute__((visibility("hidden")))
 #if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
   static constexpr
 #else
@@ -86,6 +93,7 @@ struct MutexPlatformHelper {
       conditionStaticInit() {
     return PTHREAD_MUTEX_INITIALIZER;
   };
+  __attribute__((visibility("hidden")))
 #if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
   static constexpr
 #else
@@ -99,30 +107,46 @@ struct MutexPlatformHelper {
     return PTHREAD_MUTEX_INITIALIZER;
 #endif  
   }
+
+  __attribute__((visibility("hidden")))
   static void init(ConditionMutexHandle &mutex, bool checked = false);
+
+  __attribute__((visibility("hidden")))
   static void destroy(ConditionMutexHandle &mutex);
+  __attribute__((visibility("hidden")))
   static void lock(ConditionMutexHandle &mutex);
+  __attribute__((visibility("hidden")))
   static void unlock(ConditionMutexHandle &mutex);
+  __attribute__((visibility("hidden")))
   static bool try_lock(ConditionMutexHandle &mutex);
 
   // The ConditionMutexHandle versions handle everything on-Apple platforms.
 #if HAS_OS_UNFAIR_LOCK
 
+  __attribute__((visibility("hidden")))
   static void init(MutexHandle &mutex, bool checked = false);
+  __attribute__((visibility("hidden")))
   static void destroy(MutexHandle &mutex);
+  __attribute__((visibility("hidden")))
   static void lock(MutexHandle &mutex);
+  __attribute__((visibility("hidden")))
   static void unlock(MutexHandle &mutex);
+  __attribute__((visibility("hidden")))
   static bool try_lock(MutexHandle &mutex);
 
   // os_unfair_lock always checks for errors, so just call through.
+  __attribute__((visibility("hidden")))
   static void unsafeLock(MutexHandle &mutex) { lock(mutex); }
+  __attribute__((visibility("hidden")))
   static void unsafeUnlock(MutexHandle &mutex) { unlock(mutex); }
 #endif
 
   // The unsafe versions don't do error checking.
+  __attribute__((visibility("hidden")))
   static void unsafeLock(ConditionMutexHandle &mutex) {
     (void)pthread_mutex_lock(&mutex);
   }
+  __attribute__((visibility("hidden")))
   static void unsafeUnlock(ConditionMutexHandle &mutex) {
     (void)pthread_mutex_unlock(&mutex);
   }
@@ -133,6 +157,8 @@ struct MutexPlatformHelper {
 ///
 /// See ReadWriteLock
 struct ReadWriteLockPlatformHelper {
+
+  __attribute__((visibility("hidden")))
 #if SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR
   static constexpr
 #else
@@ -143,13 +169,21 @@ struct ReadWriteLockPlatformHelper {
     return PTHREAD_RWLOCK_INITIALIZER;
   };
 
+  __attribute__((visibility("hidden")))
   static void init(ReadWriteLockHandle &rwlock);
+  __attribute__((visibility("hidden")))
   static void destroy(ReadWriteLockHandle &rwlock);
+  __attribute__((visibility("hidden")))
   static void readLock(ReadWriteLockHandle &rwlock);
+  __attribute__((visibility("hidden")))
   static bool try_readLock(ReadWriteLockHandle &rwlock);
+  __attribute__((visibility("hidden")))
   static void readUnlock(ReadWriteLockHandle &rwlock);
+  __attribute__((visibility("hidden")))
   static void writeLock(ReadWriteLockHandle &rwlock);
+  __attribute__((visibility("hidden")))
   static bool try_writeLock(ReadWriteLockHandle &rwlock);
+  __attribute__((visibility("hidden")))
   static void writeUnlock(ReadWriteLockHandle &rwlock);
 };
 }

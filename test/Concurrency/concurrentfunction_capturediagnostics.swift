@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=targeted
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete
 
 // REQUIRES: concurrency
 
@@ -86,7 +88,7 @@ func testCaseTrivialValue4() {
                     // expected-note @-8 {{capturing use}}
 }
 
-class Klass: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+class Klass: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}{{documentation-file=deprecated-declaration}}
   var next: Klass? = nil
 }
 func inoutUserKlass(_ k: inout Klass) {}

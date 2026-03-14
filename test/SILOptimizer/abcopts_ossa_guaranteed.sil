@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all  -abcopts  %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -parse-serialized-sil -enable-sil-verify-all  -bcopts  %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -60,6 +60,8 @@ sil public_external [ossa] [_semantics "array.get_count"] @getCount : $@conventi
 bb0(%0: @guaranteed $ArrayInt):
     unreachable
 }
+
+sil [ossa] @nonconst : $@convention(thin) () -> Builtin.Int32
 
 sil [ossa] @unknown_func : $@convention(thin) () -> () {
 bb0:
@@ -740,7 +742,7 @@ bb2:
   return %23 : $Int32
 }
 
-// CHECK-LABEL: sil [ossa] @hoist_rangechecked :
+// CHECK-LABEL: sil [ossa] @hoist_rangechecked1 :
 // CHECK: bb0
 // CHECK:  cond_br {{.*}}, bb2, bb1
 // CHECK: bb1:
@@ -757,8 +759,8 @@ bb2:
 // CHECK:   br bb6
 // CHECK: bb6{{.*}}:
 // CHECK:  return
-// CHECK-LABEL: } // end sil function 'hoist_rangechecked'
-sil [ossa] @hoist_rangechecked : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
+// CHECK-LABEL: } // end sil function 'hoist_rangechecked1'
+sil [ossa] @hoist_rangechecked1 : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %1 : $*ArrayInt):
   %2 = integer_literal $Builtin.Int1, -1
   %3 = struct $Bool (%2 : $Builtin.Int1)
@@ -806,6 +808,70 @@ bb6(%36 : $Builtin.Int32):
   return %37 : $Int32
 }
 
+// CHECK-LABEL: sil [ossa] @hoist_rangechecked2 :
+// CHECK: bb0
+// CHECK:  cond_br {{.*}}, bb2, bb1
+// CHECK: bb1:
+// CHECK:   [[CB:%[0-9]+]] = function_ref @checkbounds
+// CHECK:    apply [[CB]]
+// CHECK:   br bb3{{.*}}
+// CHECK: bb3{{.*}}:
+// CHECK-NOT: function_ref @checkbounds
+// CHECK-NOT:    apply [[CB]]
+// CHECK:   cond_br {{.*}}, bb5, bb4
+// CHECK: bb4
+// CHECK:   br bb3
+// CHECK: bb5
+// CHECK:   br bb6
+// CHECK: bb6{{.*}}:
+// CHECK:  return
+// CHECK-LABEL: } // end sil function 'hoist_rangechecked2'
+sil [ossa] @hoist_rangechecked2 : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
+bb0(%0 : $Int32, %1 : $*ArrayInt):
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = struct $Bool (%2 : $Builtin.Int1)
+  %4 = struct_extract %0 : $Int32, #Int32._value
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = builtin "cmp_slt_Int32"(%4 : $Builtin.Int32, %5 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %7 : $Builtin.Int1, ""
+  %10 = builtin "cmp_eq_Int32"(%5 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int1
+  %17 = load [copy] %1 : $*ArrayInt
+  cond_br %10, bb2, bb1
+
+bb1:
+  br bb3(%5 : $Builtin.Int32)
+
+bb2:
+  br bb6(%5 : $Builtin.Int32)
+
+bb3(%14 : $Builtin.Int32):
+  %15 = struct $Int32 (%14 : $Builtin.Int32)
+  %16 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @guaranteed ArrayInt) -> _DependenceToken
+  %21 = apply %16(%15, %3, %17) : $@convention(method) (Int32, Bool, @guaranteed ArrayInt) -> _DependenceToken
+  %22 = integer_literal $Builtin.Int32, 1
+  %23 = integer_literal $Builtin.Int1, -1
+  %24 = builtin "sadd_with_overflow_Int32"(%14 : $Builtin.Int32, %22 : $Builtin.Int32, %23 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %25 = tuple_extract %24 : $(Builtin.Int32, Builtin.Int1), 0
+  %26 = function_ref @getElementAddr : $@convention(method) (Int32, @guaranteed ArrayInt) -> UnsafeMutablePointerInt
+  %28 = apply %26(%15, %17) : $@convention(method) (Int32, @guaranteed ArrayInt) -> UnsafeMutablePointerInt
+  %29 = struct_extract %28 : $UnsafeMutablePointerInt, #UnsafeMutablePointerInt._rawValue
+  %30 = pointer_to_address %29 : $Builtin.RawPointer to [strict] $*Int32
+  store %0 to [trivial] %30 : $*Int32
+  %32 = builtin "cmp_eq_Int32"(%25 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %32, bb5, bb4
+
+bb4:
+  br bb3(%25 : $Builtin.Int32)
+
+bb5:
+  br bb6(%25 : $Builtin.Int32)
+
+bb6(%36 : $Builtin.Int32):
+  destroy_value %17 : $ArrayInt
+  %37 = struct $Int32 (%36 : $Builtin.Int32)
+  return %37 : $Int32
+}
 // CHECK-LABEL: sil [ossa] @hoist_rangechecked_ref_tail_addr :
 // CHECK: bb0
 // CHECK:  cond_br {{.*}}, bb2, bb1
@@ -1047,7 +1113,7 @@ bb6(%38 : $Builtin.Int32):
   return %39 : $Int32
 }
 
-// CHECK-LABEL: sil [ossa] @hoist_inclusive_rangechecked :
+// CHECK-LABEL: sil [ossa] @hoist_inclusive_rangechecked1 :
 // CHECK: bb0
 // CHECK:  cond_br {{.*}}, bb2, bb1
 // CHECK: bb1:
@@ -1063,8 +1129,8 @@ bb6(%38 : $Builtin.Int32):
 // CHECK: bb5:
 // CHECK:  br bb6
 // CHECK: bb6{{.*}}:
-// CHECK-LABEL: } // end sil function 'hoist_inclusive_rangechecked'
-sil [ossa] @hoist_inclusive_rangechecked : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
+// CHECK-LABEL: } // end sil function 'hoist_inclusive_rangechecked1'
+sil [ossa] @hoist_inclusive_rangechecked1 : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %1 : $*ArrayInt):
   %2 = integer_literal $Builtin.Int1, -1
   %3 = struct $Bool (%2 : $Builtin.Int1)
@@ -1114,6 +1180,71 @@ bb6(%37 : $Builtin.Int32):
   return %38 : $Int32
 }
 
+// CHECK-LABEL: sil [ossa] @hoist_inclusive_rangechecked2 :
+// CHECK: bb0
+// CHECK:  cond_br {{.*}}, bb2, bb1
+// CHECK: bb1:
+// CHECK:   [[CB:%[0-9]+]] = function_ref @checkbounds
+// CHECK:    apply [[CB]]
+// CHECK:   br bb3{{.*}}
+// CHECK: bb3{{.*}}:
+// CHECK-NOT: function_ref @checkbounds
+// CHECK-NOT:    apply [[CB]]
+// CHECK:   cond_br {{.*}}, bb5, bb4
+// CHECK: bb4:
+// CHECK:  br bb3
+// CHECK: bb5:
+// CHECK:  br bb6
+// CHECK: bb6{{.*}}:
+// CHECK-LABEL: } // end sil function 'hoist_inclusive_rangechecked2'
+sil [ossa] @hoist_inclusive_rangechecked2 : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
+bb0(%0 : $Int32, %1 : $*ArrayInt):
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = struct $Bool (%2 : $Builtin.Int1)
+  %4 = struct_extract %0 : $Int32, #Int32._value
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = builtin "cmp_slt_Int32"(%4 : $Builtin.Int32, %5 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %7 : $Builtin.Int1, ""
+  %10 = integer_literal $Builtin.Int32, 1
+  %11 = integer_literal $Builtin.Int1, 0
+  %12 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %11 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %13 = tuple_extract %12 : $(Builtin.Int32, Builtin.Int1), 0
+  %14 = builtin "cmp_sgt_Int32"(%13 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int1
+  %15 = builtin "xor_Int1"(%14 : $Builtin.Int1, %6 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %15 : $Builtin.Int1, ""
+  %17 = builtin "cmp_eq_Int32"(%5 : $Builtin.Int32, %13 : $Builtin.Int32) : $Builtin.Int1
+  %24 = load [copy] %1 : $*ArrayInt
+  cond_br %17, bb2, bb1
+
+bb1:
+  br bb3(%5 : $Builtin.Int32)
+
+bb2:
+  br bb6(%5 : $Builtin.Int32)
+
+bb3(%21 : $Builtin.Int32):
+  %22 = struct $Int32 (%21 : $Builtin.Int32)
+  %23 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @guaranteed ArrayInt) -> _DependenceToken
+  %28 = apply %23(%22, %3, %24) : $@convention(method) (Int32, Bool, @guaranteed ArrayInt) -> _DependenceToken
+  %29 = integer_literal $Builtin.Int32, 1
+  %30 = integer_literal $Builtin.Int1, -1
+  %31 = builtin "sadd_with_overflow_Int32"(%21 : $Builtin.Int32, %29 : $Builtin.Int32, %30 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %32 = tuple_extract %31 : $(Builtin.Int32, Builtin.Int1), 0
+  %33 = builtin "cmp_eq_Int32"(%32 : $Builtin.Int32, %13 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %33, bb5, bb4
+
+bb4:
+  br bb3(%32 : $Builtin.Int32)
+
+bb5:
+  br bb6(%32 : $Builtin.Int32)
+
+bb6(%37 : $Builtin.Int32):
+  destroy_value %24 : $ArrayInt
+  %38 = struct $Int32 (%37 : $Builtin.Int32)
+  return %38 : $Int32
+}
 // Don't hoist arrays that are variant.
 // CHECK-LABEL: sil [ossa] @dont_hoist_variant_array :
 // CHECK: bb0
@@ -1289,3 +1420,214 @@ bb6(%32 : $Builtin.Int32):
   return %33 : $Int32
 }
 
+// CHECK-LABEL: sil [ossa] @non_const_post_increment :
+// CHECK-NOT:     apply
+// CHECK:       bb1({{.*}}):
+// CHECK:         function_ref @nonconst
+// CHECK:         apply
+// CHECK:         function_ref @checkbounds2
+// CHECK:         apply
+// CHECK:       bb2:
+// CHECK:       } // end sil function 'non_const_post_increment'
+sil [ossa] @non_const_post_increment : $@convention(thin) (@guaranteed Array<Int>) -> () {
+bb0(%0 : @guaranteed $Array<Int>):
+  %t = integer_literal $Builtin.Int1, -1
+  %ts = struct $Bool (%t : $Builtin.Int1)
+  %zero = integer_literal $Builtin.Int32, 0
+  %one = integer_literal $Builtin.Int32, 1
+  %ten = integer_literal $Builtin.Int32, 10
+  br bb1(%zero : $Builtin.Int32)
+
+bb1(%i : $Builtin.Int32):
+  %a1 = builtin "sadd_with_overflow_Int32"(%i : $Builtin.Int32, %one : $Builtin.Int32, %t : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %i1 = tuple_extract %a1 : $(Builtin.Int32, Builtin.Int1), 0
+  %nf = function_ref @nonconst : $@convention(thin) () -> Builtin.Int32
+  %nc = apply %nf() : $@convention(thin) () -> Builtin.Int32
+  %a2 = builtin "sadd_with_overflow_Int32"(%i : $Builtin.Int32, %nc : $Builtin.Int32, %t : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %idx = tuple_extract %a2 : $(Builtin.Int32, Builtin.Int1), 0
+  %idxs = struct $Int32 (%idx : $Builtin.Int32)
+  %f2 = function_ref @checkbounds2 : $@convention(method) (Int32, Bool, @guaranteed Array<Int>) -> _DependenceToken
+  apply %f2(%idxs, %ts, %0) : $@convention(method) (Int32, Bool, @guaranteed Array<Int>) -> _DependenceToken
+  %c = builtin "cmp_eq_Int32"(%i1 : $Builtin.Int32, %ten : $Builtin.Int32) : $Builtin.Int1
+  cond_br %c, bb3, bb2
+
+bb2:
+  br bb1(%i1 : $Builtin.Int32)
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @isNativeUnavailable1 :
+// CHECK: [[ISNATIVE:%.*]] = function_ref @arrayPropertyIsNative :
+// CHECK: bb1:
+// CHECK: [[CHECKBOUNDS:%.*]] = function_ref @checkbounds :
+// CHECK: apply [[ISNATIVE]]
+// CHECK: apply [[CHECKBOUNDS]]
+// CHECK: bb2
+// CHECK-LABEL: } // end sil function 'isNativeUnavailable1'
+sil [ossa] @isNativeUnavailable1 : $@convention(thin) (Int32, @owned ArrayInt) -> Int32 {
+bb0(%0 : $Int32, %1 : @owned $ArrayInt):
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = struct $Bool (%2)
+  %4 = struct_extract %0, #Int32._value
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = builtin "cmp_eq_Int32"(%5, %4) : $Builtin.Int1
+  %7 = begin_borrow %1
+  %8 = copy_value %7
+  %9 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed ArrayInt) -> Bool
+  %10 = apply %9(%7) : $@convention(method) (@guaranteed ArrayInt) -> Bool
+  end_borrow %7
+  cond_br %6, bb2, bb1
+
+bb1:
+  br bb3(%5)
+
+bb2:
+  destroy_value %8
+  destroy_value %1
+  br bb6(%5)
+
+bb3(%17 : $Builtin.Int32):
+  %18 = struct $Int32 (%17)
+  %19 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @guaranteed ArrayInt) -> _DependenceToken
+  %20 = apply %19(%18, %10, %8) : $@convention(method) (Int32, Bool, @guaranteed ArrayInt) -> _DependenceToken
+  %21 = integer_literal $Builtin.Int32, 1
+  %22 = integer_literal $Builtin.Int1, -1
+  %23 = builtin "sadd_with_overflow_Int32"(%17, %21, %22) : $(Builtin.Int32, Builtin.Int1)
+  %24 = tuple_extract %23, 0
+  %25 = tuple_extract %23, 1
+  cond_fail %25, ""
+  %27 = builtin "cmp_eq_Int32"(%24, %4) : $Builtin.Int1
+  cond_br %27, bb5, bb4
+
+bb4:
+  br bb3(%24)
+
+bb5:
+  destroy_value %8
+  destroy_value %1
+  br bb6(%24)
+
+bb6(%33 : $Builtin.Int32):
+  %34 = struct $Int32 (%33)
+  return %34
+}
+
+// CHECK-LABEL: sil [ossa] @isNativeUnavailable2 :
+// CHECK: [[ISNATIVE:%.*]] = function_ref @arrayPropertyIsNative :
+// CHECK: bb1:
+// CHECK: [[CHECKBOUNDS:%.*]] = function_ref @checkbounds :
+// CHECK: apply [[ISNATIVE]]
+// CHECK: apply [[CHECKBOUNDS]]
+// CHECK: bb2
+// CHECK-LABEL: } // end sil function 'isNativeUnavailable2'
+sil [ossa] @isNativeUnavailable2 : $@convention(thin) (Int32, @owned ArrayInt) -> Int32 {
+bb0(%0 : $Int32, %1 : @owned $ArrayInt):
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = struct $Bool (%2)
+  %4 = struct_extract %0, #Int32._value
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = builtin "cmp_eq_Int32"(%5, %4) : $Builtin.Int1
+  %7 = copy_value %1
+  %8 = copy_value %7
+  %9 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed ArrayInt) -> Bool
+  %10 = apply %9(%7) : $@convention(method) (@guaranteed ArrayInt) -> Bool
+  destroy_value %7
+  cond_br %6, bb2, bb1
+
+bb1:
+  br bb3(%5)
+
+bb2:
+  destroy_value %8
+  destroy_value %1
+  br bb6(%5)
+
+bb3(%17 : $Builtin.Int32):
+  %18 = struct $Int32 (%17)
+  %19 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @guaranteed ArrayInt) -> _DependenceToken
+  %20 = apply %19(%18, %10, %8) : $@convention(method) (Int32, Bool, @guaranteed ArrayInt) -> _DependenceToken
+  %21 = integer_literal $Builtin.Int32, 1
+  %22 = integer_literal $Builtin.Int1, -1
+  %23 = builtin "sadd_with_overflow_Int32"(%17, %21, %22) : $(Builtin.Int32, Builtin.Int1)
+  %24 = tuple_extract %23, 0
+  %25 = tuple_extract %23, 1
+  cond_fail %25, ""
+  %27 = builtin "cmp_eq_Int32"(%24, %4) : $Builtin.Int1
+  cond_br %27, bb5, bb4
+
+bb4:
+  br bb3(%24)
+
+bb5:
+  destroy_value %8
+  destroy_value %1
+  br bb6(%24)
+
+bb6(%33 : $Builtin.Int32):
+  %34 = struct $Int32 (%33)
+  return %34
+}
+
+struct Wrapper {
+  let arr: ArrayInt
+}
+
+// CHECK-LABEL: sil [ossa] @isNativeUnavailable3 :
+// CHECK: [[ISNATIVE:%.*]] = function_ref @arrayPropertyIsNative :
+// CHECK: bb1:
+// CHECK: [[CHECKBOUNDS:%.*]] = function_ref @checkbounds :
+// CHECK: apply [[ISNATIVE]]
+// CHECK: apply [[CHECKBOUNDS]]
+// CHECK: bb2
+// CHECK-LABEL: } // end sil function 'isNativeUnavailable3'
+sil [ossa] @isNativeUnavailable3 : $@convention(thin) (Int32, @owned Wrapper) -> Int32 {
+bb0(%0 : $Int32, %1 : @owned $Wrapper):
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = struct $Bool (%2)
+  %4 = struct_extract %0, #Int32._value
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = builtin "cmp_eq_Int32"(%5, %4) : $Builtin.Int1
+  %7 = begin_borrow %1
+  %7a = struct_extract %7, #Wrapper.arr
+  %8 = copy_value %7a
+  %9 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed ArrayInt) -> Bool
+  %10 = apply %9(%7a) : $@convention(method) (@guaranteed ArrayInt) -> Bool
+  end_borrow %7
+  cond_br %6, bb2, bb1
+
+bb1:
+  br bb3(%5)
+
+bb2:
+  destroy_value %8
+  destroy_value %1
+  br bb6(%5)
+
+bb3(%17 : $Builtin.Int32):
+  %18 = struct $Int32 (%17)
+  %19 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @guaranteed ArrayInt) -> _DependenceToken
+  %20 = apply %19(%18, %10, %8) : $@convention(method) (Int32, Bool, @guaranteed ArrayInt) -> _DependenceToken
+  %21 = integer_literal $Builtin.Int32, 1
+  %22 = integer_literal $Builtin.Int1, -1
+  %23 = builtin "sadd_with_overflow_Int32"(%17, %21, %22) : $(Builtin.Int32, Builtin.Int1)
+  %24 = tuple_extract %23, 0
+  %25 = tuple_extract %23, 1
+  cond_fail %25, ""
+  %27 = builtin "cmp_eq_Int32"(%24, %4) : $Builtin.Int1
+  cond_br %27, bb5, bb4
+
+bb4:
+  br bb3(%24)
+
+bb5:
+  destroy_value %8
+  destroy_value %1
+  br bb6(%24)
+
+bb6(%33 : $Builtin.Int32):
+  %34 = struct $Int32 (%33)
+  return %34
+}

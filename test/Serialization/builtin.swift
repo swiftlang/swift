@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t %S/Inputs/alias_builtin.swift
 // RUN: llvm-bcanalyzer %t/alias_builtin.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -I %t -typecheck %s -verify
+// RUN: %target-swift-frontend -I %t -typecheck %s -verify -verify-ignore-unrelated
 
 // CHECK-NOT: UnknownCode
 

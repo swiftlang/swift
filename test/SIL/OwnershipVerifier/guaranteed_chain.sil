@@ -15,7 +15,7 @@ struct PairC {
 //
 sil [ossa] @testSSALongForwardingChain : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa_liveness @trace[0]"
   debug_value [trace] %0 : $C
   %s0 = struct $PairC(%0 : $C, %0 : $C)
   %s0a = struct_extract %s0 : $PairC, #PairC.first

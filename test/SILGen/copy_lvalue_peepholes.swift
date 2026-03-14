@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -parse-as-library %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
 
@@ -9,9 +9,11 @@ func getInt() -> Int { return zero }
 
 // CHECK-LABEL: sil hidden [ossa] @$s21copy_lvalue_peepholes014init_var_from_B0{{[_0-9a-zA-Z]*}}F
 // CHECK:   [[X:%.*]] = alloc_box ${ var Builtin.Int64 }
-// CHECK:   [[PBX:%.*]] = project_box [[X]]
+// CHECK:   [[XLIFE:%.*]] = begin_borrow [var_decl] [[X]]
+// CHECK:   [[PBX:%.*]] = project_box [[XLIFE]]
 // CHECK:   [[Y:%.*]] = alloc_box ${ var Builtin.Int64 }
-// CHECK:   [[PBY:%.*]] = project_box [[Y]]
+// CHECK:   [[YLIFE:%.*]] = begin_borrow [var_decl] [[Y]]
+// CHECK:   [[PBY:%.*]] = project_box [[YLIFE]]
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
 // CHECK:   copy_addr [[READ]] to [init] [[PBY]] : $*Builtin.Int64
 func init_var_from_lvalue(x: Int) {
@@ -38,7 +40,8 @@ func init_var_from_computed_lvalue() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s21copy_lvalue_peepholes021assign_computed_from_B0{{[_0-9a-zA-Z]*}}F
 // CHECK:   [[Y:%.*]] = alloc_box
-// CHECK:   [[PBY:%.*]] = project_box [[Y]]
+// CHECK:   [[YLIFE:%.*]] = begin_borrow [var_decl] [[Y]]
+// CHECK:   [[PBY:%.*]] = project_box [[YLIFE]]
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBY]]
 // CHECK:   [[Y_VAL:%.*]] = load [trivial] [[READ]]
 // CHECK:   [[SETTER:%.*]] = function_ref @$s21copy_lvalue_peepholes8computedBi64_vs

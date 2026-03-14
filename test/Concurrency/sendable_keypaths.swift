@@ -1,0 +1,315 @@
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability -verify-additional-prefix swift5-
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -language-mode 6 -verify-additional-prefix swift6-
+
+// REQUIRES: concurrency
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_InferSendableFromCaptures
+
+class NonSendable : Hashable {
+  var data: Int
+
+  init(data: Int = 42) {
+    self.data = data
+  }
+
+  init(data: [Int]) {
+    self.data = data.first!
+  }
+
+  static func == (x: NonSendable, y: NonSendable) -> Bool { false }
+  func hash(into hasher: inout Hasher) {}
+}
+
+final class CondSendable<T> : Hashable {
+  init(_: T) {}
+  init(_: Int) {}
+  init<U>(_: T, other: U = 42) {}
+  init<Q>(_: [Q] = []) {}
+
+  static func == (x: CondSendable, y: CondSendable) -> Bool { false }
+  func hash(into hasher: inout Hasher) {}
+}
+
+extension CondSendable : Sendable where T: Sendable {
+}
+
+// Test forming sendable key paths without context
+do {
+  class K {
+    var data: String = ""
+
+    subscript<T>(_: T) -> Bool {
+      get { false }
+    }
+
+    subscript<Q>(_: Int, _: Q) -> Int {
+      get { 42 }
+      set {}
+    }
+  }
+
+  let kp = \K.data // Marked as  `& Sendable`
+
+  let _: KeyPath<K, String> = kp // Ok
+  let _: KeyPath<K, String> & Sendable = kp // Ok
+
+  func test<V>(_: KeyPath<K, V> & Sendable) {
+  }
+
+  test(kp) // Ok
+
+  let nonSendableKP = \K.[NonSendable()]
+
+  let _: KeyPath<K, Bool> = \.[NonSendable()] // ok
+  let _: KeyPath<K, Bool> & Sendable = \.[NonSendable()] // expected-swift5-warning {{type 'KeyPath<K, Bool>' does not conform to the 'Sendable' protocol}}
+  // expected-swift6-error@-1 {{type 'KeyPath<K, Bool>' does not conform to the 'Sendable' protocol}}
+  let _: KeyPath<K, Int> & Sendable = \.[42, NonSendable(data: [-1, 0, 1])] // expected-swift5-warning {{type 'KeyPath<K, Int>' does not conform to the 'Sendable' protocol}}
+  // expected-swift6-error@-1 {{type 'KeyPath<K, Int>' does not conform to the 'Sendable' protocol}}
+  let _: KeyPath<K, Int> & Sendable = \.[42, -1] // Ok
+
+  test(nonSendableKP) // expected-swift5-warning {{type 'KeyPath<K, Bool>' does not conform to the 'Sendable' protocol}}
+  // expected-swift6-error@-1 {{type 'KeyPath<K, Bool>' does not conform to the 'Sendable' protocol}}
+}
+
+// Test using sendable and non-Sendable key paths.
+do {
+  class V {
+    var i: Int = 0
+
+    subscript<T>(_: T) -> Int {
+      get { 42 }
+    }
+
+    subscript<Q>(_: Int, _: Q) -> Int {
+      get { 42 }
+      set {}
+    }
+  }
+
+  func testSendableKP<T, U>(v: T, _ kp: any KeyPath<T, U> & Sendable) {}
+  func testSendableFn<T, U>(v: T, _: @Sendable (T) -> U) {}
+
+  func testNonSendableKP<T, U>(v: T, _ kp: KeyPath<T, U>) {}
+  func testNonSendableFn<T, U>(v: T, _ kp: (T) -> U) {}
+
+  let v = V()
+
+  testSendableKP(v: v, \.i) // Ok
+  testSendableFn(v: v, \.i) // Ok
+
+  testSendableKP(v: v, \.[42]) // Ok
+  testSendableFn(v: v, \.[42]) // Ok
+
+  testSendableKP(v: v, \.[NonSendable()]) // expected-swift5-warning {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
+  // expected-swift6-error@-1 {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
+  testSendableFn(v: v, \.[NonSendable()]) // expected-swift5-warning {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+  // expected-swift6-error@-1 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+
+  testNonSendableKP(v: v, \.[NonSendable()]) // Ok
+  testNonSendableFn(v: v, \.[NonSendable()]) // Ok
+
+  let _: @Sendable (V) -> Int = \.[NonSendable()]
+  // expected-swift5-warning@-1 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+  // expected-swift6-error@-2 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+
+  let _: KeyPath<V, Int> & Sendable = \.[42, CondSendable(NonSendable(data: [1, 2, 3]))]
+  // expected-swift5-warning@-1 {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
+  // expected-swift6-error@-2 {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
+
+  let _: KeyPath<V, Int> & Sendable = \.[42, CondSendable(42)] // Ok
+
+  struct Root {
+    let v: V
+  }
+
+  testSendableKP(v: v, \.[42, CondSendable(NonSendable(data: [1, 2, 3]))])
+  // expected-swift5-warning@-1 {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
+  // expected-swift6-error@-2 {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
+
+  testSendableFn(v: v, \.[42, CondSendable(NonSendable(data: [1, 2, 3]))])
+  // expected-swift5-warning@-1 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+  // expected-swift6-error@-2 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+
+  testSendableKP(v: v, \.[42, CondSendable(42)]) // Ok
+
+  let nonSendable = NonSendable()
+  testSendableKP(v: v, \.[42, CondSendable(nonSendable)])
+  // expected-swift5-warning@-1 {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
+  // expected-swift6-error@-2 {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
+
+  testSendableFn(v: v, \.[42, CondSendable(nonSendable)])
+  // expected-swift5-warning@-1 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+  // expected-swift6-error@-2 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+}
+
+// @dynamicMemberLookup with Sendable requirement
+do {
+  @dynamicMemberLookup
+  struct Test<T> {
+    var obj: T
+
+    subscript<U>(dynamicMember member: KeyPath<T, U> & Sendable) -> U {
+      get { obj[keyPath: member] }
+    }
+  }
+
+  _ = Test(obj: "Hello").utf8.count // Ok
+}
+
+// global-actor-isolated properties.
+func testGlobalActorIsolatedReferences() {
+  @MainActor struct Isolated {
+    var data: Int = 42
+    subscript(v: Int) -> Bool { false }
+  }
+
+  let dataKP = \Isolated.data // Ok
+  let subscriptKP = \Isolated.[42]
+  // expected-swift5-warning@-1 {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in the Swift 6 language mode}}
+  // expected-swift6-error@-2 {{cannot form key path to main actor-isolated subscript 'subscript(_:)'}}
+
+  let _: KeyPath<Isolated, Int> & Sendable = dataKP
+  // expected-swift5-warning@-1 {{type 'WritableKeyPath<Isolated, Int>' does not conform to the 'Sendable' protocol}}
+  // expected-swift6-error@-2 {{type 'WritableKeyPath<Isolated, Int>' does not conform to the 'Sendable' protocol}}
+
+  let _: KeyPath<Isolated, Bool> & Sendable = subscriptKP
+  // expected-swift5-warning@-1 {{type 'KeyPath<Isolated, Bool>' does not conform to the 'Sendable' protocol}}
+  // expected-swift6-error@-2 {{type 'KeyPath<Isolated, Bool>' does not conform to the 'Sendable' protocol}}
+
+  func testNonIsolated() {
+    _ = \Isolated.data // Ok
+  }
+
+  @MainActor func testIsolated() {
+    _ = \Isolated.data // Ok
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor SomeActor {
+}
+
+@available(SwiftStdlib 5.1, *)
+@globalActor
+actor GlobalActor {
+  static let shared: SomeActor = SomeActor()
+}
+
+@available(SwiftStdlib 5.1, *)
+func testReferencesToDifferentGlobalActorIsolatedMembers() {
+  struct Info {
+    @MainActor var name: String  { "" }
+  }
+
+  struct Isolated {
+    @GlobalActor var info: Info { Info() }
+  }
+
+  @MainActor func testIsolatedToMain() {
+    _ = \Info.name // Ok
+    _ = \Isolated.info.name
+    // expected-swift5-warning@-1 {{cannot form key path to global actor 'GlobalActor'-isolated property 'info'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-2 {{cannot form key path to global actor 'GlobalActor'-isolated property 'info'}}
+  }
+
+  @GlobalActor func testIsolatedToCustom() {
+    _ = \Info.name // Ok
+    // expected-swift5-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-2 {{cannot form key path to main actor-isolated property 'name'}}
+
+    _ = \Isolated.info.name
+    // expected-swift5-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-2 {{cannot form key path to main actor-isolated property 'name'}}
+  }
+}
+
+do {
+  struct S {
+    var a: Int
+    var b: String?
+  }
+
+  func test<T: Sendable>(_: T) {}
+
+  let kp = [\S.a, \S.b]
+
+  test(kp) // Ok
+  test([\S.a, \S.b]) // Ok
+
+  let _: [PartialKeyPath<S>] = [\.a, \.b] // Ok
+  let _: [any PartialKeyPath<S> & Sendable] = [\.a, \.b] // Ok
+}
+
+do {
+  func kp() -> KeyPath<String, Int> & Sendable {
+    fatalError()
+  }
+
+  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
+  func test() -> KeyPath<String, Int> {
+    true ? kp() : kp() // expected-error {{failed to produce diagnostic for expression}}
+  }
+
+  func forward<T>(_ v: T) -> T { v }
+  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
+  let _: KeyPath<String, Int> = forward(kp()) // expected-swift5-error {{conflicting arguments to generic parameter 'T' ('any KeyPath<String, Int> & Sendable' vs. 'KeyPath<String, Int>')}}
+}
+
+do {
+  final class C<T> {
+    let immutable: String = ""
+  }
+
+  _ = \C<Int>.immutable as? ReferenceWritableKeyPath // Ok
+}
+
+// Should be moved back to sendable_methods.swift once ambiguities are fixed
+do {
+  struct Test {
+    static func fn() {}
+    static func otherFn() {}
+  }
+
+  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
+  func fnRet(cond: Bool) -> () -> Void {
+    cond ? Test.fn : Test.otherFn // expected-swift5-error {{failed to produce diagnostic for expression}}
+  }
+
+  func forward<T>(_: T) -> T {
+  }
+
+  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
+  let _: () -> Void = forward(Test.fn) // expected-swift5-error {{conflicting arguments to generic parameter 'T' ('@Sendable () -> ()' vs. '() -> Void')}}
+}
+
+// https://github.com/swiftlang/swift/issues/77105
+do {
+  @dynamicMemberLookup
+  struct S<T> {
+    subscript<U>(dynamicMember keyPath: KeyPath<T, U> & Sendable) -> U {
+      fatalError()
+    }
+  }
+
+  struct Foo {
+    subscript<T>(bar bar: T) -> Int { 42 }
+  }
+
+  func test(s: S<Foo>) {
+    _ = s[bar: NonSendable()]
+    // expected-swift5-warning@-1 {{type 'KeyPath<Foo, Int>' does not conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-2 {{type 'KeyPath<Foo, Int>' does not conform to the 'Sendable' protocol}}
+  }
+}
+
+public final class TestSetterRef {
+  public internal(set) var v: Int = 0 // expected-note {{setter for property 'v' is not '@usableFromInline' or public}}
+
+  public func test1(_ kp: KeyPath<TestSetterRef, Int> = \.v) {} // Ok
+  public func test2(_ kp: KeyPath<TestSetterRef, Int> = \TestSetterRef.v) {} // Ok
+  public func test3(_ kp: KeyPath<TestSetterRef, Int> & Sendable = \.v) {} // Ok
+
+  public func test_err(_ kp: WritableKeyPath<TestSetterRef, Int> = \.v) {}
+  // expected-swift5-warning@-1 {{setter for property 'v' is internal and should not be referenced from a default argument value}}
+  // expected-swift6-error@-2 {{setter for property 'v' is internal and cannot be referenced from a default argument value}}
+}

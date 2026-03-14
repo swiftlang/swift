@@ -17,6 +17,7 @@
 #define DEBUG_TYPE "sil-constant-evaluable-subset-checker"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILConstants.h"
@@ -79,8 +80,8 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
         callee = applyInst->getReferencedFunctionOrNull();
       }
 
-      Optional<SILBasicBlock::iterator> nextInstOpt;
-      Optional<SymbolicValue> errorVal;
+      std::optional<SILBasicBlock::iterator> nextInstOpt;
+      std::optional<SymbolicValue> errorVal;
 
       if (!applyInst || !callee || !isConstantEvaluable(callee)) {
 

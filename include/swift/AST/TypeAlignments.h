@@ -26,6 +26,7 @@
 
 namespace swift {
   class AbstractClosureExpr;
+  class AbstractSpecializeAttr;
   class AbstractStorageDecl;
   class ArchetypeType;
   class AssociatedTypeDecl;
@@ -33,6 +34,7 @@ namespace swift {
   class AttributeBase;
   class BraceStmt;
   class CaptureListExpr;
+  class CustomAvailabilityDomain;
   class Decl;
   class DeclContext;
   class DifferentiableAttr;
@@ -54,6 +56,7 @@ namespace swift {
   class SILFunction;
   class SILFunctionType;
   class SpecializeAttr;
+  class SpecializedAttr;
   class Stmt;
   class TrailingWhereClause;
   class TypeVariableType;
@@ -78,6 +81,7 @@ namespace swift {
   constexpr size_t ASTContextAlignInBits = 2;
   constexpr size_t TypeVariableAlignInBits = 4;
   constexpr size_t StoredDefaultArgumentAlignInBits = 3;
+  constexpr size_t CustomAvailabilityDomainAlignInBits = 3;
 
   // Well, this is the *minimum* pointer alignment; it's going to be 3 on
   // 64-bit targets, but that doesn't matter.
@@ -149,6 +153,8 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::RequirementRepr,
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::SILFunction,
                             swift::SILFunctionAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::SpecializeAttr, swift::PointerAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::SpecializedAttr, swift::PointerAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::AbstractSpecializeAttr, swift::PointerAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TrailingWhereClause,
                             swift::PointerAlignInBits)
 
@@ -160,6 +166,9 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::CaseLabelItem, swift::PatternAlignInBits)
 
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::StmtConditionElement,
                             swift::PatternAlignInBits)
+
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::CustomAvailabilityDomain,
+                            swift::CustomAvailabilityDomainAlignInBits)
 
 static_assert(alignof(void*) >= 2, "pointer alignment is too small");
 

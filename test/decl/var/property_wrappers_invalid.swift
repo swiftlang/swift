@@ -1,13 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -verify -verify-ignore-unknown
-
-// FIXME: This should produce a diagnostic with a proper
-// source location. Right now, we just get three useless errors:
-
-// <unknown>:0: error: type of expression is ambiguous without more context
-// <unknown>:0: error: type of expression is ambiguous without more context
-// <unknown>:0: error: type of expression is ambiguous without more context
-
-// The actual problem is the type of the subscript declaration is wrong.
+// RUN: %target-swift-frontend -typecheck %s -verify
 
 public class Store {
     @Published public var state: Any
@@ -23,12 +14,13 @@ public class Store {
     set {}
   }
   public static subscript(_enclosingInstance object: Any,
-                          wrapped wrappedKeyPath: Any,
-                          storage storageKeyPath: Any)
+                          wrapped wrappedKeyPath: Any, // expected-error {{parameter 'wrapped' of enclosing-self subscript should have read-only or writable key path type (got 'Any')}}
+                          storage storageKeyPath: Any) // expected-error {{parameter 'storage' of enclosing-self subscript should have read-only or writable key path type (got 'Any')}}
       -> Value {
     get { fatalError() }
     set {}
   }
+
   public struct Publisher {}
   public var projectedValue: Publisher {
     mutating get { fatalError() }

@@ -29,16 +29,6 @@ class SILFunction;
 class SILBasicBlock;
 class SingleValueInstruction;
 
-void printBitsAsArray(llvm::raw_ostream &OS, const SmallBitVector &bits);
-
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                                     const SmallBitVector &bits) {
-  printBitsAsArray(OS, bits);
-  return OS;
-}
-
-void dumpBits(const SmallBitVector &bits);
-
 /// The MemoryLocations utility provides functions to analyze memory locations.
 ///
 /// Memory locations are limited to addresses which are guaranteed to
@@ -153,6 +143,10 @@ public:
     /// sub location of this location.
     bool isSubLocation(unsigned idx) const {
       return idx < subLocations.size() && subLocations.test(idx);
+    }
+
+    bool selfBitRepresentsUnknownSubFields() const {
+      return numFieldsNotCoveredBySubfields > 0;
     }
 
   private:

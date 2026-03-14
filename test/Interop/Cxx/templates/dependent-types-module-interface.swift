@@ -1,3 +1,6 @@
+// Waiting for support for dependent types to be added back: rdar://103530256&90587703&89090706&89090631&89034704&89034440&83406001&83367285
+// XFAIL: *
+
 // RUN: %target-swift-ide-test -print-module -module-to-print=DependentTypes -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: func differentDependentArgAndRet<T, U>(_ a: Any, T: T.Type, U: U.Type) -> Any

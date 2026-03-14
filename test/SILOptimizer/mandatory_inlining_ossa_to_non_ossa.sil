@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
 sil_stage raw
 
@@ -240,7 +240,7 @@ bb0(%0 : $Builtin.NativeObject):
 
 sil [transparent] [ossa] @term_ossa_callee : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $FakeOptional<Klass>):
-  checked_cast_br %0 : $Builtin.NativeObject to Klass, bb1, bb2
+  checked_cast_br Builtin.NativeObject in %0 : $Builtin.NativeObject to Klass, bb1, bb2
 
 bb1(%1a : @owned $Klass):
   destroy_value %1a : $Klass
@@ -267,7 +267,7 @@ bb6:
 
 // CHECK-LABEL: sil @term_non_ossa_caller : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $FakeOptional<Klass>):
-// CHECK:   checked_cast_br [[ARG0]] : $Builtin.NativeObject to Klass, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+// CHECK:   checked_cast_br Builtin.NativeObject in [[ARG0]] : $Builtin.NativeObject to Klass, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
 //
 // CHECK: [[YES]]([[SUCC:%.*]] :
 // CHECK:   release_value [[SUCC]]
@@ -322,7 +322,7 @@ bb3:
 // CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
 // CHECK-NEXT:   store [[ARG]] to [[SRC_ADDR]]
 // CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [[SRC_ADDR]]
-// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+// CHECK-NEXT:   checked_cast_br Builtin.NativeObject in [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
 //
 // ==> On success, we store the value into dest. The destroy is not from the
 // ==> optimizer, but from the code.
@@ -378,7 +378,7 @@ bb3:
 // CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
 // CHECK-NEXT:   store [[ARG]] to [[SRC_ADDR]]
 // CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [[SRC_ADDR]]
-// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+// CHECK-NEXT:   checked_cast_br Builtin.NativeObject in [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] :
 // ==> On success, we store into dest and destroy dest.
@@ -433,7 +433,7 @@ bb3:
 // CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
 // CHECK-NEXT:   store [[ARG]] to [[SRC_ADDR]]
 // CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [[SRC_ADDR]]
-// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+// CHECK-NEXT:   checked_cast_br Builtin.NativeObject in [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] :
 // CHECK-NEXT:   strong_retain [[CAST_VALUE]]
@@ -456,3 +456,36 @@ bb0(%0 : $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil @paable : $@convention(thin) (Builtin.Int64) -> ()
+
+sil [transparent] [ossa] @partial_apply_on_stack_nesting_violator : $@convention(thin) () -> () {
+    %paable = function_ref @paable : $@convention(thin) (Builtin.Int64) -> ()
+    %one = integer_literal $Builtin.Int64, 1
+    %first = partial_apply [callee_guaranteed] [on_stack] %paable(%one) : $@convention(thin) (Builtin.Int64) -> ()
+    %two = integer_literal $Builtin.Int64, 2
+    %second = partial_apply [callee_guaranteed] [on_stack] %paable(%two) : $@convention(thin) (Builtin.Int64) -> ()
+    // Note that the destroy_values do not occur in an order which coincides
+    // with stack disciplined dealloc_stacks.
+    destroy_value %first : $@noescape @callee_guaranteed () -> ()
+    destroy_value %second : $@noescape @callee_guaranteed () -> ()
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Verify that when inlining partial_apply_on_stack_nesting_violator, the stack
+// nesting of the on_stack closures is fixed.
+// CHECK-LABEL: sil @test_inline_stack_violating_ossa_func : {{.*}} {
+// CHECK:         [[PAABLE:%[^,]+]] = function_ref @paable
+// CHECK:         [[FIRST:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[PAABLE]]
+// CHECK:         [[SECOND:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[PAABLE]]
+// CHECK:         dealloc_stack [[SECOND]]
+// CHECK:         dealloc_stack [[FIRST]]
+// CHECK-LABEL: } // end sil function 'test_inline_stack_violating_ossa_func'
+sil @test_inline_stack_violating_ossa_func : $@convention(thin) () -> () {
+    %callee = function_ref @partial_apply_on_stack_nesting_violator : $@convention(thin) () -> ()
+    apply %callee() : $@convention(thin) () -> ()
+    %retval = tuple ()
+    return %retval : $()
+}
+

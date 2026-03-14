@@ -257,7 +257,7 @@ bb0(%0 : @guaranteed ${ var Int64 }):
 }
 
 // CHECK-LABEL: sil [noinline] [ossa] @$testrecur :
-// CHECK: alloc_box ${ var Int64 }, var, name "x"
+// CHECK:         alloc_stack $Int64, var, name "x"
 // CHECK-LABEL: } // end sil function '$testrecur'
 sil [noinline] [ossa] @$testrecur : $@convention(thin) () -> () {
 bb0:
@@ -314,7 +314,7 @@ bb0:
   store %3 to [trivial] %1 : $*Int64
   %5 = function_ref @$testbeginapplybas : $@yield_once @convention(thin) (@guaranteed { var Int64 }) -> @yields ()
   (%addr, %token) = begin_apply %5(%0) : $@yield_once @convention(thin) (@guaranteed { var Int64 }) -> @yields ()
-  end_apply %token
+  end_apply %token as $()
   destroy_value %0 : ${ var Int64 }
   %8 = tuple ()
   return %8 : $()
@@ -358,8 +358,8 @@ struct Int {
 // AppliesToSpecialize should have the order: bar bas common.
 // Only then, the functions get specialized correctly, and we won't see an assert in checkNoPromotedBoxInApply.
 // CHECK-LABEL: sil [noinline] [ossa] @$testdfs1 :
-// CHECK-NOT : alloc_box ${ var Int64 }, var, name "x"
-// CHECK-NOT : alloc_box ${ var Int64 }, var, name "y"
+// CHECK-NOT: alloc_box ${ var Int64 }, var, name "x"
+// CHECK-NOT: alloc_box ${ var Int64 }, var, name "y"
 // CHECK-LABEL:} // end sil function '$testdfs1'
 sil [noinline] [ossa] @$testdfs1 : $@convention(thin) () -> Int64 {
 bb0:
@@ -409,15 +409,10 @@ bb0(%0 : @guaranteed ${ var Int64 }):
   return %4 : $Int64
 }
 
-// Test to make sure we don't optimize the case when we have an inner common function call for multiple boxes.
-// We don't optimize this case now, because we don't have additional logic to correctly construct AppliesToSpecialize
-// Order of function calls constructed in PromotedOperands: bar innercommon local1 bas innercommon local2
-// AppliesToSpecialize should have the order: bar bas innercommon local1 local2
-// Since we don't maintain any tree like data structure with more info on the call tree, this is not possible to construct today 
 // CHECK-LABEL: sil [noinline] [ossa] @$testdfs2 :
-// CHECK: alloc_box ${ var Int }, var, name "x"
-// CHECK: alloc_box ${ var Int }, var, name "y"
-// CHECK-LABEL:} // end sil function '$testdfs2'
+// CHECK:         alloc_stack $Int, var, name "x"
+// CHECK:         alloc_stack $Int, var, name "y"
+// CHECK-LABEL: } // end sil function '$testdfs2'
 sil [noinline] [ossa] @$testdfs2 : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_box ${ var Int }, var, name "x"
@@ -446,6 +441,7 @@ bb0:
   return %21 : $Int
 }
 
+// CHECK-LABEL: sil private [noinline] [ossa] @$s12$testdfs2barTf0s_n : $@convention(thin) (@inout_aliasable Int) -> Int {
 sil private [noinline] [ossa] @$testdfs2bar : $@convention(thin) (@guaranteed { var Int }) -> Int {
 bb0(%0 : @guaranteed ${ var Int }):
   %1 = project_box %0 : ${ var Int }, 0
@@ -453,6 +449,7 @@ bb0(%0 : @guaranteed ${ var Int }):
   return %4 : $Int
 }
 
+// CHECK-LABEL: sil private [noinline] [ossa] @$s12$testdfs2basTf0s_n : $@convention(thin) (@inout_aliasable Int) -> Int {
 sil private [noinline] [ossa] @$testdfs2bas : $@convention(thin) (@guaranteed { var Int }) -> Int {
 bb0(%0 : @guaranteed ${ var Int }):
   %1 = project_box %0 : ${ var Int }, 0
@@ -460,6 +457,7 @@ bb0(%0 : @guaranteed ${ var Int }):
   return %4 : $Int
 }
 
+// CHECK-LABEL: sil private [noinline] [ossa] @$s20$testdfs2innercommonTf0ss_n : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int) -> Int {
 sil private [noinline] [ossa] @$testdfs2innercommon : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int {
 bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   %2 = project_box %0 : ${ var Int }, 0
@@ -471,6 +469,7 @@ bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   return %12 : $Int
 }
 
+// CHECK-LABEL: sil private [noinline] [ossa] @$s15$testdfs2local1Tf0ss_n : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int) -> Int {
 sil private [noinline] [ossa] @$testdfs2local1 : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int {
 bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   %2 = project_box %0 : ${ var Int }, 0
@@ -480,6 +479,7 @@ bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   return %8 : $Int
 }
 
+// CHECK-LABEL: sil private [noinline] [ossa] @$s15$testdfs2local2Tf0ss_n : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int) -> Int {
 sil private [noinline] [ossa] @$testdfs2local2 : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int {
 bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   %2 = project_box %0 : ${ var Int }, 0
@@ -487,4 +487,64 @@ bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   %7 = function_ref @$testdfs2innercommon : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int
   %8 = apply %7(%0, %1) : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int
   return %8 : $Int
+}
+
+class C {}
+
+sil @getC : $@convention(thin) () -> (@owned C)
+
+sil [ossa] @borrow_c_box : $@convention(thin) (@guaranteed { var C }) -> () {
+entry(%box : @guaranteed ${var C}):
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_copy_applied : {{.*}} {
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[CLOSURE]]
+// CHECK:         destroy_value [[CLOSURE]]
+// CHECK:         apply [[COPY]]()
+// CHECK:         destroy_addr
+// CHECK:         dealloc_stack
+// CHECK-LABEL: } // end sil function 'test_copy_applied'
+sil [ossa] @test_copy_applied : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var C }, var, name "x"
+  %addr = project_box %box : ${ var C }, 0
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c = apply %getC() : $@convention(thin) () -> (@owned C)
+  store %c to [init] %addr : $*C
+
+  %borrow_int_box = function_ref @borrow_c_box : $@convention(thin) (@guaranteed { var C }) -> ()
+  %closure = partial_apply [callee_guaranteed] %borrow_int_box(%box) : $@convention(thin) (@guaranteed { var C }) -> ()
+  %copy = copy_value %closure : $@callee_guaranteed () -> ()
+  destroy_value %closure : $@callee_guaranteed () -> ()
+  apply %copy() : $@callee_guaranteed () -> ()
+  destroy_value %copy : $@callee_guaranteed () -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_move_applied : {{.*}} {
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply
+// CHECK:         [[MOVE:%[^,]+]] = move_value [[CLOSURE]]
+// CHECK:         apply [[MOVE]]()
+// CHECK:         destroy_addr
+// CHECK:         dealloc_stack
+// CHECK-LABEL: } // end sil function 'test_move_applied'
+sil [ossa] @test_move_applied : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var C }, var, name "x"
+  %addr = project_box %box : ${ var C }, 0
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c = apply %getC() : $@convention(thin) () -> (@owned C)
+  store %c to [init] %addr : $*C
+
+  %borrow_int_box = function_ref @borrow_c_box : $@convention(thin) (@guaranteed { var C }) -> ()
+  %closure = partial_apply [callee_guaranteed] %borrow_int_box(%box) : $@convention(thin) (@guaranteed { var C }) -> ()
+  %move = move_value %closure : $@callee_guaranteed () -> ()
+  apply %move() : $@callee_guaranteed () -> ()
+  destroy_value %move : $@callee_guaranteed () -> ()
+  %retval = tuple ()
+  return %retval : $()
 }

@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -opt-mode=none -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
-// RUN: %target-sil-opt -opt-mode=speed -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
+// RUN: %target-sil-opt -sil-print-types -opt-mode=none -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
+// RUN: %target-sil-opt -sil-print-types -opt-mode=speed -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
 
 import Builtin
 
@@ -283,9 +283,9 @@ bb0(%0 : $*X3, %1 : @guaranteed $Builtin.NativeObject):
 //
 // CHECK-LABEL: sil [ossa] @testDestructureTupleNoCrash : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.NativeObject)) -> () {
 // CHECKOPT: bb0(
-// CHECKOPT-NEXT: destroy_value
-// CHECKOPT-NEXT: tuple
-// CHECKOPT-NEXT: return
+// CHECKOPT-NEXT: (%1, %2) = destructure_tuple
+// CHECKOPT:      destroy_value %2
+// CHECKOPT-NEXT: destroy_value %1
 // CHECK: } // end sil function 'testDestructureTupleNoCrash'
 sil [ossa] @testDestructureTupleNoCrash : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.NativeObject)) -> () {
 bb0(%0 : @owned $(Builtin.NativeObject, Builtin.NativeObject)):
@@ -341,54 +341,44 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   return %1 : $Builtin.NativeObject
 }
 
-// Test SemanticARCOpts eliminateSimpleCopies. At -O, remove the
-// debug_value with the copy to avoid a lifetime violation. -Onone, do nothing.
-//
-// CHECK-LABEL: sil [ossa] @testSimpleCopyWithDebug : $@convention(thin) (@owned Klass) -> Builtin.Int64 {
-// CHECKOPT-NOT: copy_value
-// CHECKOPT-NOT: debug_value
-// CHECKDEB: copy_value
-// CHECKDEB: debug_value
-// CHECK-LABEL: } // end sil function 'testSimpleCopyWithDebug'
-sil [ossa] @testSimpleCopyWithDebug : $@convention(thin) (@owned Klass) -> Builtin.Int64 {
-bb9(%0 : @owned $Klass):
-  %borrow = begin_borrow %0 : $Klass
-  %p = ref_element_addr %borrow : $Klass, #Klass.property
-  %v = load [trivial] %p : $*Builtin.Int64
-  %copy = copy_value %borrow : $Klass
-  end_borrow %borrow : $Klass
-  debug_value %copy : $Klass, let, name "c"
-  destroy_value %copy : $Klass
-  destroy_value %0 : $Klass
-  return %v : $Builtin.Int64
+struct Outer {
+  var middle: Middle
 }
 
-// debug_value must be preserved after splitting loads
-
-struct IntWrapper {
-  var _value : Int
+struct Middle {
+  var inner: Inner
 }
 
-sil_scope 5 { loc "./test.swift":3:6 parent @testSplitLoadDebug : $@convention(thin) (@in_guaranteed IntWrapper) -> Builtin.Int32 }
-sil_scope 6 { loc "./test.swift":3:10 parent 5 }
+struct Inner {
+  var guts: Builtin.AnyObject
+}
 
-// CHECK-LABEL: sil hidden [ossa] @testSplitLoadDebug : $@convention(thin) (@in_guaranteed IntWrapper) -> Builtin.Int32 {
-// CHECK: bb0(%0 : $*IntWrapper):
-// CHECKDEB:   [[A1:%.*]] = struct_element_addr %0 : $*IntWrapper, #IntWrapper._value
-// CHECKDEB:   [[A2:%.*]] = struct_element_addr [[A1]] : $*Int, #Int._value
-// CHECKDEB:   [[SPLIT:%.*]] = load [trivial] %2 : $*Builtin.Int32
-// CHECKDEB:   [[A3:%.*]] = struct_element_addr %0 : $*IntWrapper, #IntWrapper._value
-// CHECKDEB:   [[A4:%.*]] = begin_access [read] [unsafe] [no_nested_conflict] [[A3]] : $*Int
-// CHECKDEB:   [[OLD:%.*]] = load [trivial] [[A4]] : $*Int
-// CHECKDEB:   end_access [[A4]] : $*Int
-// CHECKDEB:   debug_value [[OLD]] : $Int, let, name "flag"
-// CHECKDEB:   return [[SPLIT]] : $Builtin.Int32
-// CHECK-LABEL: } // end sil function 'testSplitLoadDebug'
-sil hidden [ossa] @testSplitLoadDebug : $@convention(thin) (@in_guaranteed IntWrapper) -> Builtin.Int32 {
-bb0(%0: $*IntWrapper):
-  %1 = struct_element_addr %0 : $*IntWrapper, #IntWrapper._value
-  %2 = load [trivial] %1 : $*Int
-  debug_value %2 : $Int, let, name "flag", loc "./test.swift":4:7, scope 6
-  %4 = struct_extract %2 : $Int, #Int._value
-  return %4 : $Builtin.Int32
+sil @getOuter : $@convention(thin) () -> @owned Outer
+sil @takeInner : $@convention(thin) (@owned Inner) -> ()
+
+// CHECK-LABEL: sil [ossa] @narrowLoadThroughProjectionSequence : {{.*}} {
+// CHECK:         [[OUTER_ADDR:%[^,]+]] = project_box
+// CHECK:         [[MIDDLE_ADDR:%[^,]+]] = struct_element_addr [[OUTER_ADDR]]
+// CHECK:         [[INNER_ADDR:%[^,]+]] = struct_element_addr [[MIDDLE_ADDR]]
+// CHECK:         [[INNER_BORROW:%[^,]+]] = load_borrow [[INNER_ADDR]]
+// CHECK:         copy_value [[INNER_BORROW]]
+// CHECK-LABEL: } // end sil function 'narrowLoadThroughProjectionSequence'
+sil [ossa] @narrowLoadThroughProjectionSequence : $@convention(thin) () -> () {
+  %box = alloc_box ${ let Outer }
+  %box_borrow = begin_borrow [lexical] [var_decl] %box : ${ let Outer }
+  %outer_addr = project_box %box_borrow : ${ let Outer }, 0
+  %getOuter = function_ref @getOuter : $@convention(thin) () -> @owned Outer
+  %outer = apply %getOuter() : $@convention(thin) () -> @owned Outer
+  store %outer to [init] %outer_addr : $*Outer
+  %outer_borrow = load_borrow %outer_addr : $*Outer
+  %middle = struct_extract %outer_borrow : $Outer, #Outer.middle
+  %inner = struct_extract %middle : $Middle, #Middle.inner
+  %inner_copy = copy_value %inner : $Inner
+  %takeInner = function_ref @takeInner : $@convention(thin) (@owned Inner) -> ()
+  apply %takeInner(%inner_copy) : $@convention(thin) (@owned Inner) -> ()
+  end_borrow %outer_borrow : $Outer
+  end_borrow %box_borrow : ${ let Outer }
+  dealloc_box %box : ${ let Outer }
+  %retval = tuple ()
+  return %retval : $()
 }

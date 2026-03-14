@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
 
 enum Optional<T> {
   case some(T)
@@ -37,7 +37,7 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ClassBound> { var τ_0_0 } <T>
-  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X_ADDR]]
+  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X_ADDR]]
   // CHECK:   [[PB:%.*]] = project_box [[X_LIFETIME]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
@@ -54,7 +54,7 @@ func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ClassBound, τ_0_0 : NotClassBound> { var τ_0_0 } <T>
-  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X_ADDR]]
+  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X_ADDR]]
   // CHECK:   [[PB:%.*]] = project_box [[X_LIFETIME]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
@@ -69,7 +69,7 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $any ClassBound):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box ${ var any ClassBound }
-  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X_ADDR]]
+  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X_ADDR]]
   // CHECK:   [[PB:%.*]] = project_box [[X_LIFETIME]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
@@ -85,7 +85,7 @@ func class_bound_protocol_composition(x: ClassBound & NotClassBound)
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $any ClassBound & NotClassBound):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box ${ var any ClassBound & NotClassBound }
-  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X_ADDR]]
+  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X_ADDR]]
   // CHECK:   [[PB:%.*]] = project_box [[X_LIFETIME]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
@@ -131,7 +131,7 @@ func class_bound_method(x: ClassBound) {
   var x = x
   x.classBoundMethod()
   // CHECK: [[XBOX:%.*]] = alloc_box ${ var any ClassBound }, var, name "x"
-  // CHECK: [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [[XBOX]]
+  // CHECK: [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[XBOX]]
   // CHECK: [[XBOX_PB:%.*]] = project_box [[XLIFETIME]]
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK: store [[ARG_COPY]] to [init] [[XBOX_PB]]
@@ -181,23 +181,11 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   // CHECK-NEXT: [[X_PAYLOAD:%.*]] = open_existential_ref [[X_VALUE]] : $any InheritsMutatingMethod to $@opened("{{.*}}", any InheritsMutatingMethod) Self
   // CHECK-NEXT: [[TEMPORARY:%.*]] = alloc_stack $@opened("{{.*}}", any InheritsMutatingMethod) Self
   // CHECK-NEXT: store [[X_PAYLOAD]] to [init] [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: [[X_PAYLOAD_RELOADED:%.*]] = load_borrow [[TEMPORARY]]
-  //
-  // ** *NOTE* This extra copy is here since RValue invariants enforce that all
-  // ** loadable objects are actually loaded. So we form the RValue and
-  // ** load... only to then need to store the value back in a stack location to
-  // ** pass to an in_guaranteed method. PredictableMemOpts is able to handle this
-  // ** type of temporary codegen successfully.
-  // CHECK-NEXT: [[TEMPORARY_2:%.*]] = alloc_stack $@opened("{{.*}}", any InheritsMutatingMethod) Self
-  // CHECK-NEXT: [[SB:%.*]] = store_borrow [[X_PAYLOAD_RELOADED:%.*]] to [[TEMPORARY_2]]
-  // 
   // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened("{{.*}}", any InheritsMutatingMethod) Self, #HasMutatingMethod.mutatingCounter!getter : <Self where Self : HasMutatingMethod> (Self) -> () -> Value, [[X_PAYLOAD]] : $@opened("{{.*}}", any InheritsMutatingMethod) Self : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
-  // CHECK-NEXT: [[RESULT_VALUE:%.*]] = apply [[METHOD]]<@opened("{{.*}}", any InheritsMutatingMethod) Self>([[SB]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
-  // CHECK-NEXT:  end_borrow [[SB]]
-  // CHECK-NEXT: dealloc_stack  [[TEMPORARY_2]]
-  // CHECK-NEXT: end_borrow
+  // CHECK-NEXT: [[RESULT_VALUE:%.*]] = apply [[METHOD]]<@opened("{{.*}}", any InheritsMutatingMethod) Self>([[TEMPORARY]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
   // CHECK-NEXT: destroy_addr
   // CHECK-NEXT: end_access [[X_ADDR]] : $*any InheritsMutatingMethod
+  // CHECK-NEXT: ignored_use [[RESULT_VALUE]]
   // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
   _ = x.mutatingCounter
 

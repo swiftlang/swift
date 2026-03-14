@@ -36,9 +36,10 @@ class ProfileCounterRef final {
 public:
   enum class Kind : uint8_t {
     /// References an ASTNode.
-    // TODO: This is the currently the only kind, but it will be expanded in
-    // the future for e.g top-level entry and error branches.
-    Node
+    Node,
+
+    /// References the error branch for an apply or access.
+    ErrorBranch
   };
 
 private:
@@ -54,6 +55,12 @@ public:
   static ProfileCounterRef node(ASTNode node) {
     assert(node && "Must have non-null ASTNode");
     return ProfileCounterRef(node, Kind::Node);
+  }
+
+  /// A profile counter that is associated with the error branch of a particular
+  /// error-throwing AST node.
+  static ProfileCounterRef errorBranchOf(ASTNode node) {
+    return ProfileCounterRef(node, Kind::ErrorBranch);
   }
 
   /// Retrieve the corresponding location of the counter.
@@ -124,7 +131,7 @@ public:
 
   /// Get the node's parent ASTNode (e.g to get the parent IfStmt or IfCond of
   /// a condition), if one is available.
-  Optional<ASTNode> getPGOParent(ASTNode Node);
+  std::optional<ASTNode> getPGOParent(ASTNode Node);
 
   /// Get the function name mangled for use with PGO.
   StringRef getPGOFuncName() const { return PGOFuncName; }
@@ -135,11 +142,13 @@ public:
   /// Get the number of region counters.
   unsigned getNumRegionCounters() const { return NumRegionCounters; }
 
-  /// Get the mapping from a \c ProfileCounterRef to its corresponding
-  /// profile counter.
-  const llvm::DenseMap<ProfileCounterRef, unsigned> &
-  getRegionCounterMap() const {
-    return RegionCounterMap;
+  /// Retrieve the counter index for a given counter reference, asserting that
+  /// it is present.
+  unsigned getCounterIndexFor(ProfileCounterRef ref);
+
+  /// Whether a counter has been recorded for the given counter reference.
+  bool hasCounterFor(ProfileCounterRef ref) {
+    return RegionCounterMap.contains(ref);
   }
 
 private:

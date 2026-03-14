@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 func fizzbuzz(i: Int) -> String {
   return i % 3 == 0
@@ -33,11 +33,11 @@ func consumeAddressOnly(_: AddressOnly) {}
 func addr_only_ternary_1(x: Bool) -> AddressOnly {
   // CHECK: bb0([[RET:%.*]] : $*any AddressOnly, {{.*}}):
   // CHECK: [[a:%[0-9]+]] = alloc_box ${ var any AddressOnly }, var, name "a"
-  // CHECK: [[a_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[a]]
+  // CHECK: [[a_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[a]]
   // CHECK: [[PBa:%.*]] = project_box [[a_LIFETIME]]
   var a : AddressOnly = A()
   // CHECK: [[b:%[0-9]+]] = alloc_box ${ var any AddressOnly }, var, name "b"
-  // CHECK: [[b_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[b]]
+  // CHECK: [[b_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[b]]
   // CHECK: [[PBb:%.*]] = project_box [[b_LIFETIME]]
   var b : AddressOnly = B()
 

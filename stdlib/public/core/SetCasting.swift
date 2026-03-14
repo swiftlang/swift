@@ -29,7 +29,7 @@ extension Set {
     } else {
       for m in source {
         guard let member = transform(m) else { return nil }
-        target._unsafeInsertNew(member)
+        unsafe target._unsafeInsertNew(member)
       }
     }
     self.init(_native: target)
@@ -41,6 +41,7 @@ extension Set {
 /// - Precondition: `BaseValue` is a base class or base `@objc`
 ///   protocol (such as `AnyObject`) of `DerivedValue`.
 @inlinable
+@_unavailableInEmbedded
 public func _setUpCast<DerivedValue, BaseValue>(
   _ source: Set<DerivedValue>
 ) -> Set<BaseValue> {
@@ -57,10 +58,11 @@ public func _setUpCast<DerivedValue, BaseValue>(
 
 /// Called by the casting machinery.
 @_silgen_name("_swift_setDownCastIndirect")
+@_unavailableInEmbedded
 internal func _setDownCastIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Set<SourceValue>>,
   _ target: UnsafeMutablePointer<Set<TargetValue>>) {
-  target.initialize(to: _setDownCast(source.pointee))
+  unsafe target.initialize(to: _setDownCast(source.pointee))
 }
 
 /// Implements a forced downcast.  This operation should have O(1) complexity.
@@ -71,6 +73,7 @@ internal func _setDownCastIndirect<SourceValue, TargetValue>(
 /// - Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 ///   are reference types.
 @inlinable
+@_unavailableInEmbedded
 public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   -> Set<DerivedValue> {
 
@@ -99,12 +102,13 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
 
 /// Called by the casting machinery.
 @_silgen_name("_swift_setDownCastConditionalIndirect")
+@_unavailableInEmbedded
 internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Set<SourceValue>>,
   _ target: UnsafeMutablePointer<Set<TargetValue>>
 ) -> Bool {
-  if let result: Set<TargetValue> = _setDownCastConditional(source.pointee) {
-    target.initialize(to: result)
+  if let result: Set<TargetValue> = unsafe _setDownCastConditional(source.pointee) {
+    unsafe target.initialize(to: result)
     return true
   }
   return false
@@ -118,6 +122,7 @@ internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
 /// - Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 ///   are reference types.
 @inlinable
+@_unavailableInEmbedded
 public func _setDownCastConditional<BaseValue, DerivedValue>(
   _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {

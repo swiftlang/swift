@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=convert_escape_to_noescape | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+// https://github.com/apple/swift/issues/73253
+// UNSUPPORTED: OS=windows-msvc
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil @cl : $@convention(thin) () -> Int
+
+// CHECK-LABEL: sil [ossa] @remove_convert :
+// CHECK:         [[F:%.*]] = thin_to_thick_function %0 : $@convention(thin) () -> Int to $@noescape @callee_guaranteed () -> Int
+// CHECK-NEXT:    apply [[F]]() : $@noescape
+// CHECK-NEXT:    destroy_value [[F]]
+// CHECK:       } // end sil function 'remove_convert'
+sil [ossa] @remove_convert : $@convention(thin) () -> Int {
+bb0:
+  %0 = function_ref @cl : $@convention(thin) () -> Int
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> Int to $@callee_guaranteed () -> Int
+  %2 = convert_escape_to_noescape %1 : $@callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> Int
+  %3 = apply %2() : $@noescape @callee_guaranteed () -> Int
+  destroy_value %2 : $@noescape @callee_guaranteed () -> Int
+  return %3 : $Int
+}
+
+

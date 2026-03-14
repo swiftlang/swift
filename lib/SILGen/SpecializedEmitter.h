@@ -20,6 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 namespace swift {
 class Expr;
@@ -89,8 +90,8 @@ public:
     : TheKind(Kind::LateEmitter), TheLateEmitter(emitter) {}
 
   /// Try to find an appropriate emitter for the given declaration.
-  static Optional<SpecializedEmitter>
-  forDecl(SILGenModule &SGM, SILDeclRef decl);
+  static std::optional<SpecializedEmitter> forDecl(SILGenModule &SGM,
+                                                   SILDeclRef decl);
 
   bool isEarlyEmitter() const { return TheKind == Kind::EarlyEmitter; }
   EarlyEmitter *getEarlyEmitter() const {

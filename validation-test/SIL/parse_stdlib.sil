@@ -3,3 +3,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all=true %t.sil > /dev/null
 // REQUIRES: long_test
 // REQUIRES: nonexecutable_test
+
+// rdar://124657305 (@substituted generic signatures need to either include inverses or the Copyable/Escapable conformances)
+// XFAIL: *

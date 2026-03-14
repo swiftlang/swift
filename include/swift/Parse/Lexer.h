@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -39,7 +39,6 @@ namespace swift {
   template<typename ...T> struct Diag;
 
 enum class CommentRetentionMode {
-  None,
   AttachToNextToken,
   ReturnAsTokens,
 };
@@ -82,7 +81,7 @@ class Lexer {
 
   /// A queue of diagnostics to emit when a token is consumed. We want to queue
   /// them, as the parser may backtrack and re-lex a token.
-  Optional<DiagnosticQueue> DiagQueue;
+  std::optional<DiagnosticQueue> DiagQueue;
 
   using State = LexerState;
 
@@ -185,7 +184,7 @@ public:
       const LangOptions &Options, const SourceManager &SourceMgr,
       unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
       HashbangMode HashbangAllowed = HashbangMode::Disallowed,
-      CommentRetentionMode RetainComments = CommentRetentionMode::None);
+      CommentRetentionMode RetainComments = CommentRetentionMode::AttachToNextToken);
 
   /// Create a lexer that scans a subrange of the source buffer.
   Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
@@ -249,11 +248,11 @@ public:
 
   /// If a lexer cut off point has been set returns the offset in the buffer at
   /// which lexing is being cut off.
-  Optional<size_t> lexingCutOffOffset() const {
+  std::optional<size_t> lexingCutOffOffset() const {
     if (LexerCutOffPoint) {
       return LexerCutOffPoint - BufferStart;
     } else {
-      return None;
+      return std::nullopt;
     }
   }
 
@@ -395,6 +394,15 @@ public:
   /// identifier, without escaping characters.
   static bool isIdentifier(StringRef identifier);
 
+  // Returns true if the given string is a raw identifier that must always
+  // be escaped by backticks when printing it back in source form or writing
+  // its name into runtime metadata.
+  static bool identifierMustAlwaysBeEscaped(StringRef str);
+
+  /// Determines if the given string is a valid non-operator
+  /// identifier if it were surrounded by backticks.
+  static bool isValidAsEscapedIdentifier(StringRef identifier);
+
   /// Determine the token kind of the string, given that it is a valid
   /// non-operator identifier. Return tok::identifier if the string is not a
   /// reserved word.
@@ -405,7 +413,7 @@ public:
   static bool isOperator(StringRef string);
 
   SourceLoc getLocForStartOfBuffer() const {
-    return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
+    return SourceLoc::getFromPointer(BufferStart);
   }
   
   /// StringSegment - A segment of a (potentially interpolated) string.
@@ -507,7 +515,7 @@ public:
   }
 
   static SourceLoc getSourceLoc(const char *Loc) {
-    return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
+    return SourceLoc::getFromPointer(Loc);
   }
 
   /// Get the token that starts at the given location.
@@ -598,12 +606,7 @@ private:
   void lexHexNumber();
   void lexNumber();
 
-  /// Skip over trivia and return characters that were skipped over in a \c
-  /// StringRef. \p AllTriviaStart determines the start of the trivia. In nearly
-  /// all cases, this should be \c CurPtr. If other trivia has already been
-  /// skipped over (like a BOM), this can be used to point to the start of the
-  /// BOM. The returned \c StringRef will always start at \p AllTriviaStart.
-  StringRef lexTrivia(bool IsForTrailingTrivia, const char *AllTriviaStart);
+  void lexTrivia();
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr, char StopQuote,

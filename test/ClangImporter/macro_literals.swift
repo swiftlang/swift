@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-debuginfo -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-disable-pass=Simplification -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo -emit-sil %s | %FileCheck %s
 
 import macros
 

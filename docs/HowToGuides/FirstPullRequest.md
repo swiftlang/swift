@@ -6,7 +6,7 @@ you are an experienced open source contributor who is excited about Swift, or
 maybe you are somewhere in-between. Regardless of your background, we are
 excited to have you contribute and improve the developer experience for Swift
 programmers all over the globe.
-:sparkles:🧒🏾🧑🏼‍🎓👩🏽‍💻🧑🏻‍💻👨🏿‍💻:sparkles:
+✨🧒🏾🧑🏼‍🎓👩🏽‍💻🧑🏻‍💻👨🏿‍💻✨
 
 This document provides a high-level overview of different parts of the
 contribution process.
@@ -98,16 +98,26 @@ make changes, run tests and debug issues.
 
 ## Submitting a pull request
 
+Alright! You've implemented a change and would like to submit it.
+
 ### Tidying up
 
-Alright! You've implemented a change and would like to submit it.
-Double-check that you've tidied your Git history, such as squashing
-work-in-progress commits, and that your commit messages provide context.
-For example, if a commit fixes a bug, then include a "Fixes SR-NNNNN" with the
-bug number in the commit message.
+> **Note**  
+> If you intend to create a [draft pull request][draft-pr], you can tidy up
+> later *before* marking it as ready for review.
 
-Next, [format your changes](/docs/HowToGuides/FAQ.md#how-do-i-format-my-changes)
-using `clang-format`.
+1. [Tidy up your commit history](FAQ.md#how-do-i-clean-up-my-git-history):
+   * Squash work-in-progress commits.
+   * Break up your changes into as many self-sufficient, meaningful commits as
+     you can, rather than cramming everything into a single commit.
+     For example, a patch that renames a function (1) and modifies an algorithm
+     (2) can be split into two commits.
+     A self-sufficient commit must compile, pass all tests, and contain
+     any associated test changes.
+     This practice is key to efficient and rigorous code review processes,
+     as well as a neat, transparent, and actionable commit history.
+   * [Top off your commit messages](/CONTRIBUTING.md#commit-messages).
+1. Tidy up and [format your code changes](FAQ.md#how-do-i-format-my-changes).
 
 ### Pushing and creating a pull request
 
@@ -115,26 +125,33 @@ Assuming you followed the steps in our [Getting Started guide][], you should now
 be able to push your latest changes to GitHub using `git push`.
 
 Next, [create a pull request][] (PR). Usually, if you navigate to
-https://github.com/apple/swift right after pushing your change, GitHub will
+https://github.com/swiftlang/swift right after pushing your change, GitHub will
 show a helpful "Compare & Pull Request" button.
 
 ![Compare & Pull Request button in GitHub UI](/docs/GitHubCreatePRScreenshot.png)
 
+[draft-pr]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests#draft-pull-requests
 [create a pull request]: https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request#creating-the-pull-request
 
 ## Asking for code review
 
-If you had an active discussion with someone on how to implement your change,
-you can `@` mention them in the PR description and ask for code review.
-If you directly implemented the change without any guidance from anyone else,
-`@` mention someone from GitHub's suggested reviewers. If GitHub doesn't
-make any suggestions, ask the [Code Owner](https://github.com/apple/swift/blob/main/CODE_OWNERS.TXT) based on the
-component for your change. Please ask someone though! We don't want you to get
-stuck because you were not sure who to ask for code review.
+Reviews are automatically requested from code owners per the
+[CODEOWNERS](/.github/CODEOWNERS) file upon opening a non-draft pull request.
+If this doesn't happen, @mention and ask a suggested person under **Reviewers**
+to review your changes in a comment. If no suggestions are shown either, please
+ask [@swiftlang/contributor-experience][contributor-experience-team] to sort out
+review requests for you.
 
-At the beginning, contributors are not able to run the continuous integration
-(CI) bot, which builds the project and runs tests. Please ask your code
-reviewer(s) to invoke the bot for you.
+[contributor-experience-team]: https://github.com/orgs/swiftlang/teams/contributor-experience
+
+You are welcome to invite other people for review as well — say, someone you
+had an active discussion with on how to implement your change.
+Anyone with a GitHub account can review or comment on changes proposed to
+this repository!
+
+Contributors without [write access][write-access] are not able to run the
+continuous integration (CI) bot, which builds the project and runs tests.
+Please ask a code reviewer with write access to invoke the bot for you.
 
 ## Responding to code review comments
 
@@ -175,13 +192,13 @@ something in the near future. Please don't feel sad or apologetic!
 
 Awesome! You are welcome to tackle as many [good first issues][good-first-issues]
 as it takes for you to gain a desired level of confidence in working with the
-codebase. Beyond that, there is an endless supply of [other issues](https://github.com/apple/swift/issues)
+codebase. Beyond that, there is an endless supply of [other issues](https://github.com/swiftlang/swift/issues)
 waiting for a hero. Don't hesitate to ask for help if you need directions or
 get stuck!
 
 Once you've made multiple substantial contributions, you can
-[ask for commit access](https://swift.org/contributing/#commit-access),
-which will allow you to pick reviewers, trigger the CI bot and merge changes
-upon approval.
+[ask for commit access][write-access], which will allow you to pick reviewers,
+trigger the CI bot and merge changes upon approval.
 
-[good-first-issues]: https://github.com/apple/swift/contribute
+[good-first-issues]: https://github.com/swiftlang/swift/contribute
+[write-access]: /CONTRIBUTING.md#commit-access

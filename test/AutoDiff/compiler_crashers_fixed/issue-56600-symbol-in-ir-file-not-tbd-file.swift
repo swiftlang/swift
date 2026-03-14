@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift
 
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // https://github.com/apple/swift/issues/56600
 // Error: symbol 'powTJfSSpSr' (powTJfSSpSr) is in generated IR file, but not
@@ -12,6 +14,8 @@ import _Differentiation
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(Android)
+  import Android
 #elseif os(Windows)
   import CRT
 #else

@@ -17,10 +17,12 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -51,6 +53,8 @@ StringRef Stmt::getDescriptiveKindName(StmtKind K) {
     return "return";
   case StmtKind::Yield:
     return "yield";
+  case StmtKind::Then:
+    return "then";
   case StmtKind::Defer:
     return "defer";
   case StmtKind::If:
@@ -81,8 +85,12 @@ StringRef Stmt::getDescriptiveKindName(StmtKind K) {
     return "return";
   case StmtKind::Throw:
     return "throw";
+  case StmtKind::Discard:
+    return "discard";
   case StmtKind::PoundAssert:
     return "#assert";
+  case StmtKind::Opaque:
+    llvm_unreachable("OpaqueStmt only exists for SILGen, the type-checker should never care about it");
   }
   llvm_unreachable("Unhandled case in switch!");
 }
@@ -173,14 +181,12 @@ SourceLoc Stmt::getEndLoc() const {
   llvm_unreachable("statement type not handled!");
 }
 
-BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
-                     SourceLoc rbloc, Optional<bool> implicit)
-  : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
-    LBLoc(lbloc), RBLoc(rbloc)
-{
+BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts, SourceLoc rbloc,
+                     std::optional<bool> implicit)
+    : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
+      LBLoc(lbloc), RBLoc(rbloc) {
   Bits.BraceStmt.NumElements = elts.size();
-  std::uninitialized_copy(elts.begin(), elts.end(),
-                          getTrailingObjects<ASTNode>());
+  std::uninitialized_copy(elts.begin(), elts.end(), getTrailingObjects());
 
 #ifndef NDEBUG
   for (auto elt : elts)
@@ -191,7 +197,7 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
 
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
                              ArrayRef<ASTNode> elts, SourceLoc rbloc,
-                             Optional<bool> implicit) {
+                             std::optional<bool> implicit) {
   assert(std::none_of(elts.begin(), elts.end(),
                       [](ASTNode node) -> bool { return node.isNull(); }) &&
          "null element in BraceStmt");
@@ -217,7 +223,11 @@ SourceLoc BraceStmt::getEndLoc() const {
 
 SourceLoc BraceStmt::getContentStartLoc() const {
   for (auto elt : getElements()) {
-    if (auto loc = elt.getStartLoc()) {
+    if (auto *D = elt.dyn_cast<Decl *>()) {
+      // FIXME: This should really be the default behavior of Decl::getStartLoc.
+      if (auto range = D->getSourceRangeIncludingAttrs())
+        return range.Start;
+    } else if (auto loc = elt.getStartLoc()) {
       return loc;
     }
   }
@@ -245,6 +255,11 @@ ASTNode BraceStmt::findAsyncNode() {
   class FindInnerAsync : public ASTWalker {
     ASTNode AsyncNode;
 
+    /// Walk only the macro arguments.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // If we've found an 'await', record it and terminate the traversal.
       if (isa<AwaitExpr>(expr)) {
@@ -254,7 +269,7 @@ ASTNode BraceStmt::findAsyncNode() {
 
       // Do not recurse into other closures.
       if (isa<ClosureExpr>(expr))
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
 
       return Action::Continue(expr);
     }
@@ -268,7 +283,7 @@ ASTNode BraceStmt::findAsyncNode() {
         return Action::Continue();
       }
 
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
@@ -292,6 +307,32 @@ ASTNode BraceStmt::findAsyncNode() {
   return asyncFinder.getAsyncNode();
 }
 
+bool BraceStmt::hasExplicitReturnStmt(ASTContext &ctx) const {
+  return evaluateOrDefault(ctx.evaluator,
+                           BraceHasExplicitReturnStmtRequest{this}, false);
+}
+
+static bool hasSingleActiveElement(ArrayRef<ASTNode> elts) {
+  return elts.size() == 1;
+}
+
+ASTNode BraceStmt::getSingleActiveElement() const {
+  return hasSingleActiveElement(getElements()) ? getLastElement() : nullptr;
+}
+
+Expr *BraceStmt::getSingleActiveExpression() const {
+  return getSingleActiveElement().dyn_cast<Expr *>();
+}
+
+Stmt *BraceStmt::getSingleActiveStatement() const {
+  return getSingleActiveElement().dyn_cast<Stmt *>();
+}
+
+IsSingleValueStmtResult Stmt::mayProduceSingleValue(ASTContext &ctx) const {
+  return evaluateOrDefault(ctx.evaluator, IsSingleValueStmtRequest{this, &ctx},
+                           IsSingleValueStmtResult::circularReference());
+}
+
 SourceLoc ReturnStmt::getStartLoc() const {
   if (ReturnLoc.isInvalid() && Result)
     return Result->getStartLoc();
@@ -304,8 +345,8 @@ SourceLoc ReturnStmt::getEndLoc() const {
 }
 
 YieldStmt *YieldStmt::create(const ASTContext &ctx, SourceLoc yieldLoc,
-                             SourceLoc lpLoc, ArrayRef<Expr*> yields,
-                             SourceLoc rpLoc, Optional<bool> implicit) {
+                             SourceLoc lpLoc, ArrayRef<Expr *> yields,
+                             SourceLoc rpLoc, std::optional<bool> implicit) {
   void *buffer = ctx.Allocate(totalSizeToAlloc<Expr*>(yields.size()),
                               alignof(YieldStmt));
   return ::new(buffer) YieldStmt(yieldLoc, lpLoc, yields, rpLoc, implicit);
@@ -315,8 +356,44 @@ SourceLoc YieldStmt::getEndLoc() const {
   return RPLoc.isInvalid() ? getYields()[0]->getEndLoc() : RPLoc;
 }
 
+ThenStmt *ThenStmt::createParsed(ASTContext &ctx, SourceLoc thenLoc,
+                                 Expr *result) {
+  return new (ctx) ThenStmt(thenLoc, result, /*isImplicit*/ false);
+}
+
+ThenStmt *ThenStmt::createImplicit(ASTContext &ctx, Expr *result) {
+  return new (ctx) ThenStmt(SourceLoc(), result, /*isImplicit*/ true);
+}
+
+SourceRange ThenStmt::getSourceRange() const {
+  return SourceRange::combine(ThenLoc, getResult()->getSourceRange());
+}
+
 SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
+SourceLoc DiscardStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
+
+DeferStmt *DeferStmt::create(DeclContext *dc, SourceLoc deferLoc) {
+  ASTContext &ctx = dc->getASTContext();
+
+  auto params = ParameterList::createEmpty(ctx);
+  DeclName name(ctx, ctx.getIdentifier("$defer"), params);
+  auto *const funcDecl = FuncDecl::createImplicit(
+      ctx, StaticSpellingKind::None, name, /*NameLoc=*/deferLoc,
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*ThrownType=*/Type(),
+      /*GenericParams=*/nullptr, params, TupleType::getEmpty(ctx), dc);
+
+  // Form the call, which will be emitted on any path that needs to run the
+  // code.
+  auto DRE = new (ctx)
+      DeclRefExpr(funcDecl, DeclNameLoc(deferLoc),
+                  /*Implicit*/ true, AccessSemantics::DirectToStorage);
+  auto call = CallExpr::createImplicitEmpty(ctx, DRE);
+
+  return new (ctx) DeferStmt(deferLoc, funcDecl, call);
+}
 
 SourceLoc DeferStmt::getEndLoc() const {
   return tempDecl->getBody()->getEndLoc();
@@ -378,21 +455,21 @@ void ForEachStmt::setPattern(Pattern *p) {
   Pat->markOwnedByStatement(this);
 }
 
-Expr *ForEachStmt::getTypeCheckedSequence() const {
-  return iteratorVar ? iteratorVar->getInit(/*index=*/0) : nullptr;
-}
-
-DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
-                                 SourceLoc doLoc, Stmt *body,
+DoCatchStmt *DoCatchStmt::create(DeclContext *dc, LabeledStmtInfo labelInfo,
+                                 SourceLoc doLoc, SourceLoc throwsLoc,
+                                 TypeLoc thrownType, Stmt *body,
                                  ArrayRef<CaseStmt *> catches,
-                                 Optional<bool> implicit) {
+                                 std::optional<bool> implicit) {
+  ASTContext &ctx = dc->getASTContext();
   void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt *>(catches.size()),
                            alignof(DoCatchStmt));
-  return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
+  return ::new (mem) DoCatchStmt(dc, labelInfo, doLoc, throwsLoc, thrownType,
+                                 body, catches, implicit);
 }
 
 bool CaseLabelItem::isSyntacticallyExhaustive() const {
-  return getGuardExpr() == nullptr && !getPattern()->isRefutablePattern();
+  return getGuardExpr() == nullptr &&
+         !getPattern()->isRefutablePattern(/*allowIsPatternCoercion*/ true);
 }
 
 bool DoCatchStmt::isSyntacticallyExhaustive() const {
@@ -403,6 +480,33 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
     }
   }
   return false;
+}
+
+BraceStmt *ForEachStmt::getDesugaredStmt() {
+  auto &ctx = DC->getASTContext();
+  return evaluateOrDefault(ctx.evaluator, DesugarForEachStmtRequest{this},
+                           nullptr);
+}
+
+Type DoCatchStmt::getExplicitCaughtType() const {
+  ASTContext &ctx = DC->getASTContext();
+  return CatchNode(const_cast<DoCatchStmt *>(this)).getExplicitCaughtType(ctx);
+}
+
+Type DoCatchStmt::getCaughtErrorType() const {
+  // Check for an explicitly-specified error type.
+  if (Type explicitError = getExplicitCaughtType())
+    return explicitError;
+
+  auto firstPattern = getCatches()
+    .front()
+    ->getCaseLabelItems()
+    .front()
+    .getPattern();
+  if (firstPattern->hasType() && !firstPattern->getType()->hasError())
+    return firstPattern->getType();
+
+  return Type();
 }
 
 void LabeledConditionalStmt::setCond(StmtCondition e) {
@@ -416,6 +520,122 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
   Cond = e;
 }
 
+/// Whether or not this conditional stmt rebinds self with a `let self`
+/// or `let self = self` condition.
+///  - If `requiresCaptureListRef` is `true`, additionally requires that the
+///    RHS of the self condition references a var defined in a capture list.
+bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
+                                         bool requiresCaptureListRef,
+                                         bool requireLoadExpr) const {
+  return llvm::any_of(getCond(), [&Ctx, requiresCaptureListRef,
+                                  requireLoadExpr](const auto &cond) {
+    return cond.rebindsSelf(Ctx, requiresCaptureListRef, requireLoadExpr);
+  });
+}
+
+/// Whether or not this conditional stmt rebinds self with a `let self`
+/// or `let self = self` condition.
+///  - If `requiresCaptureListRef` is `true`, additionally requires that the
+///    RHS of the self condition references a var defined in a capture list.
+bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
+                                       bool requiresCaptureListRef,
+                                       bool requireLoadExpr) const {
+  auto pattern = getPatternOrNull();
+  if (!pattern) {
+    return false;
+  }
+
+  // Check whether or not this pattern defines a new `self` decl
+  bool isSelfRebinding = false;
+  if (pattern->getBoundName() == Ctx.Id_self) {
+    isSelfRebinding = true;
+  }
+
+  else if (auto OSP = dyn_cast<OptionalSomePattern>(pattern)) {
+    if (auto subPattern = OSP->getSubPattern()) {
+      isSelfRebinding = subPattern->getBoundName() == Ctx.Id_self;
+    }
+  }
+
+  if (!isSelfRebinding) {
+    return false;
+  }
+
+  // Check that the RHS expr is exactly `self` and not something else
+  Expr *exprToCheckForDRE = getInitializerOrNull();
+  if (!exprToCheckForDRE) {
+    return false;
+  }
+
+  if (requireLoadExpr && !isa<LoadExpr>(exprToCheckForDRE)) {
+    return false;
+  }
+
+  if (auto *load = dyn_cast<LoadExpr>(exprToCheckForDRE)) {
+    exprToCheckForDRE = load->getSubExpr();
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(
+          exprToCheckForDRE->getSemanticsProvidingExpr())) {
+    auto *decl = DRE->getDecl();
+
+    bool definedInCaptureList = false;
+    if (auto varDecl = dyn_cast_or_null<VarDecl>(DRE->getDecl())) {
+      definedInCaptureList = varDecl->isCaptureList();
+    }
+
+    if (requiresCaptureListRef && !definedInCaptureList) {
+      return false;
+    }
+
+    bool isVariableNamedSelf = false;
+    if (decl && decl->hasName()) {
+      isVariableNamedSelf = decl->getName().isSimpleName(Ctx.Id_self);
+    }
+
+    return isVariableNamedSelf;
+  }
+
+  return false;
+}
+
+Expr *StmtConditionElement::getSynthesizedShorthandInitOrNull() const {
+  auto *init = getInitializerOrNull();
+  if (!init)
+    return nullptr;
+
+  auto *pattern = dyn_cast_or_null<OptionalSomePattern>(getPattern());
+  if (!pattern)
+    return nullptr;
+
+  auto *var = pattern->getSubPattern()->getSingleVar();
+  if (!var)
+    return nullptr;
+
+  // If the right-hand side has the same location as the variable, it was
+  // synthesized.
+  if (var->getLoc().isValid() && var->getLoc() == init->getStartLoc() &&
+      init->getStartLoc() == init->getEndLoc()) {
+    return init;
+  }
+  return nullptr;
+}
+
+SourceRange ConditionalPatternBindingInfo::getSourceRange() const {
+  SourceLoc Start;
+  if (IntroducerLoc.isValid())
+    Start = IntroducerLoc;
+  else
+    Start = ThePattern->getStartLoc();
+
+  SourceLoc End = Initializer->getEndLoc();
+  if (Start.isValid() && End.isValid()) {
+    return SourceRange(Start, End);
+  } else {
+    return SourceRange();
+  }
+}
+
 PoundAvailableInfo *
 PoundAvailableInfo::create(ASTContext &ctx, SourceLoc PoundLoc,
                            SourceLoc LParenLoc,
@@ -425,6 +645,11 @@ PoundAvailableInfo::create(ASTContext &ctx, SourceLoc PoundLoc,
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
   return ::new (Buffer) PoundAvailableInfo(PoundLoc, LParenLoc, queries,
                                            RParenLoc, isUnavailability);
+}
+
+SemanticAvailabilitySpecs PoundAvailableInfo::getSemanticAvailabilitySpecs(
+    const DeclContext *declContext) const {
+  return SemanticAvailabilitySpecs(getQueries(), declContext);
 }
 
 SourceLoc PoundAvailableInfo::getEndLoc() const {
@@ -448,18 +673,7 @@ SourceRange StmtConditionElement::getSourceRange() const {
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getSourceRange();
   case StmtConditionElement::CK_PatternBinding:
-    SourceLoc Start;
-    if (IntroducerLoc.isValid())
-      Start = IntroducerLoc;
-    else
-      Start = getPattern()->getStartLoc();
-    
-    SourceLoc End = getInitializer()->getEndLoc();
-    if (Start.isValid() && End.isValid()) {
-      return SourceRange(Start, End);
-    } else {
-      return SourceRange();
-    }
+    return getPatternBinding()->getSourceRange();
   }
 
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
@@ -481,7 +695,7 @@ SourceLoc StmtConditionElement::getStartLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getStartLoc();
   case StmtConditionElement::CK_PatternBinding:
-    return getSourceRange().Start;
+    return getPatternBinding()->getStartLoc();
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getStartLoc();
   }
@@ -496,7 +710,7 @@ SourceLoc StmtConditionElement::getEndLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getEndLoc();
   case StmtConditionElement::CK_PatternBinding:
-    return getSourceRange().End;
+    return getPatternBinding()->getEndLoc();
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getEndLoc();
   }
@@ -509,19 +723,47 @@ static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
   return Ctx.AllocateCopy(Arr);
 }
 
-IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
-               Stmt *Else, Optional<bool> implicit, ASTContext &Ctx)
-  : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc, Else,
-           implicit) {
+IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, BraceStmt *Then, SourceLoc ElseLoc,
+               Stmt *Else, std::optional<bool> implicit, ASTContext &Ctx)
+    : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc,
+             Else, implicit) {}
+
+ArrayRef<Stmt *> IfStmt::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
+  assert(scratch.empty());
+  scratch.push_back(getThenStmt());
+
+  auto *elseBranch = getElseStmt();
+  while (elseBranch) {
+    if (auto *IS = dyn_cast<IfStmt>(elseBranch)) {
+      // Look through else ifs.
+      elseBranch = IS->getElseStmt();
+      scratch.push_back(IS->getThenStmt());
+      continue;
+    }
+    // An unconditional else, we're done.
+    scratch.push_back(elseBranch);
+    break;
+  }
+  return scratch;
+}
+
+bool IfStmt::isSyntacticallyExhaustive() const {
+  auto *elseBranch = getElseStmt();
+  while (elseBranch) {
+    // Look through else ifs.
+    if (auto *IS = dyn_cast<IfStmt>(elseBranch)) {
+      elseBranch = IS->getElseStmt();
+      continue;
+    }
+    // An unconditional else.
+    return true;
+  }
+  return false;
 }
 
 GuardStmt::GuardStmt(SourceLoc GuardLoc, Expr *Cond, BraceStmt *Body,
-                     Optional<bool> implicit, ASTContext &Ctx)
-  : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {
-    
-}
-  
-
+                     std::optional<bool> implicit, ASTContext &Ctx)
+    : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {}
 
 SourceLoc RepeatWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
 
@@ -542,16 +784,17 @@ SourceLoc CaseLabelItem::getEndLoc() const {
 CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
                    ArrayRef<CaseLabelItem> caseLabelItems,
                    SourceLoc unknownAttrLoc, SourceLoc itemTerminatorLoc,
-                   BraceStmt *body,
-                   Optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
-                   Optional<bool> implicit,
+                   BraceStmt *body, ArrayRef<VarDecl *> caseBodyVariables,
+                   std::optional<bool> implicit,
                    NullablePtr<FallthroughStmt> fallthroughStmt)
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, itemIntroducerLoc)),
       UnknownAttrLoc(unknownAttrLoc), ItemIntroducerLoc(itemIntroducerLoc),
       ItemTerminatorLoc(itemTerminatorLoc), ParentKind(parentKind),
-      BodyAndHasFallthrough(body, fallthroughStmt.isNonNull()),
-      CaseBodyVariables(caseBodyVariables) {
+      BodyAndHasFallthrough(body, fallthroughStmt.isNonNull()) {
   Bits.CaseStmt.NumPatterns = caseLabelItems.size();
+  Bits.CaseStmt.NumCaseBodyVars = caseBodyVariables.size();
+  ASSERT(Bits.CaseStmt.NumCaseBodyVars == caseBodyVariables.size() &&
+         "too many case body vars");
   assert(Bits.CaseStmt.NumPatterns > 0 &&
          "case block must have at least one pattern");
   assert(
@@ -561,33 +804,158 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
     *getTrailingObjects<FallthroughStmt *>() = fallthroughStmt.get();
   }
 
-  MutableArrayRef<CaseLabelItem> items{getTrailingObjects<CaseLabelItem>(),
-                                       Bits.CaseStmt.NumPatterns};
+  std::uninitialized_copy(caseBodyVariables.begin(), caseBodyVariables.end(),
+                          getCaseBodyVariablesBuffer().begin());
 
-  // At the beginning mark all of our var decls as being owned by this
-  // statement. In the typechecker we wireup the case stmt var decl list since
-  // we know everything is lined up/typechecked then.
+  MutableArrayRef<CaseLabelItem> items{getTrailingObjects<CaseLabelItem>(),
+                                       static_cast<size_t>(Bits.CaseStmt.NumPatterns)};
+
   for (unsigned i : range(Bits.CaseStmt.NumPatterns)) {
     new (&items[i]) CaseLabelItem(caseLabelItems[i]);
-    items[i].getPattern()->markOwnedByStatement(this);
+    // Mark the CaseStmt as the parent for any canonical VarDecls in the
+    // pattern.
+    items[i].getPattern()->forEachVariable([&](VarDecl *VD) {
+      if (!VD->getParentVarDecl())
+        VD->setParentPatternStmt(this);
+    });
   }
-  for (auto *vd : caseBodyVariables.value_or(MutableArrayRef<VarDecl *>())) {
-    vd->setParentPatternStmt(this);
+}
+
+namespace {
+/// Produces an array of internal case body variables, and binds all of the
+/// pattern variables that occur within the case to their "parent" pattern
+/// variables, forming chains of variables with the same name.
+///
+/// Given a case such as:
+/// \code
+/// case .a(let x), .b(let x), .c(let x):
+/// \endcode
+///
+/// Each case item contains a (different) pattern variable named `x`. This
+/// function will set the "parent" variable of the second and third `x`
+/// variables to the `x` variable immediately to its left. A fourth `x` will be
+/// the body case variable, whose parent will be set to the `x` within the final
+/// case item.
+static void getCaseVarDecls(ASTContext &ctx, ArrayRef<CaseLabelItem> labelItems,
+                            SmallVectorImpl<VarDecl *> &caseVars) {
+  llvm::SmallDenseMap<Identifier, VarDecl *, 4> allVars;
+
+  auto foundVar = [&](VarDecl *VD) {
+    if (!VD->hasName())
+      return;
+
+    auto &entry = allVars[VD->getName()];
+    if (entry) {
+      VD->setParentVarDecl(entry);
+    } else {
+      auto *caseVar = new (ctx) VarDecl(
+          /*IsStatic*/ false, VD->getIntroducer(), VD->getNameLoc(),
+          VD->getName(), VD->getDeclContext());
+      caseVar->setImplicit();
+      caseVars.push_back(caseVar);
+    }
+    entry = VD;
+  };
+
+  for (auto &caseItem : labelItems)
+    caseItem.getPattern()->forEachVariable(foundVar);
+
+  // Now that we've collected the case variables, ensure they're parented to
+  // the last pattern variables we saw.
+  for (auto caseVar : caseVars)
+    foundVar(caseVar);
+}
+
+struct FallthroughFinder : ASTWalker {
+  FallthroughStmt *result;
+
+  FallthroughFinder() : result(nullptr) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
   }
+
+  // We walk through statements.  If we find a fallthrough, then we got what
+  // we came for.
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *s) override {
+    if (auto *f = dyn_cast<FallthroughStmt>(s)) {
+      result = f;
+    }
+
+    return Action::Continue(s);
+  }
+
+  // Expressions, patterns and decls cannot contain fallthrough statements, so
+  // there is no reason to walk into them.
+  PreWalkResult<Expr *> walkToExprPre(Expr *e) override {
+    return Action::SkipNode(e);
+  }
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *p) override {
+    return Action::SkipNode(p);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *d) override {
+    return Action::SkipNode();
+  }
+  PreWalkAction walkToTypeReprPre(TypeRepr *t) override {
+    return Action::SkipNode();
+  }
+
+  static FallthroughStmt *findFallthrough(Stmt *s) {
+    FallthroughFinder finder;
+    s->walk(finder);
+    return finder.result;
+  }
+};
+} // namespace
+
+CaseStmt *
+CaseStmt::createParsedSwitchCase(ASTContext &ctx, SourceLoc introducerLoc,
+                                 ArrayRef<CaseLabelItem> caseLabelItems,
+                                 SourceLoc unknownAttrLoc, SourceLoc colonLoc,
+                                 BraceStmt *body) {
+  SmallVector<VarDecl *, 4> caseVarDecls;
+  getCaseVarDecls(ctx, caseLabelItems, caseVarDecls);
+  auto fallthroughStmt = FallthroughFinder().findFallthrough(body);
+  return create(ctx, CaseParentKind::Switch, introducerLoc, caseLabelItems,
+                unknownAttrLoc, colonLoc, body, caseVarDecls,
+                /*implicit=*/false, fallthroughStmt);
+}
+
+CaseStmt *CaseStmt::createParsedDoCatch(ASTContext &ctx, SourceLoc catchLoc,
+                                        ArrayRef<CaseLabelItem> caseLabelItems,
+                                        BraceStmt *body) {
+  SmallVector<VarDecl *, 4> caseVarDecls;
+  getCaseVarDecls(ctx, caseLabelItems, caseVarDecls);
+  return create(ctx, CaseParentKind::DoCatch, catchLoc, caseLabelItems,
+                /*unknownAttrLoc=*/SourceLoc(), body->getStartLoc(), body,
+                caseVarDecls, /*implicit=*/false, /*fallthroughStmt=*/nullptr);
+}
+
+CaseStmt *
+CaseStmt::createImplicit(ASTContext &ctx, CaseParentKind parentKind,
+                         ArrayRef<CaseLabelItem> caseLabelItems,
+                         BraceStmt *body,
+                         NullablePtr<FallthroughStmt> fallthroughStmt) {
+  SmallVector<VarDecl *, 4> caseVarDecls;
+  getCaseVarDecls(ctx, caseLabelItems, caseVarDecls);
+  return create(ctx, parentKind, /*catchLoc*/ SourceLoc(), caseLabelItems,
+                /*unknownAttrLoc*/ SourceLoc(), /*colonLoc*/ SourceLoc(), body,
+                caseVarDecls, /*implicit*/ true, fallthroughStmt);
 }
 
 CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
                            SourceLoc caseLoc,
                            ArrayRef<CaseLabelItem> caseLabelItems,
                            SourceLoc unknownAttrLoc, SourceLoc colonLoc,
-                           BraceStmt *body,
-                           Optional<MutableArrayRef<VarDecl *>> caseVarDecls,
-                           Optional<bool> implicit,
+                           BraceStmt *body, ArrayRef<VarDecl *> caseVarDecls,
+                           std::optional<bool> implicit,
                            NullablePtr<FallthroughStmt> fallthroughStmt) {
-  void *mem =
-      ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(
-                       fallthroughStmt.isNonNull(), caseLabelItems.size()),
-                   alignof(CaseStmt));
+  void *mem = ctx.Allocate(
+      totalSizeToAlloc<FallthroughStmt *, CaseLabelItem, VarDecl *>(
+          fallthroughStmt.isNonNull(), caseLabelItems.size(),
+          caseVarDecls.size()),
+      alignof(CaseStmt));
   return ::new (mem)
       CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
                body, caseVarDecls, implicit, fallthroughStmt);
@@ -646,20 +1014,10 @@ CaseStmt *CaseStmt::findNextCaseStmt() const {
 }
 
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
-                               Expr *SubjectExpr,
-                               SourceLoc LBraceLoc,
-                               ArrayRef<ASTNode> Cases,
-                               SourceLoc RBraceLoc,
-                               SourceLoc EndLoc,
-                               ASTContext &C) {
-#ifndef NDEBUG
-  for (auto N : Cases)
-    assert((N.is<Stmt*>() && isa<CaseStmt>(N.get<Stmt*>())) ||
-           (N.is<Decl*>() && (isa<IfConfigDecl>(N.get<Decl*>()) ||
-                              isa<PoundDiagnosticDecl>(N.get<Decl*>()))));
-#endif
-
-  void *p = C.Allocate(totalSizeToAlloc<ASTNode>(Cases.size()),
+                               Expr *SubjectExpr, SourceLoc LBraceLoc,
+                               ArrayRef<CaseStmt *> Cases, SourceLoc RBraceLoc,
+                               SourceLoc EndLoc, ASTContext &C) {
+  void *p = C.Allocate(totalSizeToAlloc<CaseStmt *>(Cases.size()),
                        alignof(SwitchStmt));
   SwitchStmt *theSwitch = ::new (p) SwitchStmt(LabelInfo, SwitchLoc,
                                                SubjectExpr, LBraceLoc,
@@ -667,7 +1025,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                                EndLoc);
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
-                          theSwitch->getTrailingObjects<ASTNode>());
+                          theSwitch->getTrailingObjects());
   for (auto *caseStmt : theSwitch->getCases())
     caseStmt->setParentStmt(theSwitch);
 
@@ -684,8 +1042,42 @@ LabeledStmt *ContinueStmt::getTarget() const {
   return evaluateOrDefault(eval, ContinueTargetRequest{this}, nullptr);
 }
 
+FallthroughStmt *FallthroughStmt::createParsed(SourceLoc Loc, DeclContext *DC) {
+  auto &ctx = DC->getASTContext();
+  return new (ctx) FallthroughStmt(Loc, DC);
+}
+
+CaseStmt *FallthroughStmt::getFallthroughSource() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, FallthroughSourceAndDestRequest{this}, {})
+      .Source;
+}
+
+CaseStmt *FallthroughStmt::getFallthroughDest() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, FallthroughSourceAndDestRequest{this}, {})
+      .Dest;
+}
+
 SourceLoc swift::extractNearestSourceLoc(const Stmt *S) {
   return S->getStartLoc();
+}
+
+ArrayRef<Stmt *>
+SwitchStmt::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
+  assert(scratch.empty());
+  for (auto *CS : getCases())
+    scratch.push_back(CS->getBody());
+  return scratch;
+}
+
+ArrayRef<Stmt *>
+DoCatchStmt::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
+  assert(scratch.empty());
+  scratch.push_back(getBody());
+  for (auto *CS : getCatches())
+    scratch.push_back(CS->getBody());
+  return scratch;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Stmts, is

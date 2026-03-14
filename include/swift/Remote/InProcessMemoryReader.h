@@ -88,6 +88,8 @@ class InProcessMemoryReader final : public MemoryReader {
       }
       return true;
     }
+    case DLQ_GetObjCInteropIsEnabled:
+      break;
     }
     return false;
   }
@@ -103,8 +105,8 @@ class InProcessMemoryReader final : public MemoryReader {
     return ReadBytesResult(address.getLocalPointer<void>(), [](const void *) {});
   }
 };
- 
-}
-}
+
+} // namespace remote
+} // namespace swift
 
 #endif

@@ -29,6 +29,7 @@
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 
 using namespace swift;
@@ -81,7 +82,7 @@ SILLayout::SILLayout(CanGenericSignature Sig,
 #ifndef NDEBUG
   verifyFields(Sig, Fields);
 #endif
-  auto FieldsMem = getTrailingObjects<SILField>();
+  auto *FieldsMem = getTrailingObjects();
   for (unsigned i : indices(Fields)) {
     new (FieldsMem + i) SILField(Fields[i]);
   }

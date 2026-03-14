@@ -17,6 +17,7 @@
 #ifndef SWIFT_ABI_TASK_BACKDEPLOY56_H
 #define SWIFT_ABI_TASK_BACKDEPLOY56_H
 
+#include "Concurrency/TaskLocal.h"
 #include "Executor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
@@ -26,7 +27,7 @@
 #include "VoucherShims.h"
 #include "swift/Basic/STLExtras.h"
 #include <bitset>
-#include <queue>
+#include <queue> // TODO: remove and replace with our own mpsc
 
 namespace swift {
 class AsyncTask;
@@ -275,13 +276,6 @@ public:
   void setTaskId();
   uint64_t getTaskId();
 
-  /// Get the task's resume function, for logging purposes only. This will
-  /// attempt to see through the various adapters that are sometimes used, and
-  /// failing that will return ResumeTask. The returned function pointer may
-  /// have a different signature than ResumeTask, and it's only for identifying
-  /// code associated with the task.
-  const void *getResumeFunctionForLogging();
-
   /// Given that we've already fully established the job context
   /// in the current thread, start running this task.  To establish
   /// the job context correctly, call swift_job_run or
@@ -313,34 +307,44 @@ public:
   ///
   /// Generally this should be done immediately after updating
   /// ActiveTask.
+  __attribute__((visibility("hidden")))
   void flagAsRunning();
+  __attribute__((visibility("hidden")))
   void flagAsRunning_slow();
 
-  /// Flag that this task is now suspended.
+  /// Flag that this task is now suspended.  This can update the
+  /// priority stored in the job flags if the priority has been
+  /// escalated.  Generally this should be done immediately after
+  /// clearing ActiveTask and immediately before enqueuing the task
+  /// somewhere.  TODO: record where the task is enqueued if
+  /// possible.
+  __attribute__((visibility("hidden")))
   void flagAsSuspended();
+  __attribute__((visibility("hidden")))
   void flagAsSuspended_slow();
-
-  /// Flag that the task is to be enqueued on the provided executor and actually
-  /// enqueue it
-  void flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor);
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.
+  __attribute__((visibility("hidden")))
   void flagAsCompleted();
 
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
+  __attribute__((visibility("hidden")))
   bool isCancelled() const;
 
   // ==== Task Local Values ----------------------------------------------------
 
+  __attribute__((visibility("hidden")))
   void localValuePush(const HeapObject *key,
                       /* +1 */ OpaqueValue *value,
                       const Metadata *valueType);
 
+  __attribute__((visibility("hidden")))
   OpaqueValue *localValueGet(const HeapObject *key);
 
   /// Returns true if storage has still more bindings.
+  __attribute__((visibility("hidden")))
   bool localValuePop();
 
   // ==== Child Fragment -------------------------------------------------------
@@ -568,6 +572,7 @@ public:
   /// the future has completed and can be queried.
   /// The waiting task's async context will be initialized with the parameters if
   /// the current's task state is executing.
+  __attribute__((visibility("hidden")))
   FutureFragment::Status waitFuture(AsyncTask *waitingTask,
                                     AsyncContext *waitingTaskContext,
                                     TaskContinuationFunction *resumeFn,
@@ -595,14 +600,19 @@ private:
   }
 };
 
+enum { NumWords_AsyncTask = 24 };
+
 // The compiler will eventually assume these.
 static_assert(sizeof(AsyncTask) == NumWords_AsyncTask * sizeof(void*),
               "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
 // Libc hardcodes this offset to extract the TaskID
 static_assert(offsetof(AsyncTask, Id) == 4 * sizeof(void *) + 4,
               "AsyncTask::Id offset is wrong");
+#pragma clang diagnostic pop
 
 SWIFT_CC(swiftasync)
 inline void Job::runInFullyEstablishedContext() {
@@ -613,6 +623,65 @@ inline void Job::runInFullyEstablishedContext() {
 }
 
 // ==== ------------------------------------------------------------------------
+
+/// The Swift5.6 AsyncContextKind for the AsyncContext.
+/// Note that these were removed in Swift5.7
+/// (aca744b21165a20655502b563a6fa54c2c83efdf).
+/// Kinds of async context.
+enum class AsyncContextKind {
+  /// An ordinary asynchronous function.
+  Ordinary         = 0,
+
+  /// A context which can yield to its caller.
+  Yielding         = 1,
+
+  /// A continuation context.
+  Continuation     = 2,
+
+  // Other kinds are reserved for interesting special
+  // intermediate contexts.
+
+  // Kinds >= 192 are private to the implementation.
+  First_Reserved = 192
+};
+
+
+/// The Swift5.6 AsyncContextFlags for the AsyncContext.
+/// Note that these were removed in Swift5.7
+/// (aca744b21165a20655502b563a6fa54c2c83efdf).
+/// Flags for async contexts.
+class AsyncContextFlags : public FlagSet<uint32_t> {
+public:
+  enum {
+    Kind                = 0,
+    Kind_width          = 8,
+
+    CanThrow            = 8,
+
+    // Kind-specific flags should grow down from 31.
+
+    Continuation_IsExecutorSwitchForced = 31,
+  };
+
+  explicit AsyncContextFlags(uint32_t bits) : FlagSet(bits) {}
+  constexpr AsyncContextFlags() {}
+  AsyncContextFlags(AsyncContextKind kind) {
+    setKind(kind);
+  }
+
+  /// The kind of context this represents.
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, AsyncContextKind,
+                                 getKind, setKind)
+
+  /// Whether this context is permitted to throw.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow, canThrow, setCanThrow)
+
+  /// See AsyncContinuationFlags::isExecutorSwitchForced.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Continuation_IsExecutorSwitchForced,
+                                continuation_isExecutorSwitchForced,
+                                continuation_setIsExecutorSwitchForced)
+};
+
 
 /// An asynchronous context within a task.  Generally contexts are
 /// allocated using the task-local stack alloc/dealloc operations, but
@@ -634,9 +703,19 @@ public:
   TaskContinuationFunction * __ptrauth_swift_async_context_resume
     ResumeParent;
 
-  AsyncContext(TaskContinuationFunction *resumeParent,
+  /// Flags describing this context.
+  ///
+  /// Note that this field is only 32 bits; any alignment padding
+  /// following this on 64-bit platforms can be freely used by the
+  /// function.  If the function is a yielding function, that padding
+  /// is of course interrupted by the YieldToParent field.
+  AsyncContextFlags Flags;
+
+  AsyncContext(AsyncContextFlags flags,
+               TaskContinuationFunction *resumeParent,
                AsyncContext *parent)
-    : Parent(parent), ResumeParent(resumeParent) {}
+    : Parent(parent), ResumeParent(resumeParent),
+      Flags(flags) {}
 
   AsyncContext(const AsyncContext &) = delete;
   AsyncContext &operator=(const AsyncContext &) = delete;
@@ -660,58 +739,36 @@ public:
   TaskContinuationFunction * __ptrauth_swift_async_context_yield
     YieldToParent;
 
-  YieldingAsyncContext(TaskContinuationFunction *resumeParent,
+  YieldingAsyncContext(AsyncContextFlags flags,
+                       TaskContinuationFunction *resumeParent,
                        TaskContinuationFunction *yieldToParent,
                        AsyncContext *parent)
-    : AsyncContext(resumeParent, parent),
+    : AsyncContext(flags, resumeParent, parent),
       YieldToParent(yieldToParent) {}
+
+  static bool classof(const AsyncContext *context) {
+    return context->Flags.getKind() == AsyncContextKind::Yielding;
+  }
 };
 
 /// An async context that can be resumed as a continuation.
 class ContinuationAsyncContext : public AsyncContext {
 public:
-  class FlagsType : public FlagSet<size_t> {
-  public:
-    enum {
-      CanThrow = 0,
-      IsExecutorSwitchForced = 1,
-    };
-
-    explicit FlagsType(size_t bits) : FlagSet(bits) {}
-    constexpr FlagsType() {}
-
-    /// Whether this is a throwing continuation.
-    FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow,
-                                  canThrow,
-                                  setCanThrow)
-
-    /// See AsyncContinuationFlags::isExecutorSwitchForced().
-    FLAGSET_DEFINE_FLAG_ACCESSORS(IsExecutorSwitchForced,
-                                  isExecutorSwitchForced,
-                                  setIsExecutorSwitchForced)
-  };
-
-  /// Flags for the continuation.  Not public ABI.
-  FlagsType Flags;
-
   /// An atomic object used to ensure that a continuation is not
   /// scheduled immediately during a resume if it hasn't yet been
-  /// awaited by the function which set it up.  Not public ABI.
+  /// awaited by the function which set it up.
   std::atomic<ContinuationStatus> AwaitSynchronization;
 
   /// The error result value of the continuation.
   /// This should be null-initialized when setting up the continuation.
   /// Throwing resumers must overwrite this with a non-null value.
-  /// Public ABI.
   SwiftError *ErrorResult;
 
   /// A pointer to the normal result value of the continuation.
   /// Normal resumers must initialize this before resuming.
-  /// Public ABI.
   OpaqueValue *NormalResult;
 
   /// The executor that should be resumed to.
-  /// Public ABI.
   ExecutorRef ResumeToExecutor;
 
   void setErrorResult(SwiftError *error) {
@@ -719,7 +776,11 @@ public:
   }
 
   bool isExecutorSwitchForced() const {
-    return Flags.isExecutorSwitchForced();
+    return Flags.continuation_isExecutorSwitchForced();
+  }
+
+  static bool classof(const AsyncContext *context) {
+    return context->Flags.getKind() == AsyncContextKind::Continuation;
   }
 };
 

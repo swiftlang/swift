@@ -1,9 +1,6 @@
 // RUN: not %swift -Xcc -fake-argument -typecheck %s 2>&1 | %FileCheck %s -check-prefix=CHECK-UNKNOWN-ARG
 // CHECK-UNKNOWN-ARG: unknown argument: '-fake-argument'
 
-// Temporarily disable this test on ASAN bots.
-// UNSUPPORTED: asan
-
 // RUN: not %swift -Xcc -ivfsoverlay -Xcc %t.nonexistent -typecheck %s 2>&1 | %FileCheck %s -check-prefix=CHECK-VFS-NONEXISTENT
 // CHECK-VFS-NONEXISTENT: virtual filesystem overlay file '{{.*}}' not found
 

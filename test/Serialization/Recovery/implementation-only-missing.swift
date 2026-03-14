@@ -3,24 +3,36 @@
 // rdar://problem/52837313
 
 // RUN: %empty-directory(%t)
+// RUN: split-file %s %t --leading-lines
 
 //// Build the private module, the public module and the client app normally.
 //// Force the public module to be system with an underlying Clang module.
-// RUN: %target-swift-frontend -emit-module -DPRIVATE_LIB %s -module-name private_lib -emit-module-path %t/private_lib.swiftmodule
-// RUN: %target-swift-frontend -emit-module -DPUBLIC_LIB %s -module-name public_lib -emit-module-path %t/public_lib.swiftmodule -I %t -I %S/Inputs/implementation-only-missing -import-underlying-module
+// RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift \
+// RUN:   -emit-module-path %t/PrivateLib.swiftmodule
+// RUN: %target-swift-frontend -emit-module %t/PublicLib.swift \
+// RUN:   -emit-module-path %t/PublicLib.swiftmodule \
+// RUN:   -I %t -import-underlying-module
 
-//// The client app should build OK without the private module. Removing the
-//// private module is superfluous but makes sure that it's not somehow loaded.
-// RUN: rm %t/private_lib.swiftmodule
-// RUN: %target-swift-frontend -typecheck -DCLIENT_APP %s -I %t -index-system-modules -index-store-path %t
-// RUN: %target-swift-frontend -typecheck -DCLIENT_APP %s -I %t -D FAIL_TYPECHECK -verify
-// RUN: %target-swift-frontend -emit-sil -DCLIENT_APP %s -I %t -module-name client
+//// Remove the private module make sure it's not somehow loaded.
+// RUN: rm %t/PrivateLib.swiftmodule
+
+//// The client app should build and index OK without the private module.
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -index-system-modules -index-store-path %t
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -D FAIL_TYPECHECK -verify
+// RUN: %target-swift-frontend -emit-sil %t/Client.swift -I %t \
+// RUN:   -module-name client
 
 //// Printing the public module should not crash when checking for overrides of
 //// methods from the private module.
-// RUN: %target-swift-ide-test -print-module -module-to-print=public_lib -source-filename=x -skip-overrides -I %t
+// RUN: %target-swift-ide-test -print-module -module-to-print=PublicLib \
+// RUN:   -source-filename=x -skip-overrides -I %t
 
-#if PRIVATE_LIB
+//--- module.modulemap
+module PublicLib [system] {}
+
+//--- PrivateLib.swift
 
 @propertyWrapper
 public struct IoiPropertyWrapper<V> {
@@ -49,11 +61,30 @@ public protocol HiddenProtocolWithOverride {
   func hiddenOverride()
 }
 
-public class HiddenClass {}
+open class HiddenClass {}
 
-#elseif PUBLIC_LIB
+public struct HiddenRawType: ExpressibleByStringLiteral, Equatable, CustomStringConvertible {
 
-@_implementationOnly import private_lib
+    fileprivate var staticValue: String
+
+    public init(stringLiteral value: String) {
+        self.init(value)
+    }
+
+    public init(_ value: String) {
+        self.staticValue = value
+    }
+
+    public static func == (lhs: HiddenRawType, rhs: HiddenRawType) -> Bool {
+        return lhs.staticValue == rhs.staticValue
+    }
+
+    public var description: String { self.staticValue }
+}
+
+//--- PublicLib.swift
+
+@_implementationOnly import PrivateLib
 
 struct LibProtocolConstraint { }
 
@@ -112,9 +143,22 @@ struct StructInheritingFromComposition : CompositionMemberInheriting & Compositi
 class ClassInheritingFromComposition : CompositionMemberInheriting & CompositionMemberSimple {}
 protocol InheritingFromCompositionDirect : CompositionMemberSimple & HiddenProtocol2 {}
 
-#elseif CLIENT_APP
+// rdar://147091863
+enum InternalEnumWithRawType: HiddenRawType {
+    case a
+}
 
-import public_lib
+class InternalSubclass: HiddenClass {}
+class GenericBase<T> {}
+class Sub: GenericBase<Sub.Nested> {
+  class Nested: HiddenClass {}
+}
+
+func InternalFuncWithParam(a: HiddenRawType)  {}
+
+//--- Client.swift
+
+import PublicLib
 
 var s = PublicStruct()
 print(s.nonWrappedVar)
@@ -128,6 +172,4 @@ print(p)
     class ClassUnrelatedToSomeClass {}
     var something = ClassUnrelatedToSomeClass() as AnyObject
     something.triggerTypoCorrection = 123 // expected-error {{value of type 'AnyObject' has no member 'triggerTypoCorrection'}}
-#endif
-
 #endif

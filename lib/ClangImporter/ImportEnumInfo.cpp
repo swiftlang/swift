@@ -18,6 +18,7 @@
 #include "ClangAdapter.h"
 #include "ImportEnumInfo.h"
 #include "ImporterImpl.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "clang/AST/Attr.h"
@@ -108,11 +109,11 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
 
   // If API notes have /removed/ a FlagEnum or EnumExtensibility attribute,
   // then we don't need to check the macros.
-  for (auto *attr : decl->specific_attrs<clang::SwiftVersionedAttr>()) {
+  for (auto *attr : decl->specific_attrs<clang::SwiftVersionedAdditionAttr>()) {
     if (!attr->getIsReplacedByActive())
       continue;
-    if (isa<clang::FlagEnumAttr>(attr->getAttrToAdd()) ||
-        isa<clang::EnumExtensibilityAttr>(attr->getAttrToAdd())) {
+    if (isa<clang::FlagEnumAttr>(attr->getAdditionalAttr()) ||
+        isa<clang::EnumExtensibilityAttr>(attr->getAdditionalAttr())) {
       kind = EnumKind::Unknown;
       return;
     }
@@ -219,7 +220,7 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
 
   // Is the plural string just "[singular]s"?
   plural = plural.drop_back();
-  if (plural.endswith(firstLeftoverWord))
+  if (plural.ends_with(firstLeftoverWord))
     return commonPrefixPlusWord;
 
   if (plural.empty() || plural.back() != 'e')
@@ -227,7 +228,7 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
 
   // Is the plural string "[singular]es"?
   plural = plural.drop_back();
-  if (plural.endswith(firstLeftoverWord))
+  if (plural.ends_with(firstLeftoverWord))
     return commonPrefixPlusWord;
 
   if (plural.empty() || !(plural.back() == 'i' && singular.back() == 'y'))
@@ -236,17 +237,51 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
   // Is the plural string "[prefix]ies" and the singular "[prefix]y"?
   plural = plural.drop_back();
   firstLeftoverWord = firstLeftoverWord.drop_back();
-  if (plural.endswith(firstLeftoverWord))
+  if (plural.ends_with(firstLeftoverWord))
     return commonPrefixPlusWord;
 
   return commonPrefix;
 }
 
 const clang::Type *importer::getUnderlyingType(const clang::EnumDecl *decl) {
-  const clang::Type *underlyingType = decl->getIntegerType().getTypePtr();
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(underlyingType))
-    underlyingType = elaborated->desugar().getTypePtr();
-  return underlyingType;
+  return importer::desugarIfElaborated(decl->getIntegerType().getTypePtr());
+}
+
+ImportedType importer::findOptionSetEnum(clang::QualType type,
+                                         ClangImporter::Implementation &Impl) {
+  auto typedefType = dyn_cast<clang::TypedefType>(type);
+  if (!typedefType || !Impl.isUnavailableInSwift(typedefType->getDecl()))
+    // If this isn't a typedef, or it is a typedef that is available in Swift,
+    // then this definitely isn't used for {CF,NS}_OPTIONS.
+    return ImportedType();
+
+  if (Impl.SwiftContext.LangOpts.EnableCXXInterop &&
+      !isCFOptionsMacro(typedefType->getDecl(), Impl.getClangPreprocessor())) {
+    return ImportedType();
+  }
+
+  auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType);
+  if (!clangEnum)
+    return ImportedType();
+
+  // Assert that the typedef has the same underlying integer representation as
+  // the enum we think it assigns a type name to.
+  //
+  // If these fails, it means that we need a stronger predicate for
+  // determining the relationship between an enum and typedef.
+  if (auto *tdEnum =
+          dyn_cast<clang::EnumType>(typedefType->getCanonicalTypeInternal())) {
+    ASSERT(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+           tdEnum->getDecl()->getIntegerType()->getCanonicalTypeInternal());
+  } else {
+    ASSERT(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+           typedefType->getCanonicalTypeInternal());
+  }
+
+  if (auto *swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion))
+    return {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
+
+  return ImportedType();
 }
 
 /// Determine the prefix to be stripped from the names of the enum constants

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../IDE/Inputs/custom-modules %s -emit-sil -enable-copy-propagation=false | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../IDE/Inputs/custom-modules %s -Xllvm -sil-print-types -emit-sil -enable-copy-propagation=false | %FileCheck %s
 
 // Using -enable-copy-propagation=false to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around
@@ -24,7 +24,7 @@ extension Hive {
   // CHECK-LABEL: sil hidden @$sSo4HiveC027definite_init_objc_factory_C0E10otherQueenABSo3BeeC_tcfC
   convenience init(otherQueen other: Bee) {
     // CHECK: bb0({{.*}}, [[META:%.*]] : $@thick Hive.Type)
-    // CHECK: [[SELF_ADDR:%[0-9]+]] = alloc_stack $Hive
+    // CHECK: [[SELF_ADDR:%[0-9]+]] = alloc_stack [var_decl] $Hive
     // CHECK: [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
     // CHECK: [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.foreign : (Hive.Type) -> (Bee?) -> Hive?, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
     // CHECK: apply [[FACTORY]]([[QUEEN:%[0-9]+]], [[OBJC_META]]) : $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>

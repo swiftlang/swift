@@ -14,7 +14,7 @@
 ///
 /// Contains optimizations that eliminate redundant copy values.
 ///
-/// FIXME: CanonicalizeOSSALifetime likely replaces everything this file.
+/// FIXME: OSSACanonicalizeOwned likely replaces everything this file.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -24,8 +24,10 @@
 #include "SemanticARCOptVisitor.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/Test.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -68,7 +70,10 @@ using namespace swift::semanticarc;
 // TODO: This needs a better name.
 bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
     CopyValueInst *cvi) {
-  // All mandatory copy optimization is handled by CanonicalizeOSSALifetime,
+  LLVM_DEBUG(llvm::dbgs() << "Looking at ");
+  LLVM_DEBUG(cvi->dump());
+
+  // All mandatory copy optimization is handled by OSSACanonicalizeOwned,
   // which knows how to preserve lifetimes for debugging.
   if (ctx.onlyMandatoryOpts)
     return false;
@@ -76,13 +81,16 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   SmallVector<BorrowedValue, 4> borrowScopeIntroducers;
 
   // Find all borrow introducers for our copy operand. If we are unable to find
-  // all of the reproducers (due to pattern matching failure), conservatively
+  // all of the introducers (due to pattern matching failure), conservatively
   // return false. We can not optimize.
   //
   // NOTE: We can get multiple introducers if our copy_value's operand
   // value runs through a phi or an aggregate forming instruction.
-  if (!getAllBorrowIntroducingValues(cvi->getOperand(), borrowScopeIntroducers))
+  if (!getAllBorrowIntroducingValues(cvi->getOperand(),
+                                     borrowScopeIntroducers)) {
+    LLVM_DEBUG(llvm::dbgs() << "Did not find all borrow introducers\n");
     return false;
+  }
 
   // Then go over all of our uses and see if the value returned by our copy
   // value forms a dead live range or a live range that would be dead if it was
@@ -95,6 +103,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
       lr.hasUnknownConsumingUse(ctx.assumingAtFixedPoint);
   if (hasUnknownConsumingUseState ==
       OwnershipLiveRange::HasConsumingUse_t::Yes) {
+    LLVM_DEBUG(llvm::dbgs() << "Found unknown consuming uses\n");
     return false;
   }
 
@@ -162,7 +171,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
         return borrowScope.isLocalScope();
       });
 
-  auto destroys = lr.getDestroyingUses();
+  auto destroys = lr.getDestroyingInsts();
   if (destroys.empty() && haveAnyLocalScopes) {
     return false;
   }
@@ -188,9 +197,11 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   // block.
   {
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-          return !borrowScope.areUsesWithinExtendedScope(
-              lr.getAllConsumingUses(), nullptr);
+          return !borrowScope.areWithinExtendedScope(lr.getAllConsumingInsts(),
+                                                     nullptr);
         })) {
+      LLVM_DEBUG(llvm::dbgs() << "copy_value is extending borrow introducer "
+                                 "lifetime, bailing out\n");
       return false;
     }
   }
@@ -216,9 +227,20 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
         return false;
       }
 
+      // Replacing owned phi operands with a local borrow introducer can
+      // introduce reborrows. Since lifetime adjustment is not implemented for
+      // this case, disable here.
+      // Returning false here will make sure so this isn't populated in
+      // joinedOwnedIntroducerToConsumedOperands which is used by
+      // semanticarc::tryConvertOwnedPhisToGuaranteedPhis for transforming owned
+      // phi to guaranteed.
+      if (haveAnyLocalScopes) {
+        return false;
+      }
+
       if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-            return !borrowScope.areUsesWithinExtendedScope(
-                phiArgLR.getAllConsumingUses(), nullptr);
+            return !borrowScope.areWithinExtendedScope(
+                phiArgLR.getAllConsumingInsts(), nullptr);
           })) {
         return false;
       }
@@ -251,7 +273,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
 /// If cvi only has destroy value users, then cvi is a dead live range. Lets
 /// eliminate all such dead live ranges.
 ///
-/// FIXME: CanonicalizeOSSALifetime replaces this.
+/// FIXME: OSSACanonicalizeOwned replaces this.
 bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(
     CopyValueInst *cvi) {
   // This is a cheap optimization generally.
@@ -367,6 +389,11 @@ static bool isUseBetweenInstAndBlockEnd(
 static bool tryJoinIfDestroyConsumingUseInSameBlock(
     SemanticARCOptVisitor &ctx, CopyValueInst *cvi, DestroyValueInst *dvi,
     SILValue operand, Operand *singleCVIConsumingUse) {
+  // Pointer escapes propagate values ways that may not be discoverable.
+  // If \p cvi or \p operand has escaped, then do not optimize.
+  if (findPointerEscape(cvi) || findPointerEscape(operand)) {
+    return false;
+  }
   // First see if our destroy_value is in between singleCVIConsumingUse and the
   // end of block. If this is not true, then we know the destroy_value must be
   // /before/ our singleCVIConsumingUse meaning that by joining the lifetimes,
@@ -380,6 +407,17 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     ctx.eraseAndRAUWSingleValueInstruction(cvi, operand);
     return true;
   }
+
+  // The lifetime of the original ends after the lifetime of the copy.
+  // Its lifetime must not be shortened through deinit barriers.
+  // At this point, visitedInsts contains all the instructions between the
+  // consuming use of the copy and the destroy.  If any of those instructions
+  // is a deinit barrier, it would be illegal to shorten the original lexical
+  // value's lifetime to end at that consuming use.  Bail if any are.
+  if (llvm::any_of(visitedInsts, [](auto *inst) {
+        return mayBeDeinitBarrierNotConsideringSideEffects(inst);
+      }))
+    return false;
 
   // If we reached this point, isUseBetweenInstAndBlockEnd succeeded implying
   // that we found destroy_value to be after our consuming use. Noting that
@@ -463,6 +501,13 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     if (visitedInsts.count(use->getUser()))
       return false;
 
+    // If the cvi's operand value has a non-consuming use in the same
+    // instruction which consumes the copy, bailout. NOTE:
+    // isUseBetweenInstAndBlockEnd does not check this.
+    if (user == singleCVIConsumingUse->getUser()) {
+      return false;
+    }
+
     // Ok, we have a use that isn't in our visitedInsts region. That being said,
     // we may still have a use that introduces a new BorrowScope onto our
     // copy_value's operand that overlaps with our forwarding value region. In
@@ -473,7 +518,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     // we need to only find scopes that end within the region in between the
     // singleConsumingUse (the original forwarded use) and the destroy_value. In
     // such a case, we must bail!
-    if (auto operand = BorrowingOperand(use))
+    if (auto operand = BorrowingOperand(use)) {
       if (!operand.visitScopeEndingUses([&](Operand *endScopeUse) {
             // Return false if we did see the relevant end scope instruction
             // in the block. That means that we are going to exit early and
@@ -481,6 +526,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
             return !visitedInsts.count(endScopeUse->getUser());
           }))
         return false;
+    }
   }
 
   // Ok, we now know that we can eliminate this value.
@@ -616,7 +662,7 @@ static bool tryJoiningIfCopyOperandHasSingleDestroyValue(
 // begin_borrow. Because of that we can not shrink lifetimes and instead rely on
 // SILGen's correctness.
 //
-// FIXME: CanonicalizeOSSALifetime replaces this.
+// FIXME: OSSACanonicalizeOwned replaces this.
 bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
     CopyValueInst *cvi) {
   // First do a quick check if our operand is owned. If it is not owned, we can
@@ -722,7 +768,7 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
 /// value and is not consumed, eliminate the copy.
 bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
     CopyValueInst *cvi) {
-  // All mandatory copy optimization is handled by CanonicalizeOSSALifetime,
+  // All mandatory copy optimization is handled by OSSACanonicalizeOwned,
   // which knows how to preserve lifetimes for debugging.
   if (ctx.onlyMandatoryOpts)
     return false;
@@ -759,13 +805,15 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   SmallVector<Operand *, 8> parentLifetimeEndingUses;
   for (auto *origValueUse : originalValue->getUses())
     if (origValueUse->isLifetimeEnding() &&
-        !OwnershipForwardingMixin::isa(origValueUse->getUser()))
+        !ForwardingInstruction::isa(origValueUse->getUser()))
       parentLifetimeEndingUses.push_back(origValueUse);
 
   // Ok, we have an owned value. If we do not have any non-destroying consuming
   // uses, see if all of our uses (ignoring destroying uses) are within our
   // parent owned value's lifetime.
-  LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
+  // Note: we cannot optimistically ignore DeadEndBlocks - unlike for ownership
+  //       verification.
+  LinearLifetimeChecker checker(nullptr, /*instIndices=*/ nullptr);
   if (!checker.validateLifetime(originalValue, parentLifetimeEndingUses,
                                 allCopyUses))
     return false;
@@ -777,6 +825,20 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   eraseAndRAUWSingleValueInstruction(cvi, cvi->getOperand());
   return true;
 }
+
+namespace swift::test {
+static FunctionTest SemanticARCOptsCopyValueOptsGuaranteedValueOptTest(
+    "semantic_arc_opts__copy_value_opts__guaranteed_value_opt",
+    [](auto &function, auto &arguments, auto &test) {
+      SemanticARCOptVisitor visitor(function, test.getPassManager(),
+                                    *test.getDeadEndBlocks(),
+                                    /*onlyMandatoryOpts=*/false);
+
+      visitor.performGuaranteedCopyValueOptimization(
+          cast<CopyValueInst>(arguments.takeInstruction()));
+      function.print(llvm::errs());
+    });
+} // end namespace swift::test
 
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint

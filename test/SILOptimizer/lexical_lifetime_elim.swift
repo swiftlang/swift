@@ -1,39 +1,24 @@
-// RUN: %target-swift-frontend -emit-sil -O -parse-as-library -enable-copy-propagation=false -Xllvm -sil-print-all -module-name=main %s 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -O -parse-as-library -enable-lexical-lifetimes=false -Xllvm -sil-print-all -module-name=main %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O -parse-as-library -enable-copy-propagation=false -module-name=main %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O -parse-as-library -enable-lexical-lifetimes=false -module-name=main %s | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
+@_silgen_name("takeGuaranteed")
 @inline(never)
-func takeGuaranteed(_ a: AnyObject) -> AnyObject {
-  return a
-}
+func takeGuaranteed(_ a: AnyObject) -> AnyObject
 
-// CHECK-LABEL: // testLexical(a:)
-// CHECK: [[B:%.*]] = begin_borrow [lexical] %0
-// CHECK: apply %{{.*}}([[B]])
-// CHECK: apply
-// CHECK: end_borrow [[B]]
-// CHECK-LABEL: } // end sil function
+@_silgen_name("getOwned")
+@inline(never)
+func getOwned() -> AnyObject
 
-// LexicalLifetimeEliminator must strip the [lexical] flag
-// before the first round of SemanticARCOpts.
-
-// CHECK-NOT: *** SIL function after {{.*}} (semantic-arc-opts)
-
-// CHECK-LABEL: *** SIL function after {{.*}} (sil-lexical-lifetime-eliminator)
-// CHECK-LABEL: // testLexical(a:)
-// CHECK: [[B:%.*]] = begin_borrow %0
-// CHECK: apply %{{.*}}([[B]])
-// CHECK: apply
-// CHECK: end_borrow [[B]]
-// CHECK-LABEL: } // end sil function
-
-// The first round of SemanticARCOpts must eliminate the borrow scope
-// that was only needed for a lexical lifetime.
-
-// CHECK-LABEL: *** SIL function after {{.*}} (semantic-arc-opts)
-// CHECK-LABEL: // testLexical(a:)
-// CHECK: apply %{{.*}}(%0)
-// CHECK-LABEL: } // end sil function
-public func testLexical(a: __owned AnyObject) -> AnyObject {
+// CHECK-LABEL: sil @$s4main11testLexicalyXlyF :
+// CHECK:         [[A:%.*]] = apply
+// CHECK:         [[B:%.*]] = apply
+// CHECK-DAG:     strong_release [[B]]
+// CHECK-DAG:     strong_release [[A]]
+// CHECK-LABEL: } // end sil function '$s4main11testLexicalyXlyF'
+public func testLexical() -> AnyObject {
+  let a = getOwned()
   // Without lexical lifetimes, the lifetime of 'a' ends in between the two calls:
   return takeGuaranteed(takeGuaranteed(a))
 }

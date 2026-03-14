@@ -44,7 +44,7 @@ As noted earlier, ABI stability is necessary, though not sufficient, for binary 
 
 ### Library Evolution
 
-Expressive and performance-focused languages which have binary interfaces tend to exhibit the [fragile binary interface problem](https://en.wikipedia.org/wiki/Fragile_binary_interface_problem), which makes it difficult for any library or component to change over time without requiring every user to recompile with new versions of that library. A major push in Swift currently is the plan for [Library Evolution](https://github.com/apple/swift/blob/main/docs/LibraryEvolution.rst), which aims to grant flexibility for library authors to maintain backwards and forwards binary compatibility. Many implementation concerns therein could have an impact on ABI. 
+Expressive and performance-focused languages which have binary interfaces tend to exhibit the [fragile binary interface problem](https://en.wikipedia.org/wiki/Fragile_binary_interface_problem), which makes it difficult for any library or component to change over time without requiring every user to recompile with new versions of that library. A major push in Swift currently is the plan for [Library Evolution](https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst), which aims to grant flexibility for library authors to maintain backwards and forwards binary compatibility. Many implementation concerns therein could have an impact on ABI. 
 
 One of the goals of rolling out ABI stability is to remain flexible enough to accommodate library evolution changes without limiting the design space. Library evolution concerns will be addressed in each individual section, though a common refrain will be that the details are still undecided.
 
@@ -106,17 +106,17 @@ Opaque layout occurs whenever the layout is not known until runtime. This can co
 
 The size and alignment of an object of opaque layout, as well as whether it is trivial or bitwise movable, is determined by querying its value witness table, which is described further in the [value witness table section](#value-witness-table). The offsets for data members are determined by querying the type's metadata, which is described further in the [value metadata section](#value-metadata). Objects of opaque layout must typically be passed indirectly, described further in the [function signature lowering section](#function-signature-lowering). The Swift runtime interacts with objects of opaque layout through pointers, and thus they must be addressable, described further in the [abstraction levels section](#abstraction-levels).
 
-In practice, layout might be partially-known at compilation time. An example is a generic struct over type `T` that stores an integer as well as an object of type `T`. In this case, the layout of the integer itself is known and its location within the generic struct might be as well, depending on the specifics of the layout algorithm. However, the generic stored property has opaque layout, and thus the struct overall has an unknown size and alignment. We are investigating how to most efficiently lay out partially-opaque aggregates [[#46307](https://github.com/apple/swift/issues/46307)]. This will likely entail placing the opaque members at the end in order to guarantee known offsets of non-opaque data members.
+In practice, layout might be partially-known at compilation time. An example is a generic struct over type `T` that stores an integer as well as an object of type `T`. In this case, the layout of the integer itself is known and its location within the generic struct might be as well, depending on the specifics of the layout algorithm. However, the generic stored property has opaque layout, and thus the struct overall has an unknown size and alignment. We are investigating how to most efficiently lay out partially-opaque aggregates [[#46307](https://github.com/swiftlang/swift/issues/46307)]. This will likely entail placing the opaque members at the end in order to guarantee known offsets of non-opaque data members.
 
 #### <a name="layout-library-evolution"></a>Library Evolution
 
 Library evolution introduces *resilient* layouts of public types by default and provides new annotations that freeze the layout for performance. A resilient layout avoids many of the pitfalls of the fragile binary problem by making the layout opaque. Resilient types have far more freedom to change and evolve without breaking binary compatibility: public data members can be rearranged, added, and even removed (by providing a computed getter/setter instead). The new annotations provide the ability to relinquish these freedoms by making stricter guarantees about their layout in order to be more efficiently compiled and accessed. 
 
-In order to allow for cross-module optimizations for modules that are distributed together, there is the concept of a *resilience domain*. A resilience domain is a grouping of modules which are version-locked with each other and thus do not have binary compatibility across multiple version requirements with each other. See [Resilience Domains](https://github.com/apple/swift/blob/main/docs/LibraryEvolution.rst#resilience-domains) for more details. 
+In order to allow for cross-module optimizations for modules that are distributed together, there is the concept of a *resilience domain*. A resilience domain is a grouping of modules which are version-locked with each other and thus do not have binary compatibility across multiple version requirements with each other. See [Resilience Domains](https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst#resilience-domains) for more details. 
 
 Resilient types are required to have opaque layout when exposed outside their resilience domain. Inside a resilience domain, this requirement is lifted and their layout may be statically known or opaque as determined by their type (see [previous section](#opaque-layout)).
 
-Annotations may be applied to a library's types in future versions of that library, in which case the annotations are versioned, yet the library remains binary compatible. How this will impact the ABI is still under investigation [[#46496](https://github.com/apple/swift/issues/46496)].
+Annotations may be applied to a library's types in future versions of that library, in which case the annotations are versioned, yet the library remains binary compatible. How this will impact the ABI is still under investigation [[#46496](https://github.com/swiftlang/swift/issues/46496)].
 
 
 #### <a name="abstraction-levels"></a>Abstraction Levels
@@ -132,9 +132,9 @@ What follows is a breakdown of the different kinds of types in Swift and what ne
 
 #### Structs
 
-The layout algorithm for structs should result in an efficient use of space, possibly by laying out fields in a different order than declared [[#46308](https://github.com/apple/swift/issues/46308)]. We may want a fully declaration-order-agnostic algorithm to allow data members to be reordered in source without breaking binary compatibility [[#46309](https://github.com/apple/swift/issues/46309)]. We also need to consider whether, by default, we want to ensure struct data members are addressable (i.e. byte-aligned) or if we'd rather do bit-packing to save space [[#46310](https://github.com/apple/swift/issues/46310)].
+The layout algorithm for structs should result in an efficient use of space, possibly by laying out fields in a different order than declared [[#46308](https://github.com/swiftlang/swift/issues/46308)]. We may want a fully declaration-order-agnostic algorithm to allow data members to be reordered in source without breaking binary compatibility [[#46309](https://github.com/swiftlang/swift/issues/46309)]. We also need to consider whether, by default, we want to ensure struct data members are addressable (i.e. byte-aligned) or if we'd rather do bit-packing to save space [[#46310](https://github.com/swiftlang/swift/issues/46310)].
 
-Zero sized structs do not take up any space as data members and struct members may be laid out in the padding of sub-structs. We may want to explore whether there are implementation benefits to capping alignment at some number, e.g. 16 on many platforms [[#46497](https://github.com/apple/swift/issues/46497)].
+Zero sized structs do not take up any space as data members and struct members may be laid out in the padding of sub-structs. We may want to explore whether there are implementation benefits to capping alignment at some number, e.g. 16 on many platforms [[#46497](https://github.com/swiftlang/swift/issues/46497)].
 
 #### <a name="tuples"></a>Tuples
 
@@ -142,7 +142,7 @@ Tuples are similar to anonymous structs, but they differ in that they exhibit st
 
 This may be an argument for a simple, declaration-order, non bit-packed layout algorithm for tuples. Tuples are often used for small local values and rarely persisted across ABI boundaries in a way that aggressive packing is performance-critical. This would also be more consistent with how fixed-size C arrays are presented in Swift, which are imported as tuples.
 
-We should investigate whether to aggressively bit-pack tuple elements similarly to structs, paying the reabstraction costs, or if the benefits are not worth the costs [[#46311](https://github.com/apple/swift/issues/46311)].
+We should investigate whether to aggressively bit-pack tuple elements similarly to structs, paying the reabstraction costs, or if the benefits are not worth the costs [[#46311](https://github.com/swiftlang/swift/issues/46311)].
 
 Tuples should be binary compatible between labeled and unlabeled tuples of the same type and structure.
 
@@ -161,7 +161,7 @@ Degenerate enums take zero space. Trivial enums are just their discriminator.
 
 Single payload enums try to fit their discriminator in the payload's extra inhabitants for the non-payload cases, otherwise they will store the discriminator after the payload. When the discriminator is stored after the payload, the bits are not set for the payload case. The payload is guaranteed to be layout compatible with the enum as the payload case does not use any extra inhabitants. Storing the discriminator after the payload may also result in more efficient layout of aggregates containing the enum, due to alignment.
 
-The layout algorithm for multi-payload enums is more complicated and still needs to be developed [[#46312](https://github.com/apple/swift/issues/46312)]. The algorithm should try to rearrange payloads so as to coalesce cases and save space. This rearrangement can also improve performance and code size. For example, if ARC-ed payload components reside in the same location, operations like copy can be done directly on the values without extensive switching.
+The layout algorithm for multi-payload enums is more complicated and still needs to be developed [[#46312](https://github.com/swiftlang/swift/issues/46312)]. The algorithm should try to rearrange payloads so as to coalesce cases and save space. This rearrangement can also improve performance and code size. For example, if ARC-ed payload components reside in the same location, operations like copy can be done directly on the values without extensive switching.
 
 Enum raw values are not ABI, as they are implemented as code present in the computed property getter and setter. `@objc` enums are C-compatible, which means they must be trivial.
 
@@ -177,7 +177,7 @@ The layout of class instances is mostly opaque. This is to avoid the vexing prob
 
 The run-time type of a non-final class instance or a class existential is not known statically. To facilitate dynamic casts, the object must store a pointer to its type, called the *isa* pointer. The *isa* pointer is always stored at offset 0 within the object. How that type is represented and what information it provides is part of the class's metadata and is covered in the [class metadata section](#class-metadata). Similarly, the function for a non-final method call is also not known statically and is dispatched based on the run-time type. Method dispatch is covered in the [method dispatch section](#method-dispatch).
 
-Class instances will, as part of ABI-stability, guarantee a word-sized field of opaque data following the isa field that may be used for reference counting by the runtime [[#46932](https://github.com/apple/swift/issues/46932)]. But, the format and conventions of this opaque data will not be ABI at first in order to have more flexibility for language or implementation changes. Instead, runtime functions provide the means to interact with reference counts. This opaque data and its conventions may be locked down for more efficient access in the future, which will be an ABI-additive change.
+Class instances will, as part of ABI-stability, guarantee a word-sized field of opaque data following the isa field that may be used for reference counting by the runtime [[#46932](https://github.com/swiftlang/swift/issues/46932)]. But, the format and conventions of this opaque data will not be ABI at first in order to have more flexibility for language or implementation changes. Instead, runtime functions provide the means to interact with reference counts. This opaque data and its conventions may be locked down for more efficient access in the future, which will be an ABI-additive change.
 
 ##### References
 
@@ -187,7 +187,7 @@ References to Objective-C-compatible class instances (i.e. those that inherit fr
 
 References to native, non-Objective-C-compatible Swift class instances do not have this constraint. The alignment of native Swift class instances is part of ABI, providing spare bits in the lower bits of references. Platforms may also provide spare bits (typically upper bits) and extra inhabitants (typically lower addresses) for references due to limited address spaces.
 
-We may want to explore using spare bits in references to store local reference counts in order to perform some ARC operations more efficiently [[#46313](https://github.com/apple/swift/issues/46313)]. These would need to be flushed to the object whenever a reference may escape or the local reference count reaches zero. If these local reference counts can cross ABI boundaries, then such a change will have to be implemented in an ABI-additive way with deployment target checking.
+We may want to explore using spare bits in references to store local reference counts in order to perform some ARC operations more efficiently [[#46313](https://github.com/swiftlang/swift/issues/46313)]. These would need to be flushed to the object whenever a reference may escape or the local reference count reaches zero. If these local reference counts can cross ABI boundaries, then such a change will have to be implemented in an ABI-additive way with deployment target checking.
 
 #### <a name="existential-containers"></a>Existential Containers
 
@@ -205,15 +205,15 @@ A type's conformance to a protocol consists of functions (whether methods or get
 
 Class-constrained existentials omit the metadata pointer (as the object itself contains a pointer to its type), as well as any excess inline buffer space. `Any`, which is an existential value without any conformances, has no witness table pointer.
 
-We are re-evaluating the inline buffer size for existential containers prior to ABI stability [[#45928](https://github.com/apple/swift/issues/45928)]. We are also considering making the out-of-line allocation be copy-on-write (COW) [[#46913](https://github.com/apple/swift/issues/46913)]. We should also explore "exploding" existential parameters, i.e. converting an existential parameter into a protocol-constrained generic parameter [[#46914](https://github.com/apple/swift/issues/46914)].
+We are re-evaluating the inline buffer size for existential containers prior to ABI stability [[#45928](https://github.com/swiftlang/swift/issues/45928)]. We are also considering making the out-of-line allocation be copy-on-write (COW) [[#46913](https://github.com/swiftlang/swift/issues/46913)]. We should also explore "exploding" existential parameters, i.e. converting an existential parameter into a protocol-constrained generic parameter [[#46914](https://github.com/swiftlang/swift/issues/46914)].
 
 ### Declaring Stability
 
-ABI stability means nailing down type layout and making decisions about how to handle the concerns of Library Evolution. The end result will be a technical specification of the layout algorithms that future compilers must adhere to in order to ensure binary compatibility [[#46315](https://github.com/apple/swift/issues/46315)].
+ABI stability means nailing down type layout and making decisions about how to handle the concerns of Library Evolution. The end result will be a technical specification of the layout algorithms that future compilers must adhere to in order to ensure binary compatibility [[#46315](https://github.com/swiftlang/swift/issues/46315)].
 
 For all of the areas discussed above, more aggressive layout improvements may be invented in the post-ABI stability future. For example, we may want to explore rearranging and packing nested type data members with outer type data members. Such improvements would have to be done in an ABI-additive fashion through deployment target and/or min-version checking. This may mean that the module file will need to track per-type ABI versioning information.
 
-A potentially out of date description of Swift's current type layout can be found in the [Type Layout docs](https://github.com/apple/swift/blob/main/docs/ABI/TypeLayout.rst).
+A potentially out of date description of Swift's current type layout can be found in the [Type Layout docs](https://github.com/swiftlang/swift/blob/main/docs/ABI/TypeLayout.rst).
 
 
 ## <a name="metadata"></a>Type Metadata
@@ -222,15 +222,15 @@ While data layout specifies the layout of objects of a given type, *type metadat
 
 Swift keeps metadata records for every *concrete type*. Concrete types include all non-generic types as well as generic types with concrete type parameters. These records are created by the compiler as well as lazily created at run time (e.g. for generic type instantiations). This metadata stores information about its type, discussed in each section below.
 
-A potential approach to stability mechanism is to provide metadata read/write functions alongside the runtime to interact with metadata, giving some freedom to the underlying structures to grow and change. This effectively makes large portions of metadata opaque. But, certain fields require access to be as efficient as possible (e.g. dynamic casts, calling into witness tables) and the performance hit from going through an intermediary function would be unacceptable. Thus, we will probably freeze the performance-critical parts and use accessor functions for the rest [[#46508](https://github.com/apple/swift/issues/46508)].
+A potential approach to stability mechanism is to provide metadata read/write functions alongside the runtime to interact with metadata, giving some freedom to the underlying structures to grow and change. This effectively makes large portions of metadata opaque. But, certain fields require access to be as efficient as possible (e.g. dynamic casts, calling into witness tables) and the performance hit from going through an intermediary function would be unacceptable. Thus, we will probably freeze the performance-critical parts and use accessor functions for the rest [[#46508](https://github.com/swiftlang/swift/issues/46508)].
 
-Metadata has many historical artifacts in its representation that we want to clean up [[#46509](https://github.com/apple/swift/issues/46509)]. We also want to make small tweaks to present more semantic information in the metadata, to enable better future tooling and features such as reflection [[#46510](https://github.com/apple/swift/issues/46510)]. Some of these need to be done before declaring ABI stability and some may be additive.
+Metadata has many historical artifacts in its representation that we want to clean up [[#46509](https://github.com/swiftlang/swift/issues/46509)]. We also want to make small tweaks to present more semantic information in the metadata, to enable better future tooling and features such as reflection [[#46510](https://github.com/swiftlang/swift/issues/46510)]. Some of these need to be done before declaring ABI stability and some may be additive.
 
 #### Declaring Stability
 
-Stabilizing the ABI means producing a precise technical specification for the fixed part of the metadata layout of all language constructs so that future compilers and tools can continue to read and write them. A prose description is not necessarily needed, though explanations are useful. We will also want to carve out extra space for areas where it is likely to be needed for future functionality [[#46316](https://github.com/apple/swift/issues/46316)].
+Stabilizing the ABI means producing a precise technical specification for the fixed part of the metadata layout of all language constructs so that future compilers and tools can continue to read and write them. A prose description is not necessarily needed, though explanations are useful. We will also want to carve out extra space for areas where it is likely to be needed for future functionality [[#46316](https://github.com/swiftlang/swift/issues/46316)].
 
-For more, but potentially out of date, details see the [Type Metadata docs](https://github.com/apple/swift/blob/main/docs/ABI/TypeMetadata.rst).
+For more, but potentially out of date, details see the [Type Metadata docs](https://github.com/swiftlang/swift/blob/main/docs/ABI/TypeMetadata.rst).
 
 ### Generic Parameters
 
@@ -240,7 +240,7 @@ At run time, objects only have concrete types. If the type in source code is gen
 
 ### <a name="value-metadata"></a>Value Metadata
 
-Named value types store the type name (currently mangled but we are investigating un-mangled [[#46511](https://github.com/apple/swift/issues/46511)]) and a pointer to the type's parent for nested types.
+Named value types store the type name (currently mangled but we are investigating un-mangled [[#46511](https://github.com/swiftlang/swift/issues/46511)]) and a pointer to the type's parent for nested types.
 
 Value type metadata also has kind-specific entries. Struct metadata stores information about its fields, field offsets, field names, and field metadata. Enum metadata stores information about its cases, payload sizes, and payload metadata. Tuple metadata stores information about its elements and labels.
 
@@ -248,21 +248,21 @@ Value type metadata also has kind-specific entries. Struct metadata stores infor
 
 Every concrete type has a *value witness table* that provides information about how to lay out and manipulate values of that type. When a value type has [opaque layout](#opaque-layout), the actual layout and properties of that value type are not known at compilation time, so the value witness table is consulted.
 
-The value witness table stores whether a type is trivial and/or bitwise movable, whether there are extra inhabitants and if so how to store and retrieve them, etc. For enums, the value witness table will also provide functionality for interacting with the discriminator. There may be more efficient ways of representing enums that simplify this functionality (or provide a fast path), and that's under investigation [[#46915](https://github.com/apple/swift/issues/46915)].
+The value witness table stores whether a type is trivial and/or bitwise movable, whether there are extra inhabitants and if so how to store and retrieve them, etc. For enums, the value witness table will also provide functionality for interacting with the discriminator. There may be more efficient ways of representing enums that simplify this functionality (or provide a fast path), and that's under investigation [[#46915](https://github.com/swiftlang/swift/issues/46915)].
 
-These value witness tables may be constructed statically for known values or dynamically for some generic values. While every unique type in Swift has a unique metadata pointer, value witness tables can be shared by types so long as the information provided is identical (i.e. same layout). Value witness tables always represent a type at its highest [abstraction level](#abstraction-levels). The value witness table entries and structure need to be locked down for ABI stability [[#46512](https://github.com/apple/swift/issues/46512)].
+These value witness tables may be constructed statically for known values or dynamically for some generic values. While every unique type in Swift has a unique metadata pointer, value witness tables can be shared by types so long as the information provided is identical (i.e. same layout). Value witness tables always represent a type at its highest [abstraction level](#abstraction-levels). The value witness table entries and structure need to be locked down for ABI stability [[#46512](https://github.com/swiftlang/swift/issues/46512)].
 
 ### <a name="class-metadata"></a>Class Metadata
 
 Swift class metadata is layout-compatible with Objective-C class objects on Apple's platforms, which places requirements on the contents of the first section of class metadata. In this first section, entries such as super class pointers, instance size, instance alignment, flags, and opaque data for the Objective-C runtime are stored.
 
-Following that are superclass members, parent type metadata, generic parameter metadata, class members, and *vtables*, described below. Library evolution may present many changes to what exactly is present and will likely make many of the contents opaque to accommodate changes [[#46922](https://github.com/apple/swift/issues/46922)].
+Following that are superclass members, parent type metadata, generic parameter metadata, class members, and *vtables*, described below. Library evolution may present many changes to what exactly is present and will likely make many of the contents opaque to accommodate changes [[#46922](https://github.com/swiftlang/swift/issues/46922)].
 
 ##### <a name="method-dispatch"></a>Method Dispatch
 
 Invoking a non-final instance method involves calling a function that is not known at compile time: it must be resolved at run time. This is solved through the use of a *vtable*, or virtual method table (so called because overridable methods are also known as "virtual" methods). A *vtable* is a table of function pointers to a class or subclass's implementation of overridable methods. If the vtable is determined to be part of ABI, it needs a layout algorithm that also provides flexibility for library evolution.
 
-Alternatively, we may decide to perform inter-module calls through opaque *thunks*, or compiler-created intermediary functions, which then perform either direct or vtable dispatch as needed [[#46513](https://github.com/apple/swift/issues/46513)]. This enables greater library evolution without breaking binary compatibility by allowing internal class hierarchies to change. This would also unify non-final method dispatch between open and non-open classes while still allowing for aggressive compiler optimizations like de-virtualization for non-open classes. This approach would make vtables not be ABI, as that part of the type metadata would effectively be opaque to another module.
+Alternatively, we may decide to perform inter-module calls through opaque *thunks*, or compiler-created intermediary functions, which then perform either direct or vtable dispatch as needed [[#46513](https://github.com/swiftlang/swift/issues/46513)]. This enables greater library evolution without breaking binary compatibility by allowing internal class hierarchies to change. This would also unify non-final method dispatch between open and non-open classes while still allowing for aggressive compiler optimizations like de-virtualization for non-open classes. This approach would make vtables not be ABI, as that part of the type metadata would effectively be opaque to another module.
 
 ### Protocol and Existential Metadata
 
@@ -270,23 +270,23 @@ Alternatively, we may decide to perform inter-module calls through opaque *thunk
 
 The protocol witness table is a function table of a type's conformance to the protocol's interfaces. If the protocol also has an associated type requirement, then the witness table will store the metadata for the associated type. Protocol witness tables are used with [existential containers](#existential-containers) where the run time type is not known.
 
-Protocol witness tables may be created dynamically by the runtime or statically by the compiler. The layout of a protocol witness table is ABI and we need to determine a layout algorithm that also accommodates library evolution concerns, where additional protocol requirements may be added with default fall-backs [[#46317](https://github.com/apple/swift/issues/46317)].
+Protocol witness tables may be created dynamically by the runtime or statically by the compiler. The layout of a protocol witness table is ABI and we need to determine a layout algorithm that also accommodates library evolution concerns, where additional protocol requirements may be added with default fall-backs [[#46317](https://github.com/swiftlang/swift/issues/46317)].
 
 ##### Existential Metadata
 
-Existential type metadata contains the number of witness tables present, whether the type is class-constrained, and a *protocol descriptor* for each protocol constraint. A protocol descriptor describes an individual protocol constraint, such as whether it is class-constrained, the size of conforming witness tables, and protocol descriptors for any protocols it refines. Protocol descriptors are layout compatible with the Objective-C runtime's protocol records on Apple platforms. The format of the existential type metadata needs to be reviewed as part of the ABI definition [[#46920](https://github.com/apple/swift/issues/46920)].
+Existential type metadata contains the number of witness tables present, whether the type is class-constrained, and a *protocol descriptor* for each protocol constraint. A protocol descriptor describes an individual protocol constraint, such as whether it is class-constrained, the size of conforming witness tables, and protocol descriptors for any protocols it refines. Protocol descriptors are layout compatible with the Objective-C runtime's protocol records on Apple platforms. The format of the existential type metadata needs to be reviewed as part of the ABI definition [[#46920](https://github.com/swiftlang/swift/issues/46920)].
 
 ### Function Metadata
 
-In addition to common metadata entries, function type metadata stores information about the function signature: parameter and result type metadata, calling convention, per-parameter ownership conventions, and whether the function throws. Function type metadata always represents the function at its highest abstraction level, which is explained later in the [function signature lowering section](#lowering-higher-order-functions). Function parameters are currently modeled with a tuple-based design, but this should be updated to match modern Swift [[#46916](https://github.com/apple/swift/issues/46916)]. As more ownership semantics are modeled, more information may be stored about each parameter.
+In addition to common metadata entries, function type metadata stores information about the function signature: parameter and result type metadata, calling convention, per-parameter ownership conventions, and whether the function throws. Function type metadata always represents the function at its highest abstraction level, which is explained later in the [function signature lowering section](#lowering-higher-order-functions). Function parameters are currently modeled with a tuple-based design, but this should be updated to match modern Swift [[#46916](https://github.com/swiftlang/swift/issues/46916)]. As more ownership semantics are modeled, more information may be stored about each parameter.
 
 ## <a name="mangling"></a>Mangling
 
 Mangling is used to produce unique symbols. It applies to both external (public) symbols as well as internal or hidden symbols. Only the mangling scheme for external symbols is part of ABI.
 
-ABI stability means a stable mangling scheme, fully specified so that future compilers and tools can honor it. For a potentially out-of-date specification of what the mangling currently looks like, see the [Name Mangling docs](https://github.com/apple/swift/blob/main/docs/ABI/Mangling.rst).
+ABI stability means a stable mangling scheme, fully specified so that future compilers and tools can honor it. For a potentially out-of-date specification of what the mangling currently looks like, see the [Name Mangling docs](https://github.com/swiftlang/swift/blob/main/docs/ABI/Mangling.rst).
 
-There are some corner cases currently in the mangling scheme that should be fixed before declaring ABI stability. We need to come up with a canonicalization of generic and protocol requirements to allow for order-agnostic mangling [[#46318](https://github.com/apple/swift/issues/46318)]. We also may decide to more carefully mangle variadicity of function parameters, etc [[#46319](https://github.com/apple/swift/issues/46319)]. Most often, though, mangling improvements focus on reducing symbol size.
+There are some corner cases currently in the mangling scheme that should be fixed before declaring ABI stability. We need to come up with a canonicalization of generic and protocol requirements to allow for order-agnostic mangling [[#46318](https://github.com/swiftlang/swift/issues/46318)]. We also may decide to more carefully mangle variadicity of function parameters, etc [[#46319](https://github.com/swiftlang/swift/issues/46319)]. Most often, though, mangling improvements focus on reducing symbol size.
 
 Mangling design centers around coming up with short and efficient manglings that still retain important properties such as uniqueness and integration with existing tools and formats. Given the prevalence of public symbols in libraries and frameworks, and debugging symbols in applications, the symbol names themselves can make up a significant portion of binary size. Reducing this impact is a major focus of stabilizing the mangling. Post-ABI-stability, any new manglings or techniques must be additive and must support the existing manglings.
 
@@ -294,23 +294,23 @@ There are many ways to improve the existing mangling without major impact on exi
 
 ### Compact Manglings
 
-Minor tweaks to shorten the mangling can have a beneficial impact on all Swift program binary sizes. These tweaks should compact existing manglings while preserving a simple unique mapping. One example is not distinguishing between struct/enum in mangling structures, which would also provide more library evolution freedom [[#46515](https://github.com/apple/swift/issues/46515)]. We are considering dropping some internal witness table symbols when they don't provide any meaningful information conducive to debugging [[#46516](https://github.com/apple/swift/issues/46516)]. We recently overhauled word substitutions in mangling, with the goal of reducing as much redundancy in names as possible [[#46923](https://github.com/apple/swift/issues/46923)].
+Minor tweaks to shorten the mangling can have a beneficial impact on all Swift program binary sizes. These tweaks should compact existing manglings while preserving a simple unique mapping. One example is not distinguishing between struct/enum in mangling structures, which would also provide more library evolution freedom [[#46515](https://github.com/swiftlang/swift/issues/46515)]. We are considering dropping some internal witness table symbols when they don't provide any meaningful information conducive to debugging [[#46516](https://github.com/swiftlang/swift/issues/46516)]. We recently overhauled word substitutions in mangling, with the goal of reducing as much redundancy in names as possible [[#46923](https://github.com/swiftlang/swift/issues/46923)].
 
-There are other aggressive directions to investigate as well, such as mangling based on a known overload set for non-resilient functions. This does have the downside of making manglings unstable when new overloads are added, so its benefits would have to be carefully weighed [[#46518](https://github.com/apple/swift/issues/46518)].
+There are other aggressive directions to investigate as well, such as mangling based on a known overload set for non-resilient functions. This does have the downside of making manglings unstable when new overloads are added, so its benefits would have to be carefully weighed [[#46518](https://github.com/swiftlang/swift/issues/46518)].
 
 Any more ambitious reimagining of how to store symbols such as aggressive whole-library symbol name compression would have to be done in tight coupling with existing low level tools. Unfortunately, this might make some of the more ambitious options infeasible in time for ABI stability. They could be rolled out as ABI-additive using deployment target checking in the future.
 
 ### Suffix Differentiation
 
-There are many existing low level tools and formats that store and consume the symbol information, and some of them use efficient storage techniques such as tries. Suffix differentiation is about adjusting the mangling in ways that take advantage of them: by distinguishing manglings through suffixes, i.e. having common shared prefixes. This is currently underway and is resulting in binary size reductions for platforms that use these techniques [[#46517](https://github.com/apple/swift/issues/46517)].
+There are many existing low level tools and formats that store and consume the symbol information, and some of them use efficient storage techniques such as tries. Suffix differentiation is about adjusting the mangling in ways that take advantage of them: by distinguishing manglings through suffixes, i.e. having common shared prefixes. This is currently underway and is resulting in binary size reductions for platforms that use these techniques [[#46517](https://github.com/swiftlang/swift/issues/46517)].
 
 ## <a name="calling-convention"></a>Calling Convention
 
-For the purposes of this document, "standard calling convention" refers to the C calling convention for a given platform (see [appendix](#platform-abis)), and "Swift calling convention" refers to the calling convention used by Swift code when calling other Swift code. One of the first steps toward ABI stability is for Swift to adopt the Swift calling convention [[#46925](https://github.com/apple/swift/issues/46925)]. The Swift runtime uses the standard calling convention, though it may make alterations (see section [Runtime calling convention](#runtime-calling-convention)).
+For the purposes of this document, "standard calling convention" refers to the C calling convention for a given platform (see [appendix](#platform-abis)), and "Swift calling convention" refers to the calling convention used by Swift code when calling other Swift code. One of the first steps toward ABI stability is for Swift to adopt the Swift calling convention [[#46925](https://github.com/swiftlang/swift/issues/46925)]. The Swift runtime uses the standard calling convention, though it may make alterations (see section [Runtime calling convention](#runtime-calling-convention)).
 
 Calling convention stability pertains to public interfaces. The Swift compiler is free to choose any convention for internal (intra-module) functions and calls.
 
-For rationale and potentially-out-of-date details, see the [Swift Calling Convention Whitepaper](https://github.com/apple/swift/blob/main/docs/CallingConvention.rst). As part of nailing down the calling conventions, that document will either be updated with the final specifications of the calling conventions or else moved to a rationale document and a more succinct and rigorous specification put in its place.
+For rationale and potentially-out-of-date details, see the [Swift Calling Convention Whitepaper](https://github.com/swiftlang/swift/blob/main/docs/ABI/CallingConvention.rst). As part of nailing down the calling conventions, that document will either be updated with the final specifications of the calling conventions or else moved to a rationale document and a more succinct and rigorous specification put in its place.
 
 ### Register convention
 
@@ -337,21 +337,21 @@ Having the call context register be callee-saved is advantageous. It keeps the r
 
 Throwing functions communicate error values to their callers through the *error* register on some platforms. The error register holds a pointer to the error value if an error occurred, otherwise 0. The caller of a throwing function is expected to quickly check for 0 before continuing on with non-error code, otherwise branching to code to handle or propagate the error. Using a callee-saved register for the error register enables free conversion from non-throwing to throwing functions, which is required to honor the subtyping relationship.
 
-The specific registers used in these roles are documented in [the calling convention summary document](ABI/CallConvSummary.rst).
+The specific registers used in these roles are documented in [the calling convention summary document](ABI/CallingConventionSummary.rst).
 
 ### <a name="function-signature-lowering"></a>Function Signature Lowering
 
 Function signature lowering is the mapping of a function's source-language type, which includes formal parameters and results, all the way down to a physical convention, which dictates what values are stored in what registers and what values to pass on the stack.
 
-ABI stability requires nailing down and fully specifying this algorithm so that future Swift versions can lower Swift types to the same physical call signature as prior Swift versions [[#46928](https://github.com/apple/swift/issues/46928)]. More in-depth descriptions and rationale of function signature lowering can be found in the [function signature lowering docs](https://github.com/apple/swift/blob/main/docs/CallingConvention.rst#function-signature-lowering).
+ABI stability requires nailing down and fully specifying this algorithm so that future Swift versions can lower Swift types to the same physical call signature as prior Swift versions [[#46928](https://github.com/swiftlang/swift/issues/46928)]. More in-depth descriptions and rationale of function signature lowering can be found in the [function signature lowering docs](https://github.com/swiftlang/swift/blob/main/docs/ABI/CallingConvention.rst#function-signature-lowering).
 
-Lowering the result value is usually done first, with a certain number of registers designated to hold the result value if it fits, otherwise the result value is passed on the stack. A good heuristic is needed for the limit and is architecture specific (e.g. 4 registers on modern 64-bit architectures) [[#46531](https://github.com/apple/swift/issues/46531)].
+Lowering the result value is usually done first, with a certain number of registers designated to hold the result value if it fits, otherwise the result value is passed on the stack. A good heuristic is needed for the limit and is architecture specific (e.g. 4 registers on modern 64-bit architectures) [[#46531](https://github.com/swiftlang/swift/issues/46531)].
 
 Next comes lowering parameters, which proceeds greedily by trying to fit values into registers from left-to-right, though some parameters may be re-ordered. For example, closures are best placed at the end to take advantage of ABI compatibility between thick closures and thin ones without a context.
 
 Some values must be passed and returned indirectly as they are *address only*. Address only values include [non-bitwise-copyable](#type-properties) values, values with [opaque layout](#opaque-layout), and non-class-constrained [existential values](#existential-containers). Even if the runtime type would normally be passed in a register, or even if the type is statically known at the call-site, if the callee receives or returns values with opaque layout, they must be passed or returned indirectly.
 
-We should investigate whether it makes sense to split values with partially opaque layout by passing the non-opaque parts in registers [[#46532](https://github.com/apple/swift/issues/46532)].
+We should investigate whether it makes sense to split values with partially opaque layout by passing the non-opaque parts in registers [[#46532](https://github.com/swiftlang/swift/issues/46532)].
 
 Parameter ownership is not reflected in the physical calling convention, though it will be noted in the mangling of the function name. Default argument expressions will not be ABI, as they will be emitted into the caller. This means that a library can add, modify, or remove default argument expressions without breaking binary compatibility (though modifying/removing may break source compatibility).
 
@@ -383,16 +383,16 @@ Such changes to runtime functions can be rolled out incrementally in the future,
 
 Swift exposes a runtime that provides APIs for compiled code. Calls into the Swift runtime are produced by the compiler for concerns such as memory management and run-time type information. Additionally, the runtime exposes low-level reflection APIs that are useful to the standard library and some users.
 
-Every existing runtime function will need to be audited for its desirability and behavior [[#46320](https://github.com/apple/swift/issues/46320)]. For every function, we need to evaluate whether we want the API as is:
+Every existing runtime function will need to be audited for its desirability and behavior [[#46320](https://github.com/swiftlang/swift/issues/46320)]. For every function, we need to evaluate whether we want the API as is:
 
 * If yes, then we need to precisely specify the semantics and guarantees of the API. 
 * If not, we need to either change, remove, or replace the API, and precisely specify the new semantics.
 
-The runtime is also responsible for lazily creating new type metadata entries at run time, either for generic type instantiations or for resilient constructs. Library evolution in general introduces a whole new category of needs from the runtime by making data and metadata more opaque, requiring interaction to be done through runtime APIs. Additionally, ownership semantics may require new runtime APIs or modifications to existing APIs. These new runtime needs are still under investigation [[#46931](https://github.com/apple/swift/issues/46931)].
+The runtime is also responsible for lazily creating new type metadata entries at run time, either for generic type instantiations or for resilient constructs. Library evolution in general introduces a whole new category of needs from the runtime by making data and metadata more opaque, requiring interaction to be done through runtime APIs. Additionally, ownership semantics may require new runtime APIs or modifications to existing APIs. These new runtime needs are still under investigation [[#46931](https://github.com/swiftlang/swift/issues/46931)].
 
 There are many potential future directions to open up the ABI and operate on less-opaque data directly, as well as techniques such as call-site caching. These are ABI-additive, and will be interesting to explore in the future.
 
-For a potentially-out-of-date listing of runtime symbols and some details, see the [Runtime docs](https://github.com/apple/swift/blob/main/docs/Runtime.md).
+For a potentially-out-of-date listing of runtime symbols and some details, see the [Runtime docs](https://github.com/swiftlang/swift/blob/main/docs/Runtime.md).
 
 ## <a name="standard-library"></a>Standard Library
 
@@ -408,15 +408,15 @@ Any standard library API shipped post-ABI-stability must be supported into the f
 
 Inlineable code that calls internal functions makes those internal functions ABI, as the client code will be making external calls to them. Thus, many internal interfaces in the standard library will need to be locked down if called from inlineable code. Whether to mark code inlineable will have to carefully weigh performance requirements against keeping flexibility for future changes.
 
-This tradeoff between performance and flexibility also affects the ability to deploy bug fixes and performance improvements to users. Users that have inlined code from the standard library will not be able to get bug fixes and performance improvements in an OS update without performing a recompilation with the new library. For more information on this topic, see [Inlineable Functions](https://github.com/apple/swift/blob/main/docs/LibraryEvolution.rst#inlineable-functions).
+This tradeoff between performance and flexibility also affects the ability to deploy bug fixes and performance improvements to users. Users that have inlined code from the standard library will not be able to get bug fixes and performance improvements in an OS update without performing a recompilation with the new library. For more information on this topic, see [Inlineable Functions](https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst#inlineable-functions).
 
 ### Upcoming Changes
 
 While the standard library is already ensuring source stability, it will be changing many of its fundamental underlying representations this year. When ABI stability lands, the standard library will be severely limited in the kinds of changes it can make to existing APIs and non-resilient types. Getting the standard library in the right place is of critical importance.
 
-The programming model for String is still being redesigned [[#46933](https://github.com/apple/swift/issues/46933)], and many types such as Int are undergoing implementation changes [[#45784](https://github.com/apple/swift/issues/45784)]. At the same time, the standard library is simultaneously switching to new compiler features such as conditional conformances to clean up and deliver the best APIs [[#46046](https://github.com/apple/swift/issues/46046)].
+The programming model for String is still being redesigned [[#46933](https://github.com/swiftlang/swift/issues/46933)], and many types such as Int are undergoing implementation changes [[#45784](https://github.com/swiftlang/swift/issues/45784)]. At the same time, the standard library is simultaneously switching to new compiler features such as conditional conformances to clean up and deliver the best APIs [[#46046](https://github.com/swiftlang/swift/issues/46046)].
 
-Another goal of Swift is to improve the applicability of Swift to systems programming. Ownership semantics may make a large impact, including things such as improved `inout` semantics that allow for efficient and safe array slicing. Providing the right abstractions for efficient use of contiguous memory is still under investigation [[#46934](https://github.com/apple/swift/issues/46934)].
+Another goal of Swift is to improve the applicability of Swift to systems programming. Ownership semantics may make a large impact, including things such as improved `inout` semantics that allow for efficient and safe array slicing. Providing the right abstractions for efficient use of contiguous memory is still under investigation [[#46934](https://github.com/swiftlang/swift/issues/46934)].
 
 ## Next Steps
 

@@ -1,0 +1,65 @@
+// RUN: %target-sil-opt -sil-diagnostic-dead-function-elim -sil-verify-all %s | %FileCheck %s
+
+// CHECK-LABEL: sil @public_function_without_marker : $@convention(thin) () -> () {
+// CHECK: tuple
+// CHECK: } // end sil function 'public_function_without_marker'
+sil public @public_function_without_marker : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Possibly used externally... shouldn't eliminate this.
+// CHECK-LABEL: sil [_semantics "sil.optimizer.delete_if_unused"] @public_function_with_marker : $@convention(thin) () -> () {
+// CHECK: tuple
+// CHECK: } // end sil function 'public_function_with_marker'
+sil public [_semantics "sil.optimizer.delete_if_unused"] @public_function_with_marker : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil shared @shared_function_without_marker : $@convention(thin) () -> () {
+// CHECK: tuple
+// CHECK: } // end sil function 'shared_function_without_marker'
+sil shared @shared_function_without_marker : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil private [_semantics "sil.optimizer.delete_if_unused"] @shared_function_with_marker : $@convention(thin) () -> () {
+// CHECK: unreachable
+// CHECK: } // end sil function 'shared_function_with_marker'
+sil shared [_semantics "sil.optimizer.delete_if_unused"] @shared_function_with_marker : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil private @private_function_without_marker : $@convention(thin) () -> () {
+// CHECK: tuple
+// CHECK: } // end sil function 'private_function_without_marker'
+sil private @private_function_without_marker : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil private [_semantics "sil.optimizer.delete_if_unused"] @private_function_with_marker : $@convention(thin) () -> () {
+// CHECK: unreachable
+// CHECK: } // end sil function 'private_function_with_marker'
+sil private [_semantics "sil.optimizer.delete_if_unused"] @private_function_with_marker : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: sil private [_semantics "sil.optimizer.delete_if_unused"] @serialized_shared_function_with_marker : $@convention(thin) () -> () {
+// CHECK: unreachable
+// CHECK: } // end sil function 'serialized_shared_function_with_marker'
+sil shared [serialized] [_semantics "sil.optimizer.delete_if_unused"] @serialized_shared_function_with_marker : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple ()
+  return %9999 : $()
+}

@@ -17,16 +17,18 @@
 #define MANGLE_AS_STRING(M) STRINGIFY_MANGLING(M)
 
 /// The mangling prefix for the new mangling.
-#if !defined(_MSC_VER) || _MSC_VER-0 >= 1926
+#if defined(__clang__)
 _Pragma("clang diagnostic push")
 _Pragma("clang diagnostic ignored \"-Wdollar-in-identifier-extension\"")
 #endif
 #define MANGLING_PREFIX $s
-#if !defined(_MSC_VER) || _MSC_VER-0 >= 1926
+#define MANGLING_PREFIX_EMBEDDED $e
+#if defined(__clang__)
 _Pragma("clang diagnostic pop")
 #endif
 
 #define MANGLING_PREFIX_STR MANGLE_AS_STRING(MANGLING_PREFIX)
+#define MANGLING_PREFIX_EMBEDDED_STR MANGLE_AS_STRING(MANGLING_PREFIX_EMBEDDED)
 
 // The following macros help to create symbol manglings. They can be used
 // if a mangled name is needed at compile-time, e.g. for variable names in the

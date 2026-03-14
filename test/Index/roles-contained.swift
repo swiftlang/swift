@@ -224,7 +224,7 @@ let (tupleNestedFuncSiblingElementA, (tupleNestedFuncSiblingElementB, tupleNeste
 // CHECK-NEXT: RelCont | variable/Swift | tupleNestedFuncSiblingElementC | {{.*}}
 
 func containingFunc(param: Int) {
-    // CHECK: [[@LINE-1]]:6 | function/Swift | containingFunc(param:) | {{.*}} | Def | rel: 0
+    // CHECK: [[@LINE-1]]:6 | function(internal)/Swift | containingFunc(param:) | {{.*}} | Def | rel: 0
     // CHECK: [[@LINE-2]]:21 | param/Swift | param | {{.*}} | Def,RelChild | rel: 1
     // CHECK-NEXT: RelChild | function/Swift | containingFunc(param:) | {{.*}}
 
@@ -254,6 +254,47 @@ func containingFunc(param: Int) {
     // CHECK-NEXT: RelCont | variable(local)/Swift | tupleIgnoredSiblingElementContained | {{.*}}
     // CHECK: [[@LINE-11]]:78 | function/acc-get/Swift | getter:stringValue | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 2
     // CHECK-NEXT: RelCont | variable(local)/Swift | tupleIgnoredSiblingElementContained | {{.*}}
+
+    let (_, tupleIgnoredSiblingElementContained): (Int, String) = (
+      { let x = intValue; return x }(),
+      { let y = stringValue; return y }()
+    )
+    // CHECK:      [[@LINE-3]]:13 | variable(local)/Swift | x | {{.*}} | Def,RelChild | rel: 1
+    // CHECK-NEXT: RelChild | function/Swift | containingFunc(param:)
+
+    // CHECK:      [[@LINE-6]]:17 | variable/Swift | intValue | {{.*}} | Ref,Read,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | variable(local)/Swift | x
+
+    // Here the reference to intValue is contained by 'x'.
+    // CHECK:      [[@LINE-10]]:17 | function/acc-get/Swift | getter:intValue | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 2
+    // CHECK-NEXT: RelCont | variable(local)/Swift | x
+    // CHECK-NEXT: RelCall | function/Swift | containingFunc(param:)
+
+    // But here the container for the reference to 'x' is the parent function.
+    // CHECK:      [[@LINE-15]]:34 | variable(local)/Swift | x | {{.*}} | Ref,Read,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | function/Swift | containingFunc(param:)
+
+    // CHECK:      [[@LINE-18]]:34 | function/acc-get(local)/Swift | getter:x | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 1
+    // CHECK-NEXT: RelCall,RelCont | function/Swift | containingFunc(param:)
+
+    // CHECK:      [[@LINE-20]]:13 | variable(local)/Swift | y | {{.*}} | Def,RelChild | rel: 1
+    // CHECK-NEXT: RelChild | function/Swift | containingFunc(param:)
+
+    // CHECK:      [[@LINE-23]]:17 | variable/Swift | stringValue | {{.*}} | Ref,Read,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | variable(local)/Swift | y
+
+    // Here the reference to stringValue is contained by 'y'.
+    // CHECK:      [[@LINE-27]]:17 | function/acc-get/Swift | getter:stringValue | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 2
+    // CHECK-NEXT: RelCont | variable(local)/Swift | y
+    // CHECK-NEXT: RelCall | function/Swift | containingFunc(param:)
+
+    // But here the container for the reference to 'y' is the parent binding.
+    // CHECK:      [[@LINE-32]]:37 | variable(local)/Swift | y | {{.*}} | Ref,Read,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | variable(local)/Swift | tupleIgnoredSiblingElementContained
+
+    // CHECK:      [[@LINE-35]]:37 | function/acc-get(local)/Swift | getter:y | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 2
+    // CHECK-NEXT: RelCont | variable(local)/Swift | tupleIgnoredSiblingElementContained
+    // CHECK-NEXT: RelCall | function/Swift | containingFunc(param:)
 }
 
 func functionWithReturnType() -> Int { 0 }
@@ -278,7 +319,11 @@ struct SomeStruct {
     // CHECK-NEXT: RelCont | static-property/Swift | staticProperty | {{.*}}
 
     lazy var lazyProperty: Int = { 1 }()
-    // CHECK: [[@LINE-1]]:28 | struct/Swift | Int | {{.*}} | Ref,RelCont | rel: 1
+    // CHECK: [[@LINE-1]]:14 | instance-method/acc-get/Swift | getter:lazyProperty | s:14swift_ide_test10SomeStructV12lazyPropertySivg | Def,Impl,RelChild,RelAcc | rel: 1
+    // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | lazyProperty | s:14swift_ide_test10SomeStructV12lazyPropertySivp
+    // CHECK: [[@LINE-3]]:14 | instance-method/acc-set/Swift | setter:lazyProperty | s:14swift_ide_test10SomeStructV12lazyPropertySivs | Def,Impl,RelChild,RelAcc | rel: 1
+    // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | lazyProperty | s:14swift_ide_test10SomeStructV12lazyPropertySivp
+    // CHECK: [[@LINE-5]]:28 | struct/Swift | Int | {{.*}} | Ref,RelCont | rel: 1
     // CHECK-NEXT: RelCont | instance-property/Swift | lazyProperty | {{.*}}
 
     @Wrapped
@@ -287,7 +332,7 @@ struct SomeStruct {
     // CHECK-NEXT: RelCont | instance-property/Swift | wrappedProperty | {{.*}}
     // CHECK: [[@LINE-4]]:6 | constructor/Swift | init(wrappedValue:) | {{.*}} | Ref,Call,Impl,RelCont | rel: 1
     // CHECK-NEXT: RelCont | instance-property/Swift | wrappedProperty | {{.*}}
-    // CHECK: [[@LINE-5]]:9 | instance-property/Swift | wrappedProperty | {{.*}} | Def,RelChild | rel: 1
+    // CHECK: [[@LINE-5]]:9 | instance-property(internal)/Swift | wrappedProperty | {{.*}} | Def,RelChild | rel: 1
     // CHECK: [[@LINE-6]]:26 | struct/Swift | Int | {{.*}} | Ref,RelCont | rel: 1
     // CHECK-NEXT: RelCont | instance-property/Swift | wrappedProperty | {{.*}}
 
@@ -297,15 +342,15 @@ struct SomeStruct {
 }
 
 let voidProperty: () = ()
-// CHECK: [[@LINE-1]]:5 | variable/Swift | voidProperty | {{.*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable(internal)/Swift | voidProperty | {{.*}} | Def | rel: 0
 
 let voidAliasedProperty: Void = ()
-// CHECK: [[@LINE-1]]:5 | variable/Swift | voidAliasedProperty | {{.*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable(internal)/Swift | voidAliasedProperty | {{.*}} | Def | rel: 0
 // CHECK: [[@LINE-2]]:26 | type-alias/Swift | Void | {{.*}} | Ref,RelCont | rel: 1
 // CHECK-NEXT: RelCont | variable/Swift | voidAliasedProperty | {{.*}}
 
 var computedVoidProperty: () { () }
-// CHECK: [[@LINE-1]]:5 | variable/Swift | computedVoidProperty | {{.*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable(internal)/Swift | computedVoidProperty | {{.*}} | Def | rel: 0
 
 func voidFunc() -> () { () }
-// CHECK: [[@LINE-1]]:6 | function/Swift | voidFunc() | {{.*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:6 | function(internal)/Swift | voidFunc() | {{.*}} | Def | rel: 0

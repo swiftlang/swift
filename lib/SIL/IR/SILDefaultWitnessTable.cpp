@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTMangler.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
@@ -97,7 +98,7 @@ convertToDefinition(ArrayRef<Entry> entries) {
 }
 
 std::string SILDefaultWitnessTable::getUniqueName() const {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(getProtocol()->getASTContext());
   return Mangler.mangleTypeWithoutPrefix(
     getProtocol()->getDeclaredInterfaceType());
 }

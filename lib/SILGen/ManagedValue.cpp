@@ -19,8 +19,19 @@
 
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
+#include "swift/Basic/Assertions.h"
 using namespace swift;
 using namespace Lowering;
+
+ManagedValue ManagedValue::forFormalAccessedAddress(SILValue address,
+                                                    SGFAccessKind accessKind) {
+  if (isReadAccess(accessKind)) {
+    return forBorrowedAddressRValue(address);
+  } else {
+    return forLValue(address);
+  }
+}
+
 
 ManagedValue ManagedValue::forForwardedRValue(SILGenFunction &SGF,
                                               SILValue value) {
@@ -60,8 +71,8 @@ ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
 // WARNING: Callers of this API should manage the cleanup of this value!
 SILValue ManagedValue::unmanagedCopy(SILGenFunction &SGF,
                                          SILLocation loc) const {
-  auto &lowering = SGF.getTypeLowering(getType());
-  if (lowering.isTrivial())
+  auto props = SGF.getTypeProperties(getType());
+  if (props.isTrivial())
     return getValue();
 
   if (getType().isObject()) {
@@ -79,8 +90,8 @@ ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &SGF,
                                             SILLocation loc) {
   assert(SGF.isInFormalEvaluationScope() &&
          "Can only perform a formal access copy in a formal evaluation scope");
-  auto &lowering = SGF.getTypeLowering(getType());
-  if (lowering.isTrivial())
+  auto props = SGF.getTypeProperties(getType());
+  if (props.isTrivial())
     return *this;
 
   if (getType().isObject()) {
@@ -155,14 +166,14 @@ SILValue ManagedValue::forward(SILGenFunction &SGF) const {
 
 void ManagedValue::forwardInto(SILGenFunction &SGF, SILLocation loc,
                                SILValue address) {
-  assert(isPlusOne(SGF));
+  assert(isPlusOneOrTrivial(SGF));
   auto &addrTL = SGF.getTypeLowering(address->getType());
   SGF.emitSemanticStore(loc, forward(SGF), address, addrTL, IsInitialization);
 }
 
 void ManagedValue::assignInto(SILGenFunction &SGF, SILLocation loc,
                               SILValue address) {
-  assert(isPlusOne(SGF));
+  assert(isPlusOneOrTrivial(SGF));
   auto &addrTL = SGF.getTypeLowering(address->getType());
   SGF.emitSemanticStore(loc, forward(SGF), address, addrTL,
                         IsNotInitialization);
@@ -170,7 +181,7 @@ void ManagedValue::assignInto(SILGenFunction &SGF, SILLocation loc,
 
 void ManagedValue::forwardInto(SILGenFunction &SGF, SILLocation loc,
                                Initialization *dest) {
-  assert(isPlusOne(SGF));
+  assert(isPlusOneOrTrivial(SGF) || dest->isBorrow());
   dest->copyOrInitValueInto(SGF, loc, *this, /*isInit*/ true);
   dest->finishInitialization(SGF);
 }
@@ -208,8 +219,8 @@ ManagedValue ManagedValue::materialize(SILGenFunction &SGF,
     return ManagedValue::forOwnedAddressRValue(
         temporary, SGF.enterDestroyCleanup(temporary));
   }
-  auto &lowering = SGF.getTypeLowering(getType());
-  if (lowering.isAddressOnly()) {
+  auto props = SGF.getTypeProperties(getType());
+  if (props.isAddressOnly()) {
     assert(!SGF.silConv.useLoweredAddresses());
     auto copy = SGF.B.createCopyValue(loc, getValue());
     SGF.B.emitStoreValueOperation(loc, copy, temporary,
@@ -228,7 +239,7 @@ ManagedValue ManagedValue::formallyMaterialize(SILGenFunction &SGF,
                                                SILLocation loc) const {
   auto temporary = SGF.emitTemporaryAllocation(loc, getType());
   bool hadCleanup = hasCleanup();
-  auto &lowering = SGF.getTypeLowering(getType());
+  auto props = SGF.getTypeProperties(getType());
 
   if (hadCleanup) {
     SGF.B.emitStoreValueOperation(loc, forward(SGF), temporary,
@@ -237,7 +248,7 @@ ManagedValue ManagedValue::formallyMaterialize(SILGenFunction &SGF,
     return ManagedValue::forOwnedAddressRValue(
         temporary, SGF.enterDestroyCleanup(temporary));
   }
-  if (lowering.isAddressOnly()) {
+  if (props.isAddressOnly()) {
     assert(!SGF.silConv.useLoweredAddresses());
     auto copy = SGF.B.createCopyValue(loc, getValue());
     SGF.B.emitStoreValueOperation(loc, copy, temporary,
@@ -281,7 +292,7 @@ ManagedValue ManagedValue::ensurePlusOne(SILGenFunction &SGF,
   if (isa<SILUndef>(getValue()))
     return *this;
 
-  if (!isPlusOne(SGF)) {
+  if (!isPlusOneOrTrivial(SGF)) {
     return copy(SGF, loc);
   }
   return *this;
@@ -293,17 +304,18 @@ bool ManagedValue::isPlusOne(SILGenFunction &SGF) const {
   if (isa<SILUndef>(getValue()))
     return true;
 
-  // Ignore trivial values since for our purposes they are always at +1 since
-  // they can always be passed to +1 APIs.
-  if (getType().isTrivial(SGF.F))
-    return true;
-
-  // If we have an object and the object has any ownership, the same
-  // property applies.
+  // A value without ownership can always be passed to +1 APIs.
+  //
+  // This is not true for address types because deinitializing an in-memory
+  // value invalidates the storage.
   if (getType().isObject() && getOwnershipKind() == OwnershipKind::None)
     return true;
 
   return hasCleanup();
+}
+
+bool ManagedValue::isPlusOneOrTrivial(SILGenFunction &SGF) const {
+  return getType().isTrivial(SGF.F) || isPlusOne(SGF);
 }
 
 bool ManagedValue::isPlusZero() const {

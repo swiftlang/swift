@@ -1,0 +1,28 @@
+module BasicBridging {
+  header "swift/Basic/BasicBridging.h"
+  requires cplusplus
+  export *
+}
+
+module ASTBridging {
+  header "swift/AST/ASTBridging.h"
+  requires cplusplus
+  export *
+}
+
+module IDEBridging {
+  header "swift/IDE/IDEBridging.h"
+  requires cplusplus
+  export *
+}
+
+module SILBridging {
+  header "swift/SIL/SILBridging.h"
+  requires cplusplus
+  export *
+}
+
+module OptimizerBridging {
+  header "swift/SILOptimizer/OptimizerBridging.h"
+  export *
+}

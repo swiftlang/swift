@@ -1,26 +1,10 @@
-// BEGIN MyModule.swift
-public actor MyActor {
-  public func asyncFunc(fn: () async -> Void) async throws {}
-}
-
-func test(act: MyActor) async throws {
-    try await act.asyncFunc {}
-}
-
-// BEGIN App.swift
-import MyModule
-
-func test(act: MyActor) async throws {
-    try await act.asyncFunc {}
-}
-
 // REQUIRES: concurrency
 
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/split_file.py -o %t %s
-
 // RUN: %empty-directory(%t/Modules)
-// RUN: %target-swift-frontend -emit-module -o %t/Modules/MyModule.swiftmodule -module-name MyModule %t/MyModule.swift  -disable-availability-checking
+// RUN: split-file %s %t
+
+// RUN: %target-swift-frontend -emit-module -o %t/Modules/MyModule.swiftmodule -module-name MyModule %t/MyModule.swift  -target %target-swift-5.1-abi-triple
 
 // RUN: %sourcekitd-test -req=cursor -pos=1:15 %t/MyModule.swift -- %t/MyModule.swift -target %target-triple  | %FileCheck -check-prefix=ACTOR %s
 // RUN: %sourcekitd-test -req=cursor -pos=2:15 %t/MyModule.swift -- %t/MyModule.swift -target %target-triple  | %FileCheck -check-prefix=FUNC %s
@@ -41,3 +25,19 @@ func test(act: MyActor) async throws {
 
 // FUNC_XMOD: <Declaration>func asyncFunc(fn: () async -&gt; <Type usr="s:s4Voida">Void</Type>) async throws</Declaration>
 // FUNC_XMOD: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>asyncFunc</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>fn</decl.var.parameter.argument_label>: <decl.var.parameter.type>() <syntaxtype.keyword>async</syntaxtype.keyword> -&gt; <decl.function.returntype><ref.typealias usr="s:s4Voida">Void</ref.typealias></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>async</syntaxtype.keyword> <syntaxtype.keyword>throws</syntaxtype.keyword></decl.function.method.instance>
+
+//--- MyModule.swift
+public actor MyActor {
+  public func asyncFunc(fn: () async -> Void) async throws {}
+}
+
+func test(act: MyActor) async throws {
+    try await act.asyncFunc {}
+}
+
+//--- App.swift
+import MyModule
+
+func test(act: MyActor) async throws {
+    try await act.asyncFunc {}
+}

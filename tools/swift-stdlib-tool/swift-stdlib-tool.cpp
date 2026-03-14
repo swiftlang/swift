@@ -760,7 +760,7 @@ std::vector<uint8_t> readToEOF(int fd) {
   ssize_t readSize = 0;
   while ((readSize = read(fd, readBuffer, BUFFER_SIZE)) > 0) {
     retData.reserve(retData.size() + readSize);
-    std::copy(readBuffer, readBuffer + readSize, std::back_inserter(retData));
+    std::copy_n(readBuffer, readSize, std::back_inserter(retData));
   }
   return retData;
 }

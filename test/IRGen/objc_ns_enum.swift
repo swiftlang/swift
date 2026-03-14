@@ -21,6 +21,14 @@ import gizmo
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i32 @main
 // CHECK:         call swiftcc %swift.metadata_response @"$sSo16NSRuncingOptionsVMa"(i64 0)
 
+func use_metadata<T: Equatable>(_ t:T){}
+use_metadata(NSRuncingOptions.mince)
+
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo16NSRuncingOptionsVMa"(i64 %0)
+// CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0,
+// CHECK-SAME:    @"$sSo16NSRuncingOptionsVMf"
+// CHECK-SAME:    [[NOUNWIND_READNONE:#[0-9]+]]
+
 // CHECK: define hidden swiftcc i16 @"$s12objc_ns_enum09imported_C9_inject_aSo16NSRuncingOptionsVyF"()
 // CHECK:   ret i16 123
 func imported_enum_inject_a() -> NSRuncingOptions {
@@ -87,42 +95,34 @@ func test_enum_without_name_Equatable(_ obj: TestThatEnumType) -> Bool {
   return obj.getValue() != .ValueOfThatEnumType
 }
 
-func use_metadata<T: Equatable>(_ t:T){}
-use_metadata(NSRuncingOptions.mince)
-
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo16NSRuncingOptionsVMa"(i64 %0)
-// CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0,
-// CHECK-SAME:    @"$sSo16NSRuncingOptionsVMf"
-// CHECK-SAME:    [[NOUNWIND_READNONE:#[0-9]+]]
-
 @objc enum ExportedToObjC: Int {
   case Foo = -1, Bar, Bas
 }
 
 @objc class ObjCEnumMethods : NSObject {
-  // CHECK: define internal void @"$s12objc_ns_enum15ObjCEnumMethodsC0C2InyyAA010ExportedToD1COFTo"([[OBJC_ENUM_METHODS:.*]]* %0, i8* %1, i64 %2)
+  // CHECK: define internal void @"$s12objc_ns_enum15ObjCEnumMethodsC0C2InyyAA010ExportedToD1COFTo"(ptr %0, ptr %1, i64 %2)
   @objc dynamic func enumIn(_ x: ExportedToObjC) {}
-  // CHECK: define internal i64 @"$s12objc_ns_enum15ObjCEnumMethodsC0C3OutAA010ExportedToD1COyFTo"([[OBJC_ENUM_METHODS]]* %0, i8* %1)
+  // CHECK: define internal i64 @"$s12objc_ns_enum15ObjCEnumMethodsC0C3OutAA010ExportedToD1COyFTo"(ptr %0, ptr %1)
   @objc dynamic func enumOut() -> ExportedToObjC { return .Foo }
 
-  // CHECK: define internal i64 @"$s12objc_ns_enum15ObjCEnumMethodsC4propAA010ExportedToD1COvgTo"([[OBJC_ENUM_METHODS]]* %0, i8* %1)
-  // CHECK: define internal void @"$s12objc_ns_enum15ObjCEnumMethodsC4propAA010ExportedToD1COvsTo"([[OBJC_ENUM_METHODS]]* %0, i8* %1, i64 %2)
+  // CHECK: define internal i64 @"$s12objc_ns_enum15ObjCEnumMethodsC4propAA010ExportedToD1COvgTo"(ptr %0, ptr %1)
+  // CHECK: define internal void @"$s12objc_ns_enum15ObjCEnumMethodsC4propAA010ExportedToD1COvsTo"(ptr %0, ptr %1, i64 %2)
   @objc dynamic var prop: ExportedToObjC = .Foo
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s12objc_ns_enum0a1_C13_method_callsyyAA15ObjCEnumMethodsCF"(%T12objc_ns_enum15ObjCEnumMethodsC* %0)
+// CHECK-LABEL: define hidden swiftcc void @"$s12objc_ns_enum0a1_C13_method_callsyyAA15ObjCEnumMethodsCF"(ptr %0)
 func objc_enum_method_calls(_ x: ObjCEnumMethods) {
   
-  // CHECK: call i64 bitcast (void ()* @objc_msgSend to i64 ([[OBJC_ENUM_METHODS]]*, i8*)*)
-  // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJC_ENUM_METHODS]]*, i8*, i64)*)
+  // CHECK: call i64 @objc_msgSend
+  // CHECK: call void @objc_msgSend
   x.enumIn(x.enumOut())
-  // CHECK: call i64 bitcast (void ()* @objc_msgSend to i64 ([[OBJC_ENUM_METHODS]]*, i8*)*)
-  // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJC_ENUM_METHODS]]*, i8*, i64)*)
+  // CHECK: call i64 @objc_msgSend
+  // CHECK: call void @objc_msgSend
   x.enumIn(x.prop)
-  // CHECK: call i64 bitcast (void ()* @objc_msgSend to i64 ([[OBJC_ENUM_METHODS]]*, i8*)*)
-  // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJC_ENUM_METHODS]]*, i8*, i64)*)
+  // CHECK: call i64 @objc_msgSend
+  // CHECK: call void @objc_msgSend
   x.prop = x.enumOut()
 }
 
-// CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
+// CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind memory(none) }
 

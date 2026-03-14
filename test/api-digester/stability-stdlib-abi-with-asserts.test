@@ -3,6 +3,7 @@
 // RUN: %api-digester -diagnose-sdk -module Swift -o %t.tmp/changes.txt -module-cache-path %t.tmp/module-cache -sdk %t.tmp/dummy.sdk -abi -avoid-location
 // RUN: %clang -E -P -x c %S/stability-stdlib-abi-without-asserts.test -o - > %t.tmp/stability-stdlib-abi.swift.expected
 // RUN: %clang -E -P -x c %S/stability-stdlib-abi-with-asserts.test -o - >> %t.tmp/stability-stdlib-abi.swift.expected
+// RUN: %clang -E -P -x c %S/Inputs/stability-stdlib-abi-without-asserts-%target-cpu.txt -o - >> %t.tmp/stability-stdlib-abi.swift.expected
 // RUN: %clang -E -P -x c %t.tmp/stability-stdlib-abi.swift.expected -o - | sed '/^\s*$/d' | sort > %t.tmp/stability-stdlib-abi.swift.expected.sorted
 // RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed -E -e '/^\s*$/d' -e 's/ in _[0-9A-F]{32}/ in #UNSTABLE ID#/g' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected.sorted %t.tmp/changes.txt.tmp
@@ -46,7 +47,8 @@
 // https://github.com/apple/swift/issues/55803
 // We currently only have a baseline for Intel CPUs on macOS.
 // REQUIRES: OS=macosx
-// REQUIRES: CPU=x86_64
+// XFAIL: CPU=arm64e
+
 
 // The digester can incorrectly register a generic signature change when
 // declarations are shuffled. rdar://problem/46618883
@@ -56,12 +58,14 @@
 
 // Note: normally you'll need to add new entries to
 // `stability-stdlib-abi-without-asserts.test`, not this file.
-Func _collectReferencesInsideObject(_:) is a new API without @available attribute
-Func _loadDestroyTLSCounter() is a new API without @available attribute
-Func _measureRuntimeFunctionCountersDiffs(objects:_:) is a new API without @available attribute
-Protocol _RuntimeFunctionCountersStats is a new API without @available attribute
-Struct _GlobalRuntimeFunctionCountersState is a new API without @available attribute
-Struct _ObjectRuntimeFunctionCountersState is a new API without @available attribute
-Struct _RuntimeFunctionCounters is a new API without @available attribute
+Func _collectReferencesInsideObject(_:) is a new API without '@available'
+Func _loadDestroyTLSCounter() is a new API without '@available'
+Func _measureRuntimeFunctionCountersDiffs(objects:_:) is a new API without '@available'
+Protocol _RuntimeFunctionCountersStats is a new API without '@available'
+Struct _GlobalRuntimeFunctionCountersState is a new API without '@available'
+Struct _ObjectRuntimeFunctionCountersState is a new API without '@available'
+Struct _RuntimeFunctionCounters is a new API without '@available'
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+
+

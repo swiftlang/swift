@@ -16,7 +16,7 @@ class SomeClass  : SomeProtocol {
   func foo() -> Int
 }
 
-sil hidden [thunk] [always_inline] [ossa] @foo_ : $@convention(witness_method:SomeProtocol) (@in_guaranteed SomeClass) -> Int {
+sil hidden [thunk] [heuristic_always_inline] [ossa] @foo_ : $@convention(witness_method:SomeProtocol) (@in_guaranteed SomeClass) -> Int {
 bb0(%0 : $*SomeClass):
   %1 = load_borrow %0 : $*SomeClass
   %2 = class_method %1 : $SomeClass, #SomeClass.foo : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int

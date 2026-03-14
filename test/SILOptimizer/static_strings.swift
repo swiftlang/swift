@@ -9,16 +9,22 @@
 // REQUIRES: CPU=arm64 || CPU=x86_64
 // REQUIRES: swift_in_compiler
 
+// The required relocation format for a single return LLVM instruction are not necessarily
+// supported on object file formats other than Mach-O.
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchOS || OS=xros
+
 // This is an end-to-end test to ensure that the optimizer generates
 // optimal code for static String variables.
 
 public struct S {
-  // CHECK: {{^@"}}[[SMALL:.*smallstr.*pZ]]" ={{.*}} global {{.*}} inttoptr
+  // CHECK: {{^@"}}[[SMALL:.*smallstr.*pZ]]" ={{.*}} constant {{.*}} inttoptr
   public static let smallstr = "abc123a"
-  // CHECK: {{^@"}}[[LARGE:.*largestr.*pZ]]" ={{.*}} global {{.*}} inttoptr {{.*}} add
+  // CHECK: {{^@"}}[[LARGE:.*largestr.*pZ]]" ={{.*}} constant {{.*}} inttoptr {{.*}} add
   public static let largestr = "abc123asd3sdj3basfasdf"
-  // CHECK: {{^@"}}[[UNICODE:.*unicodestr.*pZ]]" ={{.*}} global {{.*}} inttoptr {{.*}} add
+  // CHECK: {{^@"}}[[UNICODE:.*unicodestr.*pZ]]" ={{.*}} constant {{.*}} inttoptr {{.*}} add
   public static let unicodestr = "❄️gastroperiodyni"
+  // CHECK: {{^@"}}[[EMPTY:.*emptystr.*pZ]]" ={{.*}} constant {{.*}} inttoptr
+  public static let emptystr = ""
 }
 
 // unsafeMutableAddressor for S.smallstr
@@ -40,10 +46,10 @@ public struct S {
 // CHECK-NEXT: }
 
 // getter for S.largestr
-// CHECK: define {{.*largestr.*}}gZ"
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK:      define {{.*largestr.*}}gZ"
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 
 // unsafeMutableAddressor for S.unicodestr
 // CHECK: define {{.*unicodestr.*}}u"
@@ -53,6 +59,18 @@ public struct S {
 
 // getter for S.unicodestr
 // CHECK: define {{.*unicodestr.*}}gZ"
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
+
+// unsafeMutableAddressor for S.emptystr
+// CHECK: define {{.*emptystr.*}}u"
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   ret {{.*}} @"[[EMPTY]]"
+// CHECK-NEXT: }
+
+// getter for S.emptystr
+// CHECK: define {{.*emptystr.*}}gZ"
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   ret {{.*}}
 // CHECK-NEXT: }
@@ -67,31 +85,31 @@ public func get_smallstr() -> String {
 }
 
 // CHECK-LABEL: define {{.*}}get_largestr
-// CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 @inline(never)
 public func get_largestr() -> String {
   return S.largestr
 }
 
 // CHECK-LABEL: define {{.*}}get_unicodestr
-// CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 @inline(never)
 public func get_unicodestr() -> String {
   return S.unicodestr
 }
 
-// Also check if the generated code is correct.
-
-// CHECK-OUTPUT: abc123a
-// CHECK-OUTPUT: abc123asd3sdj3basfasdf
-// CHECK-OUTPUT: ❄️gastroperiodyni
-print(get_smallstr())
-print(get_largestr())
-print(get_unicodestr())
+// CHECK-LABEL: define {{.*}}get_emptystr
+// CHECK:      entry:
+// CHECK-NEXT:   ret {{.*}}
+// CHECK-NEXT: }
+@inline(never)
+public func get_emptystr() -> String {
+  return S.emptystr
+}
 
 // Really load the globals from their addresses.
 @_optimize(none)
@@ -99,10 +117,27 @@ func print_strings_from_addressors() {
   print(S.smallstr)
   print(S.largestr)
   print(S.unicodestr)
+  print("<\(S.emptystr)>")
 }
 
-// CHECK-OUTPUT: abc123a
-// CHECK-OUTPUT: abc123asd3sdj3basfasdf
-// CHECK-OUTPUT: ❄️gastroperiodyni
-print_strings_from_addressors()
+@inline(never)
+func testit() {
+  // Also check if the generated code is correct.
+  
+  // CHECK-OUTPUT: abc123a
+  // CHECK-OUTPUT: abc123asd3sdj3basfasdf
+  // CHECK-OUTPUT: ❄️gastroperiodyni
+  // CHECK-OUTPUT: <>
+  print(get_smallstr())
+  print(get_largestr())
+  print(get_unicodestr())
+  print("<\(get_emptystr())>")
+  
+  // CHECK-OUTPUT: abc123a
+  // CHECK-OUTPUT: abc123asd3sdj3basfasdf
+  // CHECK-OUTPUT: ❄️gastroperiodyni
+  // CHECK-OUTPUT: <>
+  print_strings_from_addressors()
+}
 
+testit()

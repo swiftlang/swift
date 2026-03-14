@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -sil-verify-all -emit-sil -primary-file %s -o /dev/null -verify
 //
 // Tests for yield-once diagnostics emitted for generalized accessors.
 
@@ -358,7 +357,7 @@ struct TestExplicitReturn {
       if flag {
         stored = 2
       }
-      return // expected-error {{accessor must yield before returning}}
+      return; // expected-error {{accessor must yield before returning}}
 
       if !flag { // expected-warning {{code after 'return' will never be executed}}
         stored = 3

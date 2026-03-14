@@ -5,6 +5,10 @@ sil_stage canonical
 
 import Builtin
 import Swift
+import SwiftShims
+
+// CHECK-LABEL: sil_global private @privateGlobal
+sil_global private @privateGlobal : $Int64
 
 // This function needs to be removed.
 // KEEP-NOT: @remove_me
@@ -22,9 +26,55 @@ sil_global @globalFunctionPointer : $@callee_guaranteed () -> () = {
   %initval = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
 }
 
+// CHECK-LABEL: sil_global private @self_referencing_private_global
+sil_global private @self_referencing_private_global : $Builtin.RawPointer = {
+  %0 = global_addr @self_referencing_private_global : $*Builtin.RawPointer
+  %initval = address_to_pointer %0 : $*Builtin.RawPointer to $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil_global private @referencing_other_private_global
+sil_global private @referencing_other_private_global : $Builtin.RawPointer = {
+  %0 = global_addr @self_referencing_private_global : $*Builtin.RawPointer
+  %initval = address_to_pointer %0 : $*Builtin.RawPointer to $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil_global @referencing_private_globals
+sil_global @referencing_private_globals : $Builtin.RawPointer = {
+  %0 = global_addr @referencing_other_private_global : $*Builtin.RawPointer
+  %initval = address_to_pointer %0 : $*Builtin.RawPointer to $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil_global private @array_buffer
+sil_global private @array_buffer : $_ContiguousArrayStorage<Int> = {
+  %0 = integer_literal $Builtin.Int64, 3
+  %1 = struct $Int (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 6
+  %3 = struct $UInt (%2 : $Builtin.Int64)
+  %4 = struct $_SwiftArrayBodyStorage (%1 : $Int, %3 : $UInt)
+  %5 = struct $_ArrayBody (%4 : $_SwiftArrayBodyStorage)
+  %6 = integer_literal $Builtin.Int64, 1
+  %7 = struct $Int (%6 : $Builtin.Int64)
+  %8 = integer_literal $Builtin.Int64, 2
+  %9 = struct $Int (%8 : $Builtin.Int64)
+  %initval = object $_ContiguousArrayStorage<Int> (%5 : $_ArrayBody, [tail_elems] %7 : $Int, %9 : $Int, %1 : $Int)
+}
+
+// CHECK-LABEL: sil_global @referencing_object
+sil_global @referencing_object : $Builtin.BridgeObject = {
+  %0 = global_value @array_buffer : $_ContiguousArrayStorage<Int>
+  %initval = unchecked_ref_cast %0 : $_ContiguousArrayStorage<Int> to $Builtin.BridgeObject
+}
+
+// KEEP-NOT: @dead_self_referencing_private_global
+sil_global private @dead_self_referencing_private_global : $Builtin.RawPointer = {
+  %0 = global_addr @dead_self_referencing_private_global : $*Builtin.RawPointer
+  %initval = address_to_pointer %0 : $*Builtin.RawPointer to $Builtin.RawPointer
+}
+
 // CHECK-LABEL: sil private @alivePrivateFunc
 sil private @alivePrivateFunc : $@convention(thin) () -> () {
 bb0:
+  alloc_global @privateGlobal
   %0 = tuple ()
   return %0 : $()
 }

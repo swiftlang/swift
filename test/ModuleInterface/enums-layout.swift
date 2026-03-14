@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-module-interface-path %t/Lib.swiftinterface -emit-module -o %t/unused.swiftmodule -enable-library-evolution -Xfrontend -enable-objc-interop -Xfrontend -disable-objc-attr-requires-foundation-module -swift-version 5 %S/Inputs/enums-layout-helper.swift -module-name Lib
+// RUN: %target-build-swift -no-emit-module-separately -emit-module-interface-path %t/Lib.swiftinterface -emit-module -o %t/unused.swiftmodule -enable-library-evolution -Xfrontend -enable-objc-interop -Xfrontend -disable-objc-attr-requires-foundation-module -swift-version 5 %S/Inputs/enums-layout-helper.swift -module-name Lib
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK-MULTI-FILE %S/Inputs/enums-layout-helper.swift < %t/Lib.swiftinterface
 // RUN: %target-swift-frontend -enable-objc-interop -compile-module-from-interface %t/Lib.swiftinterface -o  %t/compiled-from-interface.swiftmodule -module-name Lib
 // RUN: %target-swift-frontend -enable-objc-interop -O -emit-ir -primary-file %s -I %t -Xllvm -swiftmergefunc-threshold=0 | %FileCheck %s
@@ -18,10 +18,10 @@ import Lib
 func testFutureproofEnum() -> FutureproofEnum {
   // Check a few things in the function to make sure it's getting the case
   // representation dynamically.
-  // CHECK: [[CASE:%.+]] = load i32, i32* @"$s3Lib15FutureproofEnumO1byA2CmFWC"
+  // CHECK: [[CASE:%.+]] = load i32, ptr @"$s3Lib15FutureproofEnumO1byA2CmFWC"
   // CHECK: [[METADATA_RESPONSE:%.+]] = tail call swiftcc %swift.metadata_response @"$s3Lib15FutureproofEnumOMa"
   // CHECK: [[METADATA:%.+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
-  // CHECK: call void {{%.+}}(%swift.opaque* noalias %0, i32 [[CASE]], %swift.type* [[METADATA]])
+  // CHECK: call void {{%.+}}(ptr noalias %0, i32 [[CASE]], ptr [[METADATA]])
   // CHECK-NEXT: ret void
   return .b
 } // CHECK-NEXT: {{^}$}}
@@ -46,20 +46,20 @@ func testFrozenObjCEnum() -> FrozenObjCEnum {
 
 // CHECK-LABEL: define{{.+}}testFutureproofUnicodeScalarEnum
 func testFutureproofUnicodeScalarEnum() -> FutureproofUnicodeScalarEnum {
-  // CHECK: [[CASE:%.+]] = load i32, i32* @"$s3Lib28FutureproofUnicodeScalarEnumO1ayA2CmFWC"
+  // CHECK: [[CASE:%.+]] = load i32, ptr @"$s3Lib28FutureproofUnicodeScalarEnumO1ayA2CmFWC"
   // CHECK: [[METADATA_RESPONSE:%.+]] = tail call swiftcc %swift.metadata_response @"$s3Lib28FutureproofUnicodeScalarEnumOMa"
   // CHECK: [[METADATA:%.+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
-  // CHECK: call void {{%.+}}(%swift.opaque* noalias %0, i32 [[CASE]], %swift.type* [[METADATA]])
+  // CHECK: call void {{%.+}}(ptr noalias %0, i32 [[CASE]], ptr [[METADATA]])
   // CHECK-NEXT: ret void
   return .a
 }
 
 // CHECK-LABEL: define{{.+}}testFutureproofIndirectEnum
 func testFutureproofIndirectEnum() -> FutureproofIndirectEnum {
-  // CHECK: [[CASE:%.+]] = load i32, i32* @"$s3Lib23FutureproofIndirectEnumO1cyA2CmFWC"
+  // CHECK: [[CASE:%.+]] = load i32, ptr @"$s3Lib23FutureproofIndirectEnumO1cyA2CmFWC"
   // CHECK: [[METADATA_RESPONSE:%.+]] = tail call swiftcc %swift.metadata_response @"$s3Lib23FutureproofIndirectEnumOMa"
   // CHECK: [[METADATA:%.+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
-  // CHECK: call void {{%.+}}(%swift.opaque* noalias %0, i32 [[CASE]], %swift.type* [[METADATA]])
+  // CHECK: call void {{%.+}}(ptr noalias %0, i32 [[CASE]], ptr [[METADATA]])
   // CHECK-NEXT: ret void
   return .c
 }
@@ -74,10 +74,10 @@ func testFrozenIndirectEnum() -> FrozenIndirectEnum {
 
 // CHECK-LABEL: define{{.+}}testFutureproofIndirectCaseEnum
 func testFutureproofIndirectCaseEnum() -> FutureproofIndirectCaseEnum {
-  // CHECK: [[CASE:%.+]] = load i32, i32* @"$s3Lib27FutureproofIndirectCaseEnumO1cyA2CmFWC"
+  // CHECK: [[CASE:%.+]] = load i32, ptr @"$s3Lib27FutureproofIndirectCaseEnumO1cyA2CmFWC"
   // CHECK: [[METADATA_RESPONSE:%.+]] = tail call swiftcc %swift.metadata_response @"$s3Lib27FutureproofIndirectCaseEnumOMa"
   // CHECK: [[METADATA:%.+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
-  // CHECK: call void {{%.+}}(%swift.opaque* noalias %0, i32 [[CASE]], %swift.type* [[METADATA]])
+  // CHECK: call void {{%.+}}(ptr noalias %0, i32 [[CASE]], ptr [[METADATA]])
   // CHECK-NEXT: ret void
   return .c
 }

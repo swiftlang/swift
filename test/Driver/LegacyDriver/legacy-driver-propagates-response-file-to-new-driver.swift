@@ -3,11 +3,12 @@
 // preserving response files) instead of trying to spawn the process with the
 // expansion, which may exceed `ARG_MAX`.
 
-// REQUIRES: shell
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %{python} -c 'for i in range(500001): print("-DTEST5_" + str(i))' > %t.resp
-// RUN: cp %S/Inputs/print-args.sh %swift_obj_root/bin/legacy-driver-propagates-response-file.sh
-// RUN: env SWIFT_USE_NEW_DRIVER=legacy-driver-propagates-response-file.sh %swiftc_driver_plain %s @%t.resp | %FileCheck %s
-// RUN: rm %swift_obj_root/bin/legacy-driver-propagates-response-file.sh
+// RUN: cp %S/Inputs/print-args.sh %swift-bin-dir/legacy-driver-propagates-response-file.sh
+// RUN: env SWIFT_OVERLOAD_DRIVER=legacy-driver-propagates-response-file.sh %swiftc_driver_plain -disallow-use-new-driver %s @%t.resp | %FileCheck %s
+// RUN: rm %swift-bin-dir/legacy-driver-propagates-response-file.sh
 
 // CHECK:      -Xfrontend
 // CHECK-NEXT: -new-driver-path

@@ -56,8 +56,8 @@ namespace index {
 bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
                     StringRef indexStorePath, bool indexClangModules,
                     bool indexSystemModules, bool skipStdlib,
-                    bool includeLocals, bool isDebugCompilation,
-                    StringRef targetTriple,
+                    bool includeLocals, bool compress, bool isDebugCompilation,
+                    bool isExplicitModuleBuild, StringRef targetTriple,
                     const DependencyTracker &dependencyTracker,
                     const PathRemapper &pathRemapper);
 
@@ -98,8 +98,9 @@ bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
 bool indexAndRecord(ModuleDecl *module, ArrayRef<std::string> indexUnitTokens,
                     StringRef moduleUnitToken, StringRef indexStorePath,
                     bool indexClangModules, bool indexSystemModules,
-                    bool skipStdlib, bool includeLocals,
-                    bool isDebugCompilation, StringRef targetTriple,
+                    bool skipStdlib, bool includeLocals, bool compress,
+                    bool isDebugCompilation, bool isExplicitModuleBuild,
+                    StringRef targetTriple,
                     const DependencyTracker &dependencyTracker,
                     const PathRemapper &pathRemapper);
 // FIXME: indexUnitTokens could be StringRef, but that creates an impedance

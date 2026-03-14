@@ -5,14 +5,26 @@
 
 import Foundation
 
-@objc protocol P {}
+@objc protocol P: Q {
+  func foo()
+}
+
+@objc protocol Q {
+  func bar()
+}
 
 @_optimize(none)
-func takesP<T : P>(_: T) {}
+func takesP<T : P>(_ t: T) {}
+
+@_optimize(none)
+func takesQ<T : Q>(_ t: T) {}
 
 @inline(__always)
 func callsTakesP<T : P>(_ t: T) {
   takesP(t)
+  takesQ(t)
+  t.foo()
+  t.bar()
 }
 
 // CHECK-LABEL: sil hidden @$s26specialize_self_conforming16callsTakesPWithPyyAA1P_pF : $@convention(thin) (@guaranteed any P) -> () {

@@ -31,8 +31,7 @@ func optionalMembers1(_ a: HasOptionalMembers1) {
 // OPTIONAL_MEMBERS_1: Begin completions, 3 items
 // OPTIONAL_MEMBERS_1-DAG: Decl[InstanceMethod]/CurrNominal: optionalInstanceFunc?()[#Int#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: optionalInstanceProperty[#Int?#]{{; name=.+$}}
-// OPTIONAL_MEMBERS_1-DAG: Keyword[self]/CurrNominal: self[#HasOptionalMembers1#]; name=self
-// OPTIONAL_MEMBERS_1: End completions
+// OPTIONAL_MEMBERS_1-DAG: Keyword[self]/CurrNominal: self[#any HasOptionalMembers1#]; name=self
 
 func optionalMembers2<T : HasOptionalMembers1>(_ a: T) {
   T.#^OPTIONAL_MEMBERS_2^#
@@ -41,6 +40,5 @@ func optionalMembers2<T : HasOptionalMembers1>(_ a: T) {
 // OPTIONAL_MEMBERS_2-DAG: Decl[InstanceMethod]/CurrNominal: optionalInstanceFunc?({#(self): HasOptionalMembers1#})[#() -> Int#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_2-DAG: Decl[StaticMethod]/CurrNominal: optionalClassFunc?()[#Int#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_2-DAG: Decl[StaticVar]/CurrNominal: optionalClassProperty[#Int?#]{{; name=.+$}}
-// OPTIONAL_MEMBERS_2-DAG: Keyword[self]/CurrNominal: self[#T.Type#]; name=self
-// OPTIONAL_MEMBERS_2-DAG: Keyword/CurrNominal: Type[#T.Type#]; name=Type
-// OPTIONAL_MEMBERS_2: End completions
+// OPTIONAL_MEMBERS_2-DAG: Keyword[self]/CurrNominal: self[#HasOptionalMembers1.Type#]; name=self
+// OPTIONAL_MEMBERS_2-DAG: Keyword/CurrNominal: Type[#HasOptionalMembers1.Type#]; name=Type

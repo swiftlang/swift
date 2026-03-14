@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -enable-experimental-feature ResultBuilderASTTransform -module-name main -I %t -L %t %s -o %t/main %target-rpath(%t)
+// RUN: %target-build-swift -module-name main -I %t -L %t %s -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

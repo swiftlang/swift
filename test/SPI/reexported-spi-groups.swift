@@ -53,29 +53,30 @@
 /// Test diagnostics of a multifile client
 // RUN: %target-swift-frontend -typecheck \
 // RUN:   %t/Client_FileA.swift %t/Client_FileB.swift\
-// RUN:   -swift-version 5 -I %t -verify
+// RUN:   -swift-version 5 -I %t -verify -verify-ignore-unrelated
 
-/// Test that SPIs aren't avaible from a reexport without export_as
+/// SPIs are now reexported by any `@_exported` from Swift modules, no matter
+/// if `export_as` is present or not.
 // RUN: %target-swift-frontend -typecheck \
 // RUN:   %t/NonExportedAsClient.swift \
-// RUN:   -swift-version 5 -I %t -verify
+// RUN:   -swift-version 5 -I %t -verify -verify-ignore-unrelated
 
 /// Test that SPIs don't leak when not reexported
 // RUN: %target-swift-frontend -typecheck \
 // RUN:   %t/NonExporterClient.swift \
-// RUN:   -swift-version 5 -I %t -verify
+// RUN:   -swift-version 5 -I %t -verify -verify-ignore-unrelated
 
 /// Test diagnostics against private swiftinterfaces
 // RUN: rm %t/Exported.swiftmodule %t/Exporter.swiftmodule
 // RUN: %target-swift-frontend -typecheck \
 // RUN:   %t/Client_FileA.swift %t/Client_FileB.swift\
-// RUN:   -swift-version 5 -I %t -verify
+// RUN:   -swift-version 5 -I %t -verify -verify-ignore-unrelated
 
 /// Test diagnostics against public swiftinterfaces
 // RUN: rm %t/Exported.private.swiftinterface %t/Exporter.private.swiftinterface
 // RUN: %target-swift-frontend -typecheck \
 // RUN:   %t/PublicClient.swift \
-// RUN:   -swift-version 5 -I %t -verify
+// RUN:   -swift-version 5 -I %t -verify -verify-ignore-unrelated
 
 //--- module.modulemap
 module Exported {
@@ -91,6 +92,8 @@ public func exportedPublicFunc() {}
 @_spi(X) public func exportedSpiFunc() {}
 
 @_spi(X) public struct ExportedSpiType {}
+
+@_spi(O) public func exportedSpiFuncOtherGroup() {}
 
 //--- Exporter.swift
 
@@ -130,6 +133,7 @@ public func clientA() {
     exportedPublicFunc()
     exportedSpiFunc()
     exporterSpiFunc()
+    exportedSpiFuncOtherGroup() // expected-error {{cannot find 'exportedSpiFuncOtherGroup' in scope}}
 }
 
 @inlinable
@@ -159,7 +163,7 @@ public func clientB() {
 
 public func client() {
     exportedPublicFunc()
-    exportedSpiFunc() // expected-error {{cannot find 'exportedSpiFunc' in scope}}
+    exportedSpiFunc()
     exporterSpiFunc()
 }
 

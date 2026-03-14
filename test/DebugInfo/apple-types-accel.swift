@@ -22,12 +22,13 @@
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "foo"
 // CHECK-SAME:             identifier: "$s4main3fooCD"
 class foo {
-	var x : Int64 = 1
+  var x : Int64 = 1
 }
 
 func main() -> Int64 {
-	var thefoo = foo();
-	return thefoo.x
+  var y : Int64 = 2
+  var thefoo = foo();
+  return thefoo.x
 }
 
 main()

@@ -4,7 +4,7 @@
 // RUN: %target-build-swift -emit-module -o %t/System/Library/Frameworks/TestFramework.framework/Modules/TestFramework.swiftmodule/%target-swiftmodule-name -module-name TestFramework %s -DFRAMEWORK
 // RUN: %target-build-swift -emit-module -o %t/Library/Frameworks/TestFramework2.framework/Modules/TestFramework2.swiftmodule/%target-swiftmodule-name -module-name TestFramework2 %s -DFRAMEWORK
 
-// RUN: not %target-swift-frontend -typecheck -sdk %t -show-diagnostics-after-fatal %s 2>&1 | %FileCheck -check-prefix=CHECK-%target-runtime %s
+// RUN: not %target-swift-frontend -typecheck -sdk %t -show-diagnostics-after-fatal %s -diagnostic-style llvm 2>&1 | %FileCheck -check-prefix=CHECK-%target-runtime %s
 // FIXME: This isn't really about objc vs. native runtime,
 // but about Apple vs. non-Apple platforms.
 

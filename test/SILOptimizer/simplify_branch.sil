@@ -1,0 +1,101 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplification -simplify-instruction=br | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=br -sil-print-debuginfo | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+// CHECK-LABEL: sil @merge_blocks_same_location1
+// CHECK:         %0 = integer_literal $Builtin.Int64, 0
+// CHECK:         fix_lifetime %0 : $Builtin.Int64
+// CHECK:         return %0 : $Builtin.Int64
+// CHECK:       } // end sil function 'merge_blocks_same_location1'
+sil @merge_blocks_same_location1 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  br bb1(%0 : $Builtin.Int64), loc "a.swift":1:1
+
+bb1(%2 : $Builtin.Int64):
+  fix_lifetime %2 : $Builtin.Int64, loc "a.swift":1:1
+  return %2 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @merge_blocks_same_location2
+// CHECK:         %0 = integer_literal $Builtin.Int64, 0
+// CHECK:         fix_lifetime %0 : $Builtin.Int64
+// CHECK:         return %0 : $Builtin.Int64
+// CHECK:       } // end sil function 'merge_blocks_same_location2'
+sil @merge_blocks_same_location2 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0, loc "a.swift":1:1
+  br bb1(%0 : $Builtin.Int64), loc "a.swift":1:1
+
+bb1(%2 : $Builtin.Int64):
+  fix_lifetime %2 : $Builtin.Int64
+  return %2 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @merge_blocks_different_locations
+// CHECK:         %0 = integer_literal $Builtin.Int64, 0
+// CHECK-ONONE:   debug_step , loc "a.swift":2:1
+// CHECK:         fix_lifetime %0 : $Builtin.Int64
+// CHECK:         return %0 : $Builtin.Int64
+// CHECK:       } // end sil function 'merge_blocks_different_locations'
+sil @merge_blocks_different_locations : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0, loc "a.swift":1:1
+  br bb1(%0 : $Builtin.Int64), loc "a.swift":2:1
+
+bb1(%2 : $Builtin.Int64):
+  fix_lifetime %2 : $Builtin.Int64, loc "a.swift":3:1
+  return %2 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @dont_merge_blocks
+// CHECK:         bb1:
+// CHECK-NEXT:      br bb3
+// CHECK:         bb2:
+// CHECK-NEXT:      br bb3
+// CHECK:       } // end sil function 'dont_merge_blocks'
+sil @dont_merge_blocks : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_merge_block_in_single_cycle
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'dont_merge_block_in_single_cycle'
+sil @dont_merge_block_in_single_cycle : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  br bb1
+}
+
+// CHECK-LABEL: sil @dont_crash_with_unreachable_invalid_dominance
+// CHECK-NOT:     bb1
+// CHECK:       } // end sil function 'dont_crash_with_unreachable_invalid_dominance'
+sil @dont_crash_with_unreachable_invalid_dominance : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  return %0 : $Builtin.Int64
+
+bb1(%2 : $Builtin.Int64):
+  br bb2
+
+bb2:
+  br bb1(%2 : $Builtin.Int64)
+}
+

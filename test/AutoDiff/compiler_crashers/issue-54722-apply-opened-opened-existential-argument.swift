@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
 
 // https://github.com/apple/swift/issues/54722
 // Differentiation transform crash for `apply` with opened existential arguments
@@ -9,6 +9,7 @@ public protocol TensorView {
   associatedtype Element
 }
 public protocol DifferentiableTensorView: TensorView & Differentiable where Self == TangentVector {}
+// expected-warning@-1 {{protocol 'DifferentiableTensorView' should be declared to refine 'AdditiveArithmetic' due to a same-type constraint on 'Self'}}
 
 public protocol PlatformAPI {
   func abs<T>(_ x: T) -> T where T: DifferentiableTensorView, T.Element: Numeric
@@ -24,6 +25,8 @@ public final class Platform {
 @differentiable(reverse where T: DifferentiableTensorView)
 public func abs<T: DifferentiableTensorView>(_ x: T) -> T where T.Element: Numeric {
   Platform.service.abs(x)
+  // expected-error@-1 {{expression is not differentiable}}
+  // expected-note@-2 {{member is not differentiable because the corresponding protocol requirement is not '@differentiable'}}
 }
 
 // swift: swift/lib/AST/ASTContext.cpp:3307: swift::SILFunctionType::SILFunctionType(swift::GenericSignature, swift::SILFunctionType::ExtInfo, swift::SILCoroutineKind, swift::ParameterConvention, ArrayRef<swift::SILParameterInfo>, ArrayRef<swift::SIL
@@ -50,8 +53,8 @@ public func abs<T: DifferentiableTensorView>(_ x: T) -> T where T.Element: Numer
 //  #9 0x000000000179a806 swift::SILFunctionType::get(swift::GenericSignature, swift::SILFunctionType::ExtInfo, swift::SILCoroutineKind, swift::ParameterConvention, llvm::ArrayRef<swift::SILParameterInfo>, llvm::ArrayRef<swift::SILYieldInfo>, llvm::ArrayRef<swift::SILResultInfo>, llvm::Optional<swift::SILResultInfo>, swift::SubstitutionMap, swift::SubstitutionMap, swift::ASTContext const&, swift::ProtocolConformanceRef) (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0x179a806)
 // #10 0x00000000010bf7e8 (anonymous namespace)::SILTypeSubstituter::substSILFunctionType(swift::CanTypeWrapper<swift::SILFunctionType>, bool) (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0x10bf7e8)
 // #11 0x00000000010be86c swift::SILType::subst(swift::Lowering::TypeConverter&, llvm::function_ref<swift::Type (swift::SubstitutableType*)>, llvm::function_ref<swift::ProtocolConformanceRef (swift::CanType, swift::Type, swift::ProtocolDecl*)>, swift::CanGenericSignature, bool) const (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0x10be86c)
-// #12 0x00000000010ae3fe swift::GenericEnvironment::mapTypeIntoContext(swift::SILModule&, swift::SILType) const (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0x10ae3fe)
+// #12 0x00000000010ae3fe swift::GenericEnvironment::mapTypeIntoEnvironment(swift::SILModule&, swift::SILType) const (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0x10ae3fe)
 // #13 0x0000000000f1a1e1 swift::autodiff::LinearMapInfo::addLinearMapToStruct(swift::autodiff::ADContext&, swift::ApplyInst*) (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0xf1a1e1)
 // #14 0x0000000000f17925 swift::autodiff::LinearMapInfo::generateDifferentiationDataStructures(swift::autodiff::ADContext&, swift::SILFunction*) (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0xf17925)
 // #15 0x0000000000f2615f swift::autodiff::VJPEmitter::VJPEmitter(swift::autodiff::ADContext&, swift::SILFunction*, swift::SILDifferentiabilityWitness*, swift::SILFunction*, swift::autodiff::DifferentiationInvoker) (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0xf2615f)
-// #16 0x0000000000e7efff (anonymous namespace)::DifferentiationTransformer::canonicalizeDifferentiabilityWitness(swift::SILFunction*, swift::SILDifferentiabilityWitness*, swift::autodiff::DifferentiationInvoker, swift::IsSerialized_t) (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0xe7efff)
+// #16 0x0000000000e7efff (anonymous namespace)::DifferentiationTransformer::canonicalizeDifferentiabilityWitness(swift::SILFunction*, swift::SILDifferentiabilityWitness*, swift::autodiff::DifferentiationInvoker, swift::SerializedKind_t) (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0xe7efff)

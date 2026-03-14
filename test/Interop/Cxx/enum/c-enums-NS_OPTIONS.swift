@@ -3,8 +3,9 @@
 
 import CenumsNSOptions
 
-// CHECK: typealias NSBinarySearchingOptions = UInt
-// CHECK-NEXT: struct NSBinarySearchingOptions : OptionSet, @unchecked Sendable {
+// CHECK-NOT: typealias NSBinarySearchingOptions = UInt
+
+// CHECK: struct NSBinarySearchingOptions : OptionSet, @unchecked Sendable {
 // CHECK-NEXT:   init(rawValue: UInt)
 // CHECK-NEXT:   let rawValue: UInt
 // CHECK-NEXT:   typealias RawValue = UInt
@@ -19,4 +20,20 @@ import CenumsNSOptions
 // CHECK-NEXT:   static var insertionIndex: NSBinarySearchingOptions { get }
 // CHECK-NEXT:   @available(swift, obsoleted: 3, renamed: "insertionIndex")
 // CHECK-NEXT:   static var InsertionIndex: NSBinarySearchingOptions { get }
+// CHECK-NEXT: }
+
+// CHECK: struct Bar : OptionSet, @unchecked Sendable
+// CHECK: struct HasNSOptionField {
+// CHECK:   var bar: Bar
+// CHECK: }
+
+// CHECK: class HasNSOptionFieldObjC {
+// CHECK-NEXT:   var bar: Bar
+// CHECK-NEXT:   class func bar() -> Bar
+// CHECK-NEXT:   class func setBar(_ bar: Bar)
+// CHECK-NEXT: }
+
+// CHECK: class HasNSOptionFieldObjC2 {
+// CHECK-NEXT:   class func setBar(_ bar: Bar)
+// CHECK-NEXT:   func setBar(_ bar: Bar)
 // CHECK-NEXT: }

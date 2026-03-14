@@ -41,7 +41,12 @@ static TaskAllocator &allocator(AsyncTask *task) {
   // FIXME: this fall-back shouldn't be necessary, but it's useful
   // for now, since the current execution tests aren't setting up a task
   // properly.
+
+  // https://github.com/apple/swift/issues/62761
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wexit-time-destructors"
   static GlobalAllocator global;
+#pragma clang diagnostic pop
   return global.allocator;
 }
 

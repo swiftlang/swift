@@ -26,17 +26,25 @@
 
 ERROR(invalid_name, none, "'%0' is not a valid name", (StringRef))
 
-ERROR(invalid_location, none, "given location is not valid", ())
+ERROR(extract_function_not_supported_swiftsyntax_missing, none, "Extract Function is not supported because sourcekitd was built without swift-syntax", ())
 
 ERROR(arity_mismatch, none, "the given new name '%0' does not match the arity of the old name '%1'", (StringRef, StringRef))
 
 ERROR(name_not_functionlike, none, "the 'call' name usage cannot be used with a non-function-like name '%0'", (StringRef))
 
-ERROR(unresolved_location, none, "cannot resolve location as name", ())
+ERROR(unresolved_location, none, "cannot rename due to unresolved location", ())
 
-ERROR(location_module_mismatch, none, "given location does not belong to module '%0'", (StringRef))
+ERROR(value_decl_no_loc, none, "cannot rename %0 as it has no declaration location", (DeclName))
 
-ERROR(value_decl_no_loc, none, "value decl '%0' has no declaration location", (DeclName))
+ERROR(decl_is_system_symbol, none, "cannot rename system symbol %0", (DeclName))
+
+ERROR(decl_has_no_name, none, "cannot rename as no declaration name was found", ())
+
+ERROR(decl_no_accessibility, none, "cannot rename as accessibility could not be determined", ())
+
+ERROR(decl_from_clang, none, "cannot rename a Clang symbol from its Swift reference", ())
+
+ERROR(decl_in_macro, none, "cannot rename a symbol defined in a macro", ())
 
 ERROR(value_decl_referenced_out_of_range, none, "value decl '%0' is referenced out of range", (DeclName))
 

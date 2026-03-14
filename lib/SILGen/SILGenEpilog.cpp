@@ -14,15 +14,16 @@
 #include "SILGen.h"
 #include "SILGenFunction.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace Lowering;
 
-void SILGenFunction::prepareEpilog(Optional<Type> directResultType,
-                                   bool isThrowing,
-                                   CleanupLocation CleanupL) {
+void SILGenFunction::prepareEpilog(
+    DeclContext *DC, std::optional<Type> directResultType,
+    std::optional<Type> errorType, CleanupLocation CleanupL) {
   auto *epilogBB = createBasicBlock();
 
   // If we have any direct results, receive them via BB arguments.
@@ -32,29 +33,38 @@ void SILGenFunction::prepareEpilog(Optional<Type> directResultType,
     // emits unreachable if there is no source level return.
     NeedsReturn = !(*directResultType)->isEqual(TupleType::getEmpty(getASTContext()));
     if (NeedsReturn) {
-      for (auto directResult : fnConv.getDirectSILResults()) {
-        SILType resultType = F.getLoweredType(F.mapTypeIntoContext(
-            fnConv.getSILType(directResult, getTypeExpansionContext())));
-        // @out tuples do not get flattened in the function's return type, but
-        // the epilog block expects (recursively) flattened arguments. Flatten
-        // the type now.
-        SmallVector<SILType, 4> worklist;
-        worklist.push_back(resultType);
-        while (!worklist.empty()) {
-          auto ty = worklist.pop_back_val();
-          if (auto tupleType = ty.getASTType()->getAs<TupleType>()) {
-            assert(!fnConv.useLoweredAddresses() &&
-                   "expanding tuple in non-opaque-values exit block?!");
-            // Push tuple elements in reverse order (resulting in later tuple
-            // elements appearing earlier in worklist) so that as the worklist
-            // is drained by popping the back, arguments are created for the
-            // earlier types first.
-            for (auto index :
-                 llvm::reverse(indices(tupleType->getElementTypes()))) {
-              worklist.push_back(ty.getTupleElementType(index));
+      if (fnConv.hasAddressResult() || fnConv.hasGuaranteedResult()) {
+        // Do not explode tuples for borrow/mutate accessors
+        SILType resultType =
+            F.getLoweredType(F.mapTypeIntoEnvironment(*directResultType));
+        epilogBB->createPhiArgument(resultType, fnConv.hasGuaranteedResult()
+                                                    ? OwnershipKind::Guaranteed
+                                                    : OwnershipKind::None);
+      } else {
+        for (auto directResult : fnConv.getDirectSILResults()) {
+          SILType resultType = F.getLoweredType(F.mapTypeIntoEnvironment(
+              fnConv.getSILType(directResult, getTypeExpansionContext())));
+          // @out tuples do not get flattened in the function's return type, but
+          // the epilog block expects (recursively) flattened arguments. Flatten
+          // the type now.
+          SmallVector<SILType, 4> worklist;
+          worklist.push_back(resultType);
+          while (!worklist.empty()) {
+            auto ty = worklist.pop_back_val();
+            if (auto tupleType = ty.getASTType()->getAs<TupleType>()) {
+              assert(!fnConv.useLoweredAddresses() &&
+                     "expanding tuple in non-opaque-values exit block?!");
+              // Push tuple elements in reverse order (resulting in later tuple
+              // elements appearing earlier in worklist) so that as the worklist
+              // is drained by popping the back, arguments are created for the
+              // earlier types first.
+              for (auto index :
+                   llvm::reverse(indices(tupleType->getElementTypes()))) {
+                worklist.push_back(ty.getTupleElementType(index));
+              }
+            } else {
+              epilogBB->createPhiArgument(ty, OwnershipKind::Owned);
             }
-          } else {
-            epilogBB->createPhiArgument(ty, OwnershipKind::Owned);
           }
         }
       }
@@ -63,8 +73,15 @@ void SILGenFunction::prepareEpilog(Optional<Type> directResultType,
 
   ReturnDest = JumpDest(epilogBB, getCleanupsDepth(), CleanupL);
 
-  if (isThrowing) {
-    prepareRethrowEpilog(CleanupL);
+  if (errorType) {
+    auto genericSig = DC->getGenericSignatureOfContext();
+    errorType = (*errorType)->getReducedType(genericSig);
+    AbstractionPattern origErrorType = TypeContext
+      ? *TypeContext->OrigType.getFunctionThrownErrorType()
+      : AbstractionPattern(genericSig.getCanonicalSignature(),
+                           (*errorType)->getCanonicalType());
+
+    prepareRethrowEpilog(DC, origErrorType, *errorType, CleanupL);
   }
 
   if (F.getLoweredFunctionType()->isCoroutine()) {
@@ -72,11 +89,20 @@ void SILGenFunction::prepareEpilog(Optional<Type> directResultType,
   }
 }
 
-void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
-  auto exnType = SILType::getExceptionType(getASTContext());
+void SILGenFunction::prepareRethrowEpilog(
+    DeclContext *dc, AbstractionPattern origErrorType, Type errorType,
+    CleanupLocation cleanupLoc) {
+  ASSERT(!errorType->hasPrimaryArchetype());
+
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  rethrowBB->createPhiArgument(exnType, OwnershipKind::Owned);
-  ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
+  if (!IndirectErrorResult) {
+    auto errorTypeInContext = dc->mapTypeIntoEnvironment(errorType);
+    SILType loweredErrorType = getLoweredType(origErrorType, errorTypeInContext);
+    rethrowBB->createPhiArgument(loweredErrorType, OwnershipKind::Owned);
+  }
+
+  ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc,
+                       ThrownErrorInfo(IndirectErrorResult));
 }
 
 void SILGenFunction::prepareCoroutineUnwindEpilog(CleanupLocation cleanupLoc) {
@@ -134,9 +160,9 @@ static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
   if (!fnConv.useLoweredAddresses()) {
     // In opaque-values code, nested @out tuples are not flattened.  Reconstruct
     // nested tuples.
-    auto resultType = SGF.F.getLoweredType(SGF.F.mapTypeIntoContext(
+    auto resultType = SGF.F.getLoweredType(SGF.F.mapTypeIntoEnvironment(
         fnConv.getSILResultType(SGF.getTypeExpansionContext())));
-    SmallVector<Optional<SILValue>, 4> mutableDirectResult;
+    SmallVector<std::optional<SILValue>, 4> mutableDirectResult;
     for (auto result : directResults) {
       mutableDirectResult.push_back({result});
     }
@@ -170,7 +196,7 @@ static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
   return SGF.B.createTuple(loc, resultType, directResults);
 }
 
-static Optional<SILLocation>
+static std::optional<SILLocation>
 prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
                               SILBasicBlock *epilogBB,
                               SmallVectorImpl<SILValue> &directResults) {
@@ -191,7 +217,7 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
 
     // If the current bb is terminated then the epilog is just unreachable.
     if (!SGF.B.hasValidInsertionPoint())
-      return None;
+      return std::nullopt;
 
     // We emit the epilog at the current insertion point.
     return implicitReturnFromTopLevel;
@@ -215,7 +241,7 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
       epilogBB->getArgument(index)->replaceAllUsesWith(result);
     }
 
-    Optional<SILLocation> returnLoc;
+    std::optional<SILLocation> returnLoc;
     // If we are optimizing, we should use the return location from the single,
     // previously processed, return statement if any.
     if (predBranch->getLoc().is<ReturnLocation>()) {
@@ -258,7 +284,7 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
   return cleanupLoc;
 }
 
-std::pair<Optional<SILValue>, SILLocation>
+std::pair<std::optional<SILValue>, SILLocation>
 SILGenFunction::emitEpilogBB(SILLocation topLevel) {
   assert(ReturnDest.getBlock() && "no epilog bb prepared?!");
   SILBasicBlock *epilogBB = ReturnDest.getBlock();
@@ -270,7 +296,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
   auto returnLoc =
       prepareForEpilogBlockEmission(*this, topLevel, epilogBB, directResults);
   if (!returnLoc.has_value()) {
-    return {None, topLevel};
+    return {std::nullopt, topLevel};
   }
 
   // Emit top-level cleanups into the epilog block.
@@ -290,7 +316,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
     assert(directResults.size() ==
            F.getConventions().getNumExpandedDirectSILResults(
                getTypeExpansionContext()));
-    returnValue = buildReturnValue(*this, topLevel, directResults);
+    returnValue = buildReturnValue(*this, cleanupLoc, directResults);
   }
 
   return {returnValue, *returnLoc};
@@ -298,7 +324,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
 
 SILLocation SILGenFunction::
 emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
-  Optional<SILValue> maybeReturnValue;
+  std::optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(TopLevel);
   std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(TopLevel);
 
@@ -389,12 +415,21 @@ static bool prepareExtraEpilog(SILGenFunction &SGF, JumpDest &dest,
 void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
   SILValue exn;
   SILLocation throwLoc = topLevel;
-  if (!prepareExtraEpilog(*this, ThrowDest, throwLoc, &exn))
+
+  if (!prepareExtraEpilog(*this, ThrowDest, throwLoc,
+                          !IndirectErrorResult ? &exn : nullptr)) {
     return;
+  }
 
   Cleanups.emitCleanupsForReturn(ThrowDest.getCleanupLocation(), IsForUnwind);
 
-  B.createThrow(CleanupLocation(throwLoc), exn);
+  // FIXME: opaque values
+  if (!IndirectErrorResult) {
+    B.createThrow(CleanupLocation(throwLoc), exn);
+  } else {
+    assert(IndirectErrorResult);
+    B.createThrowAddr(CleanupLocation(throwLoc));
+  }
 
   ThrowDest = JumpDest::invalid();
 }

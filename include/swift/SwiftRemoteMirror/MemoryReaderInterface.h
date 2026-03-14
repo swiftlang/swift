@@ -103,6 +103,10 @@ typedef enum {
   /// process.  This is currently 0x1000 (4096) except on 64-bit Apple platforms
   /// where it is 0x100000000.
   DLQ_GetLeastValidPointerValue,
+
+  /// The query should ignore inBuffer, and treat outBuffer as bool* which
+  /// should be populated with whether the target runtime uses Obj-C interop.
+  DLQ_GetObjCInteropIsEnabled,
 } DataLayoutQueryType;
 
 /// Data layout query function, which returns answers based on query types (from

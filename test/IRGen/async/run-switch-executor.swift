@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift  -Xfrontend -disable-availability-checking %s -g -parse-as-library -module-name main -o %t/main
+// RUN: %target-build-swift  -target %target-swift-5.1-abi-triple %s -g -parse-as-library -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
@@ -9,8 +9,6 @@
 
 // FIXME: both of these should work, need to figure out why
 // UNSUPPORTED: CPU=arm64e
-
-// REQUIRES: rdar72893124
 
 // Currently this test just checks if nothing crashes.
 // TODO: also check if the current executor is the correct one.

@@ -7,5 +7,9 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  DiagnoseUnknownConstValues.swift
+  EmbeddedSwiftDiagnostics.swift
+  MandatoryPerformanceOptimizations.swift
+  ReadOnlyGlobalVariables.swift
   StackProtection.swift
 )

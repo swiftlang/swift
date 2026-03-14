@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s17variant_overrides1AC3foo5blockyyACc_tF :
 // CHECK-SAME:    $@convention(method) (@guaranteed @callee_guaranteed (@guaranteed A) -> (), @guaranteed A) -> ()

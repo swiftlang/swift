@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name optional_lvalue %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name optional_lvalue %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue07assign_a1_B0yySiSgz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Int>

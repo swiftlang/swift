@@ -35,6 +35,7 @@ public:
     : super(IGM), Target(target) {}
 
   void layout() {
+    asImpl().addLayoutStringPointer();
     super::layout();
     asImpl().addNominalTypeDescriptor();
     asImpl().addSuperclass();
@@ -60,6 +61,7 @@ protected:
 
 public:
   void addMetadataFlags() { addPointer(); }
+  void addLayoutStringPointer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
   void addSuperclass() { addPointer(); }
@@ -83,6 +85,7 @@ public:
       : super(IGM), Target(target) {}
 
   void layout() {
+    asImpl().addLayoutStringPointer();
     super::layout();
     asImpl().addNominalTypeDescriptor();
     asImpl().addReservedWord();

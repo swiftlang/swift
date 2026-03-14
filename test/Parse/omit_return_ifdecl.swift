@@ -676,7 +676,7 @@ func ff_implicitInjectIntoOptionalExpr(_ int: Int) -> Int? {
 
 func ff_implicitTupleShuffle(_ input: (one: Int, two: Int)) -> (two: Int, one: Int) {
     #if true
-    input // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
+    input // expected-warning {{implicit reordering of tuple elements from 'one:two:' to 'two:one:' is deprecated; this will be an error in a future Swift language mode}}
     #endif
 }
 
@@ -2430,9 +2430,9 @@ class CImplicitIdentityExpr { func gimme() -> CImplicitIdentityExpr { self } }
 
 class CImplicitDotSelfExpr { func gimme() -> CImplicitDotSelfExpr { self.self } }
 
-func badIs<T>(_ value: Any, anInstanceOf type: T.Type) -> Bool {
+func badIs<T>(_ value: Any, anInstanceOf type: T.Type) -> Bool { // expected-note {{'type' declared here}}
     #if true
-    value is type // expected-error {{cannot find type 'type' in scope}}
+    value is type // expected-error {{type-casting operator expects a type on its right-hand side (got: parameter 'type')}}
     #endif
 }
 

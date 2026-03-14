@@ -1,0 +1,58 @@
+// RUN: %target-sil-opt -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -sil-move-only-borrow-to-destructure %s
+
+// REQUIRES: swift_feature_MoveOnlyClasses
+
+sil_stage raw
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass {}
+
+struct AggStruct {
+   var lhs: Klass
+   var rhs: Klass
+}
+
+sil @classConsume : $@convention(thin) (@owned Klass) -> ()
+
+// We shouldn't emit any errors here since while AggStruct is no implicit copy,
+// its fields are not, so we can copy them.
+sil [ossa] @aggStructConsumeField : $@convention(thin) (@guaranteed AggStruct) -> () {
+bb0(%0 : @guaranteed $AggStruct):
+  debug_value %0 : $AggStruct, let, name "x", argno 1
+  %2 = copy_value %0 : $AggStruct
+  %3 = move_value [lexical] [var_decl] %2 : $AggStruct
+  %5 = copyable_to_moveonlywrapper [owned] %3 : $AggStruct
+  %6 = mark_unresolved_non_copyable_value [consumable_and_assignable] %5 : $@moveOnly AggStruct
+  debug_value %6 : $@moveOnly AggStruct, let, name "x2"
+  %8 = begin_borrow %6 : $@moveOnly AggStruct
+  %9 = struct_extract %8 : $@moveOnly AggStruct, #AggStruct.lhs
+  %10 = copy_value %9 : $@moveOnly Klass
+  %11 = function_ref @classConsume : $@convention(thin) (@owned Klass) -> ()
+  %12 = moveonlywrapper_to_copyable [owned] %10 : $@moveOnly Klass
+  %13 = apply %11(%12) : $@convention(thin) (@owned Klass) -> ()
+  end_borrow %8 : $@moveOnly AggStruct
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %52 = begin_borrow %6 : $@moveOnly AggStruct
+  %53 = struct_extract %52 : $@moveOnly AggStruct, #AggStruct.lhs
+  %54 = copy_value %53 : $@moveOnly Klass
+  %55 = function_ref @classConsume : $@convention(thin) (@owned Klass) -> ()
+  %56 = moveonlywrapper_to_copyable [owned] %54 : $@moveOnly Klass
+  %57 = apply %55(%56) : $@convention(thin) (@owned Klass) -> ()
+  end_borrow %52 : $@moveOnly AggStruct
+  br bb1
+
+bb3:
+  destroy_value %6 : $@moveOnly AggStruct
+  %64 = tuple ()
+  return %64 : $()
+}

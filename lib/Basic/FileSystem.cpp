@@ -12,8 +12,10 @@
 
 #include "swift/Basic/FileSystem.h"
 
-#include "swift/Basic/LLVM.h"
+#include "swift/Basic/Assertions.h"
 #include "clang/Basic/FileManager.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FileSystem.h"
@@ -21,6 +23,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include <optional>
 
 using namespace swift;
 
@@ -45,7 +48,7 @@ namespace {
 /// If the result is an error, the write won't succeed at all, and the calling
 /// operation should bail out early.
 static llvm::ErrorOr<bool>
-canUseTemporaryForWrite(const StringRef outputPath) {
+canUseTemporaryForWrite(const llvm::StringRef outputPath) {
   namespace fs = llvm::sys::fs;
 
   if (outputPath == "-") {
@@ -83,17 +86,18 @@ canUseTemporaryForWrite(const StringRef outputPath) {
 ///
 /// \returns The path to the temporary file that was opened, or \c None if the
 /// file couldn't be created.
-static Optional<std::string>
-tryToOpenTemporaryFile(Optional<llvm::raw_fd_ostream> &openedStream,
-                       const StringRef outputPath) {
+static std::optional<std::string>
+tryToOpenTemporaryFile(std::optional<llvm::raw_fd_ostream> &openedStream,
+                       const llvm::StringRef outputPath) {
   namespace fs = llvm::sys::fs;
 
   // Create a temporary file path.
   // Insert a placeholder for a random suffix before the extension (if any).
   // Then because some tools glob for build artifacts (such as clang's own
   // GlobalModuleIndex.cpp), also append .tmp.
-  SmallString<128> tempPath;
-  const StringRef outputExtension = llvm::sys::path::extension(outputPath);
+  llvm::SmallString<128> tempPath;
+  const llvm::StringRef outputExtension =
+      llvm::sys::path::extension(outputPath);
   tempPath = outputPath.drop_back(outputExtension.size());
   tempPath += "-%%%%%%%%";
   tempPath += outputExtension;
@@ -107,7 +111,7 @@ tryToOpenTemporaryFile(Optional<llvm::raw_fd_ostream> &openedStream,
   if (EC) {
     // Ignore the specific error; the caller has to fall back to not using a
     // temporary anyway.
-    return None;
+    return std::nullopt;
   }
 
   openedStream.emplace(fd, /*shouldClose=*/true);
@@ -117,7 +121,7 @@ tryToOpenTemporaryFile(Optional<llvm::raw_fd_ostream> &openedStream,
 }
 
 std::error_code swift::atomicallyWritingToFile(
-    const StringRef outputPath,
+    const llvm::StringRef outputPath,
     const llvm::function_ref<void(llvm::raw_pwrite_stream &)> action) {
   namespace fs = llvm::sys::fs;
 
@@ -130,9 +134,9 @@ std::error_code swift::atomicallyWritingToFile(
   if (std::error_code error = canUseTemporary.getError())
     return error;
 
-  Optional<std::string> temporaryPath;
+  std::optional<std::string> temporaryPath;
   {
-    Optional<llvm::raw_fd_ostream> OS;
+    std::optional<llvm::raw_fd_ostream> OS;
     if (canUseTemporary.get()) {
       temporaryPath = tryToOpenTemporaryFile(OS, outputPath);
 

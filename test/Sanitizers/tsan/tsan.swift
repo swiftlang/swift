@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=thread %import-libdispatch -o %t_tsan-binary
+// RUN: %target-swiftc_driver %s -g -sanitize=thread %import-libdispatch -o %t_tsan-binary
 // RUN: %target-codesign %t_tsan-binary
 // RUN: env %env-TSAN_OPTIONS="abort_on_error=0" not %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
@@ -13,6 +13,12 @@
 // FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
 // don't support TSan.
 // UNSUPPORTED: remote_run
+
+// TSan is detecting race conditions in the concurrency runtime.
+// This might be an issue in how it is hooked into the underlying threading
+// model on FreeBSD.
+// rdar://158355890
+// XFAIL: OS=freebsd
 
 #if canImport(Darwin)
   import Darwin
@@ -50,7 +56,7 @@ var racey_x: Int;
 
 // TSan %deflake as part of the test.
 for _ in 1...5 {
-#if os(macOS) || os(iOS)
+#if os(macOS) || os(iOS) || os(FreeBSD)
   var t : pthread_t?
 #else
   var t : pthread_t = 0
@@ -61,7 +67,7 @@ for _ in 1...5 {
 
     return nil
   }, nil)
-#if os(macOS) || os(iOS)
+#if os(macOS) || os(iOS) || os(FreeBSD)
   threads.append(t!)
 #else
   threads.append(t)

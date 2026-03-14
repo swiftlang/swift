@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BeginCOWMutationInst : SILCombineSimplifyable {
+extension BeginCOWMutationInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     /// The buffer of an empty Array/Set/Dictionary singleton is known to be not
@@ -56,49 +56,55 @@ extension BeginCOWMutationInst : SILCombineSimplifyable {
 private extension BeginCOWMutationInst {
 
   func optimizeEmptySingleton(_ context: SimplifyContext) {
-    if !isEmptyCOWSingleton(operand) {
+    if !isEmptyCOWSingleton(instance) {
       return
     }
-    if uniquenessResult.nonDebugUses.isEmpty {
+    if uniquenessResult.uses.ignoreDebugUses.isEmpty {
       /// Don't create an integer_literal which would be dead. This would result
       /// in an infinite loop in SILCombine.
       return
     }
     let builder = Builder(before: self, location: location, context)
-    let zero = builder.createIntegerLiteral(0, type: uniquenessResult.type);
-    uniquenessResult.uses.replaceAll(with: zero, context)
+    let falseLiteral = builder.createBoolLiteral(false)
+    uniquenessResult.uses.replaceAll(with: falseLiteral, context)
   }
 
   func optimizeEmptyBeginEndPair(_ context: SimplifyContext) -> Bool {
-    if !uniquenessResult.nonDebugUses.isEmpty {
+    if !uniquenessResult.uses.ignoreDebugUses.isEmpty {
       return false
     }
-    let buffer = bufferResult
-    if buffer.nonDebugUses.contains(where: { !($0.instruction is EndCOWMutationInst) }) {
+    let buffer = instanceResult
+    guard buffer.uses.ignoreDebugUses.allSatisfy({
+        if let endCOW = $0.instruction as? EndCOWMutationInst {
+          return !endCOW.doKeepUnique
+        }
+        return false
+      }) else
+    {
       return false
     }
 
-    for use in buffer.nonDebugUses {
+    for use in buffer.uses.ignoreDebugUses {
       let endCOW = use.instruction as! EndCOWMutationInst
-      endCOW.uses.replaceAll(with: operand, context)
-      context.erase(instruction: endCOW)
+      endCOW.replace(with: instance, context)
     }
     context.erase(instructionIncludingDebugUses: self)
     return true
   }
 
   func optimizeEmptyEndBeginPair(_ context: SimplifyContext) -> Bool {
-    if !uniquenessResult.nonDebugUses.isEmpty {
+    if !uniquenessResult.uses.ignoreDebugUses.isEmpty {
       return false
     }
-    guard let endCOW = operand as? EndCOWMutationInst else {
+    guard let endCOW = instance as? EndCOWMutationInst,
+          !endCOW.doKeepUnique else {
       return false
     }
-    if endCOW.nonDebugUses.contains(where: { $0.instruction != self }) {
+    if endCOW.uses.ignoreDebugUses.contains(where: { $0.instruction != self }) {
       return false
     }
 
-    bufferResult.uses.replaceAll(with: endCOW.operand, context)
+    instanceResult.uses.replaceAll(with: endCOW.instance, context)
     context.erase(instructionIncludingDebugUses: self)
     context.erase(instructionIncludingDebugUses: endCOW)
     return true
@@ -114,7 +120,7 @@ private func isEmptyCOWSingleton(_ value: Value) -> Bool {
            is RawPointerToRefInst,
            is AddressToPointerInst,
            is CopyValueInst:
-        v = (v as! UnaryInstruction).operand
+        v = (v as! UnaryInstruction).operand.value
       case let globalAddr as GlobalAddrInst:
         let name = globalAddr.global.name
         return name == "_swiftEmptyArrayStorage" ||

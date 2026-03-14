@@ -20,6 +20,7 @@ protocol P4 { } // expected-note{{'P4' declared here}}
 class C { }
 @_marker protocol P5a: AnyObject { }  // okay
 @_marker protocol P5b: C { }   // expected-error{{marker protocol 'P5b' cannot inherit class 'C'}}
+@_marker protocol P5c where Self: C { }   // expected-error{{marker protocol 'P5c' cannot inherit class 'C'}}
 
 // Legitimate uses of marker protocols.
 extension P3 {
@@ -67,3 +68,6 @@ protocol P10 { }
 
 extension Array: P10 where Element: P10, Element: P8 { }
 // expected-error@-1{{conditional conformance to non-marker protocol 'P10' cannot depend on conformance of 'Element' to marker protocol 'P8'}}
+
+@objc @_marker protocol P11 {}
+// expected-error@-1 {{only classes (and their extensions), non-marker protocols, methods, initializers, properties, and subscript declarations can be declared '@objc'}}

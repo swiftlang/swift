@@ -22,9 +22,11 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/TypeLowering.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/Support/SipHash.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -127,11 +129,14 @@ llvm::Value *irgen::emitPointerAuthSign(IRGenFunction &IGF, llvm::Value *fnPtr,
   if (auto constantFnPtr = dyn_cast<llvm::Constant>(fnPtr)) {
     if (auto constantDiscriminator =
           dyn_cast<llvm::Constant>(newAuthInfo.getDiscriminator())) {
-      llvm::Constant *other = nullptr, *address = nullptr;
-      if (constantDiscriminator->getType()->isPointerTy())
+      llvm::Constant *address = nullptr;
+      llvm::ConstantInt *other = nullptr;
+      if (constantDiscriminator->getType()->isPointerTy()) {
         address = constantDiscriminator;
-      else
-        other = constantDiscriminator;
+      } else if (auto otherDiscriminator =
+                     dyn_cast<llvm::ConstantInt>(constantDiscriminator)) {
+        other = otherDiscriminator;
+      }
       return IGF.IGM.getConstantSignedPointer(constantFnPtr,
                                               newAuthInfo.getKey(),
                                               address, other);
@@ -156,7 +161,7 @@ struct IRGenModule::PointerAuthCachesType {
   llvm::DenseMap<SILDeclRef, llvm::ConstantInt*> Decls;
   llvm::DenseMap<CanType, llvm::ConstantInt*> Types;
   llvm::DenseMap<CanType, llvm::ConstantInt*> YieldTypes;
-  llvm::DenseMap<AssociatedType, llvm::ConstantInt*> AssociatedTypes;
+  llvm::DenseMap<AssociatedTypeDecl *, llvm::ConstantInt*> AssociatedTypes;
   llvm::DenseMap<AssociatedConformance, llvm::ConstantInt*> AssociatedConformances;
 };
 
@@ -183,8 +188,14 @@ static const PointerAuthSchema &getFunctionPointerSchema(IRGenModule &IGM,
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+  case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     if (fnType->isAsync()) {
       return options.AsyncSwiftFunctionPointers;
+    } else if (fnType->isCalleeAllocatedCoroutine()) {
+      return options.CoroSwiftFunctionPointers;
     }
 
     return options.SwiftFunctionPointers;
@@ -239,12 +250,57 @@ PointerAuthInfo PointerAuthInfo::emit(IRGenFunction &IGF,
 }
 
 PointerAuthInfo
-PointerAuthInfo::emit(IRGenModule &IGM,
-                      clang::PointerAuthQualifier pointerAuthQual) {
-  return PointerAuthInfo(
-      pointerAuthQual.getKey(),
-      llvm::ConstantInt::get(IGM.Int64Ty,
-                             pointerAuthQual.getExtraDiscriminator()));
+PointerAuthInfo::emit(IRGenFunction &IGF,
+                      clang::PointerAuthQualifier pointerAuthQual,
+                      llvm::Value *storageAddress) {
+  unsigned key = pointerAuthQual.getKey();
+
+  // Produce the 'other' discriminator.
+  auto otherDiscriminator = pointerAuthQual.getExtraDiscriminator();
+  llvm::Value *discriminator =
+      llvm::ConstantInt::get(IGF.IGM.Int64Ty, otherDiscriminator);
+
+  // Factor in the address.
+  if (pointerAuthQual.isAddressDiscriminated()) {
+    assert(storageAddress &&
+           "no storage address for address-discriminated schema");
+
+    if (otherDiscriminator != 0) {
+      discriminator = emitPointerAuthBlend(IGF, storageAddress, discriminator);
+    } else {
+      discriminator =
+          IGF.Builder.CreatePtrToInt(storageAddress, IGF.IGM.Int64Ty);
+    }
+  }
+
+  return PointerAuthInfo(key, discriminator);
+}
+
+PointerAuthInfo PointerAuthInfo::emit(IRGenFunction &IGF,
+                                      const PointerAuthSchema &schema,
+                                      llvm::Value *storageAddress,
+                                      llvm::ConstantInt *otherDiscriminator) {
+  if (!schema)
+    return PointerAuthInfo();
+
+  unsigned key = schema.getKey();
+
+  llvm::Value *discriminator = otherDiscriminator;
+
+  // Factor in the address.
+  if (schema.isAddressDiscriminated()) {
+    assert(storageAddress &&
+           "no storage address for address-discriminated schema");
+
+    if (!otherDiscriminator->isZero()) {
+      discriminator = emitPointerAuthBlend(IGF, storageAddress, discriminator);
+    } else {
+      discriminator =
+          IGF.Builder.CreatePtrToInt(storageAddress, IGF.IGM.Int64Ty);
+    }
+  }
+
+  return PointerAuthInfo(key, discriminator);
 }
 
 llvm::ConstantInt *
@@ -269,25 +325,19 @@ PointerAuthInfo::getOtherDiscriminator(IRGenModule &IGM,
   llvm_unreachable("bad kind");
 }
 
-static llvm::ConstantInt *getDiscriminatorForHash(IRGenModule &IGM,
-                                                  uint64_t rawHash) {
-  uint16_t reducedHash = (rawHash % 0xFFFF) + 1;
-  return llvm::ConstantInt::get(IGM.Int64Ty, reducedHash);
-}
-
 static llvm::ConstantInt *getDiscriminatorForString(IRGenModule &IGM,
                                                     StringRef string) {
-  uint64_t rawHash = clang::CodeGen::computeStableStringHash(string);
-  return getDiscriminatorForHash(IGM, rawHash);
+  return llvm::ConstantInt::get(IGM.Int64Ty,
+                                llvm::getPointerAuthStableSipHash(string));
 }
 
-static std::string mangle(AssociatedType association) {
-  return IRGenMangler()
-    .mangleAssociatedTypeAccessFunctionDiscriminator(association);
+static std::string mangle(AssociatedTypeDecl *assocType) {
+  return IRGenMangler(assocType->getASTContext())
+    .mangleAssociatedTypeAccessFunctionDiscriminator(assocType);
 }
 
 static std::string mangle(const AssociatedConformance &association) {
-  return IRGenMangler()
+  return IRGenMangler(association.getAssociatedRequirement()->getASTContext())
     .mangleAssociatedTypeWitnessTableAccessFunctionDiscriminator(association);
 }
 
@@ -310,6 +360,12 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
       case Special::ProtocolConformanceDescriptor:
       case Special::ProtocolConformanceDescriptorAsArgument:
         return SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor;
+      case Special::ProtocolDescriptorAsArgument:
+        return SpecialPointerAuthDiscriminators::ProtocolDescriptor;
+      case Special::OpaqueTypeDescriptorAsArgument:
+        return SpecialPointerAuthDiscriminators::OpaqueTypeDescriptor;
+      case Special::ContextDescriptorAsArgument:
+        return SpecialPointerAuthDiscriminators::ContextDescriptor;
       case Special::PartialApplyCapture:
         return PointerAuthDiscriminator_PartialApplyCapture;
       case Special::KeyPathDestroy:
@@ -334,9 +390,19 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
         return SpecialPointerAuthDiscriminators::KeyPathMetadataAccessor;
       case Special::DynamicReplacementKey:
         return SpecialPointerAuthDiscriminators::DynamicReplacementKey;
+      case Special::TypeLayoutString:
+        return SpecialPointerAuthDiscriminators::TypeLayoutString;
       case Special::BlockCopyHelper:
       case Special::BlockDisposeHelper:
         llvm_unreachable("no known discriminator for these foreign entities");
+      case Special::CoroAllocationFunction:
+        return SpecialPointerAuthDiscriminators::CoroAllocationFunction;
+      case Special::CoroDeallocationFunction:
+        return SpecialPointerAuthDiscriminators::CoroDeallocationFunction;
+      case Special::CoroFrameAllocationFunction:
+        return SpecialPointerAuthDiscriminators::CoroFrameAllocationFunction;
+      case Special::CoroFrameDeallocationFunction:
+        return SpecialPointerAuthDiscriminators::CoroFrameDeallocationFunction;
       }
       llvm_unreachable("bad kind");
     };
@@ -367,7 +433,7 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
   }
 
   case Kind::AssociatedType: {
-    auto association = Storage.get<AssociatedType>(StoredKind);
+    auto association = Storage.get<AssociatedTypeDecl *>(StoredKind);
     llvm::ConstantInt *&cache =
       IGM.getPointerAuthCaches().AssociatedTypes[association];
     if (cache) return cache;
@@ -412,156 +478,16 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
   llvm_unreachable("bad kind");
 }
 
-static void hashStringForFunctionType(IRGenModule &IGM, CanSILFunctionType type,
-                                      raw_ostream &Out,
-                                      GenericEnvironment *genericEnv);
-
-static void hashStringForType(IRGenModule &IGM, CanType Ty, raw_ostream &Out,
-                              GenericEnvironment *genericEnv) {
-  if (Ty->isAnyClassReferenceType()) {
-    // Any class type has to be hashed opaquely.
-    Out << "-class";
-  } else if (isa<AnyMetatypeType>(Ty)) {
-    // Any metatype has to be hashed opaquely.
-    Out << "-metatype";
-  } else if (auto UnwrappedTy = Ty->getOptionalObjectType()) {
-    if (UnwrappedTy->isBridgeableObjectType()) {
-      // Optional<T> is compatible with T when T is class-based.
-      hashStringForType(IGM, UnwrappedTy->getCanonicalType(), Out, genericEnv);
-    } else if (UnwrappedTy->is<MetatypeType>()) {
-      // Optional<T> is compatible with T when T is a metatype.
-      hashStringForType(IGM, UnwrappedTy->getCanonicalType(), Out, genericEnv);
-    } else {
-      // Optional<T> is direct if and only if T is.
-      Out << "Optional<";
-      hashStringForType(IGM, UnwrappedTy->getCanonicalType(), Out, genericEnv);
-      Out << ">";
-    }
-  } else if (auto ETy = dyn_cast<ExistentialType>(Ty)) {
-    // Look through existential types
-    hashStringForType(IGM, ETy->getConstraintType()->getCanonicalType(),
-                      Out, genericEnv);
-  } else if (auto GTy = dyn_cast<AnyGenericType>(Ty)) {
-    // For generic and non-generic value types, use the mangled declaration
-    // name, and ignore all generic arguments.
-    NominalTypeDecl *nominal = cast<NominalTypeDecl>(GTy->getDecl());
-    Out << Mangle::ASTMangler().mangleNominalType(nominal);
-  } else if (auto FTy = dyn_cast<SILFunctionType>(Ty)) {
-    Out << "(";
-    hashStringForFunctionType(IGM, FTy, Out, genericEnv);
-    Out << ")";
-  } else {
-    Out << "-";
-  }
+static llvm::ConstantInt *getTypeDiscriminator(IRGenModule &IGM,
+                                               CanSILFunctionType type) {
+  return llvm::ConstantInt::get(
+      IGM.Int64Ty, type->getPointerAuthDiscriminator(&IGM.getSILModule()));
 }
 
-template <class T>
-static void hashStringForList(IRGenModule &IGM, const ArrayRef<T> &list,
-                              raw_ostream &Out, GenericEnvironment *genericEnv,
-                              const SILFunctionType *fnType) {
-  for (auto paramOrRetVal : list) {
-    if (paramOrRetVal.isFormalIndirect()) {
-      // Indirect params and return values have to be opaque.
-      Out << "-indirect";
-    } else {
-      CanType Ty = paramOrRetVal.getArgumentType(
-          IGM.getSILModule(), fnType, IGM.getMaximalTypeExpansionContext());
-      if (Ty->hasTypeParameter())
-        Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
-      hashStringForType(IGM, Ty, Out, genericEnv);
-    }
-    Out << ":";
-  }
-}
-
-static void hashStringForList(IRGenModule &IGM,
-                              const ArrayRef<SILResultInfo> &list,
-                              raw_ostream &Out, GenericEnvironment *genericEnv,
-                              const SILFunctionType *fnType) {
-  for (auto paramOrRetVal : list) {
-    if (paramOrRetVal.isFormalIndirect()) {
-      // Indirect params and return values have to be opaque.
-      Out << "-indirect";
-    } else {
-      CanType Ty = paramOrRetVal.getReturnValueType(
-          IGM.getSILModule(), fnType, IGM.getMaximalTypeExpansionContext());
-      if (Ty->hasTypeParameter())
-        Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
-      hashStringForType(IGM, Ty, Out, genericEnv);
-    }
-    Out << ":";
-  }
-}
-
-static void hashStringForFunctionType(IRGenModule &IGM, CanSILFunctionType type,
-                                      raw_ostream &Out,
-                                      GenericEnvironment *genericEnv) {
-  Out << (type->isCoroutine() ? "coroutine" : "function") << ":";
-  Out << type->getNumParameters() << ":";
-  hashStringForList(IGM, type->getParameters(), Out, genericEnv, type);
-  Out << type->getNumResults() << ":";
-  hashStringForList(IGM, type->getResults(), Out, genericEnv, type);
-  if (type->isCoroutine()) {
-    Out << type->getNumYields() << ":";
-    hashStringForList(IGM, type->getYields(), Out, genericEnv, type);
-  }
-}
-
-static uint64_t getTypeHash(IRGenModule &IGM, CanSILFunctionType type) {
-  // The hash we need to do here ignores:
-  //   - thickness, so that we can promote thin-to-thick without rehashing;
-  //   - error results, so that we can promote nonthrowing-to-throwing
-  //     without rehashing;
-  //   - types of indirect arguments/retvals, so they can be substituted freely;
-  //   - types of class arguments/retvals
-  //   - types of metatype arguments/retvals
-  // See isABICompatibleWith and areABICompatibleParamsOrReturns in
-  // SILFunctionType.cpp.
-
-  SmallString<32> Buffer;
-  llvm::raw_svector_ostream Out(Buffer);
-  auto genericSig = type->getInvocationGenericSignature();
-  hashStringForFunctionType(
-      IGM, type, Out,
-      genericSig.getCanonicalSignature().getGenericEnvironment());
-  return clang::CodeGen::computeStableStringHash(Out.str());
-}
-
-static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
-  SmallString<32> buffer;
-  llvm::raw_svector_ostream out(buffer);
-  auto genericSig = type->getInvocationGenericSignature();
-  auto *genericEnv =  genericSig.getCanonicalSignature().getGenericEnvironment();
-
-  out << [&]() -> StringRef {
-    switch (type->getCoroutineKind()) {
-    case SILCoroutineKind::YieldMany: return "yield_many:";
-    case SILCoroutineKind::YieldOnce: return "yield_once:";
-    case SILCoroutineKind::None: llvm_unreachable("not a coroutine");
-    }
-    llvm_unreachable("bad coroutine kind");
-  }();
-
-  out << type->getNumYields() << ":";
-
-  for (auto yield: type->getYields()) {
-    // We can't mangle types on inout and indirect yields because they're
-    // abstractable.
-    if (yield.isIndirectInOut()) {
-      out << "inout";
-    } else if (yield.isFormalIndirect()) {
-      out << "indirect";
-    } else {
-      CanType Ty = yield.getArgumentType(IGM.getSILModule(), type,
-                                         IGM.getMaximalTypeExpansionContext());
-      if (Ty->hasTypeParameter())
-        Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
-      hashStringForType(IGM, Ty, out, genericEnv);
-    }
-    out << ":";
-  }
-
-  return clang::CodeGen::computeStableStringHash(out.str());  
+static llvm::ConstantInt *
+getCoroutineYieldTypesDiscriminator(IRGenModule &IGM, CanSILFunctionType type) {
+  return llvm::ConstantInt::get(
+      IGM.Int64Ty, type->getCoroutineYieldTypesDiscriminator(IGM.getSILModule()));
 }
 
 llvm::ConstantInt *
@@ -573,12 +499,15 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::WitnessMethod:
-    case SILFunctionTypeRepresentation::Closure: {
+    case SILFunctionTypeRepresentation::Closure:
+    case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+    case SILFunctionTypeRepresentation::KeyPathAccessorHash: {
       llvm::ConstantInt *&cache = IGM.getPointerAuthCaches().Types[fnType];
       if (cache) return cache;
 
-      auto hash = getTypeHash(IGM, fnType);
-      cache = getDiscriminatorForHash(IGM, hash);
+      cache = ::getTypeDiscriminator(IGM, fnType);
       return cache;
     }
     
@@ -595,15 +524,6 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
     llvm_unreachable("invalid representation");
   };
 
-  auto getCoroutineYieldTypesDiscriminator = [&](CanSILFunctionType fnType) {
-    llvm::ConstantInt *&cache = IGM.getPointerAuthCaches().Types[fnType];
-    if (cache) return cache;
-
-    auto hash = getYieldTypesHash(IGM, fnType);
-    cache = getDiscriminatorForHash(IGM, hash);
-    return cache;
-  };
-
   switch (StoredKind) {
   case Kind::None:
   case Kind::Special:
@@ -615,7 +535,13 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
 
   case Kind::CoroutineYieldTypes: {
     auto fnType = Storage.get<CanSILFunctionType>(StoredKind);
-    return getCoroutineYieldTypesDiscriminator(fnType);
+
+    llvm::ConstantInt *&cache = IGM.getPointerAuthCaches().Types[fnType];
+    if (cache)
+      return cache;
+
+    cache = getCoroutineYieldTypesDiscriminator(IGM, fnType);
+    return cache;
   }
 
   case Kind::CanSILFunctionType: {
@@ -651,10 +577,10 @@ IRGenModule::getConstantSignedCFunctionPointer(llvm::Constant *fn) {
   return fn;
 }
 
-llvm::Constant *IRGenModule::getConstantSignedPointer(llvm::Constant *pointer,
-                                                      unsigned key,
-                                          llvm::Constant *storageAddress,
-                                          llvm::Constant *otherDiscriminator) {
+llvm::Constant *
+IRGenModule::getConstantSignedPointer(llvm::Constant *pointer, unsigned key,
+                                      llvm::Constant *storageAddress,
+                                      llvm::ConstantInt *otherDiscriminator) {
   return clang::CodeGen::getConstantSignedPointer(getClangCGM(), pointer, key,
                                                   storageAddress,
                                                   otherDiscriminator);
@@ -696,4 +622,18 @@ void ConstantAggregateBuilderBase::addSignedPointer(llvm::Constant *pointer,
 
   addSignedPointer(pointer, schema.getKey(), schema.isAddressDiscriminated(),
                    llvm::ConstantInt::get(IGM().Int64Ty, otherDiscriminator));
+}
+
+llvm::ConstantInt *IRGenModule::getMallocTypeId(llvm::Function *fn) {
+  if (!getOptions().EmitTypeMallocForCoroFrame) {
+    // Even when typed malloc isn't enabled, a type id may be required for ABI
+    // reasons (e.g. as an argument to swift_coro_alloc).  Use a cheaply
+    // materialized value.
+    return llvm::ConstantInt::get(Int64Ty, 0);
+  }
+  return getDiscriminatorForString(*this, fn->getName());
+}
+
+llvm::ConstantInt* IRGenFunction::getMallocTypeId() {
+  return IGM.getMallocTypeId(CurFn);
 }

@@ -7,7 +7,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendableCompletionHandlers
 import _Concurrency
 
 // CHECK-LABEL: class SlowServer : NSObject, ServiceProvider {
@@ -42,6 +42,9 @@ import _Concurrency
 // CHECK-NOT: @unchecked Sendable
 // CHECK: @available(*, unavailable)
 // CHECK-NEXT: extension AuditedBoth : @unchecked Sendable {
+
+// CHECK-LABEL: public protocol SendableProtocol
+// CHECK-SAME: : Sendable
 
 // CHECK-LABEL: enum SendableEnum :
 // CHECK-SAME: @unchecked Sendable

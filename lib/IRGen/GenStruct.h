@@ -17,7 +17,7 @@
 #ifndef SWIFT_IRGEN_GENSTRUCT_H
 #define SWIFT_IRGEN_GENSTRUCT_H
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace llvm {
   class Constant;
@@ -68,9 +68,9 @@ namespace irgen {
   ///
   /// Returns None if \p field has an empty type and therefore has no
   /// corresponding element in the llvm type.
-  llvm::Optional<unsigned> getPhysicalStructFieldIndex(IRGenModule &IGM,
-                                                       SILType baseType,
-                                                       VarDecl *field);
+  std::optional<unsigned> getPhysicalStructFieldIndex(IRGenModule &IGM,
+                                                      SILType baseType,
+                                                      VarDecl *field);
 } // end namespace irgen
 } // end namespace swift
 

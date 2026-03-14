@@ -4,7 +4,7 @@ struct G<T> {}
 
 extension G {
   struct H<U> {
-    func usesBoth<T, U>(t: T, u: U) -> (T, U) {}
+    func usesBoth<T1, U1>(t: T1, u: U1) -> (T1, U1) {}
   }
 }
 

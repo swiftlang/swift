@@ -59,20 +59,21 @@ template <typename T, typename Enable> struct DenseMapInfo;
 
 template<typename T>
 struct DenseMapInfo<swift::Located<T>> {
+  using SourceLoc = swift::SourceLoc;
 
   static inline swift::Located<T> getEmptyKey() {
     return swift::Located<T>(DenseMapInfo<T>::getEmptyKey(),
-                             DenseMapInfo<swift::SourceLoc>::getEmptyKey());
+                             DenseMapInfo<SourceLoc>::getEmptyKey());
   }
 
   static inline swift::Located<T> getTombstoneKey() {
     return swift::Located<T>(DenseMapInfo<T>::getTombstoneKey(),
-                             DenseMapInfo<swift::SourceLoc>::getTombstoneKey());
+                             DenseMapInfo<SourceLoc>::getTombstoneKey());
   }
 
   static unsigned getHashValue(const swift::Located<T> &LocatedVal) {
-    return combineHashValue(DenseMapInfo<T>::getHashValue(LocatedVal.Item),
-                            DenseMapInfo<swift::SourceLoc>::getHashValue(LocatedVal.Loc));
+    return detail::combineHashValue(DenseMapInfo<T>::getHashValue(LocatedVal.Item),
+                            DenseMapInfo<SourceLoc>::getHashValue(LocatedVal.Loc));
   }
 
   static bool isEqual(const swift::Located<T> &LHS, const swift::Located<T> &RHS) {
@@ -81,5 +82,13 @@ struct DenseMapInfo<swift::Located<T>> {
   }
 };
 } // namespace llvm
+
+namespace swift {
+  template<typename T>
+  llvm::hash_code hash_value(const Located<T> &LocatedVal) {
+    return llvm::DenseMapInfo<Located<T>>::getHashValue(LocatedVal);
+  }
+} // namespace swift
+
 
 #endif // SWIFT_BASIC_LOCATED_H

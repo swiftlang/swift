@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: not %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 //--- Inputs/module.modulemap
 module Test {
@@ -27,9 +27,18 @@ struct Nested {
 
 import Test
 
-// CHECK: note: record 'A' is not automatically importable: does not have a copy constructor or destructor. Refer to the C++ Interop User Manual to classify this type.
+// CHECK: note: record 'A' is not automatically available: it must have a copy/move constructor and a destructor; does this type have reference semantics?
+// CHECK: struct A {
+// CHECK: ^
+// CHECK: SWIFT_SHARED_REFERENCE(<#retain#>, <#release#>)
 public func test(x: A) { }
-// CHECK: note: record 'B' is not automatically importable: does not have a copy constructor or destructor. Refer to the C++ Interop User Manual to classify this type.
+// CHECK: note: record 'B' is not automatically available: it must have a copy/move constructor and a destructor; does this type have reference semantics?
+// CHECK: struct {{.*}}B {
+// CHECK: ^
+// CHECK: SWIFT_SHARED_REFERENCE(<#retain#>, <#release#>)
 public func test(x: B) { }
-// CHECK: note: record 'Nested' is not automatically importable: does not have a copy constructor or destructor. Refer to the C++ Interop User Manual to classify this type.
+// CHECK: note: record 'Nested' is not automatically available: it must have a copy/move constructor and a destructor; does this type have reference semantics?
+// CHECK: struct Nested {
+// CHECK: ^
+// CHECK: SWIFT_SHARED_REFERENCE(<#retain#>, <#release#>)
 public func test(x: Namespace.Nested) { }

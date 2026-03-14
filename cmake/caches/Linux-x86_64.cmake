@@ -135,19 +135,21 @@ set(LLDB_TOOLS
       lldb-argdumper
       lldb-python-scripts
       lldb-server
-      lldb-vscode
+      lldb-dap
       repl_swift
     CACHE STRING "")
 
 set(SWIFT_INSTALL_COMPONENTS
       autolink-driver
       compiler
+      compiler-swift-syntax-lib
       clang-builtin-headers
       editor-integration
       tools
       sourcekit-inproc
       swift-remote-mirror
       swift-remote-mirror-headers
+      swift-syntax-lib
     CACHE STRING "")
 
 set(LLVM_DISTRIBUTION_COMPONENTS

@@ -216,6 +216,9 @@ public struct Mirror {
   }
 }
 
+@available(*, unavailable)
+extension Mirror: Sendable {}
+
 extension Mirror {
   /// Representation of descendant classes that don't override
   /// `customMirror`.
@@ -310,6 +313,7 @@ extension Mirror {
   public enum DisplayStyle: Sendable {
     case `struct`, `class`, `enum`, tuple, optional, collection
     case dictionary, `set`
+    @available(SwiftStdlib 6.2, *) case foreignReference
   }
 
   internal static func _noSuperclassMirror() -> Mirror? { return nil }
@@ -347,6 +351,9 @@ extension Mirror {
     return Mirror._noSuperclassMirror
   }
 }
+
+@available(*, unavailable)
+extension Mirror.AncestorRepresentation: Sendable {}
 
 /// A type that explicitly supplies its own mirror.
 ///
@@ -475,6 +482,7 @@ public struct Mirror {
   public enum DisplayStyle: Sendable {
     case `struct`, `class`, `enum`, tuple, optional, collection
     case dictionary, `set`
+    @available(SwiftStdlib 6.2, *) case foreignReference
   }
   public init<Subject, C: Collection>(
     _ subject: Subject,
@@ -532,6 +540,7 @@ extension Mirror {
 
 //===--- General Utilities ------------------------------------------------===//
 
+@_unavailableInEmbedded
 extension String {
   /// Creates a string representing the given value.
   ///

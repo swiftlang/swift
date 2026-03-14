@@ -22,6 +22,7 @@
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/RequestCache.h"
 #include "swift/Basic/AnyValue.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Statistic.h"
@@ -29,8 +30,6 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/PrettyStackTrace.h"
-#include <string>
-#include <tuple>
 #include <type_traits>
 #include <vector>
 
@@ -41,8 +40,6 @@ class raw_ostream;
 namespace swift {
 
 using llvm::ArrayRef;
-using llvm::Optional;
-using llvm::None;
 
 class DiagnosticEngine;
 class Evaluator;
@@ -71,47 +68,6 @@ public:
     out << "\n";
   }
 };
-
-/// An llvm::ErrorInfo container for a request in which a cycle was detected
-/// and diagnosed.
-template <typename Request>
-struct CyclicalRequestError : 
-  public llvm::ErrorInfo<CyclicalRequestError<Request>> {
-public:
-  static char ID;
-  const Request &request;
-  const Evaluator &evaluator;
-
-  CyclicalRequestError(const Request &request, const Evaluator &evaluator)
-    : request(request), evaluator(evaluator) {}
-
-  virtual void log(llvm::raw_ostream &out) const override;
-
-  virtual std::error_code convertToErrorCode() const override {
-    // This is essentially unused, but is a temporary requirement for
-    // llvm::ErrorInfo subclasses.
-    llvm_unreachable("shouldn't get std::error_code from CyclicalRequestError");
-  }
-};
-
-template <typename Request>
-char CyclicalRequestError<Request>::ID = '\0';
-
-/// Evaluates a given request or returns a default value if a cycle is detected.
-template <typename Request>
-typename Request::OutputType
-evaluateOrDefault(
-  Evaluator &eval, Request req, typename Request::OutputType def) {
-  auto result = eval(req);
-  if (auto err = result.takeError()) {
-    llvm::handleAllErrors(std::move(err),
-      [](const CyclicalRequestError<Request> &E) {
-        // cycle detected
-      });
-    return def;
-  }
-  return *result;
-}
 
 /// Report that a request of the given kind is being evaluated, so it
 /// can be recorded by the stats reporter.
@@ -208,6 +164,9 @@ class Evaluator {
   /// is treated as a stack and is used to detect cycles.
   llvm::SetVector<ActiveRequest> activeRequests;
 
+  /// A set of active requests that have been diagnosed for a cycle.
+  llvm::DenseSet<ActiveRequest> diagnosedActiveCycles;
+
   /// A cache that stores the results of requests.
   evaluator::RequestCache cache;
 
@@ -231,6 +190,11 @@ public:
   /// diagnostics through the given diagnostics engine.
   Evaluator(DiagnosticEngine &diags, const LangOptions &opts);
 
+  /// For last-ditch diagnostics, get a good approximate source location for
+  /// the thing we're currently type checking by searching for a request whose
+  /// source location matches the predicate.
+  SourceLoc getInnermostSourceLoc(llvm::function_ref<bool(SourceLoc)> fn);
+
   /// Emit GraphViz output visualizing the request graph.
   void emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath);
 
@@ -248,42 +212,32 @@ public:
   void enumerateReferencesInFile(
       const SourceFile *SF,
       evaluator::DependencyRecorder::ReferenceEnumerator f) const {
+    ASSERT(recorder.isRecordingEnabled() && "Dep recording should be enabled");
     return recorder.enumerateReferencesInFile(SF, f);
   }
 
   /// Retrieve the result produced by evaluating a request that can
   /// be cached.
-  template<typename Request,
+  template<typename Request, typename Fn,
            typename std::enable_if<Request::isEverCached>::type * = nullptr>
-  llvm::Expected<typename Request::OutputType>
-  operator()(const Request &request) {
+  typename Request::OutputType
+  operator()(const Request &request, Fn defaultValueFn) {
     // The request can be cached, but check a predicate to determine
     // whether this particular instance is cached. This allows more
     // fine-grained control over which instances get cache.
     if (request.isCached())
-      return getResultCached(request);
+      return getResultCached(request, std::move(defaultValueFn));
 
-    return getResultUncached(request);
+    return getResultUncached(request, std::move(defaultValueFn));
   }
 
   /// Retrieve the result produced by evaluating a request that
   /// will never be cached.
-  template<typename Request,
+  template<typename Request, typename Fn,
            typename std::enable_if<!Request::isEverCached>::type * = nullptr>
-  llvm::Expected<typename Request::OutputType>
-  operator()(const Request &request) {
-    return getResultUncached(request);
-  }
-
-  /// Evaluate a set of requests and return their results as a tuple.
-  ///
-  /// Use this to describe cases where there are multiple (known)
-  /// requests that all need to be satisfied.
-  template<typename ...Requests>
-  std::tuple<llvm::Expected<typename Requests::OutputType>...>
-  operator()(const Requests &...requests) {
-    return std::tuple<llvm::Expected<typename Requests::OutputType>...>(
-      (*this)(requests)...);
+  typename Request::OutputType
+  operator()(const Request &request, Fn defaultValueFn) {
+    return getResultUncached(request, std::move(defaultValueFn));
   }
 
   /// Cache a precomputed value for the given request, so that it will not
@@ -301,7 +255,15 @@ public:
            typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
   void cacheOutput(const Request &request,
                    typename Request::OutputType &&output) {
-    cache.insert<Request>(request, std::move(output));
+    bool inserted = cache.insert<Request>(request, std::move(output));
+    assert(inserted && "Request result was already cached");
+    (void) inserted;
+  }
+
+  template<typename Request,
+           typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
+  bool hasCachedResult(const Request &request) {
+    return cache.find_as(request) != cache.end<Request>();
   }
 
   /// Do not introduce new callers of this function.
@@ -312,6 +274,29 @@ public:
     recorder.clearRequest<Request>(request);
   }
 
+  /// Store a value in the request evaluator's cache for a split-cached request.
+  /// The request chooses to do this itself for storing some suitable definition of
+  /// "non-empty" value.
+  template<typename Request,
+           typename std::enable_if<Request::hasSplitCache>::type* = nullptr>
+  void cacheNonEmptyOutput(const Request &request,
+                           typename Request::OutputType &&output) {
+    (void)cache.insert<Request>(request, std::move(output));
+  }
+
+  /// Consults the request evaluator's cache for a split-cached request.
+  /// The request should perform this check after consulting it's own optimized
+  /// representation for storing an empty value.
+  template<typename Request,
+           typename std::enable_if<Request::hasSplitCache>::type* = nullptr>
+  std::optional<typename Request::OutputType>
+  getCachedNonEmptyOutput(const Request &request) {
+    auto found = cache.find_as(request);
+    if (found == cache.end<Request>())
+      return std::nullopt;
+    return found->second;
+  }
+
   /// Clear the cache stored within this evaluator.
   ///
   /// Note that this does not clear the caches of requests that use external
@@ -319,10 +304,16 @@ public:
   void clearCache() { cache.clear(); }
 
   /// Is the given request, or an equivalent, currently being evaluated?
+  ///
+  /// WARN: do not rely on this function to avoid request cycles. Doing so can
+  /// lead to bugs that are very difficult to debug, especially when request
+  /// caching is involved.
   template <typename Request>
   bool hasActiveRequest(const Request &request) const {
     return activeRequests.count(ActiveRequest(request));
   }
+
+  void dump(llvm::raw_ostream &out) { cache.dump(out); }
 
 private:
   /// Diagnose a cycle detected in the evaluation of the given
@@ -337,16 +328,19 @@ private:
   /// request to the \c activeRequests stack.
   bool checkDependency(const ActiveRequest &request);
 
+  /// Note that we have finished this request, popping it from the
+  /// \c activeRequests stack.
+  void finishedRequest(const ActiveRequest &request);
+
   /// Produce the result of the request without caching.
-  template<typename Request>
-  llvm::Expected<typename Request::OutputType>
-  getResultUncached(const Request &request) {
+  template<typename Request, typename Fn>
+  typename Request::OutputType
+  getResultUncached(const Request &request, Fn defaultValueFn) {
     auto activeReq = ActiveRequest(request);
 
     // Check for a cycle.
     if (checkDependency(activeReq)) {
-      return llvm::Error(
-          std::make_unique<CyclicalRequestError<Request>>(request, *this));
+      return defaultValueFn();
     }
 
     PrettyStackTraceRequest<Request> prettyStackTrace(request);
@@ -357,7 +351,17 @@ private:
 
     recorder.beginRequest<Request>();
 
-    auto &&result = getRequestFunction<Request>()(request, *this);
+    auto result = [&]() -> typename Request::OutputType {
+      auto reqResult = getRequestFunction<Request>()(request, *this);
+
+      // If we diagnosed a cycle for this request, we want to only use the
+      // default value to ensure we return a consistent result.
+      if (!diagnosedActiveCycles.empty() &&
+          diagnosedActiveCycles.erase(activeReq)) {
+        return defaultValueFn();
+      }
+      return reqResult;
+    }();
 
     recorder.endRequest<Request>(request);
 
@@ -366,19 +370,18 @@ private:
 
     // Make sure we remove this from the set of active requests once we're
     // done.
-    assert(activeRequests.back() == activeReq);
-    activeRequests.pop_back();
+    finishedRequest(activeReq);
 
-    return std::move(result);
+    return result;
   }
 
   /// Get the result of a request, consulting an external cache
   /// provided by the request to retrieve previously-computed results
   /// and detect recursion.
-  template<typename Request,
+  template<typename Request, typename Fn,
            typename std::enable_if<Request::hasExternalCache>::type * = nullptr>
-  llvm::Expected<typename Request::OutputType>
-  getResultCached(const Request &request) {
+  typename Request::OutputType
+  getResultCached(const Request &request, Fn defaultValueFn) {
     // If there is a cached result, return it.
     if (auto cached = request.getCachedResult()) {
       recorder.replayCachedRequest(request);
@@ -387,13 +390,10 @@ private:
     }
 
     // Compute the result.
-    auto result = getResultUncached(request);
+    auto result = getResultUncached(request, std::move(defaultValueFn));
 
     // Cache the result if applicable.
-    if (!result)
-      return result;
-
-    request.cacheResult(*result);
+    request.cacheResult(result);
 
     // Return it.
     return result;
@@ -402,10 +402,10 @@ private:
   /// Get the result of a request, consulting the general cache to
   /// retrieve previously-computed results and detect recursion.
   template<
-      typename Request,
+      typename Request, typename Fn,
       typename std::enable_if<!Request::hasExternalCache>::type * = nullptr>
-  llvm::Expected<typename Request::OutputType>
-  getResultCached(const Request &request) {
+  typename Request::OutputType
+  getResultCached(const Request &request, Fn defaultValueFn) {
     // If we already have an entry for this request in the cache, return it.
     auto known = cache.find_as<Request>(request);
     if (known != cache.end<Request>()) {
@@ -416,12 +416,10 @@ private:
     }
 
     // Compute the result.
-    auto result = getResultUncached(request);
-    if (!result)
-      return result;
+    auto result = getResultUncached(request, std::move(defaultValueFn));
 
     // Cache the result.
-    cache.insert<Request>(request, *result);
+    cache.insert<Request>(request, result);
     return result;
   }
 
@@ -435,6 +433,8 @@ private:
             typename std::enable_if<Request::isDependencySink>::type * = nullptr>
   void handleDependencySinkRequest(const Request &r,
                                    const typename Request::OutputType &o) {
+    if (!recorder.isRecordingEnabled())
+      return;
     evaluator::DependencyCollector collector(recorder);
     r.writeDependencySink(collector, o);
   }
@@ -446,6 +446,8 @@ private:
   template <typename Request,
             typename std::enable_if<Request::isDependencySource>::type * = nullptr>
   void handleDependencySourceRequest(const Request &r) {
+    if (!recorder.isRecordingEnabled())
+      return;
     auto source = r.readDependencySource(recorder);
     if (!source.isNull() && source.get()->isPrimary()) {
       recorder.handleDependencySourceRequest(r, source.get());
@@ -453,13 +455,22 @@ private:
   }
 };
 
-template <typename Request>
-void CyclicalRequestError<Request>::log(llvm::raw_ostream &out) const {
-  out << "Cycle detected:\n";
-  simple_display(out, request);
-  out << "\n";
+/// Evaluates a given request or returns a default value if a cycle is detected.
+template<typename Request>
+typename Request::OutputType
+evaluateOrDefault(Evaluator &eval, Request req, typename Request::OutputType def) {
+  return eval(req, [def]() { return def; });
 }
 
-} // end namespace evaluator
+/// Evaluates a given request or returns a default value if a cycle is detected.
+template<typename Request>
+typename Request::OutputType
+evaluateOrFatal(Evaluator &eval, Request req) {
+  return eval(req, []() -> typename Request::OutputType {
+    llvm::report_fatal_error("Request cycle");
+  });
+}
+
+} // end namespace swift
 
 #endif // SWIFT_AST_EVALUATOR_H

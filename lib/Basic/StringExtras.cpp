@@ -15,19 +15,24 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <optional>
 
 using namespace swift;
 using namespace camel_case;
+
+using llvm::StringRef;
 
 bool swift::canBeArgumentLabel(StringRef identifier) {
   return llvm::StringSwitch<bool>(identifier)
@@ -65,7 +70,7 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
 #include "PartsOfSpeech.def"
 
   // Identify gerunds, which always end in "ing".
-  if (word.endswith("ing") && word.size() > 4) {
+  if (word.ends_with("ing") && word.size() > 4) {
     StringRef possibleVerb = word.drop_back(3);
 
     // If what remains is a verb, we have a gerund.
@@ -211,6 +216,17 @@ void WordIterator::computePrevPosition() const {
   PrevPositionValid = true;
 }
 
+bool camel_case::Words::hasWordStartingAt(unsigned targetPosition) const {
+  // Iterate over the words until we see one at or past targetPosition.
+  // FIXME: Is there a faster way to do this by looking at the characters around
+  //        the position?
+  for (auto i = begin(); i != end() && i.getPosition() <= targetPosition; i++) {
+    if (i.getPosition() == targetPosition)
+      return true;
+  }
+  return false;
+}
+
 StringRef camel_case::getFirstWord(StringRef string) {
   if (string.empty())
     return "";
@@ -243,6 +259,30 @@ bool camel_case::startsWithIgnoreFirstCase(StringRef word1, StringRef word2) {
     return false;
 
   return word1.substr(1, word2.size() - 1) == word2.substr(1);
+}
+
+bool camel_case::hasWordSuffix(StringRef haystack, StringRef needle) {
+  // Is it even possible for one to be a suffix of the other?
+  if (needle.empty() || haystack.size() <= needle.size())
+    return false;
+
+  // Does haystack have a word boundary at the right position?
+  auto targetPosition = haystack.size() - needle.size();
+  if (!Words(haystack).hasWordStartingAt(targetPosition))
+    return false;
+
+  StringRef suffix = haystack.substr(targetPosition);
+
+  // Fast path: Without potentially copying the strings, do they match?
+  if (sameWordIgnoreFirstCase(suffix, needle))
+    return true;
+
+  // Flatten out leading initialisms. Do they match?
+  SmallString<32> suffixScratch, needleScratch;
+  auto suffixFlat = toLowercaseInitialisms(suffix, suffixScratch);
+  auto needleFlat = toLowercaseInitialisms(needle, needleScratch);
+
+  return suffixFlat == needleFlat;
 }
 
 StringRef camel_case::toLowercaseWord(StringRef string,
@@ -343,8 +383,9 @@ size_t camel_case::findWord(StringRef string, StringRef word) {
 }
 
 /// Skip a type suffix that can be dropped.
-static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
-  if (typeName.empty()) return None;
+static std::optional<StringRef> skipTypeSuffix(StringRef typeName) {
+  if (typeName.empty())
+    return std::nullopt;
 
   auto lastWord = camel_case::getLastWord(typeName);
 
@@ -377,10 +418,10 @@ static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
   }
 
   // _t.
-  if (typeName.size() > 2 && typeName.endswith("_t")) {
+  if (typeName.size() > 2 && typeName.ends_with("_t")) {
     return typeName.drop_back(2);
   }
-  return None;
+  return std::nullopt;
 }
 
 /// Match a word within a name to a word within a type.
@@ -393,7 +434,7 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
     // We can match the suffix of the type so long as everything preceding the
     // match is neither a lowercase letter nor a '_'. This ignores type
     // prefixes for acronyms, e.g., the 'NS' in 'NSURL'.
-    if (typeWord.endswith_insensitive(nameWord) &&
+    if (typeWord.ends_with_insensitive(nameWord) &&
         !clang::isLowercase(typeWord[typeWord.size() - nameWord.size()])) {
       // Check that everything preceding the match is neither a lowercase letter
       // nor a '_'.
@@ -406,7 +447,7 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
 
     // We can match a prefix so long as everything following the match is
     // a number.
-    if (typeWord.startswith_insensitive(nameWord)) {
+    if (typeWord.starts_with_insensitive(nameWord)) {
       for (unsigned i = nameWord.size(), n = typeWord.size(); i != n; ++i) {
         if (!clang::isDigit(typeWord[i])) return false;
       }
@@ -515,7 +556,7 @@ static StringRef omitNeedlessWordsFromPrefix(StringRef name,
     if (firstWord == "By") {
       StringRef nextWord = camel_case::getFirstWord(
                              newName.substr(firstWord.size()));
-      if (nextWord.endswith("ing")) {
+      if (nextWord.ends_with("ing")) {
         return newName.substr(firstWord.size());
       }
     }
@@ -717,7 +758,7 @@ omitSelfTypeFromBaseName(StringRef name, OmissionTypeName typeName,
   typeName.CollectionElement = StringRef();
 
   auto nameWords = camel_case::getWords(name);
-  Optional<llvm::iterator_range<WordIterator>> matchingRange;
+  std::optional<llvm::iterator_range<WordIterator>> matchingRange;
 
   // Search backwards for the type name, whether anchored at the end or not.
   for (auto nameReverseIter = nameWords.rbegin();
@@ -1208,18 +1249,14 @@ static bool splitBaseName(StringRef &baseName, StringRef &argName,
   return false;
 }
 
-bool swift::omitNeedlessWords(StringRef &baseName,
-                              MutableArrayRef<StringRef> argNames,
-                              StringRef firstParamName,
-                              OmissionTypeName givenResultType,
-                              OmissionTypeName contextType,
-                              ArrayRef<OmissionTypeName> paramTypes,
-                              bool returnsSelf,
-                              bool isProperty,
-                              const InheritedNameSet *allPropertyNames,
-                              Optional<unsigned> completionHandlerIndex,
-                              Optional<StringRef> completionHandlerName,
-                              StringScratchSpace &scratch) {
+bool swift::omitNeedlessWords(
+    StringRef &baseName, MutableArrayRef<StringRef> argNames,
+    StringRef firstParamName, OmissionTypeName givenResultType,
+    OmissionTypeName contextType, ArrayRef<OmissionTypeName> paramTypes,
+    bool returnsSelf, bool isProperty, const InheritedNameSet *allPropertyNames,
+    std::optional<unsigned> completionHandlerIndex,
+    std::optional<StringRef> completionHandlerName,
+    StringScratchSpace &scratch) {
   bool anyChanges = false;
   OmissionTypeName resultType = returnsSelf ? contextType : givenResultType;
 
@@ -1366,32 +1403,33 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   return lowercaseAcronymsForReturn();
 }
 
-Optional<StringRef> swift::stripWithCompletionHandlerSuffix(StringRef name) {
-  if (name.endswith("WithCompletionHandler")) {
+std::optional<StringRef>
+swift::stripWithCompletionHandlerSuffix(StringRef name) {
+  if (name.ends_with("WithCompletionHandler")) {
     return name.drop_back(strlen("WithCompletionHandler"));
   }
 
-  if (name.endswith("WithCompletion")) {
+  if (name.ends_with("WithCompletion")) {
     return name.drop_back(strlen("WithCompletion"));
   }
 
-  if (name.endswith("WithCompletionBlock")) {
+  if (name.ends_with("WithCompletionBlock")) {
     return name.drop_back(strlen("WithCompletionBlock"));
   }
 
-  if (name.endswith("WithBlock")) {
+  if (name.ends_with("WithBlock")) {
     return name.drop_back(strlen("WithBlock"));
   }
 
-  if (name.endswith("WithReplyTo")) {
+  if (name.ends_with("WithReplyTo")) {
     return name.drop_back(strlen("WithReplyTo"));
   }
 
-  if (name.endswith("WithReply")) {
+  if (name.ends_with("WithReply")) {
     return name.drop_back(strlen("WithReply"));
   }
 
-  return None;
+  return std::nullopt;
 }
 
 void swift::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
@@ -1416,4 +1454,16 @@ void swift::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
         break;
     }
   }
+}
+
+bool swift::pathStartsWith(StringRef prefix, StringRef path) {
+  auto prefixIt = llvm::sys::path::begin(prefix),
+       prefixEnd = llvm::sys::path::end(prefix);
+  for (auto pathIt = llvm::sys::path::begin(path),
+            pathEnd = llvm::sys::path::end(path);
+       prefixIt != prefixEnd && pathIt != pathEnd; ++prefixIt, ++pathIt) {
+    if (*prefixIt != *pathIt)
+      return false;
+  }
+  return prefixIt == prefixEnd;
 }

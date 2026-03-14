@@ -1,7 +1,11 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -parse-as-library)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
+
+// rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
 
 // rdar://76038845
@@ -10,7 +14,7 @@
 // UNSUPPORTED: back_deploy_concurrency
 
 // Crash expectations can't be implemented on WASI/WebAssembly.
-// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: OS=wasip1
 
 // This test makes sure that we properly save/restore access when we
 // synchronously launch a task from a serial executor. The access from the task
@@ -24,6 +28,8 @@ import StdlibUnittest
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Android)
+import Android
 #elseif canImport(CRT)
 import CRT
 #endif
@@ -172,7 +178,7 @@ struct Runner {
     @MainActor static func main() async {
         var exclusivityTests = TestSuite("Async Exclusivity Custom Executors")
 
-        // As a quick sanity test, make sure that the crash doesn't occur if we
+        // As a quick soundness test, make sure that the crash doesn't occur if we
         // don't have the withExclusiveAccess(to: ) from the case below.
         exclusivityTests.test("exclusivityAccessesPropagateFromExecutorIntoTasks NoConflict") {
             @MainActor in
@@ -200,7 +206,7 @@ struct Runner {
             await handle.value
         }
 
-        // If all of the previous tests passed, then we have basic sanity
+        // If all of the previous tests passed, then we have basic soundness
         // done. Lets now test out our cases that involve a live sync access.
         //
         // We test cases 3,4,7,8 here. The other cases that do not involve a
@@ -653,7 +659,7 @@ struct Runner {
 
                 // In order to test that we properly hand off the access, we
                 // need to await here.
-                let handle2 = await Task { @CustomActor in
+                let handle2 = Task { @CustomActor in
                     debugLog("==> In inner handle")
                 }
                 await handle2.value
@@ -747,7 +753,7 @@ struct Runner {
 
                 // In order to test that we properly hand off the access, we
                 // need to await here.
-                let handle2 = await Task { @CustomActor in
+                let handle2 = Task { @CustomActor in
                     debugLog("==> In inner handle")
                 }
                 await handle2.value

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILArgument.h"
@@ -35,6 +36,9 @@ DominanceInfo::DominanceInfo(SILFunction *F)
   assert(!F->isExternalDeclaration() &&
          "Make sure the function is a definition and not a declaration.");
   recalculate(*F);
+}
+
+DominanceInfo::~DominanceInfo() {
 }
 
 bool DominanceInfo::properlyDominates(SILInstruction *a, SILInstruction *b) {
@@ -70,6 +74,15 @@ bool DominanceInfo::properlyDominates(SILValue a, SILInstruction *b) {
   return false;
 }
 
+SILBasicBlock *DominanceInfo::getLeastCommonAncestorOfUses(SILValue value) {
+  SILBasicBlock *lca = nullptr;
+  for (auto *use : value->getUses()) {
+    auto *block = use->getParentBlock();
+    lca = lca ? findNearestCommonDominator(lca, block) : block;
+  }
+  return lca;
+}
+
 void DominanceInfo::verify() const {
   // Recompute.
   auto *F = getRoot()->getParent();
@@ -77,11 +90,12 @@ void DominanceInfo::verify() const {
 
   // And compare.
   if (errorOccurredOnComparison(OtherDT)) {
-    llvm::errs() << "DominatorTree is not up to date!\nComputed:\n";
-    print(llvm::errs());
-    llvm::errs() << "\nActual:\n";
-    OtherDT.print(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "DominatorTree is not up to date!\nComputed:\n";
+      print(out);
+      out << "\nActual:\n";
+      OtherDT.print(out);
+    });
   }
 }
 
@@ -134,19 +148,18 @@ void PostDominanceInfo::verify() const {
 
   // And compare.
   if (errorOccurredOnComparison(OtherDT)) {
-    llvm::errs() << "PostDominatorTree is not up to date!\nComputed:\n";
-    print(llvm::errs());
-    llvm::errs() << "\nActual:\n";
-    OtherDT.print(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "PostDominatorTree is not up to date!\nComputed:\n";
+      print(out);
+      out << "\nActual:\n";
+      OtherDT.print(out);
+    });
   }
 }
 
 void swift::computeDominatedBoundaryBlocks(
     SILBasicBlock *root, DominanceInfo *domTree,
     SmallVectorImpl<SILBasicBlock *> &boundary) {
-  auto *function = root->getParent();
-  assert(function->hasOwnership());
   assert(boundary.empty());
 
   DominanceOrder domOrder(root, domTree);

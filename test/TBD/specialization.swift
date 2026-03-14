@@ -11,9 +11,9 @@
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all -enable-library-evolution -enable-testing %s
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd
-// RUN: diff -u %t/typecheck.tbd %t/emit-ir.tbd
+// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd -tbd-install_name specialization
+// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd -tbd-install_name specialization
+// RUN: %llvm-readtapi --compare %t/typecheck.tbd %t/emit-ir.tbd
 
 // rdar://problem/40738913
 
@@ -40,7 +40,7 @@ public func f() {
 
 // Generic specialization, from the foo call in f
 // CHECK-LABEL: // specialized Foo.foo<A>(_:)
-// CHECK-NEXT: sil private [noinline] @$s14specialization3FooC3foo33_A6E3E43DB6679655BDF5A878ABC489A0LLyyxmlFSi_Tg5Tf4dd_n : $@convention(thin) () -> ()
+// CHECK-NEXT: sil private [noinline] @$s14specialization3FooC3foo33_A6E3E43DB6679655BDF5A878ABC489A0LLyyxmlFSi_Ttg5Tf4d_n : $@convention(thin) () -> ()
 
 // Function signature specialization, from the bar call in Bar.init
 // CHECK-LABEL: // specialized Bar.bar()

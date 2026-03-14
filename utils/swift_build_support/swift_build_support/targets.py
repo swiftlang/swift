@@ -11,12 +11,15 @@
 import os
 import platform
 
+
 from . import cmake
 from . import shell
 
 try:
+    from build_swift.build_swift.versions import Version
     from build_swift.build_swift.wrappers import xcrun
 except ImportError:
+    from build_swift.versions import Version
     from build_swift.wrappers import xcrun
 
 
@@ -69,7 +72,7 @@ class Platform(object):
                 return True
         return False
 
-    def swift_flags(self, args):
+    def swift_flags(self, args, resource_path=None):
         """
         Swift compiler flags for a platform, useful for cross-compiling
         """
@@ -113,7 +116,7 @@ class DarwinPlatform(Platform):
         """
         return self.is_embedded and not self.is_simulator
 
-    def sdk_supports_architecture(self, arch, toolchain):
+    def sdk_supports_architecture(self, arch, toolchain, args):
         """
         Convenience function for checking whether the SDK supports the
         target architecture.
@@ -122,7 +125,8 @@ class DarwinPlatform(Platform):
         # The names match up with the xcrun SDK names.
         xcrun_sdk_name = self.name
 
-        if (xcrun_sdk_name == 'watchos' and arch == 'armv7k'):
+        if (xcrun_sdk_name == 'watchos' and arch == 'armv7k' and
+           Version(args.darwin_deployment_version_watchos) < Version('9.0')):
             return True
 
         sdk_path = xcrun.sdk_path(sdk=xcrun_sdk_name, toolchain=toolchain)
@@ -150,17 +154,21 @@ class AndroidPlatform(Platform):
         """
         return True
 
-    def swift_flags(self, args):
+    def swift_flags(self, args, resource_path=None):
         flags = '-target %s-unknown-linux-android%s ' % (args.android_arch,
                                                          args.android_api_level)
 
-        flags += '-resource-dir %s/swift-%s-%s/lib/swift ' % (
-                 args.build_root, self.name, args.android_arch)
+        if resource_path is not None:
+            flags += '-resource-dir %s ' % (resource_path)
+        else:
+            flags += '-resource-dir %s/swift-%s-%s/lib/swift ' % (
+                     args.build_root, self.name, args.android_arch)
 
         android_toolchain_path = self.ndk_toolchain_path(args)
 
         flags += '-sdk %s/sysroot ' % (android_toolchain_path)
-        flags += '-tools-directory %s/bin' % (android_toolchain_path)
+        flags += '-tools-directory %s/bin ' % (android_toolchain_path)
+        flags += '-Xclang-linker -Wl,-z,max-page-size=16384'
         return flags
 
     def cmake_options(self, args):
@@ -254,15 +262,24 @@ class StdlibDeploymentTarget(object):
                                 sdk_name="WATCHOS")
 
     AppleWatchSimulator = DarwinPlatform("watchsimulator",
-                                         archs=["i386", "x86_64", "arm64"],
+                                         archs=["x86_64", "arm64"],
                                          sdk_name="WATCHOS_SIMULATOR",
                                          is_simulator=True)
 
+    XROS = DarwinPlatform("xros", archs=["arm64", "arm64e"],
+                          sdk_name="XROS")
+
+    XROSSimulator = DarwinPlatform("xrsimulator",
+                                   archs=["arm64"],
+                                   sdk_name="XROS_SIMULATOR",
+                                   is_simulator=True)
+
     # A platform that's not tied to any particular OS, and it meant to be used
     # to build the stdlib as standalone and/or statically linked.
-    Freestanding = Platform("freestanding",
-                            archs=["i386", "x86_64", "armv7", "armv7s", "armv7k",
-                                   "arm64", "arm64e"])
+    Freestanding = Platform("freestanding", archs=[
+        "i386", "x86_64",
+        "armv7", "armv7s", "armv7k", "armv7m", "armv7em",
+        "arm64", "arm64e", "arm64_32"])
 
     Linux = Platform("linux", archs=[
         "x86_64",
@@ -274,11 +291,16 @@ class StdlibDeploymentTarget(object):
         "powerpc",
         "powerpc64",
         "powerpc64le",
+        "riscv64",
         "s390x"])
 
-    FreeBSD = Platform("freebsd", archs=["x86_64"])
+    FreeBSD = Platform("freebsd", archs=["x86_64", "aarch64"])
 
-    OpenBSD = OpenBSDPlatform("openbsd", archs=["amd64"])
+    LinuxStatic = Platform('linux-static', sdk_name='LINUX_STATIC', archs=[
+        'x86_64',
+        'aarch64'])
+
+    OpenBSD = OpenBSDPlatform("openbsd", archs=["x86_64", "aarch64"])
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
 
@@ -296,8 +318,10 @@ class StdlibDeploymentTarget(object):
         iOS, iOSSimulator,
         AppleTV, AppleTVSimulator,
         AppleWatch, AppleWatchSimulator,
+        XROS, XROSSimulator,
         Freestanding,
         Linux,
+        LinuxStatic,
         FreeBSD,
         OpenBSD,
         Cygwin,
@@ -319,6 +343,8 @@ class StdlibDeploymentTarget(object):
         'TVOS_SIMULATOR': AppleTVSimulator.targets,
         'WATCHOS': AppleWatch.targets,
         'WATCHOS_SIMULATOR': AppleWatchSimulator.targets,
+        'XROS': XROS.targets,
+        'XROS_SIMULATOR': XROSSimulator.targets,
     }
 
     @staticmethod
@@ -360,6 +386,8 @@ class StdlibDeploymentTarget(object):
                 return StdlibDeploymentTarget.Linux.powerpc64
             elif machine == 'ppc64le':
                 return StdlibDeploymentTarget.Linux.powerpc64le
+            elif machine == 'riscv64':
+                return StdlibDeploymentTarget.Linux.riscv64
             elif machine == 's390x':
                 return StdlibDeploymentTarget.Linux.s390x
 
@@ -374,10 +402,14 @@ class StdlibDeploymentTarget(object):
         elif system == 'FreeBSD':
             if machine == 'amd64':
                 return StdlibDeploymentTarget.FreeBSD.x86_64
+            elif machine == 'arm64':
+                return StdlibDeploymentTarget.FreeBSD.aarch64
 
         elif system == 'OpenBSD':
             if machine == 'amd64':
-                return StdlibDeploymentTarget.OpenBSD.amd64
+                return StdlibDeploymentTarget.OpenBSD.x86_64
+            elif machine == 'arm64':
+                return StdlibDeploymentTarget.OpenBSD.aarch64
 
         elif system == 'CYGWIN_NT-10.0':
             if machine == 'x86_64':

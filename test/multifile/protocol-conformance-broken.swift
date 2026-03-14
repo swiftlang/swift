@@ -2,7 +2,7 @@
 
 // rdar://problem/29689007
 protocol P {
-  associatedtype AT // expected-note{{protocol requires nested type 'AT'; do you want to add it?}}
+  associatedtype AT // expected-note{{protocol requires nested type 'AT'}}
   func f() -> AT
 }
 

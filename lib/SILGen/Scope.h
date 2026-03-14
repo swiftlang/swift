@@ -18,6 +18,7 @@
 #define SWIFT_SILGEN_SCOPE_H
 
 #include "SILGenFunction.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "Cleanup.h"
 
@@ -154,28 +155,12 @@ class LLVM_LIBRARY_VISIBILITY DebugScope {
   SILGenFunction &SGF;
 
 public:
-  explicit DebugScope(SILGenFunction &SGF, CleanupLocation loc) : SGF(SGF) {
+  explicit DebugScope(SILGenFunction &SGF, SILLocation loc) : SGF(SGF) {
     SGF.enterDebugScope(loc);
   }
 
   ~DebugScope() { SGF.leaveDebugScope(); }
 };
-
-/// A scope that represents a Macro expansion.
-class LLVM_LIBRARY_VISIBILITY MacroScope {
-  SILGenFunction &SGF;
-
-public:
-  explicit MacroScope(SILGenFunction &SGF, CleanupLocation loc,
-                      SILLocation MacroExpansion, DeclNameRef MacroName,
-                      DeclNameLoc MacroNameLoc)
-      : SGF(SGF) {
-    SGF.enterDebugScope(loc, false, MacroExpansion, MacroName, MacroNameLoc);
-  }
-
-  ~MacroScope() { SGF.leaveDebugScope(); }
-};
-
 
 } // end namespace Lowering
 } // end namespace swift

@@ -5,7 +5,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 // CHECK-LABEL: class EffProps : NSObject {
 // CHECK:       @available(*, renamed: "getter:doggo()")
@@ -13,7 +13,7 @@
 // CHECK:       var doggo: NSObject { get async }
 
 // CHECK:       @available(*, renamed: "getter:catto()")
-// CHECK-NEXT:  func obtainCat(_ completionHandler: @escaping @Sendable (NSObject?, Error?) -> Void)
+// CHECK-NEXT:  func obtainCat(_ completionHandler: @escaping @Sendable (NSObject?, (any Error)?) -> Void)
 // CHECK-NEXT:  var catto: NSObject? { get async throws }
 
 // CHECK:       @available(*, renamed: "getter:available()")
@@ -33,11 +33,11 @@
 // CHECK-NEXT:  var fromNullableHandler: String { get async }
 
 // CHECK:       @available(*, renamed: "getter:mainDogProp()")
-// CHECK-NEXT:  func getMainDog(_ completion: @escaping @MainActor (String) -> Void)
+// CHECK-NEXT:  func getMainDog(_ completion: @escaping @MainActor @Sendable (String) -> Void)
 // CHECK-NEXT:  var mainDogProp: String { get async }
 
 // CHECK:       @available(*, renamed: "regularMainDog()")
-// CHECK-NEXT:  func regularMainDog(_ completion: @escaping @MainActor (String) -> Void)
+// CHECK-NEXT:  func regularMainDog(_ completion: @escaping @MainActor @Sendable (String) -> Void)
 // CHECK-NEXT:  @discardableResult
 // CHECK-NEXT:  func regularMainDog() async -> String
 // CHECK: }

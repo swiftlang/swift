@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 -parse-as-library -emit-library -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift -o %t/%target-library-name(FakeDistributedActorSystems)
-// RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 -parse-as-library -lFakeDistributedActorSystems -module-name main -I %t -L %t %s -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color
+// RUN: %target-build-swift -target %target-cpu-apple-macosx13.0 -parse-as-library -emit-library -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift -o %t/%target-library-name(FakeDistributedActorSystems)
+// RUN: %target-build-swift -target %target-cpu-apple-macosx13.0 -parse-as-library -lFakeDistributedActorSystems -module-name main -I %t -L %t %s -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: OS=macosx && (CPU=x86_64 || CPU=arm64)
 // REQUIRES: executable_test

@@ -6,23 +6,23 @@
       key.implicitmembers: [
         {
           key.name: "east",
-          key.sourcetext: "east",
-          key.description: "east"
+          key.description: "east",
+          key.sourcetext: "east"
         },
         {
           key.name: "west",
-          key.sourcetext: "west",
-          key.description: "west"
+          key.description: "west",
+          key.sourcetext: "west"
         },
         {
           key.name: "vector(x:y:)",
-          key.sourcetext: "vector(x: <#T##Int#>, y: <#T##Int#>)",
-          key.description: "vector(x: Int, y: Int)"
+          key.description: "vector(x: Int, y: Int)",
+          key.sourcetext: "vector(x: <#T##Int#>, y: <#T##Int#>)"
         },
         {
           key.name: "distance(_:)",
-          key.sourcetext: "distance(<#T##Int#>)",
-          key.description: "distance(Int)"
+          key.description: "distance(Int)",
+          key.sourcetext: "distance(<#T##Int#>)"
         }
       ]
     },
@@ -32,27 +32,27 @@
       key.implicitmembers: [
         {
           key.name: "me",
-          key.sourcetext: "me",
           key.description: "me",
-          key.doc.brief: "Mine."
+          key.doc.brief: "Mine.",
+          key.sourcetext: "me"
         },
         {
           key.name: "you",
-          key.sourcetext: "you",
           key.description: "you",
-          key.doc.brief: "Yours."
+          key.doc.brief: "Yours.",
+          key.sourcetext: "you"
         },
         {
           key.name: "them",
-          key.sourcetext: "them",
           key.description: "them",
-          key.doc.brief: "Theirs."
+          key.doc.brief: "Theirs.",
+          key.sourcetext: "them"
         },
         {
           key.name: "all",
-          key.sourcetext: "all",
           key.description: "all",
-          key.doc.brief: "One for all."
+          key.doc.brief: "One for all.",
+          key.sourcetext: "all"
         }
       ]
     }
@@ -66,23 +66,23 @@
       key.implicitmembers: [
         {
           key.name: "east",
-          key.sourcetext: "east",
-          key.description: "east"
+          key.description: "east",
+          key.sourcetext: "east"
         },
         {
           key.name: "west",
-          key.sourcetext: "west",
-          key.description: "west"
+          key.description: "west",
+          key.sourcetext: "west"
         },
         {
           key.name: "vector(x:y:)",
-          key.sourcetext: "vector(x: <#T##Int#>, y: <#T##Int#>)",
-          key.description: "vector(x: Int, y: Int)"
+          key.description: "vector(x: Int, y: Int)",
+          key.sourcetext: "vector(x: <#T##Int#>, y: <#T##Int#>)"
         },
         {
           key.name: "distance(_:)",
-          key.sourcetext: "distance(<#T##Int#>)",
-          key.description: "distance(Int)"
+          key.description: "distance(Int)",
+          key.sourcetext: "distance(<#T##Int#>)"
         }
       ]
     },
@@ -92,27 +92,27 @@
       key.implicitmembers: [
         {
           key.name: "me",
-          key.sourcetext: "me",
           key.description: "me",
-          key.doc.brief: "Mine."
+          key.doc.brief: "Mine.",
+          key.sourcetext: "me"
         },
         {
           key.name: "you",
-          key.sourcetext: "you",
           key.description: "you",
-          key.doc.brief: "Yours."
+          key.doc.brief: "Yours.",
+          key.sourcetext: "you"
         },
         {
           key.name: "them",
-          key.sourcetext: "them",
           key.description: "them",
-          key.doc.brief: "Theirs."
+          key.doc.brief: "Theirs.",
+          key.sourcetext: "them"
         },
         {
           key.name: "all",
-          key.sourcetext: "all",
           key.description: "all",
-          key.doc.brief: "One for all."
+          key.doc.brief: "One for all.",
+          key.sourcetext: "all"
         }
       ]
     }

@@ -6,6 +6,7 @@
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
+// UNSUPPORTED: CPU=wasm32
 
 import TestModule
 
@@ -22,10 +23,11 @@ enum Value<First> {
 }
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
-// CHECK:   [[DEMANGLED_TYPE:%[0-9]+]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$s4main5ValueOy10TestModule7IntegerVGMD") #{{[0-9]+}}
+// CHECK:      [[DEMANGLED_TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(
+// CHECK-SAME:   $s4main5ValueOy10TestModule7IntegerVGMD
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   %swift.opaque* noalias nocapture %{{[0-9]+}}, 
-// CHECK-SAME:   %swift.type* [[DEMANGLED_TYPE]]
+// CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
+// CHECK-SAME:   ptr [[DEMANGLED_TYPE]]
 // CHECK-SAME: )
 // CHECK: }
 func doit() {
@@ -33,18 +35,14 @@ func doit() {
 }
 doit()
 
-// CHECK: ; Function Attrs: noinline nounwind readnone
-// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, %swift.type* %1) #{{[0-9]+}} {{(section)?.*}}{
-// CHECK: entry:
-// CHECK:   [[ERASED_TYPE:%[0-9]+]] = bitcast %swift.type* %1 to i8*
+// CHECK: ; Function Attrs: noinline nounwind memory(none)
+// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
 // CHECK-SAME:     [[INT]] %0, 
-// CHECK-SAME:     i8* [[ERASED_TYPE]], 
-// CHECK-SAME:     i8* undef, 
-// CHECK-SAME:     i8* undef, 
-// CHECK-SAME:     %swift.type_descriptor* bitcast (
-// CHECK-SAME:       {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
-// CHECK-SAME:     )
-// CHECK-SAME:   ) #{{[0-9]+}}
+// CHECK-SAME:     ptr %1, 
+// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     $s4main5ValueOMn
+// CHECK-SAME:   )
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

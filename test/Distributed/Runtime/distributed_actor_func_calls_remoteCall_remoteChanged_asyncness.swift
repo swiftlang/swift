@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main  -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color --dump-input=always
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -module-name main  -target %target-swift-5.7-abi-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s 
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -57,7 +57,7 @@ func test_usedToBeAsync_but_remoteImplIsNotAnymore() async throws {
     // so mangling based on the 'async throws' thunk does not introduce
     // unexpected effects in remote calls.
     //
-    // Design limitation by choice: this means we cannot
+    // Design limitation by choice: this means we cannot overload distributed methods on async-ness alone
     target: RemoteCallTarget("$s4main7GreeterC28usedToHaveAsyncBytNotAnymoreSSyYaKFTE"),
     invocation: &invocation,
     throwing: Never.self,

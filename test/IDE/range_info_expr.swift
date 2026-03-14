@@ -109,7 +109,7 @@ func bar(x: C2 = .main) {}
 // CHECK-MTEE-EXPR-3-NEXT: <Content>{ escapable in
 // CHECK-MTEE-EXPR-3-NEXT:     _ = escapable
 // CHECK-MTEE-EXPR-3-NEXT:   }</Content>
-// CHECK-MTEE-EXPR-3-NEXT: <Type>(@escaping (Int) -> Void) -> ()</Type><Exit>false</Exit>
+// CHECK-MTEE-EXPR-3-NEXT: <Type>(_ escapable: @escaping (Int) -> Void) -> ()</Type><Exit>false</Exit>
 // CHECK-MTEE-EXPR-3-NEXT: <Context>swift_ide_test.(file).testWithoutActuallyEscaping(closure:)</Context>
 // CHECK-MTEE-EXPR-3-NEXT: <Declared>escapable</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK-MTEE-EXPR-3-NEXT: <Referenced>escapable</Referenced><Type>(Int) -> Void</Type>

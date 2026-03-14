@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-emit-module-interface(%t/CoreVegetable.swiftinterface) %S/Inputs/CoreVegetable.swift -disable-availability-checking
+// RUN: %target-swift-emit-module-interface(%t/CoreVegetable.swiftinterface) %S/Inputs/CoreVegetable.swift -target %target-swift-5.1-abi-triple
 // RUN: %target-swift-typecheck-module-from-interface(%t/CoreVegetable.swiftinterface)
-// RUN: %target-swift-emit-module-interface(%t/CoreChef.swiftinterface) %s -module-name CoreChef -I %t -disable-availability-checking -DLIB
-// RUN: %target-swift-typecheck-module-from-interface(%t/CoreChef.swiftinterface) -module-name CoreChef -I %t -disable-availability-checking
+// RUN: %target-swift-emit-module-interface(%t/CoreChef.swiftinterface) %s -module-name CoreChef -I %t -target %target-swift-5.1-abi-triple -DLIB
+// RUN: %target-swift-typecheck-module-from-interface(%t/CoreChef.swiftinterface) -module-name CoreChef -I %t -target %target-swift-5.1-abi-triple
 
 // Also build the module itself with -g to exercise debug info round tripping.
-// RUN: %target-swift-frontend -emit-ir -g %s -I %t -disable-availability-checking
+// RUN: %target-swift-frontend -emit-ir -g %s -I %t -target %target-swift-5.1-abi-triple
 
 // RUN: %FileCheck %s < %t/CoreChef.swiftinterface
 

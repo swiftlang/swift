@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang %s -std=c++11 -isysroot %sdk -o %t/main
 // RUN: %target-codesign %t/main
-// RUN: %target-swift-frontend -runtime-compatibility-version none -c %S/Inputs/entry-point-section/main.swift -O -o %t/howdy.o -module-name Howdy
+// RUN: %target-swift-frontend -c %S/Inputs/entry-point-section/main.swift -O -o %t/howdy.o -module-name Howdy
 // RUN: %target-ld %t/howdy.o -syslibroot %sdk -lSystem -dylib -o %t/libHowdy.dylib
 // RUN: %target-codesign %t/libHowdy.dylib
 // RUN: %target-run %t/main %t/libHowdy.dylib | %FileCheck %s
@@ -22,6 +22,13 @@
 using mach_header_platform = mach_header_64;
 #else
 using mach_header_platform = mach_header;
+#endif
+
+#if __has_feature(ptrauth_function_pointer_type_discrimination)
+#define my_ptrauth_function_pointer_type_discriminator(__type) \
+  __builtin_ptrauth_type_discriminator(__type)
+#else
+#define my_ptrauth_function_pointer_type_discriminator(__type) ((ptrauth_extra_data_t)0)
 #endif
 
 int main(int argc, char *argv[]) {
@@ -67,7 +74,7 @@ int main(int argc, char *argv[]) {
               reinterpret_cast<long>(data) + offset
           ),
           ptrauth_key_function_pointer,
-          ptrauth_function_pointer_type_discriminator(MainFunction)
+          my_ptrauth_function_pointer_type_discriminator(MainFunction)
       )
     );
 

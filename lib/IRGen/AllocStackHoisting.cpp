@@ -12,9 +12,9 @@
 
 #define DEBUG_TYPE "alloc-stack-hoisting"
 
-#include "swift/AST/Availability.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -88,6 +88,9 @@ static bool isHoistable(AllocStackInst *Inst, irgen::IRGenModule &Mod) {
 /// a set of alloc_stack instructions that can be assigned a single stack
 /// location.
 namespace {
+
+using InstructionIndices = llvm::SmallDenseMap<SILInstruction *, int>;
+
 class Partition {
 public:
   SmallVector<AllocStackInst *, 4> Elts;
@@ -113,8 +116,9 @@ public:
   /// statistics to make sure that we haven't hurt debuggability by making the
   /// change.
   bool hasMovedElt() const {
-    return llvm::any_of(Elts,
-                        [](AllocStackInst *asi) { return asi->getWasMoved(); });
+    return llvm::any_of(Elts, [](AllocStackInst *asi) {
+      return asi->usesMoveableValueDebugInfo();
+    });
   }
 };
 } // end anonymous namespace
@@ -153,12 +157,13 @@ void moveAllocStackToBeginningOfBlock(
   // of the debug_value to the original position.
   if (haveMovedElt) {
     if (auto varInfo = AS->getVarInfo()) {
-      SILBuilderWithScope Builder(AS);
+      // SILBuilderWithScope skips over meta instructions when picking a scope.
+      SILBuilder Builder(AS, AS->getDebugScope());
       auto *DVI = Builder.createDebugValue(AS->getLoc(), AS, *varInfo);
-      DVI->markAsMoved();
+      DVI->setUsesMoveableValueDebugInfo();
       DebugValueToBreakBlocksAt.push_back(DVI);
       AS->invalidateVarInfo();
-      AS->markAsMoved();
+      AS->markUsesMoveableValueDebugInfo();
     }
   }
   AS->moveFront(BB);
@@ -192,14 +197,14 @@ void Partition::assignStackLocation(
     if (AssignedLoc == AllocStack) continue;
     eraseDeallocStacks(AllocStack);
     AllocStack->replaceAllUsesWith(AssignedLoc);
-    if (hasAtLeastOneMovedElt) {
-      if (auto VarInfo = AllocStack->getVarInfo()) {
-        SILBuilderWithScope Builder(AllocStack);
-        auto *DVI = Builder.createDebugValue(AllocStack->getLoc(), AssignedLoc,
-                                             *VarInfo);
-        DVI->markAsMoved();
-        DebugValueToBreakBlocksAt.push_back(DVI);
+    if (auto VarInfo = AllocStack->getVarInfo()) {
+      SILBuilder Builder(AllocStack, AllocStack->getDebugScope());
+      auto *DVI = Builder.createDebugValueAddr(AllocStack->getLoc(),
+                                               AssignedLoc, *VarInfo);
+      if (hasAtLeastOneMovedElt) {
+        DVI->setUsesMoveableValueDebugInfo();
       }
+      DebugValueToBreakBlocksAt.push_back(DVI);
     }
     AllocStack->eraseFromParent();
   }
@@ -232,7 +237,8 @@ public:
   /// If they are in the same basic block we scan the basic block to determine
   /// whether one dealloc_stack dominates the other alloc_stack. If this is the
   /// case the live ranges can't overlap.
-  bool mayOverlap(AllocStackInst *A, AllocStackInst *B) {
+  bool mayOverlap(AllocStackInst *A, AllocStackInst *B,
+                  const InstructionIndices &stackInstructionIndices) {
     assert(A != B);
 
     // Check that we have a single dealloc_stack user in the same block.
@@ -248,23 +254,15 @@ public:
     // Different basic blocks.
     if (A->getParent() != B->getParent())
       return false;
-    bool ALive = false;
-    bool BLive = false;
-    for (auto &Inst : *A->getParent()) {
-      if (A == &Inst) {
-        ALive = true;
-      } else if (singleDeallocA == &Inst) {
-        ALive = false;
-      } else if (B == &Inst) {
-        BLive = true;
-      } else if (singleDeallocB == &Inst) {
-        BLive = false;
-      }
 
-      if (ALive && BLive)
-        return true;
-    }
-    return false;
+    // Within the same basic block we can use the consecutive instruction indices
+    // to check for overlapping.
+    if (stackInstructionIndices.lookup(A) > stackInstructionIndices.lookup(singleDeallocB))
+      return false;
+    if (stackInstructionIndices.lookup(B) > stackInstructionIndices.lookup(singleDeallocA))
+      return false;
+
+    return true;
   }
 };
 } // end anonymous namespace
@@ -282,6 +280,11 @@ class MergeStackSlots {
   SmallVector<Partition, 2> PartitionByType;
   /// The function exits.
   SmallVectorImpl<SILInstruction *> &FunctionExits;
+
+  /// Consecutive indices for all `alloc_stack` and `dealloc_stack`
+  /// instructions in the function.
+  const InstructionIndices &stackInstructionIndices;
+
   /// If we are merging any alloc_stack that were moved, to work around a bug in
   /// SelectionDAG that sinks to llvm.dbg.addr, we need to break blocks right
   /// after each llvm.dbg.addr.
@@ -292,7 +295,8 @@ class MergeStackSlots {
 
 public:
   MergeStackSlots(SmallVectorImpl<AllocStackInst *> &AllocStacks,
-                  SmallVectorImpl<SILInstruction *> &FuncExits);
+                  SmallVectorImpl<SILInstruction *> &FuncExits,
+                  const InstructionIndices &stackInstructionIndices);
 
   /// Merge alloc_stack instructions if possible and hoist them to the entry
   /// block.
@@ -301,8 +305,9 @@ public:
 } // end anonymous namespace
 
 MergeStackSlots::MergeStackSlots(SmallVectorImpl<AllocStackInst *> &AllocStacks,
-                                 SmallVectorImpl<SILInstruction *> &FuncExits)
-    : FunctionExits(FuncExits) {
+                                 SmallVectorImpl<SILInstruction *> &FuncExits,
+                                 const InstructionIndices &stackInstructionIndices)
+    : FunctionExits(FuncExits), stackInstructionIndices(stackInstructionIndices) {
   // Build initial partitions based on the type.
   llvm::DenseMap<SILType, unsigned> TypeToPartitionMap;
   for (auto *AS : AllocStacks) {
@@ -347,7 +352,7 @@ MergeStackSlots::mergeSlots(DominanceInfo *DomToUpdate) {
         // candidate partition.
         bool InterferesWithCandidateP = false;
         for (auto *AllocStackInPartition : CandidateP.Elts) {
-          if (Live.mayOverlap(AllocStackInPartition, CurAllocStack)) {
+          if (Live.mayOverlap(AllocStackInPartition, CurAllocStack, stackInstructionIndices)) {
             InterferesWithCandidateP = true;
             break;
           }
@@ -402,7 +407,11 @@ class HoistAllocStack {
   SmallVector<AllocStackInst *, 16> AllocStackToHoist;
   SmallVector<SILInstruction *, 8> FunctionExits;
 
-  Optional<SILAnalysis::InvalidationKind> InvalidationKind = None;
+  /// Consecutive indices for all `alloc_stack` and `dealloc_stack`
+  /// instructions in the function.
+  InstructionIndices stackInstructionIndices;
+
+  std::optional<SILAnalysis::InvalidationKind> InvalidationKind = std::nullopt;
 
   DominanceInfo *DomInfoToUpdate = nullptr;
 
@@ -413,7 +422,7 @@ public:
   /// Try to hoist generic alloc_stack instructions to the entry block.  Returns
   /// none if the function was not changed. Otherwise, returns the analysis
   /// invalidation kind to use if the function was changed.
-  Optional<SILAnalysis::InvalidationKind> run();
+  std::optional<SILAnalysis::InvalidationKind> run();
 
   void setDominanceToUpdate(DominanceInfo *DI) { DomInfoToUpdate = DI; }
 
@@ -432,7 +441,9 @@ bool inhibitsAllocStackHoisting(SILInstruction *I) {
     return Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION);
   }
   if (auto *bi = dyn_cast<BuiltinInst>(I)) {
-    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast;
+    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast
+        || bi->getBuiltinInfo().ID == BuiltinValueKind::TargetVariantOSVersionAtLeast
+        || bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionOrVariantOSVersionAtLeast;
   }
   if (isa<HasSymbolInst>(I)) {
     return true;
@@ -447,6 +458,8 @@ bool inhibitsAllocStackHoisting(SILInstruction *I) {
 /// A generic alloc_stack could reference an opened archetype that was not
 /// opened in the entry block.
 void HoistAllocStack::collectHoistableInstructions() {
+  int stackInstructionIndex = 0;
+
   for (auto &BB : *F) {
     for (auto &Inst : BB) {
       // Terminators that are function exits are our dealloc_stack
@@ -463,10 +476,15 @@ void HoistAllocStack::collectHoistableInstructions() {
         AllocStackToHoist.clear();
         return;
       }
+      if (isa<DeallocStackInst>(&Inst))
+        stackInstructionIndices[&Inst] = stackInstructionIndex++;
+
       auto *ASI = dyn_cast<AllocStackInst>(&Inst);
       if (!ASI) {
         continue;
       }
+      stackInstructionIndices[ASI] = stackInstructionIndex++;
+
       if (isHoistable(ASI, IRGenMod)) {
         LLVM_DEBUG(llvm::dbgs() << "Hoisting     " << Inst);
         AllocStackToHoist.push_back(ASI);
@@ -481,7 +499,7 @@ void HoistAllocStack::collectHoistableInstructions() {
 /// dealloc_stack instructions to the function exists.
 void HoistAllocStack::hoist() {
   if (SILUseStackSlotMerging) {
-    MergeStackSlots Merger(AllocStackToHoist, FunctionExits);
+    MergeStackSlots Merger(AllocStackToHoist, FunctionExits, stackInstructionIndices);
     InvalidationKind = Merger.mergeSlots(DomInfoToUpdate);
     return;
   }
@@ -503,7 +521,7 @@ void HoistAllocStack::hoist() {
 
 /// Try to hoist generic alloc_stack instructions to the entry block.
 /// Returns true if the function was changed.
-Optional<SILAnalysis::InvalidationKind> HoistAllocStack::run() {
+std::optional<SILAnalysis::InvalidationKind> HoistAllocStack::run() {
   collectHoistableInstructions();
 
   // Nothing to hoist?

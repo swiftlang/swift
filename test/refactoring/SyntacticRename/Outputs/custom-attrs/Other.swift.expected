@@ -17,7 +17,7 @@ struct Projection<T> {
 }
 
 @resultBuilder
-struct /*builder:def*/OtherBuilder {
+struct /*builder:def*/<base>Other</base> {
     public static func buildBlock(_ components: String...) -> String {
         return components.joined()
     }
@@ -37,11 +37,11 @@ struct Bar {
         return Bar().inner
     }()
 
-    func combined(@/*builder*/OtherBuilder _ a: () -> String) -> String {
+    func combined(@/*builder*/<base>Other</base> _ a: () -> String) -> String {
         return a()
     }
 
-     @/*builder*/OtherBuilder
+     @/*builder*/<base>Other</base>
     func hello() -> String {
         "hello"
         "there"

@@ -24,6 +24,8 @@
 #include <cstring>
 #include <string>
 
+#include <errno.h>
+
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Win32.h"
 
@@ -35,6 +37,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <shellapi.h>
+#pragma comment(lib, "shell32.lib")
 #endif
 
 // Backing storage for overrides of `Swift.CommandLine.arguments`.
@@ -133,7 +136,11 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
       }
     }
 
+#if defined(_WIN32)
+    argv[argc] = _strdup(arg);
+#else
     argv[argc] = strdup(arg);
+#endif
     argc += 1;
   });
 
@@ -166,7 +173,204 @@ static char **swift::getUnsafeArgvArgc(int *outArgLen) {
 
 template <typename F>
 static void swift::enumerateUnsafeArgv(const F& body) { }
-#elif defined(__linux__) || defined(__CYGWIN__)
+#elif defined(__linux__)
+// On Linux, there is no easy way to get the argument vector pointer outside
+// of the main() function.  However, the ABI specifications dictate the layout
+// of the process's initial stack, which looks something like:
+//
+// stack top ----> ┌────────────────────────┐
+//                 │ Unspecified            │
+//                 ┊                        ┊
+//                 ├┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+//                 │ Information block      │
+//                 │ (argument strings,     │
+//                 │ environment strings,   │
+//                 │ auxiliary information) │
+//                 ┊                        ┊
+//                 ├┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+//                 │ Unspecified            │
+//                 ┊                        ┊
+//                 ├┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+//                 │ NULL                   │
+//                 ├┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+//                 │ Auxiliary Vector       │
+//                 ┊                        ┊
+//                 ├┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+//                 │ NULL                   │
+//                 ├┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+//                 │ Environment Pointers   │
+//                 ┊                        ┊
+// environ ------> ├┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+//                 │ NULL                   │
+//                 ├┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+//                 │ Argument Pointers      │
+//                 ┊                        ┊
+//                 ├┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+//                 │ Argument Count         │
+//                 ├┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+//                 ┊                        ┊
+//
+//                 See https://gitlab.com/x86-psABIs/x86-64-ABI,
+//                     https://gitlab.com/x86-psABIs/i386-ABI
+//
+// The upshot is that if we can get hold of `environ` before anything has
+// had a chance to change it, we can find the `argv` array and also the
+// argument count, `argc`, by walking back up the stack.
+//
+// (Note that Linux uses this same layout for all platforms, not just x86-based
+// ones.  It also has a fixed layout for the data at the top of the stack, but
+// we don't need to take advantage of that here and can stick to things that
+// are defined in the ABI specs.)
+
+#include <unistd.h>
+
+#define DEBUG_ARGVGRABBER 0
+#if DEBUG_ARGVGRABBER
+#define ARGVDEBUG(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define ARGVDEBUG(...)
+#endif
+
+namespace {
+
+struct ArgvGrabber {
+  char **argv;
+  int argc;
+
+  ArgvGrabber();
+
+private:
+  struct stack {
+    void *base;
+    void *top;
+
+    stack() : base(nullptr), top(nullptr) {}
+    stack(void *b, void *t) : base(b), top(t) {}
+  };
+
+  stack findStack();
+  void findArgv(stack s);
+};
+
+// Find the stack by looking at /proc/self/maps
+ArgvGrabber::stack ArgvGrabber::findStack(void) {
+  FILE *maps = fopen("/proc/self/maps", "r");
+  if (!maps) {
+    ARGVDEBUG("unable to open maps - %d\n", errno);
+    return stack();
+  }
+
+  char line[256];
+  void *base = NULL, *top = NULL;
+  bool found = false;
+  while (fgets(line, sizeof(line), maps)) {
+    // line is on the stack, so we know we're looking at the right
+    // region if line is between base and top.
+    //
+    // Note that we can't look for [stack], because Rosetta and qemu
+    // set up a separate stack for the emulated code.
+    //
+    // We also need to glom on extra VM ranges after the first one
+    // we find, because *sometimes* we end up with an extra range.
+    void *lo, *hi;
+    if (sscanf(line, "%p-%p", &lo, &hi) == 2) {
+      if ((void *)line >= lo && (void *)line < hi) {
+        base = lo;
+        top = hi;
+        found = true;
+      } else if (found && top == lo) {
+        top = hi;
+      }
+    }
+  }
+
+  fclose(maps);
+
+  if (!found) {
+    ARGVDEBUG("stack not found in maps\n");
+    return stack();
+  }
+
+  return stack(base, top);
+}
+
+#if DEBUG_ARGVGRABBER
+void printMaps() {
+  FILE *maps = fopen("/proc/self/maps", "r");
+  if (!maps) {
+    fprintf(stderr, "unable to open maps - %d\n", errno);
+    return;
+  }
+
+  char line[256];
+  while (fgets(line, sizeof(line), maps)) {
+    fputs(line, stderr);
+  }
+
+  fclose(maps);
+}
+#endif
+
+// Find argv by walking backwards from environ
+void ArgvGrabber::findArgv(ArgvGrabber::stack stack) {
+  if (!stack.base) {
+    ARGVDEBUG("no stack\n");
+    return;
+  }
+
+  // Check that environ points to the stack
+  char **envp = environ;
+  if ((void *)envp < stack.base || (void *)envp >= stack.top) {
+    ARGVDEBUG("envp = %p, stack is from %p to %p\n",
+              envp, stack.base, stack.top);
+#if DEBUG_ARGVGRABBER
+    printMaps();
+#endif
+    return;
+  }
+
+  char **ptr = envp - 1;
+
+  // We're now pointing at the NULL that terminates argv.  Keep going back
+  // while we're seeing pointers (values greater than envp).
+  while ((void *)(ptr - 1) > stack.base) {
+    --ptr;
+
+    // The first thing less than envp must be the argc value
+    if ((void *)*ptr < (void *)envp) {
+      argc = (int)(intptr_t)*ptr++;
+      argv = ptr;
+      return;
+    }
+  }
+
+  ARGVDEBUG("didn't find argc\n");
+}
+
+ArgvGrabber::ArgvGrabber() : argv(nullptr), argc(0) {
+  ARGVDEBUG("***GRABBING ARGV for %d***\n", getpid());
+  findArgv(findStack());
+#if DEBUG_ARGVGRABBER
+  fprintf(stderr, "ARGV is at %p with count %d\n", argv, argc);
+  for (int i = 0; i < argc; ++i) {
+    fprintf(stderr, "  argv[%d] = \"%s\"\n", i, argv[i]);
+  }
+  fprintf(stderr, "***ARGV GRABBED***\n");
+#endif
+}
+
+ArgvGrabber argvGrabber;
+
+} // namespace
+
+static char **swift::getUnsafeArgvArgc(int *outArgLen) {
+  *outArgLen = argvGrabber.argc;
+  return argvGrabber.argv;
+}
+
+template <typename F>
+static void swift::enumerateUnsafeArgv(const F& body) { }
+#elif defined(__CYGWIN__)
 static char **swift::getUnsafeArgvArgc(int *outArgLen) {
   return nullptr;
 }

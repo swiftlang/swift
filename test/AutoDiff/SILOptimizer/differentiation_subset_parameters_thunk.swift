@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -Xllvm -sil-disable-pass=OnoneSimplification %s | %FileCheck %s
 
 import _Differentiation
 

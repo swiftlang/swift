@@ -50,18 +50,17 @@ struct CursorInfoOwner {
     return !(lhs == rhs);
   }
   bool isValid() const {
-    return File && File->getBufferID() && Loc.isValid();
+    return File && Loc.isValid();
   }
 };
 
 void simple_display(llvm::raw_ostream &out, const CursorInfoOwner &owner);
 
 /// Resolve cursor info at a given location.
-class CursorInfoRequest:
-    public SimpleRequest<CursorInfoRequest,
-                         ide::ResolvedCursorInfo(CursorInfoOwner),
-                         RequestFlags::Cached>
-{
+class CursorInfoRequest
+    : public SimpleRequest<CursorInfoRequest,
+                           ide::ResolvedCursorInfoPtr(CursorInfoOwner),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -69,8 +68,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ide::ResolvedCursorInfo evaluate(Evaluator &evaluator,
-                                   CursorInfoOwner CI) const;
+  ide::ResolvedCursorInfoPtr evaluate(Evaluator &evaluator,
+                                      CursorInfoOwner CI) const;
 
 public:
   // Caching
@@ -111,7 +110,7 @@ struct RangeInfoOwner {
   }
 
   bool isValid() const {
-    return File && File->getBufferID() && StartLoc.isValid() && EndLoc.isValid();
+    return File && StartLoc.isValid() && EndLoc.isValid();
   }
 };
 

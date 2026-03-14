@@ -1,0 +1,73 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+class C {}
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+sil @getOwned : $@convention(thin) () -> (@owned C)
+
+sil @borrow : $@convention(thin) (@guaranteed C) -> ()
+
+sil @useUnmanaged : $@convention(thin) (@sil_unmanaged C) -> ()
+
+sil [ossa] @test_escape_of_phi_transitive_incoming_value : $@convention(thin) () -> () {
+entry:
+  %getOwned = function_ref @getOwned : $@convention(thin) () -> (@owned C)
+  %useUnmanaged = function_ref @useUnmanaged : $@convention(thin) (@sil_unmanaged C) -> ()
+  cond_br undef, left, right
+left:
+  cond_br undef, left_left, left_right
+left_left:
+  %llinstance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  br left_bottom(%llinstance : $C)
+left_right:
+  %lrinstance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  %escape = ref_to_unmanaged %lrinstance : $C to $@sil_unmanaged C
+  apply %useUnmanaged(%escape) : $@convention(thin) (@sil_unmanaged C) -> ()
+  br left_bottom(%lrinstance : $C)
+left_bottom(%linstance : @owned $C):
+  br exit(%linstance : $C)
+right:
+  %rinstance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  br exit(%rinstance : $C)
+exit(%instance : @owned $C):
+// CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on test_escape_of_phi_transitive_incoming_value: has_pointer_escape
+// CHECK:       %14 = argument of bb6 : $C
+// CHECK:       true
+// CHECK-LABEL: end running test {{[0-9]+}} of {{[0-9]+}} on test_escape_of_phi_transitive_incoming_value: has_pointer_escape with
+  specify_test "has_pointer_escape @block.argument"
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @test_loop_phi : $@convention(thin) () -> () {
+entry:
+  %instance_1 = enum $FakeOptional<C>, #FakeOptional.none!enumelt
+  br loop_entry(%instance_1 : $FakeOptional<C>)
+
+loop_entry(%18 : @owned $FakeOptional<C>):
+  specify_test "has_pointer_escape @block.argument"
+  br loop_body
+
+loop_body:
+  cond_br undef, loop_back, loop_exit
+
+loop_back:
+  br loop_entry(%18 : $FakeOptional<C>)
+
+loop_exit:
+  destroy_value %18 : $FakeOptional<C>
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}

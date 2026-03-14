@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - -parse-as-library \
-// RUN:    -module-name M  -disable-availability-checking | %FileCheck %s --dump-input always
+// RUN:    -module-name M  -target %target-swift-5.1-abi-triple | %FileCheck %s
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)

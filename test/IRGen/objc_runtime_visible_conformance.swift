@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -enable-objc-interop -I %S/../Inputs/custom-modules %s -emit-ir | %FileCheck %s
+// REQUIRES: objc_codegen
 
 import ObjCRuntimeVisible
 

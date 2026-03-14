@@ -241,7 +241,7 @@ let diffFunction: @differentiable (Float) -> Float = function
 
 Differentiable function types are a subtype of normal function types. See [here](DifferentiableProgramming.md#function-subtyping-and-runtime-representation) for more information about type checking rules.
 
-Differentiable function conversion is represented in the AST as an explicit [DifferentiableFunctionExpr](https://github.com/apple/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/include/swift/AST/Expr.h#L2923) expression. Example output from `swiftc -dump-ast` for the explicit conversion example above:
+Differentiable function conversion is represented in the AST as an explicit [DifferentiableFunctionExpr](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/include/swift/AST/Expr.h#L2923) expression. Example output from `swiftc -dump-ast` for the explicit conversion example above:
 
 ```
 (differentiable_function implicit
@@ -793,15 +793,15 @@ Many of these instructions have well-defined corresponding tangent instructions 
 
 | Original | Tangent (differential) | Adjoint (pullback)
 | -------- | ---------------------- | ------------------ 
-| `y = load x` | `tan[y] = load tan[x]` | `adj[x] += adj[y]` [(code)](https://github.com/apple/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5346)
-| `store x to y` | `store tan[x] to tan[y]` | `adj[x] += load adj[y]; adj[y] = 0` [(code)](https://github.com/apple/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5365)
-| `copy_addr x to y` | `copy_addr tan[x] to tan[y]` | `adj[x] += adj[y]; adj[y] = 0` [(code)](https://github.com/apple/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5382)
-| `y = struct (x0, x1, ...)` | `tan[y] = struct (tan[x0], tan[x1], ...)` | `adj[x0] += struct_extract adj[y], #x0` `adj[x1] += struct_extract adj[y], #x1` `...` [(code)](https://github.com/apple/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5110)
-| `y = struct_extract x, #field` | `tan[y] = struct_extract tan[x], #field’` | `adj[x] += struct (0, ..., #field': adj[y], ..., 0)` [(code)](https://github.com/apple/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5183)
-| `y = struct_element_addr x, #field` | `tan[y] = struct_element_addr tan[x], #field’` | No generated code. `adj[y] = struct_element_addr adj[x], #field’` [(code)](https://github.com/apple/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L4157)
-| `y = tuple (x0, x1, ...)` | `tan[y] = tuple (tan[x0], tan[x1], ...)` | `adj[x0] += tuple_extract adj[y], 0` `adj[x1] += tuple_extract adj[y], 1` `...` [(code)](https://github.com/apple/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5257)
-| `y = tuple_extract x, <n>` | `tan[y] = tuple_extract tan[x], <n’>` | `adj[x] += tuple (0, ..., adj[y], ..., 0)` [(code)](https://github.com/apple/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5298)
-| `y = tuple_element_addr x, <n>` | `tan[y] = tuple_element_addr tan[x], <n’>` | No generated code. `adj[y] = tuple_element_addr adj[x], <n’>` [(code)](https://github.com/apple/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L4169)
+| `y = load x` | `tan[y] = load tan[x]` | `adj[x] += adj[y]` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5346)
+| `store x to y` | `store tan[x] to tan[y]` | `adj[x] += load adj[y]; adj[y] = 0` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5365)
+| `copy_addr x to y` | `copy_addr tan[x] to tan[y]` | `adj[x] += adj[y]; adj[y] = 0` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5382)
+| `y = struct (x0, x1, ...)` | `tan[y] = struct (tan[x0], tan[x1], ...)` | `adj[x0] += struct_extract adj[y], #x0` `adj[x1] += struct_extract adj[y], #x1` `...` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5110)
+| `y = struct_extract x, #field` | `tan[y] = struct_extract tan[x], #field’` | `adj[x] += struct (0, ..., #field': adj[y], ..., 0)` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5183)
+| `y = struct_element_addr x, #field` | `tan[y] = struct_element_addr tan[x], #field’` | No generated code. `adj[y] = struct_element_addr adj[x], #field’` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L4157)
+| `y = tuple (x0, x1, ...)` | `tan[y] = tuple (tan[x0], tan[x1], ...)` | `adj[x0] += tuple_extract adj[y], 0` `adj[x1] += tuple_extract adj[y], 1` `...` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5257)
+| `y = tuple_extract x, <n>` | `tan[y] = tuple_extract tan[x], <n’>` | `adj[x] += tuple (0, ..., adj[y], ..., 0)` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L5298)
+| `y = tuple_element_addr x, <n>` | `tan[y] = tuple_element_addr tan[x], <n’>` | No generated code. `adj[y] = tuple_element_addr adj[x], <n’>` [(code)](https://github.com/swiftlang/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/lib/SILOptimizer/Mandatory/Differentiation.cpp#L4169)
 
 In general, tangent transformation rules are simpler because the tangent transformation does not involve control flow reversal and because many instructions themselves are linear.
 
@@ -962,7 +962,7 @@ This involves:
 - Adding a JVP/VJP type calculation special case for reabstraction thunks.
 - Changing the differentiation transform so that reabstraction thunk JVP/VJP callers always construct and pass a `@differentiable` function-typed value.
 
-This approach is implemented in https://github.com/apple/swift/pull/28570. A partially-applied reabstraction thunk derivative matches the derivative type of the reabstracted original function.
+This approach is implemented in https://github.com/swiftlang/swift/pull/28570. A partially-applied reabstraction thunk derivative matches the derivative type of the reabstracted original function.
 
 Alternatives:
 - Make reabstraction thunk JVPs/VJPs take a "JVP/VJP" function-typed argument instead of a `@differentiable` function-typed argument.

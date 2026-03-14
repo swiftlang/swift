@@ -15,17 +15,20 @@
 /// (debug info) operator and operand.
 ///
 //===----------------------------------------------------------------------===//
+
 #ifndef SWIFT_SIL_DEBUGINFOEXPRESSION_H
 #define SWIFT_SIL_DEBUGINFOEXPRESSION_H
+
 #include "swift/AST/Decl.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 namespace swift {
+
 class TailAllocatedDebugVariable;
 
 /// Operator in a debug info expression
@@ -37,7 +40,7 @@ enum class SILDIExprOperator : unsigned {
   /// associated source variable. This operator takes a single
   /// VarDecl operand pointing to the field declaration.
   /// Note that this directive can only appear at the end of an
-  /// expression.
+  /// expression, along with `TupleFragment`.
   Fragment,
   /// Perform arithmetic addition on the top two elements of the
   /// expression stack and push the result back to the stack.
@@ -48,7 +51,13 @@ enum class SILDIExprOperator : unsigned {
   /// Push an unsigned integer constant onto the stack.
   ConstUInt,
   /// Push a signed integer constant onto the stack.
-  ConstSInt
+  ConstSInt,
+  /// Specifies that the SSA value is an element of the
+  /// associated tuple. This operator takes a TupleType
+  /// operand pointing to the tuple type, and the index of the element.
+  /// Note that this directive can only appear at the end of an
+  /// expression, along with `Fragment`.
+  TupleFragment
 };
 
 /// Represents a single component in a debug info expression.
@@ -61,7 +70,9 @@ struct SILDIExprElement {
     DeclKind,
     /// An integer constant value. Note that
     /// we don't specify its signedness here.
-    ConstIntKind
+    ConstIntKind,
+    /// An operand that has `Type` type.
+    TypeKind
   };
 
 private:
@@ -71,6 +82,7 @@ private:
     SILDIExprOperator Operator;
     Decl *Declaration;
     uint64_t ConstantInt;
+    Type TypePtr;
   };
 
   explicit SILDIExprElement(Kind OpK) : OpKind(OpK) {}
@@ -84,12 +96,14 @@ public:
 
   Decl *getAsDecl() const { return OpKind == DeclKind ? Declaration : nullptr; }
 
-  Optional<uint64_t> getAsConstInt() const {
+  std::optional<uint64_t> getAsConstInt() const {
     if (OpKind == ConstIntKind)
       return ConstantInt;
     else
       return {};
   }
+
+  Type getAsType() const { return OpKind == TypeKind ? TypePtr : nullptr; }
 
   static SILDIExprElement createOperator(SILDIExprOperator Op) {
     SILDIExprElement DIOp(OperatorKind);
@@ -106,6 +120,12 @@ public:
   static SILDIExprElement createConstInt(uint64_t V) {
     SILDIExprElement DIOp(ConstIntKind);
     DIOp.ConstantInt = V;
+    return DIOp;
+  }
+
+  static SILDIExprElement createType(Type T) {
+    SILDIExprElement DIOp(TypeKind);
+    DIOp.TypePtr = T;
     return DIOp;
   }
 };
@@ -264,8 +284,12 @@ public:
   /// Return true if this expression is not empty
   inline operator bool() const { return Elements.size(); }
 
-  /// Create a op_fragment expression
+  /// Create a `op_fragment` expression
   static SILDebugInfoExpression createFragment(VarDecl *Field);
+
+  /// Create a `op_tuple_fragment` expression
+  static
+  SILDebugInfoExpression createTupleFragment(TupleType *TypePtr, unsigned Idx);
 
   /// Return true if this DIExpression starts with op_deref
   bool startsWithDeref() const {
@@ -273,11 +297,14 @@ public:
            Elements[0].getAsOperator() == SILDIExprOperator::Dereference;
   }
 
-  /// Return true if this DIExpression has op_fragment (at the end)
-  bool hasFragment() const {
-    return Elements.size() >= 2 &&
-           Elements[Elements.size() - 2].getAsOperator() ==
-            SILDIExprOperator::Fragment;
+  /// Return the part of this SILDebugInfoExpression corresponding to fragments
+  SILDebugInfoExpression getFragmentPart() const {
+    for (auto it = element_begin(), end = element_end(); it != end; ++it) {
+      if (it->getAsOperator() == SILDIExprOperator::Fragment
+          || it->getAsOperator() == SILDIExprOperator::TupleFragment)
+        return SILDebugInfoExpression(ArrayRef(it, element_end()));
+    }
+    return {};
   }
 };
 
@@ -287,4 +314,5 @@ inline llvm::hash_code hash_value(const SILDebugInfoExpression &elt) {
 }
 
 } // end namespace swift
+
 #endif

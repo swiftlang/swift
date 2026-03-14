@@ -8,7 +8,7 @@ case message
 struct NewItemResponse {}
 
 protocol Publisher {
-  associatedtype Output // expected-note {{protocol requires nested type 'Output'; do you want to add it?}}
+  associatedtype Output // expected-note {{protocol requires nested type 'Output'}}
 }
 
 extension Publisher {
@@ -20,7 +20,9 @@ func fetchFile<T>(name: String) -> MyPublisher<T, APIError> {
   fatalError()
 }
 
-struct ReplaceError<Upstream> : Publisher { // expected-error {{type 'ReplaceError<Upstream>' does not conform to protocol 'Publisher'}}
+struct ReplaceError<Upstream> : Publisher { 
+  // expected-error@-1 {{type 'ReplaceError<Upstream>' does not conform to protocol 'Publisher'}}
+  // expected-note@-2 {{add stubs for conformance}}
   typealias Output = Upstream.Output // expected-error {{'Output' is not a member type of type 'Upstream'}}
   typealias Failure = Never
 }

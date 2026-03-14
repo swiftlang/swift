@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 
 _ = /(/ // expected-error@:7 {{expected ')'}}
 _ = #/(/# // expected-error@:8 {{expected ')'}}

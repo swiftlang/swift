@@ -4,6 +4,7 @@
 // PtrAuthFramework only supports these OSes.
 //
 // REQUIRES: OS=tvos || OS=macosx || OS=ios
+// UNSUPPORTED: DARWIN_SIMULATOR={{.*}}
 
 // When run on arm64, this tests that we fall back to the arm64e interface, but
 // build it with `#if _ptrauth(_arm64e)` off.

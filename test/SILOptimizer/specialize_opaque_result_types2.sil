@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -primary-file %S/Inputs/specialize_opaque_result_types.swift -enable-library-evolution -module-name A -emit-sib -o %t/A.sib
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -enable-library-evolution -O -module-name A %t/A.sib -o - | %FileCheck %s
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
 sil_stage canonical
 
@@ -35,9 +35,9 @@ bb0(%0 : $*T):
   return %5 : $@callee_owned () -> @out T       // id: %7
 }
 
-// CHECK-LABEL: sil shared [noinline] @$s17getGenericClosure1A19exportsOpaqueReturnQryFQOyQo__Tg5 : $@convention(thin) (Int) -> @owned @callee_owned () -> @out Int {
+// CHECK-LABEL: sil shared [noinline] @$s17getGenericClosureSi_Tg5 : $@convention(thin) (Int) -> @owned @callee_owned () -> @out Int {
 // CHECK:  alloc_box $<τ_0_0> { var τ_0_0 } <Int>
-// CHECK: } // end sil function '$s17getGenericClosure1A19exportsOpaqueReturnQryFQOyQo__Tg5'
+// CHECK: } // end sil function '$s17getGenericClosureSi_Tg5'
 
 sil [transparent] [serialized] @specializePartialApplies : $@convention(thin) (@in SomeButt) -> () {
 bb0(%0 : $*SomeButt):

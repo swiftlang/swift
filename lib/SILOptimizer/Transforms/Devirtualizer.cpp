@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "sil-devirtualizer"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -78,7 +79,7 @@ void Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
   for (auto Apply : Applies) {
     ApplySite NewInst;
     bool modifiedCFG;
-    std::tie(NewInst, modifiedCFG) = tryDevirtualizeApply(Apply, CHA, &ORE);
+    std::tie(NewInst, modifiedCFG) = tryDevirtualizeApply(getPassManager(), Apply, CHA, &ORE);
     if (!NewInst)
       continue;
 

@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithMethodMembers -verify-additional-prefix non-resilient-
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithMethodMembers -enable-library-evolution -verify-additional-prefix resilient-
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 var global = 42
 
@@ -140,7 +142,7 @@ func testIUOResult(x: IUOResult) {
 // Subscript index must be ExpressibleByStringLiteral.
 @dynamicMemberLookup
 struct Invalid1 {
-  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-error @+1 {{'@dynamicMemberLookup' requires 'Invalid1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
   subscript(dynamicMember member: Int) -> Int {
     return 42
   }
@@ -149,7 +151,7 @@ struct Invalid1 {
 // Subscript may not be variadic.
 @dynamicMemberLookup
 struct Invalid2 {
-  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid2' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-error @+1 {{'@dynamicMemberLookup' requires 'Invalid2' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
   subscript(dynamicMember member: String...) -> Int {
     return 42
   }
@@ -188,7 +190,7 @@ func NotAllowedOnFunc() {}
 // @dynamicMemberLookup cannot be declared on a base class and fulfilled with a
 // derived class.
 
-// expected-error @+1 {{@dynamicMemberLookup attribute requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+// expected-error @+1 {{'@dynamicMemberLookup' requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
 class InvalidBase {}
 
@@ -196,6 +198,97 @@ class InvalidDerived : InvalidBase { subscript(dynamicMember: String) -> Int { g
 
 // expected-error @+1 {{value of type 'InvalidDerived' has no member 'dynamicallyLookedUp'}}
 _ = InvalidDerived().dynamicallyLookedUp
+
+//===----------------------------------------------------------------------===//
+// Access level
+//===----------------------------------------------------------------------===//
+
+@dynamicMemberLookup
+public struct Accessible1 {
+  public subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+private struct Accessible2 {
+  fileprivate subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+open class Accessible3 {
+  public subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+open class Accessible4 {
+  open subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+public struct Accessible5 {
+  subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+
+  public subscript(dynamicMember member: StaticString) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+public struct Inaccessible1 {
+  // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{3-3=public }}
+  // expected-resilient-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{3-3=public }}
+  subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+public struct Inaccessible2 {
+  // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{21-29=public}}
+  // expected-resilient-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{21-29=public}}
+  @usableFromInline internal subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+internal struct Inaccessible3 {
+  // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{3-10=internal}}
+  // expected-resilient-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{3-10=internal}}
+  private subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+private struct Inaccessible4 {
+  // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{3-10=fileprivate}}
+  // expected-resilient-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{3-10=fileprivate}}
+  private subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+public struct Inaccessible5 {
+  internal struct Nested { }
+  var nested: Nested
+
+  // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{3-11=public}}
+  // expected-resilient-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{3-11=public}}
+  internal subscript<Value>(dynamicMember keyPath: KeyPath<Nested, Value>) -> Value {
+    nested[keyPath: keyPath]
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Existentials
@@ -475,6 +568,44 @@ var namedTupleLens = Lens<(question: String, answer: Int)>((question: "ultimate 
 _ = namedTupleLens.question.count
 _ = namedTupleLens.answer
 
+struct MethodAndInitializerTest {
+  let value: Int
+  init(value: Int) { self.value = value }
+  func instanceMethod() -> String { return "InstanceMethod" }
+  static func staticMethod() -> Int { return 42 }
+}
+
+@dynamicMemberLookup
+struct MethodAndInitializerLens<T> {
+  var value: T
+  var type: T.Type
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+      return value[keyPath: member]
+  }
+
+  subscript<U>(dynamicMember member: (T) -> () -> U) -> () -> U {
+      return { member(self.value)() }
+  }
+
+  subscript<U>(dynamicMember member: (T.Type) -> () -> U) -> () -> U {
+      return { member(self.type)() }
+  }
+}
+
+func test_method_and_init_lens() {
+  let instance = MethodAndInitializerTest(value: 10)
+  let methodLens = MethodAndInitializerLens(value: instance, type: MethodAndInitializerTest.self)
+
+  let _ = methodLens[dynamicMember: MethodAndInitializerTest.instanceMethod]()
+
+  let staticMethodClosure = methodLens[dynamicMember: { $0.staticMethod }]
+  let _ = staticMethodClosure()
+
+  let initializer = MethodAndInitializerTest.init
+  let _ = MethodAndInitializerLens(value: initializer(20), type: MethodAndInitializerTest.self)
+}
+
 @dynamicMemberLookup
 class A<T> {
   var value: T
@@ -484,6 +615,19 @@ class A<T> {
   }
 
   subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+  }
+}
+
+@dynamicMemberLookup
+class AMetatype<T> {
+  var value: T.Type
+
+  init(_ v: T.Type) {
+    self.value = v
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T.Type, U>) -> U {
     get { return value[keyPath: member] }
   }
 }
@@ -668,8 +812,8 @@ func test_chain_of_recursive_lookups(_ lens: Lens<Lens<Lens<Point>>>) {
   _ = \Lens<Lens<Point>>.obj.x
 }
 
-// KeyPath Dynamic Member Lookup can't refer to methods, mutating setters and static members
-// because of the KeyPath limitations
+// KeyPath Dynamic Member Lookup can't refer mutating setters because of the
+// KeyPath limitations
 func invalid_refs_through_dynamic_lookup() {
   struct S {
     static var foo: Int = 42
@@ -682,10 +826,15 @@ func invalid_refs_through_dynamic_lookup() {
   }
 
   func test(_ lens: A<S>) {
-    _ = lens.foo           // expected-error {{dynamic key path member lookup cannot refer to static member 'foo'}}
-    _ = lens.bar()         // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
-    _ = lens.bar().faz + 1 // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
-    _ = lens.baz("hello")  // expected-error {{dynamic key path member lookup cannot refer to static method 'baz'}}
+    _ = lens.foo           // expected-error {{static member 'foo' cannot be used on instance of type 'S'}}
+    _ = lens.bar()
+    _ = lens.bar().faz + 1 
+    _ = lens.baz("hello")  // expected-error {{static member 'baz' cannot be used on instance of type 'S'}}
+  }
+  
+  func testStatic(_ lens: AMetatype<S>) {
+    _ = lens.foo
+    _ = lens.baz("hello")
   }
 }
 
@@ -732,20 +881,20 @@ do {
 
 @dynamicMemberLookup
 struct S1_52957 {
-  subscript(dynamicMember: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'S1_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
-  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the @dynamicMemberLookup requirement}}{{13-13=dynamicMember }}
+  subscript(dynamicMember: String) -> String { // expected-error {{'@dynamicMemberLookup' requires 'S1_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the '@dynamicMemberLookup' requirement}}{{13-13=dynamicMember }}
     fatalError()
   }
 }
 
 @dynamicMemberLookup
 struct S2_52957 {
-  subscript(foo bar: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'S2_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  subscript(foo bar: String) -> String { // expected-error {{'@dynamicMemberLookup' requires 'S2_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
     fatalError()
   }
 
-  subscript(foo: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'S2_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
-  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the @dynamicMemberLookup requirement}} {{13-13=dynamicMember }}
+  subscript(foo: String) -> String { // expected-error {{'@dynamicMemberLookup' requires 'S2_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the '@dynamicMemberLookup' requirement}} {{13-13=dynamicMember }}
     fatalError()
   }
 }
@@ -833,3 +982,40 @@ public extension S3_54864 {
     get { s2_54864_instance[keyPath: member] } // expected-error {{key path with root type 'S3_54864' cannot be applied to a base of type 'S2_54864'}}
   }
 }
+
+// https://github.com/swiftlang/swift/issues/75244
+struct WithSendable {
+  subscript(dynamicMember member: KeyPath<String, Int> & Sendable) -> Bool { // Ok
+    get { false }
+  }
+}
+
+// Make sure we enforce a limit on the number of chained dynamic member lookups.
+@dynamicMemberLookup
+struct SelfRecursiveLookup<T> {
+  init(_: () -> T) {}
+  init(_: () -> KeyPath<Self, T>) {}
+  subscript<U>(dynamicMember kp: KeyPath<T, U>) -> SelfRecursiveLookup<U> {}
+}
+let selfRecurse1 = SelfRecursiveLookup { selfRecurse1.e }
+// expected-error@-1 {{could not find member 'e'; exceeded the maximum number of nested dynamic member lookups}}
+
+let selfRecurse2 = SelfRecursiveLookup { selfRecurse2[a: 0] }
+// expected-error@-1 {{could not find member 'subscript'; exceeded the maximum number of nested dynamic member lookups}}
+
+let selfRecurse3 = SelfRecursiveLookup { \.e }
+// expected-error@-1 {{could not find member 'e'; exceeded the maximum number of nested dynamic member lookups}}
+
+let selfRecurse4 = SelfRecursiveLookup { \.[a: 0] }
+// expected-error@-1 {{could not find member 'subscript'; exceeded the maximum number of nested dynamic member lookups}}
+
+extension SelfRecursiveLookup where T == SelfRecursiveLookup<SelfRecursiveLookup<SelfRecursiveLookup<Int>>> {
+  var terminator: T { fatalError() }
+  subscript(terminator terminator: Int) -> T { fatalError() }
+}
+
+let selfRecurse5 = SelfRecursiveLookup { selfRecurse5.terminator }
+let selfRecurse6 = SelfRecursiveLookup { selfRecurse6[terminator: 0] }
+
+let selfRecurse7 = SelfRecursiveLookup { \.terminator }
+let selfRecurse8 = SelfRecursiveLookup { \.[terminator: 0] }

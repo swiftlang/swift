@@ -1,0 +1,7 @@
+// This test runs a grep that validates that specific patterns do not occur in
+// the code base.
+
+// The [c] is necessary to prevent substitutions by lit. Same difference since it
+// is just a regex.
+//
+// RUN: cd %swift_src_root && not git grep 'pragma [c]lang optimize off' include lib stdlib

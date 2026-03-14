@@ -27,9 +27,6 @@ namespace irgen {
 /// Construct a ConstantInt from an IntegerLiteralInst.
 llvm::Constant *emitConstantInt(IRGenModule &IGM, IntegerLiteralInst *ILI);
 
-/// Construct a zero from a zero initializer BuiltinInst.
-llvm::Constant *emitConstantZero(IRGenModule &IGM, BuiltinInst *Bi);
-
 /// Construct a ConstantFP from a FloatLiteralInst.
 llvm::Constant *emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI);
 
@@ -38,7 +35,8 @@ llvm::Constant *emitAddrOfConstantString(IRGenModule &IGM,
                                          StringLiteralInst *SLI);
 
 /// Construct a constant from a SILValue containing constant values.
-llvm::Constant *emitConstantValue(IRGenModule &IGM, SILValue value);
+Explosion emitConstantValue(IRGenModule &IGM, SILValue value,
+                            bool flatten = false);
 
 /// Construct an object (with a HeapObject header) from an ObjectInst
 /// containing constant values.

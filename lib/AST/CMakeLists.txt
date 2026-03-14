@@ -9,8 +9,8 @@ add_swift_host_library(swiftAST STATIC
   AbstractSourceFileDepGraphFactory.cpp
   AccessNotes.cpp
   AccessRequests.cpp
+  ActorIsolation.cpp
   ArgumentList.cpp
-  ASTBridging.cpp
   ASTContext.cpp
   ASTDemangler.cpp
   ASTDumper.cpp
@@ -27,19 +27,31 @@ add_swift_host_library(swiftAST STATIC
   Attr.cpp
   AutoDiff.cpp
   Availability.cpp
+  AvailabilityConstraint.cpp
+  AvailabilityContext.cpp
+  AvailabilityDomain.cpp
+  AvailabilityQuery.cpp
+  AvailabilityScope.cpp
+  AvailabilityScopeBuilder.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
-  CASTBridging.cpp
   CaptureInfo.cpp
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
+  Concurrency.cpp
   ConcreteDeclRef.cpp
+  ConformanceLookup.cpp
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
+  DeclContextDumper.cpp
+  DeclNameExtractor.cpp
   DeclNameLoc.cpp
+  DiagnosticArgument.cpp
+  DiagnosticBridge.cpp
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
+  DiagnosticGroups.cpp
   DiagnosticList.cpp
   DistributedDecl.cpp
   DocComment.cpp
@@ -48,9 +60,12 @@ add_swift_host_library(swiftAST STATIC
   ExistentialGeneralization.cpp
   Expr.cpp
   ExtInfo.cpp
+  FeatureSet.cpp
   FineGrainedDependencies.cpp
   FineGrainedDependencyFormat.cpp
+  FreestandingMacroExpansion.cpp
   FrontendSourceFileDepGraphFactory.cpp
+  FunctionRefInfo.cpp
   GenericEnvironment.cpp
   GenericParamList.cpp
   GenericSignature.cpp
@@ -59,6 +74,8 @@ add_swift_host_library(swiftAST STATIC
   IndexSubset.cpp
   InlinableText.cpp
   LayoutConstraint.cpp
+  LifetimeDependence.cpp
+  LocalArchetypeRequirementCollector.cpp
   Module.cpp
   ModuleDependencies.cpp
   ModuleLoader.cpp
@@ -71,13 +88,16 @@ add_swift_host_library(swiftAST STATIC
   ParameterPack.cpp
   Parameter.cpp
   Pattern.cpp
-  PlatformKind.cpp
+  PlatformKindUtils.cpp
+  PluginLoader.cpp
+  PluginRegistry.cpp
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   ProtocolConformanceRef.cpp
   RawComment.cpp
   Requirement.cpp
   RequirementEnvironment.cpp
+  RequirementMachine/ApplyInverses.cpp
   RequirementMachine/ConcreteContraction.cpp
   RequirementMachine/ConcreteTypeWitness.cpp
   RequirementMachine/Diagnostics.cpp
@@ -107,16 +127,16 @@ add_swift_host_library(swiftAST STATIC
   SearchPathOptions.cpp
   SILLayout.cpp
   Stmt.cpp
+  StorageImpl.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
   Type.cpp
   TypeCheckRequests.cpp
   TypeDeclFinder.cpp
   TypeJoinMeet.cpp
-  TypeRefinementContext.cpp
   TypeRepr.cpp
+  TypeSubstitution.cpp
   TypeWalker.cpp
-  TypeWrapper.cpp
   UnqualifiedLookup.cpp
   USRGeneration.cpp
 
@@ -124,8 +144,10 @@ add_swift_host_library(swiftAST STATIC
   ${SWIFTAST_LLVM_LINK_COMPONENTS}
   )
 
+add_subdirectory(Bridging)
+
 if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
-  if(CMAKE_CXX_COMPILER_ID STREQUAL MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL MSVC)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
     target_compile_options(swiftAST PRIVATE /O2 /Ob2)
   else()
     target_compile_options(swiftAST PRIVATE -O3)
@@ -152,22 +174,13 @@ target_link_libraries(swiftAST INTERFACE
   clangAPINotes
   clangBasic)
 
-if(SWIFT_SWIFT_PARSER)
-  target_compile_definitions(swiftAST
-    PRIVATE
-    SWIFT_SWIFT_PARSER
-  )
-endif()
-
 target_link_libraries(swiftAST
   PUBLIC swiftBasic
   PRIVATE swiftMarkup)
 
-# intrinsics_gen is the LLVM tablegen target that generates the include files
-# where intrinsics and attributes are declared. swiftAST depends on these
-# headers.
-# For more information see the comment at the top of lib/CMakeLists.txt.
-add_dependencies(swift-ast-generated-headers intrinsics_gen clang-tablegen-targets)
-add_dependencies(swiftAST swift-ast-generated-headers)
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftAST
+    PRIVATE swiftASTGen swiftBasicSwift)
+endif()
 
 set_swift_llvm_is_available(swiftAST)

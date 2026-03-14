@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
@@ -14,8 +14,9 @@ class Other { }
 
 func f1<T : A>(_: T) where T : Other {} // expected-error{{no type for 'T' can satisfy both 'T : Other' and 'T : A'}}
 
+// CHECK-LABEL: .f2@
+// CHECK-NEXT: Generic signature: <T where T : B>
 func f2<T : A>(_: T) where T : B {}
-// expected-warning@-1{{redundant superclass constraint 'T' : 'A'}}
 
 class GA<T> {}
 class GB<T> : GA<T> {}
@@ -30,11 +31,13 @@ func f7<U, T>(_: T, _: U) where U : GA<T>, T : P {}
 
 func f8<T : GA<A>>(_: T) where T : GA<B> {} // expected-error{{no type for 'T' can satisfy both 'T : GA<B>' and 'T : GA<A>'}}
 
+// CHECK-LABEL: .f9@
+// CHECK-NEXT: Generic signature: <T where T : GB<A>>
 func f9<T : GA<A>>(_: T) where T : GB<A> {}
-// expected-warning@-1{{redundant superclass constraint 'T' : 'GA<A>'}}
 
+// CHECK-LABEL: .f10@
+// CHECK-NEXT: Generic signature: <T where T : GB<A>>
 func f10<T : GB<A>>(_: T) where T : GA<A> {}
-// expected-warning@-1{{redundant superclass constraint 'T' : 'GA<A>'}}
 
 func f11<T : GA<T>>(_: T) { }
 func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { }
@@ -63,7 +66,7 @@ class S : P2 {
 // CHECK-NEXT: Generic signature: <T where T : C>
 func superclassConformance1<T>(t: T)
   where T : C,
-        T : P3 {} // expected-warning{{redundant conformance constraint 'C' : 'P3'}}
+        T : P3 {}
 
 
 
@@ -71,7 +74,7 @@ func superclassConformance1<T>(t: T)
 // CHECK-NEXT: Generic signature: <T where T : C>
 func superclassConformance2<T>(t: T)
   where T : C,
-   T : P3 {} // expected-warning{{redundant conformance constraint 'C' : 'P3'}}
+   T : P3 {}
 
 protocol P4 { }
 
@@ -80,8 +83,6 @@ class C2 : C, P4 { }
 // CHECK-LABEL: .superclassConformance3(t:)@
 // CHECK-NEXT: Generic signature: <T where T : C2>
 func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
-// expected-warning@-1{{redundant superclass constraint 'T' : 'C'}}
-// expected-warning@-2{{redundant conformance constraint 'T' : 'P4'}}
 
 protocol P5: A { }
 
@@ -101,7 +102,7 @@ protocol P7 {
 // CHECK-LABEL: .superclassConformance4@
 // CHECK-NEXT: Generic signature: <T, U where T : P3, U : P3, T.[P3]T : C, T.[P3]T == U.[P3]T>
 func superclassConformance4<T: P3, U: P3>(_: T, _: U)
-  where T.T: C, // expected-warning{{redundant superclass constraint 'T.T' : 'C'}}
+  where T.T: C,
         U.T: C,
         T.T == U.T { }
 
@@ -171,8 +172,9 @@ protocol Rump : Tail {
 
 class Horse<T>: Rump { }
 
+// CHECK-LABEL: .hasRedundantConformanceConstraint@
+// CHECK-NEXT: Generic signature: <X, T where X : Horse<T>>
 func hasRedundantConformanceConstraint<X : Horse<T>, T>(_: X) where X : Rump {}
-// expected-warning@-1 {{redundant conformance constraint 'Horse<T>' : 'Rump'}}
 
 // https://github.com/apple/swift/issues/48432
 
@@ -204,7 +206,7 @@ func g<T : Init & Derived>(_: T.Type) {
 // Binding a class-constrained generic parameter to a subclass existential is
 // not sound.
 struct G<T : Base> {}
-// expected-note@-1 2 {{requirement specified as 'T' : 'Base' [with T = Base & P]}}
+// expected-note@-1 2 {{requirement specified as 'T' : 'Base' [with T = any Base & P]}}
 
 _ = G<Base & P>() // expected-error {{'G' requires that 'any Base & P' inherit from 'Base'}}
 
@@ -232,7 +234,10 @@ extension Animal: Pony { }
 
 public struct AnimalWrapper<Friend: Animal> { }
 
-// FIXME: Generic signature: <Friend where Friend : Animal, Friend : Pony>
-// Generic signature: <Friend where Friend : Animal>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=AnimalWrapper
+
+// FIXME: This should be <Friend where Friend : Animal, Friend : Pony>
+// taking into account conformance availability.
+
+// CHECK-NEXT: Generic signature: <Friend where Friend : Animal>
 extension AnimalWrapper: Pony where Friend: Pony { }
-// expected-warning@-1{{redundant conformance constraint 'Animal' : 'Pony'}}

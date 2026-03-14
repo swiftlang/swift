@@ -5,7 +5,7 @@
 // appeared before any top-level expressions. The _1 and _2 variants of
 // this test cover both cases.
 
-@objc class Foo {} // expected-error {{@objc attribute used without importing module 'Foundation'}} expected-error {{only classes that inherit from NSObject can be declared @objc}} {{1-7=}}
+@objc class Foo {} // expected-error {{@objc attribute used without importing module 'Foundation'}} expected-error {{only classes that inherit from NSObject can be declared '@objc'}} {{1-7=}}
 // expected-note@-1 {{inherit from 'NSObject' to silence this error}} {{16-16=: NSObject}}
 
 #if false

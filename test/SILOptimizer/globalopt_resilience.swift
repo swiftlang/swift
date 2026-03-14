@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend  -O -module-name=test -enable-library-evolution -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend  -O -module-name=test -enable-library-evolution -Xllvm -sil-print-types -emit-sil -primary-file %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 // Check if GlobalOpt generates the optimal getter for a static property with a resilient type.
 // The (resilient) getter should just return the literal (and not lazily initialize a global variable).
@@ -35,13 +37,9 @@ public func cannotConvertToValueUse() {
 }
 
 // CHECK-LABEL: sil @$s4test23cannotConvertToValueUseyyF : $@convention(thin) () -> ()
-// CHECK: [[INT:%.*]] = integer_literal $Builtin.Int{{32|64}}, 27
-// CHECK: [[S1:%.*]] = struct $Int ([[INT]] : $Builtin.Int{{32|64}})
-// CHECK: [[S2:%.*]] = struct $ResilientStruct ([[S1]] : $Int)
-// CHECK: [[TMP:%.*]] = alloc_stack $ResilientStruct
-// CHECK: store [[S2]] to [[TMP]] : $*ResilientStruct
+// CHECK: [[GA:%.*]] = global_addr @$s4test15ResilientStructV9staticValACvpZ
 // CHECK: [[METHOD:%.*]] = function_ref @$s4test15ResilientStructV6methodyyF : $@convention(method) (@in_guaranteed ResilientStruct) -> ()
-// CHECK: apply [[METHOD]]([[TMP]]) : $@convention(method) (@in_guaranteed ResilientStruct) -> ()
+// CHECK: apply [[METHOD]]([[GA]]) : $@convention(method) (@in_guaranteed ResilientStruct) -> ()
 // CHECK: [[RESULT:%.*]] = tuple ()
 // CHECK: return [[RESULT]] : $()
 

@@ -1,13 +1,17 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s --dump-input=always
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: reflection
 
-// REQUIRES: rdar104212282
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+
+// FIXME: enable discarding taskgroup on windows; rdar://104762037
+// UNSUPPORTED: OS=windows-msvc
 
 struct Boom: Error {
   let id: String
@@ -69,11 +73,38 @@ func test_taskGroup_noThrow_ifNotAwaitedThrowingTask() async {
   print("Expected no error to be thrown, got: \(got)") // CHECK: Expected no error to be thrown, got: 1
 }
 
+func test_taskGroup_throw_rethrows_waitForAll() async {
+  print("==== \(#function) ------") // CHECK-LABEL: test_taskGroup_throw_rethrows_waitForAll
+  do {
+    _ = try await withThrowingTaskGroup(of: Int.self) { group in
+      group.addTask {
+        throw CancellationError()
+      }
+      group.addTask {
+        1
+      }
+
+      do {
+        try await group.waitForAll()
+      } catch {
+        print("waitAll rethrown: ", error)
+        // CHECK: waitAll rethrown: CancellationError()
+        print("isEmpty: ", group.isEmpty)
+        // CHECK: isEmpty: true
+        throw error
+      }
+    }
+  } catch {
+    print("rethrown: ", error)
+    // CHECK: rethrown: CancellationError()
+  }
+}
+
 func test_discardingTaskGroup_automaticallyRethrows() async {
   print("==== \(#function) ------") // CHECK-LABEL: test_discardingTaskGroup_automaticallyRethrows
   do {
     let got = try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
-      group.addTask { await echo(1) }
+      group.addTask { _ = await echo(1) }
       group.addTask { throw Boom() }
       // add a throwing task, but don't consume it explicitly
       // since we're in discard results mode, all will be awaited and the first error it thrown
@@ -92,7 +123,7 @@ func test_discardingTaskGroup_automaticallyRethrowsOnlyFirst() async {
   do {
     let got = try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
       group.addTask {
-        await echo(1)
+        _ = await echo(1)
       }
       group.addTask {
         let error = Boom(id: "first, isCancelled:\(Task.isCancelled)")
@@ -125,13 +156,20 @@ func test_discardingTaskGroup_automaticallyRethrowsOnlyFirst() async {
 func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst() async {
   print("==== \(#function) ------") // CHECK-LABEL: test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst
   do {
-    try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
+    _ = try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
       group.addTask {
-        await echo(1)
+        _ = await echo(1)
       }
       group.addTask {
-        try? await Task.sleep(until: .now + .seconds(10), clock: .continuous)
-        let error = Boom(id: "task, second, isCancelled:\(Task.isCancelled)")
+        let start: ContinuousClock.Instant = .now
+        do {
+          // Sleep for a long time because we need to account for very slow test runners;
+          // This should rarely actually wait so long as throwing from the group will cancel and wake-up this child task.
+          try await Task.sleep(until: start + .seconds(30), clock: .continuous)
+        } catch {
+          print("Child task cancelled! Slept: \(ContinuousClock.Instant.now - start)")
+        }
+        let error = Boom(id: "task, second, isCancelled:\(Task.isCancelled), slept: \(ContinuousClock.Instant.now - start)")
         print("Throwing: \(error)")
         throw error
       }
@@ -144,6 +182,7 @@ func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst(
     fatalError("Expected error to be thrown")
   } catch {
     // CHECK: Throwing: Boom(id: "body, first, isCancelled:false
+    // CHECK: Child task cancelled!
     // CHECK: Throwing: Boom(id: "task, second, isCancelled:true
     // and only then the re-throw happens:
     // CHECK: rethrown: Boom(id: "body, first
@@ -154,7 +193,7 @@ func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst(
 func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodySecond() async {
   print("==== \(#function) ------") // CHECK-LABEL: test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodySecond
   do {
-    try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
+    _ = try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
       group.addTask {
         let error = Boom(id: "task, first, isCancelled:\(Task.isCancelled)")
         print("Throwing: \(error)")
@@ -183,6 +222,7 @@ func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodySecond
   static func main() async {
     await test_taskGroup_throws_rethrows()
     await test_taskGroup_noThrow_ifNotAwaitedThrowingTask()
+    await test_taskGroup_throw_rethrows_waitForAll()
     await test_discardingTaskGroup_automaticallyRethrows()
     await test_discardingTaskGroup_automaticallyRethrowsOnlyFirst()
     await test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst()

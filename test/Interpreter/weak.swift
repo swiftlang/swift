@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-feature -Xfrontend ImmutableWeakCaptures) | %FileCheck %s --check-prefixes=CHECK
+
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 
 protocol Protocol : class {
   func noop()
@@ -76,6 +79,18 @@ func testWeakInLet() {
 
 testWeakInLet()
 
+func testWeakLet() {
+  print("testWeakLet") // CHECK-LABEL: testWeakLet
+
+  var obj: SwiftClassBase? = SwiftClass() // CHECK: SwiftClass Created
+  weak let weakRef = obj
+  printState(weakRef) // CHECK-NEXT: is present
+  obj = nil // CHECK-NEXT: SwiftClass Destroyed
+  printState(weakRef) // CHECK-NEXT: is nil
+}
+
+testWeakLet()
+
 
 //======================== Test Classbound Protocols ========================
 
@@ -115,3 +130,19 @@ func test_rdar15293354() {
 
 test_rdar15293354()
 
+
+
+
+func testStaticObject() {
+  print("testStaticObject")                     // CHECK: testStaticObject
+
+  enum Static {
+    static let staticObject = SwiftClassBase()
+  }
+  weak var w: SwiftClassBase?
+  printState(w)                                 // CHECK-NEXT: is nil
+  w = Static.staticObject
+  printState(w)                                 // CHECK-NEXT: is present
+}
+
+testStaticObject()

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %clang -c -v %target-cc-options %target-threading-opt -g -O0 -isysroot %sdk %S/Inputs/isPrespecialized.cpp -o %t/isPrespecialized.o -I %clang-include-dir -I %swift_src_root/include/ -I %swift_src_root/stdlib/public/SwiftShims/ -I %llvm_src_root/include -I %llvm_obj_root/include -L %clang-include-dir/../lib/swift/macosx
+// RUN: %clang -c -std=c++17 -v %target-cc-options %target-threading-opt -g -O0 -isysroot %sdk %S/Inputs/isPrespecialized.cpp -o %t/isPrespecialized.o -I %swift-include-dir -I %swift_src_root/include/ -I %swift_src_root/stdlib/public/SwiftShims/ -I %llvm_src_root/include -I %llvm_obj_root/include -L %swift-include-dir/../lib/swift/macosx
 
-// RUN: %target-build-swift -v %mcp_opt %s %t/isPrespecialized.o -import-objc-header %S/Inputs/isPrespecialized.h -Xfrontend -prespecialize-generic-metadata -target %module-target-future -lc++ -L %clang-include-dir/../lib/swift/macosx -sdk %sdk -o %t/main
+// RUN: %target-build-swift -v %mcp_opt %s %t/isPrespecialized.o -import-objc-header %S/Inputs/isPrespecialized.h -Xfrontend -prespecialize-generic-metadata -target %module-target-future -lc++ -L %swift-include-dir/../lib/swift/macosx -sdk %sdk -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 

@@ -11,51 +11,61 @@
 //===----------------------------------------------------------------------===//
 
 /// A C++ type that can be converted to a Swift collection.
-public protocol CxxConvertibleToCollection {
+public protocol CxxConvertibleToCollection<Element> {
+  associatedtype Element
   associatedtype RawIterator: UnsafeCxxInputIterator
+    where RawIterator.Pointee == Element
 
   /// Do not implement this function manually in Swift.
-  mutating func __beginUnsafe() -> RawIterator
+  func __beginUnsafe() -> RawIterator
 
   /// Do not implement this function manually in Swift.
-  mutating func __endUnsafe() -> RawIterator
+  func __endUnsafe() -> RawIterator
 }
 
-@inlinable @inline(__always)
-internal func forEachElement<C: CxxConvertibleToCollection>(
-  of c: C,
-  body: (C.RawIterator.Pointee) -> Void
-) {
-  var mutableC = c
-  withExtendedLifetime(mutableC) {
-    var rawIterator = mutableC.__beginUnsafe()
-    let endIterator = mutableC.__endUnsafe()
+extension CxxConvertibleToCollection {
+  @inlinable
+  public func forEach(_ body: (RawIterator.Pointee) throws -> Void) rethrows {
+    var rawIterator = __beginUnsafe()
+    let endIterator = __endUnsafe()
     while rawIterator != endIterator {
-      body(rawIterator.pointee)
+      try body(rawIterator.pointee)
       rawIterator = rawIterator.successor()
     }
   }
 }
 
-extension Array {
-  /// Creates an array containing the elements of a C++ container.
+// Break the ambiguity between Sequence.forEach and CxxConvertibleToCollection.forEach.
+extension CxxConvertibleToCollection where Self: Sequence {
+  @inlinable
+  public func forEach(_ body: (Element) throws -> Void) rethrows {
+    for element in self {
+      try body(element)
+    }
+  }
+}
+
+extension RangeReplaceableCollection {
+  /// Creates a collection containing the elements of a C++ container.
   ///
-  /// This initializes the array by copying every element of the C++ container.
+  /// This initializes the collection by copying every element of the C++
+  /// container.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the C++
   ///   container when each element is copied in O(1). Note that this might not
   ///   be true for certain C++ types, e.g. those with a custom copy
   ///   constructor that performs additional logic.
-  public init<C: CxxConvertibleToCollection>(_ c: C)
+  @inlinable
+  public init<C: CxxConvertibleToCollection>(_ elements: __shared C)
     where C.RawIterator.Pointee == Element {
 
     self.init()
-    forEachElement(of: c) { self.append($0) }
+    elements.forEach { self.append($0) }
   }
 }
 
-extension Set {
-  /// Creates an set containing the elements of a C++ container.
+extension SetAlgebra {
+  /// Creates a set containing the elements of a C++ container.
   ///
   /// This initializes the set by copying every element of the C++ container.
   ///
@@ -63,10 +73,11 @@ extension Set {
   ///   container when each element is copied in O(1). Note that this might not
   ///   be true for certain C++ types, e.g. those with a custom copy
   ///   constructor that performs additional logic.
-  public init<C: CxxConvertibleToCollection>(_ c: C)
+  @inlinable
+  public init<C: CxxConvertibleToCollection>(_ elements: __shared C)
     where C.RawIterator.Pointee == Element {
 
     self.init()
-    forEachElement(of: c) { self.insert($0) }
+    elements.forEach { self.insert($0) }
   }
 }

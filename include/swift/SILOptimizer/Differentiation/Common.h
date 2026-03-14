@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/Projection.h"
@@ -112,7 +113,7 @@ void collectAllDirectResultsInTypeOrder(SILFunction &function,
 /// Given a function call site, gathers all of its actual results (both direct
 /// and indirect) in an order defined by its result type.
 void collectAllActualResultsInTypeOrder(
-    ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
+    FullApplySite fai, ArrayRef<SILValue> extractedDirectResults,
     SmallVectorImpl<SILValue> &results);
 
 /// For an `apply` instruction with active results, compute:
@@ -120,7 +121,7 @@ void collectAllActualResultsInTypeOrder(
 /// - The set of minimal parameter and result indices for differentiating the
 ///   `apply` instruction.
 void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, const AutoDiffConfig &parentConfig,
+    FullApplySite fai, const AutoDiffConfig &parentConfig,
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices);
@@ -143,7 +144,7 @@ template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
   return nullptr;
 }
 
-Optional<std::pair<SILDebugLocation, SILDebugVariable>>
+std::optional<std::pair<SILDebugLocation, SILDebugVariable>>
 findDebugLocationAndVariable(SILValue originalValue);
 
 //===----------------------------------------------------------------------===//
@@ -228,7 +229,7 @@ getExactDifferentiabilityWitness(SILModule &module, SILFunction *original,
 /// \param minimalASTParameterIndices is an output parameter that is set to the
 /// AST indices of the minimal configuration, or to `nullptr` if no such
 /// configuration exists.
-Optional<AutoDiffConfig>
+std::optional<AutoDiffConfig>
 findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
                                    IndexSubset *parameterIndices,
                                    IndexSubset *&minimalASTParameterIndices);
@@ -273,19 +274,27 @@ inline void createEntryArguments(SILFunction *f) {
   for (auto indResTy :
        conv.getIndirectSILResultTypes(f->getTypeExpansionContext())) {
     if (indResTy.hasArchetype())
-      indResTy = indResTy.mapTypeOutOfContext();
-    createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
+      indResTy = indResTy.mapTypeOutOfEnvironment();
+    createFunctionArgument(f->mapTypeIntoEnvironment(indResTy).getAddressType());
   }
+  if (auto indErrorResTy =
+          conv.getIndirectErrorResultType(f->getTypeExpansionContext())) {
+    if (indErrorResTy.hasArchetype())
+      indErrorResTy = indErrorResTy.mapTypeOutOfEnvironment();
+    createFunctionArgument(
+        f->mapTypeIntoEnvironment(indErrorResTy).getAddressType());
+  }
+
   for (auto paramTy : conv.getParameterSILTypes(f->getTypeExpansionContext())) {
     if (paramTy.hasArchetype())
-      paramTy = paramTy.mapTypeOutOfContext();
-    createFunctionArgument(f->mapTypeIntoContext(paramTy));
+      paramTy = paramTy.mapTypeOutOfEnvironment();
+    createFunctionArgument(f->mapTypeIntoEnvironment(paramTy));
   }
 }
 
 /// Cloner that remaps types using the target function's generic environment.
 class BasicTypeSubstCloner final
-    : public TypeSubstCloner<BasicTypeSubstCloner, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<BasicTypeSubstCloner> {
 
   static SubstitutionMap getSubstitutionMap(SILFunction *target) {
     if (auto *targetGenEnv = target->getGenericEnvironment())

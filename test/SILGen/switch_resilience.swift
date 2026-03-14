@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-emit-silgen -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %t %s | %FileCheck %s
 
 import resilient_struct
 
@@ -10,7 +10,7 @@ import resilient_struct
 //
 // CHECK: bb1:
 // CHECK:   [[VALUE:%.*]] = unchecked_take_enum_data_addr [[STACK_SLOT]] : $*Enum
-// CHECK:   [[STACK_SLOT_COPY:%.*]] = alloc_stack [lexical] $(url: ResilientRef, void: ()), let, name "value"
+// CHECK:   [[STACK_SLOT_COPY:%.*]] = alloc_stack [lexical] [var_decl] $(url: ResilientRef, void: ()), let, name "value"
 // CHECK:   copy_addr [[VALUE]] to [init] [[STACK_SLOT_COPY]]
 // CHECK:   cond_br {{%.*}}, bb2, bb3
 //

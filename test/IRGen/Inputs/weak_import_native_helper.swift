@@ -33,6 +33,17 @@ public struct S {
   }
 }
 
+extension S {
+  @_weakLinked
+  public func extensionFn() {}
+
+  @_weakLinked
+  public var extensionProp: Int {
+    get { return 1 }
+    set {}
+  }
+}
+
 public enum E {
   case strong
 

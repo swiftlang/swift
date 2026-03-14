@@ -130,8 +130,10 @@ private:
 
     case TermKind::UnreachableInst:
     case TermKind::ReturnInst:
+    case TermKind::ReturnBorrowInst:
     case TermKind::SwitchValueInst:
     case TermKind::ThrowInst:
+    case TermKind::ThrowAddrInst:
     case TermKind::UnwindInst:
       llvm_unreachable("Did not expect terminator that does not have args!");
 

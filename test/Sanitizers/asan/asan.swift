@@ -1,9 +1,16 @@
-// RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -o %t_asan-binary
+// XFAIL: OS=windows-msvc
+
+// This test hangs on aarch64 FreeBSD
+// XFAIL will try to run the test and the verify that the test fails, which
+// still hits the hang.
+// UNSUPPORTED: OS=freebsd && CPU=aarch64
+
+// RUN: %target-swiftc_driver %s -g -sanitize=address -o %t_asan-binary
 // RUN: %target-codesign %t_asan-binary
 // RUN: env %env-ASAN_OPTIONS=abort_on_error=0 not %target-run %t_asan-binary 2>&1 | %FileCheck %s
 
 // ODR Indicator variant
-// RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address \
+// RUN: %target-swiftc_driver %s -g -sanitize=address \
 // RUN:   -sanitize-address-use-odr-indicator -o %t_asan-binary-odr-indicator
 // RUN: %target-codesign %t_asan-binary-odr-indicator
 // RUN: env %env-ASAN_OPTIONS=abort_on_error=0 not %target-run \

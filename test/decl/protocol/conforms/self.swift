@@ -57,7 +57,7 @@ class SillyClass {}
 
 protocol HasDefault {
   func foo()
-  // expected-note@-1 {{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'foo()' with type '() -> ()'}}
 }
 
 extension HasDefault where Self == SillyClass {
@@ -67,6 +67,7 @@ extension HasDefault where Self == SillyClass {
 
 extension SillyClass : HasDefault {}
 // expected-error@-1 {{type 'SillyClass' does not conform to protocol 'HasDefault'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 // This is OK, though
 class SeriousClass {}

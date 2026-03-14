@@ -53,12 +53,18 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK-RULE:      - τ_0_0.B2 => τ_0_0.[P1:B1]
 // CHECK-RULE:      }
 // CHECK-RULE: Property map: {
-// CHECK-RULE-NEXT:   [P1] => { conforms_to: [P1] }
+// CHECK-RULE-NEXT:   [P1] => { conforms_to: [P1 Copyable Escapable] }
+// CHECK-RULE-NEXT:   [P1:A1] => { conforms_to: [Copyable Escapable] }
+// CHECK-RULE-NEXT:   [P1:B1] => { conforms_to: [Copyable Escapable] }
 // CHECK-RULE-NEXT:   [P1:X] => { layout: _NativeClass superclass: [superclass: Derived<[P1:A1], [P1:B1]>] }
-// CHECK-RULE-NEXT:   [P2] => { conforms_to: [P2] }
+// CHECK-RULE-NEXT:   [P2] => { conforms_to: [P2 Copyable Escapable] }
+// CHECK-RULE-NEXT:   [P2:A2] => { conforms_to: [Copyable Escapable] }
+// CHECK-RULE-NEXT:   [P2:B2] => { conforms_to: [Copyable Escapable] }
 // CHECK-RULE-NEXT:   [P2:X] => { layout: _NativeClass superclass: [superclass: Generic<[P2:A2], String, [P2:B2]>] }
-// CHECK-RULE-NEXT:   τ_0_0 => { conforms_to: [P1 P2] }
-// CHECK-RULE-NEXT:   τ_0_0.[P2:A2] => { concrete_type: [concrete: Int] }
+// CHECK-RULE-NEXT:   [Copyable] => { conforms_to: [Copyable] }
+// CHECK-RULE-NEXT:   [Escapable] => { conforms_to: [Escapable] }
+// CHECK-RULE-NEXT:   τ_0_0 => { conforms_to: [P1 P2 Copyable Escapable] }
+// CHECK-RULE-NEXT:   τ_0_0.[P2:A2] => { conforms_to: [Copyable Escapable] concrete_type: [concrete: Int] }
 // CHECK-RULE-NEXT:   τ_0_0.[P1:X] => { layout: _NativeClass superclass: [superclass: Derived<τ_0_0.[P1:A1], τ_0_0.[P1:B1]>] }
-// CHECK-RULE-NEXT:   τ_0_0.[P1:A1] => { concrete_type: [concrete: String] }
+// CHECK-RULE-NEXT:   τ_0_0.[P1:A1] => { conforms_to: [Copyable Escapable] concrete_type: [concrete: String] }
 // CHECK-RULE-NEXT: }

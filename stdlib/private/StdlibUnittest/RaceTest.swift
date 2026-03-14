@@ -40,18 +40,22 @@ import SwiftPrivate
 import SwiftPrivateLibcExtras
 import SwiftPrivateThreadExtras
 #if canImport(Darwin)
-import Darwin
+internal import Darwin
 #elseif canImport(Glibc)
-import Glibc
+internal import Glibc
+#elseif canImport(Musl)
+internal import Musl
+#elseif canImport(Android)
+internal import Android
 #elseif os(WASI)
-import WASILibc
+internal import WASILibc
 #elseif os(Windows)
-import CRT
-import WinSDK
+internal import CRT
+internal import WinSDK
 #endif
 
 #if _runtime(_ObjC)
-import ObjectiveC
+internal import ObjectiveC
 #else
 func autoreleasepool(invoking code: () -> Void) {
   // Native runtime does not have autorelease pools.  Execute the code

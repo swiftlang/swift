@@ -14,10 +14,10 @@ bb0(%instance : @_eagerMove @owned $C):
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @one_arg_eager_move_and_no_implicit_copy : {{.*}} {
+// CHECK-LABEL: sil [ossa] @one_arg_eager_move_and_consumable_and_assignable : {{.*}} {
 // CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @noImplicitCopy @_eagerMove @owned $C):
-// CHECK-LABEL: } // end sil function 'one_arg_eager_move_and_no_implicit_copy'
-sil [ossa] @one_arg_eager_move_and_no_implicit_copy : $(@owned C) -> () {
+// CHECK-LABEL: } // end sil function 'one_arg_eager_move_and_consumable_and_assignable'
+sil [ossa] @one_arg_eager_move_and_consumable_and_assignable : $(@owned C) -> () {
 bb0(%instance : @noImplicitCopy @_eagerMove @owned $C):
   destroy_value %instance : $C
   %retval = tuple()
@@ -34,13 +34,19 @@ bb0(%instance : @_lexical @owned $C):
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @one_arg_lexical_and_no_implicit_copy : {{.*}} {
+// CHECK-LABEL: sil [ossa] @one_arg_lexical_and_consumable_and_assignable : {{.*}} {
 // CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @noImplicitCopy @_lexical @owned $C):
-// CHECK-LABEL: } // end sil function 'one_arg_lexical_and_no_implicit_copy'
-sil [ossa] @one_arg_lexical_and_no_implicit_copy : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: } // end sil function 'one_arg_lexical_and_consumable_and_assignable'
+sil [ossa] @one_arg_lexical_and_consumable_and_assignable : $@convention(thin) (@owned C) -> () {
 bb0(%instance : @noImplicitCopy @_lexical @owned $C):
   destroy_value %instance : $C
   %retval = tuple()
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [lexical_lifetimes] [ossa] @force_lexical_function : {{.*}} {
+// CHECK-LABEL: } // end sil function 'force_lexical_function'
+sil [lexical_lifetimes] [ossa] @force_lexical_function : $@convention(thin) () -> () {
+  %retval = tuple()
+  return %retval : $()
+}

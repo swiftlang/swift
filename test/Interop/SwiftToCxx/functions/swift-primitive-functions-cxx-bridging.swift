@@ -1,162 +1,163 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
-// RUN: %FileCheck %s < %t/functions.h
+// RUN: %target-swift-frontend %s -module-name Functions -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/functions.h
+// RUN: %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-abi < %t/functions.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
-// CHECK:      inline float passThrougCFloat(float x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT: return _impl::$s9Functions16passThrougCFloatyS2fF(x);
+// CHECK:      SWIFT_INLINE_THUNK bool passThroughBool(bool x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions15passThroughBoolyS2bF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline bool passThroughBool(bool x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions15passThroughBoolyS2bF(x);
+// CHECK:      SWIFT_INLINE_THUNK bool passThroughCBool(bool x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions16passThroughCBoolyS2bF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline bool passThroughCBool(bool x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions16passThroughCBoolyS2bF(x);
+// CHECK:      SWIFT_INLINE_THUNK char passThroughCChar(char x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions16passThroughCCharys4Int8VADF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline char passThroughCChar(char x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions16passThroughCCharys4Int8VADF(x);
+// CHECK:      SWIFT_INLINE_THUNK char16_t passThroughCChar16(char16_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions18passThroughCChar16ys6UInt16VADF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline char16_t passThroughCChar16(char16_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions18passThroughCChar16ys6UInt16VADF(x);
+// CHECK:      SWIFT_INLINE_THUNK char32_t passThroughCChar32(char32_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions18passThroughCChar32ys7UnicodeO6ScalarVAFF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline char32_t passThroughCChar32(char32_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions18passThroughCChar32ys7UnicodeO6ScalarVAFF(x);
+// CHECK:      SWIFT_INLINE_THUNK double passThroughCDouble(double x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions18passThroughCDoubleyS2dF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline double passThroughCDouble(double x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions18passThroughCDoubleyS2dF(x);
+// CHECK:      SWIFT_INLINE_THUNK float passThroughCFloat(float x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT: return Functions::_impl::$s9Functions17passThroughCFloatyS2fF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline int passThroughCInt(int x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions15passThroughCIntys5Int32VADF(x);
+// CHECK:      SWIFT_INLINE_THUNK int passThroughCInt(int x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions15passThroughCIntys5Int32VADF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline long long passThroughCLongLong(long long x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions20passThroughCLongLongys5Int64VADF(x);
+// CHECK:      SWIFT_INLINE_THUNK long long passThroughCLongLong(long long x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions20passThroughCLongLongys5Int64VADF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline short passThroughCShort(short x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions17passThroughCShortys5Int16VADF(x);
+// CHECK:      SWIFT_INLINE_THUNK short passThroughCShort(short x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions17passThroughCShortys5Int16VADF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline signed char passThroughCSignedChar(signed char x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions22passThroughCSignedCharys4Int8VADF(x);
-// CHECK-NEXT: }
-
-
-// CHECK:      inline unsigned int passThroughCUnsignedInt(unsigned int x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions23passThroughCUnsignedIntys6UInt32VADF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline unsigned long long passThroughCUnsignedLongLong(unsigned long long x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions024passThroughCUnsignedLongE0ys6UInt64VADF(x);
+// CHECK:      SWIFT_INLINE_THUNK signed char passThroughCSignedChar(signed char x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions22passThroughCSignedCharys4Int8VADF(x);
 // CHECK-NEXT: }
 
 
-// CHECK:      inline unsigned short passThroughCUnsignedShort(unsigned short x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions25passThroughCUnsignedShortys6UInt16VADF(x);
+// CHECK:      SWIFT_INLINE_THUNK unsigned int passThroughCUnsignedInt(unsigned int x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions23passThroughCUnsignedIntys6UInt32VADF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline unsigned char passThroughCUnsignedSignedChar(unsigned char x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions30passThroughCUnsignedSignedCharys5UInt8VADF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline wchar_t passThroughCWideChar(wchar_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions20passThroughCWideCharys7UnicodeO6ScalarVAFF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline double passThroughDouble(double x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions17passThroughDoubleyS2dF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline float passThroughFloat(float x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions16passThroughFloatyS2fF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline float passThroughFloat32(float x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions18passThroughFloat32yS2fF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline double passThroughFloat64(double x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions18passThroughFloat64yS2dF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline swift::Int passThroughInt(swift::Int x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions14passThroughIntyS2iF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline int16_t passThroughInt16(int16_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions16passThroughInt16ys0D0VADF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline int32_t passThroughInt32(int32_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions16passThroughInt32ys0D0VADF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline int64_t passThroughInt64(int64_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions16passThroughInt64ys0D0VADF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline int8_t passThroughInt8(int8_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions15passThroughInt8ys0D0VADF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline void * _Nonnull passThroughOpaquePointer(void * _Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions24passThroughOpaquePointerys0dE0VADF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline swift::UInt passThroughUInt(swift::UInt x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions15passThroughUIntyS2uF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline uint16_t passThroughUInt16(uint16_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions17passThroughUInt16ys0D0VADF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline uint32_t passThroughUInt32(uint32_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions17passThroughUInt32ys0D0VADF(x);
-// CHECK-NEXT: }
-
-// CHECK:      inline uint64_t passThroughUInt64(uint64_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions17passThroughUInt64ys0D0VADF(x);
+// CHECK:      SWIFT_INLINE_THUNK unsigned long long passThroughCUnsignedLongLong(unsigned long long x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions024passThroughCUnsignedLongE0ys6UInt64VADF(x);
 // CHECK-NEXT: }
 
 
-// CHECK:      inline uint8_t passThroughUInt8(uint8_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions16passThroughUInt8ys0D0VADF(x);
+// CHECK:      SWIFT_INLINE_THUNK unsigned short passThroughCUnsignedShort(unsigned short x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions25passThroughCUnsignedShortys6UInt16VADF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline int32_t * _Nullable passThroughUnsafeGenericMutableOptionalPointer(int32_t * _Nullable x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions46passThroughUnsafeGenericMutableOptionalPointerySpys5Int32VGSgAFF(x);
+// CHECK:      SWIFT_INLINE_THUNK unsigned char passThroughCUnsignedSignedChar(unsigned char x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions30passThroughCUnsignedSignedCharys5UInt8VADF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline int32_t * _Nonnull passThroughUnsafeGenericMutablePointer(int32_t * _Nonnull x) noexcept  SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions38passThroughUnsafeGenericMutablePointerySpys5Int32VGAEF(x);
+// CHECK:      SWIFT_INLINE_THUNK wchar_t passThroughCWideChar(wchar_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-SYSV:   return Functions::_impl::$s9Functions20passThroughCWideCharys7UnicodeO6ScalarVAFF(x);
+// CHECK-WIN:   return Functions::_impl::$s9Functions20passThroughCWideCharys6UInt16VADF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline int32_t const * _Nullable passThroughUnsafeGenericOptionalPointer(int32_t const * _Nullable x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions39passThroughUnsafeGenericOptionalPointerySPys5Int32VGSgAFF(x);
+// CHECK:      SWIFT_INLINE_THUNK double passThroughDouble(double x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions17passThroughDoubleyS2dF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline int32_t const * _Nonnull passThroughUnsafeGenericPointer(int32_t const * _Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions31passThroughUnsafeGenericPointerySPys5Int32VGAEF(x);
+// CHECK:      SWIFT_INLINE_THUNK float passThroughFloat(float x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions16passThroughFloatyS2fF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline void * _Nonnull passThroughUnsafeMutableRawPointer(void * _Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions34passThroughUnsafeMutableRawPointeryS2vF(x);
+// CHECK:      SWIFT_INLINE_THUNK float passThroughFloat32(float x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions18passThroughFloat32yS2fF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline void const * _Nonnull passThroughUnsafeRawPointer(void const * _Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions27passThroughUnsafeRawPointeryS2VF(x);
+// CHECK:      SWIFT_INLINE_THUNK double passThroughFloat64(double x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions18passThroughFloat64yS2dF(x);
 // CHECK-NEXT: }
 
-// CHECK:      inline void * _Nullable roundTwoPassThroughUnsafeMutableRawPointer(void * _Nullable x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions42roundTwoPassThroughUnsafeMutableRawPointerySvSgACF(x);
+// CHECK:      SWIFT_INLINE_THUNK swift::Int passThroughInt(swift::Int x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions14passThroughIntyS2iF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK int16_t passThroughInt16(int16_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions16passThroughInt16ys0D0VADF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK int32_t passThroughInt32(int32_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions16passThroughInt32ys0D0VADF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK int64_t passThroughInt64(int64_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions16passThroughInt64ys0D0VADF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK int8_t passThroughInt8(int8_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions15passThroughInt8ys0D0VADF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK void * _Nonnull passThroughOpaquePointer(void * _Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions24passThroughOpaquePointerys0dE0VADF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK swift::UInt passThroughUInt(swift::UInt x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions15passThroughUIntyS2uF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK uint16_t passThroughUInt16(uint16_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions17passThroughUInt16ys0D0VADF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK uint32_t passThroughUInt32(uint32_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions17passThroughUInt32ys0D0VADF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK uint64_t passThroughUInt64(uint64_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions17passThroughUInt64ys0D0VADF(x);
+// CHECK-NEXT: }
+
+
+// CHECK:      SWIFT_INLINE_THUNK uint8_t passThroughUInt8(uint8_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions16passThroughUInt8ys0D0VADF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK int32_t * _Nullable passThroughUnsafeGenericMutableOptionalPointer(int32_t * _Nullable x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions46passThroughUnsafeGenericMutableOptionalPointerySpys5Int32VGSgAFF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK int32_t * _Nonnull passThroughUnsafeGenericMutablePointer(int32_t * _Nonnull x) noexcept  SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions38passThroughUnsafeGenericMutablePointerySpys5Int32VGAEF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK int32_t const * _Nullable passThroughUnsafeGenericOptionalPointer(int32_t const * _Nullable x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions39passThroughUnsafeGenericOptionalPointerySPys5Int32VGSgAFF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK int32_t const * _Nonnull passThroughUnsafeGenericPointer(int32_t const * _Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions31passThroughUnsafeGenericPointerySPys5Int32VGAEF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK void * _Nonnull passThroughUnsafeMutableRawPointer(void * _Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions34passThroughUnsafeMutableRawPointeryS2vF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK void const * _Nonnull passThroughUnsafeRawPointer(void const * _Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions27passThroughUnsafeRawPointeryS2VF(x);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK void * _Nullable roundTwoPassThroughUnsafeMutableRawPointer(void * _Nullable x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return Functions::_impl::$s9Functions42roundTwoPassThroughUnsafeMutableRawPointerySvSgACF(x);
 // CHECK-NEXT: }
 
 public func passThroughCBool(_ x: CBool) -> CBool { return x }
@@ -178,7 +179,7 @@ public func passThroughCUnsignedShort(_ x: CUnsignedShort) -> CUnsignedShort { r
 public func passThroughCUnsignedInt(_ x: CUnsignedInt) -> CUnsignedInt { return x }
 public func passThroughCUnsignedLongLong(_ x: CUnsignedLongLong) -> CUnsignedLongLong { return x }
 
-public func passThrougCFloat(_ x: CFloat) -> CFloat { return x }
+public func passThroughCFloat(_ x: CFloat) -> CFloat { return x }
 public func passThroughCDouble(_ x: CDouble) -> CDouble { return x }
 
 public func passThroughInt8(_ x: Int8) -> Int8 { return x }

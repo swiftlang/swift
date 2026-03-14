@@ -1,0 +1,56 @@
+// RUN: %target-sil-opt \
+// RUN:   -generic-specializer \
+// RUN:   -sil-verify-all \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature AddressableParameters \
+// RUN:   -enable-experimental-feature AddressableTypes \
+// RUN:   %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableParameters
+// REQUIRES: swift_feature_AddressableTypes
+
+// REQUIRES: PTRSIZE=64
+
+// Test the SIL representation for lifetime dependence scope fixup.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil @makeSpan : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafePointer<τ_0_0>, Int, @thin Span<τ_0_0>.Type) -> @lifetime(borrow 0) @owned Span<τ_0_0>
+
+// Ensure that the addressable argument is not deleted.
+//
+// CHECK-LABEL: sil shared [ossa] @$s12getSpanOfOneSi_Tg5 : $@convention(thin) (@in_guaranteed CollectionOfOne<Int>) -> @lifetime(borrow address_for_deps 0) @owned Span<Int> {
+sil shared [ossa] @getSpanOfOne : $@convention(thin) <Element> (@in_guaranteed CollectionOfOne<Element>) -> @lifetime(borrow address_for_deps 0) @owned Span<Element> {
+[global: ]
+bb0(%0 : $*CollectionOfOne<Element>):
+  %1 = address_to_pointer [stack_protection] %0 : $*CollectionOfOne<Element> to $Builtin.RawPointer
+  %2 = struct $UnsafePointer<Element> (%1 : $Builtin.RawPointer)
+  %3 = metatype $@thin Span<Element>.Type
+  %4 = integer_literal $Builtin.Int64, 1
+  %5 = struct $Int (%4 : $Builtin.Int64)
+  %6 = function_ref @makeSpan : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafePointer<τ_0_0>, Int, @thin Span<τ_0_0>.Type) -> @lifetime(borrow 0) @owned Span<τ_0_0>
+  %7 = apply %6<Element>(%2, %5, %3) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafePointer<τ_0_0>, Int, @thin Span<τ_0_0>.Type) -> @lifetime(borrow 0) @owned Span<τ_0_0>
+  return %7 : $Span<Element>
+}
+
+sil hidden [ossa] @testGetSpanOfOne : $@convention(thin) (@in_guaranteed CollectionOfOne<Int>) -> () {
+bb0(%0 : $*CollectionOfOne<Int>):
+  %temp = alloc_stack $CollectionOfOne<Int>
+  %load = load [trivial] %0 : $*CollectionOfOne<Int>
+  %borrow = store_borrow %load to %temp : $*CollectionOfOne<Int>
+
+  %fget = function_ref @getSpanOfOne : $@convention(thin) <Element> (@in_guaranteed CollectionOfOne<Element>) -> @lifetime(borrow address_for_deps 0) @owned Span<Element>
+  %span = apply %fget<Int>(%borrow) : $@convention(thin) <τ_0_0> (@in_guaranteed CollectionOfOne<τ_0_0>) -> @lifetime(borrow address_for_deps 0) @owned Span<τ_0_0>
+
+  destroy_value %span : $Span<Int>
+  end_borrow %borrow : $*CollectionOfOne<Int>
+  dealloc_stack %temp : $*CollectionOfOne<Int>
+
+  %99 = tuple ()
+  return %99 : $()
+}

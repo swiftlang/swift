@@ -19,24 +19,17 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 #define SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 
+#include "swift/AST/DiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/SourceMgr.h"
+#include <optional>
 
 namespace swift {
   class DiagnosticArgument;
   class DiagnosticEngine;
   class SourceManager;
   enum class DiagID : uint32_t;
-
-/// Describes the kind of diagnostic.
-///
-enum class DiagnosticKind : uint8_t {
-  Error,
-  Warning,
-  Remark,
-  Note
-};
 
 /// Information about a diagnostic passed to DiagnosticConsumers.
 struct DiagnosticInfo {
@@ -58,8 +51,8 @@ struct DiagnosticInfo {
   /// DiagnosticInfo of notes which are children of this diagnostic, if any
   ArrayRef<DiagnosticInfo *> ChildDiagnosticInfo;
 
-  /// Paths to "educational note" diagnostic documentation in the toolchain.
-  ArrayRef<std::string> EducationalNotePaths;
+  /// Path for category documentation.
+  std::string CategoryDocumentationURL;
 
   /// Represents a fix-it, a replacement of one range of text with another.
   class FixIt {
@@ -120,7 +113,9 @@ public:
   /// Invoked whenever the frontend emits a diagnostic.
   ///
   /// \param SM The source manager associated with the source locations in
-  /// this diagnostic.
+  /// this diagnostic. NOTE: Do not persist either the SourceManager, or the
+  /// buffer names from the SourceManager, since it may not outlive the
+  /// DiagnosticConsumer (this is the case when building module interfaces).
   ///
   /// \param Info Information describing the diagnostic.
   virtual void handleDiagnostic(SourceManager &SM,
@@ -295,7 +290,7 @@ private:
   ///
   /// If None, Note diagnostics are sent to every consumer.
   /// If null, diagnostics are suppressed.
-  Optional<Subconsumer *> SubconsumerForSubsequentNotes = None;
+  std::optional<Subconsumer *> SubconsumerForSubsequentNotes = std::nullopt;
 
   bool HasAnErrorBeenConsumed = false;
 
@@ -323,16 +318,16 @@ private:
   /// Returns nullptr if diagnostic is to be suppressed,
   /// None if diagnostic is to be distributed to every consumer,
   /// a particular consumer if diagnostic goes there.
-  Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+  std::optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   subconsumerForLocation(SourceManager &SM, SourceLoc loc);
 
-  Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+  std::optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   findSubconsumer(SourceManager &SM, const DiagnosticInfo &Info);
 
-  Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+  std::optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   findSubconsumerForNonNote(SourceManager &SM, const DiagnosticInfo &Info);
 };
-  
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_DIAGNOSTICCONSUMER_H

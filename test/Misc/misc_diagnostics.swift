@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 
@@ -26,8 +26,8 @@ let total = 15.0
 let count = 7
 let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note {{overloads for '/' exist with these partially matching parameter lists:}}
 
-if (1) {} // expected-error{{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
-if 1 {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+if (1) {} // expected-error{{integer literal value '1' cannot be used as a boolean; did you mean 'true'?}} {{5-6=true}}
+if 1 {} // expected-error {{integer literal value '1' cannot be used as a boolean; did you mean 'true'?}} {{4-5=true}}
 
 var a: [String] = [1] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 var b: Int = [1, 2, 3] // expected-error{{cannot convert value of type '[Int]' to specified type 'Int'}}
@@ -56,7 +56,7 @@ class A {
     var a: MyArray<Int>
     init() {
         a = MyArray<Int // expected-error {{generic parameter 'Element' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
-       // expected-error@-1 {{binary operator '<' cannot be applied to operands of type 'MyArray<_>.Type' and 'Int.Type'}}
+       // expected-error@-1 {{binary operator '<' cannot be applied to operands of type 'MyArray<Element>.Type' and 'Int.Type'}}
        // expected-error@-2 {{cannot assign value of type 'Bool' to type 'MyArray<Int>'}}
     }
 }
@@ -109,6 +109,10 @@ func insertA<T>(array : inout [T], elt : T) {
   array.append(T); // expected-error {{cannot convert value of type 'T.Type' to expected argument type 'T'}}
 }
 
+extension Array {
+  fileprivate mutating func appendLocal(_ newElement: Element) {}
+}
+
 // <rdar://problem/17875634> can't append to array of tuples
 func test17875634() {
   var match: [(Int, Int)] = []
@@ -122,12 +126,12 @@ func test17875634() {
 
   match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
-  match.append(row, col) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
+  match.appendLocal(row, col) // expected-error {{instance method 'appendLocal' expects a single parameter of type '(Int, Int)'}} {{21-21=(}} {{29-29=)}}
 
-  match.append(1, 2) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{20-20=)}}
+  match.appendLocal(1, 2) // expected-error {{instance method 'appendLocal' expects a single parameter of type '(Int, Int)'}} {{21-21=(}} {{25-25=)}}
 
-  match.append(coord)
-  match.append((1, 2))
+  match.appendLocal(coord)
+  match.appendLocal((1, 2))
 
   // Make sure the behavior matches the non-generic case.
   struct FakeNonGenericArray {
@@ -144,9 +148,6 @@ func test17875634() {
 func test20770032() {
   if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}}
     // expected-error@-1 {{expression pattern of type 'ClosedRange<Int>' cannot match values of type '(Int, Int)'}}
-    // expected-error@-2 {{type '(Int, Int)' cannot conform to 'Equatable'}}
-    // expected-note@-3 {{only concrete types such as structs, enums and classes can conform to protocols}}
-    // expected-note@-4 {{required by operator function '~=' where 'T' = '(Int, Int)'}}
   }
 }
 

@@ -15,7 +15,7 @@ import CxxStdlibPerformance
 import CxxStdlib
 
 let cxxStringSize = 1_000_000
-let swiftStringSize = 25_000
+let swiftStringSize = 1_000_000
 
 var cxxString: std.string? = nil
 var swiftString: String? = nil
@@ -54,7 +54,7 @@ public func run_swiftToCxx(_ n: Int) {
 public func run_cxxToSwift(_ n: Int) {
   let str = cxxString!
   for _ in 0..<n {
-    let x = String(cxxString: str)
+    let x = String(str)
     blackHole(x)
   }
 }

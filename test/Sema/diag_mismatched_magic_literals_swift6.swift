@@ -4,7 +4,8 @@
 
 // And is also available in Swift 6 mode on asserts compilers.
 // RUN: %target-typecheck-verify-swift -swift-version 6
-// REQUIRES: asserts
+
+// REQUIRES: swift_feature_ConciseMagicFile
 
 func callee(file: String = #file) {} // expected-note {{'file' declared here}}
 func callee(fileID: String = #fileID) {} // expected-note {{'fileID' declared here}}

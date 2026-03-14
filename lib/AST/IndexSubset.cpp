@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/IndexSubset.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -47,6 +48,14 @@ bool IndexSubset::isSupersetOf(IndexSubset *other) const {
   assert(capacity == other->capacity);
   for (auto index : range(numBitWords))
     if (~getBitWord(index) & other->getBitWord(index))
+      return false;
+  return true;
+}
+
+bool IndexSubset::isDisjointWith(IndexSubset *other) const {
+  assert(capacity == other->capacity);
+  for (auto index : range(numBitWords))
+    if (getBitWord(index) & other->getBitWord(index))
       return false;
   return true;
 }

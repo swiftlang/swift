@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -target %target-swift-5.7-abi-triple -I %t | %FileCheck %s --enable-var-scope --dump-input=fail
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -29,7 +29,7 @@ distributed actor MyDistActor {
   }
 
   // CHECK-LABEL: // MyDistActor.init(system_async_fail:cond:)
-  // CHECK: sil hidden{{.*}} @$s14default_deinit11MyDistActorC17system_async_fail4condACSg015FakeDistributedE7Systems0jE6SystemV_SbtYacfc : $@convention(method) @async (@owned FakeActorSystem, Bool, @owned MyDistActor) -> @owned Optional<MyDistActor> {
+  // CHECK: sil hidden{{.*}} @$s14default_deinit11MyDistActorC17system_async_fail4condACSg015FakeDistributedE7Systems0jE6SystemV_SbtYacfc : $@convention(method) @async (@owned FakeActorSystem, Bool, @sil_isolated @owned MyDistActor) -> @owned Optional<MyDistActor> {
   // CHECK: bb0([[SYSTEM:%[0-9]+]] : $FakeActorSystem, [[COND:%[0-9]+]] : $Bool, [[SELF:%[0-9]+]] : $MyDistActor):
   // CHECK:   cond_br {{%[0-9]+}}, [[SUCCESS_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
 

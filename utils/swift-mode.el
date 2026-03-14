@@ -2,7 +2,7 @@
 ;
 ; This source file is part of the Swift.org open source project
 ;
-; Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+; Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 ; Licensed under Apache License v2.0 with Runtime Library Exception
 ;
 ; See https://swift.org/LICENSE.txt for license information
@@ -48,14 +48,15 @@
    ;; Integer literals
    '("\\b[-]?[0-9]+\\b" . font-lock-preprocessor-face)
    ;; Decl and type keywords
-   `(,(regexp-opt '("class" "init" "deinit" "extension" "fileprivate" "func"
-                    "import" "let" "protocol" "static" "struct" "subscript"
-                    "typealias" "enum" "var" "lazy" "where" "private" "public"
-                    "internal" "override" "open" "associatedtype" "inout"
-                    "indirect" "final")
+   `(,(regexp-opt '("import"
+                    "class" "struct" "enum" "extension" "protocol" "typealias" "var" "let" "actor"
+                    "func" "init" "deinit" "subscript" "associatedtype"
+                    "public" "internal" "private" "fileprivate" "package"
+                    "static"
+                    "where")
                   'words) . font-lock-keyword-face)
    ;; Variable decl keywords
-   `("\\b\\(?:[^a-zA-Z_0-9]*\\)\\(get\\|set\\)\\(?:[^a-zA-Z_0-9]*\\)\\b" 1 font-lock-keyword-face)
+   `("\\b\\(?:[^a-zA-Z_0-9]*\\)\\(get\\|set\\|_read\\|_modify\\|unsafe\\(Mutable\\)?Address\\)\\(?:[^a-zA-Z_0-9]*\\)\\b" 1 font-lock-keyword-face)
    `(,(regexp-opt '("willSet" "didSet") 'words) . font-lock-keyword-face)
    ;; Operators
    `("\\b\\(?:\\(?:pre\\|post\\|in\\)fix\\s-+\\)operator\\b" . font-lock-keyword-face)
@@ -63,20 +64,27 @@
    `("#\\(if\\|endif\\|elseif\\|else\\|available\\|error\\|warning\\)\\b" . font-lock-string-face)
    `("#\\(file\\|line\\|column\\|function\\|selector\\)\\b" . font-lock-keyword-face)
    ;; Infix operator attributes
-   `(,(regexp-opt '("precedence" "associativity" "left" "right" "none")
+   `(,(regexp-opt '("precedence" "associativity" "left" "right" "none" "precedencegroup")
                   'words) . font-lock-keyword-face)
    ;; Statements
    `(,(regexp-opt '("if" "guard" "in" "else" "for" "do" "repeat" "while"
                     "return" "break" "continue" "fallthrough"  "switch" "case"
-                    "default" "defer" "catch")
+                    "default" "defer" "catch" "yield")
                   'words) . font-lock-keyword-face)
    ;; Decl modifier keywords
-   `(,(regexp-opt '("convenience" "dynamic" "mutating" "nonmutating" "optional"
-                    "required" "weak" "unowned" "safe" "unsafe")
+   `(,(regexp-opt '("mutating" "nonmutating" "__consuming" "consuming" "borrowing" "inout"
+                    "convenience" "dynamic" "optional"
+                    "indirect" "override" "open" "final"
+                    "required" "lazy" "weak"
+                    "_compilerInitialized" "_const" "_local"
+                    "nonisolated" "distributed")
                   'words) . font-lock-keyword-face)
+   `("\\<unowned\\((\\(un\\)?safe)\\)?\\>" . font-lock-keyword-face)
    ;; Expression keywords: "Any" and "Self" are included in "Types" above
    `(,(regexp-opt '("as" "false" "is" "nil" "rethrows" "super" "self" "throw"
-                    "true" "try" "throws")
+                    "true" "try" "throws" "async" "await"
+                    "consume" "copy" "_move" "_borrow" "discard"
+                    "any" "some" "repeat" "each")
                   'words) . font-lock-keyword-face)
    ;; Expressions
    `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)
@@ -495,6 +503,7 @@ directory."
              (funcall swift-find-executable-fn "swiftc")
              temp-file)))
 
+(require 'flymake-proc)
 (add-to-list 'flymake-allowed-file-name-masks '(".+\\.swift$" flymake-swift-init))
 
 (setq flymake-err-line-patterns

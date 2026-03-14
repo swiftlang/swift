@@ -28,6 +28,7 @@
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 #include <memory>
 
@@ -311,27 +312,11 @@ private:
 
   /// The path and argument string to use for the response file if the job's
   /// arguments should be passed using one.
-  Optional<ResponseFileInfo> ResponseFile;
+  std::optional<ResponseFileInfo> ResponseFile;
 
   /// The modification time of the main input file, if any.
   llvm::sys::TimePoint<> InputModTime = llvm::sys::TimePoint<>::max();
 
-#ifndef NDEBUG
-  /// The "wave" of incremental jobs that this \c Job was scheduled into.
-  ///
-  /// The first "wave" of jobs is computed by the driver from the set of inputs
-  /// and external files that have been mutated by the user. From there, as
-  /// jobs from the first wave finish executing, we reload their \c swiftdeps
-  /// files and re-integrate them into the dependency graph to discover
-  /// the jobs for the second "wave".
-  ///
-  /// In +asserts builds, we ensure that no more than two "waves" occur for
-  /// any given incremental compilation session. This is a consequence of
-  /// 1) transitivity in dependency arcs
-  /// 2) dependency tracing from uses that affect a def's interfaces to that
-  ///    def's uses.
-  mutable unsigned Wave = 1;
-#endif
 
 public:
   Job(const JobAction &Source, SmallVectorImpl<const Job *> &&Inputs,
@@ -339,7 +324,7 @@ public:
       llvm::opt::ArgStringList Arguments,
       EnvironmentVector ExtraEnvironment = {},
       std::vector<FilelistInfo> Infos = {},
-      Optional<ResponseFileInfo> ResponseFile = None)
+      std::optional<ResponseFileInfo> ResponseFile = std::nullopt)
       : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)),
@@ -404,8 +389,7 @@ public:
                                       StringRef Terminator = "\n") const;
 
   /// Call the provided Callback with any Jobs (and their possibly-quasi-PIDs)
-  /// contained within this Job; if this job is not a BatchJob, just pass \c
-  /// this and the provided \p OSPid back to the Callback.
+  /// contained within this Job;
   virtual void forEachContainedJobAndPID(
       llvm::sys::procid_t OSPid,
       llvm::function_ref<void(const Job *, Job::PID)> Callback) const {
@@ -424,56 +408,6 @@ public:
   /// Assumes that, if a compile job, has one primary swift input
   /// May return empty if none.
   StringRef getFirstSwiftPrimaryInput() const;
-
-#ifndef NDEBUG
-  unsigned getWave() const { return Wave; }
-  void setWave(unsigned WaveNum) const { Wave = WaveNum; }
-#endif
-};
-
-/// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar
-/// to the others that the whole set can be combined into a single subprocess
-/// (and thus run potentially more-efficiently than running each Job in the set
-/// individually).
-///
-/// Not all Jobs can be combined into a BatchJob: at present, only those Jobs
-/// that come from CompileJobActions, and which otherwise have the exact same
-/// input file list and arguments as one another, aside from their primary-file.
-/// See ToolChain::jobsAreBatchCombinable for details.
-
-class BatchJob : public Job {
-
-  /// The set of constituents making up the batch.
-  const SmallVector<const Job *, 4> CombinedJobs;
-
-  /// A negative number to use as the base value for assigning quasi-PID to Jobs
-  /// in the \c CombinedJobs array. Quasi-PIDs count _down_ from this value.
-  const Job::PID QuasiPIDBase;
-
-public:
-  BatchJob(const JobAction &Source, SmallVectorImpl<const Job *> &&Inputs,
-           std::unique_ptr<CommandOutput> Output, const char *Executable,
-           llvm::opt::ArgStringList Arguments,
-           EnvironmentVector ExtraEnvironment, std::vector<FilelistInfo> Infos,
-           ArrayRef<const Job *> Combined, Job::PID &NextQuasiPID,
-           Optional<ResponseFileInfo> ResponseFile = None);
-
-  ArrayRef<const Job*> getCombinedJobs() const {
-    return CombinedJobs;
-  }
-
-  /// Call the provided callback for each Job in the batch, passing the
-  /// corresponding quasi-PID with each Job.
-  void forEachContainedJobAndPID(
-      llvm::sys::procid_t OSPid,
-      llvm::function_ref<void(const Job *, Job::PID)> Callback) const override {
-    Job::PID QPid = QuasiPIDBase;
-    assert(QPid < 0);
-    for (auto const *J : CombinedJobs) {
-      assert(QPid != std::numeric_limits<Job::PID>::min());
-      Callback(J, QPid--);
-    }
-  }
 };
 
 } // end namespace driver

@@ -59,7 +59,7 @@ struct Tester {
   void find(StringRef key) {
     auto stdmapResult = StdMap.lower_bound(key.str());
     while (stdmapResult == StdMap.end() ||
-           !key.startswith(stdmapResult->first)) {
+           !key.starts_with(stdmapResult->first)) {
       if (stdmapResult == StdMap.begin()) {
         stdmapResult = StdMap.end();
         break;
@@ -73,7 +73,7 @@ struct Tester {
     EXPECT_EQ(hasStdmapEntry, bool(premapResult.first));
     if (!hasStdmapEntry) return;
 
-    assert(key.startswith(stdmapResult->first));
+    assert(key.starts_with(stdmapResult->first));
     auto stdmapValue = stdmapResult->second;
     EXPECT_EQ(stdmapValue, *premapResult.first);
     EXPECT_EQ(key.begin() + stdmapResult->first.size(), premapResult.second);
