@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::constraints::ConstraintSystem::recordResolvedOverload(swift::constraints::ConstraintLocator*, swift::constraints::SelectedOverload)","signatureAssert":"Assertion failed: (inserted), function recordResolvedOverload"}
+// {"kind":"typecheck","signature":"swift::constraints::ConstraintSystem::recordResolvedOverload(swift::constraints::ConstraintLocator*, swift::constraints::SelectedOverload)","signatureAssert":"Assertion failed: (inserted), function recordResolvedOverload","signatureNext":"ConstraintSystem::resolveOverload"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 struct a func b(c : a) {
   {

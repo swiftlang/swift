@@ -69,13 +69,13 @@ public struct CrashLog: Sendable {
 
   /// Given a set of stack frames, find the deepest one that should be considered
   /// the signature of the crash.
-  private static func findFrameSignature(
+  private static func findInterestingSymbols(
     _ frames: [Frame], isStackOverflow: Bool
-  ) -> String? {
+  ) -> [String] {
     guard let lastFrameIdx = frames.lastIndex(
       where: { Self.targetImageNames.contains($0.image) })
     else {
-      return nil
+      return []
     }
     let firstFrameIdx = frames[...lastFrameIdx].reversed().firstIndex(where: {
       !Self.targetImageNames.contains($0.image)
@@ -84,16 +84,34 @@ public struct CrashLog: Sendable {
     let unfiltered = Array(frames[firstFrameIdx ... lastFrameIdx])
     let filtered = unfiltered.filter { frame in
       // Ignore frames with 0 offset, they're almost certainly bogus.
-      frame.offset != 0 && !Signature.symbol(frame.symbol, assert: nil).shouldIgnore
+      frame.offset != 0 && !Signature.symbols([frame.symbol], assert: nil).shouldIgnore
     }
     let symbols = (filtered.isEmpty ? unfiltered : filtered).map(\.symbol)
 
     // Check for recursion
     if isStackOverflow,
        let recurse = symbols.reversed().findRepeatedSlice(minRepeats: 10) {
-      return recurse.min()
+      guard let min = recurse.min() else { return [] }
+      return [min]
     }
-    return symbols.first
+    guard let firstSymbol = symbols.first else {
+      return []
+    }
+    // Return the first full symbol, and the next symbol with a different short
+    // signature.
+    if let firstShort = Signature.symbols([firstSymbol], assert: nil).short {
+      let nextSyms = symbols.dropFirst().map {
+        Signature.symbols([$0], assert: nil)
+      }
+      let next = nextSyms.first(where: {
+        guard let nextShort = $0.short else { return false }
+        return nextShort != firstShort
+      })
+      if let next {
+        return [firstSymbol, next.short!.symbol]
+      }
+    }
+    return [firstSymbol]
   }
 
   private static func findAbort(_ lines: [String]) -> String? {
@@ -122,12 +140,13 @@ public struct CrashLog: Sendable {
 
     var sig: Signature?
 
-    sig = Self.findFrameSignature(frames, isStackOverflow: isStackOverflow)
-      .map { Signature(symbol: $0, assertion: assertion) }
-
+    let syms = Self.findInterestingSymbols(frames, isStackOverflow: isStackOverflow)
+    if !syms.isEmpty {
+      sig = Signature(symbols: syms, assertion: assertion)
+    }
     if sig == nil {
       sig = Self.findAbort(lines)
-        .map({ Signature(symbol: $0, assertion: assertion) })
+        .map({ Signature(symbols: [$0], assertion: assertion) })
     }
     if sig == nil {
       sig = assertion.map(Signature.assertion)

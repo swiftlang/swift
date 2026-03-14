@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"(anonymous namespace)::Verifier::verifyChecked(swift::ValueDecl*)"}
+// {"kind":"typecheck","signature":"(anonymous namespace)::Verifier::verifyChecked(swift::ValueDecl*)","signatureNext":"Verifier::walkToDeclPost"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b

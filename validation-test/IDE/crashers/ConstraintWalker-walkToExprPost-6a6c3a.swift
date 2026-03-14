@@ -1,4 +1,4 @@
-// {"kind":"complete","languageMode":6,"original":"18c8278f","signature":"(anonymous namespace)::ConstraintWalker::walkToExprPost(swift::Expr*)"}
+// {"kind":"complete","languageMode":6,"original":"18c8278f","signature":"(anonymous namespace)::ConstraintWalker::walkToExprPost(swift::Expr*)","signatureNext":"Traversal::doIt"}
 // RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -swift-version 6 -source-filename %s
 func a
 class b {

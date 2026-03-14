@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::IsObjCRequest::evaluate(swift::Evaluator&, swift::ValueDecl*) const","signatureAssert":"Assertion failed: (errorConvention && \"Missing error convention\"), function markAsObjC"}
+// {"kind":"typecheck","signature":"swift::IsObjCRequest::evaluate(swift::Evaluator&, swift::ValueDecl*) const","signatureAssert":"Assertion failed: (errorConvention && \"Missing error convention\"), function markAsObjC","signatureNext":"Evaluator::getResultUncached"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 // REQUIRES: objc_interop
 class a {

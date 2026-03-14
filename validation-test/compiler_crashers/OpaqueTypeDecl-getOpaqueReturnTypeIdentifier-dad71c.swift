@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"2e672fab","signature":"swift::OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const"}
+// {"kind":"typecheck","original":"2e672fab","signature":"swift::OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const","signatureNext":"SourceFile::getOpaqueReturnTypeDecls"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 struct a<b {
   protocol c {
