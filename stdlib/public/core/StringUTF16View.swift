@@ -861,8 +861,7 @@ extension String.UTF16View {
       return _guts.getUTF16Count()
     }
 
-    guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset),
-          !_guts.hasOneCrumb else {
+    guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
       return _utf16Distance(from: startIndex, to: idx)
     }
 
@@ -911,7 +910,7 @@ extension String.UTF16View {
       }
     }
 
-    guard useCrumbs, !_guts.hasOneCrumb else {
+    guard useCrumbs else {
       return _index(startIndex, offsetBy: offset)._knownUTF8
     }
 

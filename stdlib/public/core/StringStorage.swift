@@ -867,7 +867,19 @@ extension _StringGuts {
       }
     }
     
-    if !oneCrumb, let breadcrumbs = unsafe _stdlib_atomicAcquiringLoadARCRef(object: mutPtr) {
+    if oneCrumb {
+      // The slot holds a raw integer (UTF-16 count), not an ARC reference.
+      // CAS it to zero so the existing nil-handling path can initialize real
+      // breadcrumbs. The range check ensures we never zero out a valid
+      // breadcrumbs pointer if another thread already upgraded.
+      let word = Builtin.atomicload_acquire_Word(mutPtr._rawValue)
+      if Int(word) > 0 && Int(word) <= Int(Int32.max) {
+        _ = Builtin.cmpxchg_acqrel_acquire_Word(
+          mutPtr._rawValue, word, 0._builtinWordValue)
+      }
+    }
+
+    if let breadcrumbs = unsafe _stdlib_atomicAcquiringLoadARCRef(object: mutPtr) {
       return unsafe breadcrumbs
     }
     return unsafe createAndLoadBreadcrumbs_time_here_is_String_to_NSString_bridging_overhead(mutPtr)
