@@ -235,9 +235,13 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     
     if distance >= 0 {
       if _guts.isASCII {
-        let raw = i.encoded(offsetBy: distance)._scalarAligned._knownUTF8
-        guard limit < start || raw <= limit else { return nil }
-        return _guts.validateInclusiveScalarIndex(raw)
+        let targetOffset = i._encodedOffset &+ distance
+        guard limit < start || targetOffset <= limit._encodedOffset else {
+          return nil
+        }
+        return _guts.validateInclusiveScalarIndex(
+          i.encoded(offsetBy: distance)._scalarAligned._knownUTF8
+        )
       }
       for _ in stride(from: 0, to: distance, by: 1) {
         guard limit < start || i < limit else { return nil }
@@ -247,9 +251,13 @@ extension String.UnicodeScalarView: BidirectionalCollection {
       guard limit < start || i <= limit else { return nil }
     } else {
       if _guts.isASCII {
-        let raw = i.encoded(offsetBy: distance)._scalarAligned._knownUTF8
-        guard limit > start || raw >= limit else { return nil }
-        return _guts.validateInclusiveScalarIndex(raw)
+        let targetOffset = i._encodedOffset &+ distance
+        guard limit > start || targetOffset >= limit._encodedOffset else {
+          return nil
+        }
+        return _guts.validateInclusiveScalarIndex(
+          i.encoded(offsetBy: distance)._scalarAligned._knownUTF8
+        )
       }
       for _ in stride(from: 0, to: distance, by: -1) {
         guard limit > start || i > limit else { return nil }
