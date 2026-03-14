@@ -595,8 +595,13 @@ extension __StringStorage {
     unsafe self.terminator.pointee = 0
 
     // TODO(String performance): Consider updating breadcrumbs when feasible.
-    if hasBreadcrumbs {
+    if hasAllocatedBreadcrumbs {
       unsafe self._breadcrumbsAddress.pointee = nil
+    } else if hasOneCrumb {
+      // The slot holds a raw integer (UTF-16 count), not an ARC reference.
+      // Use a raw store to avoid swift_release on the integer value.
+      unsafe UnsafeMutableRawPointer(_breadcrumbsAddress)
+        .storeBytes(of: 0, as: Int.self)
     }
     _invariantCheck()
   }
