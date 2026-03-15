@@ -1553,8 +1553,7 @@ public:
 
 class AllowTypeOrInstanceMember final : public AllowInvalidMemberRef {
   AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType,
-                            ValueDecl *member, DeclNameRef name,
-                            Expr *baseExpr,
+                            ValueDecl *member, DeclNameRef name, Expr *baseExpr,
                             ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowTypeOrInstanceMember, baseType,
                               member, name, locator),

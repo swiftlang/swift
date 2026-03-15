@@ -4854,7 +4854,8 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
   return true;
 }
 
-StringRef AllowTypeOrInstanceMemberFailure::getInstanceNameFromBaseExpr() const {
+StringRef
+AllowTypeOrInstanceMemberFailure::getInstanceNameFromBaseExpr() const {
 
   if (!BaseExpr)
     return "instance";
@@ -5120,8 +5121,9 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       Diag.emplace(
           emitDiagnostic(diag::could_not_use_enum_element_on_instance, Name));
     } else {
-      Diag.emplace(emitDiagnostic(diag::static_can_only_be_used_on_type_not_instance,
-                                  Name, baseTy, getInstanceNameFromBaseExpr()));
+      Diag.emplace(
+          emitDiagnostic(diag::static_can_only_be_used_on_type_not_instance,
+                         Name, baseTy, getInstanceNameFromBaseExpr()));
     }
 
     Diag->highlight(getSourceRange());

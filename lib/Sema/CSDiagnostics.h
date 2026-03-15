@@ -1385,10 +1385,10 @@ class AllowTypeOrInstanceMemberFailure final : public MemberReferenceFailure {
 public:
   AllowTypeOrInstanceMemberFailure(const Solution &solution, Type baseType,
                                    ValueDecl *member, DeclNameRef name,
-                                   Expr *baseExpr,
-                                   ConstraintLocator *locator)
+                                   Expr *baseExpr, ConstraintLocator *locator)
       : MemberReferenceFailure(solution, locator),
-        BaseType(baseType->getRValueType()), Member(member), Name(name), BaseExpr(baseExpr) {
+        BaseType(baseType->getRValueType()), Member(member), Name(name),
+        BaseExpr(baseExpr) {
     assert(member);
   }
 
