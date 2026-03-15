@@ -55,7 +55,7 @@ struct TheArgument {
 // CHECK-SAME:       %swift.full_type,
 // CHECK-SAME:       $s8Argument03OneA0Vy4main03TheA0VGMN
 // CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 2
+// CHECK-SAME:       i32 3
 // CHECK-SAME:     ),
 // CHECK-SAME:     $s8Argument03OneA0Vy4main03TheA0VGMJ
 // CHECK-SAME:   )

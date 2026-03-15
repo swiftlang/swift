@@ -123,11 +123,9 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
 // NOTE: the memcpy and asm("") naming shenanigans are to convince the compiler
 // not to emit a bunch of ptrauth instructions just to perform the comparison.
 // We only want to authenticate the function pointer if we actually call it.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
-static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
-                                       size_t requiredSize,
-                                       size_t requiredAlignmentMask)
-                                       asm("__swift_allocObject_");
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD static HeapObject *
+_swift_allocObject_(HeapMetadata const *metadata, size_t requiredSize,
+                    size_t requiredAlignmentMask) asm("__swift_allocObject_");
 static HeapObject *_swift_retain_(HeapObject *object) asm("__swift_retain_");
 static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n)
   asm("__swift_retain_n_");
@@ -200,6 +198,9 @@ computeMallocTypeSummary(const HeapMetadata *heapMetadata) {
 }
 
 static malloc_type_id_t getMallocTypeId(const HeapMetadata *heapMetadata) {
+  if (metadata->hasTypedMallocTypeId()) {
+    return metadata->getTypedMallocTypeId();
+  }
   uint64_t metadataPtrBits = reinterpret_cast<uint64_t>(heapMetadata);
   uint32_t hash = (metadataPtrBits >> 32) ^ (metadataPtrBits >> 0);
 
@@ -210,6 +211,24 @@ static malloc_type_id_t getMallocTypeId(const HeapMetadata *heapMetadata) {
 
   return desc.type_id;
 }
+
+static HeapObject *_swift_allocObjectTyped(HeapMetadata const *metadata,
+                                           size_t requiredSize,
+                                           size_t requiredAlignmentMask,
+                                           malloc_type_id_t typeId) {
+  auto object = reinterpret_cast<HeapObject *>(
+      swift_slowAllocTyped(requiredSize, requiredAlignmentMask, typeId));
+
+  ::new (object) HeapObject(metadata);
+
+  // If leak tracking is enabled, start tracking this object.
+  SWIFT_LEAKS_START_TRACKING_OBJECT(object);
+
+  SWIFT_RT_TRACK_INVOCATION(object, swift_allocObject);
+
+  return object;
+}
+
 #endif // SWIFT_STDLIB_HAS_MALLOC_TYPE
 
 #ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
@@ -256,9 +275,6 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
       swift_slowAlloc(requiredSize, requiredAlignmentMask));
 #endif
 
-  // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
-  // check on the placement new allocator which we have observed on Windows,
-  // Linux, and macOS.
   ::new (object) HeapObject(metadata);
 
   // If leak tracking is enabled, start tracking this object.
@@ -358,12 +374,13 @@ public:
   FullMetadata<GenericBoxHeapMetadata> Data;
 
   BoxCacheEntry(const Metadata *type)
-    : Data{HeapMetadataHeader{ {/*type layout*/nullptr}, {destroyGenericBox},
-                               {/*vwtable*/ nullptr}},
-           GenericBoxHeapMetadata{MetadataKind::HeapGenericLocalVariable,
-                                  GenericBoxHeapMetadata::getHeaderOffset(type),
-                                  type}} {
-  }
+      : Data{HeapMetadataHeader{{/*types malloc type id*/ 0},
+                                {/*type layout*/ nullptr},
+                                {destroyGenericBox},
+                                {/*vwtable*/ nullptr}},
+             GenericBoxHeapMetadata{
+                 MetadataKind::HeapGenericLocalVariable,
+                 GenericBoxHeapMetadata::getHeaderOffset(type), type}} {}
 
   intptr_t getKeyIntValueForDump() {
     return reinterpret_cast<intptr_t>(Data.BoxedType);

@@ -50,7 +50,7 @@ bb0(%0 : $ObjCClass):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @indirect_partial_apply(ptr %0, ptr %1, i64 %2) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[OBJ:%.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata, i32 0, i32 2), i64 40, i64 7)
+// CHECK:   [[OBJ:%.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata, i32 0, i32 3), i64 40, i64 7)
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds{{.*}} [[DATA_TYPE:<{ %swift.refcounted, i64, ptr, ptr }>]], ptr [[OBJ]], i32 0, i32 1
 // CHECK:   store i64 %2, ptr [[X_ADDR]], align 8
 // CHECK:   [[CONTEXT_ADDR:%.*]] = getelementptr inbounds{{.*}} [[DATA_TYPE]], ptr [[OBJ]], i32 0, i32 2
@@ -80,7 +80,7 @@ entry(%f : $@callee_owned (Builtin.Word) -> (), %x : $Builtin.Word):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @objc_partial_apply(ptr %0) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[OBJ:%.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata.2, i32 0, i32 2), i64 24, i64 7)
+// CHECK:   [[OBJ:%.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata.2, i32 0, i32 3), i64 24, i64 7)
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds{{.*}} [[DATA_TYPE:<{ %swift.refcounted, ptr }>]], ptr [[OBJ]], i32 0, i32 1
 // CHECK:   store ptr %0, ptr [[X_ADDR]], align 8
 // CHECK:   [[RET:%.*]] = insertvalue { ptr, ptr } { ptr [[OBJC_PARTIAL_APPLY_STUB:@"\$sTa[A-Za-z0-9_]*"]], ptr undef }, ptr [[OBJ]], 1

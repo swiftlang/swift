@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend -emit-irgen %s | %FileCheck %s
 
-// CHECK: [[BOX_1:@[A-Za-z0-9.]+]] = private constant %swift.full_boxmetadata { ptr [[DESTROY_BOX_1:@[A-Za-z0-9._]+]],
-// CHECK: [[BOX_2:@[A-Za-z0-9.]+]] = private constant %swift.full_boxmetadata { ptr [[DESTROY_BOX_2:@[A-Za-z0-9._]+]],
-// CHECK: [[BOX_3:@[A-Za-z0-9.]+]] = private constant %swift.full_boxmetadata { ptr [[DESTROY_BOX_3:@[A-Za-z0-9._]+]],
-// CHECK: [[BOX_4:@[A-Za-z0-9.]+]] = private constant %swift.full_boxmetadata { ptr [[DESTROY_BOX_4:@[A-Za-z0-9._]+]],
+// CHECK: [[BOX_1:@[A-Za-z0-9.]+]] = private constant %swift.full_boxmetadata { i64 {{[0-9]+}}, ptr [[DESTROY_BOX_1:@[A-Za-z0-9._]+]],
+// CHECK: [[BOX_2:@[A-Za-z0-9.]+]] = private constant %swift.full_boxmetadata { i64 {{[0-9]+}}, ptr [[DESTROY_BOX_2:@[A-Za-z0-9._]+]],
+// CHECK: [[BOX_3:@[A-Za-z0-9.]+]] = private constant %swift.full_boxmetadata { i64 {{[0-9]+}}, ptr [[DESTROY_BOX_3:@[A-Za-z0-9._]+]],
+// CHECK: [[BOX_4:@[A-Za-z0-9.]+]] = private constant %swift.full_boxmetadata { i64 {{[0-9]+}}, ptr [[DESTROY_BOX_4:@[A-Za-z0-9._]+]],
 
 // We don't really need to test arm64e, and doing so would mean tweaking the
 // test to cope with ptrauth.

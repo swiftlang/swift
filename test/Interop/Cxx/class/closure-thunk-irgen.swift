@@ -38,7 +38,7 @@ public func testClosureToFuncPtrReturnNonTrivial() {
 
 // CHECK: define{{( protected)?}} swiftcc { ptr, ptr } @"$s4main13returnFuncPtrySo10NonTrivialVcyF"()
 // CHECK: %[[V0:.*]] = call ptr @_Z8getFnPtrv()
-// CHECK: %[[V1:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%{{.*}}, ptr @{{.*}}, i32 0, i32 2), i64 24, i64 7)
+// CHECK: %[[V1:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%{{.*}}, ptr @{{.*}}, i32 0, i32 3), i64 24, i64 7)
 // CHECK: %[[V2:.*]] = getelementptr inbounds{{.*}} <{ %{{.*}}, ptr }>, ptr %[[V1]], i32 0, i32 1
 // CHECK: store ptr %[[V0]], ptr %[[V2]], align 8
 // CHECK: %[[V3:.*]] = insertvalue { ptr, ptr } { ptr @"$sSo10NonTrivialVIetCX_ABIegn_TRTA{{(\.ptrauth)?}}", ptr undef }, ptr %[[V1]], 1

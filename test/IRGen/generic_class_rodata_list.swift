@@ -36,7 +36,7 @@
 // CHECK:         .long   40
 // CHECK:         .long   40
 // CHECK:         .long   0
-// CHECK:         .quad   _$s25generic_class_rodata_list9SomethingCySuGMf+24
+// CHECK:         .quad   _$s25generic_class_rodata_list9SomethingCySuGMf+32
 // CHECK:         .quad   0
 // CHECK:         .quad   __CLASS_METHODS_$s25generic_class_rodata_list9SomethingCySuGMf
 

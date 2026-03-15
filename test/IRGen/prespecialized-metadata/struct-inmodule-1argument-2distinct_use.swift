@@ -56,7 +56,7 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:     %swift.full_type, 
 // CHECK-SAME:     $s4main5ValueVySiGMf
 // CHECK-SAME:     i32 0, 
-// CHECK-SAME:     i32 2
+// CHECK-SAME:     i32 3
 // CHECK-SAME:   )
 // CHECK-SAME: )
 // CHECK:      call swiftcc void @"$s4main7consumeyyxlF"(
@@ -65,7 +65,7 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:     %swift.full_type, 
 // CHECK-SAME:     $s4main5ValueVySdGMf
 // CHECK-SAME:     i32 0, 
-// CHECK-SAME:     i32 2
+// CHECK-SAME:     i32 3
 // CHECK-SAME:   )
 // CHECK-SAME: )
 // CHECK: }

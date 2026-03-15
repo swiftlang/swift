@@ -131,6 +131,12 @@ struct MetadataDependency {
   }
 };
 
+/// Prefix of a metadata header, containing the typed malloc type identifier.
+template <typename Runtime>
+struct TargetTypeMetadataTypedMallocPrefix {
+  uint64_t typedMallocTypeId;
+};
+
 /// Prefix of a metadata header, containing a pointer to the
 /// type layout string.
 template <typename Runtime>
@@ -155,15 +161,17 @@ struct TargetTypeMetadataHeaderBase {
 };
 
 template <typename Runtime>
-struct TargetTypeMetadataHeader
-    : TargetTypeMetadataLayoutPrefix<Runtime>,
-      TargetTypeMetadataHeaderBase<Runtime> {
+struct TargetTypeMetadataHeader : TargetTypeMetadataTypedMallocPrefix<Runtime>,
+                                  TargetTypeMetadataLayoutPrefix<Runtime>,
+                                  TargetTypeMetadataHeaderBase<Runtime> {
 
   TargetTypeMetadataHeader() = default;
   constexpr TargetTypeMetadataHeader(
-    const TargetTypeMetadataLayoutPrefix<Runtime> &layout,
-    const TargetTypeMetadataHeaderBase<Runtime> &header)
-      : TargetTypeMetadataLayoutPrefix<Runtime>(layout),
+      const TargetTypeMetadataTypedMallocPrefix<Runtime> &typedMalloc,
+      const TargetTypeMetadataLayoutPrefix<Runtime> &layout,
+      const TargetTypeMetadataHeaderBase<Runtime> &header)
+      : TargetTypeMetadataTypedMallocPrefix<Runtime>(typedMalloc),
+        TargetTypeMetadataLayoutPrefix<Runtime>(layout),
         TargetTypeMetadataHeaderBase<Runtime>(header) {}
 };
 
@@ -366,7 +374,34 @@ public:
 
     return false;
   }
-  
+
+  bool hasExtendedFlags() {
+    if (auto *descriptor = getTypeContextDescriptor()) {
+      return descriptor->hasExtendedFlags();
+    }
+
+    return getKind() == MetadataKind::HeapLocalVariable;
+  }
+
+  ExtendedTypeContextDescriptorFlags getExtendedFlags() {
+    return getTypeContextDescriptor().getExtendedFlags();
+  }
+
+  bool hasTypedMallocTypeId() {
+    return getExtendedFlags().hasTypedMallocTypeId();
+  }
+
+  uint64_t getTypedMallocTypeId() {
+    assert(hasTypedMallocTypeId());
+    if (isAnyClass()) {
+      return asFullMetadata(
+                 reinterpret_cast<TargetAnyClassMetadata<Runtime> *>(this))
+          ->typedMallocTypeId;
+    } else {
+      return asFullMetadata(this)->typedMallocTypeId;
+    }
+  }
+
   // Define forwarders for value witnesses. These invoke this metadata's value
   // witness table with itself as the 'self' parameter.
   #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
@@ -536,17 +571,19 @@ using HeapMetadataHeaderPrefix =
 
 /// The header present on all heap metadata.
 template <typename Runtime>
-struct TargetHeapMetadataHeader
-    : TargetTypeMetadataLayoutPrefix<Runtime>,
-      TargetHeapMetadataHeaderPrefix<Runtime>,
-      TargetTypeMetadataHeaderBase<Runtime> {
+struct TargetHeapMetadataHeader : TargetTypeMetadataTypedMallocPrefix<Runtime>,
+                                  TargetTypeMetadataLayoutPrefix<Runtime>,
+                                  TargetHeapMetadataHeaderPrefix<Runtime>,
+                                  TargetTypeMetadataHeaderBase<Runtime> {
   constexpr TargetHeapMetadataHeader(
+      const TargetTypeMetadataTypedMallocPrefix<Runtime> &typedMalloc,
       const TargetTypeMetadataLayoutPrefix<Runtime> &typeLayoutPrefix,
       const TargetHeapMetadataHeaderPrefix<Runtime> &heapPrefix,
       const TargetTypeMetadataHeaderBase<Runtime> &typePrefix)
-    : TargetTypeMetadataLayoutPrefix<Runtime>(typeLayoutPrefix),
-      TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
-      TargetTypeMetadataHeaderBase<Runtime>(typePrefix) {}
+      : TargetTypeMetadataTypedMallocPrefix<Runtime>(typedMalloc),
+        TargetTypeMetadataLayoutPrefix<Runtime>(typeLayoutPrefix),
+        TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
+        TargetTypeMetadataHeaderBase<Runtime>(typePrefix) {}
 };
 using HeapMetadataHeader =
   TargetHeapMetadataHeader<InProcess>;
@@ -4086,6 +4123,10 @@ public:
     return getTypeContextDescriptorFlags().hasLayoutString();
   }
 
+  bool hasExtendedFlags() const {
+    return getTypeContextDescriptorFlags().hasExtendedFlags();
+  }
+
   /// Given that this type has foreign metadata initialization, return the
   /// control structure for it.
   const TargetForeignMetadataInitialization<Runtime> &
@@ -4256,45 +4297,43 @@ template <typename Runtime>
 class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
     TargetClassDescriptor final
     : public TargetTypeContextDescriptor<Runtime>,
-      public TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
-                              TargetTypeGenericContextDescriptorHeader,
-                              /*additional trailing objects:*/
-                              TargetResilientSuperclass<Runtime>,
-                              TargetForeignMetadataInitialization<Runtime>,
-                              TargetSingletonMetadataInitialization<Runtime>,
-                              TargetVTableDescriptorHeader<Runtime>,
-                              TargetMethodDescriptor<Runtime>,
-                              TargetOverrideTableHeader<Runtime>,
-                              TargetMethodOverrideDescriptor<Runtime>,
-                              TargetObjCResilientClassStubInfo<Runtime>,
-                              TargetCanonicalSpecializedMetadatasListCount<Runtime>,
-                              TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
-                              TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
-                              TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                              InvertibleProtocolSet,
-                              TargetSingletonMetadataPointer<Runtime>,
-                              TargetMethodDefaultOverrideTableHeader<Runtime>,
-                              TargetMethodDefaultOverrideDescriptor<Runtime>> {
+      public TrailingGenericContextObjects<
+          TargetClassDescriptor<Runtime>,
+          TargetTypeGenericContextDescriptorHeader,
+          /*additional trailing objects:*/
+          TargetResilientSuperclass<Runtime>,
+          TargetForeignMetadataInitialization<Runtime>,
+          TargetSingletonMetadataInitialization<Runtime>,
+          TargetVTableDescriptorHeader<Runtime>,
+          TargetMethodDescriptor<Runtime>, TargetOverrideTableHeader<Runtime>,
+          TargetMethodOverrideDescriptor<Runtime>,
+          TargetObjCResilientClassStubInfo<Runtime>,
+          TargetCanonicalSpecializedMetadatasListCount<Runtime>,
+          TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
+          TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
+          TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
+          InvertibleProtocolSet, TargetSingletonMetadataPointer<Runtime>,
+          TargetMethodDefaultOverrideTableHeader<Runtime>,
+          TargetMethodDefaultOverrideDescriptor<Runtime>,
+          ExtendedTypeContextDescriptorFlags> {
 private:
-  using TrailingGenericContextObjects = 
-    swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
-                                         TargetTypeGenericContextDescriptorHeader,
-                                         TargetResilientSuperclass<Runtime>,
-                                         TargetForeignMetadataInitialization<Runtime>,
-                                         TargetSingletonMetadataInitialization<Runtime>,
-                                         TargetVTableDescriptorHeader<Runtime>,
-                                         TargetMethodDescriptor<Runtime>,
-                                         TargetOverrideTableHeader<Runtime>,
-                                         TargetMethodOverrideDescriptor<Runtime>,
-                                         TargetObjCResilientClassStubInfo<Runtime>,
-                                         TargetCanonicalSpecializedMetadatasListCount<Runtime>,
-                                         TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
-                                         TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
-                                         TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                                         InvertibleProtocolSet,
-                                         TargetSingletonMetadataPointer<Runtime>,
-                                         TargetMethodDefaultOverrideTableHeader<Runtime>,
-                                         TargetMethodDefaultOverrideDescriptor<Runtime>>;
+  using TrailingGenericContextObjects = swift::TrailingGenericContextObjects<
+      TargetClassDescriptor<Runtime>, TargetTypeGenericContextDescriptorHeader,
+      TargetResilientSuperclass<Runtime>,
+      TargetForeignMetadataInitialization<Runtime>,
+      TargetSingletonMetadataInitialization<Runtime>,
+      TargetVTableDescriptorHeader<Runtime>, TargetMethodDescriptor<Runtime>,
+      TargetOverrideTableHeader<Runtime>,
+      TargetMethodOverrideDescriptor<Runtime>,
+      TargetObjCResilientClassStubInfo<Runtime>,
+      TargetCanonicalSpecializedMetadatasListCount<Runtime>,
+      TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
+      TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
+      TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
+      InvertibleProtocolSet, TargetSingletonMetadataPointer<Runtime>,
+      TargetMethodDefaultOverrideTableHeader<Runtime>,
+      TargetMethodDefaultOverrideDescriptor<Runtime>,
+      ExtendedTypeContextDescriptorFlags>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4482,6 +4521,11 @@ private:
     if (!hasDefaultOverrideTable())
       return 0;
     return getDefaultOverrideTable()->NumEntries;
+  }
+
+  size_t
+  numTrailingObjects(OverloadToken<ExtendedTypeContextDescriptorFlags>) const {
+    return this->hasExtendedFlags() ? 1 : 0;
   }
 
 public:
@@ -4706,6 +4750,14 @@ public:
     return this->hasInvertibleProtocols() ? 1 : 0;
   }
 
+  const ExtendedTypeContextDescriptorFlags getExtendedFlags() const {
+    if (!this->hasExtendedFlags()) {
+      return {};
+    }
+    return *this->template getTrailingObjects<
+        ExtendedTypeContextDescriptorFlags>();
+  }
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Class;
   }
@@ -4728,16 +4780,17 @@ template <typename Runtime>
 class swift_ptrauth_struct_context_descriptor(StructDescriptor)
     TargetStructDescriptor final
     : public TargetValueTypeDescriptor<Runtime>,
-      public TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
-                            TargetTypeGenericContextDescriptorHeader,
-                            /*additional trailing objects*/
-                            TargetForeignMetadataInitialization<Runtime>,
-                            TargetSingletonMetadataInitialization<Runtime>,
-                            TargetCanonicalSpecializedMetadatasListCount<Runtime>,
-                            TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
-                            TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                            InvertibleProtocolSet,
-                            TargetSingletonMetadataPointer<Runtime>> {
+      public TrailingGenericContextObjects<
+          TargetStructDescriptor<Runtime>,
+          TargetTypeGenericContextDescriptorHeader,
+          /*additional trailing objects*/
+          TargetForeignMetadataInitialization<Runtime>,
+          TargetSingletonMetadataInitialization<Runtime>,
+          TargetCanonicalSpecializedMetadatasListCount<Runtime>,
+          TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
+          TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
+          InvertibleProtocolSet, TargetSingletonMetadataPointer<Runtime>,
+          ExtendedTypeContextDescriptorFlags> {
 public:
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
@@ -4754,16 +4807,12 @@ public:
   using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
 
 private:
-  using TrailingGenericContextObjects =
-      swift::TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
-                                           TargetTypeGenericContextDescriptorHeader,
-                                           ForeignMetadataInitialization,
-                                           SingletonMetadataInitialization,
-                                           MetadataListCount,
-                                           MetadataListEntry,
-                                           MetadataCachingOnceToken,
-                                           InvertibleProtocolSet,
-                                           TargetSingletonMetadataPointer<Runtime>>;
+  using TrailingGenericContextObjects = swift::TrailingGenericContextObjects<
+      TargetStructDescriptor<Runtime>, TargetTypeGenericContextDescriptorHeader,
+      ForeignMetadataInitialization, SingletonMetadataInitialization,
+      MetadataListCount, MetadataListEntry, MetadataCachingOnceToken,
+      InvertibleProtocolSet, TargetSingletonMetadataPointer<Runtime>,
+      ExtendedTypeContextDescriptorFlags>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4799,6 +4848,11 @@ private:
 
   size_t numTrailingObjects(OverloadToken<SingletonMetadataPointer>) const {
     return this->hasSingletonMetadataPointer() ? 1 : 0;
+  }
+
+  size_t
+  numTrailingObjects(OverloadToken<ExtendedTypeContextDescriptorFlags>) const {
+    return this->hasExtendedFlags() ? 1 : 0;
   }
 
 public:
@@ -4879,6 +4933,14 @@ public:
     return this->hasInvertibleProtocols() ? 1 : 0;
   }
 
+  const ExtendedTypeContextDescriptorFlags getExtendedFlags() const {
+    if (!this->hasExtendedFlags()) {
+      return {};
+    }
+    return *this->template getTrailingObjects<
+        ExtendedTypeContextDescriptorFlags>();
+  }
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Struct;
   }
@@ -4890,16 +4952,17 @@ template <typename Runtime>
 class swift_ptrauth_struct_context_descriptor(EnumDescriptor)
     TargetEnumDescriptor final
     : public TargetValueTypeDescriptor<Runtime>,
-      public TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
-                            TargetTypeGenericContextDescriptorHeader,
-                            /*additional trailing objects*/
-                            TargetForeignMetadataInitialization<Runtime>,
-                            TargetSingletonMetadataInitialization<Runtime>,
-                            TargetCanonicalSpecializedMetadatasListCount<Runtime>,
-                            TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
-                            TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                            InvertibleProtocolSet,
-                            TargetSingletonMetadataPointer<Runtime>> {
+      public TrailingGenericContextObjects<
+          TargetEnumDescriptor<Runtime>,
+          TargetTypeGenericContextDescriptorHeader,
+          /*additional trailing objects*/
+          TargetForeignMetadataInitialization<Runtime>,
+          TargetSingletonMetadataInitialization<Runtime>,
+          TargetCanonicalSpecializedMetadatasListCount<Runtime>,
+          TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
+          TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
+          InvertibleProtocolSet, TargetSingletonMetadataPointer<Runtime>,
+          ExtendedTypeContextDescriptorFlags> {
 public:
   using SingletonMetadataInitialization =
     TargetSingletonMetadataInitialization<Runtime>;
@@ -4916,16 +4979,12 @@ public:
   using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
 
 private:
-  using TrailingGenericContextObjects =
-    swift::TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
-                                        TargetTypeGenericContextDescriptorHeader,
-                                        ForeignMetadataInitialization,
-                                        SingletonMetadataInitialization,
-                                        MetadataListCount,
-                                        MetadataListEntry, 
-                                        MetadataCachingOnceToken,
-                                        InvertibleProtocolSet,
-                                        TargetSingletonMetadataPointer<Runtime>>;
+  using TrailingGenericContextObjects = swift::TrailingGenericContextObjects<
+      TargetEnumDescriptor<Runtime>, TargetTypeGenericContextDescriptorHeader,
+      ForeignMetadataInitialization, SingletonMetadataInitialization,
+      MetadataListCount, MetadataListEntry, MetadataCachingOnceToken,
+      InvertibleProtocolSet, TargetSingletonMetadataPointer<Runtime>,
+      ExtendedTypeContextDescriptorFlags>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4961,6 +5020,11 @@ private:
 
   size_t numTrailingObjects(OverloadToken<SingletonMetadataPointer>) const {
     return this->hasSingletonMetadataPointer() ? 1 : 0;
+  }
+
+  size_t
+  numTrailingObjects(OverloadToken<ExtendedTypeContextDescriptorFlags>) const {
+    return this->hasExtendedFlags() ? 1 : 0;
   }
 
 public:
@@ -5053,6 +5117,14 @@ public:
                
   size_t numTrailingObjects(OverloadToken<InvertibleProtocolSet>) const {
     return this->hasInvertibleProtocols() ? 1 : 0;
+  }
+
+  const ExtendedTypeContextDescriptorFlags getExtendedFlags() const {
+    if (!this->hasExtendedFlags()) {
+      return {};
+    }
+    return *this->template getTrailingObjects<
+        ExtendedTypeContextDescriptorFlags>();
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {

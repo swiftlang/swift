@@ -9,7 +9,7 @@
 
 // -- partial_apply context metadata
 
-// CHECK-DAG: [[METADATA:@.*]] = private constant %swift.full_boxmetadata { ptr {{.*}}@__swift_closure_destructor{{(\.ptrauth.*)?}}, ptr null, %swift.type { i64 1024 }, i32 16, ptr @"\01l__swift5_reflection_descriptor" }
+// CHECK-DAG: [[METADATA:@.*]] = private constant %swift.full_boxmetadata { i64 {{.*}}, ptr {{.*}}@__swift_closure_destructor{{(\.ptrauth.*)?}}, ptr null, %swift.type { i64 1024 }, i32 16, ptr @"\01l__swift5_reflection_descriptor" }
 
 func a(i i: Int) -> (Int) -> Int {
   return { x in i }

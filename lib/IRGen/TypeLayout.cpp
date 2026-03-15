@@ -628,6 +628,14 @@ bool TypeLayoutEntry::refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
   return true;
 }
 
+bool TypeLayoutEntry::computeLayoutSemantics(
+    IRGenModule &IGM, uint64_t currentOffset,
+    llvm::SmallVectorImpl<LayoutSemanticsSpan> &layoutProperties,
+    std::optional<Alignment> parentAlignment) const {
+  ASSERT(isEmpty());
+  return true;
+}
+
 llvm::Value *TypeLayoutEntry::extraInhabitantCount(IRGenFunction &IGF) const {
   assert(isEmpty());
   return llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
@@ -1322,6 +1330,76 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
   return true;
 }
 
+bool ScalarTypeLayoutEntry::computeLayoutSemantics(
+    IRGenModule &IGM, uint64_t currentOffset,
+    llvm::SmallVectorImpl<LayoutSemanticsSpan> &layoutProperties,
+    std::optional<Alignment> parentAlignment) const {
+  auto size = typeInfo.getFixedSize();
+  switch (scalarKind) {
+  case ScalarKind::ErrorReference:
+  case ScalarKind::NativeStrongReference:
+  case ScalarKind::NativeUnownedReference:
+  case ScalarKind::NativeWeakReference:
+  case ScalarKind::UnknownWeakReference:
+  case ScalarKind::UnknownReference:
+  case ScalarKind::UnknownUnownedReference:
+  case ScalarKind::BridgeReference:
+  case ScalarKind::BlockReference:
+  case ScalarKind::ObjCReference:
+    layoutProperties.push_back(
+        {currentOffset, size.getValue(),
+         TypedMemoryLayoutSemantics::StructPointer |
+             TypedMemoryLayoutSemantics::ReferenceCount});
+    break;
+  case ScalarKind::ThickFunc:
+    layoutProperties.push_back(
+        {currentOffset, IGM.getPointerSize().getValue(),
+         TypedMemoryLayoutSemantics::AnonymousPointer});
+    layoutProperties.push_back(
+        {currentOffset + IGM.getPointerSize().getValue(),
+         IGM.getPointerSize().getValue(),
+         TypedMemoryLayoutSemantics::StructPointer |
+             TypedMemoryLayoutSemantics::ReferenceCount});
+    break;
+  case ScalarKind::TriviallyDestroyable:
+    if (typeInfo.getStorageType()->isPointerTy()) {
+      layoutProperties.push_back(
+          {currentOffset, size.getValue(),
+           TypedMemoryLayoutSemantics::AnonymousPointer});
+    } else {
+      layoutProperties.push_back(
+          {currentOffset, size.getValue(),
+           TypedMemoryLayoutSemantics::GenericData});
+    }
+    break;
+  case ScalarKind::ExistentialReference:
+    layoutProperties.push_back(
+        {currentOffset, IGM.getPointerSize().getValue(),
+         TypedMemoryLayoutSemantics::StructPointer |
+             TypedMemoryLayoutSemantics::ReferenceCount});
+    for (auto i = size - IGM.getPointerSize(); !i.isZero();
+         i -= IGM.getPointerSize()) {
+      layoutProperties.push_back(
+          {currentOffset, IGM.getPointerSize().getValue(),
+           TypedMemoryLayoutSemantics::AnonymousPointer});
+    }
+    break;
+  case ScalarKind::CustomReference:
+    if (size == IGM.getPointerSize()) {
+      layoutProperties.push_back(
+          {currentOffset, size.getValue(),
+           TypedMemoryLayoutSemantics::AnonymousPointer});
+    } else {
+      return false;
+    }
+    break;
+  default:
+    llvm_unreachable("Unsupported ScalarKind");
+  }
+
+  return true;
+}
+
 void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   auto &IGM = IGF.IGM;
 
@@ -1781,6 +1859,47 @@ bool AlignedGroupEntry::refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
   return true;
 }
 
+bool AlignedGroupEntry::computeLayoutSemantics(
+    IRGenModule &IGM, uint64_t currentOffset,
+    llvm::SmallVectorImpl<LayoutSemanticsSpan> &layoutProperties,
+    std::optional<Alignment> parentAlignment) const {
+  if (!isFixedSize(IGM)) {
+    return false;
+  }
+
+  uint64_t offset = currentOffset;
+  for (auto *entry : entries) {
+    // TODO: Why is this even possible? If the aligned group entry is
+    //       fixed size, each component should be fixed size as well.
+    if (!entry->isFixedSize(IGM)) {
+      return false;
+    }
+    auto fieldAlignment = *entry->fixedAlignment(IGM);
+    if (offset) {
+      auto groupAlignment = *fixedAlignment(IGM);
+      groupAlignment =
+          std::min(groupAlignment, parentAlignment.value_or(groupAlignment));
+      fieldAlignment = std::min(fieldAlignment, groupAlignment);
+      uint64_t alignmentMask = fieldAlignment.getMaskValue();
+      uint64_t alignedOffset = offset + alignmentMask;
+      alignedOffset &= ~alignmentMask;
+      if (alignedOffset > offset) {
+        layoutProperties.push_back(
+            {offset, alignedOffset - offset,
+             TypedMemoryLayoutSemantics::GenericData});
+        offset = alignedOffset;
+      }
+    }
+    if (!entry->computeLayoutSemantics(IGM, offset, layoutProperties,
+                                       fieldAlignment)) {
+      return false;
+    }
+    offset += entry->fixedSize(IGM)->getValue();
+  }
+
+  return true;
+}
+
 static Address alignAddress(IRGenFunction &IGF, Address addr,
                             llvm::Value *alignMask) {
   auto &Builder = IGF.Builder;
@@ -2127,6 +2246,13 @@ bool ArchetypeLayoutEntry::refCountString(IRGenModule &IGM,
   return false;
 }
 
+bool ArchetypeLayoutEntry::computeLayoutSemantics(
+    IRGenModule &IGM, uint64_t currentOffset,
+    llvm::SmallVectorImpl<LayoutSemanticsSpan> &layoutProperties,
+    std::optional<Alignment> parentAlignment) const {
+  return false;
+}
+
 void ArchetypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   emitDestroyCall(IGF, archetype, addr);
 }
@@ -2405,7 +2531,6 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
   case CopyDestroyStrategy::ForwardToPayload:
     return cases[0]->refCountString(IGM, B, genericSig);
   case CopyDestroyStrategy::Normal: {
-
     if (isMultiPayloadEnum() &&
         buildMultiPayloadRefCountString(IGM, B, genericSig)) {
       return true;
@@ -2422,6 +2547,38 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
 
     auto *accessor = createMetatypeAccessorFunction(IGM, ty, genericSig);
     B.addFixedEnumRefCount(accessor);
+    return true;
+  }
+  }
+}
+
+bool EnumTypeLayoutEntry::computeLayoutSemantics(
+    IRGenModule &IGM, uint64_t currentOffset,
+    llvm::SmallVectorImpl<LayoutSemanticsSpan> &layoutProperties,
+    std::optional<Alignment> parentAlignment) const {
+  if (!isFixedSize(IGM))
+    return false;
+
+  switch (copyDestroyKind(IGM)) {
+  case CopyDestroyStrategy::TriviallyDestroyable: {
+    auto size = fixedSize(IGM);
+    assert(size && "POD should not have dynamic size");
+    layoutProperties.push_back(
+        {currentOffset, fixedSize(IGM)->getValue(),
+         TypedMemoryLayoutSemantics::GenericData});
+    return true;
+  }
+  case CopyDestroyStrategy::NullableRefcounted:
+  case CopyDestroyStrategy::ForwardToPayload:
+    return cases[0]->computeLayoutSemantics(IGM, currentOffset,
+                                            layoutProperties);
+  case CopyDestroyStrategy::Normal: {
+    for (auto *c : cases) {
+      if (!c->computeLayoutSemantics(IGM, currentOffset, layoutProperties)) {
+        return false;
+      }
+    }
+
     return true;
   }
   }
@@ -3602,6 +3759,13 @@ bool ResilientTypeLayoutEntry::refCountString(
   return false;
 }
 
+bool ResilientTypeLayoutEntry::computeLayoutSemantics(
+    IRGenModule &IGM, uint64_t currentOffset,
+    llvm::SmallVectorImpl<LayoutSemanticsSpan> &layoutProperties,
+    std::optional<Alignment> parentAlignment) const {
+  return false;
+}
+
 void ResilientTypeLayoutEntry::computeProperties() {
   hasResilientField = true;
   if (ty.getASTType()->hasArchetype())
@@ -3835,6 +3999,13 @@ bool TypeInfoBasedTypeLayoutEntry::refCountString(
       return true;
     }
   }
+  return false;
+}
+
+bool TypeInfoBasedTypeLayoutEntry::computeLayoutSemantics(
+    IRGenModule &IGM, uint64_t currentOffset,
+    llvm::SmallVectorImpl<LayoutSemanticsSpan> &layoutProperties,
+    std::optional<Alignment> parentAlignment) const {
   return false;
 }
 
@@ -4102,6 +4273,53 @@ bool ArrayLayoutEntry::refCountString(
     IRGenModule &IGM, LayoutStringBuilder &B,
     GenericSignature genericSig) const {
   return false;
+}
+
+bool ArrayLayoutEntry::computeLayoutSemantics(
+    IRGenModule &IGM, uint64_t currentOffset,
+    llvm::SmallVectorImpl<LayoutSemanticsSpan> &layoutProperties,
+    std::optional<Alignment> parentAlignment) const {
+  if (!isFixedSize(IGM)) {
+    return false;
+  }
+
+  auto size = fixedSize(IGM).value();
+  if (isTriviallyDestroyable()) {
+    layoutProperties.push_back(
+        {currentOffset, size.getValue(),
+         TypedMemoryLayoutSemantics::GenericData});
+    return true;
+  }
+
+  if (getKind() == TypeLayoutEntryKind::Scalar &&
+      size <= IGM.getPointerSize()) {
+    if (!elementLayout->computeLayoutSemantics(IGM, currentOffset,
+                                               layoutProperties)) {
+      return false;
+    }
+    auto semanticsSpan = layoutProperties.pop_back_val();
+
+    layoutProperties.push_back(
+        {semanticsSpan.Offset, size.getValue(), semanticsSpan.Semantics});
+    return true;
+  }
+
+  auto integer = countType->castTo<IntegerType>();
+
+  if (integer->isNegative()) {
+    return false;
+  }
+
+  auto &elementTypeInfo = cast<FixedTypeInfo>(IGM.getTypeInfo(elementType));
+  auto elementStride = elementTypeInfo.getFixedStride().getValue();
+  for (auto i = integer->getValue(); !i.isZero();
+       (void)i--, currentOffset += elementStride) {
+    if (!elementLayout->computeLayoutSemantics(IGM, currentOffset,
+                                               layoutProperties)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 std::optional<const FixedTypeInfo *>ArrayLayoutEntry::getFixedTypeInfo() const {

@@ -50,7 +50,7 @@ import Argument
 // CHECK-SAME:       %swift.full_type,
 // CHECK-SAME:       $s7Generic11OneArgumentVy0C07IntegerVGMN
 // CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 2
+// CHECK-SAME:       i32 3
 // CHECK-SAME:     ),
 // CHECK-SAME:     $s7Generic11OneArgumentVy0C07IntegerVGMJ
 // CHECK-NEXT:   [[CANONICALIZED_METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[CANONICALIZED_METADATA_RESPONSE]], 0

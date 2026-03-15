@@ -15,13 +15,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/Path.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/EndianStream.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Path.h"
+#include "llvm/Support/SipHash.h"
 
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
@@ -45,6 +47,7 @@
 #include "IRGenModule.h"
 #include "IndirectTypeInfo.h"
 #include "MetadataRequest.h"
+#include "TypeLayout.h"
 
 #include "GenHeap.h"
 
@@ -516,6 +519,9 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
   }
 
   auto fields = builder.beginStruct(IGM.FullBoxMetadataStructTy);
+  auto typedMallocTypeId = layout.computeTypedMallocTypeDescriptor(IGM);
+
+  fields.addInt64(typedMallocTypeId.value_or(0));
 
   fields.addSignedPointer(dtorFn, IGM.getOptions().PointerAuth.HeapDestructors,
                           PointerAuthEntity::Special::HeapDestructor);
@@ -545,10 +551,8 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
                                  /*constant*/ true,
                                  llvm::GlobalVariable::PrivateLinkage);
 
-  llvm::Constant *indices[] = {
-    llvm::ConstantInt::get(IGM.Int32Ty, 0),
-    llvm::ConstantInt::get(IGM.Int32Ty, 2)
-  };
+  llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, 0),
+                               llvm::ConstantInt::get(IGM.Int32Ty, 3)};
   return llvm::ConstantExpr::getInBoundsGetElementPtr(var->getValueType(), var,
                                                       indices);
 }
@@ -562,6 +566,32 @@ HeapLayout::getPrivateMetadata(IRGenModule &IGM,
         IGM, *this, createDtorFn(IGM, *this, name), captureDescriptor,
         MetadataKind::HeapLocalVariable);
   return privateMetadata;
+}
+
+std::optional<uint64_t>
+HeapLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM) const {
+  if (!isAlwaysFixedSize()) {
+    return std::nullopt;
+  }
+  llvm::SmallVector<SILType> storageEntries;
+
+  auto rawPointerType = SILType::getRawPointerType(IGM.Context);
+
+  // Add the heap header as the first entry
+  storageEntries.push_back(rawPointerType);
+  storageEntries.push_back(rawPointerType);
+
+  for (auto elType : ElementTypes) {
+    if (!elType) {
+      // FIXME: In partial function application, the bindings get stored as
+      //        opaque storage with SILType(). Can we find a way to get a proper
+      //        type mapping instead?
+      return std::nullopt;
+    }
+    storageEntries.push_back(elType.getObjectType());
+  }
+
+  return ::computeTypedMallocTypeDescriptor(IGM, storageEntries);
 }
 
 llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
@@ -2160,4 +2190,100 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
   // Non-class heap objects should be pure Swift, so we can access their isas
   // directly.
   return IsaEncoding::Pointer;
+}
+
+namespace {
+uint64_t getTypedMemoryDescriptorStableSipHash(StringRef Str) {
+  static const uint8_t K[16] = {0xb5, 0xd4, 0xc9, 0xeb, 0x79, 0x10, 0x4a, 0x79,
+                                0x6f, 0xec, 0x8b, 0x1b, 0x42, 0x87, 0x81, 0xd4};
+
+  uint8_t RawHashBytes[8];
+  getSipHash_2_4_64(arrayRefFromStringRef(Str), K, RawHashBytes);
+  return llvm::support::endian::read64le(RawHashBytes);
+}
+} // namespace
+
+std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
+    IRGenModule &IGM, llvm::SmallVectorImpl<SILType> &fieldTypes) {
+  if (fieldTypes.empty()) {
+    return std::nullopt;
+  }
+  llvm::SmallVector<LayoutSemanticsSpan, 4> layoutProperties;
+  uint64_t offset = 0;
+  for (auto fieldType : fieldTypes) {
+    auto &fieldTI = IGM.getTypeInfo(fieldType);
+    auto *fieldTLE =
+        fieldTI.buildTypeLayoutEntry(IGM, fieldType, /*useStructLayouts*/ true);
+
+    if (!fieldTLE->isFixedSize(IGM)) {
+      return std::nullopt;
+    }
+
+    if (offset) {
+      uint64_t alignmentMask = fieldTLE->fixedAlignment(IGM)->getMaskValue();
+      uint64_t alignedOffset = offset + alignmentMask;
+      alignedOffset &= ~alignmentMask;
+      if (alignedOffset > offset) {
+        layoutProperties.push_back(
+            {offset, alignedOffset - offset,
+             TypedMemoryLayoutSemantics::GenericData});
+        offset = alignedOffset;
+      }
+    }
+
+    if (!fieldTLE->computeLayoutSemantics(IGM, /*currentOffset=*/offset,
+                                          layoutProperties)) {
+      return std::nullopt;
+    }
+
+    offset += fieldTLE->fixedSize(IGM)->getValue();
+  }
+
+  llvm::stable_sort(layoutProperties,
+                    [&](LayoutSemanticsSpan L, LayoutSemanticsSpan R) {
+                      return L.Offset < R.Offset;
+                    });
+
+  TypedMemoryLayoutSemantics layoutSemantics = TypedMemoryLayoutSemantics::None;
+  SmallVector<TypedMemoryLayoutSemantics> unfolded;
+  unfolded.resize(offset, TypedMemoryLayoutSemantics::None);
+  for (auto &cur : layoutProperties) {
+    for (size_t I = cur.Offset; I < cur.Offset + cur.Width; I++) {
+      unfolded[I] |= cur.Semantics;
+      layoutSemantics |= cur.Semantics;
+    }
+  }
+
+  if (unfolded.empty()) {
+    return std::nullopt;
+  }
+
+  SmallVector<LayoutSemanticsSpan> coalesced;
+  coalesced.push_back({0, 0, unfolded.front()});
+  for (size_t I = 0; I < unfolded.size(); I++) {
+    LayoutSemanticsSpan &last = coalesced.back();
+    if (unfolded[I] == last.Semantics) {
+      last.Width += 1;
+    } else {
+      coalesced.push_back({I, 1, unfolded[I]});
+    }
+  }
+
+  std::string layoutString;
+  llvm::raw_string_ostream layoutStream(layoutString);
+
+  for (auto &S : coalesced) {
+    layoutStream << "[" << S.Offset << "," << S.Width << ":"
+                 << static_cast<uint16_t>(S.Semantics) << "]";
+  }
+
+  uint64_t hash =
+      getTypedMemoryDescriptorStableSipHash(layoutString) & 0xffffffff;
+
+  uint64_t summary = 0; // Version 0
+  summary |= 1 << 6;    // Callsite flags: fixed size
+  summary |= 2 << 10;   // Type kind: Swift
+  summary |= ((uint64_t)layoutSemantics) << 16;
+
+  return hash | (summary << 32);
 }

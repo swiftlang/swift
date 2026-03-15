@@ -26,7 +26,7 @@ sil @$s6vtable1CCfD : $@convention(method) (@owned C) -> ()
 // CHECK-objc:          ptr null,
 // CHECK-objc:          i64 add (i64 ptrtoint (ptr @_DATA__TtC6vtable1C to i64), i64 {{1|2}}),
 // CHECK-objc:          i32 {{3|2}}, i32 0, i32 16, i16 7, i16 0,
-// CHECK-objc:          i32 112, i32 24,
+// CHECK-objc:          i32 120, i32 32,
 // CHECK-objc:          @"$s6vtable1CCMn"
 // CHECK-objc:          ptr @"$s6vtable1CCACycACmcfC"
 // CHECK-objc:  }>
@@ -37,7 +37,7 @@ sil @$s6vtable1CCfD : $@convention(method) (@owned C) -> ()
 // CHECK-native: i64 0,
 // CHECK-native: ptr null,
 // CHECK-native: i32 {{3|2}}, i32 0, i32 16, i16 7, i16 0,
-// CHECK-native: i32 88, i32 24,
+// CHECK-native: i32 96, i32 32,
 // CHECK-native: @"$s6vtable1CCMn"
 // CHECK-native: ptr @"$s6vtable1CCACycACmcfC"
 // CHECK-native: }>

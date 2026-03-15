@@ -254,7 +254,7 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s42conditional_conformance_basic_conformances23double_generic_concreteyyxmAA2P2RzlF"(ptr %0, ptr %X, ptr %X.P2)
 // CHECK-NEXT:  entry:
 // CHECK:         %conditional.requirement.buffer = alloca [2 x ptr], align 8
-// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVMa"(i64 0, ptr %X, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s42conditional_conformance_basic_conformances4IsP3VMf", i32 0, i32 2))
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVMa"(i64 0, ptr %X, ptr getelementptr inbounds (<{ i64, ptr, ptr, i64, ptr }>, ptr @"$s42conditional_conformance_basic_conformances4IsP3VMf", i32 0, i32 3))
 // CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [2 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0

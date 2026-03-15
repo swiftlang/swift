@@ -52,9 +52,10 @@ public:
   }
 
   void layout() {
-    static_assert(MetadataAdjustmentIndex::ValueType == 2,
+    static_assert(MetadataAdjustmentIndex::ValueType == 3,
                   "Adjustment index must be synchronized with this layout");
 
+    asImpl().addTypedMallocTypeId();
     asImpl().addLayoutStringPointer();
 
     // Metadata header.
@@ -109,6 +110,7 @@ protected:
 
 public:
   void addMetadataFlags() { addPointer(); }
+  void addTypedMallocTypeId() { addInt64(); }
   void addLayoutStringPointer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }

@@ -10,14 +10,14 @@
 // CHECK-LABEL: @"$s13generic_types1ACMI" = internal global [16 x ptr] zeroinitializer, align 8
 
 // CHECK-LABEL: @"$s13generic_types1ACMn" = hidden constant
-// CHECK-SAME:   i32 -2147483440,
+// CHECK-SAME:   i32 -2145386288,
 // CHECK-SAME:   @"$s13generic_typesMXM"
 //               <name>
 // CHECK-SAME:   @"$s13generic_types1ACMa"
 // -- superclass
 // CHECK-SAME:   i32 0,
 // -- negative size in words
-// CHECK-SAME:   i32 3,
+// CHECK-SAME:   i32 4,
 // -- positive size in words
 // CHECK-objc-SAME:   i32 17,
 // CHECK-native-SAME:   i32 14,

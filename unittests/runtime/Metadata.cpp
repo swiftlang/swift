@@ -145,7 +145,7 @@ TEST(StaticObjects, ini) {
 }
 
 FullMetadata<ClassMetadata> MetadataTest2 = {
-  { { nullptr }, { &VALUE_WITNESS_SYM(Bo) } },
+  { { 0 }, { nullptr }, { &VALUE_WITNESS_SYM(Bo) } },
   { { nullptr }, ClassFlags(), 0, 0, 0, 0, 0, 0 }
 };
 

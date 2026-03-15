@@ -107,9 +107,8 @@ static SWIFT_CC(swift) void deinitTestObject(SWIFT_CONTEXT HeapObject *_object) 
 }
 
 static const FullMetadata<ClassMetadata> TestClassObjectMetadata = {
-  { { nullptr }, { &deinitTestObject }, { &VALUE_WITNESS_SYM(Bo) } },
-  { { nullptr }, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
-};
+    {{0}, {nullptr}, {&deinitTestObject}, {&VALUE_WITNESS_SYM(Bo)}},
+    {{nullptr}, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0}};
 
 /// Create an object that, when deinited, stores the given value to
 /// the given pointer.

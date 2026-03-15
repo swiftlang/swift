@@ -24,8 +24,8 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$s14generic_vtable4BaseCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, is class, is unique
-// CHECK-DIRECT-SAME: <i32 0x8000_0050>,
-// CHECK-INDIRECT-SAME: <i32 0x8001_0050>,
+// CHECK-DIRECT-SAME: <i32 0x8020_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x8021_0050>,
 // -- vtable offset
 // CHECK-objc32-SAME: i32 16,
 // CHECK-native32-SAME: i32 13,
@@ -61,7 +61,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$s14generic_vtable7DerivedCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, has override table, is class, is unique, is generic
-// CHECK-SAME: <i32 0xC000_00D0>,
+// CHECK-SAME: <i32 0xC020_00D0>,
 // -- vtable offset
 // CHECK-objc32-SAME: i32 17,
 // CHECK-native32-SAME: i32 14,
@@ -99,7 +99,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$s14generic_vtable8ConcreteCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, has override table, in-place initialization, is class, is unique
-// CHECK-SAME: <i32 0xC001_0050>,
+// CHECK-SAME: <i32 0xC021_0050>,
 // -- vtable offset
 // CHECK-objc32-SAME: i32 19,
 // CHECK-native32-SAME: i32 16,

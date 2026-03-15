@@ -25,22 +25,22 @@
 
 // class metadata base offset for package_resilience.MyResilientParent
 // CHECK: @"$s18package_resilience17MyResilientParentCMo" = constant [[BOUNDS:{ (i32|i64), i32, i32 }]]
-// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 3, i32 [[#MDWORDS + 6 + 2]] }, align [[#WORDSIZE]]
-// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 3, i32 [[#MDWORDS + 3 + 2]] }, align [[#WORDSIZE]]
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 4, i32 [[#MDWORDS + 6 + 2]] }, align [[#WORDSIZE]]
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 4, i32 [[#MDWORDS + 3 + 2]] }, align [[#WORDSIZE]]
 
 // CHECK: @"$s18package_resilience16MyResilientChildC5fields5Int32VvpWvd" = hidden constant [[INT]] [[#WORDSIZE + WORDSIZE + 4]], align [[#WORDSIZE]]
 
 // CHECK: @"$s18package_resilience16MyResilientChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE]], i32 3, i32 [[#MDWORDS + 6 + 3]] }
-// CHECK-64-SAME: { [[INT]] [[#MDSIZE64 + WORDSIZE + WORDSIZE]], i32 3, i32 [[#MDWORDS + 3 + 3]] }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE]], i32 4, i32 [[#MDWORDS + 6 + 3]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64 + WORDSIZE + WORDSIZE]], i32 4, i32 [[#MDWORDS + 3 + 3]] }
 
 // CHECK: @"$s18package_resilience24MyResilientGenericParentCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 3, i32 [[#MDWORDS + 6 + 3]] }
-// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 3, i32 [[#MDWORDS + 3 + 3]] }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 4, i32 [[#MDWORDS + 6 + 3]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 4, i32 [[#MDWORDS + 3 + 3]] }
 
 // CHECK: @"$s18package_resilience24MyResilientConcreteChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 3, i32 [[#MDWORDS + 6 + 5]] }
-// CHECK-64-SAME: { [[INT]] [[#MDSIZE64 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 3, i32 [[#MDWORDS + 3 + 5]] }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 4, i32 [[#MDWORDS + 6 + 5]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 4, i32 [[#MDWORDS + 3 + 5]] }
 
 // CHECK: @"$s18package_resilience27ClassWithEmptyThenResilientC5emptyAA0E0VvpWvd" = hidden constant [[INT]] 0,
 // CHECK: @"$s18package_resilience27ClassWithEmptyThenResilientC9resilient0H7_struct0G3IntVvpWvd" = hidden constant [[INT]] [[#WORDSIZE + WORDSIZE]], align [[#WORDSIZE]]

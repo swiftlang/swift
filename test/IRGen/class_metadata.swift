@@ -9,8 +9,8 @@ class A {}
 // CHECK:      [[A_NAME:@.*]] = private constant [2 x i8] c"A\00"
 // CHECK-LABEL: @"$s14class_metadata1ACMn" =
 //   Flags. 0x8000_0050 == HasVTable | Unique | Class
-// CHECK-DIRECT-SAME: <i32 0x8000_0050>,
-// CHECK-INDIRECT-SAME: <i32 0x8001_0050>,
+// CHECK-DIRECT-SAME: <i32 0x8020_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x8021_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadataMXM"
 //   Name.
@@ -20,7 +20,7 @@ class A {}
 //   Superclass.
 // CHECK-SAME: i32 0,
 //   Negative size in words.
-// CHECK-SAME: i32 3,
+// CHECK-SAME: i32 4,
 //   Positive size in words.
 // CHECK-32-SAME: i32 [[#MDSIZE + 6 + 1]],
 // CHECK-64-SAME: i32 [[#MDSIZE + 3 + 1]],
@@ -50,8 +50,8 @@ class B : A {}
 // CHECK:      [[B_NAME:@.*]] = private constant [2 x i8] c"B\00"
 // CHECK-LABEL: @"$s14class_metadata1BCMn" =
 //   Flags. 0x4000_0050 == HasOverrideTable | Unique | Class
-// CHECK-DIRECT-SAME: <i32 0x4000_0050>,
-// CHECK-INDIRECT-SAME: <i32 0x4001_0050>,
+// CHECK-DIRECT-SAME: <i32 0x4020_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x4021_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadataMXM"
 //   Name.
@@ -61,7 +61,7 @@ class B : A {}
 //   Superclass type.
 // CHECK-SAME: @"symbolic _____ 14class_metadata1AC"
 //   Negative size in words.
-// CHECK-SAME: i32 3,
+// CHECK-SAME: i32 4,
 //   Positive size in words.
 // CHECK-32-SAME: i32 [[#MDSIZE + 6 + 1]],
 // CHECK-64-SAME: i32 [[#MDSIZE + 3 + 1]],
@@ -90,7 +90,7 @@ class C<T> : B {}
 // CHECK:      [[C_NAME:@.*]] = private constant [2 x i8] c"C\00"
 // CHECK-LABEL: @"$s14class_metadata1CCMn" =
 //   Flags. 0x4000_00d0 == HasOverrideTable | Generic | Unique | Class
-// CHECK-SAME: <i32 0x4000_00d0>,
+// CHECK-SAME: <i32 0x4020_00d0>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadataMXM"
 //   Name.
@@ -100,7 +100,7 @@ class C<T> : B {}
 //   Superclass type.
 // CHECK-SAME: @"symbolic _____ 14class_metadata1BC"
 //   Negative size in words.
-// CHECK-SAME: i32 3,
+// CHECK-SAME: i32 4,
 //   Positive size in words.
 // CHECK-32-SAME: i32 [[#MDSIZE + 6 + 2]],
 // CHECK-64-SAME: i32 [[#MDSIZE + 3 + 2]],
@@ -152,8 +152,8 @@ class D : E {}
 // CHECK:      [[D_NAME:@.*]] = private constant [2 x i8] c"D\00"
 // CHECK-LABEL: @"$s14class_metadata1DCMn" =
 //   Flags. 0x4200_0050 == HasOverrideTable | Unique | Class
-// CHECK-DIRECT-SAME: <i32 0x4000_0050>,
-// CHECK-INDIRECT-SAME: <i32 0x4001_0050>,
+// CHECK-DIRECT-SAME: <i32 0x4020_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x4021_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadataMXM"
 //   Name.
@@ -163,7 +163,7 @@ class D : E {}
 //   Superclass type.
 // CHECK-SAME: @"symbolic _____ 14class_metadata1EC"
 //   Negative size in words.
-// CHECK-SAME: i32 3,
+// CHECK-SAME: i32 4,
 //   Positive size in words.
 // CHECK-32-SAME: i32 [[#MDSIZE + 6 + 1]],
 // CHECK-64-SAME: i32 [[#MDSIZE + 3 + 1]],
