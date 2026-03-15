@@ -248,13 +248,13 @@ extension String {
   /// This is expected to be some monotonically increasing subsequence of word
   /// boundaries detected in the forward direction, allowing some repeated
   /// items.
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(SwiftStdlib 6.3, *)
   func randomAccessWordBreaks() -> [String.Index] {
     unicodeScalars.allIndices().map { self._wordIndex(somewhereAtOrBefore: $0) }
   }
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(SwiftStdlib 6.3, *)
 func check(length: Int) {
   withEveryArray(of: 0 ..< samples.count, count: length) { vector in
     let str = string(for: vector)
@@ -292,7 +292,7 @@ func check(length: Int) {
   }
 }
 
-if #available(StdlibDeploymentTarget 6.3, *) {
+if #available(SwiftStdlib 6.3, *) {
   suite.test("Exhaustive consistency checks, length 1") {
     check(length: 1)
   }

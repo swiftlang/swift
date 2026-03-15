@@ -1,4 +1,4 @@
-// {"issueID":85266,"kind":"emit-silgen","signature":"swift::Lowering::TypeConverter::setCaptureTypeExpansionContext(swift::SILDeclRef, swift::SILModule&)","signatureAssert":"Assertion failed: (existing->second == context && \"closure shouldn't be emitted with different capture type expansion contexts\"), function setCaptureTypeExpansionContext"}
+// {"issueID":85266,"kind":"emit-silgen","signature":"swift::Lowering::TypeConverter::setCaptureTypeExpansionContext(swift::SILDeclRef, swift::SILModule&)","signatureAssert":"Assertion failed: (existing->second == context && \"closure shouldn't be emitted with different capture type expansion contexts\"), function setCaptureTypeExpansionContext","signatureNext":"Lowering::SILGenModule::emitFunction"}
 // RUN: not --crash %target-swift-frontend -emit-silgen %s
 // https://github.com/swiftlang/swift/issues/85266
 func a() {

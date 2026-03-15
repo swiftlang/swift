@@ -16,10 +16,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckType.h"
+#include "MiscDiagnostics.h"
 #include "NonisolatedNonsendingByDefaultMigration.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
-#include "TypeCheckEmbedded.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
@@ -1844,6 +1844,33 @@ static void diagnoseBorrowInoutType(TypeDecl *typeDecl, SourceLoc loc,
   ctx.Diags.diagnose(loc, diag::borrow_inout_experimental, nameString);
 }
 
+/// Diagnose when this is one of the BorrowingSequence types, which currently require
+/// an experimental feature to use.
+static void diagnoseBorrowingSequenceType(TypeDecl *typeDecl, SourceLoc loc,
+                             const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::BorrowingSequence))
+    return;
+
+  auto nameString = typeDecl->getName().str();
+  if (nameString != "BorrowingSequence" && nameString != "BorrowingIteratorProtocol"
+      && nameString != "SpanIterator" && nameString != "BorrowingIteratorAdapter")
+    return;
+
+  // Don't require this in the standard library or _Concurrency library.
+  auto module = dc->getParentModule();
+  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
+    return;
+
+  ctx.Diags.diagnose(loc, diag::borrowingsequence_experimental, nameString);
+}
+
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 /// \param silContext Used to look up generic parameters in SIL mode.
@@ -1960,6 +1987,7 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
     }
 
     diagnoseBorrowInoutType(currentDecl, repr->getLoc(), DC);
+    diagnoseBorrowingSequenceType(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -2194,6 +2222,8 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
     member = memberTypes.back().Member;
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
+
+    diagnoseBorrowingSequenceType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
@@ -4608,7 +4638,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       }
     }
   } else if (repr->getThrowsLoc().isValid()) {
-    diagnoseUntypedThrowsInEmbedded(getDeclContext(), repr->getThrowsLoc());
+    diagnoseUntypedThrows(getDeclContext(), repr->getThrowsLoc());
   }
 
   bool hasSendingResult =
@@ -7317,7 +7347,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
 
     // Explicit 'throws' implies that this throws 'any Error'.
     if (closure->getThrowsLoc().isValid()) {
-      diagnoseUntypedThrowsInEmbedded(closure, closure->getThrowsLoc());
+      diagnoseUntypedThrows(closure, closure->getThrowsLoc());
       return ctx.getErrorExistentialType();
     }
 
@@ -7337,7 +7367,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
 
     // If there is no explicitly-specified thrown error type, it's 'any Error'.
     if (!typeRepr) {
-      diagnoseUntypedThrowsInEmbedded(doCatch->getDeclContext(),
+      diagnoseUntypedThrows(doCatch->getDeclContext(),
                                       doCatch->getThrowsLoc());
       return ctx.getErrorExistentialType();
     }

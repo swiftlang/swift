@@ -50,4 +50,41 @@ struct SWIFT_NONCOPYABLE ContiguousNonCopyableSequence {
 };
 #endif
 
+struct NonInlineDereferenceOperatorSequence {
+  NonInlineDereferenceOperator begin() const {
+    return NonInlineDereferenceOperator(1);
+  }
+  NonInlineDereferenceOperator end() const {
+    return NonInlineDereferenceOperator(5);
+  }
+};
+
+struct NoConstDereferenceOperatorSequence {
+  NoConstDereferenceOperator begin() const {
+    return NoConstDereferenceOperator(1);
+  }
+  NoConstDereferenceOperator end() const {
+    return NoConstDereferenceOperator(5);
+  }
+};
+
+struct DifferentResultsDereferenceOperatorSequence {
+  DifferentResultsDereferenceOperator begin() const {
+    return DifferentResultsDereferenceOperator(1, 42);
+  }
+  DifferentResultsDereferenceOperator end() const {
+    return DifferentResultsDereferenceOperator(5, 56);
+  }
+};
+
+struct ConstRACButNotBorrowingIteratorSequence {
+  int arr[5] = {2, 1, 2, 7, 5};
+  ConstRACButNotBorrowingIterator begin() const {
+    return ConstRACButNotBorrowingIterator(&arr[0]);
+  }
+  ConstRACButNotBorrowingIterator end() const {
+    return ConstRACButNotBorrowingIterator(&arr[5]);
+  }
+};
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_BORROWING_SEQUENCE_H

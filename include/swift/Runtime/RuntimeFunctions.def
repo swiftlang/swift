@@ -2335,7 +2335,7 @@ FUNCTION(TaskAlloc,
          ARGS(SizeTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         MEMEFFECTS(InaccessibleMemOnly))
 
 // void swift_task_dealloc(void *ptr);
 FUNCTION(TaskDealloc,
@@ -2345,7 +2345,7 @@ FUNCTION(TaskDealloc,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         MEMEFFECTS(InaccessibleMemOnly))
 
 // void swift_task_dealloc_through(void *ptr);
 FUNCTION(TaskDeallocThrough,
@@ -2355,7 +2355,7 @@ FUNCTION(TaskDeallocThrough,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         MEMEFFECTS(InaccessibleMemOnly))
 
 // void swift_task_cancel(AsyncTask *task);
 FUNCTION(TaskCancel,
@@ -2365,7 +2365,7 @@ FUNCTION(TaskCancel,
          ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         MEMEFFECTS(InaccessibleMemOnly))
 
 // AsyncTaskAndContext swift_task_create(
 //     size_t taskCreateFlags,

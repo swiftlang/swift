@@ -914,6 +914,9 @@ bool swift::emitLoadedModuleTraceIfNeeded(const ModuleDependencyID &mainModule,
     if (!allLoadedModules.insert(mod).second)
       continue; // already visited.
 
+    if (mod.Kind == ModuleDependencyKind::Clang)
+      continue; // ignore clang dependencies.
+
     auto deps = cache.getAllSwiftDependencies(mod);
     workList.append(deps.begin(), deps.end());
   }
@@ -924,6 +927,7 @@ bool swift::emitLoadedModuleTraceIfNeeded(const ModuleDependencyID &mainModule,
 
   std::vector<SwiftModuleTraceInfo> swiftModules;
   for (auto &mod : allLoadedModules) {
+    // Record swift module dependencies and ignore other dependencies.
     auto &info = cache.findKnownDependency(mod);
     if (auto *binary = info.getAsSwiftBinaryModule())
       swiftModules.push_back({mod.ModuleName, binary->getDefiningModulePath(),
@@ -933,8 +937,6 @@ bool swift::emitLoadedModuleTraceIfNeeded(const ModuleDependencyID &mainModule,
       swiftModules.push_back(
           {mod.ModuleName, textual->swiftInterfaceFile, isDirectImport(mod),
            /*isResilient=*/true, textual->isStrictMemorySafety});
-    else
-      llvm::report_fatal_error("unexpected dependency kind");
   }
 
   std::vector<SwiftMacroTraceInfo> swiftMacros;

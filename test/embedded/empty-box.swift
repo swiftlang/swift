@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -wmo) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -wmo %target-embedded-posix-shim) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test

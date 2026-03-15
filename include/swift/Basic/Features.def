@@ -286,6 +286,8 @@ LANGUAGE_FEATURE(BuiltinMarkDependence, 0, "markDependence Builtin")
 // suppression of @c in Swift interfaces as a temporary measure.
 SUPPRESSIBLE_LANGUAGE_FEATURE(CAttribute, 495, "@c attribute")
 
+BASELINE_LANGUAGE_FEATURE(AnyAppleOSAvailability, 0, "Support `anyAppleOS` availability")
+
 //===----------------------------------------------------------------------===//
 // MARK: - Swift 6 features
 //===----------------------------------------------------------------------===//
@@ -497,9 +499,6 @@ EXPERIMENTAL_FEATURE(DebugDescriptionMacro, true)
 
 EXPERIMENTAL_FEATURE(ReinitializeConsumeInMultiBlockDefer, false)
 
-EXPERIMENTAL_FEATURE(SE427NoInferenceOnExtension, true)
-
-
 EXPERIMENTAL_FEATURE(Extern, true)
 
 // Enable trailing comma for comma-separated lists.
@@ -574,7 +573,7 @@ EXPERIMENTAL_FEATURE(DeprecateCompatMemberwiseInit, false)
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 
 /// Enable borrow/mutate accessors
-EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
+EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, true)
 
 /// Enable borrowing for-in loops
 EXPERIMENTAL_FEATURE(BorrowingForLoop, false)
@@ -598,9 +597,6 @@ EXPERIMENTAL_FEATURE(EmbeddedExistentials, true)
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
 
-/// Allow use of the 'anyAppleOS' availability domain.
-EXPERIMENTAL_FEATURE(AnyAppleOSAvailability, true)
-
 /// Check @_implementationOnly imports in non-library-evolution mode.
 EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
 
@@ -622,6 +618,9 @@ EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
 
 /// Allows the standard library `Borrow` and `Inout` types to be used.
 EXPERIMENTAL_FEATURE(BorrowInout, true)
+
+/// Allow access to the BorrowingSequence protocols/types outside the stdlib.
+EXPERIMENTAL_FEATURE(BorrowingSequence, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

@@ -219,16 +219,18 @@ public:
   /// can be replaced as-is with it's existing uses, create an instance of
   /// OwnershipRAUWHelper and check its validity.
   static bool hasValidRAUWOwnership(SILValue oldValue, SILValue newValue,
-                                    ArrayRef<Operand *> oldUses);
+                                    ArrayRef<Operand *> oldUses,
+                                    bool respectLexicalFlags);
 
   static bool hasValidNonLexicalRAUWOwnership(SILValue oldValue,
-                                              SILValue newValue) {
+                                              SILValue newValue,
+                                              bool respectLexicalFlags) {
     if (oldValue->isLexical() || newValue->isLexical())
       return false;
 
     // Pretend that we have no uses since they are only used to check lexical
     // lifetimes.
-    return hasValidRAUWOwnership(oldValue, newValue, {});
+    return hasValidRAUWOwnership(oldValue, newValue, {}, respectLexicalFlags);
   }
 
 private:
@@ -261,7 +263,7 @@ public:
   /// address, then these transforms can only transform the address into a
   /// derived address.
   OwnershipRAUWHelper(OwnershipFixupContext &ctx, SILValue oldValue,
-                      SILValue newValue);
+                      SILValue newValue, bool respectLexicalFlags);
 
   /// Returns true if this helper was initialized into a valid state.
   operator bool() const { return isValid(); }
@@ -335,7 +337,7 @@ public:
   /// NOTE: For now we only support objects, not addresses so addresses will
   /// always yield an invalid helper.
   OwnershipReplaceSingleUseHelper(OwnershipFixupContext &ctx, Operand *use,
-                                  SILValue newValue);
+                                  SILValue newValue, bool respectLexicalFlags);
 
   ~OwnershipReplaceSingleUseHelper() { if (ctx) ctx->clear(); }
 

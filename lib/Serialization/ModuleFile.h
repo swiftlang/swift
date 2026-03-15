@@ -593,6 +593,10 @@ public:
     return Core->PublicModuleName;
   }
 
+  StringRef getOSLogStringSectionName() const {
+    return Core->OSLogStringSectionName;
+  }
+
   /// The ABI name of the module.
   StringRef getModuleABIName() const {
     return Core->ModuleABIName;

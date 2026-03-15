@@ -51,8 +51,19 @@ func testFakeOptional() {
   _ = FakeOptional<Int>(())
 }
 
+func testStaticMethod(
+  inPlace message: inout MutableRawSpan,
+  tag: RawSpan, gcm: GCM) {
+  GCM.open(inPlace: &message, tag: tag)
+  let propagatedMessage = GCM.propagate(message: message)
+  let gcmX = gcm.x
+  message = propagatedMessage
+}
 // CHECK: sil @$s32def_explicit_lifetime_dependence6deriveyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> @lifetime(borrow 0) @owned BufferView
 // CHECK: sil @$s32def_explicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnF : $@convention(thin) (@owned BufferView) -> @lifetime(copy 0) @owned BufferView
 // CHECK: sil @$s32def_explicit_lifetime_dependence15borrowAndCreateyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> @lifetime(borrow 0) @owned BufferView
 // CHECK: sil @$s32def_explicit_lifetime_dependence16deriveThisOrThatyAA10BufferViewVAD_ADtF : $@convention(thin) (@guaranteed BufferView, @guaranteed BufferView) -> @lifetime(copy 1, borrow 0) @owned BufferView
 // CHECK: sil @$s32def_explicit_lifetime_dependence10BufferViewVyACSW_SaySiGhtcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> @lifetime(borrow 1) @owned BufferView
+// CHECK-LABEL: sil @$s32def_explicit_lifetime_dependence3GCMV4open7inPlace3tagys14MutableRawSpanVz_s0kL0VtFZ : $@convention(method) (@lifetime(copy 0) @inout MutableRawSpan, @guaranteed RawSpan, @thin GCM.Type) -> ()
+// CHECK-LABEL: sil @$s32def_explicit_lifetime_dependence3GCMV9propagate7messages14MutableRawSpanVAGn_tFZ : $@convention(method) (@owned MutableRawSpan, @thin GCM.Type) -> @lifetime(copy 0) @owned MutableRawSpan
+// CHECK-LABEL: sil @$s32def_explicit_lifetime_dependence3GCMV1xs7RawSpanVvg : $@convention(method) (GCM) -> @lifetime(borrow 0) @owned RawSpan

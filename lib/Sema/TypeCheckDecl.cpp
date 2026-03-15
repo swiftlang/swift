@@ -878,6 +878,8 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
           case AccessorKind::Read:
           case AccessorKind::Modify:
+          case AccessorKind::YieldingBorrow:
+          case AccessorKind::YieldingMutate:
           case AccessorKind::Get:
           case AccessorKind::DistributedGet:
           case AccessorKind::Set:
@@ -2731,13 +2733,13 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
       // or lazy type-checking, regular type-checking should go through the
       // StmtChecker and assign types before querying this, otherwise we could
       // end up double-type-checking.
-      //
-      // FIXME: We ought to be able to enable the following assert once we've
-      // fixed cases where we currently allow forward references to variables to
-      // kick interface type requests
-      // (https://github.com/swiftlang/swift/pull/85141).
-      // ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
-      //        Context.TypeCheckerOpts.EnableLazyTypecheck);
+      // FIXME: The check for 'IsForSourceKit' is a hack to workaround cases
+      // where we're doing cursor info in an invalid extension, we ought to
+      // still be type-checking decls in invalid extensions.
+      ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
+             Context.LangOpts.IsForSourceKit ||
+             Context.TypeCheckerOpts.EnableLazyTypecheck &&
+             "Querying VarDecl's type before type-checking parent stmt");
 
       // Try type checking parent control statement.
       if (auto condStmt = dyn_cast<LabeledConditionalStmt>(parentStmt)) {

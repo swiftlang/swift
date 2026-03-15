@@ -1,4 +1,4 @@
-// {"kind":"typecheck","noSDK":true,"signature":"swift::recordRequiredImportAccessLevelForDecl(swift::Decl const*, swift::DeclContext const*, swift::AccessLevel, std::__1::function<void (swift::AttributedImport<swift::ImportedModule>)>)"}
+// {"kind":"typecheck","noSDK":true,"signature":"swift::recordRequiredImportAccessLevelForDecl(swift::Decl const*, swift::DeclContext const*, swift::AccessLevel, std::__1::function<void (swift::AttributedImport<swift::ImportedModule>)>)","signatureNext":"TypeChecker::checkDistributedActor"}
 // RUN: %empty-directory(%t)
 // RUN: not --crash %target-swift-frontend -typecheck -sdk %t %s
 // REQUIRES: OS=macosx

@@ -1410,6 +1410,11 @@ public:
   /// Otherwise, it returns the type itself.
   Type getReferenceStorageReferent();
 
+  /// Replace all type variables and placeholders in the type with ErrorType.
+  /// This is necessary in a small number of cases where we need to ensure that
+  /// a type isn't solver allocated, for e.g diagnostic printing.
+  Type replaceTypeVariablesAndPlaceholdersWithErrors();
+
   /// Assumes this is a nominal type. Returns a substitution map that sends each
   /// generic parameter of the declaration's generic signature to the corresponding
   /// generic argument of this nominal type.
@@ -7223,6 +7228,10 @@ public:
   /// any of its associated types, since those are the only kind of existential
   /// type we can represent.
   Type getExistentialType() const;
+
+  /// Determine whether it's possible for this type to have an isolated
+  /// conformance. This could be prohibited in the generic signature.
+  bool mayHaveIsolatedConformance() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

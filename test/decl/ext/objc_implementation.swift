@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature ObjCImplementation -target %target-stable-abi-triple
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature ObjCImplementation -target %target-stable-abi-triple -Xcc -Wno-nullability-completeness
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_ObjCImplementation
 
@@ -426,6 +426,17 @@ protocol EmptySwiftProto {}
   func requiredMethod1() {}
 
   func optionalMethod1() {}
+}
+
+@objc(OwnershipTests) @implementation extension ObjCClass {
+  func consumingMismatchMethod(_ param: consuming Any?) {
+    // expected-error@-1 {{instance method 'consumingMismatchMethod' has a parameter ownership modifier that does not match the declaration in the header}}
+  }
+  func consumingMismatchMethod2(_ param: Any?) {
+    // expected-error@-1 {{instance method 'consumingMismatchMethod2' has a parameter ownership modifier that does not match the declaration in the header}}
+  }
+  func consumingMethod(_ param: consuming Any?) {
+  }
 }
 
 @objc(TypeMatchOptionality) @implementation extension ObjCClass {

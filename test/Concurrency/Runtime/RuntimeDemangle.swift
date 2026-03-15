@@ -15,7 +15,7 @@ import StdlibUnittest
 
 var DemangleTests = TestSuite("Demangle")
 
-if #available(SwiftStdlib 6.3, *) {
+if #available(SwiftStdlib 6.4, *) {
   DemangleTests.test("basic string return API") {
     // First, test that we get back 'nil' with invalid input.
     expectEqual(try? demangle("abc123"), nil)

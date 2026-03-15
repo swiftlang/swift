@@ -605,10 +605,7 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     // is not enabled.
     if (gp->isParameterPack()) {
       // Variadic nominal types require runtime support.
-      //
-      // Embedded doesn't require runtime support for this feature.
-      if (isa<NominalTypeDecl>(decl) &&
-          !ctx.LangOpts.hasFeature(Feature::Embedded)) {
+      if (isa<NominalTypeDecl>(decl)) {
         TypeChecker::checkAvailability(
             gp->getSourceRange(),
             ctx.getVariadicGenericTypeAvailability(),
@@ -628,11 +625,9 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     // Value generic nominal types require runtime support.
     if (gp->isValue() && isa<NominalTypeDecl>(decl)) {
       auto nomTypeDecl = cast<NominalTypeDecl>(decl);
-      // But: Embedded doesn't require runtime support for this feature.
       // But: Stdlib/libswiftCore carries its own support,
       //      so non-public stdlib declarations are safe
-      if (!ctx.LangOpts.hasFeature(Feature::Embedded) &&
-          !(decl->getModuleContext()->isStdlibModule() &&
+      if (!(decl->getModuleContext()->isStdlibModule() &&
             !nomTypeDecl->isAccessibleFrom(nullptr))) {
         // Everything else gets diagnosed for availability
         TypeChecker::checkAvailability(
@@ -2023,6 +2018,20 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
                     diag::replace_placeholder_with_inferred_type, initTy)
           .fixItReplace(PTR->getSourceRange(), initTy.getString());
     }
+  }
+}
+
+static void checkDeprecatedSuppressedAssociatedTypes(ProtocolDecl *proto) {
+  auto &ctx = proto->getASTContext();
+
+  if (!ctx.LangOpts.hasFeature(SuppressedAssociatedTypes))
+    return;
+
+  for (auto req : proto->getInverseRequirements()) {
+    if (req.subject->getCanonicalType() == ctx.TheSelfType)
+      continue;
+
+    ctx.Diags.diagnose(req.loc, diag::legacy_suppressed_assoc_types);
   }
 }
 
@@ -3522,6 +3531,8 @@ public:
     // Copyable that will appear as if deserialized, so skip checking those.
     if (PD->getParentSourceFile())
       TypeChecker::checkConformancesInContext(PD);
+
+    checkDeprecatedSuppressedAssociatedTypes(PD);
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -3559,6 +3570,13 @@ public:
     TypeChecker::checkDeclAttributes(FD);
     TypeChecker::checkDistributedFunc(FD);
     checkEmbeddedRestrictionsInSignature(FD);
+
+    // Untyped throws might need to be diagnosed.
+    SourceLoc throwsLoc = FD->getThrowsLoc();
+    if (throwsLoc.isValid() && !FD->getThrownTypeRepr() &&
+        !FD->hasPolymorphicEffect(EffectKind::Throws)) {
+      diagnoseUntypedThrows(FD, throwsLoc);
+    }
 
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
@@ -3946,6 +3964,13 @@ public:
 
     if (CD->getAsyncLoc().isValid())
       TypeChecker::checkConcurrencyAvailability(CD->getAsyncLoc(), CD);
+
+    // Untyped throws might need to be diagnosed.
+    SourceLoc throwsLoc = CD->getThrowsLoc();
+    if (throwsLoc.isValid() && !CD->getThrownTypeRepr() &&
+        !CD->hasPolymorphicEffect(EffectKind::Throws)) {
+      diagnoseUntypedThrows(CD, throwsLoc);
+    }
 
     // Check whether this initializer overrides an initializer in its
     // superclass.

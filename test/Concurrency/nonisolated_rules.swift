@@ -85,11 +85,9 @@ nonisolated struct StructRemovesGlobalActor: GloballyIsolated {
   }
 
   struct Nested: GloballyIsolated {
-    // expected-note@+1 {{mutation of this property is only permitted within the actor}}
-    var z: NonSendable
+    var z: NonSendable // expected-note {{mutation of this property is only permitted within the actor}}
     nonisolated init(z: NonSendable) {
-      // expected-error@+1 {{main actor-isolated property 'z' can not be mutated from a nonisolated context}}
-      self.z = z
+      self.z = z // expected-error {{main actor-isolated property 'z' can not be mutated from a nonisolated context}}
     }
   }
 }

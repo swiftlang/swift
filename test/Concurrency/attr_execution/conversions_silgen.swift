@@ -713,3 +713,104 @@ nonisolated(nonsending) func localVariableAssignmentConversion() async {
   let c2 = globalCallerFunc
   await c2()
 }
+
+// Make sure that when an isolated parameter is captured it's not marked as `isolated` when a closure is not isolated to it.
+func testConversionsToSendable() {
+  func compute(_: nonisolated(nonsending) () async -> Void) async {}
+  func sendableCompute(_: nonisolated(nonsending) @Sendable () async -> Void) async {}
+
+  func testActorCapture(a: A) {
+    // CHECK: // closure #1 in testActorCapture #1 (a:) in testConversionsToSendable()
+    // CHECK: // Isolation: caller_isolation_inheriting
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D12ActorCaptureL_1ayAaByyF1AL_C_tFyyYaYbYCcfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed A) -> ()
+    let _: nonisolated(nonsending) @Sendable () async -> Void = {
+      _ = await a.test()
+    }
+  }
+
+  func testIsolatedParameter(isolation: isolated (any Actor)?) async {
+    // CHECK: // closure #1 in testIsolatedParameter #1 (isolation:) in testConversionsToSendable()
+    // CHECK: // Isolation: caller_isolation_inheriting
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D17IsolatedParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCcfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Optional<any Actor>) -> ()
+    let _: nonisolated(nonsending) @Sendable () async -> Void = {
+      _ = isolation
+    }
+
+    // Passing a closure to a non-Sendable parameter doesn't make it "boundary" and so allows it to be isolated to the capture.
+    // CHECK: // closure #2 in testIsolatedParameter #1 (isolation:) in testConversionsToSendable()
+    // CHECK: // Isolation: actor_instance. name: 'isolation'
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D17IsolatedParameterL_9isolationyScA_pSgYi_tYaFyyYaXEfU0_ : $@convention(thin) @async (@sil_isolated @guaranteed Optional<any Actor>) -> ()
+    await compute {
+      _ = isolation
+    }
+
+    // Here on the other hand the parameter is `@Sendable` which means that closure cannot be isolated to its parent context and can assume `nonisolated(nonsending)` isolation.
+    // CHECK: // closure #3 in testIsolatedParameter #1 (isolation:) in testConversionsToSendable()
+    // CHECK: // Isolation: caller_isolation_inheriting
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D17IsolatedParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCXEfU1_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Optional<any Actor>) -> ()
+    await sendableCompute {
+      _ = isolation
+    }
+  }
+
+  func testCaptureWithParameter(isolation: isolated (any Actor)? = nil) async {
+    // CHECK: // local #1 @Sendable (_:) in testCaptureWithParameter #1 (isolation:) in testConversionsToSendable()
+    // CHECK: // Isolation: actor_instance. name: '_'
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaF5localL_yyAEYiYaYbF : $@convention(thin) @Sendable @async (@sil_isolated @guaranteed Optional<any Actor>) -> ()
+    @Sendable func local(_: isolated (any Actor)? = nil) async { }
+
+    // CHECK: // closure #1 in testCaptureWithParameter #1 (isolation:) in testConversionsToSendable()
+    // CHECK: // Isolation: caller_isolation_inheriting
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCXEfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+    // CHECK: hop_to_executor %0
+    // CHECK: [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+    // CHECK: [[LOCAL:%.*]] = function_ref @$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaF5localL_yyAEYiYaYbF
+    // CHECK: apply [[LOCAL]]([[GENERIC_EXEC]]) : $@convention(thin) @Sendable @async (@sil_isolated @guaranteed Optional<any Actor>) -> ()
+    // CHECK: hop_to_executor %0
+    // CHECK: } // end sil function '$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCXEfU_'
+    await sendableCompute {
+      await local()
+    }
+
+    // CHECK: // closure #2 in testCaptureWithParameter #1 (isolation:) in testConversionsToSendable()
+    // CHECK: // Isolation: caller_isolation_inheriting
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCXEfU0_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Optional<any Actor>) -> ()
+    // CHECK: hop_to_executor %0
+    // CHECK: [[LOCAL:%.*]] = function_ref @$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaF5localL_yyAEYiYaYbF
+    // CHECK: apply [[LOCAL]](%1) : $@convention(thin) @Sendable @async (@sil_isolated @guaranteed Optional<any Actor>) -> ()
+    // CHECK: } // end sil function '$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCXEfU0_'
+    await sendableCompute {
+      await local(isolation)
+    }
+  }
+
+  actor A {
+    func test() {}
+
+    func testLocalCapture() async {
+      @Sendable func local() {}
+
+      // CHECK: // closure #1 in testLocalCapture() in A #1 in testConversionsToSendable()
+      // CHECK: // Isolation: actor_instance. name: 'self'
+      await compute {
+        local()
+      }
+    }
+
+    func testSelfCapture() async {
+      // CHECK: // closure #1 in testSelfCapture() in A #1 in testConversionsToSendable()
+      // CHECK: // Isolation: caller_isolation_inheriting
+      // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF1AL_C0D11SelfCaptureyyYaFyyYaYbYCXEfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed A) -> ()
+      await sendableCompute {
+        _ = self
+      }
+
+      // CHECK: // closure #2 in testSelfCapture() in A #1 in testConversionsToSendable()
+      // CHECK: // Isolation: global_actor. type: MainActor
+      // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF1AL_C0D11SelfCaptureyyYaFyyYaYbScMYcXEfU0_ : $@convention(thin) @Sendable @async (@guaranteed A) -> ()
+      await sendableCompute { @MainActor in
+        _ = self
+      }
+    }
+  }
+}

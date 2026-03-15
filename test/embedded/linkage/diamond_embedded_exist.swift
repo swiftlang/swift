@@ -6,7 +6,7 @@
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
-// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
+// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o %target-embedded-posix-shim -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // But use this file's Root.swift
@@ -19,7 +19,7 @@
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
-// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
+// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o %target-embedded-posix-shim -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // REQUIRES: swift_in_compiler

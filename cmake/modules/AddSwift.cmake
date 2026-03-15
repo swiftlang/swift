@@ -229,7 +229,22 @@ function(_add_host_variant_c_compile_flags target)
     endif()
 
     target_compile_definitions(${target} PRIVATE
-      $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:LLVM_ON_WIN32 _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS>)
+      $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:
+      # NOTE(compnerd) we are hosting on Windows, indicate that to LLVM
+      LLVM_ON_WIN32
+      # NOTE(compnerd) Ignore the warnings from Microsoft related to deprecation
+      # of C standard functions (primarily due to a combination of security and
+      # compliance). While ideally we would migrate to the safer variants, this
+      # is currently expedient.
+      _CRT_SECURE_NO_WARNINGS
+      _CRT_NONSTDC_NO_WARNINGS
+      # NOTE(compnerd) enable UTF-16 codepaths always on Windows. We do not want
+      # to use the ANSI codepaths by default as any filesystem access can cause
+      # problems. Additionally, the Unicode variant is required for extended
+      # paths. Enable Win32 Unicode paths (`UNICODE`) and the UCRT/STL unicode
+      # paths (`_UNICODE`).
+      UNICODE
+      _UNICODE>)
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
       target_compile_definitions(${target} PRIVATE
         $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:_CRT_USE_BUILTIN_OFFSETOF>)
@@ -262,7 +277,8 @@ function(_add_host_variant_c_compile_flags target)
     # TODO(compnerd) when moving up to VS 2017 15.3 and newer, we can disable
     # RTTI again
     if(SWIFT_COMPILER_IS_MSVC_LIKE)
-      target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:/GR->)
+      target_compile_options(${target} PRIVATE
+        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:/GR->)
     else()
       target_compile_options(${target} PRIVATE
         $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-frtti>
@@ -274,14 +290,6 @@ function(_add_host_variant_c_compile_flags target)
     # guarantees on the SDK version currently.
     target_compile_definitions(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:_HAS_STATIC_RTTI=0>)
-
-    # NOTE(compnerd) workaround LLVM invoking `add_definitions(-D_DEBUG)` which
-    # causes failures for the runtime library when cross-compiling due to
-    # undefined symbols from the standard library.
-    if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-      target_compile_options(${target} PRIVATE
-        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-U_DEBUG>)
-    endif()
   endif()
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID")

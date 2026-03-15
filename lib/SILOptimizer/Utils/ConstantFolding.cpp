@@ -1816,7 +1816,7 @@ ConstantFolder::processWorkList() {
         InvalidateInstructions = true;
         instToDelete->eraseFromParent();
       });
-  InstructionDeleter deleter(std::move(callbacks));
+  InstructionDeleter deleter(std::move(callbacks), /*assumeFixedLifetimes=*/ !EnableDiagnostics);
 
   // An out parameter array that we use to return new simplified results from
   // constantFoldInstruction.
@@ -1840,7 +1840,8 @@ ConstantFolder::processWorkList() {
           // Schedule users for constant folding.
           WorkList.insert(AssertConfInt);
           // Delete the call.
-          eliminateDeadInstruction(BI, deleter.getCallbacks());
+          eliminateDeadInstruction(BI, deleter.getCallbacks(),
+                                   /*assumeFixedLifetimes=*/ !EnableDiagnostics);
           continue;
         }
 
@@ -1861,7 +1862,8 @@ ConstantFolder::processWorkList() {
         SILBuilderWithScope B(I);
         auto tru = B.createIntegerLiteral(apply->getLoc(), apply->getType(), 1);
         apply->replaceAllUsesWith(tru);
-        eliminateDeadInstruction(I, deleter.getCallbacks());
+        eliminateDeadInstruction(I, deleter.getCallbacks(),
+                                 /*assumeFixedLifetimes=*/ !EnableDiagnostics);
         WorkList.insert(tru);
         InvalidateInstructions = true;
       }
@@ -1910,7 +1912,8 @@ ConstantFolder::processWorkList() {
       if (constantFoldGlobalStringTablePointerBuiltin(cast<BuiltinInst>(I),
                                                       EnableDiagnostics)) {
         // Here, the builtin instruction got folded, so clean it up.
-        eliminateDeadInstruction(I, deleter.getCallbacks());
+        eliminateDeadInstruction(I, deleter.getCallbacks(),
+                                 /*assumeFixedLifetimes=*/ !EnableDiagnostics);
       }
       continue;
     }
@@ -1959,7 +1962,8 @@ ConstantFolder::processWorkList() {
             SILType::getBuiltinIntegerType(1, builder.getASTContext()), val);
         BI->replaceAllUsesWith(inst);
 
-        eliminateDeadInstruction(I, deleter.getCallbacks());
+        eliminateDeadInstruction(I, deleter.getCallbacks(),
+                                 /*assumeFixedLifetimes=*/ !EnableDiagnostics);
         continue;
       }
     }

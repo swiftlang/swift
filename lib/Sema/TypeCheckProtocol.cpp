@@ -762,6 +762,8 @@ bool swift::TypeChecker::witnessStructureMatches(ValueDecl *req,
       == std::nullopt;
 }
 
+static PossibleEffects getEffects(ValueDecl *value);
+
 RequirementMatch swift::matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
     llvm::function_ref<
@@ -950,6 +952,26 @@ RequirementMatch swift::matchWitness(
 
     if (auto result = matchTypes(reqType, witnessType)) {
       return std::move(result.value());
+    }
+  }
+
+  {
+    // The witness must have the same or fewer effects than the requirement.
+    auto reqEff = getEffects(req);
+    auto witnessEff = getEffects(witness);
+    if (auto invalidEffects = witnessEff - reqEff) {
+      for (auto kind : EffectKinds::all()) {
+        if (invalidEffects.contains(kind)) {
+          switch (kind) {
+          case EffectKind::Unsafe:
+            continue;  // This is diagnosed as a warning elsewhere.
+          case EffectKind::Throws:
+            return RequirementMatch(witness, MatchKind::ThrowsConflict);
+          case EffectKind::Async:
+            return RequirementMatch(witness, MatchKind::AsyncConflict);
+          }
+        }
+      }
     }
   }
 

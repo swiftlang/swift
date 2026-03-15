@@ -216,7 +216,8 @@ public:
   IRGenDebugInfoImpl(const IRGenOptions &Opts, ClangImporter &CI,
                      IRGenModule &IGM, llvm::Module &M,
                      StringRef MainOutputFilenameForDebugInfo,
-                     StringRef PrivateDiscriminator);
+                     StringRef PrivateDiscriminator,
+                     StringRef CacheKeyForJob);
   ~IRGenDebugInfoImpl() {
     // FIXME: SILPassManager sometimes creates an IGM and doesn't finalize it.
     if (!FwdDeclTypes.empty())
@@ -967,6 +968,10 @@ private:
     // the module on disk is Bar (.swiftmodule or .swiftinterface), and is used
     // for loading and mangling.
     StringRef Name = M->getRealName().str();
+    // Handle bridging header imports. If there is a cache key, use cache key as
+    // path if debug module path is specified.
+    if (Name == CLANG_HEADER_MODULE_NAME && !Opts.BridgingPCHCacheKey.empty())
+      Path = Opts.BridgingPCHCacheKey;
     return getOrCreateModule(M, TheCU, Name, Path);
   }
 
@@ -1450,6 +1455,21 @@ private:
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
+  /// If the enum case is indirect, wrap the payload debug type in a
+  /// DW_TAG_reference_type to indicate the case stores a pointer to a
+  /// heap-allocated box rather than the payload directly.
+  llvm::DIType *wrapInReferenceTypeIfIndirect(llvm::DIType *PayloadDITy,
+                                              EnumElementDecl *ElemDecl,
+                                              EnumDecl *Decl) {
+    if (ElemDecl->isIndirect() || Decl->isIndirect()) {
+      unsigned PtrSizeInBits =
+          CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
+      return DBuilder.createReferenceType(llvm::dwarf::DW_TAG_reference_type,
+                                          PayloadDITy, PtrSizeInBits);
+    }
+    return PayloadDITy;
+  }
+
   /// Create debug information for an enum with no raw type.
   llvm::DICompositeType *createVariantType(CompletedDebugTypeInfo DbgTy,
                                            EnumDecl *Decl,
@@ -1491,10 +1511,14 @@ private:
               llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
               llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, MangledName);
         }
+        llvm::DIType *PayloadDITy = getOrCreateType(*ElemDbgTy);
+        PayloadDITy =
+            wrapInReferenceTypeIfIndirect(PayloadDITy, ElemDecl, Decl);
+
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(),
                                  getByteSize() *
                                      ElemDbgTy->getAlignment().getValue(),
-                                 TrackingDIType(getOrCreateType(*ElemDbgTy)));
+                                 TrackingDIType(PayloadDITy));
       } else {
         // A variant with no payload.
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
@@ -1548,10 +1572,14 @@ private:
         PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoEnvironment(PayloadTy);
         ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
             PayloadTy, IGM.getTypeInfoForUnlowered(PayloadTy), IGM);
+        llvm::DIType *PayloadDITy = getOrCreateType(*ElemDbgTy);
+        PayloadDITy =
+            wrapInReferenceTypeIfIndirect(PayloadDITy, ElemDecl, Decl);
+
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(),
                                  getByteSize() *
                                      ElemDbgTy->getAlignment().getValue(),
-                                 TrackingDIType(getOrCreateType(*ElemDbgTy)));
+                                 TrackingDIType(PayloadDITy));
       } else {
         // A variant with no payload.
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
@@ -2857,7 +2885,8 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        ClangImporter &CI, IRGenModule &IGM,
                                        llvm::Module &M,
                                        StringRef MainOutputFilenameForDebugInfo,
-                                       StringRef PD)
+                                       StringRef PD,
+                                       StringRef CacheKeyForJob)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), M(M), DBuilder(M),
       IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap) {
   assert(Opts.DebugInfoLevel > IRGenDebugInfoLevel::None &&
@@ -2930,6 +2959,9 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   // Create a module for the current compile unit.
   auto *MDecl = IGM.getSwiftModule();
   StringRef Path = Opts.DebugModulePath;
+  if (Opts.DebugModuleSelfKey)
+    Path = CacheKeyForJob;
+
   if (Path.empty()) {
     llvm::sys::path::remove_filename(SourcePath);
     Path = SourcePath;
@@ -4127,9 +4159,10 @@ void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
 std::unique_ptr<IRGenDebugInfo> IRGenDebugInfo::createIRGenDebugInfo(
     const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
     llvm::Module &M, StringRef MainOutputFilenameForDebugInfo,
-    StringRef PrivateDiscriminator) {
+    StringRef PrivateDiscriminator, StringRef CacheKeyForJob) {
   return std::make_unique<IRGenDebugInfoImpl>(
-      Opts, CI, IGM, M, MainOutputFilenameForDebugInfo, PrivateDiscriminator);
+      Opts, CI, IGM, M, MainOutputFilenameForDebugInfo, PrivateDiscriminator,
+      CacheKeyForJob);
 }
 
 IRGenDebugInfo::~IRGenDebugInfo() {}

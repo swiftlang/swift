@@ -113,28 +113,11 @@ struct Wrapper {
 var i: Int
 
 var i_accessor: Int {
-  borrow { // expected-error{{a 'borrow' accessor is supported only on a struct}}
+  borrow { // expected-error{{a 'borrow' accessor is unsupported here}}
     fatalError()
   }
-  mutate { // expected-error{{a 'mutate' accessor is supported only on a struct}}
+  mutate { // expected-error{{a 'mutate' accessor is unsupported here}}
     return &i // expected-error{{'&' may only be used to pass an argument to inout parameter}}
-  }
-}
-
-class KlassWrapper {
-  var _k: Klass
-
-  init(_ k: Klass) {
-    self._k = k
-  }
-
-  var k: Klass {
-    borrow {// expected-error{{a 'borrow' accessor is supported only on a struct}}
-      return _k
-    }
-    mutate {// expected-error{{a 'mutate' accessor is supported only on a struct}}
-      return &_k
-    }
   }
 }
 

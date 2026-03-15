@@ -174,7 +174,7 @@ func isolatedFunc() {}  // expected-note 15{{calls to global function 'isolatedF
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s21deinit_isolation_objc13DefaultDeinitCfD : $@convention(method) (@owned DefaultDeinit) -> () {
 @FirstActor
 @objc class DefaultDeinit: NSObject {
-    deinit {
+    deinit { // expected-note {{add 'isolated' to run isolated to 'FirstActor', which may be later than 'nonisolated deinit'}}
 #if !SILGEN
         isolatedFunc() // expected-error {{call to global actor 'FirstActor'-isolated global function 'isolatedFunc()' in a synchronous nonisolated context}}
 #endif
@@ -215,7 +215,7 @@ func isolatedFunc() {}  // expected-note 15{{calls to global function 'isolatedF
 @FirstActor
 @objc class NonisolatedDeinit : NSObject {
     // nonisolated deinit
-    nonisolated deinit {
+    nonisolated deinit { // expected-note {{marked as 'nonisolated' here}}
 #if !SILGEN
         isolatedFunc() // expected-error {{call to global actor 'FirstActor'-isolated global function 'isolatedFunc()' in a synchronous nonisolated context}}
 #endif
@@ -283,7 +283,7 @@ func isolatedFunc() {}  // expected-note 15{{calls to global function 'isolatedF
 @FirstActor
 @objc class DefaultDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
     // nonisolated deinit
-    deinit {
+    deinit { // expected-note {{add 'isolated' to run isolated to 'FirstActor', which may be later than 'nonisolated deinit'}}
 #if !SILGEN
         isolatedFunc() // expected-error {{call to global actor 'FirstActor'-isolated global function 'isolatedFunc()' in a synchronous nonisolated context}}
 #endif
@@ -324,7 +324,7 @@ func isolatedFunc() {}  // expected-note 15{{calls to global function 'isolatedF
 @FirstActor
 @objc class NonisolatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
     // nonisolated deinit
-    nonisolated deinit {
+    nonisolated deinit { // expected-note {{marked as 'nonisolated' here}}
 #if !SILGEN
         isolatedFunc() // expected-error {{call to global actor 'FirstActor'-isolated global function 'isolatedFunc()' in a synchronous nonisolated context}}
 #endif
@@ -386,6 +386,7 @@ func isolatedFunc() {}  // expected-note 15{{calls to global function 'isolatedF
 @FirstActor
 @objc class DefaultDeinitIsolated1: BaseWithDeinitIsolatedOnFirstActor {
     // nonisolated deinit
+    // expected-note@+1 {{add 'isolated' to run isolated to 'FirstActor', which may be later than 'nonisolated deinit'}}
     deinit { // expected-error {{nonisolated deinitializer 'deinit' has different actor isolation from global actor 'FirstActor'-isolated overridden declaration}}
         isolatedFunc() // expected-error {{call to global actor 'FirstActor'-isolated global function 'isolatedFunc()' in a synchronous nonisolated context}}
     }
@@ -434,6 +435,7 @@ func isolatedFunc() {}  // expected-note 15{{calls to global function 'isolatedF
 @FirstActor
 @objc class NonisolatedDeinitIsolated1: BaseWithDeinitIsolatedOnFirstActor {
     // nonisolated deinit
+    // expected-note@+1 {{marked as 'nonisolated' here}}
     nonisolated deinit { // expected-error {{nonisolated deinitializer 'deinit' has different actor isolation from global actor 'FirstActor'-isolated overridden declaration}}
         isolatedFunc() // expected-error {{call to global actor 'FirstActor'-isolated global function 'isolatedFunc()' in a synchronous nonisolated context}}
     }
@@ -513,6 +515,7 @@ func isolatedFunc() {}  // expected-note 15{{calls to global function 'isolatedF
 @FirstActor
 @objc class NonisolatedDeinitIsolated2: BaseWithDeinitIsolatedOnSecondActor {
     // nonisolated deinit
+    // expected-note@+1 {{marked as 'nonisolated' here}}
     nonisolated deinit { // expected-error {{nonisolated deinitializer 'deinit' has different actor isolation from global actor 'SecondActor'-isolated overridden declaration}}
         isolatedFunc() // expected-error {{call to global actor 'FirstActor'-isolated global function 'isolatedFunc()' in a synchronous nonisolated context}}
     }

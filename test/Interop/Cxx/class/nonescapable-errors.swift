@@ -184,9 +184,9 @@ struct Aggregate {
   void someMethod() {}
 }; 
 
-// This is a complex record (has user-declared constructors), so we don't infer escapability.
-// By default, it's imported as escapable, which generates an error 
-// because of the non-escapable field 'View'
+// This is a complex record (has user-declared constructor), but since the copy
+// constructor is defaulted and there is no user-provided destructor, we infer
+// escapability from fields. The View field makes it non-escapable.
 struct ComplexRecord {
   int a;
   View b;
@@ -196,12 +196,38 @@ struct ComplexRecord {
   ComplexRecord(const ComplexRecord &other) = default;
 }; 
 
+// escapability is not inferred since it has a user provided copy constructor.
+struct ComplexRecord2 {
+  int a;
+  View b;
+  bool c;
+
+  ComplexRecord2() : a(1), b(), c(false) {}
+  ComplexRecord2(const ComplexRecord2 &other);
+}; 
+
+// escapability is not inferred since it has a user provided copy assignment.
+struct ComplexRecord3 {
+  int a;
+  View b;
+  bool c;
+
+  ComplexRecord3() : a(1), b(), c(false) {}
+  ComplexRecord3& operator=(const ComplexRecord3& other);
+}; 
+
 // expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 Aggregate m1();
 // expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
 
-ComplexRecord m2(); // expected-note {{'m2()' has been explicitly marked unavailable here}}
+// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
+ComplexRecord m2();
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+
+ComplexRecord2 m3(); // expected-note {{'m3()' has been explicitly marked unavailable here}}
+ComplexRecord3 m4(); // expected-note {{'m4()' has been explicitly marked unavailable here}}
 
 // expected-error@+1 {{multiple SWIFT_NONESCAPABLE annotations found on 'DoubleNonEscapableAnnotation'}}
 struct SWIFT_NONESCAPABLE SWIFT_NONESCAPABLE DoubleNonEscapableAnnotation {};
@@ -354,5 +380,7 @@ public func optional() {
 
 public func inferedEscapability() {
     m1()
-    m2() // expected-error {{'m2()' is unavailable: return type is unavailable in Swift}}
+    m2()
+    m3()  // expected-error {{'m3()' is unavailable: return type is unavailable in Swift}}
+    m4()  // expected-error {{'m4()' is unavailable: return type is unavailable in Swift}}
 }

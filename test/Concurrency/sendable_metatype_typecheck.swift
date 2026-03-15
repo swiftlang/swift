@@ -158,7 +158,7 @@ do {
 
   func test<T: Comparable>(s: S<T>) {
     compute(s, >) // expected-warning {{converting non-Sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
-    compute(s, S.test) // expected-warning {{capture of non-Sendable type 'T.Type' in an isolated closure}}
+    compute(s, S.test) // expected-warning {{converting non-Sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
   }
 }
 
@@ -203,5 +203,19 @@ func nonSendableSequence<S: AsyncSequence>(_ s: S) throws {
       // expected-warning@-1{{capture of non-Sendable type 'S.Type' in an isolated closure}}
       print(i)
     }
+  }
+}
+
+func testNonSendableMetatypeCaptures() {
+  struct Box<Wrapped> {}
+
+  func testNonSendableMetatype<T: P>(_: T) {
+    let fn = Box<T>.init // Ok
+    let _: @Sendable () -> Box<T> = fn // expected-error {{converting non-Sendable function value to '@Sendable () -> Box<T>' may introduce data races}}
+  }
+
+  func test<T: P & SendableMetatype>(_: T) {
+    let fn = Box<T>.init // Ok
+    let _: @Sendable () -> Box<T> = fn // Ok
   }
 }

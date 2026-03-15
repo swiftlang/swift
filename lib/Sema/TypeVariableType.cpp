@@ -43,6 +43,8 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
     bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToPack);
   if (isPackExpansion())
     bindingOptions.push_back(TypeVariableOptions::TVO_PackExpansion);
+  if (prefersSubtypeBinding())
+    bindingOptions.push_back(TypeVariableOptions::TVO_PrefersSubtypeBinding);
   if (!bindingOptions.empty()) {
     OS << " [can bind to: ";
     interleave(bindingOptions, OS,
@@ -118,30 +120,6 @@ bool TypeVariableType::Implementation::isKeyPathValue() const {
 bool TypeVariableType::Implementation::isKeyPathSubscriptIndex() const {
   return locator &&
          locator->isLastElement<LocatorPathElt::KeyPathSubscriptIndex>();
-}
-
-bool TypeVariableType::Implementation::isSubscriptResultType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  if (!locator->isLastElement<LocatorPathElt::FunctionResult>())
-    return false;
-
-  if (isExpr<SubscriptExpr>(locator->getAnchor()))
-    return true;
-
-  auto *KP = getAsExpr<KeyPathExpr>(locator->getAnchor());
-  if (!KP)
-    return false;
-
-  auto componentLoc = locator->findFirst<LocatorPathElt::KeyPathComponent>();
-  if (!componentLoc)
-    return false;
-
-  auto &component = KP->getComponents()[componentLoc->getIndex()];
-  return component.getKind() == KeyPathExpr::Component::Kind::Subscript ||
-         component.getKind() ==
-             KeyPathExpr::Component::Kind::UnresolvedSubscript;
 }
 
 bool TypeVariableType::Implementation::isParameterPack() const {

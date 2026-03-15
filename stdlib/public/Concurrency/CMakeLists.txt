@@ -290,6 +290,15 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   set(SWIFT_STDLIB_HAS_ASL FALSE)
   list(APPEND LLVM_OPTIONAL_SOURCES ExecutorImpl.cpp)
 
+  # Under Embedded Swift, all stdlib APIs should be available always. Replace
+  # all availability macros with an empty expansion (`*`).
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
+  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+    string(REGEX REPLACE ":.*" ":*" replaced "${def}")
+    list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
+  endforeach()
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
+
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 0 arch)
@@ -394,6 +403,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     if(NOT "${arch}" MATCHES "wasm32")
       set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
     endif()
+
+    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-${mod} ${triple})
+
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
 
     # lib/swift/embedded/<triple>/libswift_ConcurrencyDefaultExecutor.a
@@ -424,6 +436,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
     set_property(TARGET embedded-concurrency-default-executor-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+
+    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-default-executor-${mod} ${triple})
+
     add_dependencies(embedded-concurrency embedded-concurrency-default-executor-${mod})
   endforeach()
 

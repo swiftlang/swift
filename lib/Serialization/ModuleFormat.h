@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 986; // explicit module map
+const uint16_t SWIFTMODULE_VERSION_MINOR = 988; // re-order platform kinds
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1002,6 +1002,7 @@ namespace options_block {
     SWIFT_INTERFACE_COMPILER_VERSION,
     STRICT_MEMORY_SAFETY,
     DEFERRED_CODE_GEN,
+    OSLOG_STRING_SECTION_NAME,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1108,6 +1109,11 @@ namespace options_block {
 
   using PublicModuleNameLayout = BCRecordLayout<
     PUBLIC_MODULE_NAME,
+    BCBlob
+  >;
+
+  using OSLogStringSectionNameLayout = BCRecordLayout<
+    OSLOG_STRING_SECTION_NAME,
     BCBlob
   >;
 

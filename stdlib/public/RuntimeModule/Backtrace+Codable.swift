@@ -25,7 +25,7 @@ func stringFrom(sequence: some Sequence<UTF8.CodeUnit>) -> String? {
   }
 }
 
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 extension Backtrace: Codable {
 
   enum CodingKeys: CodingKey {

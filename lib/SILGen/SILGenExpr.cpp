@@ -7709,6 +7709,19 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   if (auto *LE = dyn_cast<LoadExpr>(E)) {
     LValue lv = emitLValue(LE->getSubExpr(), SGFAccessKind::IgnoredRead);
 
+    if (LE->getType()->isStructurallyUninhabited()) {
+      // If the lvalue is structurally uninhabited, we emit the load so that
+      // DI will see any uses before initialization. It should not be possible
+      // to ever really load such a value, so this should result in some sort
+      // of downstream error.
+      //
+      // Failure to do this in the past resulted in this bug:
+      // https://github.com/swiftlang/swift/issues/74478.
+
+      emitLoadOfLValue(E, std::move(lv), SGFContext::AllowImmediatePlusZero);
+      return;
+    }
+
     // If loading from the lvalue is guaranteed to have no side effects, we
     // don't need to drill into it.
     if (lv.isLoadingPure())

@@ -92,6 +92,11 @@ enum class ExtraStringFlavor : uint8_t {
   WasmImportName,
 };
 
+enum class IsNestedEncoding : uint8_t {
+  IsNotNested,
+  IsNested,
+};
+
 /// The record types within the "sil-index" block.
 ///
 /// \sa SIL_INDEX_BLOCK_ID

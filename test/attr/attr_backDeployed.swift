@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library \
-// RUN:   -define-availability "_myProject 2.0:macOS 12.0"
+// RUN:   -define-availability "_myProject 2.0:macOS 12.0" \
+// RUN:   -define-availability "_emptyMacro:*"
 
 // REQUIRES: OS=macosx
 
@@ -483,6 +484,9 @@ public func unknownMacroVersioned() {}
 
 @backDeployed(before: _unknownMacro 1.0, _myProject 2.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@backDeployed'}}
 public func knownAndUnknownMacroVersioned() {}
+
+@backDeployed(before: _emptyMacro)
+public func emptyMacro() {}
 
 @backDeployed() // expected-error {{expected 'before:' in '@backDeployed' attribute}}
 // expected-error@-1 {{expected at least one platform version in '@backDeployed' attribute}}

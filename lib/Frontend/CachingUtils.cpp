@@ -444,6 +444,45 @@ loadCachedCompileResultFromCacheKey(ObjectStore &CAS, ActionCache &Cache,
   return Buffer;
 }
 
+llvm::Expected<std::optional<llvm::cas::ObjectProxy>>
+loadCachedCompileResultProxy(llvm::cas::ObjectStore &CAS,
+                             llvm::cas::ActionCache &Cache,
+                             llvm::StringRef CacheKey, file_types::ID Kind) {
+
+  auto ID = CAS.parseID(CacheKey);
+  if (!ID)
+    return ID.takeError();
+
+  auto Ref = CAS.getReference(*ID);
+  if (!Ref)
+    return std::nullopt;
+
+  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref);
+  if (!OutputRef)
+    return OutputRef.takeError();
+
+  if (!*OutputRef)
+    return std::nullopt;
+
+  CachedResultLoader Loader(CAS, **OutputRef);
+  std::optional<llvm::cas::ObjectProxy> Result;
+  if (auto Err =
+          Loader.replay([&](file_types::ID Type, ObjectRef Ref) -> Error {
+            if (Kind != Type)
+              return Error::success();
+
+            auto Proxy = CAS.getProxy(Ref);
+            if (!Proxy)
+              return Proxy.takeError();
+
+            Result = std::move(*Proxy);
+            return Error::success();
+          }))
+    return std::move(Err);
+
+  return Result;
+}
+
 static llvm::Error createCASObjectNotFoundError(const llvm::cas::CASID &ID) {
   return createStringError(llvm::inconvertibleErrorCode(),
                            "CASID missing from Object Store " + ID.toString());

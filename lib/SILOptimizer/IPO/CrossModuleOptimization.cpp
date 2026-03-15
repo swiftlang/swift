@@ -1045,6 +1045,11 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   if (decl->getEffectiveAccess() >= AccessLevel::Package)
     return;  
 
+  // In Embedded Swift every ValueDecl is usableFromInline. (see
+  // ValueDecl::isUsableFromInline.
+  if (decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
   // This function should not be called in Package CMO mode.
   assert(!isPackageCMOEnabled(M.getSwiftModule()));
 

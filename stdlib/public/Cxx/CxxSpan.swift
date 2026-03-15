@@ -62,7 +62,7 @@ public func _cxxOverrideLifetime<
 ///
 /// C++ standard library type `std::span` conforms to this protocol.
 public protocol CxxSpan<Element> {
-  associatedtype Element
+  associatedtype Element: ~Copyable
   associatedtype Size: BinaryInteger
 
   init()
@@ -72,7 +72,7 @@ public protocol CxxSpan<Element> {
   func __dataUnsafe() -> UnsafePointer<Element>?
 }
 
-extension CxxSpan {
+extension CxxSpan where Element: ~Copyable {
   /// Creates a C++ span from a Swift UnsafeBufferPointer
   @_alwaysEmitIntoClient
   public init(_ unsafeBufferPointer: UnsafeBufferPointer<Element>) {
@@ -92,15 +92,18 @@ extension CxxSpan {
   @_alwaysEmitIntoClient
   @unsafe
   public init(_ span: Span<Element>) {
-    let (p, c) = unsafe unsafeBitCast(span, to: (UnsafeRawPointer?, Int).self)
-    unsafe precondition(p != nil, "Span should not point to nil")
-    let binding = unsafe p!.bindMemory(to: Element.self, capacity: c)
-    unsafe self.init(binding, Size(c))
+    let p = unsafe span.withUnsafeBufferPointer {
+        unsafe $0
+    }
+    defer {
+      _fixLifetime(span)
+    }
+    unsafe self.init(p)
   }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
-extension Span {
+extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @unsafe
   @_unsafeNonescapableResult
@@ -116,7 +119,7 @@ extension Span {
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
-extension MutableSpan {
+extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @unsafe
   @_unsafeNonescapableResult
@@ -132,7 +135,7 @@ extension MutableSpan {
 }
 
 public protocol CxxMutableSpan<Element> {
-  associatedtype Element
+  associatedtype Element: ~Copyable
   associatedtype Size: BinaryInteger
 
   init()
@@ -142,7 +145,7 @@ public protocol CxxMutableSpan<Element> {
   func __dataUnsafe() -> UnsafeMutablePointer<Element>?
 }
 
-extension CxxMutableSpan {
+extension CxxMutableSpan where Element: ~Copyable {
   /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
   @_alwaysEmitIntoClient
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
@@ -155,9 +158,12 @@ extension CxxMutableSpan {
   @_alwaysEmitIntoClient
   @unsafe
   public init(_ span: consuming MutableSpan<Element>) {
-    let (p, c) = unsafe unsafeBitCast(span, to: (UnsafeMutableRawPointer?, Int).self)
-    unsafe precondition(p != nil, "Span should not point to nil")
-    let binding = unsafe p!.bindMemory(to: Element.self, capacity: c)
-    unsafe self.init(binding, Size(c))
+    let p = unsafe span.withUnsafeMutableBufferPointer {
+        unsafe $0
+    }
+    defer {
+      _fixLifetime(span)
+    }
+    unsafe self.init(p)
   }
 }

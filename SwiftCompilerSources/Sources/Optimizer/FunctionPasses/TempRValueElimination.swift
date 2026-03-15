@@ -158,6 +158,11 @@ private extension AllocStackInst {
 
     liferange.insert(contentsOf: uses.ignore(usersOfType: DeallocStackInst.self).lazy.map { $0.instruction })
 
+    guard liferange.exitBlocks.isEmpty else {
+      // If there is no use on a path leaving the liverange, we don't know how the value is destroyed there.
+      return false
+    }
+
     for use in uses {
       switch use.instruction {
       case is DeallocStackInst, is DestroyAddrInst:

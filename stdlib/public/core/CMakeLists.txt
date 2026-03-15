@@ -344,6 +344,8 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ValueGene
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableParameters")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SuppressedAssociatedTypesWithDefaults")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Reparenting")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Lifetimes")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAndMutateAccessors")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
@@ -516,10 +518,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
 
   # Under Embedded Swift, all stdlib APIs should be available always. Replace
-  # all availability macros with very very old OS versions.
+  # all availability macros with an empty expansion (`*`).
   set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
   foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
-    string(REGEX REPLACE ":.*" ":macOS 10.9, iOS 7.0, watchOS 2.0, tvOS 9.0, visionOS 1.0" replaced "${def}")
+    string(REGEX REPLACE ":.*" ":*" replaced "${def}")
     list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
   endforeach()
   set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
@@ -536,6 +538,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
       set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
     endif()
+    set(swift_embedded_stdlib_extra_compile_flags)
+    if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
+      list(APPEND swift_embedded_stdlib_extra_compile_flags "-D" "SWIFT_USE_EMBEDDED_SWIFT_PLATFORM")
+    endif()
     add_swift_target_library_single(
       embedded-stdlib-${mod}
       swiftCore
@@ -544,7 +550,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       ${SWIFTLIB_EMBEDDED_SOURCES}
       GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS
-        ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded
+        ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded ${swift_embedded_stdlib_extra_compile_flags}
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"

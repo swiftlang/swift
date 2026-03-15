@@ -1,6 +1,6 @@
 // Literal expressions in integer generic parameter values
 // REQUIRES: swift_feature_LiteralExpressions
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature LiteralExpressions -disable-experimental-parser-round-trip -verify
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature LiteralExpressions -verify
 
 // =============================================================================
 // Arithmetic operators

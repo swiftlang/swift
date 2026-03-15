@@ -2,7 +2,7 @@
 // RUN: %{python} %utils/split_file.py -o %t %s
 
 // RUN: %target-swift-frontend %t/Main.swift -parse-as-library -import-bridging-header %t/BridgingHeader.h -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip -pthreads
+// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o %target-embedded-posix-shim -o %t/a.out -dead_strip -pthreads
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler

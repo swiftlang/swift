@@ -506,6 +506,7 @@ class CompilerInstance {
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   std::shared_ptr<llvm::cas::ActionCache> ResultCache;
   std::optional<llvm::cas::ObjectRef> CompileJobBaseKey;
+  std::string CASIDForPCH;
 
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
