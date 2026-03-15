@@ -121,17 +121,17 @@ class ThisDerived1 : ThisBase1 {
     var bec1 : BaseExtNestedClass
     var beo1 : BaseExtNestedUnion = .BaseExtUnionX(42)
     var bet1 : BaseExtNestedTypealias
-    var bes2 = self.BaseExtNestedStruct() // expected-error{{static member 'BaseExtNestedStruct' cannot be used on instance of type 'ThisDerived1'}}
-    var bec2 = self.BaseExtNestedClass() // expected-error{{static member 'BaseExtNestedClass' cannot be used on instance of type 'ThisDerived1'}}
+    var bes2 = self.BaseExtNestedStruct() // expected-error{{static member 'BaseExtNestedStruct' can only be used on the type 'ThisDerived1', not on the instance self}}
+    var bec2 = self.BaseExtNestedClass() // expected-error{{static member 'BaseExtNestedClass' can only be used on the type 'ThisDerived1', not on the instance self}}
     var beo2 = self.BaseExtUnionX(24) // expected-error {{value of type 'ThisDerived1' has no member 'BaseExtUnionX'}}
-    var beo3 = self.BaseExtNestedUnion.BaseExtUnionX(24) // expected-error{{static member 'BaseExtNestedUnion' cannot be used on instance of type 'ThisDerived1'}}
-    var bet2 = self.BaseExtNestedTypealias(42) // expected-error{{static member 'BaseExtNestedTypealias' cannot be used on instance of type 'ThisDerived1'}}
+    var beo3 = self.BaseExtNestedUnion.BaseExtUnionX(24) // expected-error{{static member 'BaseExtNestedUnion' can only be used on the type 'ThisDerived1', not on the instance self}}
+    var bet2 = self.BaseExtNestedTypealias(42) // expected-error{{static member 'BaseExtNestedTypealias' can only be used on the type 'ThisDerived1', not on the instance self}}
 
     self.derivedInstanceVar = 42
     self.derivedProp = 42
     self.derivedFunc0()
-    self.derivedStaticVar = 42 // expected-error {{static member 'derivedStaticVar' cannot be used on instance of type 'ThisDerived1'}}
-    self.derivedStaticProp = 42 // expected-error {{static member 'derivedStaticProp' cannot be used on instance of type 'ThisDerived1'}}
+    self.derivedStaticVar = 42 // expected-error {{static member 'derivedStaticVar' can only be used on the type 'ThisDerived1', not on the instance self}}
+    self.derivedStaticProp = 42 // expected-error {{static member 'derivedStaticProp' can only be used on the type 'ThisDerived1', not on the instance self}}
     self.derivedStaticFunc0() // expected-error {{static member 'derivedStaticFunc0' can only be used on the type 'ThisDerived1', not on the instance self}}
 
     self.derivedExtProp = 42
@@ -186,7 +186,7 @@ class ThisDerived1 : ThisBase1 {
     var bt2 = super.BaseNestedTypealias(42) // expected-error{{static member 'BaseNestedTypealias' can only be used on the type 'ThisBase1', not on the instance super}}
 
     var bes2 = super.BaseExtNestedStruct() // expected-error{{static member 'BaseExtNestedStruct' can only be used on the type 'ThisBase1', not on the instance super}}
-    var bec2 = super.BaseExtNestedClass() // expected-error{{static member 'BaseExtNestedClass' can only be used on the type 'ThisBase1', not on the instancesuper}}
+    var bec2 = super.BaseExtNestedClass() // expected-error{{static member 'BaseExtNestedClass' can only be used on the type 'ThisBase1', not on the instance super}}
     var beo2 = super.BaseExtUnionX(24) // expected-error {{value of type 'ThisBase1' has no member 'BaseExtUnionX'}}
     var beo3 = super.BaseExtNestedUnion.BaseExtUnionX(24) // expected-error{{static member 'BaseExtNestedUnion' can only be used on the type 'ThisBase1', not on the instance super}}
     var bet2 = super.BaseExtNestedTypealias(42) // expected-error{{static member 'BaseExtNestedTypealias' can only be used on the type 'ThisBase1', not on the instance super}}
