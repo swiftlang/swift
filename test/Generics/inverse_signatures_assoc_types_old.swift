@@ -15,22 +15,22 @@ protocol P2_IC: ~Copyable { associatedtype A }
 
 // CHECK-LABEL: .P2_CI@
 // CHECK: Requirement signature: <Self where Self : Copyable, Self : Escapable, Self.[P2_CI]A : Escapable>
-protocol P2_CI { associatedtype A: ~Copyable }
+protocol P2_CI { associatedtype A: ~Copyable } // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
 
 // CHECK-LABEL: .P2_II@
 // CHECK: Requirement signature: <Self where Self : Escapable, Self.[P2_II]A : Escapable>
-protocol P2_II: ~Copyable { associatedtype A: ~Copyable }
+protocol P2_II: ~Copyable { associatedtype A: ~Copyable } // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
 
 // CHECK-LABEL: .P3@
 // CHECK: Requirement signature: <Self where Self.[P3]B : Copyable>
-protocol P3 where Self: (~Copyable & ~Escapable) { associatedtype B: ~Escapable }
+protocol P3 where Self: (~Copyable & ~Escapable) { associatedtype B: ~Escapable }  // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
 
 // CHECK-LABEL: .P4@
 // CHECK: Requirement signature: <Self where Self : Copyable, Self.[P4]B : Copyable, Self.[P4]C : Escapable>
 protocol P4<B, D>: ~Escapable {
-  associatedtype B: ~Escapable
-  associatedtype C: ~Copyable
-  associatedtype D: ~Escapable, ~Copyable
+  associatedtype B: ~Escapable  // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
+  associatedtype C: ~Copyable   // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
+  associatedtype D: ~Escapable, ~Copyable   // expected-warning 2{{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
 }
 
 // CHECK-LABEL: .test3@

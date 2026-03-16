@@ -97,6 +97,8 @@ WARNING(warning_option_requires_specific_sanitizer, none,
 
 ERROR(error_option_missing_required_argument, none,
       "option '%0' is missing a required argument (%1)", (StringRef, StringRef))
+ERROR(error_option_missing_required_output_kind, none,
+      "option '%0' is missing required '%1' output", (StringRef, StringRef))
 
 ERROR(cannot_open_file,none,
       "cannot open file '%0' (%1)", (StringRef, StringRef))

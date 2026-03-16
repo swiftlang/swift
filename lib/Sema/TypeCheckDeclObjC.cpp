@@ -3565,6 +3565,7 @@ private:
     WrongWritability,
     WrongRequiredAttr,
     WrongForeignErrorConvention,
+    WrongParameterOwnership,
     WrongSendability,
 
     Match,
@@ -3897,10 +3898,17 @@ private:
       if (reqCtor->isRequired() != cast<ConstructorDecl>(cand)->isRequired())
         return MatchOutcome::WrongRequiredAttr;
 
-    if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req))
+    if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req)) {
+      auto candAFD = cast<AbstractFunctionDecl>(cand);
       if (reqAFD->getForeignErrorConvention() !=
-              cast<AbstractFunctionDecl>(cand)->getForeignErrorConvention())
+          candAFD->getForeignErrorConvention())
         return MatchOutcome::WrongForeignErrorConvention;
+      for (auto [reqParam, candParam] :
+           llvm::zip(*reqAFD->getParameters(), *candAFD->getParameters())) {
+        if (reqParam->getValueOwnership() != candParam->getValueOwnership())
+          return MatchOutcome::WrongParameterOwnership;
+      }
+    }
 
     // If we got here, everything matched. But at what quality?
     if (explicitObjCName)
@@ -4017,6 +4025,10 @@ private:
     case MatchOutcome::WrongType:
       diagnose(cand, diag::objc_implementation_type_mismatch,
                cand, getMemberType(cand), getMemberType(req));
+      return;
+
+    case MatchOutcome::WrongParameterOwnership:
+      diagnose(cand, diag::objc_implementation_ownership_mismatch, cand);
       return;
 
     case MatchOutcome::WrongWritability:

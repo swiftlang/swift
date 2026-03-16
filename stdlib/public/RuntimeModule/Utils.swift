@@ -162,7 +162,7 @@ func realPath(_ path: String) -> String? {
 
 #if os(Linux)
 @_spi(Utils)
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 public func readString(from file: String) -> String? {
   let fd = open(file, O_RDONLY, 0)
   if fd < 0 {
@@ -190,7 +190,7 @@ public func readString(from file: String) -> String? {
 #endif
 
 @_spi(Utils)
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 public func stripWhitespace<S: StringProtocol>(_ s: S)
     -> S.SubSequence {
   guard let firstNonWhitespace = s.firstIndex(where: { !$0.isWhitespace })

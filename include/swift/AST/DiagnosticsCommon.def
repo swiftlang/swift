@@ -281,7 +281,7 @@ ERROR(lookup_outputs_dont_match,none,
 //------------------------------------------------------------------------------
 
 ERROR(borrow_mutate_accessor_not_supported_in_decl, none,
-      "%0 is supported only on a struct", (StringRef))      
+      "%0 is unsupported here", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: bridged diagnostics

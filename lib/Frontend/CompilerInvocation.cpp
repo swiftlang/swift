@@ -1132,10 +1132,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (!isValid)
       diagnoseSwiftVersion(vers, A, Args, Diags);
   } else if (FrontendOpts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
-    Diags.diagnose({}, diag::error_module_interface_requires_language_mode)
-        .limitBehavior(DiagnosticBehavior::Warning);
-    // FIXME: Make this an error again (rdar://145168219)
-    // HadError = true;
+    Diags.diagnose({}, diag::error_module_interface_requires_language_mode);
+    HadError = true;
   }
 
   if (auto A = Args.getLastArg(OPT_min_swift_runtime_version)) {
@@ -2139,6 +2137,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_transitive_conformance,
                    Opts.SolverEnableTransitiveConformance);
 
+  Opts.SolverEnableBindingOptimizations =
+      Args.hasFlag(OPT_solver_enable_binding_optimizations,
+                   OPT_solver_disable_binding_optimizations,
+                   Opts.SolverEnableBindingOptimizations);
+
   Opts.SolverEnablePreparedOverloads =
       Args.hasFlag(OPT_solver_enable_prepared_overloads,
                    OPT_solver_disable_prepared_overloads,
@@ -2753,6 +2756,18 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
 
+  auto enablesSyntacticWarningControl = [&](const Arg *A) {
+    if (!A->getOption().matches(options::OPT_enable_experimental_feature))
+      return false;
+    if (auto feature = Feature::getExperimentalFeature(A->getValue())) {
+      return feature == Feature::InnerKind::SourceWarningControl;
+    }
+    return false;
+  };
+  if (llvm::any_of(Args, enablesSyntacticWarningControl)) {
+    Opts.CheckSyntacticControls = true;
+  }
+
   for (Arg *A : Args.filtered(OPT_verify_additional_file))
     Opts.AdditionalVerifierFiles.push_back(A->getValue());
   for (Arg *A : Args.filtered(OPT_verify_additional_prefix))
@@ -2910,6 +2925,9 @@ static void configureDiagnosticEngine(
   if (Options.ShowDiagnosticsAfterFatalError) {
     Diagnostics.setShowDiagnosticsAfterFatalError();
   }
+  if (Options.CheckSyntacticControls) {
+    Diagnostics.setCheckSyntacticControls();
+  }
   if (Options.SuppressWarnings) {
     Diagnostics.setSuppressWarnings(true);
   }
@@ -2928,6 +2946,12 @@ static void configureDiagnosticEngine(
     docsPath = "https://docs.swift.org/compiler/documentation/diagnostics";
   }
   Diagnostics.setDiagnosticDocumentationPath(docsPath);
+
+  llvm::SmallString<128> localDocsPath(mainExecutablePath);
+  llvm::sys::path::remove_filename(localDocsPath); // Remove /swift-frontend
+  llvm::sys::path::remove_filename(localDocsPath); // Remove /bin
+  llvm::sys::path::append(localDocsPath, "share", "doc", "swift", "diagnostics");
+  Diagnostics.setLocalDiagnosticDocumentationPath(std::string(localDocsPath));
 
   if (!Options.LocalizationCode.empty()) {
     std::string locPath = Options.LocalizationPath;
@@ -3621,9 +3645,25 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
-  if (const Arg *A = Args.getLastArg(options::OPT_debug_module_path))
-    Opts.DebugModulePath = A->getValue();
-  
+  if (auto *A =
+          Args.getLastArg(OPT_debug_module_path, OPT_debug_module_self_key)) {
+    if (A->getOption().matches(OPT_debug_module_self_key)) {
+      if (!FrontendOpts.InputsAndOutputs.hasModuleOutputPath())
+        Diags.diagnose(SourceLoc(),
+                       diag::error_option_missing_required_output_kind,
+                       A->getAsString(Args), "swiftmodule");
+      if (!Args.hasArg(OPT_cache_compile_job))
+        Diags.diagnose(SourceLoc(),
+                       diag::error_option_missing_required_argument,
+                       A->getAsString(Args), "-cache-compile-job");
+      Opts.DebugModuleSelfKey = true;
+    } else
+      Opts.DebugModulePath = A->getValue();
+  }
+
+  if (Opts.DebugModuleSelfKey || !Opts.DebugModulePath.empty())
+    Opts.BridgingPCHCacheKey = CASOpts.BridgingHeaderPCHCacheKey;
+
   for (auto A : Args.getAllArgValues(options::OPT_file_prefix_map)) {
     auto SplitMap = StringRef(A).split('=');
     Opts.FilePrefixMap.addMapping(SplitMap.first, SplitMap.second);
@@ -3848,7 +3888,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =
         parseSanitizerCoverageArgValue(A, Triple, Diags, Opts.Sanitizers);
-  } else if (Opts.Sanitizers & SanitizerKind::Fuzzer) {
+  } else if ((Opts.Sanitizers & SanitizerKind::Fuzzer) ||
+             (Opts.Sanitizers & SanitizerKind::FuzzerNoLink)) {
 
     // Automatically set coverage flags, unless coverage type was explicitly
     // requested.

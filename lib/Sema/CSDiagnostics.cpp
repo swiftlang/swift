@@ -27,6 +27,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -44,6 +45,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -869,6 +871,7 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_Unused:
   case CTP_YieldByReference:
   case CTP_EnumCaseRawValue:
+  case CTP_IntGenericParam:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
     break;
@@ -2956,6 +2959,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
     return std::nullopt;
 
   case CTP_EnumCaseRawValue:
+  case CTP_IntGenericParam:
     return diag::cannot_convert_raw_initializer_value_nil;
   case CTP_DefaultParameter:
   case CTP_AutoclosureDefaultParameter:
@@ -3720,6 +3724,7 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
                        : diag::cannot_convert_to_return_type;
   }
   case CTP_EnumCaseRawValue:
+  case CTP_IntGenericParam:
     return diag::cannot_convert_raw_initializer_value;
   case CTP_DefaultParameter:
   case CTP_AutoclosureDefaultParameter:
@@ -4245,10 +4250,8 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
     } else if (cxxMethod->getReturnType()->isRecordType()) {
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(
               cxxMethod->getReturnType()->getAsRecordDecl())) {
-        // `importerImpl` is set to nullptr here to avoid diagnostics during
-        // this CxxRecordSemantics evaluation.
         auto methodSemantics = evaluateOrDefault(
-            ctx.evaluator, CxxRecordSemantics({cxxRecord, ctx, nullptr}), {});
+            ctx.evaluator, CxxRecordSemantics({cxxRecord, ctx}), {});
         if (methodSemantics == CxxRecordSemanticsKind::Iterator) {
           ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                              name.getBaseIdentifier().str());
@@ -6253,8 +6256,8 @@ bool ExtraneousArgumentsFailure::diagnoseAsNote() {
                      (numArgs == 1));
   } else {
     emitDiagnosticAt(decl, diag::candidate_with_extraneous_args,
-                     overload->adjustedOpenedType, numArgs, ContextualType,
-                     ContextualType->getNumParams());
+                     resolveType(overload->adjustedOpenedType), numArgs,
+                     ContextualType, ContextualType->getNumParams());
   }
   return true;
 }
@@ -6618,6 +6621,16 @@ bool InvalidPackExpansion::diagnoseAsError() {
     if (auto argInfo = getFunctionArgApplyInfo(locator)) {
       emitDiagnostic(diag::invalid_expansion_argument,
                      argInfo->getParamInterfaceType());
+      // If the pack expansion is being passed to a param that expects a tuple
+      // containing a pack, note this and add a fix-it.
+      if (auto tuple = argInfo->getParamInterfaceType()->getAs<TupleType>()) {
+        if (containsPackExpansionType(tuple)) {
+          auto range = getSourceRange();
+          emitDiagnostic(diag::did_you_mean_tuple_pack_expansion)
+              .fixItInsert(range.Start, "(")
+              .fixItInsertAfter(range.End, ")");
+        }
+      }
       return true;
     }
   }

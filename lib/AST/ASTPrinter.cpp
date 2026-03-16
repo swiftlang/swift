@@ -15,7 +15,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "FeatureSet.h"
-#include "InlinableText.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -2447,6 +2447,58 @@ bool isNonSendableExtension(const Decl *D) {
 
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
+  // Skip constructors defined in Objective-C categories that are not
+  // publicly imported according to the interface type being generated
+  if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
+    if (CD->isImplicit() && Options.IsForSwiftInterface &&
+        Options.CurrentModule) {
+      // For inherited constructors, check the original declaration
+      auto *checkDecl = CD;
+      if (auto *overridden = CD->getOverriddenDecl()) {
+        checkDecl = overridden;
+      }
+      auto definingModule = checkDecl->getModuleContext();
+      // Check how the defining module is imported
+      if (auto *SF = CD->getDeclContext()->getParentSourceFile()) {
+        // Don't check import status for self-imports
+        if (definingModule != SF->getParentModule()) {
+          auto restrictedKind = SF->getRestrictedImportKind(definingModule);
+          switch (restrictedKind) {
+          // MissingImport and ImplementationOnly: skip in all interfaces
+          case RestrictedImportKind::MissingImport:
+          case RestrictedImportKind::ImplementationOnly:
+            return false;
+          // SPIOnly: skip in public interfaces
+          case RestrictedImportKind::SPIOnly:
+            if (Options.printPublicInterface())
+              return false;
+            break;
+          case RestrictedImportKind::None:
+            break;
+          }
+          // Check access level
+          if (auto importAccess = SF->getImportAccessLevel(definingModule)) {
+            auto accessLevel = importAccess->accessLevel;
+            switch (accessLevel) {
+            // Internal and below: skip in all interfaces
+            case AccessLevel::Private:
+            case AccessLevel::FilePrivate:
+            case AccessLevel::Internal:
+              return false;
+            // Package: skip in non-package interfaces only
+            case AccessLevel::Package:
+              if (!Options.printPackageInterface())
+                return false;
+              break;
+            default:
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
@@ -2655,6 +2707,31 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   bool PrintAbstract =
     Options.AbstractAccessors && !Options.FunctionDefinitions;
 
+  // For var decls, if it has an initializer, the parser only expects observing
+  // accessors. But sometimes for example in '.swiftinterface', we want to print
+  // both the initializer and the accessors. So when we print the initializer
+  // *and* the accessor block not starting with willSet/didSet, print an
+  // attribute as a disambiguation marker.
+  auto printDisambiguationMarkerIfNeeded = [&]() {
+    auto *VD = dyn_cast<VarDecl>(ASD);
+    if (!VD)
+      return;
+    auto *PBD = VD->getParentPatternBinding();
+    if (!PBD)
+      return;
+    auto i = PBD->getPatternEntryIndexForVarDecl(VD);
+
+    bool needsDisambiguationAttr = false;
+    if (Options.PrintExprs) {
+      needsDisambiguationAttr |= bool(PBD->getInit(i));
+    } else if (Options.VarInitializers) {
+      needsDisambiguationAttr |= bool(PBD->hasInitStringRepresentation(i) &&
+                                      VD->isInitExposedToClients());
+    }
+    if (needsDisambiguationAttr)
+      Printer << " @_accessorBlock";
+  };
+
   // Don't print accessors for trivially stored properties...
   if (impl.isSimpleStored()) {
     // ...unless we're printing for SIL, which expects a { get set? } on
@@ -2666,10 +2743,11 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     // ...or you're private/internal(set), at which point we'll print
     //    @_hasStorage var x: T { get }
     else if (ASD->isSettable(nullptr) && hasLessAccessibleSetter(ASD)) {
+      Printer << " {";
+      printDisambiguationMarkerIfNeeded();
       if (PrintAbstract) {
-        Printer << " { get }";
+        Printer << " get }";
       } else {
-        Printer << " {";
         {
           IndentRAII indentMore(*this);
           indent();
@@ -2876,28 +2954,9 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 
   Printer << " {";
 
-  // For var decls, if it has an initializer, the parser only expects observing
-  // accessors. But sometimes for example in '.swiftinterface', we want to print
-  // both the initializer and the accessors. So when we print the initializer
-  // *and* the accessor block not starting with willSet/didSet, print an
-  // attribute as a disambiguation marker.
-  bool needsDisambiguationAttr = false;
-  if (auto *VD = dyn_cast<VarDecl>(ASD)) {
-    if (auto *PBD = VD->getParentPatternBinding()) {
-      if (accessorsToPrint.empty() ||
-          !accessorsToPrint.front()->isObservingAccessor()) {
-        const auto i = PBD->getPatternEntryIndexForVarDecl(VD);
-        if (Options.PrintExprs) {
-          needsDisambiguationAttr |= bool(PBD->getInit(i));
-        } else if (Options.VarInitializers) {
-          needsDisambiguationAttr |= bool(PBD->hasInitStringRepresentation(i) &&
-                                          VD->isInitExposedToClients());
-        }
-      }
-    }
-  }
-  if (needsDisambiguationAttr) {
-    Printer << " @_accessorBlock";
+  if (accessorsToPrint.empty() ||
+      !accessorsToPrint.front()->isObservingAccessor()) {
+    printDisambiguationMarkerIfNeeded();
   }
 
   // If we're not printing the accessor bodies and none of the accessors have

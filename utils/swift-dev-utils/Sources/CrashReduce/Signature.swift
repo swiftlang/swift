@@ -13,7 +13,7 @@
 import Synchronization
 
 public final class Signature: Sendable {
-  let symbol: String?
+  let symbols: [String]
   let assertion: Assertion?
 
   private let _short = Mutex<ShortSignature??>(nil)
@@ -36,17 +36,21 @@ public final class Signature: Sendable {
     }
   }
 
-  init(symbol: String?, assertion: Assertion?) {
-    self.symbol = symbol
+  init(symbols: [String], assertion: Assertion?) {
+    self.symbols = symbols
     self.assertion = assertion
   }
 
   public static func assertion(_ assert: Assertion) -> Self {
-    .init(symbol: nil, assertion: assert)
+    .init(symbols: [], assertion: assert)
   }
 
-  public static func symbol(_ sym: String, assert: Assertion?) -> Self {
-    .init(symbol: sym, assertion: assert)
+  public static func symbols(_ syms: [String], assert: Assertion?) -> Self {
+    .init(symbols: syms, assertion: assert)
+  }
+
+  public var symbol: String? {
+    symbols.first
   }
 
   public var isAssertion: Bool {
@@ -56,12 +60,10 @@ public final class Signature: Sendable {
 
 extension Signature: Hashable {
   public static func == (lhs: Signature, rhs: Signature) -> Bool {
-    lhs.symbol == rhs.symbol && lhs.assertion == rhs.assertion
+    lhs.symbols == rhs.symbols && lhs.assertion == rhs.assertion
   }
   public func hash(into hasher: inout Hasher) {
-    if let symbol {
-      hasher.combine(symbol)
-    }
+    hasher.combine(symbols)
     if let assertion {
       hasher.combine(assertion)
     }
@@ -70,26 +72,28 @@ extension Signature: Hashable {
 
 extension Signature: Comparable {
   public static func < (lhs: Signature, rhs: Signature) -> Bool {
-    (lhs.symbol ?? "", lhs.assertion?.fullMessage ?? "") <
-      (rhs.symbol ?? "", rhs.assertion?.fullMessage ?? "")
+    if lhs.symbols != rhs.symbols {
+      return lhs.symbols.lexicographicallyPrecedes(rhs.symbols)
+    }
+    return lhs.assertion?.fullMessage ?? "" < rhs.assertion?.fullMessage ?? ""
   }
 }
 
 extension Signature: Codable {
   enum CodingKeys: String, CodingKey {
-    case symbol, assertion
+    case symbols, assertion
   }
   public convenience init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.init(
-      symbol: try container.decodeIfPresent(String.self, forKey: .symbol),
+      symbols: try container.decodeIfPresent([String].self, forKey: .symbols) ?? [],
       assertion:  try container.decodeIfPresent(Assertion.self, forKey: .assertion)
     )
   }
 
   public func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encodeIfPresent(symbol, forKey: .symbol)
+    try container.encodeIfPresent(symbols, forKey: .symbols)
     try container.encodeIfPresent(assertion, forKey: .assertion)
   }
 }

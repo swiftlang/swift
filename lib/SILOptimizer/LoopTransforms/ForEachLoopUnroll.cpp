@@ -668,7 +668,7 @@ class ForEachLoopUnroller : public SILFunctionTransform {
     if (!fun.hasOwnership())
       return;
 
-    InstructionDeleter deleter;
+    InstructionDeleter deleter(/*assumeFixedLifetimes=*/ false);
     for (SILBasicBlock &bb : fun) {
       for (auto instIter = bb.begin(); instIter != bb.end();) {
         SILInstruction *inst = &*instIter;

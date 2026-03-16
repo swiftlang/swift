@@ -3195,7 +3195,8 @@ public:
   /// \sa hasOpenAccess
   AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr,
-                       bool treatUsableFromInlineAsPublic = false) const;
+                       bool treatUsableFromInlineAsPublic = false,
+                       bool ignoreImportAccessLevel = false) const;
 
 
   /// Copy the formal access level and @usableFromInline attribute from
@@ -8364,6 +8365,9 @@ public:
         ->getImplicitSelfDecl(createIfNeeded);
   }
   ParamDecl *getImplicitSelfDecl(bool createIfNeeded=true);
+
+  /// Whether the function is a non-static method.
+  bool isInstanceMethod() const { return hasImplicitSelfDecl() && !isStatic(); }
 
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const {

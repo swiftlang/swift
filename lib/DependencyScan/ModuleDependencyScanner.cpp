@@ -481,11 +481,6 @@ SwiftDependencyTracker::SwiftDependencyTracker(
   StringRef AccessNotePath = CI.getLangOptions().AccessNotesPath;
   if (!AccessNotePath.empty())
     addCommonFile(AccessNotePath);
-
-  // const-gather-protocols-file
-  StringRef ConstProtocolFile = SearchPathOpts.ConstGatherProtocolListFilePath;
-  if (!ConstProtocolFile.empty())
-    addCommonFile(ConstProtocolFile);
 }
 
 void SwiftDependencyTracker::startTracking(bool includeCommonDeps) {
@@ -1499,29 +1494,32 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
         }
       };
 
-  // Enque asynchronous lookup tasks
-  for (const auto &dependsOn : moduleDependencyInfo.getModuleImports()) {
-    // Avoid querying the underlying Clang module here
-    if (moduleID.ModuleName == dependsOn.importIdentifier)
-      continue;
+  llvm::StringSet<> enquedIdentifiers;
+  auto enqueIfNeeded = [&](const ScannerImportStatementInfo &importInfo) {
+    // Avoid querying the underlying Clang module
+    if (moduleID.ModuleName == importInfo.importIdentifier)
+      return;
     // Avoid querying Swift module dependencies previously looked up
-    if (DependencyCache.hasQueriedSwiftDependency(dependsOn.importIdentifier))
-      continue;
+    if (DependencyCache.hasQueriedSwiftDependency(importInfo.importIdentifier))
+      return;
+    // If we have already enqued this module here, avoid doing it
+    // again. For example, if there's an optional import with the
+    // same identifier as a non-optional import
+    if (!enquedIdentifiers.insert(importInfo.importIdentifier).second)
+      return;
+
     ScanningThreadPool.async(
         scanForSwiftModuleDependency,
-        getModuleImportIdentifier(dependsOn.importIdentifier),
-        moduleDependencyInfo.isTestableImport(dependsOn.importIdentifier));
-  }
-  for (const auto &dependsOn :
-       moduleDependencyInfo.getOptionalModuleImports()) {
-    // Avoid querying the underlying Clang module here
-    if (moduleID.ModuleName == dependsOn.importIdentifier)
-      continue;
-    ScanningThreadPool.async(
-        scanForSwiftModuleDependency,
-        getModuleImportIdentifier(dependsOn.importIdentifier),
-        moduleDependencyInfo.isTestableImport(dependsOn.importIdentifier));
-  }
+        getModuleImportIdentifier(importInfo.importIdentifier),
+        moduleDependencyInfo.isTestableImport(importInfo.importIdentifier));
+  };
+
+  // Enque asynchronous lookup tasks
+  for (const auto &dependsOn : moduleDependencyInfo.getModuleImports())
+    enqueIfNeeded(dependsOn);
+  for (const auto &dependsOn : moduleDependencyInfo.getOptionalModuleImports())
+    enqueIfNeeded(dependsOn);
+
   ScanningThreadPool.wait();
 
   auto recordResolvedModuleImport =
@@ -1820,6 +1818,24 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
   discoverCrossImportOverlayFiles(DependencyCache, ScanASTContext, newOverlays,
                                   overlayFiles);
 
+  auto mainModuleID = ModuleDependencyID{DependencyCache.getMainModuleName().str(),
+                                         ModuleDependencyKind::SwiftSource};
+
+  // Update the command-line on the main module to disable implicit
+  // cross-import overlay search.
+  auto mainModuleInfo = DependencyCache.findKnownDependency(mainModuleID);
+  std::vector<std::string> cmdCopy = mainModuleInfo.getCommandline();
+  cmdCopy.push_back("-disable-cross-import-overlay-search");
+  for (auto &entry : overlayFiles) {
+    mainModuleInfo.addAuxiliaryFile(entry.second);
+    cmdCopy.push_back("-swift-module-cross-import");
+    cmdCopy.push_back(entry.first);
+    auto overlayPath = remapPath(entry.second);
+    cmdCopy.push_back(overlayPath);
+  }
+  mainModuleInfo.updateCommandLine(cmdCopy);
+  DependencyCache.updateDependency(mainModuleID, mainModuleInfo);
+
   // No new cross-import overlays are found, return.
   if (newOverlays.empty())
     return;
@@ -1830,8 +1846,6 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
       "_" + DependencyCache.getMainModuleName().str() + "-CrossImportOverlays";
   auto queryModuleID = ModuleDependencyID{batchCrossImportQueryModuleName,
                                         ModuleDependencyKind::SwiftSource};
-  auto mainModuleID = ModuleDependencyID{DependencyCache.getMainModuleName().str(),
-                                         ModuleDependencyKind::SwiftSource};
   auto queryModuleInfo = ModuleDependencyInfo::forSwiftSourceModule();
   llvm::for_each(
       newOverlays, [&](Identifier modName) {
@@ -1856,21 +1870,6 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
   // Update main module's dependencies to include these new overlays.
   DependencyCache.setCrossImportOverlayDependencies(
       mainModuleID, DependencyCache.getAllDependencies(queryModuleID));
-
-  // Update the command-line on the main module to disable implicit
-  // cross-import overlay search.
-  auto mainModuleInfo = DependencyCache.findKnownDependency(mainModuleID);
-  std::vector<std::string> cmdCopy = mainModuleInfo.getCommandline();
-  cmdCopy.push_back("-disable-cross-import-overlay-search");
-  for (auto &entry : overlayFiles) {
-    mainModuleInfo.addAuxiliaryFile(entry.second);
-    cmdCopy.push_back("-swift-module-cross-import");
-    cmdCopy.push_back(entry.first);
-    auto overlayPath = remapPath(entry.second);
-    cmdCopy.push_back(overlayPath);
-  }
-  mainModuleInfo.updateCommandLine(cmdCopy);
-  DependencyCache.updateDependency(mainModuleID, mainModuleInfo);
 
   // Report any discovered modules to the clients, which include all overlays
   // and their dependencies.

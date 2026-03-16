@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticArgument.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -43,7 +44,16 @@ DiagnosticArgument::DiagnosticArgument(const Decl *VD)
     : Kind(DiagnosticArgumentKind::Decl), TheDecl(VD) {}
 
 DiagnosticArgument::DiagnosticArgument(Type T)
-    : Kind(DiagnosticArgumentKind::Type), TypeVal(T) {}
+    : Kind(DiagnosticArgumentKind::Type), TypeVal(T) {
+  // Make sure we fold away any potentially solver-allocated types since this
+  // diagnostic may be captured by a DiagnosticTransaction and escape the solver
+  // arena. Ideally we'd assert that we never get solver-allocated types here,
+  // but unfortunately type resolution can end up passing types with type
+  // variables to diagnostics and we can't realistically handle every one of
+  // those. We'll just print the type variable as '_' instead.
+  if (TypeVal)
+    TypeVal = TypeVal->replaceTypeVariablesAndPlaceholdersWithErrors();
+}
 
 DiagnosticArgument::DiagnosticArgument(TypeRepr *T)
     : Kind(DiagnosticArgumentKind::TypeRepr), TyR(T) {}

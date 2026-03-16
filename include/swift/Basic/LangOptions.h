@@ -450,9 +450,6 @@ namespace swift {
     bool EnableDeserializationSafety =
       ::getenv("SWIFT_ENABLE_DESERIALIZATION_SAFETY");
 
-    /// Disable injecting deserializes module paths into the explict module map.
-    bool DisableDeserializationOfExplicitPaths = false;
-
     /// Attempt to recover for imported modules with broken modularization
     /// in an unsafe way. Currently applies only to xrefs where the target
     /// decl moved to a different module that is already loaded.
@@ -525,6 +522,10 @@ namespace swift {
     /// opening files under sourcekitd on Windows, as memory mapping on Windows
     /// prevents files from being written.
     bool OpenSourcesAsVolatile = false;
+
+    /// Whether the AST is being built for SourceKit.
+    /// FIXME: Eliminate this, it's a layering violation.
+    bool IsForSourceKit = false;
 
     /// Load swiftmodule files in memory as volatile and avoid mmap.
     bool EnableVolatileModules = false;
@@ -682,6 +683,10 @@ namespace swift {
 #else
     bool RestrictNonProductionExperimentalFeatures = false;
 #endif
+
+    /// The section and segment name to use for OSLog strings.
+    mutable std::string OSLogStringSectionName =
+        "__TEXT,__oslogstring,cstring_literals";
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
@@ -1026,6 +1031,9 @@ namespace swift {
 
     /// Enable generation of transitive conformance constraints.
     bool SolverEnableTransitiveConformance = true;
+
+    /// Enable experimental optimization to speed up binding of type variables.
+    bool SolverEnableBindingOptimizations = true;
 
     /// Enable experimental optimization to skip contradictory disjunction
     /// choices.

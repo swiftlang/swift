@@ -265,6 +265,23 @@ bb0:
   return %6 : $()
 }
 
+// CHECK-LABEL: sil @test_alloc_ref_non_nested : $@convention(thin) () -> () {
+sil @test_alloc_ref_non_nested : $@convention(thin)  () -> () {
+bb0:
+  // CHECK: %0 = alloc_ref [stack] [non_nested] $C
+  %0 = alloc_ref [stack] [non_nested] $C
+  dealloc_stack_ref %0
+
+  %2 = metatype $@thick C.Type
+
+  // CHECK: %3 = alloc_ref_dynamic [stack] [non_nested] %2 : $@thick C.Type, $C
+  %3 = alloc_ref_dynamic [stack] [non_nested] %2 : $@thick C.Type, $C
+  dealloc_stack_ref %3
+
+  %result = tuple ()
+  return %result
+}
+
 sil @optional_upcasts : $@convention(thin) (Optional<D>) -> () {
 bb0(%0: $Optional<D>):
   // CHECK: upcast {{.*}} : $Optional<D> to $Optional<C>
@@ -1028,6 +1045,17 @@ bb0(%0 : $Float):
   // CHECK: partial_apply %{{.*}}(%{{.*}}) : $@convention(thin) (Int, Float) -> ()
   %2 = partial_apply %1(%0) : $@convention(thin) (Int, Float) -> ()
   return %2 : $@callee_owned (Int) -> ()
+}
+
+// CHECK-LABEL: sil @test_partial_apply_non_nested : $@convention(thin) (Float) -> () {
+sil @test_partial_apply_non_nested : $@convention(thin)  (Float) -> () {
+bb0(%0 : $Float):
+  %1 = function_ref @takes_int64_float32 : $@convention(thin) (Int, Float) -> ()
+  // CHECK: partial_apply [on_stack] [non_nested] %{{.*}}(%{{.*}}) : $@convention(thin) (Int, Float) -> ()
+  %2 = partial_apply [on_stack] [non_nested] %1(%0) : $@convention(thin) (Int, Float) -> ()
+  dealloc_stack %2
+  %3 = tuple ()
+  return %3
 }
 
 class X {

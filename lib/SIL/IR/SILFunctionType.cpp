@@ -2473,7 +2473,13 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       }
 
       if (isolatedParam == varDecl) {
-        options |= SILParameterInfo::Isolated;
+        auto isolation = function.getActorIsolation();
+        // The function has to be isolated to this capture for it to be marked
+        // as `isolated`. It's possible to i.e. have a `nonisolated(nonsending)`
+        // closure that captures and isolated parameter.
+        if (isolation.isActorInstanceIsolated() &&
+            isolation.getActorInstance() == isolatedParam)
+          options |= SILParameterInfo::Isolated;
         isolatedParam = nullptr;
       }
     }
@@ -2887,6 +2893,16 @@ static CanSILFunctionType getSILFunctionType(
 
     auto origErrorType = optPair->first;
     auto errorType = optPair->second;
+
+    // If the abstraction pattern asks for an existential error, that becomes
+    // the return type of the abstracted function. Any concrete error type
+    // thrown by the concrete function will be type erased.
+    if (!origErrorType.isTypeParameterOrOpaqueArchetype()
+        && !origErrorType.isTuple()
+        && origErrorType.getType()->isExistentialType()) {
+      errorType = origErrorType.getType();
+    }
+    
     auto &errorTLConv = TC.getTypeLowering(origErrorType, errorType,
                                            TypeExpansionContext::minimal());
 
@@ -5296,6 +5312,19 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     extInfo = extInfo.withThrows(true, innerExtInfo.getThrownError());
   if (innerExtInfo.isAsync())
     extInfo = extInfo.withAsync(true);
+  // TODO: Merge outer and inner lifetime dependencies
+  if (innerExtInfo.getLifetimeDependencies().size() > 0) {
+    ASSERT(extInfo.getLifetimeDependencies().size() == 0 &&
+           "We only support uncurrying function types where at most one of the "
+           "inner and outer type has lifetime dependencies, because we do not "
+           "yet support closure context lifetime dependencies.");
+
+    auto uncurriedLifetimes = LifetimeDependenceInfo::uncurry(
+        Context, innerExtInfo.getLifetimeDependencies(),
+        /* numInnerParams */ inner.getParams().size(),
+        /* numOuterParams */ curried.getParams().size());
+    extInfo = extInfo.withLifetimeDependencies(uncurriedLifetimes);
+  }
 
   // Distributed thunks are always `async throws`
   if (constant.isDistributedThunk()) {

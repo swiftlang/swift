@@ -585,3 +585,8 @@ class C2 {
     self.i = i
   }
 }
+
+func noWarningForWait(for task: Task<Never, any Error>) async throws -> Never {
+    try await task.value
+}
+

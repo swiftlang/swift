@@ -9,6 +9,11 @@ class E : B {
   @_hasStorage var i: Int
 }
 
+struct S {
+  let b: B
+  let i: Int
+}
+
 // CHECK-LABEL: sil [ossa] @load_borrow_and_copy :
 // CHECK:         %1 = load [copy] %0
 // CHECK:         %2 = begin_borrow %1
@@ -136,5 +141,53 @@ bb3:
   dealloc_stack %1
   %r = tuple ()
   return %r
+}
+
+// CHECK-LABEL: sil [ossa] @load_of_store_borrow2 :
+// CHECK:       bb1:
+// CHECK-NEXT:    %4 = begin_borrow %0
+// CHECK-NEXT:    %5 = struct_extract %4, #S.b
+// CHECK-NEXT:    fix_lifetime %5
+// CHECK-NEXT:    end_borrow %4
+// CHECK:       } // end sil function 'load_of_store_borrow2'
+sil [ossa] @load_of_store_borrow2 : $@convention(thin) (@owned S) -> @owned S {
+bb0(%0 : @owned $S):
+  %1 = alloc_stack $S
+  %2 = store_borrow %0 to %1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %4 = struct_element_addr %2, #S.b
+  %5 = load_borrow %4
+  fix_lifetime %5
+  end_borrow %5
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  end_borrow %2
+  dealloc_stack %1
+  return %0
+}
+
+// CHECK-LABEL: sil [ossa] @dont_optimize_load_borrow_with_reborrow :
+// CHECK:         %4 = load_borrow %3
+// CHECK:       } // end sil function 'dont_optimize_load_borrow_with_reborrow'
+sil [ossa] @dont_optimize_load_borrow_with_reborrow : $@convention(thin) (@owned S) -> @owned S {
+bb0(%0 : @owned $S):
+  %1 = alloc_stack $S
+  %2 = store_borrow %0 to %1
+  %3 = struct_element_addr %2, #S.b
+  %4 = load_borrow %3
+  br bb1(%4)
+
+bb1(%5 : @reborrow $B):
+  %6 = borrowed %5 from ()
+  end_borrow %6
+  end_borrow %2
+  dealloc_stack %1
+  return %0
 }
 

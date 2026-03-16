@@ -1488,3 +1488,22 @@ bb6:
   %35 = tuple ()
   return %35
 }
+
+// Just make sure that CSE doesn't crash
+sil [ossa] @pointer_phi : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  %1 = load_borrow %0
+  %2 = ref_tail_addr %1, $Int
+  %3 = address_to_pointer %2 to $Builtin.RawPointer
+  end_borrow %1
+  br bb1(%3)
+
+bb1(%6 : $Builtin.RawPointer):
+  %7 = pointer_to_address %6 to [strict] $*Int
+  fix_lifetime %7
+  %9 = pointer_to_address %6 to [strict] $*Int
+  fix_lifetime %9
+  %11 = tuple ()
+  return %11
+}
+

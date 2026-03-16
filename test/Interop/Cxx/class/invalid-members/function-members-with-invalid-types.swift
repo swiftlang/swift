@@ -75,9 +75,8 @@ struct GoodStruct {
   // FIXME: operators are imported eagerly, so having this member would make GoodStruct unusable
   // int operator+(Bro<Ken>) const;
 
-  // FIXME: begin()/end() are imported eagerly, so having this member would make GoodStruct unusable
-  // Bro<Ken> begin() const;
-  // Bro<Ken> end() const;
+  Bro<Ken> begin() const;
+  Bro<Ken> end() const;
 };
 // CHECK:      struct GoodStruct {
 // CHECK-NEXT:   init()
@@ -94,6 +93,8 @@ struct GoodStruct {
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: Int32, _: Int32)
 // NOTE-MISSING: func overloadsDiffNumArgs(_: Never)
 //
+// CHECK-NEXT:   func __beginUnsafe() -> Never
+// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 
@@ -103,6 +104,8 @@ struct DerivedGoodStruct : GoodStruct {};
 // CHECK-NEXT:   func badReturn() -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: Int32)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: Int32, _: Int32)
+// CHECK-NEXT:   func __beginUnsafe() -> Never
+// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 struct UsingGoodStruct : GoodStruct {
@@ -116,6 +119,8 @@ struct UsingGoodStruct : GoodStruct {
 // CHECK-NEXT:   func badReturn() -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: Int32)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: Int32, _: Int32)
+// CHECK-NEXT:   func __beginUnsafe() -> Never
+// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 

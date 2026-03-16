@@ -107,13 +107,8 @@ public:
     if (IntroVer.has_value())
       return false;
 
-    if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
-               attr, VD->getName(), prettyPlatformString(platform));
-    } else {
-      diagnose(attr->AtLoc, diag::attr_requires_availability_for_platform, attr,
-               prettyPlatformString(platform));
-    }
+    diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
+             attr, D, prettyPlatformString(platform));
     return true;
   }
 
@@ -2420,7 +2415,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
     if (auto enclosingAvailable =
             getSemanticAvailableRangeDeclAndAttr(parent, attr->getDomain())) {
       SemanticAvailableAttr enclosingAttr = enclosingAvailable->first;
-      const Decl *enclosingDecl = enclosingAvailable->second;
+      const Decl *enclosingAvailabilityDecl = enclosingAvailable->second;
       enclosingIntroducedRange = enclosingAttr.getIntroducedRange(Ctx);
       if (enclosingIntroducedRange &&
           !introducedRange->isContainedIn(*enclosingIntroducedRange)) {
@@ -2429,21 +2424,29 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           // Incorrect availability for an implicit declaration is likely a
           // compiler bug so make the diagnostic a warning.
           limit = DiagnosticBehavior::Warning;
-        } else if (enclosingDecl != parent) {
+        } else if (enclosingAvailabilityDecl != parent) {
           // Members of extensions of nominal types with available ranges were
           // not diagnosed previously, so only emit a warning in that case.
           if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
             limit = DiagnosticBehavior::Warning;
         }
-        diagnose(D->isImplicit() ? enclosingDecl->getLoc()
-                                 : parsedAttr->getLocation(),
-                 diag::availability_decl_more_than_enclosing, D)
+        auto diagLoc = parsedAttr->getLocation();
+        if (D->isImplicit()) {
+          // Walk up until we find a non-implicit decl to diagnose.
+          const auto *diagDecl = D;
+          while (diagDecl && diagDecl->isImplicit())
+            diagDecl = diagDecl->parentDeclForAvailability();
+
+          diagLoc = diagDecl ? diagDecl->getLoc()
+                             : enclosingAvailabilityDecl->getLoc();
+        }
+        diagnose(diagLoc, diag::availability_decl_more_than_enclosing, D)
             .limitBehavior(limit);
-        if (D->isImplicit())
-          diagnose(enclosingDecl->getLoc(),
-                   diag::availability_implicit_decl_here, D,
+        if (D->isImplicit()) {
+          diagnose(diagLoc, diag::availability_implicit_decl_here, D,
                    Ctx.getTargetAvailabilityDomain(), *introducedRange);
-        diagnose(enclosingDecl->getLoc(),
+        }
+        diagnose(enclosingAvailabilityDecl->getLoc(),
                  diag::availability_decl_more_than_enclosing_here,
                  Ctx.getTargetAvailabilityDomain(), *enclosingIntroducedRange);
       }
@@ -2463,6 +2466,10 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // experimental feature is enabled.
   auto &ctx = fromModule->getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::AllowRuntimeSymbolDeclarations))
+    return true;
+
+  // Only consider "swift_"-containing symbols.
+  if (!symbol.contains("swift_"))
     return true;
 
   // Swift runtime functions are a private contract between the compiler and
@@ -3281,9 +3288,13 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
 
     Type mainActor = context.getMainActorType();
     if (mainActor) {
-      auto extInfo = ASTExtInfoBuilder().withIsolation(
-          FunctionTypeIsolation::forGlobalActor(mainActor))
-        .withThrows(true, throwsTypeVar);
+      auto extInfo =
+          ASTExtInfoBuilder()
+              .withIsolation(FunctionTypeIsolation::forGlobalActor(mainActor))
+              .withThrows(true, throwsTypeVar)
+              .withSendable(context.LangOpts.hasFeature(
+                  Feature::GlobalActorIsolatedTypesUsability));
+
       mainTypes.push_back(FunctionType::get(
           /*params*/ {}, context.TheEmptyTupleType,
           extInfo.build()));
@@ -5518,7 +5529,7 @@ void AttributeChecker::checkBackDeployedAttrs(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    if (availability.containsUnavailableDomain(Domain)) {
+    if (availability.isUnavailableForDomain(Domain)) {
       diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
                Domain.getRemappedDomain(Ctx));
 

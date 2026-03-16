@@ -589,13 +589,17 @@ bool DiagnosticEngine::finishProcessing() {
 
 bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (!sf || !sf->getExportedSourceFile())
+  if (getCheckSyntacticControls()) {
+    if (!sf || !sf->getExportedSourceFile())
+      return !state.isIgnoredDiagnosticGroupTree(groupID);
+    auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
+    return swift_ASTGen_isWarningGroupEnabledInFile(
+            sf->getExportedSourceFile(),
+            BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
+            StringRef(getDiagGroupInfoByID(groupID).name));
+  } else {
     return !state.isIgnoredDiagnosticGroupTree(groupID);
-  auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
-  return swift_ASTGen_isWarningGroupEnabledInFile(
-         sf->getExportedSourceFile(),
-         BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
-         StringRef(getDiagGroupInfoByID(groupID).name));
+  }
 #else
   // Fallback to checking only the command-line configuration
   return !state.isIgnoredDiagnosticGroupTree(groupID);
@@ -1350,6 +1354,9 @@ DiagnosticState::determineUserControlledWarningBehavior(
   } else
     userControlledBehavior = std::nullopt;
 
+  if (!checkSyntacticControls)
+    return userControlledBehavior;
+
 #if SWIFT_BUILD_SWIFT_SYNTAX
   // Use the combined global controls (command-line flags such as `-Werror`)
   // and syntactic controls at the source location of this diagnostic to
@@ -1427,10 +1434,15 @@ DiagnosticState::determineBehavior(const Diagnostic &diag,
   //   3) If the user substituted a different behavior for this warning, apply
   //      that change
   if (lvl == DiagnosticBehavior::Warning) {
-    if (auto userControlBehavior =
-            determineUserControlledWarningBehavior(diag, sourceMgr))
+    auto userControlBehavior =
+        determineUserControlledWarningBehavior(diag, sourceMgr);
+    if (userControlBehavior)
       lvl = *userControlBehavior;
-    if (suppressWarnings)
+
+    // Suppress all warnings when `-suppress-warnings` is used, except those
+    // *lexically* (`@warn`) escalated to error.
+    // (`-Werror` is not compatible with `-suppress-warnings`).
+    if (suppressWarnings && lvl != DiagnosticBehavior::Error)
       lvl = DiagnosticBehavior::Ignore;
   }
 
@@ -1714,7 +1726,9 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
       auto child =
           diagnosticInfoForDiagnostic(childNotes[i],
                                       /* includeDiagnosticName= */ true);
-      assert(child);
+      assert(child || state.getSuppressNotes());
+      if (!child)
+        continue;
       assert(child->Kind == DiagnosticKind::Note &&
              "Expected child diagnostics to all be notes?!");
       childInfo.push_back(*child);
@@ -1730,12 +1744,23 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     auto groupID = diagnostic.getGroupID();
     if (groupID != DiagGroupID::no_group) {
       const auto &diagGroup = getDiagGroupInfoByID(groupID);
-      
-      std::string docURL(getDiagnosticDocumentationPath());
-      if (!docURL.empty() && docURL.back() != '/')
-        docURL += "/";
-      docURL += diagGroup.documentationFile;
-      info->CategoryDocumentationURL = std::move(docURL);
+
+      if (diagGroup.toolchainLocalDocumentation) {
+        std::string localPath(getLocalDiagnosticDocumentationPath());
+        if (!localPath.empty()) {
+          if (localPath.back() != '/')
+            localPath += "/";
+          localPath += diagGroup.documentationFile;
+          localPath += ".md";
+          info->CategoryDocumentationURL = std::move(localPath);
+        }
+      } else {
+        std::string docURL(getDiagnosticDocumentationPath());
+        if (!docURL.empty() && docURL.back() != '/')
+          docURL += "/";
+        docURL += diagGroup.documentationFile;
+        info->CategoryDocumentationURL = std::move(docURL);
+      }
     }
 
     for (auto &consumer : Consumers) {

@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"92c14a71","signature":"swift::getDistributedActorSystemActorIDType(swift::NominalTypeDecl*)","signatureAssert":"Assertion failed: (!system->isDistributedActor()), function getDistributedActorSystemActorIDType"}
+// {"kind":"typecheck","original":"92c14a71","signature":"swift::getDistributedActorSystemActorIDType(swift::NominalTypeDecl*)","signatureAssert":"Assertion failed: (!system->isDistributedActor()), function getDistributedActorSystemActorIDType","signatureNext":"CanSynthesizeDistributedActorCodableConformanceRequest::evaluate"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 // REQUIRES: OS=macosx
 import Distributed

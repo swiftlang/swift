@@ -49,20 +49,26 @@ def main():
             if 'clang' in name:
                 build_module(args.swift_frontend, 'clang', detail)
                 module["moduleName"] = name['clang']
-                module["clangModulePath"] = detail["modulePath"]
                 if "moduleCacheKey" in detail["details"]['clang']:
                     module["clangModuleCacheKey"] = detail["details"]['clang']["moduleCacheKey"]
+                    module["clangModulePath"] = os.path.basename(detail["modulePath"])
+                else:
+                    module["clangModulePath"] = detail["modulePath"]
             if 'swift' in name:
                 build_module(args.swift_frontend, 'swift', detail)
                 module["moduleName"] = name['swift']
-                module["modulePath"] = detail["modulePath"]
                 if "moduleCacheKey" in detail["details"]['swift']:
                     module["moduleCacheKey"] = detail["details"]['swift']["moduleCacheKey"]
+                    module["modulePath"] = os.path.basename(detail["modulePath"])
+                else:
+                    module["modulePath"] = detail["modulePath"]
             if 'swiftPrebuiltExternal' in name:
                 module["moduleName"] = name['swiftPrebuiltExternal']
-                module["modulePath"] = detail["modulePath"]
                 if "moduleCacheKey" in detail["details"]['swiftPrebuiltExternal']:
                     module["moduleCacheKey"] = detail["details"]['swiftPrebuiltExternal']["moduleCacheKey"]
+                    module["modulePath"] = os.path.basename(detail["modulePath"])
+                else:
+                    module["modulePath"] = detail["modulePath"]
             modules.append(module)
 
         # Write output response file if requested.

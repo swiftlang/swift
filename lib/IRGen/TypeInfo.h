@@ -363,8 +363,7 @@ public:
 
   /// Deallocate a variable of this type.
   virtual void deallocateStack(
-      IRGenFunction &IGF, StackAddress addr, SILType T,
-      StackAllocationIsNested_t isNested = StackAllocationIsNested) const = 0;
+      IRGenFunction &IGF, StackAddress addr, SILType T) const = 0;
 
   /// Destroy the value of a variable of this type, then deallocate its
   /// memory.
@@ -437,6 +436,22 @@ public:
   virtual bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                          ReferenceCounting *refcounting
                                              = nullptr) const;
+
+  /// This is virtual to support the optimizations which rely on the
+  /// representations of some structs being a single refcounted pointer.
+  virtual void strongCustomRetain(IRGenFunction &IGF, Explosion &e,
+                                  bool needsNullCheck) const {
+    llvm_unreachable(
+        "Only classes and some single field structs can implement this.");
+  }
+
+  /// This is virtual to support the optimizations which rely on the
+  /// representations of some structs being a single refcounted pointer.
+  virtual void strongCustomRelease(IRGenFunction &IGF, Explosion &e,
+                                   bool needsNullCheck) const {
+    llvm_unreachable(
+        "Only classes and some single field structs can implement this.");
+  }
 
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single Swift-retainable object pointer?

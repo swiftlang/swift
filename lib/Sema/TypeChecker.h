@@ -921,6 +921,11 @@ void checkConformancesInContext(IterableDeclContext *idc);
 /// Check that the type of the given property conforms to NSCopying.
 ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 
+/// Simplify generic argument expressions which are type sugar productions that
+/// got parsed as expressions due to the parser not knowing which identifiers
+/// are type names.
+TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
+
 /// \name Name lookup
 ///
 /// Routines that perform name lookup.
@@ -1554,6 +1559,12 @@ bool maybeDiagnoseMissingImportForMember(
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
+
+// Guide ForEachStmt type-checking by indicating whether the BorrowingSequence
+// protocol should be used, thus enabling Borrowing iteration for a given
+// sequence type.
+bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync,
+                                SourceLoc loc, const DeclContext *dc);
 
 } // end namespace swift
 

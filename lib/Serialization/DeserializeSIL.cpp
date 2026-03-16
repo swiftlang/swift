@@ -1036,6 +1036,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // Read and instantiate the specialize attributes.
   bool shouldAddSpecAttrs = fn->getSpecializeAttrs().empty();
   bool shouldAddEffectAttrs = !fn->hasArgumentEffects();
+  StringRef WasmImportModule;
+  StringRef WasmImportField;
   for (unsigned attrIdx = 0; attrIdx < numAttrs; ++attrIdx) {
     llvm::Expected<llvm::BitstreamEntry> maybeNext =
         SILCursor.advance(AF_DontPopBlockAtEnd);
@@ -1083,6 +1085,12 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         break;
       case ExtraStringFlavor::Section:
         fn->setSection(blobData);
+        break;
+      case ExtraStringFlavor::WasmImportModule:
+        WasmImportModule = blobData;
+        break;
+      case ExtraStringFlavor::WasmImportName:
+        WasmImportField = blobData;
         break;
       }
       continue;
@@ -1139,6 +1147,11 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
           spiGroup, spiModule, availability));
     }
   }
+
+  // If either wasm import attribute was present, record both even if one is
+  // empty.
+  if (!WasmImportModule.empty() || !WasmImportField.empty())
+    fn->setWasmImportModuleAndField(WasmImportModule, WasmImportField);
 
   GenericEnvironment *genericEnv = nullptr;
   // Generic signatures are stored for declarations as well in a debug context.
@@ -2200,6 +2213,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     unsigned Flags = ListOfValues[0];
     bool isObjC = (bool)(Flags & 1);
     bool canAllocOnStack = (bool)((Flags >> 1) & 1);
+    bool isBare = (bool)((Flags >> 2) & 1);
+    auto isNested = StackAllocationIsNested_t((bool) ((Flags >> 3) & 1));
     SILType ClassTy =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
     SmallVector<SILValue, 4> Counts;
@@ -2223,12 +2238,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                           ListOfValues[i], MetadataType);
       ResultInst = Builder.createAllocRefDynamic(Loc, MetadataOp, ClassTy,
                                                  isObjC, canAllocOnStack,
+                                                 isNested,
                                                  TailTypes, Counts);
     } else {
       assert(i == NumVals);
-      bool isBare = (bool)((Flags >> 2) & 1);
       ResultInst = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack, isBare,
-                                          TailTypes, Counts);
+                                          isNested, TailTypes, Counts);
     }
     break;
   }
@@ -2345,10 +2360,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                        ? PartialApplyInst::OnStackKind::OnStack
                        : PartialApplyInst::OnStackKind::NotOnStack;
 
+    unsigned flags = ApplyCallerIsolation;
+    auto isNested = StackAllocationIsNested_t(
+      IsNestedEncoding((flags >> 0) & 1) == IsNestedEncoding::IsNested);
+
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultInst = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args,
-        closureTy->getCalleeConvention(), closureTy->getIsolation(), onStack);
+        closureTy->getCalleeConvention(), closureTy->getIsolation(), onStack,
+        isNested);
     break;
   }
   case SILInstructionKind::BuiltinInst: {
@@ -4310,6 +4330,10 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
       case ExtraStringFlavor::Section:
         v->setSection(blobData);
         break;
+      case ExtraStringFlavor::WasmImportModule:
+      case ExtraStringFlavor::WasmImportName:
+        // TODO: we still don't support wasm import on global variables
+        break;
       }
       continue;
     }
@@ -4468,12 +4492,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
   std::vector<SILVTable::Entry> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
-  while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_OVERRIDE_TABLE && kind != SIL_FUNCTION &&
-         kind != SIL_PROPERTY && kind != SIL_MOVEONLY_DEINIT) {
-    assert(kind == SIL_VTABLE_ENTRY &&
-           "Content of Vtable should be in SIL_VTABLE_ENTRY.");
+  while (kind == SIL_VTABLE_ENTRY) {
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
     unsigned RawEntryKind, IsNonOverridden;

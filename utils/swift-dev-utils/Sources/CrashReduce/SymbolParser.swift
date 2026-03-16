@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct ShortSignature {
+public struct ShortSignature: Hashable {
   public var namespace: String?
   public var symbol: String
 

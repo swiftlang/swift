@@ -217,6 +217,7 @@ bool swift_compareTypeContextDescriptors(const TypeContextDescriptor *lhs,
                                          const TypeContextDescriptor *rhs);
 
 /// Compute the bounds of class metadata with a resilient superclass.
+SWIFT_EXPORT_FROM_ATTRIBUTE(swiftCore) // Cannot use SWIFT_RUNTIME_EXPORT because it is not compatible with C linkage
 ClassMetadataBounds getResilientMetadataBounds(
                                            const ClassDescriptor *descriptor);
 int32_t getResilientImmediateMembersOffset(const ClassDescriptor *descriptor);

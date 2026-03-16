@@ -176,7 +176,7 @@ private struct FunctionChecker {
     case let apply as ApplySite:
       try checkApply(apply: apply)
 
-    case let destroy as DestroyValueInst:
+    case let destroy as DestroyValueInst where !destroy.isDeadEnd:
       let type = destroy.destroyedValue.type
       if let nominal = type.nominal,
          !nominal.hasClangNode,

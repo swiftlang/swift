@@ -1678,6 +1678,8 @@ public:
       *this << "[objc] ";
     if (ARI->canAllocOnStack())
       *this << "[stack] ";
+    if (!ARI->isStackAllocationNested())
+      *this << "[non_nested] ";
     auto Types = ARI->getTailAllocatedTypes();
     auto Counts = ARI->getTailAllocatedCounts();
     for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
@@ -1830,8 +1832,11 @@ public:
       *this << "[isolated_any] ";
       break;
     }
-    if (CI->isOnStack())
+    if (CI->isOnStack()) {
       *this << "[on_stack] ";
+      if (!CI->isStackAllocationNested())
+        *this << "[non_nested] ";
+    }
     visitApplyInstBase(CI);
   }
 

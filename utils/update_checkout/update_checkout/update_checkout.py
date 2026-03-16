@@ -259,8 +259,9 @@ def update_single_repository(pool_args: UpdateArguments):
         # If we were asked to reset to the specified branch, do the hard
         # reset and return.
         if checkout_target and pool_args.reset_to_remote and not cross_repo:
+            full_target = full_target_name(repo_path, "origin", checkout_target)
             Git.run(
-                repo_path, ["reset", "--hard", checkout_target], echo=verbose, prefix=prefix
+                repo_path, ["reset", "--hard", full_target], echo=verbose, prefix=prefix
             )
             return
 
@@ -822,6 +823,17 @@ def validate_config(config: Dict[str, Any]):
                 )
             else:
                 seen[alias] = scheme_name
+
+
+def full_target_name(repo_path: Path, remote: str, target: str) -> str:
+    branch, _, _ = Git.run(repo_path, ["branch", "--list", target], fatal=True)
+    branch = branch.replace("* ", "")
+    if branch == target:
+        name = "%s/%s" % (remote, target)
+        return name
+
+    # This is either a tag or commit hash -- we can use it as is
+    return target
 
 
 def skip_list_for_platform(config: Dict[str, Any], all_repos: bool) -> List[str]:

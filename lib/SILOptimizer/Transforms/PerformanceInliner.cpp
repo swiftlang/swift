@@ -216,7 +216,7 @@ class SILPerformanceInliner {
   llvm::DenseMap<SILFunction *, ShortestPathAnalysis *> SPAs;
   llvm::SpecificBumpPtrAllocator<ShortestPathAnalysis> SPAAllocator;
 
-  ColdBlockInfo CBI;
+  ColdBlockAnalysis *CBA;
 
   OptRemark::Emitter &ORE;
 
@@ -274,13 +274,13 @@ class SILPerformanceInliner {
 public:
   SILPerformanceInliner(StringRef PassName, SILOptFunctionBuilder &FuncBuilder,
                         InlineSelection WhatToInline, SILPassManager *pm,
-                        DominanceAnalysis *DA, PostDominanceAnalysis *PDA,
+                        DominanceAnalysis *DA, ColdBlockAnalysis *CBA,
                         SILLoopAnalysis *LA, BasicCalleeAnalysis *BCA,
                         IsSelfRecursiveAnalysis *SRA, OptimizationMode OptMode,
                         OptRemark::Emitter &ORE)
       : PassName(PassName), FuncBuilder(FuncBuilder),
         WhatToInline(WhatToInline), pm(pm), DA(DA), LA(LA), BCA(BCA), SRA(SRA),
-        CBI(DA, PDA), ORE(ORE), OptMode(OptMode) {}
+        CBA(CBA), ORE(ORE), OptMode(OptMode) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
 };
@@ -630,7 +630,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   SILLoopInfo *CalleeLI = LA->get(Callee);
   ShortestPathAnalysis *CalleeSPA = getSPA(Callee, CalleeLI);
   if (!CalleeSPA->isValid()) {
-    CalleeSPA->analyze(CBI, [](FullApplySite FAS) {
+    CalleeSPA->analyze(CBA, [](FullApplySite FAS) {
       // We don't compute SPA for another call-level. Functions called from
       // the callee are assumed to have DefaultApplyLength.
       return DefaultApplyLength.getValue();
@@ -1178,7 +1178,7 @@ void SILPerformanceInliner::collectAppliesToInline(
 
   // Compute the shortest-path analysis for the caller.
   ShortestPathAnalysis *SPA = getSPA(Caller, LI);
-  SPA->analyze(CBI, [&](FullApplySite FAS) -> int {
+  SPA->analyze(CBA, [&](FullApplySite FAS) -> int {
   
     // This closure returns the length of a called function.
 
@@ -1190,7 +1190,7 @@ void SILPerformanceInliner::collectAppliesToInline(
       SILLoopInfo *CalleeLI = LA->get(Callee);
       ShortestPathAnalysis *CalleeSPA = getSPA(Callee, CalleeLI);
       if (!CalleeSPA->isValid()) {
-        CalleeSPA->analyze(CBI, [](FullApplySite FAS) {
+        CalleeSPA->analyze(CBA, [](FullApplySite FAS) {
           // We don't compute SPA for another call-level. Functions called from
           // the callee are assumed to have DefaultApplyLength.
           return DefaultApplyLength.getValue();
@@ -1273,7 +1273,7 @@ void SILPerformanceInliner::collectAppliesToInline(
     }
 
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
-      if (CBI.isCold(child)) {
+      if (CBA->get(Caller)->isCold(child)) {
         // Handle cold blocks separately.
         visitColdBlocks(InitialCandidates, child, DT, NumCallerBlocks);
         return false;
@@ -1453,7 +1453,7 @@ public:
 
   void run() override {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
-    PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
+    ColdBlockAnalysis *CBA = PM->getAnalysis<ColdBlockAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     BasicCalleeAnalysis *BCA = PM->getAnalysis<BasicCalleeAnalysis>();
     IsSelfRecursiveAnalysis *SRA = PM->getAnalysis<IsSelfRecursiveAnalysis>();
@@ -1468,7 +1468,7 @@ public:
     SILOptFunctionBuilder FuncBuilder(*this);
 
     SILPerformanceInliner Inliner(getID(), FuncBuilder, WhatToInline,
-                                  getPassManager(), DA, PDA, LA, BCA, SRA,
+                                  getPassManager(), DA, CBA, LA, BCA, SRA,
                                   OptMode, ORE);
 
     assert(getFunction()->isDefinition() &&

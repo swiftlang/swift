@@ -1,12 +1,13 @@
+// This test is flaky, occasionally crashing in `c-index-test`.
+// rdar://168250323
+// ALLOW_RETRIES: 5
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/SlashA.swiftmodule %S/Inputs/slash.swift
 // RUN: %target-swift-frontend -emit-module -o %t/SlashB.swiftmodule %S/Inputs/slash.swift
 // RUN: not %target-swift-frontend -typecheck -I %t -serialize-diagnostics-path %t/serialized.dia %s
 // RUN: c-index-test -read-diagnostics %t/serialized.dia > %t/serialized.txt 2>&1
 // RUN: %FileCheck %s -check-prefix CHECK-DIA < %t/serialized.txt
-
-// rdar://168250323
-// XFAIL: OS=freebsd
 
 import SlashA
 import SlashB

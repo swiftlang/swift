@@ -242,8 +242,12 @@ protected:
     SHARED_FIELD(AllocRefInstBase, uint8_t
       objC : 1,
       onStack : 1,
+      isNested : 1,
       isBare : 1,   // Only used in AllocRefInst
       numTailTypes: NumAllocRefTailTypesBits);
+
+    SHARED_FIELD(PartialApplyInst, uint8_t
+                 isNested : 1);
 
     SHARED_FIELD(BeginBorrowInst, uint8_t
                  lexical : 1,

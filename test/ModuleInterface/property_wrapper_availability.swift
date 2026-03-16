@@ -31,9 +31,9 @@ public struct HasWrappers {
   // CHECK: @available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
   // CHECK-NEXT: @Library::ConditionallyAvailableWrapper<Swift::Int> public var x: Swift::Int {
   // CHECK-NEXT:   get
-  // CHECK-NEXT:   @available(iOS 13.4, tvOS 13.4, watchOS 6.2, macOS 10.15.4, *)
+  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
   // CHECK-NEXT:   set
-  // CHECK-NEXT:   @available(iOS 13.4, tvOS 13.4, watchOS 6.2, macOS 10.15.4, *)
+  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
   // CHECK-NEXT:   _modify
   // CHECK-NEXT: }
   @available(SwiftStdlib 5.2, *)
@@ -52,15 +52,15 @@ public struct HasWrappers {
 public struct UnavailableHasWrappers {
   // CHECK-LABEL:   @Library::UnavailableWrapper<Swift::Int> public var x: Swift::Int {
   // CHECK-NEXT:      get
+  // CHECK-NEXT:      @available(macOS, unavailable)
   // CHECK-NEXT:      @available(iOS, unavailable)
   // CHECK-NEXT:      @available(tvOS, unavailable)
   // CHECK-NEXT:      @available(watchOS, unavailable)
-  // CHECK-NEXT:      @available(macOS, unavailable)
   // CHECK-NEXT:      set
+  // CHECK-NEXT:      @available(macOS, unavailable)
   // CHECK-NEXT:      @available(iOS, unavailable)
   // CHECK-NEXT:      @available(tvOS, unavailable)
   // CHECK-NEXT:      @available(watchOS, unavailable)
-  // CHECK-NEXT:      @available(macOS, unavailable)
   // CHECK-NEXT:      _modify
   // CHECK-NEXT:    }
   @UnavailableWrapper public var x: Int

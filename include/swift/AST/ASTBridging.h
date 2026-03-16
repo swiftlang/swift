@@ -345,6 +345,7 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType
   NominalType_getDeclaredInterfaceType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType NominalType_getSelfInterfaceType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
   BRIDGED_INLINE bool Enum_hasRawType() const;
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
@@ -2782,11 +2783,11 @@ BridgedVarargTypeRepr_createParsed(BridgedASTContext cContext,
                                    BridgedTypeRepr base,
                                    swift::SourceLoc ellipsisLoc);
 
-SWIFT_NAME(
-    "BridgedIntegerTypeRepr.createParsed(_:string:loc:minusLoc:)")
-BridgedIntegerTypeRepr BridgedIntegerTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedStringRef cString, swift::SourceLoc loc,
-    swift::SourceLoc minusLoc);
+SWIFT_NAME("BridgedGenericArgumentExprTypeRepr.createParsed(_:expr:loc:)")
+BridgedGenericArgumentExprTypeRepr
+BridgedGenericArgumentExprTypeRepr_createParsed(BridgedASTContext cContext,
+                                                BridgedExpr cExpr,
+                                                swift::SourceLoc loc);
 
 SWIFT_NAME("BridgedTypeRepr.dump(self:)")
 void BridgedTypeRepr_dump(BridgedTypeRepr type);

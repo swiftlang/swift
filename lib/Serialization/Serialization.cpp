@@ -55,6 +55,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/Serialization.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
@@ -73,6 +74,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -902,7 +904,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
   BLOCK_RECORD(input_block, MODULE_INTERFACE_PATH);
   BLOCK_RECORD(input_block, IMPORTED_MODULE_SPIS);
-  BLOCK_RECORD(input_block, IMPORTED_MODULE_PATH);
+  BLOCK_RECORD(input_block, EXPLICIT_MODULE_MAP_ENTRY);
   BLOCK_RECORD(input_block, EXTERNAL_MACRO);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
@@ -1177,6 +1179,12 @@ void Serializer::writeHeader() {
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());
       }
 
+      if (M->getName().is("OSLog")) {
+        options_block::OSLogStringSectionNameLayout OSLogStringSectionName(Out);
+        OSLogStringSectionName.emit(ScratchRecord,
+                                    M->getASTContext().LangOpts.OSLogStringSectionName);
+      }
+
       version::Version compilerVersion = M->getSwiftInterfaceCompilerVersion();
       if (!compilerVersion.empty()) {
         options_block::SwiftInterfaceCompilerVersionLayout Version(Out);
@@ -1336,6 +1344,44 @@ static void flattenImportPath(const ImportedModule &import,
   outStream << accessPathElem.Item.str();
 }
 
+static llvm::SmallString<1024>
+flattenModuleMapEntry(StringRef name,
+                      const ExplicitSwiftModuleInputInfo &info) {
+  llvm::SmallString<1024> out;
+  {
+    llvm::raw_svector_ostream s(out);
+    s << name << '\0';
+    s << llvm::sys::path::filename(info.modulePath) << '\0';
+    s << info.moduleAlias.value_or("") << '\0';
+    s << llvm::sys::path::filename(info.moduleDocPath.value_or("")) << '\0';
+    s << llvm::sys::path::filename(info.moduleSourceInfoPath.value_or(""))
+      << '\0';
+    s << info.moduleCacheKey.value_or("") << '\0';
+    s << '\0'; // clangModuleMap
+    if (info.headerDependencyPaths)
+      for (auto &dep : *info.headerDependencyPaths)
+        s << dep << '\0';
+  }
+  return out;
+}
+
+static llvm::SmallString<1024>
+flattenModuleMapEntry(StringRef name,
+                      const ExplicitClangModuleInputInfo &info) {
+  llvm::SmallString<1024> out;
+  {
+    llvm::raw_svector_ostream s(out);
+    s << name << '\0';
+    s << llvm::sys::path::filename(info.modulePath) << '\0';
+    s << info.moduleAlias.value_or("") << '\0';
+    s << '\0'; // moduleDocPath
+    s << '\0'; // moduleSourceInfoPath
+    s << info.moduleCacheKey.value_or("") << '\0';
+    s << llvm::sys::path::filename(info.moduleMapPath) << '\0';
+  }
+  return out;
+}
+
 uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
   if (dep.isHashBased()) return dep.getContentHash();
   return dep.getModificationTime();
@@ -1355,7 +1401,7 @@ void Serializer::writeInputBlock() {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::ImportedModuleLayout importedModule(Out);
   input_block::ImportedModuleSPILayout ImportedModuleSPI(Out);
-  input_block::ImportedModulePathLayout ImportedModulePath(Out);
+  input_block::ExplicitModuleMapEntryLayout ExplicitModuleMapEntry(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
@@ -1382,19 +1428,22 @@ void Serializer::writeInputBlock() {
   // Note: We're not using StringMap here because we don't need to own the
   // strings.
   llvm::DenseMap<StringRef, unsigned> dependencyDirectories;
-  for (auto const &dep : Options.Dependencies) {
-    StringRef directoryName = llvm::sys::path::parent_path(dep.getPath());
+
+  auto getOrCreateDependencyDir = [&](llvm::StringRef path) -> unsigned {
+    StringRef directoryName = llvm::sys::path::parent_path(path);
     unsigned &dependencyDirectoryIndex = dependencyDirectories[directoryName];
     if (!dependencyDirectoryIndex) {
       // This name must be newly-added. Give it a new ID (and skip 0).
       dependencyDirectoryIndex = dependencyDirectories.size();
       DependencyDirectory.emit(ScratchRecord, directoryName);
     }
-    FileDependency.emit(ScratchRecord,
-                        dep.getSize(),
-                        getRawModTimeOrHash(dep),
-                        dep.isHashBased(),
-                        dep.isSDKRelative(),
+    return dependencyDirectoryIndex;
+  };
+
+  for (auto const &dep : Options.Dependencies) {
+    unsigned dependencyDirectoryIndex = getOrCreateDependencyDir(dep.getPath());
+    FileDependency.emit(ScratchRecord, dep.getSize(), getRawModTimeOrHash(dep),
+                        dep.isHashBased(), dep.isSDKRelative(),
                         dependencyDirectoryIndex,
                         llvm::sys::path::filename(dep.getPath()));
   }
@@ -1531,17 +1580,9 @@ void Serializer::writeInputBlock() {
     llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(import.importedModule, spis);
 
-    StringRef path;
-    if (Options.ExplicitModuleBuild && import.importedModule &&
-        !import.importedModule->isNonSwiftModule()) {
-      path = import.importedModule->getCacheKey();
-      if (path.empty())
-        path = import.importedModule->getModuleLoadedFilename();
-    }
-
-    importedModule.emit(
-        ScratchRecord, static_cast<uint8_t>(stableImportControl),
-        !import.accessPath.empty(), !spis.empty(), !path.empty(), importPath);
+    importedModule.emit(ScratchRecord,
+                        static_cast<uint8_t>(stableImportControl),
+                        !import.accessPath.empty(), !spis.empty(), importPath);
 
     if (!spis.empty()) {
       SmallString<64> out;
@@ -1551,10 +1592,28 @@ void Serializer::writeInputBlock() {
           [&outStream] { outStream << StringRef("\0", 1); });
       ImportedModuleSPI.emit(ScratchRecord, out);
     }
-
-    if (!path.empty())
-      ImportedModulePath.emit(ScratchRecord, path);
   }
+
+  if (auto *esmm = M->getASTContext().getExplicitSwiftModuleMap())
+    for (auto &entry : *esmm)
+      ExplicitModuleMapEntry.emit(
+          ScratchRecord, entry.getValue().isFramework,
+          entry.getValue().isSystem, false,
+          getOrCreateDependencyDir(entry.getValue().modulePath),
+          getOrCreateDependencyDir(entry.getValue().moduleDocPath.value_or("")),
+          getOrCreateDependencyDir(
+              entry.getValue().moduleSourceInfoPath.value_or("")),
+          0, flattenModuleMapEntry(entry.getKey(), entry.getValue()));
+
+  if (auto *ecmm = M->getASTContext().getExplicitClangModuleMap())
+    for (auto &entry : *ecmm)
+      ExplicitModuleMapEntry.emit(
+          ScratchRecord, entry.getValue().isFramework,
+          entry.getValue().isSystem,
+          entry.getValue().isBridgingHeaderDependency,
+          getOrCreateDependencyDir(entry.getValue().modulePath), 0, 0,
+          getOrCreateDependencyDir(entry.getValue().moduleMapPath),
+          flattenModuleMapEntry(entry.getKey(), entry.getValue()));
 
   if (!Options.ModuleLinkName.empty())
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
@@ -4121,6 +4180,21 @@ private:
     InlinableBodyTextLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, body);
   }
 
+  /// Issue a LifetimeDependenceInfoRequest, and serialize the requested
+  /// lifetime dependence info, if present.
+  template <typename D, typename = std::enable_if_t<std::disjunction<
+                            std::is_base_of<AbstractFunctionDecl, D>,
+                            std::is_same<EnumElementDecl, D>>::value>>
+  void writeLifetimeDependenciesIfNeeded(const D *decl) {
+    if (auto lifetimeDependencies = evaluateOrDefault(
+            S.M->getASTContext().evaluator,
+            LifetimeDependenceInfoRequest{
+                const_cast<ValueDecl *>(cast<ValueDecl>(decl))},
+            std::nullopt)) {
+      S.writeLifetimeDependencies(*lifetimeDependencies);
+    }
+  }
+
   static bool getNeedsNewTableEntry(const AbstractFunctionDecl *func) {
     if (isa_and_nonnull<ProtocolDecl>(func->getDeclContext()))
       return func->requiresNewWitnessTableEntry();
@@ -4908,13 +4982,7 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
-    auto fnType = ty->getAs<AnyFunctionType>();
-    if (fnType) {
-      auto lifetimeDependencies = fnType->getLifetimeDependencies();
-      if (!lifetimeDependencies.empty()) {
-        S.writeLifetimeDependencies(lifetimeDependencies);
-      }
-    }
+    writeLifetimeDependenciesIfNeeded(fn);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
@@ -5051,13 +5119,7 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
-    auto fnType = ty->getAs<AnyFunctionType>();
-    if (fnType) {
-      auto lifetimeDependencies = fnType->getLifetimeDependencies();
-      if (!lifetimeDependencies.empty()) {
-        S.writeLifetimeDependencies(lifetimeDependencies);
-      }
-    }
+    writeLifetimeDependenciesIfNeeded(fn);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
@@ -5111,13 +5173,7 @@ public:
     if (auto *PL = elem->getParameterList())
       writeParameterList(PL);
 
-    auto fnType = ty->getAs<AnyFunctionType>();
-    if (fnType) {
-      auto lifetimeDependencies = fnType->getLifetimeDependencies();
-      if (!lifetimeDependencies.empty()) {
-        S.writeLifetimeDependencies(lifetimeDependencies);
-      }
-    }
+    writeLifetimeDependenciesIfNeeded(elem);
   }
 
   void visitSubscriptDecl(const SubscriptDecl *subscript) {
@@ -5229,13 +5285,7 @@ public:
     writeGenericParams(ctor->getGenericParams());
     writeParameterList(ctor->getParameters());
 
-    auto fnType = ty->getAs<AnyFunctionType>();
-    if (fnType) {
-      auto lifetimeDependencies = fnType->getLifetimeDependencies();
-      if (!lifetimeDependencies.empty()) {
-        S.writeLifetimeDependencies(lifetimeDependencies);
-      }
-    }
+    writeLifetimeDependenciesIfNeeded(ctor);
 
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);

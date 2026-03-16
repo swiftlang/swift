@@ -475,6 +475,12 @@ static SILValue skipAddrProjections(SILValue v) {
     case ValueKind::TupleElementAddrInst:
       v = cast<SingleValueInstruction>(v)->getOperand(0);
       break;
+    case ValueKind::PointerToAddressInst:
+      if (auto *a2p = dyn_cast<AddressToPointerInst>(cast<PointerToAddressInst>(v)->getOperand())) {
+        v = a2p->getOperand();
+        break;
+      }
+      return v;
     default:
       return v;
     }

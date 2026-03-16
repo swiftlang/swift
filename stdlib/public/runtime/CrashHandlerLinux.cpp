@@ -29,6 +29,7 @@
 
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -65,9 +66,6 @@
 
 #include "BacktracePrivate.h"
 
-// Run the memserver in a thread (0) or separate process (1)
-#define MEMSERVER_USE_PROCESS 0
-
 #ifndef lengthof
 #define lengthof(x)     (sizeof(x) / sizeof(x[0]))
 #endif
@@ -86,6 +84,7 @@ uint32_t currently_paused();
 void wait_paused(uint32_t expected, const struct timespec *timeout);
 int  memserver_start();
 int  memserver_entry(void *);
+void closeFds(int memserver_master_fd);
 
 ssize_t safe_read(int fd, void *buf, size_t len) {
   uint8_t *ptr = (uint8_t *)buf;
@@ -128,6 +127,7 @@ ssize_t safe_write(int fd, const void *buf, size_t len) {
 }
 
 CrashInfo crashInfo;
+int maxFdToClose = 1024;
 
 const int signalsToHandle[] = {
   SIGQUIT,
@@ -194,6 +194,11 @@ _swift_installCrashHandler()
     }
   }
 
+  // Read the per-process open-file limit once, for use in closeFds()
+  struct rlimit rl;
+  if (getrlimit(RLIMIT_NOFILE, &rl) == 0)
+    maxFdToClose = (int)rl.rlim_cur;
+
   return 0;
 }
 
@@ -203,7 +208,7 @@ _swift_installCrashHandler()
 
 namespace {
 
-// Older glibc and musl don't have these two syscalls
+// Older glibc and musl don't have these syscalls
 pid_t
 gettid()
 {
@@ -213,6 +218,24 @@ gettid()
 int
 tgkill(int tgid, int tid, int sig) {
   return syscall(SYS_tgkill, tgid, tid, sig);
+}
+
+#ifndef SYS_close_range
+#define SYS_close_range 436
+#endif
+
+#define CLOSE_RANGE_UNSHARE 0x2
+#define CLOSE_RANGE_CLOEXEC 0x4
+
+static int _close_range(unsigned int first, unsigned int last, int flags) {
+  if (syscall(SYS_close_range, first, last, flags) == 0)
+    return 0;
+  if (errno != ENOSYS)
+    return -1;
+  for (unsigned int i = first; i <= last; i++) {
+    close(i);
+  }
+  return 0;
 }
 
 void
@@ -269,6 +292,10 @@ handle_fatal_signal(int signum,
 
   _swift_displayCrashMessage(signum, pc);
 
+  if (_swift_backtraceSettings.closeFds) {
+    closeFds(fd);
+  }
+  
   // Actually start the backtracer
   if (!_swift_spawnBacktracer(&crashInfo, fd)) {
     const char *message = _swift_backtraceSettings.color == OnOffTty::On
@@ -279,12 +306,10 @@ handle_fatal_signal(int signum,
       write(STDERR_FILENO, message, strlen(message));
   }
 
-#if !MEMSERVER_USE_PROCESS
-  /* If the memserver is in-process, it may have set signal handlers,
+  /* The memserver may have set signal handlers,
      so reset SIGSEGV and SIGBUS again */
   reset_signal(SIGSEGV);
   reset_signal(SIGBUS);
-#endif
 
   // Restart the other threads
   resume_other_threads();
@@ -682,6 +707,27 @@ int memserver_fd;
 sigjmp_buf memserver_fault_buf;
 pid_t memserver_pid;
 
+#define MIN_FD_TO_CLOSE 3
+
+void
+closeFds(int memserver_master_fd) {
+  // We don't attempt to close either of the file descriptors for the
+  // pipe used to communicate with the memserver thread.
+
+  // Otherwise we close all file descriptors after stderr except the end of
+  // the pipe used by swift-backtrace.
+
+  int keepOpen1 = memserver_master_fd < memserver_fd
+    ? memserver_master_fd : memserver_fd;
+  int keepOpen2 = memserver_master_fd < memserver_fd
+    ? memserver_fd : memserver_master_fd;
+
+  _close_range(MIN_FD_TO_CLOSE, keepOpen1-1, 0);
+  if (keepOpen2 > keepOpen1+1)
+    _close_range(keepOpen1+1, keepOpen2-1, 0);
+  _close_range(keepOpen2+1, maxFdToClose, 0);
+}
+
 int
 memserver_start()
 {
@@ -696,33 +742,19 @@ memserver_start()
 
   memserver_fd = fds[0];
   ret = clone(memserver_entry, memserver_stack + sizeof(memserver_stack),
-#if MEMSERVER_USE_PROCESS
-              0,
-#else
               #ifndef __musl__
               // Can't use CLONE_THREAD on musl because the clone() function
               // there returns EINVAL if we do.
               CLONE_THREAD | CLONE_SIGHAND |
               #endif
               CLONE_VM | CLONE_FILES | CLONE_FS | CLONE_IO,
-#endif
               NULL);
   if (ret < 0) {
     memserver_error("memserver_start: clone failed");
     return ret;
   }
 
-#if MEMSERVER_USE_PROCESS
-  memserver_pid = ret;
-
-  /* Tell the Yama LSM module, if it's running, that it's OK for
-     the memserver to read process memory */
-  prctl(PR_SET_PTRACER, ret);
-
-  close(fds[0]);
-#else
   memserver_pid = getpid();
-#endif
 
   return fds[1];
 }
@@ -754,10 +786,6 @@ int
 memserver_entry(void *dummy __attribute__((unused))) {
   int fd = memserver_fd;
   int result = 1;
-
-#if MEMSERVER_USE_PROCESS || defined(__musl__)
-  prctl(PR_SET_NAME, "[backtrace]");
-#endif
 
   struct sigaction sa;
   sigfillset(&sa.sa_mask);

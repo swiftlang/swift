@@ -330,7 +330,8 @@ static void printImports(raw_ostream &out,
 
   for (auto import : allImports) {
     auto importedModule = import.importedModule;
-    if (importedModule->isOnoneSupportModule()) {
+    if (importedModule->isOnoneSupportModule() ||
+        importedModule->isClangHeaderImportModule()) {
       continue;
     }
 
@@ -456,10 +457,9 @@ class InheritedProtocolCollector {
       for (auto nextAttr : D->getSemanticAvailableAttrs()) {
         // FIXME: This is just approximating the effects of nested availability
         // attributes for the same platform; formally they'd need to be merged.
-        // FIXME: [availability] This should compare availability domains.
         bool alreadyHasMoreSpecificAttrForThisPlatform = llvm::any_of(
             *cache, [nextAttr](SemanticAvailableAttr existingAttr) {
-              return existingAttr.getPlatform() == nextAttr.getPlatform();
+              return existingAttr.getDomain() == nextAttr.getDomain();
             });
         if (alreadyHasMoreSpecificAttrForThisPlatform)
           continue;
@@ -695,7 +695,7 @@ public:
     if (!printOptions.shouldPrint(nominal))
       return;
 
-    /// is this nominal specifically an 'actor' or 'distributed actor'?
+    // Is this nominal specifically an 'actor' or 'distributed actor'?
     bool anyActorClass = false;
     if (auto klass = dyn_cast<ClassDecl>(nominal)) {
       anyActorClass = klass->isAnyActor();

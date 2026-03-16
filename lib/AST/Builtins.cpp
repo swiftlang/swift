@@ -2029,6 +2029,17 @@ static ValueDecl *getFixLifetimeOperation(ASTContext &C, Identifier Id) {
   return builder.build(Id);
 }
 
+static ValueDecl *getMarkDependenceOperation(ASTContext &C, Identifier Id) {
+  // <T, V> (T, V) -> T
+  BuiltinFunctionBuilder builder(C, 2);
+  auto genericValueParam = makeGenericParam(0);
+  auto genericBaseParam = makeGenericParam(1);
+  builder.addParameter(genericValueParam);
+  builder.addParameter(genericBaseParam);
+  builder.setResult(genericValueParam);
+  return builder.build(Id);
+}
+
 static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
                                              Type FirstTy, Type SecondTy) {
   // (Vector<N, T>, Int32) -> T
@@ -3290,6 +3301,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::FixLifetime:
     return getFixLifetimeOperation(Context, Id);
+
+  case BuiltinValueKind::MarkDependence:
+    return getMarkDependenceOperation(Context, Id);
 
   case BuiltinValueKind::CanBeObjCClass:
     return getCanBeObjCClassOperation(Context, Id);

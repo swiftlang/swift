@@ -278,6 +278,12 @@ emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
                         RValue &&initialValue) {
   SmallVector<SILValue> arguments;
 
+  // FIXME: We ought to be using the high-level call emission machinery instead
+  // of hand writing this out.
+  SILValue accessorRef =
+      SGF.emitGlobalFunctionRef(loc, SGF.getAccessorDeclRef(accessor));
+  auto fnType = accessorRef->getType().castTo<SILFunctionType>();
+
   auto emitFieldReference = [&](VarDecl *field, bool forInit = false) {
     auto fieldTy =
         selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
@@ -291,7 +297,23 @@ emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
   }
 
   // `initialValue`
-  std::move(initialValue).forwardAll(SGF, arguments);
+  {
+    SILFunctionConventions fnConv(fnType, SGF.SGM.M);
+    auto startArgIdx = fnConv.getSILArgIndexOfFirstParam();
+
+    SmallVector<ManagedValue> initialValues;
+    std::move(initialValue).getAll(initialValues);
+
+    for (auto i : indices(initialValues)) {
+      // If we need the argument in memory, materialize an address.
+      auto paramInfo = fnConv.getParamInfoForSILArg(startArgIdx + i);
+      ManagedValue arg = initialValues[i];
+      if (fnConv.isSILIndirect(paramInfo) && !arg.getType().isAddress())
+        arg = arg.materialize(SGF, loc);
+
+      arguments.push_back(arg.forward(SGF));
+    }
+  }
 
   // And finally, all of the properties in `accesses` list which are
   // `inout` arguments.
@@ -309,8 +331,6 @@ emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
     subs = env->getForwardingSubstitutionMap();
   }
 
-  SILValue accessorRef =
-      SGF.emitGlobalFunctionRef(loc, SGF.getAccessorDeclRef(accessor));
   (void)SGF.B.createApply(loc, accessorRef, subs, arguments, ApplyOptions());
 }
 
@@ -1022,7 +1042,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     }
 
     selfValue = B.createAllocRefDynamic(Loc, allocArg, selfTy,
-                                        useObjCAllocation, false, {}, {});
+                                        useObjCAllocation, false,
+                                        StackAllocationIsNested, {}, {});
   } else {
     assert(ctor->isDesignatedInit());
     // For a designated initializer, we know that the static type being
@@ -1030,6 +1051,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // initializer.
     F.setIsExactSelfClass(IsExactSelfClass);
     selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false, false,
+                                 StackAllocationIsNested,
                                  ArrayRef<SILType>(), ArrayRef<SILValue>());
   }
   args.push_back(selfValue);

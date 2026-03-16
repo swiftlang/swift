@@ -17,10 +17,10 @@
 //===----------------------------------------------------------------------===//
 #include "swift/Sema/ConstraintSystem.h"
 #include "CSDiagnostics.h"
+#include "MiscDiagnostics.h"
 #include "OpenedExistentials.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
-#include "TypeCheckEmbedded.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -33,6 +33,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeTransform.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -506,7 +507,8 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
   // FIXME: This will need to change when we do inference of thrown error
   // types in closures.
   if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
-    return getClosureType(closure)->getEffectiveThrownErrorTypeOrNever();
+    auto closureTy = simplifyType(getType(closure))->castTo<FunctionType>();
+    return closureTy->getEffectiveThrownErrorTypeOrNever();
   }
 
   if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows))
@@ -1413,7 +1415,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
 
   if (throws || async) {
     if (expr->getThrowsLoc().isValid() && !expr->getExplicitThrownTypeRepr())
-      diagnoseUntypedThrowsInEmbedded(expr, expr->getThrowsLoc());
+      diagnoseUntypedThrows(expr, expr->getThrowsLoc());
 
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
@@ -1724,7 +1726,7 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
       return std::pair(ty, false);
 
     // Otherwise we've flattened the dependence, evaluate Sendable.
-    return std::make_pair(Type(), ty->isSendableType());
+    return std::make_pair(Type(), isSendableCapture(ty));
   }
 };
 
@@ -4682,22 +4684,6 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
       ctx, TypeExpr::createImplicit(typeEraser, ctx), argList);
 }
 
-/// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
-/// constraint system, return the decl that it references.
-ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
-  // See if we have a resolution for this member.
-  auto overload = findSelectedOverloadFor(locator);
-  if (!overload)
-    return nullptr;
-
-  // We only want to handle the simplest decl binding.
-  auto choice = overload->choice;
-  if (choice.getKind() != OverloadChoiceKind::Decl)
-    return nullptr;
-
-  return choice.getDecl();
-}
-
 void SyntacticElementTargetKey::dump() const { dump(llvm::errs()); }
 
 void SyntacticElementTargetKey::dump(raw_ostream &OS) const {
@@ -5286,6 +5272,23 @@ bool constraints::isOperatorDisjunction(Constraint *disjunction) {
 
   auto *decl = getOverloadChoiceDecl(choices.front());
   return decl ? decl->isOperator() : false;
+}
+
+bool constraints::isSendableCapture(Type type) {
+  ASSERT(!type->hasTypeVariable());
+
+  if (!type->isSendableType())
+    return false;
+
+  // All of the type parameters involved in the type that may have isolated
+  // conformances have to conform to `SendableMetatype`.
+  return !type.findIf([&](Type innerTy) {
+    if (auto *archetypeTy = innerTy->getAs<ArchetypeType>()) {
+      if (archetypeTy->mayHaveIsolatedConformance())
+        return !MetatypeType::get(archetypeTy)->isSendableType();
+    }
+    return false;
+  });
 }
 
 ASTNode constraints::findAsyncNode(ClosureExpr *closure) {

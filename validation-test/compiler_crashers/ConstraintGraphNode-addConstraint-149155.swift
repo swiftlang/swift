@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::constraints::ConstraintGraphNode::addConstraint(swift::constraints::Constraint*)","signatureAssert":"Assertion failed: (ConstraintIndex.count(constraint) == 0 && \"Constraint re-insertion\"), function addConstraint"}
+// {"kind":"typecheck","signature":"swift::constraints::ConstraintGraphNode::addConstraint(swift::constraints::Constraint*)","signatureAssert":"Assertion failed: (ConstraintIndex.count(constraint) == 0 && \"Constraint re-insertion\"), function addConstraint","signatureNext":"ConstraintGraph::addConstraint"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 [{
     a

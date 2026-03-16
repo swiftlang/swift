@@ -299,6 +299,10 @@ BridgedASTType BridgedDeclObj::NominalType_getDeclaredInterfaceType() const {
       getAs<swift::NominalTypeDecl>()->getDeclaredInterfaceType().getPointer()};
 }
 
+BridgedASTType BridgedDeclObj::NominalType_getSelfInterfaceType() const {
+  return { getAs<swift::NominalTypeDecl>()->getSelfInterfaceType().getPointer()};
+}
+
 void BridgedDeclObj::GenericContext_setGenericSignature(BridgedGenericSignature genericSignature) const {
   getAs<swift::GenericContext>()->setGenericSignature(genericSignature.unbridged());
 }

@@ -337,11 +337,14 @@ public:
   SingleValueInstruction *
   createNewClosure(SILBuilder &B, SILValue V,
                    llvm::SmallVectorImpl<SILValue> &Args) const {
-    if (auto *PA = dyn_cast<PartialApplyInst>(getClosure()))
-      return B.createPartialApply(getClosure()->getLoc(), V, {}, Args,
-                                  PA->getCalleeConvention(),
-                                  PA->getResultIsolation(),
-                                  PA->isOnStack());
+    if (auto *PA = dyn_cast<PartialApplyInst>(getClosure())) {
+      auto NPA = B.createPartialApply(getClosure()->getLoc(), V, {}, Args,
+                                      PA->getCalleeConvention(),
+                                      PA->getResultIsolation(),
+                                      PA->isOnStack(),
+                                      PA->isStackAllocationNested());
+      return NPA;
+    }
 
     assert(isa<ThinToThickFunctionInst>(getClosure()) &&
            "We only support partial_apply and thin_to_thick_function");
@@ -882,7 +885,7 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
     auto NewPA = Builder.createPartialApply(
         CallSiteDesc.getLoc(), FunRef, {}, {calleeValue},
         PAI->getCalleeConvention(), PAI->getResultIsolation(),
-        PAI->isOnStack());
+        PAI->isOnStack(), PAI->isStackAllocationNested());
     // If the partial_apply is on stack we will emit a dealloc_stack in the
     // epilog.
     NeedsRelease.push_back(NewPA);

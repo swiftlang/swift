@@ -1006,8 +1006,16 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
     if (dropGlobalActor && extInfo.getGlobalActor())
       extInfo = extInfo.withoutIsolation();
 
-    if (dropIsolation)
-      extInfo = extInfo.withoutIsolation();
+    if (dropIsolation) {
+      // Special case for `isolated` parameters, because even though
+      // the isolation was dropped, the parameter itself was left with
+      // `isolated` bit set. `dropIsolation` is intended only for
+      // mangling of `@preconcurrency` declarations and isolated parameters
+      // don't contribute to the type so it's save to keep the original
+      // isolation here.
+      if (!extInfo.getIsolation().isParameter())
+        extInfo = extInfo.withoutIsolation();
+    }
 
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
     Type resultType = fnType->getResult();
@@ -1462,6 +1470,31 @@ Type TypeBase::withCovariantResultType() {
   
   return FunctionType::get(fnType->getParams(), resultFnType,
                            fnType->getExtInfo());
+}
+
+Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
+  if (!hasTypeVariableOrPlaceholder())
+    return Type(this);
+
+  struct Transform : public TypeTransform<Transform> {
+    Transform(ASTContext &ctx) : TypeTransform(ctx) {}
+
+    std::optional<Type> transform(TypeBase *ty, TypePosition) {
+      if (!ty->hasTypeVariableOrPlaceholder())
+        return ty;
+
+      if (isa<TypeVariableType>(ty) || isa<PlaceholderType>(ty))
+        return ErrorType::get(ctx);
+
+      return std::nullopt;
+    }
+    std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+      // Fold away the sendable dependence if present, the function type will
+      // just become non-Sendable.
+      return std::make_pair(Type(), false);
+    }
+  };
+  return Transform(getASTContext()).doIt(this, TypePosition::Invariant);
 }
 
 /// Whether this parameter accepts an unlabeled trailing closure argument
@@ -3777,6 +3810,12 @@ Type ArchetypeType::getExistentialType() const {
 
   auto existentialType = genericSig->getExistentialType(interfaceType);
   return genericEnv->maybeApplyOuterContextSubstitutions(existentialType);
+}
+
+bool ArchetypeType::mayHaveIsolatedConformance() const {
+  auto genericEnv = getGenericEnvironment();
+  auto genericSig = genericEnv->getGenericSignature();
+  return !genericSig->prohibitsIsolatedConformance(getInterfaceType());
 }
 
 bool ArchetypeType::requiresClass() const {

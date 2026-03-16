@@ -1,9 +1,19 @@
+// FIXME: This test contains unconditional CHECKs that require all of the
+// test logic to run, but then also contain if #available(SwiftStdlib 6.4, *) 
+// conditionals that mean that the test cannot actually execute on all test runners.
+// This is why disabling availability checking is the best tool available to
+// make this test consistent. This test is thus unspported on the configurations
+// cited below, where the stdlib symbols will not be present, to avoid crashes.
+// Make sure to update this test accordingly when a more appropriate tool is added.
+
 // RUN: %target-run-simple-swift(-enable-experimental-feature BorrowingForLoop \
 // RUN: -Xfrontend -disable-availability-checking) \
-// RUN:     %s | %FileCheck %s
+// RUN: %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BorrowingForLoop
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 struct NoncopyableInt: ~Copyable {
   var value: Int
@@ -15,6 +25,7 @@ extension NoncopyableInt: Equatable {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testContinueTarget(seq: borrowing Span<NoncopyableInt>) {
   for element in seq {
     if (element.value == 2){
@@ -27,6 +38,7 @@ func testContinueTarget(seq: borrowing Span<NoncopyableInt>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testBreakTarget(seq: borrowing Span<NoncopyableInt>) {
   for element in seq {
     if (element.value == 3){
@@ -39,6 +51,7 @@ func testBreakTarget(seq: borrowing Span<NoncopyableInt>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testWhereClause(seq: borrowing Span<NoncopyableInt>) {
   for element in seq where element.value.isMultiple(of: 2) {
     // CHECK: element.value = 0
@@ -47,6 +60,7 @@ func testWhereClause(seq: borrowing Span<NoncopyableInt>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testWhereClauseWithContinue(seq: borrowing Span<NoncopyableInt>) {
   for element in seq where element.value > 0 {
     if (element.value == 2){
@@ -58,6 +72,7 @@ func testWhereClauseWithContinue(seq: borrowing Span<NoncopyableInt>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testWhereClauseWithBreak(seq: borrowing Span<NoncopyableInt>) {
   for element in seq where element.value.isMultiple(of: 2) {
     if (element.value > 1){
@@ -68,6 +83,7 @@ func testWhereClauseWithBreak(seq: borrowing Span<NoncopyableInt>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testNestedForLoops(seq: borrowing Span<NoncopyableInt>) {
   for element in seq{
     let arr = [0, 1, 2, 3]
@@ -81,6 +97,7 @@ func testNestedForLoops(seq: borrowing Span<NoncopyableInt>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testNestedForLoopsWithBreak(seq: borrowing Span<NoncopyableInt>) {
   for element in seq{
     let arr = [0, 1, 2, 3]
@@ -95,6 +112,7 @@ func testNestedForLoopsWithBreak(seq: borrowing Span<NoncopyableInt>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testNestedForLoopsWithContinue(seq: borrowing Span<NoncopyableInt>) {
   for element in seq{
     let arr = [0, 1, 2, 3]
@@ -113,6 +131,7 @@ func testNestedForLoopsWithContinue(seq: borrowing Span<NoncopyableInt>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testNestedForLoopsWithWhereClause(seq: borrowing Span<NoncopyableInt>) {
   for element in seq where element.value != 2 {
     let arr = [0, 1, 2, 3]
@@ -134,18 +153,20 @@ buffer.initializeElement(at: 1, to: NoncopyableInt(value: 1))
 buffer.initializeElement(at: 2, to: NoncopyableInt(value: 2))
 buffer.initializeElement(at: 3, to: NoncopyableInt(value: 3))
 
-let seq = Span<NoncopyableInt>(_unsafeElements: buffer)
+if #available(SwiftStdlib 6.4, *){
+  let seq = Span<NoncopyableInt>(_unsafeElements: buffer)
+  testContinueTarget(seq: seq)
+  testBreakTarget(seq: seq)
+  testWhereClause(seq: seq)
+  testWhereClauseWithContinue(seq: seq)
+  testWhereClauseWithBreak(seq: seq)
+  testNestedForLoops(seq: seq)
+  testNestedForLoopsWithBreak(seq: seq)
+  testNestedForLoopsWithContinue(seq: seq)
+  testNestedForLoopsWithWhereClause(seq: seq)
+}
 
-testContinueTarget(seq: seq)
-testBreakTarget(seq: seq)
-testWhereClause(seq: seq)
-testWhereClauseWithContinue(seq: seq)
-testWhereClauseWithBreak(seq: seq)
-testNestedForLoops(seq: seq)
-testNestedForLoopsWithBreak(seq: seq)
-testNestedForLoopsWithContinue(seq: seq)
-testNestedForLoopsWithWhereClause(seq: seq)
-
+@available(SwiftStdlib 6.4, *)
 func testCopyableContinueTarget(seq: borrowing Span<Int>) {
   for element in seq {
     if (element == 2){
@@ -158,6 +179,7 @@ func testCopyableContinueTarget(seq: borrowing Span<Int>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testCopyableBreakTarget(seq: borrowing Span<Int>) {
   for element in seq {
     if (element == 3){
@@ -170,6 +192,7 @@ func testCopyableBreakTarget(seq: borrowing Span<Int>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testCopyableWhereClause(seq: borrowing Span<Int>) {
   for element in seq where element.isMultiple(of: 2) {
     // CHECK: element = 0
@@ -178,6 +201,7 @@ func testCopyableWhereClause(seq: borrowing Span<Int>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testCopyableWhereClauseWithContinue(seq: borrowing Span<Int>) {
   for element in seq where element > 0 {
     if (element == 2){
@@ -189,6 +213,7 @@ func testCopyableWhereClauseWithContinue(seq: borrowing Span<Int>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testCopyableWhereClauseWithBreak(seq: borrowing Span<Int>) {
   for element in seq where element.isMultiple(of: 2) {
     if (element > 1){
@@ -199,6 +224,7 @@ func testCopyableWhereClauseWithBreak(seq: borrowing Span<Int>) {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 func testCopyableNestedForLoops(seq: borrowing Span<Int>) {
   for element in seq{
     let arr = [0, 1, 2, 3]
@@ -213,10 +239,12 @@ func testCopyableNestedForLoops(seq: borrowing Span<Int>) {
 }
 
 let arr = [0, 1, 2 , 3]
-let copyableSpan = arr.span
-testCopyableContinueTarget(seq: copyableSpan)
-testCopyableBreakTarget(seq: copyableSpan)
-testCopyableWhereClause(seq: copyableSpan)
-testCopyableWhereClauseWithContinue(seq: copyableSpan)
-testCopyableWhereClauseWithBreak(seq: copyableSpan)
-testCopyableNestedForLoops(seq: copyableSpan)
+if #available(SwiftStdlib 6.4, *){
+  let copyableSpan = arr.span
+  testCopyableContinueTarget(seq: copyableSpan)
+  testCopyableBreakTarget(seq: copyableSpan)
+  testCopyableWhereClause(seq: copyableSpan)
+  testCopyableWhereClauseWithContinue(seq: copyableSpan)
+  testCopyableWhereClauseWithBreak(seq: copyableSpan)
+  testCopyableNestedForLoops(seq: copyableSpan)
+}

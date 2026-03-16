@@ -181,8 +181,7 @@ private:
 
   ClangInvocationFileMapping clangFileMapping;
 
-  ClangImporter(ASTContext &ctx, DependencyTracker *tracker,
-                DWARFImporterDelegate *dwarfImporterDelegate);
+  ClangImporter(ASTContext &ctx, DependencyTracker *tracker);
 
   /// Creates a clone of Clang importer's compiler instance that has been
   /// configured for operations on precompiled outputs (either emitting a
@@ -205,20 +204,17 @@ public:
   /// \param swiftPCHHash A hash of Swift's various options in a compiler
   /// invocation, used to create a unique Bridging PCH if requested.
   ///
-  /// \param tracker The object tracking files this compilation depends on.
+  /// \param casidForPCH The CASID for the PCH buffer, used to create CASID
+  /// reference to PCH in debug info.
   ///
-  /// \param dwarfImporterDelegate A helper object that can synthesize
-  /// Clang Decls from debug info. Used by LLDB.
+  /// \param tracker The object tracking files this compilation depends on.
   ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx,
-         const IRGenOptions *IRGenOpts = nullptr,
-         std::string swiftPCHHash = "",
-         DependencyTracker *tracker = nullptr,
-         DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
-         bool ignoreFileMapping = false);
+  create(ASTContext &ctx, const IRGenOptions *IRGenOpts = nullptr,
+         std::string swiftPCHHash = "", std::string casidForPCH = "",
+         DependencyTracker *tracker = nullptr, bool ignoreFileMapping = false);
 
   static std::string getClangSystemOverlayFile(const SearchPathOptions &Opts);
 
@@ -230,6 +226,10 @@ public:
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS,
       bool suppressDiagnostics = false,
       llvm::function_ref<StringRef(StringRef)> allocateString = nullptr);
+
+  /// Install a helper object that can synthesize Clang Decls from debug
+  /// info. Used by LLDB.
+  void setDWARFImporterDelegate(DWARFImporterDelegate *dwarfImporterDelegate);
 
   std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
@@ -271,9 +271,6 @@ public:
   ClangImporter &operator=(ClangImporter &&) = delete;
 
   ~ClangImporter();
-
-  /// Only to be used by lldb-moduleimport-test.
-  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
 
   /// Create a new clang::DependencyCollector customized to
   /// ClangImporter's specific uses.
@@ -764,9 +761,9 @@ getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 /// Returns true if the given type is a C++ `const` reference type.
 bool isCxxConstReferenceType(const clang::Type *type);
 
-/// Determine whether the given Clang record declaration has one of the
-/// attributes that makes it import as a reference types.
-bool hasImportAsRefAttr(const clang::RecordDecl *decl);
+/// Determine whether the given Clang record declaration has an attribute that
+/// makes it import as a reference types. Does not check its bases, if any.
+bool hasImportReferenceAttr(const clang::RecordDecl *decl);
 
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
@@ -947,6 +944,17 @@ struct RefCountedPtrRequestResult {
 
 RefCountedPtrRequestResult
 getClangRefCountedSmartPointer(NominalTypeDecl *decl);
+
+/// Iterator categories, based on the std iterator tags
+enum class CxxIteratorCategory {
+  // Output,
+  Input = 1,
+  // Forward,
+  // Bidirectional,
+  RandomAccess,
+  Contiguous,
+};
+
 } // namespace importer
 
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.

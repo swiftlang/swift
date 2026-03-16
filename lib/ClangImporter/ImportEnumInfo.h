@@ -17,18 +17,16 @@
 #ifndef SWIFT_CLANG_IMPORT_ENUM_H
 #define SWIFT_CLANG_IMPORT_ENUM_H
 
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Sema.h"
-#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace clang {
 class EnumDecl;
 class Preprocessor;
 class MacroInfo;
-}
+} // namespace clang
 
 namespace swift {
 namespace importer {

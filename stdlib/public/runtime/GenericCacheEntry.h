@@ -17,7 +17,6 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/Unreachable.h"
-#include "swift/RemoteInspection/GenericMetadataCacheEntry.h"
 #include "swift/Runtime/LibPrespecialized.h"
 
 namespace swift {

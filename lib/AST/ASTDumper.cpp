@@ -4997,14 +4997,10 @@ public:
     printFoot();
   }
 
-  void visitIntegerTypeRepr(IntegerTypeRepr *T, Label label) {
-    printCommon("type_integer", label);
-
-    if (T->getMinusLoc()) {
-      printCommon("is_negative", label);
-    }
-
-    printFieldQuoted(T->getValue(), Label::always("value"), IdentifierColor);
+  void visitGenericArgumentExprTypeRepr(GenericArgumentExprTypeRepr *T,
+                                        Label label) {
+    printCommon("generic_argument_expr", label);
+    printRec(T->getArgExpr(), Label::optional("arg_expr"));
     printFoot();
   }
 };

@@ -567,11 +567,12 @@ public:
     }
     if (!isa<clang::TypeDecl>(clangDecl))
       return;
-    // Get the underlying clang type from a type alias decl or record decl.
+    // Get the underlying clang type from a type alias decl, record decl, or
+    // enum decl.
     auto clangType = clangDecl->getASTContext()
                          .getTypeDeclType(cast<clang::TypeDecl>(clangDecl))
                          .getCanonicalType();
-    if (!isa<clang::RecordType>(clangType.getTypePtr()))
+    if (!isa<clang::RecordType, clang::EnumType>(clangType.getTypePtr()))
       return;
     auto it = seenClangTypes.insert(clangType.getTypePtr());
     if (it.second)
@@ -592,6 +593,9 @@ public:
         if (!addImport(NTD))
           forwardDeclareCxxValueTypeIfNeeded(NTD);
         else if (isa<StructDecl>(TD) && NTD->hasClangNode())
+          emitReferencedClangTypeMetadata(NTD);
+        else if (isa<EnumDecl>(TD) && NTD->hasClangNode() &&
+                 isa<clang::EnumDecl>(NTD->getClangDecl()))
           emitReferencedClangTypeMetadata(NTD);
         else if (const auto *cd = dyn_cast<ClassDecl>(TD))
           if ((cd->isObjC() && cd->getClangDecl()) ||

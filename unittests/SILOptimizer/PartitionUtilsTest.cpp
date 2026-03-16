@@ -100,10 +100,12 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
     case PartitionOpError::NonSendableIsolationCrossingResult:
     case PartitionOpError::InOutSendingReturned:
     case PartitionOpError::InOutSendingParametersInSameRegion:
+    case PartitionOpError::IncompatibleRegionMerge:
       llvm_unreachable("Unsupported");
     case PartitionOpError::LocalUseAfterSend: {
       auto state = std::move(error).getLocalUseAfterSendError();
       failureCallback(*state.op, state.sentElement, state.sendingOp);
+      break;
     }
     }
   }
@@ -258,22 +260,33 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
     expect_join_eq();
   };
 
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(1), Element(2)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(7), Element(8)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(2), Element(7)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(1), Element(3)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(3), Element(4)));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(1), Element(2), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(7), Element(8), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(2), Element(7), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(1), Element(3), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(3), Element(4), RegionMergeReason::Unknown));
 
   EXPECT_FALSE(Partition::equals(p1, p2));
   EXPECT_FALSE(Partition::equals(p2, p3));
   EXPECT_FALSE(Partition::equals(p1, p3));
 
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(2), Element(5)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(5), Element(6)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(1), Element(6)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(2), Element(6)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(3), Element(7)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(7), Element(8)));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(2), Element(5), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(5), Element(6), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(1), Element(6), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(2), Element(6), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(3), Element(7), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(7), Element(8), RegionMergeReason::Unknown));
 }
 
 TEST(PartitionUtilsTest, Join1) {
@@ -919,7 +932,8 @@ TEST(PartitionUtilsTest, TestHistory_BuildNewRegionRepIsMergee) {
                 PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignDirect(Element(3), Element(2)),
                 PartitionOp::AssignDirect(Element(10), Element(2)),
-                PartitionOp::Merge(Element(2), Element(0))});
+                PartitionOp::Merge(Element(2), Element(0),
+                                   RegionMergeReason::Unknown)});
   }
 
   Partition pSnapshot = p;

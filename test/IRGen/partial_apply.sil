@@ -16,6 +16,7 @@ sil @$s13partial_apply10SwiftClassCfD : $@convention(method) (SwiftClass) -> ()
 
 sil @partially_applyable_to_class : $@convention(thin) (@guaranteed SwiftClass) -> ()
 sil @partially_applyable_to_two_classes : $@convention(thin) (@guaranteed SwiftClass, @guaranteed SwiftClass) -> ()
+sil @partially_applyable_to_twenty_classes : $@convention(thin) (@guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass) -> ()
 
 sil @use_closure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 
@@ -75,6 +76,96 @@ entry(%a : $SwiftClass, %b: $SwiftClass):
   %t = tuple()
   return %t : $()
 }
+
+//   A [non_nested] partial application can still allocate the context
+//   with a static alloca if it's fixed size.
+// CHECK: define{{.*}} swiftcc void @partial_apply_two_classes_on_stack_non_nested(ptr %0, ptr %1)
+// CHECK: entry:
+// CHECK:   [[CTX:%.*]] = alloca i8, i64 32, align 16
+// CHECK:   [[CAPTURE1:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, ptr }>, ptr [[CTX]], i32 0, i32 1
+// CHECK:   store ptr %0, ptr [[CAPTURE1]], align 8
+// CHECK:   [[CAPTURE2:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, ptr }>, ptr [[CTX]], i32 0, i32 2
+// CHECK:   store ptr %1, ptr [[CAPTURE2]], align 8
+// CHECK:   call swiftcc void @use_closure(ptr @"$s34partially_applyable_to_two_classesTA.2", ptr [[CTX]])
+// CHECK:   call void @swift_release(ptr %0)
+// CHECK:   call void @swift_release(ptr %1)
+// CHECK:   ret void
+// CHECK: }
+
+sil @partial_apply_two_classes_on_stack_non_nested : $@convention(thin) (@owned SwiftClass, @owned SwiftClass) -> () {
+entry(%a : $SwiftClass, %b: $SwiftClass):
+  %f = function_ref @partially_applyable_to_two_classes : $@convention(thin) (@guaranteed SwiftClass, @guaranteed SwiftClass) -> ()
+  %c = partial_apply [callee_guaranteed] [on_stack] [non_nested] %f(%a, %b) : $@convention(thin) (@guaranteed SwiftClass, @guaranteed SwiftClass) -> ()
+  %use = function_ref @use_closure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  apply %use(%c) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %c : $@noescape @callee_guaranteed () ->()
+  strong_release %a : $SwiftClass
+  strong_release %b : $SwiftClass
+  %t = tuple()
+  return %t : $()
+}
+
+//   This exceeds the limit of what we're willing to allocate on the
+//   stack, so we fall over to the heap, which makes it use malloc because
+//   it's non-nested.
+// CHECK: define{{.*}} swiftcc void @partial_apply_twenty_classes_on_stack_non_nested(ptr %0, ptr %1, ptr %2, ptr %3, ptr %4, ptr %5, ptr %6, ptr %7, ptr %8, ptr %9, ptr %10, ptr %11, ptr %12, ptr %13, ptr %14, ptr %15, ptr %16, ptr %17, ptr %18, ptr %19, i1 %20)
+// CHECK: entry:
+// CHECK:   br i1 %20, label %[[YES:[0-9]+]],
+// CHECK: [[YES]]:
+// CHECK:   [[CTX:%.*]] = call ptr @malloc(i64 176)
+// CHECK:   [[CAPTURE0:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr [[CTX]], i32 0, i32 1
+// CHECK:   store ptr %0, ptr [[CAPTURE0]], align 8
+// CHECK:   [[CAPTURE1:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr [[CTX]], i32 0, i32 2
+// CHECK:   store ptr %1, ptr [[CAPTURE1]], align 8
+//          ...
+// CHECK:   call swiftcc void @use_closure(ptr @"$s37partially_applyable_to_twenty_classesTA", ptr [[CTX]])
+// CHECK:   call void @free(ptr [[CTX]])
+// CHECK:   br label %[[DONE:[0-9]+]]
+// CHECK: [[DONE]]:
+// CHECK:   call void @swift_release(ptr %0)
+//          ...
+// CHECK:   ret void
+// CHECK: }
+
+sil @partial_apply_twenty_classes_on_stack_non_nested : $@convention(thin) (@owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, @owned SwiftClass, Builtin.Int1) -> () {
+entry(%a : $SwiftClass, %b: $SwiftClass, %c: $SwiftClass, %d: $SwiftClass, %e: $SwiftClass, %f: $SwiftClass, %g: $SwiftClass, %h: $SwiftClass, %i: $SwiftClass, %j: $SwiftClass, %k: $SwiftClass, %l: $SwiftClass, %m: $SwiftClass, %n: $SwiftClass, %o: $SwiftClass, %p: $SwiftClass, %q: $SwiftClass, %r: $SwiftClass, %s: $SwiftClass, %t: $SwiftClass, %cond: $Builtin.Int1):
+  // We don't limit the size in the entry block, so we also need control flow
+  // to trigger the malloc case.
+  cond_br %cond, bb1, bb2
+
+bb1:
+  %function = function_ref @partially_applyable_to_twenty_classes : $@convention(thin) (@guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass) -> ()
+  %closure = partial_apply [callee_guaranteed] [on_stack] [non_nested] %function(%a, %b, %c, %d, %e, %f, %g, %h, %i, %j, %k, %l, %m, %n, %o, %p, %q, %r, %s, %t) : $@convention(thin) (@guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass) -> ()
+  %use = function_ref @use_closure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  apply %use(%closure) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %closure : $@noescape @callee_guaranteed () ->()
+  br bb2
+
+bb2:
+  strong_release %a : $SwiftClass
+  strong_release %b : $SwiftClass
+  strong_release %c : $SwiftClass
+  strong_release %d : $SwiftClass
+  strong_release %e : $SwiftClass
+  strong_release %f : $SwiftClass
+  strong_release %g : $SwiftClass
+  strong_release %h : $SwiftClass
+  strong_release %i : $SwiftClass
+  strong_release %j : $SwiftClass
+  strong_release %k : $SwiftClass
+  strong_release %l : $SwiftClass
+  strong_release %m : $SwiftClass
+  strong_release %n : $SwiftClass
+  strong_release %o : $SwiftClass
+  strong_release %p : $SwiftClass
+  strong_release %q : $SwiftClass
+  strong_release %r : $SwiftClass
+  strong_release %s : $SwiftClass
+  strong_release %t : $SwiftClass
+  %ret = tuple()
+  return %ret : $()
+}
+
 //
 // Check that partially applied generic parameters are correctly substituted
 // in the forwarder.

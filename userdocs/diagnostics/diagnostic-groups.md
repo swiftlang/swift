@@ -36,16 +36,19 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
+- <doc:return-type-implicit-copy>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
 - <doc:module-version-missing>
+- <doc:oslog>
 - <doc:result-builder-methods>
 - <doc:semantic-copies>
 - <doc:strict-language-features>
 - <doc:strict-memory-safety>
 - <doc:unknown-warning-group>
+- <doc:untyped-throws>
 
 
 ## Topics
@@ -63,6 +66,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
+- <doc:return-type-implicit-copy>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
 - <doc:isolated-conformances>
@@ -72,6 +76,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:module-not-testable>
 - <doc:multiple-inheritance>
 - <doc:nominal-types>
+- <doc:oslog>
 - <doc:exclusivity-violation>
 - <doc:performance-hints>
 - <doc:property-wrapper-requirements>
@@ -89,4 +94,5 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:unknown-warning-group>
 - <doc:availability-unrecognized-name>
 - <doc:mutable-global-variable>
+- <doc:untyped-throws>
 - <doc:existential-member-access-limitations>

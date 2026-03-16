@@ -28,6 +28,8 @@
 namespace swift {
 
 class ModuleFile;
+struct ExplicitSwiftModuleMap;
+struct ExplicitClangModuleMap;
 enum class ResilienceStrategy : unsigned;
 
 namespace serialization {
@@ -126,6 +128,7 @@ class ExtendedValidationInfo {
   StringRef ModulePackageName;
   StringRef ExportAsName;
   StringRef PublicModuleName;
+  StringRef OSLogStringSectionName;
   CXXStdlibKind CXXStdlib;
   version::Version SwiftInterfaceCompilerVersion;
   struct {
@@ -234,6 +237,11 @@ public:
   StringRef getPublicModuleName() const { return PublicModuleName; }
   void setPublicModuleName(StringRef name) { PublicModuleName = name; }
 
+  StringRef getOSLogStringSectionName() const { return OSLogStringSectionName; }
+  void setOSLogStringSectionName(StringRef name) {
+    OSLogStringSectionName = name;
+  }
+
   StringRef getExportAsName() const { return ExportAsName; }
   void setExportAsName(StringRef name) { ExportAsName = name; }
 
@@ -304,12 +312,13 @@ struct SearchPath {
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data,
-    StringRef requiredSDK,
+    StringRef data, StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr,
     SmallVectorImpl<SearchPath> *searchPaths = nullptr,
+    ExplicitSwiftModuleMap *explicitSwiftModuleMap = nullptr,
+    ExplicitClangModuleMap *explicitClangModuleMa = nullptr,
     std::optional<llvm::Triple> target = std::nullopt);
 
 /// Emit diagnostics explaining a failure to load a serialized AST.

@@ -106,6 +106,11 @@ struct MoveOnlyStruct: ~Copyable {
   var value: MyInt
 }
 
+struct S1 {
+  var i: MyInt
+  var o: AnyObject
+}
+
 enum NoncopyableEnum : ~Copyable {
 case i(CopyableStruct)
 }
@@ -4282,8 +4287,7 @@ bb0(%0 : @guaranteed $B):
 //
 // CHECK-LABEL: sil [ossa] @mark_dependence_base1_lexical1 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*Builtin.Int64, [[INSTANCE:%[^,]+]] : @owned $B):
-// CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
-// CHECK:         [[OPTIONAL:%[^,]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[LIFETIME]]
+// CHECK:         [[OPTIONAL:%[^,]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[INSTANCE]]
 // CHECK:         [[DEPENDENT_ADDR:%[^,]+]] = mark_dependence [[ADDR]]
 // CHECK:         [[VALUE:%[^,]+]] = load [trivial] [[DEPENDENT_ADDR]]
 // CHECK:         return [[VALUE]]
@@ -5662,6 +5666,18 @@ bb2:
   cond_fail %10, "Insufficient space allocated to copy string contents"
   end_borrow %2
   destroy_value [dead_end] %0
+  unreachable
+}
+
+// Just check that this doesn't produce illegal SIL
+sil [ossa] @test_forwarding_from_trivial_to_non_copyable : $@convention(thin) (@owned S1) -> () {
+bb0(%0 : @owned $S1):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S1.i
+  end_borrow %1
+  destroy_value %0
+  %5 = struct $MoveOnlyStruct (%2), forwarding: @owned
+  destroy_value [dead_end] %5
   unreachable
 }
 

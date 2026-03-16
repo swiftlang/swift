@@ -447,6 +447,15 @@ public:
                SILParameterInfo::Isolated);
   }
 
+  /// Returns true if this SILFunctionArgument is an isolated leading
+  /// ImplicitBuiltinActor.
+  bool isImplicitBuiltinActor() const {
+    return isIsolated() &&
+           getKnownParameterInfo().getOptions().contains(
+               SILParameterInfo::ImplicitLeading) &&
+           getType().isBuiltinImplicitActor();
+  }
+
   Lifetime getLifetime() const {
     return getType()
         .getLifetime(*getFunction())
