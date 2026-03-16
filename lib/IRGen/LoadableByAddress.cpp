@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "loadable-address"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
@@ -584,6 +585,10 @@ struct StructLoweringState {
   SmallVector<YieldInst *, 8> modYieldInsts;
   // All destroy_value instrs should be replaced with _addr version
   SmallVector<SILInstruction *, 16> destroyValueInstsToMod;
+  // All make_borrow instrs that should be converted to make_addr_borrow
+  SmallVector<MakeBorrowInst *, 16> makeBorrowInstsToMod;
+  // All dereference_borrow instrs that should be converted to dereference_addr_borrow
+  SmallVector<DereferenceBorrowInst *, 16> dereferenceBorrowInstsToMod;
   // All debug instructions.
   // to be modified *only if* the operands are used in "real" instructions
   SmallVector<DebugValueInst *, 16> debugInstsToMod;
@@ -653,6 +658,8 @@ protected:
   void visitReturnInst(ReturnInst *instr);
   void visitYieldInst(YieldInst *instr);
   void visitDeallocInst(DeallocStackInst *instr);
+  void visitMakeBorrowInst(MakeBorrowInst *instr);
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *instr);
   void visitInstr(SILInstruction *instr);
 };
 } // end anonymous namespace
@@ -692,7 +699,10 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::RefElementAddrInst:
       case SILInstructionKind::BeginAccessInst:
       case SILInstructionKind::InitEnumDataAddrInst:
-      case SILInstructionKind::EnumInst: {
+      case SILInstructionKind::EnumInst:
+      case SILInstructionKind::MakeAddrBorrowInst:
+      case SILInstructionKind::DereferenceAddrBorrowInst:
+      case SILInstructionKind::DereferenceBorrowAddrInst: {
         // TODO Any more instructions to add here?
         visitResultTyInst(cast<SingleValueInstruction>(currIns));
         break;
@@ -755,6 +765,16 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::DeallocStackInst: {
         auto *DI = cast<DeallocStackInst>(currIns);
         visitDeallocInst(DI);
+        break;
+      }
+      case SILInstructionKind::MakeBorrowInst: {
+        auto *MBI = cast<MakeBorrowInst>(currIns);
+        visitMakeBorrowInst(MBI);
+        break;
+      }
+      case SILInstructionKind::DereferenceBorrowInst: {
+        auto *DBI = cast<DereferenceBorrowInst>(currIns);
+        visitDereferenceBorrowInst(DBI);
         break;
       }
       default: {
@@ -933,6 +953,18 @@ void LargeValueVisitor::visitStructExtractInst(StructExtractInst *instr) {
   }
 }
 
+void LargeValueVisitor::visitMakeBorrowInst(MakeBorrowInst *instr) {
+  SILValue operand = instr->getOperand();
+
+  // Value borrows of large types must be changed into address borrows, since
+  // IRGen will use the address representation.
+  if (pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
+                               operand->getType().getObjectType())) {
+    pass.makeBorrowInstsToMod.push_back(instr);
+    return;
+  }
+}
+
 void LargeValueVisitor::visitRetainInst(RetainValueInst *instr) {
   for (Operand &operand : instr->getAllOperands()) {
     if (std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
@@ -971,6 +1003,17 @@ void LargeValueVisitor::visitDestroyValueInst(DestroyValueInst *instr) {
   }
 }
 
+void LargeValueVisitor::
+visitDereferenceBorrowInst(DereferenceBorrowInst *instr) {
+  // Value borrows of large types must be changed into address borrows, since
+  // IRGen will use the address representation.
+  if (pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
+                               instr->getType().getObjectType())) {
+    pass.dereferenceBorrowInstsToMod.push_back(instr);
+    return;
+  }
+}
+
 void LargeValueVisitor::visitResultTyInst(SingleValueInstruction *instr) {
   SILType currSILType = instr->getType().getObjectType();
   SILType newSILType = pass.getNewSILType(pass.F->getLoweredFunctionType(),
@@ -978,8 +1021,7 @@ void LargeValueVisitor::visitResultTyInst(SingleValueInstruction *instr) {
   if (currSILType != newSILType) {
     pass.resultTyInstsToMod.insert(instr);
   }
-  auto *SEI = dyn_cast<StructExtractInst>(instr);
-  if (SEI) {
+  if (auto *SEI = dyn_cast<StructExtractInst>(instr)) {
     visitStructExtractInst(SEI);
   } else {
     visitInstr(instr);
@@ -1217,6 +1259,24 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
       }
       break;
     }
+    case SILInstructionKind::MakeBorrowInst: {
+      auto *instToInsert = cast<MakeBorrowInst>(userIns);
+      if (std::find(pass.makeBorrowInstsToMod.begin(),
+                    pass.makeBorrowInstsToMod.end(),
+                    instToInsert) == pass.makeBorrowInstsToMod.end()) {
+        pass.makeBorrowInstsToMod.push_back(instToInsert);
+      }
+      break;
+    }
+    case SILInstructionKind::DereferenceBorrowInst: {
+      auto *instToInsert = cast<DereferenceBorrowInst>(userIns);
+      if (std::find(pass.dereferenceBorrowInstsToMod.begin(),
+                    pass.dereferenceBorrowInstsToMod.end(),
+                    instToInsert) == pass.dereferenceBorrowInstsToMod.end()) {
+        pass.dereferenceBorrowInstsToMod.push_back(instToInsert);
+      }
+      break;
+    }
     default:
       llvm_unreachable("Unexpected instruction");
     }
@@ -1355,6 +1415,18 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
     case SILInstructionKind::SwitchEnumInst: {
       auto *instToInsert = cast<SwitchEnumInst>(userIns);
       pass.switchEnumInstsToMod.push_back(instToInsert);
+      usesToMod.push_back(use);
+      break;
+    }
+    case SILInstructionKind::MakeBorrowInst: {
+      auto *instToInsert = cast<MakeBorrowInst>(userIns);
+      pass.makeBorrowInstsToMod.push_back(instToInsert);
+      usesToMod.push_back(use);
+      break;
+    }
+    case SILInstructionKind::DereferenceBorrowInst: {
+      auto *instToInsert = cast<DereferenceBorrowInst>(userIns);
+      pass.dereferenceBorrowInstsToMod.push_back(instToInsert);
       usesToMod.push_back(use);
       break;
     }
@@ -1992,20 +2064,18 @@ static SILValue createCopyOfEnum(StructLoweringState &pass,
   return alloc;
 }
 
-static void createResultTyInstrAndLoad(LoadableStorageAllocation &allocator,
-                                       SingleValueInstruction *instr,
+static void createStructElementAddrInstrAndLoad(LoadableStorageAllocation &allocator,
+                                       StructExtractInst *instr,
                                        StructLoweringState &pass) {
   bool updateResultTy = pass.resultTyInstsToMod.count(instr) != 0;
   if (updateResultTy) {
     pass.resultTyInstsToMod.remove(instr);
   }
   SILBuilderWithScope builder(instr);
-  auto *currStructExtractInst = dyn_cast<StructExtractInst>(instr);
-  assert(currStructExtractInst && "Expected StructExtractInst");
   SingleValueInstruction *newInstr = builder.createStructElementAddr(
-      currStructExtractInst->getLoc(), currStructExtractInst->getOperand(),
-      currStructExtractInst->getField(),
-      currStructExtractInst->getType().getAddressType());
+      instr->getLoc(), instr->getOperand(),
+      instr->getField(),
+      instr->getType().getAddressType());
   // Load the struct element then see if we can get rid of the load:
   LoadInst *loadArg = nullptr;
   if (!pass.F->hasOwnership()) {
@@ -2025,6 +2095,59 @@ static void createResultTyInstrAndLoad(LoadableStorageAllocation &allocator,
 
   allocator.replaceLoad(loadArg);
 
+  if (updateResultTy) {
+    pass.resultTyInstsToMod.insert(newInstr);
+  }
+}
+
+static void createMakeAddrBorrow(LoadableStorageAllocation &allocator,
+                                 MakeBorrowInst *instr,
+                                 StructLoweringState &pass) {
+  bool updateResultTy = pass.resultTyInstsToMod.count(instr) != 0;
+  if (updateResultTy) {
+    pass.resultTyInstsToMod.remove(instr);
+  }
+
+  SILBuilderWithScope builder(instr);
+  SingleValueInstruction *newInstr = builder.createMakeAddrBorrow(
+      instr->getLoc(), instr->getOperand());
+
+  // `make_addr_borrow` produces a `Borrow<T>` by-value, like `make_borrow`,
+  // so it is a drop-in replacement.
+  instr->replaceAllUsesWith(newInstr);
+  instr->getParent()->erase(instr);
+
+  if (updateResultTy) {
+    pass.resultTyInstsToMod.insert(newInstr);
+  }
+}
+
+static void
+createDereferenceAddrBorrowAndLoad(LoadableStorageAllocation &allocator,
+                                   DereferenceBorrowInst *instr,
+                                   StructLoweringState &pass) {
+  bool updateResultTy = pass.resultTyInstsToMod.count(instr) != 0;
+  if (updateResultTy) {
+    pass.resultTyInstsToMod.remove(instr);
+  }
+
+  SILBuilderWithScope builder(instr);
+  auto *newInstr = builder.createDereferenceAddrBorrow(
+      instr->getLoc(), instr->getOperand());
+  
+  // Load the borrowed value and then see if we can get rid of the load.
+  SingleValueInstruction *loadArg;
+  if (!pass.F->hasOwnership()) {
+    loadArg = builder.createLoad(newInstr->getLoc(), newInstr,
+                                 LoadOwnershipQualifier::Unqualified);
+  } else {
+    loadArg = builder.createLoadBorrow(newInstr->getLoc(), newInstr);
+  }
+  instr->replaceAllUsesWith(loadArg);
+  instr->getParent()->erase(instr);
+
+  // TODO: Try to eliminate the load_borrow
+  
   if (updateResultTy) {
     pass.resultTyInstsToMod.insert(newInstr);
   }
@@ -2093,7 +2216,17 @@ static void rewriteFunction(StructLoweringState &pass,
 
     while (!pass.structExtractInstsToMod.empty()) {
       auto *instr = pass.structExtractInstsToMod.pop_back_val();
-      createResultTyInstrAndLoad(allocator, instr, pass);
+      createStructElementAddrInstrAndLoad(allocator, instr, pass);
+    }
+
+    while (!pass.makeBorrowInstsToMod.empty()) {
+      auto *instr = pass.makeBorrowInstsToMod.pop_back_val();
+      createMakeAddrBorrow(allocator, instr, pass);
+    }
+
+    while (!pass.dereferenceBorrowInstsToMod.empty()) {
+      auto *instr = pass.dereferenceBorrowInstsToMod.pop_back_val();
+      createDereferenceAddrBorrowAndLoad(allocator, instr, pass);
     }
 
     while (!pass.applies.empty()) {
@@ -2295,6 +2428,12 @@ static void rewriteFunction(StructLoweringState &pass,
           convInstr->hasOperand() ? convInstr->getOperand() : SILValue();
       newInstr = resultTyBuilder.createEnum(
           Loc, operand, convInstr->getElement(), newSILType.getObjectType());
+      break;
+    }
+    case SILInstructionKind::DereferenceBorrowAddrInst: {
+      auto dbaInstr = cast<DereferenceBorrowAddrInst>(instr);
+      newInstr = resultTyBuilder.createDereferenceBorrowAddr(
+          Loc, dbaInstr->getOperand());
       break;
     }
     default:
