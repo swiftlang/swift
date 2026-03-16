@@ -327,8 +327,10 @@ static bool SwiftifiableCAT(const clang::ASTContext &ctx,
      : !ConcretePointeeType(swiftType).isNull());
 }
 
-// Searches for template instantiations that are not behind type aliases.
-// FIXME: make sure the generated code compiles for template
+// Searches for unaliased std::span template instantiations.  Other unaliased
+// templates (e.g. std::optional) are harmless and must not block wrapper
+// generation.
+// FIXME: make sure the generated code compiles for std::span
 // instantiations that are not behind type aliases.
 struct UnaliasedInstantiationVisitor
     : clang::RecursiveASTVisitor<UnaliasedInstantiationVisitor> {
@@ -337,10 +339,18 @@ struct UnaliasedInstantiationVisitor
   bool TraverseTypedefType(const clang::TypedefType *) { return true; }
 
   bool
-  VisitTemplateSpecializationType(const clang::TemplateSpecializationType *) {
-    hasUnaliasedInstantiation = true;
-    DLOG("Signature contains raw template, skipping\n");
-    return false;
+  VisitTemplateSpecializationType(const clang::TemplateSpecializationType *T) {
+    // Only flag unaliased std::span instantiations.
+    auto templateName = T->getTemplateName();
+    if (auto *templateDecl = templateName.getAsTemplateDecl()) {
+      if (templateDecl->isInStdNamespace() &&
+          templateDecl->getName() == "span") {
+        hasUnaliasedInstantiation = true;
+        DLOG("Signature contains raw std::span, skipping\n");
+        return false;
+      }
+    }
+    return true;
   }
 };
 
