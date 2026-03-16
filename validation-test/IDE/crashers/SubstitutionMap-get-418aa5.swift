@@ -1,0 +1,3 @@
+// {"kind":"complete","original":"125be3c1","signature":"swift::SubstitutionMap::get(swift::GenericSignature, swift::InFlightSubstitution&)","signatureAssert":"Assertion failed: ((replacement->hasError() || gp->isParameterPack() == replacement->is<PackType>()) && \"replacement for pack parameter must be a pack type\"), function get","signatureNext":"TypeBase::getContextSubstitutionMap"}
+// RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
+struct a< b, c func d< each e, each f >(repeat each e, repeat each f ) -> (repeat a< each e, each f >) d(1)#^^#
