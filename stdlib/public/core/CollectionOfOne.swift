@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -226,8 +226,8 @@ extension CollectionOfOne where Element: Hashable {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 extension CollectionOfOne: Equatable where Element: Equatable {}
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 extension CollectionOfOne: Hashable where Element: Hashable {}

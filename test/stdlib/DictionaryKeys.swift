@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,7 +22,7 @@ let multipleElementDictMixedAndMatched = ["Five": 2, "One": 1, "Four": 4, "Three
 let singleElementDict = ["One": 1]
 let emptyDict = [String: Int]()
 
-if #available(SwiftStdlib 6.3, *) {
+if #available(SwiftStdlib 6.4, *) {
   testSuite.test("Hashable") {
     let keys = [multipleElementDict.keys, singleElementDict.keys, emptyDict.keys]
     checkHashable(keys, equalityOracle: { keys[$0] == keys[$1] })

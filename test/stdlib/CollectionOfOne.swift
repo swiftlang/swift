@@ -18,7 +18,7 @@ OneTests.test("Basic tests") {
   }
 }
 
-if #available(SwiftStdlib 6.3, *) {
+if #available(SwiftStdlib 6.4, *) {
   OneTests.test("Equatable") {
     checkEquatable(true, CollectionOfOne(1), CollectionOfOne(1))
     checkEquatable(false, CollectionOfOne("a"), CollectionOfOne("b"))
