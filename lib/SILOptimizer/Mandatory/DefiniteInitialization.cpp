@@ -577,9 +577,16 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
       StoresToSelf(UseInfo.StoresToSelf), Destroys(UseInfo.Releases),
       blockStates(blockStates), blockStateInitialized(&F) {
 
-  // Remember uses by block for subsequent caching logic.
+  // Store a map from blocks to "interesting" instructions. These are
+  // instructions we expect to be queried for liveness, so we will eagerly
+  // compute and cache some local liveness info before the core processing loop.
   llvm::SmallDenseMap<SILBasicBlock *, llvm::SmallPtrSet<SILInstruction *, 8>>
-      BlockToUseInsts;
+      BlocksToInsts;
+
+  auto rememberInterestingInst = [&BlocksToInsts](SILInstruction *I) {
+    if (DICaching)
+      BlocksToInsts[I->getParent()].insert(I);
+  };
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -587,9 +594,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     auto &Use = Uses[ui];
     assert(Use.Inst && "No instruction identified?");
 
-    auto *BB = Use.Inst->getParent();
-    if (DICaching)
-      BlockToUseInsts[BB].insert(Use.Inst);
+    rememberInterestingInst(Use.Inst);
 
     // Keep track of all the uses that aren't loads or escapes.  These are
     // important uses that we'll visit, but we don't consider them definition
@@ -616,7 +621,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
 
     NonLoadUses[Use.Inst].push_back(ui);
 
-    auto &BBInfo = getBlockInfo(BB);
+    auto &BBInfo = getBlockInfo(Use.Inst->getParent());
     BBInfo.HasNonLoadUse = true;
 
     // Each of the non-load instructions will each be checked to make sure that
@@ -649,7 +654,16 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   // number of basic blocks.
   // N.B. This must be run only after all HasNonLoadUse bits have been set.
   if (DICaching) {
-    for (auto &[BB, BlockUseInsts] : BlockToUseInsts) {
+    // Destroys are separate from Uses, but we want to cache info about them
+    // because they are expected to be queried for liveness.
+    for (auto &I : Destroys) {
+      rememberInterestingInst(I);
+    }
+
+    // Also cache the memory instruction itself
+    rememberInterestingInst(TheMemory.getUninitializedValue());
+
+    for (auto &[BB, InstsForBlock] : BlocksToInsts) {
       auto &BBInfo = getBlockInfo(BB);
 
       // If we don't write to the memory, this computation won't help.
@@ -659,12 +673,11 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
       BBInfo.StoredEltsBeforeInst.emplace();
 
       SmallBitVector LocallyStoredElts(TheMemory.getNumElements());
-      // TODO: do we need to init this to something special?
 
-      const unsigned NumUsesExpected = BlockUseInsts.size();
+      const unsigned NumUsesExpected = InstsForBlock.size();
       unsigned NumUsesSeen = 0;
 
-      // Walk the block and update needed elts.
+      // Walk the block and cache local availability info.
       for (auto &TheInst : *BB) {
         ++StatsNumCachePrecomputationInsts;
 
@@ -672,22 +685,23 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
         if (NumUsesSeen == NumUsesExpected)
           break;
 
-        // If the inst isn't one of our uses, skip it.
-        if (!BlockUseInsts.contains(&TheInst))
+        // If the instruction isn't interesting to us, ignore it.
+        if (!InstsForBlock.contains(&TheInst))
           continue;
 
         // Otherwise, update our book-keeping.
         ++NumUsesSeen;
 
-        // Store the currently known-to-be-stored element info.
+        // Save the current bitmask of elements locally stored to before this
+        // inst.
         BBInfo.StoredEltsBeforeInst->try_emplace(&TheInst, LocallyStoredElts);
 
-        // If this instruction is unrelated to the memory, carry on.
+        // If this instruction isn't a "non-load", continue.
         auto It = NonLoadUses.find(&TheInst);
         if (It == NonLoadUses.end())
           continue;
 
-        // Otherwise, mark the elements and cache the result.
+        // Otherwise, update our running computation of written-to elements.
         for (unsigned TheUse : It->second) {
           auto &TheInstUse = Uses[TheUse];
           LocallyStoredElts.set(TheInstUse.FirstElement,
@@ -3711,99 +3725,90 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
 
   auto &BBInfo = getBlockInfo(InstBB);
 
-  bool usedCache = false;
-  if (DICaching && BBInfo.HasNonLoadUse &&
-      BBInfo.StoredEltsBeforeInst.has_value()) {
-    // TODO: figure out why this crashes sometimes...
-    ASSERT(BBInfo.StoredEltsBeforeInst.has_value());
-    auto &cache = *BBInfo.StoredEltsBeforeInst;
-    auto it = cache.find(Inst);
-    if (it != cache.end()) {
-      usedCache = true;
-      ++StatsNumLivenessCacheHits;
-      SmallBitVector LocalStoresBeforeInst = cache[Inst];
-
-      LLVM_DEBUG(llvm::dbgs() << "JQ: used DI cache");
-      LLVM_DEBUG({
-        llvm::dbgs() << "LocalStoresBeforeInst: ";
-        for (unsigned i = 0; i < LocalStoresBeforeInst.size(); ++i)
-          llvm::dbgs() << (LocalStoresBeforeInst[i] ? "1" : "0");
-        llvm::dbgs() << "\n";
-      });
-
-      // Unset elts that were written to by this inst.
-      NeededElements.reset(LocalStoresBeforeInst);
-
-      // Now we check if either:
-      //
-      //   1. The block contains the memory definition.
-      //   2. The cached info covered all requested elements.
-      //
-      // In each case, we don't need to do dataflow to determine the result.
-      if (Inst->getParent() == TheMemory.getUninitializedValue()->getParent()) {
-        // The result is perfectly decided locally.
-        for (unsigned i = FirstElt, e = i + NumElts; i != e; ++i)
-          Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
-        return Result;
-      } else if (NeededElements.none()) {
-        Result.changeUnsetElementsTo(DIKind::Yes);
-        return Result;
-      }
-    }
-  }
-
-  if (usedCache) {
-    // Still need to check two cases:
-    //   1. If the block contains the memory definition.
-    //   2. If the cached info covered all needed elements.
-    if (Inst->getParent() == TheMemory.getUninitializedValue()->getParent()) {
-      // The result is perfectly decided locally.
-      for (unsigned i = FirstElt, e = i + NumElts; i != e; ++i)
-        Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
-      return Result;
-    } else if (NeededElements.none()) {
-      Result.changeUnsetElementsTo(DIKind::Yes);
-      return Result;
-    }
-  }
-
   // If there is a store in the current block, scan the block to see if the
   // store is before or after the load.  If it is before, it may produce some of
   // the elements we are looking for.
-  if (!usedCache && BBInfo.HasNonLoadUse) {
-    for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
-      if (stats) ++stats->getFrontendCounters().DINumLivenessAtInstScans;
-      ++StatsNumLivenessAtInstScans;
-      --BBI;
-      SILInstruction *TheInst = &*BBI;
+  if (BBInfo.HasNonLoadUse) {
+    // First, check our cache to see if we've already computed local liveness
+    // info for this instruction.
+    bool usedCache = false;
+    if (DICaching) {
+      ASSERT(BBInfo.StoredEltsBeforeInst.has_value());
+      auto &cache = *BBInfo.StoredEltsBeforeInst;
+      auto it = cache.find(Inst);
+      if (it != cache.end()) {
+        usedCache = true;
+        ++StatsNumLivenessCacheHits;
+        const SmallBitVector &LocalStoresBeforeInst = it->second;
 
-      // If we found the allocation itself, then we are loading something that
-      // is not defined at all yet.  Scan no further.
-      if (TheInst == TheMemory.getUninitializedValue()) {
-        // The result is perfectly decided locally.
-        for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i)
-          Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
-        return Result;
+        LLVM_DEBUG(llvm::dbgs() << "DI cache hit for inst: " << *Inst);
+        LLVM_DEBUG({
+          llvm::dbgs() << "  Elts stored before inst: ";
+          for (unsigned i = 0; i < LocalStoresBeforeInst.size(); ++i)
+            llvm::dbgs() << (LocalStoresBeforeInst[i] ? "1" : "0");
+          llvm::dbgs() << "\n";
+        });
+
+        // Unset elts that were written to by this inst.
+        NeededElements.reset(LocalStoresBeforeInst);
+
+        // Now we check if either:
+        //
+        //   1. The cached info covered all requested elements.
+        //   2. The block contains the memory definition.
+        //
+        // In each case, we don't need to do dataflow to determine the result.
+        if (Inst->getParent() ==
+            TheMemory.getUninitializedValue()->getParent()) {
+          // The result is perfectly decided locally.
+          for (unsigned i = FirstElt, e = i + NumElts; i != e; ++i)
+            Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
+          return Result;
+        } else if (NeededElements.none()) {
+          Result.changeUnsetElementsTo(DIKind::Yes);
+          return Result;
+        }
       }
+    }
 
-      // If this instruction is unrelated to the memory, ignore it.
-      auto It = NonLoadUses.find(TheInst);
-      if (It == NonLoadUses.end())
-        continue;
+    // Otherwise, fall back to a local scan within the block.
+    if (!usedCache) {
+      for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
+        if (stats)
+          ++stats->getFrontendCounters().DINumLivenessAtInstScans;
+        ++StatsNumLivenessAtInstScans;
+        --BBI;
+        SILInstruction *TheInst = &*BBI;
 
-      // Check to see which tuple elements this instruction defines.  Clear them
-      // from the set we're scanning from.
-      for (unsigned TheUse : It->second) {
-        auto &TheInstUse = Uses[TheUse];
-        NeededElements.reset(TheInstUse.FirstElement,
-                             TheInstUse.FirstElement+TheInstUse.NumElements);
-      }
+        // If we found the allocation itself, then we are loading something that
+        // is not defined at all yet.  Scan no further.
+        if (TheInst == TheMemory.getUninitializedValue()) {
+          // The result is perfectly decided locally.
+          for (unsigned i = FirstElt, e = i + NumElts; i != e; ++i)
+            Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
+          return Result;
+        }
 
-      // If that satisfied all of the elements we're looking for, then we're
-      // done.  Otherwise, keep going.
-      if (NeededElements.none()) {
-        Result.changeUnsetElementsTo(DIKind::Yes);
-        return Result;
+        // If this instruction is unrelated to the memory, ignore it.
+        auto It = NonLoadUses.find(TheInst);
+        if (It == NonLoadUses.end())
+          continue;
+
+        // Check to see which tuple elements this instruction defines.  Clear
+        // them from the set we're scanning from.
+        for (unsigned TheUse : It->second) {
+          auto &TheInstUse = Uses[TheUse];
+          NeededElements.reset(TheInstUse.FirstElement,
+                               TheInstUse.FirstElement +
+                                   TheInstUse.NumElements);
+        }
+
+        // If that satisfied all of the elements we're looking for, then we're
+        // done.  Otherwise, keep going.
+        if (NeededElements.none()) {
+          Result.changeUnsetElementsTo(DIKind::Yes);
+          return Result;
+        }
       }
     }
   }
