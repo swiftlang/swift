@@ -131,6 +131,7 @@ UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
 UNINTERESTING_FEATURE(EmbeddedExistentials)
 UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
+UNINTERESTING_FEATURE(TypedAllocation)
 
 static bool usesFeatureUnderscoreOwned(Decl *D) {
   return D->getAttrs().hasAttribute<OwnedAttr>();
