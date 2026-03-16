@@ -2580,6 +2580,23 @@ function(add_swift_target_library name)
         set(static_keyword ${SWIFTLIB_STATIC_keyword})
       endif()
 
+      # On Windows, swift-frontend loads swiftCore.dll at runtime when
+      # compiling stdlib modules, but the build graph only tracks the
+      # .swiftmodule dependency. This lets ninja schedule the swiftCore.dll
+      # link concurrently with swift-frontend compilations that have the
+      # DLL memory-mapped, causing LNK1104 because Windows prevents
+      # overwriting mapped files. Add library link targets as file
+      # dependencies so DLLs finish linking before compilations start.
+      # Filter to CMake targets only (skip raw library names like shell32).
+      set(swiftlib_file_depends_for_windows)
+      if(sdk STREQUAL "WINDOWS" AND SWIFT_BUILD_DYNAMIC_STDLIB)
+        foreach(dep ${swiftlib_private_link_libraries_targets})
+          if(TARGET ${dep})
+            list(APPEND swiftlib_file_depends_for_windows ${dep})
+          endif()
+        endforeach()
+      endif()
+
       # Add this library variant.
       add_swift_target_library_single(
         ${variant_name}
@@ -2597,7 +2614,7 @@ function(add_swift_target_library name)
         LINK_LIBRARIES ${swiftlib_link_libraries}
         FRAMEWORK_DEPENDS ${swiftlib_framework_depends_flattened}
         FRAMEWORK_DEPENDS_WEAK ${SWIFTLIB_FRAMEWORK_DEPENDS_WEAK}
-        FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
+        FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets} ${swiftlib_file_depends_for_windows}
         C_COMPILE_FLAGS ${swiftlib_c_compile_flags_all}
         SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all} ${swiftlib_swift_compile_flags_arch} ${swiftlib_swift_compile_private_frameworks_flag}
         LINK_FLAGS ${swiftlib_link_flags_all}
