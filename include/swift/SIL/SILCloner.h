@@ -1112,7 +1112,8 @@ SILCloner<ImplClass>::visitAllocRefInst(AllocRefInst *Inst) {
   }
   auto *NewInst = getBuilder().createAllocRef(getOpLocation(Inst->getLoc()),
                                       getOpType(Inst->getType()),
-                                      Inst->isObjC(), Inst->canAllocOnStack(), Inst->isBare(),
+                                      Inst->isObjC(), Inst->canAllocOnStack(),
+                                      Inst->isBare(), Inst->isStackAllocationNested(),
                                       ElemTypes, CountArgs);
   recordClonedInstruction(Inst, NewInst);
 }
@@ -1133,6 +1134,7 @@ SILCloner<ImplClass>::visitAllocRefDynamicInst(AllocRefDynamicInst *Inst) {
                                       getOpType(Inst->getType()),
                                       Inst->isObjC(),
                                       Inst->canAllocOnStack(),
+                                      Inst->isStackAllocationNested(),
                                       ElemTypes, CountArgs);
   recordClonedInstruction(Inst, NewInst);
 }
@@ -1235,9 +1237,8 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
                 Inst->getCalleeConvention(),
                 Inst->getResultIsolation(),
                 Inst->isOnStack(),
+                Inst->isStackAllocationNested(),
                 GenericSpecializationInformation::create(Inst, getBuilder()));
-  NewInst->setStackAllocationIsNested(Inst->isStackAllocationNested());
-
   recordClonedInstruction(Inst, NewInst);
 }
 

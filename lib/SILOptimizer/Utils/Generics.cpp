@@ -2665,8 +2665,7 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     auto *newPAI = builder.createPartialApply(
         loc, callee, subs, arguments,
         pai->getCalleeConvention(), pai->getResultIsolation(),
-        pai->isOnStack());
-    newPAI->setStackAllocationIsNested(pai->isStackAllocationNested());
+        pai->isOnStack(), pai->isStackAllocationNested());
     pai->replaceAllUsesWith(newPAI);
     return newPAI;
   }
@@ -3528,8 +3527,7 @@ void swift::trySpecializeApplyOfGeneric(
     SingleValueInstruction *newPAI = Builder.createPartialApply(
       PAI->getLoc(), FRI, Subs, Arguments,
       PAI->getCalleeConvention(), PAI->getResultIsolation(),
-      PAI->isOnStack());
-    newPAI->setStackAllocationIsNested(PAI->isStackAllocationNested());
+      PAI->isOnStack(), PAI->isStackAllocationNested());
     PAI->replaceAllUsesWith(newPAI);
     DeadApplies.insert(PAI);
     return;

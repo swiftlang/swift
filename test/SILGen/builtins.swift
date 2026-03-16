@@ -904,56 +904,64 @@ func injectEnumTag<T>(_ x: inout T, tag: Builtin.Int32) {
   Builtin.injectEnumTag(&x, tag)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaF : $@convention(thin) @async () -> (UnsafeRawPointer, UnsafeRawPointer) {
-// CHECK:   [[CLOSURE_FN:%.*]] = function_ref @$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaFyyXEfU_ : $@convention(thin) () -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins30testTaskAddCancellationHandleryyYaF : $@convention(thin) @async () -> () {
+// CHECK:   [[CLOSURE_FN:%.*]] = function_ref @$s8builtins30testTaskAddCancellationHandleryyYaFyyXEfU_ : $@convention(thin) () -> ()
 // CHECK:   [[CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE_FN]]
 // CHECK:   [[RESULT_VALUE:%.*]] = builtin "taskAddCancellationHandler"([[CLOSURE]] : $@noescape @callee_guaranteed () -> ()) : $UnsafeRawPointer
 // CHECK:   [[RESULT:%.*]] = move_value [var_decl] [[RESULT_VALUE]]
-// CHECK:   [[CLOSURE_FN_2:%.*]] = function_ref @$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaFyyXEfU0_ : $@convention(thin) (@guaranteed String) -> ()
+// CHECK:   [[CLOSURE_FN_2:%.*]] = function_ref @$s8builtins30testTaskAddCancellationHandleryyYaFyyXEfU0_ : $@convention(thin) (@guaranteed String) -> ()
 // CHECK:   [[CLOSURE_PA:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN_2]]({{%.*}}) :
 // CHECK:   [[CLOSURE_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_PA]]
 // CHECK:   [[RESULT_VALUE_2:%.*]] = builtin "taskAddCancellationHandler"([[CLOSURE_CVT]] : $@noescape @callee_guaranteed () -> ()) : $UnsafeRawPointer
 // CHECK:   [[RESULT_2:%.*]] = move_value [var_decl] [[RESULT_VALUE_2]]
-// CHECK:   [[TUPLE:%.*]] = tuple ([[RESULT]] : $UnsafeRawPointer, [[RESULT_2]] : $UnsafeRawPointer)
+// CHECK:   builtin "taskRemoveCancellationHandler"([[RESULT_2]] : $UnsafeRawPointer)
+// CHECK:   builtin "taskRemoveCancellationHandler"([[RESULT]] : $UnsafeRawPointer)
+// CHECK:   [[TUPLE:%.*]] = tuple ()
 // CHECK:   return [[TUPLE]]
-// CHECK: } // end sil function '$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaF'
-func testTaskAddCancellationHandler() async -> (UnsafeRawPointer, UnsafeRawPointer) {
+// CHECK: } // end sil function '$s8builtins30testTaskAddCancellationHandleryyYaF'
+func testTaskAddCancellationHandler() async {
   let result = Builtin.taskAddCancellationHandler {
   }
   let x = "123"
   let result2 = Builtin.taskAddCancellationHandler { print(x) }
-  return (result, result2)
+  Builtin.taskRemoveCancellationHandler(record: result2)
+  Builtin.taskRemoveCancellationHandler(record: result)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s8builtins33testTaskRemoveCancellationHandleryySVYaF : $@convention(thin) @async (UnsafeRawPointer) -> ()
-// CHECK: bb0([[PTR:%.*]] : $UnsafeRawPointer):
-// CHECK:   builtin "taskRemoveCancellationHandler"([[PTR]] : $UnsafeRawPointer) : $()
-// CHECK: } // end sil function '$s8builtins33testTaskRemoveCancellationHandleryySVYaF'
-func testTaskRemoveCancellationHandler(_ x: UnsafeRawPointer) async {
-  Builtin.taskRemoveCancellationHandler(record: x)
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s8builtins36testTaskAddPriorityEscalationHandlerSVyYaF : $@convention(thin) @async () -> UnsafeRawPointer {
-// CHECK:   [[CLOSURE_FN:%.*]] = function_ref @$s8builtins36testTaskAddPriorityEscalationHandlerSVyYaFys5UInt8V_ADtXEfU_ : $@convention(thin) (UInt8, UInt8) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins36testTaskAddPriorityEscalationHandleryyYaF : $@convention(thin) @async () -> () {
+// CHECK:   [[CLOSURE_FN:%.*]] = function_ref @$s8builtins36testTaskAddPriorityEscalationHandleryyYaFys5UInt8V_ADtXEfU_ : $@convention(thin) (UInt8, UInt8) -> ()
 // CHECK:   [[CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE_FN]]
 // CHECK:   [[RESULT_VALUE:%.*]] = builtin "taskAddPriorityEscalationHandler"([[CLOSURE]] : $@noescape @callee_guaranteed (UInt8, UInt8) -> ()) : $UnsafeRawPointer
 // CHECK:   [[RESULT:%.*]] = move_value [var_decl] [[RESULT_VALUE]]
-// CHECK:   return [[RESULT]]
-// CHECK: } // end sil function '$s8builtins36testTaskAddPriorityEscalationHandlerSVyYaF'
-func testTaskAddPriorityEscalationHandler() async -> UnsafeRawPointer {
+// CHECK:   builtin "taskRemovePriorityEscalationHandler"([[RESULT]] : $UnsafeRawPointer) : $()
+// CHECK:   [[TUPLE:%.*]] = tuple ()
+// CHECK:   return [[TUPLE]]
+// CHECK: } // end sil function '$s8builtins36testTaskAddPriorityEscalationHandleryyYaF'
+func testTaskAddPriorityEscalationHandler() async {
   let result = Builtin.taskAddPriorityEscalationHandler { (x: UInt8, y: UInt8) in
     _ = x
     _ = y
   }
-  return result
+  Builtin.taskRemovePriorityEscalationHandler(record: result)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s8builtins39testTaskRemovePriorityEscalationHandleryySVYaF : $@convention(thin) @async (UnsafeRawPointer) -> () {
-// CHECK: bb0([[PTR:%.*]] : $UnsafeRawPointer):
-// CHECK:   builtin "taskRemovePriorityEscalationHandler"(%0 : $UnsafeRawPointer) : $()
-// CHECK: } // end sil function '$s8builtins39testTaskRemovePriorityEscalationHandleryySVYaF'
-func testTaskRemovePriorityEscalationHandler(_ x: UnsafeRawPointer) async {
-  Builtin.taskRemovePriorityEscalationHandler(record: x)
+//   Same as above, but checking the special case to emit defers that call
+//   builtin functions immediately.
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins45testTaskAddPriorityEscalationHandlerWithDeferyyYaF : $@convention(thin) @async () -> () {
+// CHECK:   [[CLOSURE_FN:%.*]] = function_ref @$s8builtins45testTaskAddPriorityEscalationHandlerWithDeferyyYaFys5UInt8V_ADtXEfU_ : $@convention(thin) (UInt8, UInt8) -> ()
+// CHECK:   [[CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE_FN]]
+// CHECK:   [[RESULT_VALUE:%.*]] = builtin "taskAddPriorityEscalationHandler"([[CLOSURE]] : $@noescape @callee_guaranteed (UInt8, UInt8) -> ()) : $UnsafeRawPointer
+// CHECK:   [[RESULT:%.*]] = move_value [var_decl] [[RESULT_VALUE]]
+// CHECK:   builtin "taskRemovePriorityEscalationHandler"([[RESULT]] : $UnsafeRawPointer) : $()
+// CHECK:   [[TUPLE:%.*]] = tuple ()
+// CHECK:   return [[TUPLE]]
+// CHECK: } // end sil function '$s8builtins45testTaskAddPriorityEscalationHandlerWithDeferyyYaF'
+func testTaskAddPriorityEscalationHandlerWithDefer() async {
+  let result = Builtin.taskAddPriorityEscalationHandler { (x: UInt8, y: UInt8) in
+    _ = x
+    _ = y
+  }
+  defer { Builtin.taskRemovePriorityEscalationHandler(record: result) }
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins22testTaskLocalValuePushyyBp_xntYalF : $@convention(thin) @async <Value> (Builtin.RawPointer, @in Value) -> () {

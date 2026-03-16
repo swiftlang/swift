@@ -1587,6 +1587,17 @@ public class AllocRefInstBase : SingleValueInstruction, Allocation {
     context.notifyInstructionChanged(self)
   }
 
+  public final var isStackAllocationNested: Bool {
+    bridged.AllocRefInstBase_isStackAllocationNested();
+  }
+
+  public final func setStackAllocationNested(_ isNested: Bool,
+                                             _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.AllocRefInstBase_setStackAllocationIsNested(isNested)
+    context.notifyInstructionChanged(self)
+  }
+
   final public var tailAllocatedCounts: OperandArray {
     let numTailTypes = bridged.AllocRefInstBase_getNumTailTypes()
     return operands[0..<numTailTypes]

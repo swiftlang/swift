@@ -1563,8 +1563,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   auto *newPAI = builder.createPartialApply(
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
       pai->getCalleeConvention(), pai->getResultIsolation(),
-      pai->isOnStack());
-  newPAI->setStackAllocationIsNested(pai->isStackAllocationNested());
+      pai->isOnStack(), pai->isStackAllocationNested());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();
   if (fri->use_empty()) {
