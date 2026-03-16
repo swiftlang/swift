@@ -3025,15 +3025,6 @@ void SILCloner<ImplClass>::visitPackPackIndexInst(PackPackIndexInst *Inst) {
     getOpStructuralPackIndex(Inst->getIndexedPackType(),
                              Inst->getComponentStartIndex());
 
-  // If the pack expansion component was specialized to an empty pack, the
-  // component start index lands past the end of the new pack type. The
-  // pack_pack_index and all its uses are dead code (the loop over the empty
-  // expansion never executes its body). Fold the result to the inner index
-  // value to satisfy value mapping without creating an invalid instruction.
-  if (newComponentStartIndex == newPackType->getNumElements()) {
-    return recordFoldedValue(Inst, newIndexValue);
-  }
-
   recordClonedInstruction(
       Inst, getBuilder().createPackPackIndex(loc, newComponentStartIndex,
                                              newIndexValue, newPackType));

@@ -1,16 +1,11 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -sil-verify-all %s | %FileCheck %s
 
 // Verify that generic specialization of a variadic generic function called
-// with an empty parameter pack does not crash. This was triggered by the
-// GenericSpecializer encountering a pack_pack_index instruction where the
-// componentStartIndex (pointing to a trailing `repeat each C` expansion)
-// equals the number of elements in the specialized pack type after the
-// empty expansion is dropped.
+// with an empty parameter pack does not crash.
 
 @inline(never)
 func variadicFunc<A, B, each C>(_ a: A, _ b: B, _ c: repeat each C) -> (A, B, repeat each C) {
-  var tuple = (a, b, repeat each c)
-  return tuple
+  return (a, b, repeat each c)
 }
 
 // Verify that the specialized function for <Int, String, Pack{}> does not

@@ -2441,7 +2441,7 @@ PackPackIndexInst *PackPackIndexInst::create(SILFunction &F,
                                              unsigned componentStartIndex,
                                              SILValue indexWithinComponent,
                                              CanPackType packType) {
-  assert(componentStartIndex < packType->getNumElements() &&
+  assert(componentStartIndex <= packType->getNumElements() &&
          "component start index is out of bounds for indexed-into pack type");
   // TODO: assert that the shapes are similar?
 
