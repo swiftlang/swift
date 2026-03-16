@@ -20,7 +20,6 @@
 
 #include "swift/AST/Import.h"
 #include "swift/AST/LinkLibrary.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Serialization/Validation.h"

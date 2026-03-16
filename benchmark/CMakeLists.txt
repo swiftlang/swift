@@ -189,6 +189,7 @@ set(SWIFT_BENCH_MODULES
     single-source/SortLargeExistentials
     single-source/SortLettersInPlace
     single-source/SortStrings
+    single-source/SpanTests
     single-source/StaticArray
     single-source/StrComplexWalk
     single-source/StrToInt

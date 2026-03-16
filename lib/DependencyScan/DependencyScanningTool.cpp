@@ -12,19 +12,14 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/TargetInfo.h"
-#include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/Defer.h"
-#include "swift/DependencyScan/DependencyScanningTool.h"
+#include "swift/Basic/TargetInfo.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
+#include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
 #include "swift/DependencyScan/StringUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/VirtualOutputBackends.h"
-
-#include <sstream>
 
 namespace {
 llvm::ErrorOr<swift::CompilerInvocation>
@@ -58,7 +53,7 @@ ConstructInvocation(llvm::ArrayRef<const char *> CommandArgs,
     return std::make_error_code(std::errc::invalid_argument);
   return Invocation;
 }
-}
+} // anonymous namespace
 
 namespace swift {
 namespace dependencies {

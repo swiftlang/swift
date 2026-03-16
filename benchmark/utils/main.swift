@@ -194,6 +194,7 @@ import SortIntPyramids
 import SortLargeExistentials
 import SortLettersInPlace
 import SortStrings
+import SpanTests
 import StaticArray
 import StrComplexWalk
 import StrToInt
@@ -403,6 +404,7 @@ register(SortIntPyramids.benchmarks)
 register(SortLargeExistentials.benchmarks)
 register(SortLettersInPlace.benchmarks)
 register(SortStrings.benchmarks)
+register(SpanTests.benchmarks)
 register(StaticArray.benchmarks)
 register(StrComplexWalk.benchmarks)
 register(StrToInt.benchmarks)
