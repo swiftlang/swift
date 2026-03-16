@@ -123,10 +123,16 @@ DeclAvailabilityConstraints::getPrimaryConstraint() const {
     if (lhs.getReason() != rhs.getReason())
       return lhs.getReason() < rhs.getReason();
 
-    // Pick the constraint from the broader domain.
-    if (lhs.getDomain() != rhs.getDomain())
-      return rhs.getDomain().contains(lhs.getDomain());
-    
+    if (lhs.getDomain() != rhs.getDomain()) {
+      // Constraints in the universal domain are the strongest.
+      if (rhs.getDomain().isUniversal())
+        return true;
+
+      // Otherwise, pick the constraint from the broader domain.
+      if (lhs.getDomain() != rhs.getDomain())
+        return rhs.getDomain().contains(lhs.getDomain());
+    }
+
     return false;
   };
 
@@ -189,7 +195,7 @@ shouldIgnoreConstraintInContext(const Decl *decl,
   if (!canIgnoreConstraintInUnavailableContexts(decl, constraint, flags))
     return false;
 
-  return context.containsUnavailableDomain(constraint.getDomain());
+  return context.isUnavailableForDomain(constraint.getDomain());
 }
 
 /// Returns the `AvailabilityConstraint` that describes how \p attr restricts

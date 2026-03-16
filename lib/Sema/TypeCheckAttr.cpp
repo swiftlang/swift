@@ -5529,7 +5529,7 @@ void AttributeChecker::checkBackDeployedAttrs(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    if (availability.containsUnavailableDomain(Domain)) {
+    if (availability.isUnavailableForDomain(Domain)) {
       diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
                Domain.getRemappedDomain(Ctx));
 
