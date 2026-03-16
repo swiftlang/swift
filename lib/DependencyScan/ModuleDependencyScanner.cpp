@@ -1494,29 +1494,32 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
         }
       };
 
-  // Enque asynchronous lookup tasks
-  for (const auto &dependsOn : moduleDependencyInfo.getModuleImports()) {
-    // Avoid querying the underlying Clang module here
-    if (moduleID.ModuleName == dependsOn.importIdentifier)
-      continue;
+  llvm::StringSet<> enquedIdentifiers;
+  auto enqueIfNeeded = [&](const ScannerImportStatementInfo &importInfo) {
+    // Avoid querying the underlying Clang module
+    if (moduleID.ModuleName == importInfo.importIdentifier)
+      return;
     // Avoid querying Swift module dependencies previously looked up
-    if (DependencyCache.hasQueriedSwiftDependency(dependsOn.importIdentifier))
-      continue;
+    if (DependencyCache.hasQueriedSwiftDependency(importInfo.importIdentifier))
+      return;
+    // If we have already enqued this module here, avoid doing it
+    // again. For example, if there's an optional import with the
+    // same identifier as a non-optional import
+    if (!enquedIdentifiers.insert(importInfo.importIdentifier).second)
+      return;
+
     ScanningThreadPool.async(
         scanForSwiftModuleDependency,
-        getModuleImportIdentifier(dependsOn.importIdentifier),
-        moduleDependencyInfo.isTestableImport(dependsOn.importIdentifier));
-  }
-  for (const auto &dependsOn :
-       moduleDependencyInfo.getOptionalModuleImports()) {
-    // Avoid querying the underlying Clang module here
-    if (moduleID.ModuleName == dependsOn.importIdentifier)
-      continue;
-    ScanningThreadPool.async(
-        scanForSwiftModuleDependency,
-        getModuleImportIdentifier(dependsOn.importIdentifier),
-        moduleDependencyInfo.isTestableImport(dependsOn.importIdentifier));
-  }
+        getModuleImportIdentifier(importInfo.importIdentifier),
+        moduleDependencyInfo.isTestableImport(importInfo.importIdentifier));
+  };
+
+  // Enque asynchronous lookup tasks
+  for (const auto &dependsOn : moduleDependencyInfo.getModuleImports())
+    enqueIfNeeded(dependsOn);
+  for (const auto &dependsOn : moduleDependencyInfo.getOptionalModuleImports())
+    enqueIfNeeded(dependsOn);
+
   ScanningThreadPool.wait();
 
   auto recordResolvedModuleImport =
