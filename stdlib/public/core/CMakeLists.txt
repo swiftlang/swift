@@ -359,7 +359,7 @@ else()
 endif()
 
 # For `@DebugDescription`.
-list(APPEND swift_stdlib_compile_flags "-plugin-path" "${swift_lib_dir}/swift/host/plugins")
+list(APPEND swift_stdlib_compile_flags "-external-plugin-path" "${swift_lib_dir}/swift/host/plugins#${swift_bin_dir}/swift-plugin-server")
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntimeCore)
