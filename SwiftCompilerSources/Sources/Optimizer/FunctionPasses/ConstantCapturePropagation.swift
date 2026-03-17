@@ -172,9 +172,17 @@ private func specializeClosure(specializedName: String,
                                                                         preserveGenericSignature: isGeneric)
 
   context.buildSpecializedFunction(specializedFunction: specializedClosure) { (specializedClosure, specContext) in
-    cloneAndSpecializeFunction(from: callee, toEmpty: specializedClosure,
-                               substitutions: partialApply.substitutionMap,
-                               specContext)
+    if isGeneric {
+      // When the specialized closure is still generic, clone without type substitutions.
+      // The mangled name only encodes constant values, not type substitutions, so the body
+      // must stay generic to avoid ODR violations when different concrete types produce the
+      // same symbol but with different type-substituted bodies.
+      cloneFunction(from: callee, toEmpty: specializedClosure, specContext)
+    } else {
+      cloneAndSpecializeFunction(from: callee, toEmpty: specializedClosure,
+                                 substitutions: partialApply.substitutionMap,
+                                 specContext)
+    }
 
     let entryBlock = specializedClosure.entryBlock
     for constArgOp in constantArguments {
@@ -235,7 +243,7 @@ private func rewritePartialApply(_ partialApply: PartialApplyInst, withSpecializ
   let builder = Builder(before: partialApply, context)
   let fri = builder.createFunctionRef(specialized)
   let newClosure: Value
-  if arguments.isEmpty, fri.type.functionTypeRepresentation == .thin {
+  if arguments.isEmpty, specialized.genericSignature.isEmpty, fri.type.functionTypeRepresentation == .thin {
     newClosure = builder.createThinToThickFunction(thinFunction: fri, resultType: partialApply.type)
     context.erase(instructions: partialApply.uses.users(ofType: DeallocStackInst.self))
   } else {
