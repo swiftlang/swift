@@ -3807,6 +3807,19 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
   });
 }
 
+// Returns true if the given declaration is CxxBorrowingSequence,
+// CxxBorrowingIterator or an extension of one of these.
+static bool isCxxBorrowingSequenceOrIterator(Decl *decl) {
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+    decl = ext->getExtendedNominal();
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl))
+    return proto->getNameStr() == "CxxBorrowingSequence";
+  if (auto *sd = dyn_cast<StructDecl>(decl))
+    return sd->getNameStr() == "CxxBorrowingIterator";
+  return false;
+}
+
 /// Generate the appropriate #if block(s) necessary to protect the use
 /// of compiler-version-dependent features in the given function.
 ///
@@ -3833,6 +3846,19 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
   // it should go around the whole decl.
   if (isa<AccessorDecl>(decl)) {
     printBody();
+    return;
+  }
+
+  // CxxBorrowingSequence and CxxBorrowingIterator, defined in the Cxx overlay,
+  // conform to BorrowingSequence and BorrowingIteratorProtocol. When a newer
+  // compiler is used with an older SDK, the Cxx module interface may reference
+  // these Swift stdlib protocols even though they don't exist in the SDK's
+  // stdlib. To handle this, we guard them behind a Swift version.
+  if (isCxxBorrowingSequenceOrIterator(decl)) {
+    printer << "#if canImport(Swift, _version: 6.4.0.12)\n";
+    printBody();
+    printer.printNewline();
+    printer << "#endif";
     return;
   }
 
