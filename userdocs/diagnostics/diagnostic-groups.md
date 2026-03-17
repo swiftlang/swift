@@ -49,6 +49,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:strict-memory-safety>
 - <doc:unknown-warning-group>
 - <doc:untyped-throws>
+- <doc:no-use-throwing-unstructured-task>
 
 
 ## Topics
@@ -95,4 +96,5 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:availability-unrecognized-name>
 - <doc:mutable-global-variable>
 - <doc:untyped-throws>
+- <doc:no-use-throwing-unstructured-task>
 - <doc:existential-member-access-limitations>

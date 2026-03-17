@@ -3934,6 +3934,13 @@ void AttributeChecker::visitNonDiscardableThrowAttr(NonDiscardableThrowAttr *att
     return;
   }
 
+  // @_nonDiscardableThrow must be combined with @discardableResult
+  if (!AFD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+    diagnoseAndRemoveAttr(
+        attr, diag::non_discardable_throw_requires_discardable_result);
+    return;
+  }
+
   auto hasThrowingClosureParams = 0;
   for (auto *param : *AFD->getParameters()) {
     auto paramTy = param->getInterfaceType();

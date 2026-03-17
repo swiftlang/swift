@@ -83,7 +83,8 @@ func testAsync() async throws {
       }
   }
 
-  Task {
+  Task { // expected-warning {{is not used, which may accidentally ignore errors thrown inside the task}}
+    // expected-note @-1 {{to silence this warning, handle the error inside the task, or store/discard the task value explicitly}}
     while !Task.isCancelled {
       do {
         for try await _ in getAsyncCounter(upTo: 3) {

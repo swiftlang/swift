@@ -2421,7 +2421,8 @@ struct IndirectAssignTests {
 @MainActor
 class rdar169803154_Klass {
   init() {
-    Task.detached { @MainActor in
+    Task.detached { @MainActor in // expected-warning {{is not used, which may accidentally ignore errors thrown inside the task}}
+      // expected-note @-1 {{to silence this warning, handle the error inside the task, or store/discard the task value explicitly}}
       _ = self
       for try await x in rdar169803154_Seq.seq { _ = x }
     }

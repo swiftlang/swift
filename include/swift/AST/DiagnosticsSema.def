@@ -5265,8 +5265,12 @@ WARNING(expression_unused_result_call,NoUsage,
         "result of call to %0 is unused", (const ValueDecl *))
 GROUPED_WARNING(expression_unused_throwing_unstructured_task,
         NoUseUnstructuredThrowingTask, none,
-        "Unstructured throwing task created by %0 is unused",
+        "Unstructured throwing task created by %0 is not used, "
+        "which may accidentally ignore errors thrown inside the task",
         (const ValueDecl *))
+NOTE(expression_unused_throwing_unstructured_task_silence, none,
+     "to silence this warning, handle the error inside the task, or "
+     "store/discard the task value explicitly", ())
 WARNING(expression_unused_result_operator,NoUsage,
         "result of operator %0 is unused", (const ValueDecl *))
 WARNING(expression_unused_result_operator_name,NoUsage,
@@ -7422,6 +7426,9 @@ WARNING(discardable_result_on_void_never_function, none,
 //------------------------------------------------------------------------------
 // MARK: @_nonDiscardableThrow
 //------------------------------------------------------------------------------
+
+ERROR(non_discardable_throw_requires_discardable_result, none,
+      "'@_nonDiscardableThrow' must be combined with '@discardableResult'", ())
 
 ERROR(non_discardable_throw_no_throwing_closure_param, none,
       "'@_nonDiscardableThrow' requires the function to have exactly one closure "

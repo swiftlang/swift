@@ -19,7 +19,8 @@ Building this code produces a warning about the unused unstructured task:
 ```
 | func example() {
 |   Task { throw MyError() }
-|   `- warning: result of throwing unstructured task created by 'Task.init(priority:operation:)' is unused
+|   `- warning: Unstructured throwing task created by 'init(name:priority:operation:)' is not used, which may accidentally ignore errors thrown inside the task
+|      note: to silence this warning, handle the error inside the task, or store/discard the task value explicitly
 | }
 ```
 

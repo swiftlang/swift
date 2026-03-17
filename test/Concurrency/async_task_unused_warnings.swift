@@ -11,31 +11,36 @@ func test() async throws {
   Task {
     throw MyError()
   }
-  // CHECK: warning: Unstructured throwing task created by 'init(name:priority:operation:)' is unused [#NoUseUnstructuredThrowingTask]
+  // CHECK: warning: Unstructured throwing task created by 'init(name:priority:operation:)' is not used, which may accidentally ignore errors thrown inside the task [#NoUseUnstructuredThrowingTask]
+  // CHECK: note: to silence this warning, handle the error inside the task, or store/discard the task value explicitly
   // CHECK-FILE: [#NoUseUnstructuredThrowingTask]: <https://{{.*}}/no-use-throwing-unstructured-task>
 
   Task(executorPreference: nil) {
     throw MyError()
   }
-  // CHECK: warning: Unstructured throwing task created by 'init(name:executorPreference:priority:operation:)' is unused [#NoUseUnstructuredThrowingTask]
+  // CHECK: warning: Unstructured throwing task created by 'init(name:executorPreference:priority:operation:)' is not used, which may accidentally ignore errors thrown inside the task [#NoUseUnstructuredThrowingTask]
+  // CHECK: note: to silence this warning, handle the error inside the task, or store/discard the task value explicitly
   // CHECK-FILE: [#NoUseUnstructuredThrowingTask]: <https://{{.*}}/no-use-throwing-unstructured-task>
 
   Task.detached {
     throw MyError()
   }
-  // CHECK: warning: Unstructured throwing task created by 'detached(name:priority:operation:)' is unused [#NoUseUnstructuredThrowingTask]
+  // CHECK: warning: Unstructured throwing task created by 'detached(name:priority:operation:)' is not used, which may accidentally ignore errors thrown inside the task [#NoUseUnstructuredThrowingTask]
+  // CHECK: note: to silence this warning, handle the error inside the task, or store/discard the task value explicitly
   // CHECK-FILE: [#NoUseUnstructuredThrowingTask]: <https://{{.*}}/no-use-throwing-unstructured-task>
 
   Task.immediate {
     throw MyError()
   }
-  // CHECK: warning: Unstructured throwing task created by 'immediate(name:priority:executorPreference:operation:)' is unused [#NoUseUnstructuredThrowingTask]
+  // CHECK: warning: Unstructured throwing task created by 'immediate(name:priority:executorPreference:operation:)' is not used, which may accidentally ignore errors thrown inside the task [#NoUseUnstructuredThrowingTask]
+  // CHECK: note: to silence this warning, handle the error inside the task, or store/discard the task value explicitly
   // CHECK-FILE: [#NoUseUnstructuredThrowingTask]: <https://{{.*}}/no-use-throwing-unstructured-task>
 
   Task.immediateDetached {
     throw MyError()
   }
-  // CHECK: warning: Unstructured throwing task created by 'immediateDetached(name:priority:executorPreference:operation:)' is unused [#NoUseUnstructuredThrowingTask]
+  // CHECK: warning: Unstructured throwing task created by 'immediateDetached(name:priority:executorPreference:operation:)' is not used, which may accidentally ignore errors thrown inside the task [#NoUseUnstructuredThrowingTask]
+  // CHECK: note: to silence this warning, handle the error inside the task, or store/discard the task value explicitly
   // CHECK-FILE: [#NoUseUnstructuredThrowingTask]: <https://{{.*}}/no-use-throwing-unstructured-task>
 
   // Non-throwing tasks should NOT warn (discardable)

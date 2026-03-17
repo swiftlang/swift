@@ -30,7 +30,9 @@ func validTypedThrowingClosure<E: Error>(_ op: () throws(E) -> Void) -> Int { re
 struct MyError: Error {}
 
 func testNonDiscardableThrow() {
-  validThrowingClosure { throw MyError() } // expected-warning {{Unstructured throwing task created by 'validThrowingClosure(_:)' is unused}}
+  validThrowingClosure { throw MyError() }
+  // expected-warning @-1 {{is not used, which may accidentally ignore errors thrown inside the task}}
+  // expected-note @-2 {{to silence this warning, handle the error inside the task, or store/discard the task value explicitly}}
   validThrowingClosure { } // no warning - closure does not throw
   _ = validThrowingClosure { throw MyError() } // no warning - explicitly discarded
 }
