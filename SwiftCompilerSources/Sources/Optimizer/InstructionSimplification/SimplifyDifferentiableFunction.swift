@@ -99,7 +99,10 @@ extension DifferentiableFunctionInst : SILCombineSimplifiable {
 
   private func splitAndRemoveExtracts(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
     for differentiableFunctionExtract in beginBorrow.uses.users(ofType: DifferentiableFunctionExtractInst.self) {
-      let extractee = self.getExtractee(extractee: differentiableFunctionExtract.extractee)!
+      guard let extractee = self.getExtractee(extractee: differentiableFunctionExtract.extractee) else {
+        continue
+      }
+
       switch differentiableFunctionExtract.ownership {
       case .none:
         if differentiableFunctionExtract.type != extractee.type {
@@ -109,6 +112,7 @@ extension DifferentiableFunctionInst : SILCombineSimplifiable {
         } else {
           differentiableFunctionExtract.replace(with: extractee, context)
         }
+
       case .guaranteed:
         let beginBuilder = Builder(before: beginBorrow, context)
         let borrowedField = beginBuilder.createBeginBorrow(of: extractee,
@@ -125,6 +129,7 @@ extension DifferentiableFunctionInst : SILCombineSimplifiable {
           let endBuilder = Builder(before: endBorrow, context)
           endBuilder.createEndBorrow(of: borrowedField)
         }
+
       case .owned, .unowned:
         fatalError("wrong ownership of differentiable_function_extract")
       }
