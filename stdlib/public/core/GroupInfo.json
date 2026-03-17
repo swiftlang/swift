@@ -81,6 +81,7 @@
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
     "BorrowingSequence.swift",
+    "BorrowingSequenceAlgorithms.swift",
     "Sequence.swift",
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",

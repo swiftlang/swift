@@ -1,4 +1,4 @@
-//===--- BorrowingSequence.swift --------------------------------------------------===//
+//===--- BorrowingSequence.swift ------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -22,41 +22,6 @@ var suite = TestSuite("BorrowingSequence Tests")
 defer { runAllTests() }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable {
-  func reduce<T: ~Copyable>(
-    _ initial: consuming T,
-    _ nextPartialResult: @escaping (consuming T, borrowing Element) -> T
-  ) -> T {
-    var borrowIterator = makeBorrowingIterator()
-    var result = initial
-    while true {
-      let span = borrowIterator.nextSpan(maximumCount: .max)
-      if span.isEmpty { break }
-      for i in span.indices {
-        result = nextPartialResult(result, span[i])
-      }
-    }
-    return result
-  }
-  
-  func reduce<T: ~Copyable>(
-    into initial: consuming T,
-    _ nextPartialResult: (inout T, borrowing Element) -> Void
-  ) -> T {
-    var borrowIterator = makeBorrowingIterator()
-    var result = initial
-    while true {
-      let span = borrowIterator.nextSpan(maximumCount: .max)
-      if span.isEmpty { break }
-      for i in span.indices {
-        nextPartialResult(&result, span[i])
-      }
-    }
-    return result
-  }
-}
-
-@available(SwiftStdlib 6.4, *)
 extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: Copyable {
   func collectViaBorrowing() -> [Element] {
     var borrowIterator = makeBorrowingIterator()
@@ -77,36 +42,6 @@ struct NoncopyableInt: ~Copyable, Equatable {
 
   static func ==(lhs: borrowing Self, rhs: borrowing Self) -> Bool {
     lhs.value == rhs.value
-  }
-}
-
-@available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: ~Escapable & ~Copyable, Element: Equatable & ~Copyable {
-  func elementsEqual<S: BorrowingSequence<Element>>(
-    _ rhs: borrowing S
-  ) -> Bool
-    where S: ~Escapable & ~Copyable, S.Element: ~Copyable
-  {
-    var iter1 = makeBorrowingIterator()
-    var iter2 = rhs.makeBorrowingIterator()
-    while true {
-      var el1 = iter1.nextSpan(maximumCount: .max)
-
-      if el1.isEmpty {
-        // LHS is empty - sequences are equal iff RHS is also empty
-        let el2 = iter2.nextSpan(maximumCount: 1)
-        return el2.isEmpty
-      }
-
-      while el1.count > 0 {
-        let el2 = iter2.nextSpan(maximumCount: el1.count)
-        if el2.isEmpty { return false }
-        for i in 0..<el2.count {
-          if el1[i] != el2[i] { return false }
-        }
-        el1 = el1.extracting(droppingFirst: el2.count)
-      }
-    }
   }
 }
 
