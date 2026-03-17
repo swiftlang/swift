@@ -139,8 +139,7 @@ def get_branch_for_repo(
                 [
                     "fetch",
                     "origin",
-                    "pull/{0}/merge:{1}".format(pr_id, repo_branch),
-                    "--tags",
+                    "pull/{0}/merge:{1}".format(pr_id, repo_branch)
                 ],
                 echo=True,
             )
