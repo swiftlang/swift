@@ -1,0 +1,72 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -constant-capture-propagation | %FileCheck %s
+
+// Regression test for an ODR violation in ConstantCapturePropagation.
+//
+// When two callers instantiate the same generic closure with different concrete
+// types (UInt8 vs Int) and both have the same constant capture (radix=10),
+// ConstantCapturePropagation must not bake a concrete type into the specialized
+// closure body. The mangled name only encodes the constant arguments, not the
+// type substitutions, and the function gets shared (linkonce_odr) linkage.
+// Baking in a concrete type produces the same symbol with different bodies —
+// an ODR violation.
+//
+// After the fix, the specialized closure body should remain generic, using
+// type parameters like $*Optional<T> instead of $*Optional<UInt8>.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// A minimal generic closure that writes to an Optional<T> indirect result.
+sil shared [heuristic_always_inline] @generic_closure : $@convention(thin) <T where T : FixedWidthInteger> (UnsafeBufferPointer<UInt8>, Int) -> @out Optional<T> {
+bb0(%0 : $*Optional<T>, %1 : $UnsafeBufferPointer<UInt8>, %2 : $Int):
+  %3 = alloc_stack $T
+  copy_addr %3 to [init] %0 : $*Optional<T>
+  dealloc_stack %3 : $*T
+  return undef : $()
+}
+
+// caller_uint8: partial_apply generic_closure<UInt8> with constant radix=10.
+// The specialized closure should keep $*T in the body, not $*UInt8.
+//
+// CHECK-LABEL: sil @caller_uint8
+// CHECK:         function_ref @$s15generic_closureSiTf3nnpSi10_n
+// CHECK:       } // end sil function 'caller_uint8'
+sil @caller_uint8 : $@convention(thin) (UnsafeBufferPointer<UInt8>) -> @out Optional<UInt8> {
+bb0(%0 : $*Optional<UInt8>, %1 : $UnsafeBufferPointer<UInt8>):
+  %2 = integer_literal $Builtin.Int64, 10
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  %4 = function_ref @generic_closure : $@convention(thin) <T where T : FixedWidthInteger> (UnsafeBufferPointer<UInt8>, Int) -> @out Optional<T>
+  %5 = partial_apply [callee_guaranteed] %4<UInt8>(%3) : $@convention(thin) <T where T : FixedWidthInteger> (UnsafeBufferPointer<UInt8>, Int) -> @out Optional<T>
+  %6 = apply %5(%0, %1) : $@callee_guaranteed (UnsafeBufferPointer<UInt8>) -> @out Optional<UInt8>
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// caller_int: partial_apply generic_closure<Int> with constant radix=10.
+// Must reuse the same specialized closure. If the body was baked with UInt8,
+// the verifier would catch the type mismatch here.
+//
+// CHECK-LABEL: sil @caller_int
+// CHECK:         function_ref @$s15generic_closureSiTf3nnpSi10_n
+// CHECK:       } // end sil function 'caller_int'
+sil @caller_int : $@convention(thin) (UnsafeBufferPointer<UInt8>) -> @out Optional<Int> {
+bb0(%0 : $*Optional<Int>, %1 : $UnsafeBufferPointer<UInt8>):
+  %2 = integer_literal $Builtin.Int64, 10
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  %4 = function_ref @generic_closure : $@convention(thin) <T where T : FixedWidthInteger> (UnsafeBufferPointer<UInt8>, Int) -> @out Optional<T>
+  %5 = partial_apply [callee_guaranteed] %4<Int>(%3) : $@convention(thin) <T where T : FixedWidthInteger> (UnsafeBufferPointer<UInt8>, Int) -> @out Optional<T>
+  %6 = apply %5(%0, %1) : $@callee_guaranteed (UnsafeBufferPointer<UInt8>) -> @out Optional<Int>
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// The specialized closure must preserve its generic signature. Verify that the
+// body uses $*Optional<T> (generic) rather than $*Optional<UInt8> (concrete).
+//
+// CHECK-LABEL: sil shared {{.*}}@$s15generic_closureSiTf3nnpSi10_n
+// CHECK:         bb0({{.*}} : $*Optional<T>, {{.*}} : $UnsafeBufferPointer<UInt8>):
+// CHECK:           alloc_stack $T
+// CHECK:           copy_addr {{.*}} to [init] {{.*}} : $*Optional<T>
+// CHECK:       } // end sil function '$s15generic_closureSiTf3nnpSi10_n'
