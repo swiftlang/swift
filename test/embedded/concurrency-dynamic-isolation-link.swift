@@ -17,8 +17,9 @@
 // RUN: %target-clang %t/a6.o -o %t/a6.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
 // RUN: %target-run %t/a6.out | %FileCheck %s
 
-// Verify that swift_task_reportUnexpectedExecutor is referenced in the
-// Swift 6 object but not the Swift 5 one.
+// swift_task_reportUnexpectedExecutor should be referenced in Swift 6 (dynamic
+// isolation checking) but not Swift 5. Linking succeeds because Actor.cpp.o
+// (which defines it) no longer pulls in full-runtime symbols in embedded mode.
 // RUN: %llvm-nm --undefined-only %t/a6.o | %FileCheck %s --check-prefix=SWIFT6
 // RUN: %llvm-nm --undefined-only %t/a5.o | %FileCheck %s --check-prefix=SWIFT5
 
