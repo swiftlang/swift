@@ -210,6 +210,7 @@ set(SWIFT_BENCH_MODULES
     single-source/SubstringTest
     single-source/Suffix
     single-source/SuperChars
+    single-source/TaskGroups
     single-source/TwoSum
     single-source/TypeFlood
     single-source/UTF8Decode
