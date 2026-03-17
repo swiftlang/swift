@@ -125,6 +125,36 @@ extension Task { // throwing Failure error type
 
 } // extension Task ...
 
+// Necessary for Embedded Swift: the typed throws 'throws(Failure)' would
+// trigger 'cannot use a value of protocol type any Error', so we need an
+// explicit non-throwing overload.
+#if $Embedded
+extension Task where Failure == Never {
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 5.1, *)
+  public init(
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async -> Success
+  ) {
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: true,
+      inheritContext: true,
+      enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false)
+
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
+
+    self._task = task
+  }
+}
+#endif
+
 extension Task { // throwing Failure error type
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -243,6 +273,36 @@ extension Task { // throwing Failure error type
 #endif
 
 } // extension Task ...
+
+// Necessary for Embedded Swift: the typed throws 'throws(Failure)' would
+// trigger 'cannot use a value of protocol type any Error', so we need an
+// explicit non-throwing overload.
+#if $Embedded
+extension Task where Failure == Never {
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 5.1, *)
+  public static func detached(
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    operation: sending @escaping @isolated(any) () async -> Success
+  ) -> Task<Success, Never> {
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: false /* detached */,
+      inheritContext: false /* detached */,
+      enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false)
+
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
+
+    return Task(task)
+  }
+}
+#endif
 
 extension Task { // throwing Failure error type
 
