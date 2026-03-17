@@ -831,6 +831,7 @@ void swift::swift_task_reportUnexpectedExecutor(
       isFatalError ? "error" : "warning", functionIsolation,
       (int)fileLength, file, (int)line, whereExpected);
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   if (_swift_shouldReportFatalErrorsToDebugger()) {
     RuntimeErrorDetails details = {
         .version = RuntimeErrorDetails::currentVersion,
@@ -849,6 +850,7 @@ void swift::swift_task_reportUnexpectedExecutor(
         isFatalError ? RuntimeErrorFlagFatal : RuntimeErrorFlagNone, message,
         &details);
   }
+#endif
 
 #if defined(_WIN32)
 #define STDERR_FILENO 2

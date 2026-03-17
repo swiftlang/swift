@@ -9,13 +9,15 @@
 // RUN: %target-clang %t/a5.o -o %t/a5.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
 // RUN: %target-run %t/a5.out | %FileCheck %s
 
-// Swift 6: compile succeeds, but link fails because swift_task_reportUnexpectedExecutor
-// (from dynamic isolation checking) extracts Actor.cpp.o from libswift_Concurrency.a,
-// which references full-runtime symbols unavailable in embedded mode.
+// Swift 6: compile, link, and run should all succeed. Dynamic isolation checking
+// emits a reference to swift_task_reportUnexpectedExecutor, which pulls in Actor.cpp.o
+// from libswift_Concurrency.a. Actor.cpp.o must not reference full-runtime symbols
+// (like _swift_shouldReportFatalErrorsToDebugger) that are unavailable in embedded mode.
 // RUN: %target-swift-frontend -c -I %t %t/Main.swift -enable-experimental-feature Embedded -o %t/a6.o -parse-as-library -swift-version 6
-// RUN: not %target-clang %t/a6.o -o %t/a6.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
+// RUN: %target-clang %t/a6.o -o %t/a6.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
+// RUN: %target-run %t/a6.out | %FileCheck %s
 
-// Verify root cause: swift_task_reportUnexpectedExecutor is referenced in the
+// Verify that swift_task_reportUnexpectedExecutor is referenced in the
 // Swift 6 object but not the Swift 5 one.
 // RUN: %llvm-nm --undefined-only %t/a6.o | %FileCheck %s --check-prefix=SWIFT6
 // RUN: %llvm-nm --undefined-only %t/a5.o | %FileCheck %s --check-prefix=SWIFT5
