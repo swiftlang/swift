@@ -1614,8 +1614,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::ExtractFunctionIsolation:
   case BuiltinValueKind::DistributedActorAsAnyActor:
   case BuiltinValueKind::TypeJoin:
-  case BuiltinValueKind::TypeJoinInout:
-  case BuiltinValueKind::TypeJoinMeta:
   case BuiltinValueKind::TriggerFallbackDiagnostic:
     llvm_unreachable("IRGen unimplemented for this builtin!");
   }
