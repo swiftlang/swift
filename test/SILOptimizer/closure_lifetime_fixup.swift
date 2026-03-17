@@ -73,8 +73,8 @@ public protocol P {
 // CHECK:  [[PA2:%.*]] = partial_apply [callee_guaranteed]
 // CHECK:  [[CF2:%.*]] = convert_function [[PA2]]
 // CHECK:  [[CVT2:%.*]] = convert_escape_to_noescape [[CF2]]
-// CHECK:  [[W:%.*]] = witness_method $T, #P.subscript!modify
-// CHECK:  ([[BUFFER:%.*]], [[TOKEN:%.*]]) = begin_apply [[W]]<T, Int>([[CVT1]], [[CVT2]], {{.*}})
+// CHECK:  [[W:%.*]] = witness_method $T, #P.subscript!yielding_mutate
+// CHECK:  ([[BUFFER:%.*]], [[TOKEN:%.*]], [[STK:%.*]]) = begin_apply [[W]]<T, Int>([[CVT1]], [[CVT2]], {{.*}})
 // CHECK:  end_apply [[TOKEN]]
 // CHECK:  strong_release [[CF1]]
 // CHECK:  strong_release [[CF2]]
