@@ -2,7 +2,6 @@
 // RUN: echo "[MyProto]" > %t/protocols.json
 
 // RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractMemberFunctions.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s
-// RUN: cat %t/ExtractMemberFunctions.swiftconstvalues 2>&1 > /tmp/const.json
 // RUN: cat %t/ExtractMemberFunctions.swiftconstvalues 2>&1 | %FileCheck %s
 
 protocol MyProto {}
