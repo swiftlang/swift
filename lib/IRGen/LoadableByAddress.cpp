@@ -135,6 +135,30 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
   return false;
 }
 
+/// Check if a type is a large loadable tuple type that requires indirect
+/// passing according to the native calling convention.
+static bool isLargeLoadableTupleType(GenericEnvironment *GenericEnv, SILType t,
+                                     irgen::IRGenModule &Mod) {
+  if (t.isAddress() || t.isClassOrClassMetatype()) {
+    return false;
+  }
+
+  auto canType = t.getASTType();
+  if (canType->hasTypeParameter()) {
+    assert(GenericEnv && "Expected a GenericEnv");
+    canType = GenericEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
+  }
+
+  if (isa<TupleType>(canType)) {
+    assert(t.isObject() && "Expected only two categories: address and object");
+    assert(!canType->hasTypeParameter());
+    const TypeInfo &TI = Mod.getTypeInfoForLowered(canType);
+    auto &nativeSchemaOrigParam = TI.nativeParameterValueSchema(Mod);
+    return nativeSchemaOrigParam.requiresIndirect();
+  }
+  return false;
+}
+
 static bool modifiableFunction(CanSILFunctionType funcType) {
   if (funcType->getLanguage() == SILFunctionLanguage::C) {
     // C functions should use the old ABI
@@ -257,6 +281,13 @@ static bool modNonFuncTypeResultType(GenericEnvironment *genEnv,
   auto singleResult = loweredTy->getSingleResult();
   auto resultStorageType = singleResult.getSILStorageInterfaceType();
   if (isLargeLoadableType(genEnv, resultStorageType, Mod)) {
+    return true;
+  }
+  // For borrow accessors (guaranteed results), also handle large tuple types.
+  // We can't transform large loadable tuples for other functions, because of
+  // ABI differences.
+  if (singleResult.getConvention() == ResultConvention::Guaranteed &&
+      isLargeLoadableTupleType(genEnv, resultStorageType, Mod)) {
     return true;
   }
   return false;
@@ -1594,7 +1625,7 @@ void LoadableStorageAllocation::convertApplyResults() {
         continue;
       }
       auto resultStorageType = origSILFunctionType->getAllResultsInterfaceType();
-      if (!pass.isLargeLoadableType(origSILFunctionType, resultStorageType)) {
+      if (!modNonFuncTypeResultType(genEnv, origSILFunctionType, pass.Mod)) {
         // Make sure it contains a function type
         auto numFuncTy = llvm::count_if(origSILFunctionType->getResults(),
             [](const SILResultInfo &origResult) {
