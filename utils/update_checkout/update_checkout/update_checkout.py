@@ -248,9 +248,12 @@ def update_single_repository(pool_args: UpdateArguments):
         # It's important that we checkout, fetch, and rebase, in order.
         # .git/FETCH_HEAD updates the not-for-merge attributes based on
         # which branch was checked out during the fetch.
+        fetch_args = ["fetch", "--recurse-submodules=yes"]
+        if pool_args.tag:
+            fetch_args.append("--tags")
         Git.run(
             repo_path,
-            ["fetch", "--recurse-submodules=yes", "--tags"],
+            fetch_args,
             echo=verbose,
             prefix=prefix,
         )
