@@ -41,6 +41,7 @@
 GROUP(no_group,none,"")
 
 GROUP(ActorIsolatedCall,none,"actor-isolated-call")
+GROUP(ActorIsolatedMutatingAsync,none,"actor-isolated-mutating-async")
 GROUP(AlwaysAvailableDomain,none,"always-available-domain")
 GROUP(AvailabilityUnrecognizedName,none,"availability-unrecognized-name")
 GROUP(ClangDeclarationImport,none,"clang-declaration-import")
