@@ -1196,6 +1196,34 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
 SubsumeBindingResult
 BindingSet::subsumeBinding(const PotentialBinding &binding,
                            const PotentialBinding &existing) {
+  // FIXME: Hack to avoid finding duplicate solutions that only differ
+  // in CGFloat vs Double.
+  //
+  // This will be going away shortly. Once we're always promoting
+  // supertype bindings when they're ready, the subtype binding is not
+  // attempted unless its the only one, so we will not end up with
+  // duplicate solutions.
+  auto dedupCGFloatDoubleHack = [&]() -> std::optional<SubsumeBindingResult> {
+    if (!TypeVar->getImpl().isClosureParameterType()) {
+      auto lhs = existing.BindingType;
+      auto rhs = binding.BindingType;
+
+      auto lhsUnwrap = lhs;
+      auto rhsUnwrap = rhs;
+      if (lhs->isOptional() && rhs->isOptional()) {
+        lhsUnwrap = lhs->getOptionalObjectType();
+        rhsUnwrap = rhs->getOptionalObjectType();
+      }
+
+      if (lhsUnwrap->isDouble() && rhsUnwrap->isCGFloat())
+        return SubsumeBindingResult::ExistingIsBetter;
+      else if (lhsUnwrap->isCGFloat() && rhsUnwrap->isDouble())
+        return SubsumeBindingResult::NewIsBetter;
+    }
+
+    return std::nullopt;
+  };
+
   // (Exact, Exact)
   if (existing.Kind == AllowedBindingKind::Exact &&
       binding.Kind == AllowedBindingKind::Exact) {
@@ -1343,6 +1371,9 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       ASSERT(existing.BindingType->hasTypeVariable());
       return SubsumeBindingResult::NewIsBetter;
     }
+
+    if (auto result = dedupCGFloatDoubleHack())
+      return *result;
   }
 
   // (Supertypes, Fallback)
@@ -1401,9 +1432,12 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       }
     }
 
-    // FIXME: Remove this.
+    // FIXME: Remove the rest.
     if (binding.BindingType->isEqual(existing.BindingType))
       return SubsumeBindingResult::ExistingIsBetter;
+
+    if (auto result = dedupCGFloatDoubleHack())
+      return *result;
   }
 
   // (Subtypes, Subtypes)
@@ -1459,22 +1493,6 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Fallback) {
     // Drop duplicate Fallback bindings.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::NewIsBetter;
-  }
-
-  // FIXME: Refactor or remove this
-  if (!TypeVar->getImpl().isClosureParameterType()) {
-    // Since Double and CGFloat are effectively the same type due to an
-    // implicit conversion between them, always prefer Double over CGFloat
-    // when possible.
-    //
-    // Note: This optimization can't be performed for closure parameters
-    //       because their type could be converted only at the point of
-    //       use in the closure body.
-    if (binding.BindingType->isCGFloat() && existing.BindingType->isDouble())
-      return SubsumeBindingResult::ExistingIsBetter;
-
-    if (binding.BindingType->isDouble() && existing.BindingType->isCGFloat())
       return SubsumeBindingResult::NewIsBetter;
   }
 
