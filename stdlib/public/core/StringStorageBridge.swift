@@ -792,9 +792,6 @@ fileprivate func isEqual(
         return .nonequal
       }
       
-      remainingLHSByteCount &-= rhsChunkByteCount
-      offset = remainingRange.lowerBound
-      
       let result = unsafe _swift_stdlib_memcmp(
         lhsPtr + (lhsByteCount &- remainingLHSByteCount),
         buffer.baseAddress.unsafelyUnwrapped,
@@ -803,6 +800,8 @@ fileprivate func isEqual(
       if result != 0 {
         return .nonequal
       }
+      remainingLHSByteCount &-= rhsChunkByteCount
+      offset = remainingRange.lowerBound
       return remainingLHSByteCount == 0 ? .equal : .continue
     }
   }
