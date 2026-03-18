@@ -23,6 +23,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 using namespace swift;
 
@@ -340,6 +341,21 @@ static bool validateEnclosingSelfSubscript(SubscriptDecl *subscript) {
     auto paramTy = param->getInterfaceType();
     if (paramTy->hasError())
       return true;
+
+    // Strip off marker protocols from the type, other APIs associated with
+    // key paths allow compositions with `Sendable` and custom marker protocols
+    // so we need to follow suit here as well.
+    if (auto *existential = paramTy->getAs<ExistentialType>()) {
+      if (auto *compositionTy = existential->getConstraintType()
+                                    ->getAs<ProtocolCompositionType>()) {
+        auto newType = compositionTy->withoutMarkerProtocols();
+        if (!newType->isEqual(compositionTy)) {
+          paramTy = newType->getClassOrBoundGenericClass()
+                        ? newType
+                        : ExistentialType::get(newType);
+        }
+      }
+    }
 
     if (!(paramTy->isKeyPath() || paramTy->isWritableKeyPath() ||
           paramTy->isReferenceWritableKeyPath())) {

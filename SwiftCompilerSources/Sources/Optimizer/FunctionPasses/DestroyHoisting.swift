@@ -62,6 +62,13 @@ let destroyHoisting = FunctionPass(name: "destroy-hoisting") {
     return
   }
 
+  // For very large functions this optimization can run into noticeable quadratic
+  // behavior. Therefore, ignore functions with more than 100000 SIL instructions.
+  // This limit is large enough to not affect most of real-world SIL functions.
+  if function.instructions.countExceeds(100000) {
+    return
+  }
+
   for block in function.blocks {
     for arg in block.arguments {
       optimize(value: arg, context)

@@ -10,33 +10,27 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsCommon.h"
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/Frontend/CompileJobCacheKey.h"
+#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/ScanningLoaders.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
 #include "clang/CAS/IncludeTree.h"
-#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/SetOperations.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -45,9 +39,7 @@
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/VirtualFileSystem.h"
-#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputBackends.h"
-#include "llvm/Support/VirtualOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <optional>
@@ -1494,29 +1486,32 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
         }
       };
 
-  // Enque asynchronous lookup tasks
-  for (const auto &dependsOn : moduleDependencyInfo.getModuleImports()) {
-    // Avoid querying the underlying Clang module here
-    if (moduleID.ModuleName == dependsOn.importIdentifier)
-      continue;
+  llvm::StringSet<> enquedIdentifiers;
+  auto enqueIfNeeded = [&](const ScannerImportStatementInfo &importInfo) {
+    // Avoid querying the underlying Clang module
+    if (moduleID.ModuleName == importInfo.importIdentifier)
+      return;
     // Avoid querying Swift module dependencies previously looked up
-    if (DependencyCache.hasQueriedSwiftDependency(dependsOn.importIdentifier))
-      continue;
+    if (DependencyCache.hasQueriedSwiftDependency(importInfo.importIdentifier))
+      return;
+    // If we have already enqued this module here, avoid doing it
+    // again. For example, if there's an optional import with the
+    // same identifier as a non-optional import
+    if (!enquedIdentifiers.insert(importInfo.importIdentifier).second)
+      return;
+
     ScanningThreadPool.async(
         scanForSwiftModuleDependency,
-        getModuleImportIdentifier(dependsOn.importIdentifier),
-        moduleDependencyInfo.isTestableImport(dependsOn.importIdentifier));
-  }
-  for (const auto &dependsOn :
-       moduleDependencyInfo.getOptionalModuleImports()) {
-    // Avoid querying the underlying Clang module here
-    if (moduleID.ModuleName == dependsOn.importIdentifier)
-      continue;
-    ScanningThreadPool.async(
-        scanForSwiftModuleDependency,
-        getModuleImportIdentifier(dependsOn.importIdentifier),
-        moduleDependencyInfo.isTestableImport(dependsOn.importIdentifier));
-  }
+        getModuleImportIdentifier(importInfo.importIdentifier),
+        moduleDependencyInfo.isTestableImport(importInfo.importIdentifier));
+  };
+
+  // Enque asynchronous lookup tasks
+  for (const auto &dependsOn : moduleDependencyInfo.getModuleImports())
+    enqueIfNeeded(dependsOn);
+  for (const auto &dependsOn : moduleDependencyInfo.getOptionalModuleImports())
+    enqueIfNeeded(dependsOn);
+
   ScanningThreadPool.wait();
 
   auto recordResolvedModuleImport =

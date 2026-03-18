@@ -954,12 +954,9 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   if (!Wrapped)
     return;
 
-  if (!impl.lookupAndImportPointee(decl))
+  auto pointee = impl.lookupAndImportPointee(decl);
+  if (!pointee)
     return;
-
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"),
-                               Wrapped->getUnderlyingType());
-  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
 
   // `std::optional` has a C++ constructor that takes the wrapped value as a
   // parameter. Unfortunately this constructor has templated parameter type, so
@@ -1014,6 +1011,18 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   if (!importedConstructor)
     return;
   decl->addMember(importedConstructor);
+
+  // Mark `var pointee` as deprecated to direct users towards `var value`, which
+  // is provided by the Cxx overlay. It supports mutation and is UB-safe. Only
+  // do so if `value` is actually available, i.e. if the conformance to
+  // CxxOptional was synthesized.
+  auto pointeeDeprecatedAttr = AvailableAttr::createUniversallyDeprecated(
+      ctx, "use 'value' instead for instances of 'std.optional'", "value");
+  pointee->addAttribute(pointeeDeprecatedAttr);
+
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"),
+                               Wrapped->getUnderlyingType());
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
 }
 
 static void conformToCxxBorrowingSequenceIfNeeded(

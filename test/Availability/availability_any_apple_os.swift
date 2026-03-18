@@ -29,8 +29,25 @@ func availableInMacOS26_1AndAnyAppleOS26() { }
 @available(macOS 26.1, iOS 26.1, watchOS 26.1, tvOS 26.1, visionOS 26.1, *)
 func availableInEveryAppleOS26_1() { }
 
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(watchOS, unavailable)
+@available(tvOS, unavailable)
+@available(visionOS, unavailable)
+func unavailableInEveryAppleOS() {
+  availableInAnyAppleOS26_1()
+  availableInMacOS26_1AndAnyAppleOS26()
+  availableInEveryAppleOS26_1()
+  unavailableInAnyAppleOS()
+}
+
 @available(anyAppleOS, unavailable)
-func unavailableInAnyAppleOS() { } // expected-apple-note {{'unavailableInAnyAppleOS()' has been explicitly marked unavailable here}}
+func unavailableInAnyAppleOS() { // expected-apple-note {{'unavailableInAnyAppleOS()' has been explicitly marked unavailable here}}
+  availableInAnyAppleOS26_1()
+  availableInMacOS26_1AndAnyAppleOS26()
+  availableInEveryAppleOS26_1()
+  unavailableInEveryAppleOS()
+}
 
 // FIXME: [availability] Ensure the fix-it suggests @available(anyAppleOS ...) rdar://163819878
 func availableAtDeploymentTarget() {

@@ -93,8 +93,10 @@ public:
   /// Returns true if this context contains any unavailable domains.
   bool isUnavailable() const;
 
-  /// Returns true if \p domain is unavailable in this context.
-  bool containsUnavailableDomain(AvailabilityDomain domain) const;
+  /// Returns true if this context is unavailable with respect to contexts in
+  /// which \p domain is available. Note that contexts that are unavailable in
+  /// `*` are always unavailable.
+  bool isUnavailableForDomain(AvailabilityDomain domain) const;
 
   /// Returns true if this context is deprecated on the current platform.
   bool isDeprecated() const;

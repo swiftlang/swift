@@ -7,5 +7,4 @@ import CxxModule
 
 public func bar(x: Foo, y: UnsafeMutablePointer<UnsafeMutableRawPointer?>) {}
 
-// CHECK: // Unavailable in C++: Swift global function 'bar(x:y:)'.
-// TODO: the message above is not correct, this is actually unavailable in Obj-C.
+// CHECK: void bar(const Foo& x, void * _Nullable * _Nonnull y) noexcept

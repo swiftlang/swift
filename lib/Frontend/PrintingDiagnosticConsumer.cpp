@@ -23,6 +23,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Bridging/ASTGen.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -137,8 +138,14 @@ void PrintingDiagnosticConsumer::printDiagnostic(SourceManager &SM,
     DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
                                            Info.FormatArgs);
 
-    if (!Info.Category.empty())
-      Out << " [#" << Info.Category << "]";
+    if (!Info.getCategoryName().empty()) {
+      Out << " [#";
+      llvm::interleave(
+          llvm::reverse(Info.CategoryChain),
+          [&](const auto &entry) { Out << entry.Name; },
+          [&] { Out << "::"; });
+      Out << "]";
+    }
   }
 
   auto Msg = SM.GetMessage(Info.Loc, SMKind, Text, Ranges, FixIts,

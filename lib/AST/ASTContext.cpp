@@ -681,6 +681,10 @@ struct ASTContext::Implementation {
   /// The set of unique custom availability domains.
   llvm::FoldingSet<CustomAvailabilityDomain> CustomAvailabilityDomains;
 
+  /// The most specific platform AvailabilityDomain that corresponds to the
+  /// compilation's `-target`.
+  std::optional<AvailabilityDomain> TargetAvailabilityDomain;
+
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
   llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
@@ -7465,13 +7469,21 @@ ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
   llvm_unreachable("exhaustive switch");
 }
 
-AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
-  auto platform = swift::targetPlatform(LangOpts);
+static AvailabilityDomain
+targetAvailabilityDomainForPlatform(PlatformKind platform) {
   if (platform != PlatformKind::none)
     return AvailabilityDomain::forPlatform(platform);
 
   // Fall back to the universal domain for triples without a platform.
   return AvailabilityDomain::forUniversal();
+}
+
+AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
+  if (!getImpl().TargetAvailabilityDomain) {
+    getImpl().TargetAvailabilityDomain =
+        targetAvailabilityDomainForPlatform(swift::targetPlatform(LangOpts));
+  }
+  return *getImpl().TargetAvailabilityDomain;
 }
 
 GenericSignature &

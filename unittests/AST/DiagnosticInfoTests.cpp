@@ -145,7 +145,7 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Group) {
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
         EXPECT_FALSE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
-        EXPECT_EQ(info.Category, "DeprecatedDeclaration");
+        EXPECT_EQ(info.getCategoryName(), "DeprecatedDeclaration");
       },
       /*expectedNumCallbackCalls=*/1);
 }
@@ -166,7 +166,7 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Group_WrappedDiag) {
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
         EXPECT_EQ(info.ID, diag::error_in_a_future_swift_lang_mode.ID);
         EXPECT_FALSE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
-        EXPECT_EQ(info.Category, "DeprecatedDeclaration");
+        EXPECT_EQ(info.getCategoryName(), "DeprecatedDeclaration");
       },
       /*expectedNumCallbackCalls=*/1);
 }
@@ -188,7 +188,7 @@ TEST(DiagnosticInfo, CategoryDeprecation) {
             .warnUntilLanguageMode(LanguageMode::future);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
-        EXPECT_EQ(info.Category, "deprecation");
+        EXPECT_EQ(info.getCategoryName(), "deprecation");
       },
       /*expectedNumCallbackCalls=*/3);
 }
@@ -207,7 +207,7 @@ TEST(DiagnosticInfo, CategoryNoUsage) {
             .warnUntilLanguageMode(LanguageMode::future);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
-        EXPECT_EQ(info.Category, "no-usage");
+        EXPECT_EQ(info.getCategoryName(), "no-usage");
       },
       /*expectedNumCallbackCalls=*/3);
 }
@@ -226,7 +226,7 @@ TEST(DiagnosticInfo, CategoryAPIDigesterBreakage) {
             .warnUntilLanguageMode(LanguageMode::future);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
-        EXPECT_EQ(info.Category, "api-digester-breaking-change");
+        EXPECT_EQ(info.getCategoryName(), "api-digester-breaking-change");
       },
       /*expectedNumCallbackCalls=*/3);
 }

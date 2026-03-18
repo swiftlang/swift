@@ -268,6 +268,7 @@ ManagedValue SILGenBuilder::createAllocRef(
                   [](ManagedValue mv) -> SILValue { return mv.getValue(); });
 
   AllocRefInst *i = createAllocRef(loc, refType, objc, false, false,
+                                   StackAllocationIsNested,
                                    elementTypes, elementCountOperands);
   return SGF.emitManagedRValueWithCleanup(i);
 }
@@ -285,6 +286,7 @@ ManagedValue SILGenBuilder::createAllocRefDynamic(
 
   AllocRefDynamicInst *i =
       createAllocRefDynamic(loc, operand.getValue(), refType, objc, false,
+                            StackAllocationIsNested,
                             elementTypes, elementCountOperands);
   return SGF.emitManagedRValueWithCleanup(i);
 }

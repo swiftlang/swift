@@ -633,7 +633,7 @@ func rdar_50467583_and_50909555() {
     // expected-error@-1 {{no exact matches in call to subscript}}
     // expected-note@-2 {{found candidate with type '(Int) -> Int'}}
     // expected-note@-3 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
-    // expected-note@-4 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
+    // expected-note@-4 {{found candidate with type '(UnboundedRange) -> ArraySlice<Int>' (aka '((UnboundedRange_) -> ()) -> ArraySlice<Int>')}}
     // expected-note@-5 * {{found candidate with type '(RangeSet<Array<Int>.Index>) -> DiscontiguousSlice<[Int]>' (aka '(RangeSet<Int>) -> DiscontiguousSlice<Array<Int>>')}}
   }
   

@@ -26,13 +26,13 @@ func barrier()
 
 // The specializations should be @_eagerMove.
 
+// CHECK-LABEL: sil {{.*}}@$s4main27callee_guaranteed_eagerMoveyyAA1P_pFTf4e_nAA1SV_Tg5 : {{.*}}{
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove
+// CHECK-LABEL: } // end sil function '$s4main27callee_guaranteed_eagerMoveyyAA1P_pFTf4e_nAA1SV_Tg5'
+
 // CHECK-LABEL: sil {{.*}}@$s4main27callee_guaranteed_eagerMoveyyAA1P_pFTf4e_n : {{.*}}{
 // CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove $
 // CHECK-LABEL: } // end sil function '$s4main27callee_guaranteed_eagerMoveyyAA1P_pFTf4e_n'
-
-// CHECK-LABEL: sil {{.*}}@$s4main27callee_guaranteed_eagerMoveyyAA1P_pFTf4e_nAA1SV_Tg5Tf4x_n : {{.*}}{
-// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove
-// CHECK-LABEL: } // end sil function '$s4main27callee_guaranteed_eagerMoveyyAA1P_pFTf4e_nAA1SV_Tg5Tf4x_n'
 @inline(never)
 func callee_guaranteed_eagerMove(@_eagerMove _ p: P) {
   p.foo()

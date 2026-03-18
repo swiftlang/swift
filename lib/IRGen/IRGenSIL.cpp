@@ -6708,6 +6708,11 @@ buildTailArrays(IRGenSILFunction &IGF,
 }
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
+  // We can ignore isStackAllocationNested() here because we currently only
+  // use static allocas for the stack promotion optimization. If we ever do
+  // want to try dynamic allocations, we'll need to pay attention
+  // (probably by just disabling the optimization).
+
   int StackAllocSize = -1;
   if (i->canAllocOnStack()) {
     estimateStackSize();
@@ -6731,6 +6736,11 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
+  // We can ignore isStackAllocationNested() here because we currently only
+  // use static allocas for the stack promotion optimization. If we ever do
+  // want to try dynamic allocations, we'll need to pay attention
+  // (probably by just disabling the optimization).
+
   int StackAllocSize = -1;
   if (i->canAllocOnStack()) {
     assert(i->isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType());

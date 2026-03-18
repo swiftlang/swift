@@ -1346,6 +1346,10 @@ SILInstruction::getStackAllocation() const {
       BUILTIN_CASE(StackAlloc, StackAlloc)
       BUILTIN_CASE(UnprotectedStackAlloc, UnprotectedStackAlloc)
       BUILTIN_CASE(StartAsyncLetWithLocalBuffer, StartAsyncLet)
+      //BUILTIN_CASE(TaskLocalValuePush, TaskLocalValuePush)
+      BUILTIN_CASE(TaskAddPriorityEscalationHandler,
+                   TaskAddPriorityEscalationHandler)
+      BUILTIN_CASE(TaskAddCancellationHandler, TaskAddCancellationHandler)
 #undef BUILTIN_CASE
 
       default:
@@ -1363,6 +1367,8 @@ StackAllocationIsNested_t SILInstruction::isStackAllocationNested() const {
     return ASI->isStackAllocationNested();
   } else if (auto PAI = dyn_cast<PartialApplyInst>(this)) {
     return PAI->isStackAllocationNested();
+  } else if (auto ARI = dyn_cast<AllocRefInstBase>(this)) {
+    return ARI->isStackAllocationNested();
   } else {
     // TODO: implement for all remaining allocations
     return StackAllocationIsNested;
@@ -1375,8 +1381,11 @@ void SILInstruction::setStackAllocationIsNested(
     ASI->setStackAllocationIsNested(nested);
   } else if (auto PAI = dyn_cast<PartialApplyInst>(this)) {
     PAI->setStackAllocationIsNested(nested);
+  } else if (auto ARI = dyn_cast<AllocRefInstBase>(this)) {
+    ARI->setStackAllocationIsNested(nested);
   } else if (!nested) {
-    llvm_unreachable("unimplemented");
+    verificationFailure("setStackAllocationIsNested unimplemented for instruction",
+                        this, [](SILPrintContext &ctx) {});
   }
 }
 
@@ -1437,11 +1446,19 @@ SILInstruction::getStackDeallocation() const {
                    : StackAllocationKind::BuiltinUnprotectedStackAlloc);
       }
 
-      case BuiltinValueKind::FinishAsyncLet: {
-        auto alloc = StackDeallocation::getAllocationOperand(BI);
-        return StackDeallocation::getUnchecked(alloc, BI,
-                             StackAllocationKind::BuiltinStartAsyncLet);
+#define BUILTIN_CASE(FINISH_BUILTIN_ID, ID)                              \
+      case BuiltinValueKind::FINISH_BUILTIN_ID: {                        \
+        auto alloc = StackDeallocation::getAllocationOperand(BI);        \
+        return StackDeallocation::getUnchecked(alloc, BI,                \
+                                               StackAllocationKind::ID); \
       }
+      BUILTIN_CASE(FinishAsyncLet, BuiltinStartAsyncLet)
+      //BUILTIN_CASE(TaskLocalValuePop, BuiltinTaskLocalValuePush)
+      BUILTIN_CASE(TaskRemovePriorityEscalationHandler,
+                   BuiltinTaskAddPriorityEscalationHandler)
+      BUILTIN_CASE(TaskRemoveCancellationHandler,
+                   BuiltinTaskAddCancellationHandler)
+#undef BUILTIN_CASE
 
       default:
         return std::nullopt;

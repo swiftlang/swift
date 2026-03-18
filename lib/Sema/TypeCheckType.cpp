@@ -16,19 +16,22 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckType.h"
+#include "LiteralExpressionFolding.h"
 #include "MiscDiagnostics.h"
 #include "NonisolatedNonsendingByDefaultMigration.h"
+#include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
-#include "LiteralExpressionFolding.h"
 
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -43,14 +46,17 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/EnumMap.h"
 #include "swift/Basic/FixedBitSet.h"
+#include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -63,6 +69,7 @@
 #include "clang/AST/DeclBase.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -2240,22 +2247,16 @@ static Type applyNonEscapingIfNecessary(Type ty,
                                         TypeResolutionOptions options) {
   bool defaultNoEscape = isDefaultNoEscapeContext(options);
 
-  // Desugar here
-  auto *funcTy = ty->castTo<FunctionType>();
-  auto extInfo = funcTy->getExtInfo();
-  if (defaultNoEscape && !extInfo.isNoEscape()) {
-    extInfo = extInfo.withNoEscape();
+  if (!defaultNoEscape)
+    return ty;
 
-    // We lost the sugar to flip the isNoEscape bit.
-    //
-    // FIXME(https://github.com/apple/swift/issues/45125): It would be better
-    // to add a new AttributedType sugared type, which would wrap the
-    // TypeAliasType and apply the isNoEscape bit when de-sugaring.
-    return FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo);
-  }
+  return ty.transformRec([](TypeBase *ty) -> std::optional<Type> {
+    // dyn_cast (not castTo) to avoid desugaring through type alias.
+    if (auto fnTy = dyn_cast<FunctionType>(ty))
+      return fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape());
 
-  // Note: original sugared type
-  return ty;
+    return std::nullopt;
+  });
 }
 
 /// Validate whether type associated with @autoclosure attribute is correct,
@@ -2564,6 +2565,10 @@ namespace {
     llvm::SmallBitVector claimedCustomAttrs;
     FixedBitSet<NumTypeAttrKinds> claimedTypeAttrs;
 
+    /// The use-site TypeRepr after stripping attributes. Set by \c accumulate
+    /// to enable inline expansion fix-its for aliases in diagnostics.
+    TypeRepr *useSiteRepr = nullptr;
+
 #ifndef NDEBUG
     bool diagnosedUnclaimed = false;
 #endif
@@ -2670,7 +2675,8 @@ namespace {
     void diagnoseUnclaimed(TypeAttribute *attr,
                            const TypeResolution &resolution,
                            TypeResolutionOptions options,
-                           NeverNullType resolvedType);
+                           NeverNullType resolvedType,
+                           bool downgradeToWarning = false);
 
     template<typename ...ArgTypes>
     InFlightDiagnostic diagnose(ArgTypes &&...Args) const {
@@ -3391,7 +3397,10 @@ TypeRepr *TypeAttrSet::accumulate(AttributedTypeRepr *attrRepr) {
     accumulate(attrRepr->getAttrs());
     auto underlyingRepr = attrRepr->getTypeRepr();
     attrRepr = dyn_cast<AttributedTypeRepr>(underlyingRepr);
-    if (!attrRepr) return underlyingRepr;
+    if (!attrRepr) {
+      useSiteRepr = underlyingRepr;
+      return underlyingRepr;
+    }
   }
 }
 
@@ -3474,14 +3483,30 @@ void TypeAttrSet::diagnoseUnclaimed(const TypeResolution &resolution,
     diagnoseUnclaimed(customAttr, resolution, options, resolvedType);
   }
 
+  // NOTE: In a previous version of this function, the index to claimedTypeAttrs
+  // was conditionally incremented only when an unclaimed type attr was found at
+  // i. The index would not be incremented if a claimed attribute was at i. This
+  // resulted in behavior where unclaimed attributes would only be reported if
+  // they preceded a claimed attribute; once i pointed to a claimed attribute,
+  // it would no longer get incremented and subsequent unclaimed attributes
+  // would be incorrectly skipped as though they were claimed and accepted. To
+  // avoid breaking previously accepted code in dependencies, unclaimed
+  // attributes that follow a claimed attribute need to be downgraded to a
+  // warning.
+
+  bool followsClaimed = false;
+
   // Type attributes
-  size_t i = 0;
-  for (auto const &attrVector : typeAttrs) {
-    if (claimedTypeAttrs.contains(i)) continue;
-    i++;
+  for (const auto &[i, attrVector] :
+       llvm::enumerate(std::as_const(typeAttrs))) {
+    if (claimedTypeAttrs.contains(i)) {
+      followsClaimed = true;
+      continue;
+    }
 
     for (auto attr : attrVector)
-      diagnoseUnclaimed(attr, resolution, options, resolvedType);
+      diagnoseUnclaimed(attr, resolution, options, resolvedType,
+                        followsClaimed);
   }
 }
 
@@ -3507,7 +3532,7 @@ void TypeAttrSet::diagnoseUnclaimed(CustomAttr *attr,
   diagnose(attr->getLocation(), diag::unknown_attr_name, typeName);
 }
 
-static bool isFunctionAttribute(TypeAttrKind attrKind) {
+static bool isFunctionAttribute(const TypeAttribute *attr) {
   static const TypeAttrKind FunctionAttrs[] = {
       TypeAttrKind::Convention,
       TypeAttrKind::Pseudogeneric,
@@ -3523,8 +3548,19 @@ static bool isFunctionAttribute(TypeAttrKind attrKind) {
       TypeAttrKind::YieldOnce2,
       TypeAttrKind::YieldMany,
       TypeAttrKind::Async,
+      TypeAttrKind::Isolated,
   };
-  return llvm::any_of(FunctionAttrs, [attrKind](TypeAttrKind functionAttr) {
+  return llvm::any_of(FunctionAttrs,
+                      [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
+                        return functionAttr == attrKind;
+                      });
+}
+
+static bool isConcurrencyAttribute(const TypeAttribute *attr) {
+  static const TypeAttrKind ConcurrencyAttrs[] = {TypeAttrKind::Sendable,
+                                                  TypeAttrKind::Isolated};
+  return llvm::any_of(ConcurrencyAttrs,
+                      [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
                         return functionAttr == attrKind;
                       });
 }
@@ -3532,42 +3568,107 @@ static bool isFunctionAttribute(TypeAttrKind attrKind) {
 void TypeAttrSet::diagnoseUnclaimed(TypeAttribute *attr,
                                     const TypeResolution &resolution,
                                     TypeResolutionOptions options,
-                                    NeverNullType resolvedType) {
-  if (attr->isInvalid()) return;
+                                    NeverNullType resolvedType,
+                                    bool downgradeToWarning) {
+  if (attr->isInvalid())
+    return;
 
   attr->setInvalid();
 
   // Use a special diagnostic for SIL attributes.
   if (!(options & TypeResolutionFlags::SILType) &&
       TypeAttribute::isSilOnly(attr->getKind())) {
-    diagnose(attr->getStartLoc(), diag::unknown_type_attr, attr);
+    diagnose(attr->getStartLoc(), diag::unknown_type_attr, attr)
+        .warnUntilLanguageModeIf(downgradeToWarning, LanguageMode::future);
     return;
   }
 
   // Recognize function attributes being applied to non-functions.
-  if (isFunctionAttribute(attr->getKind()) &&
-      !resolvedType->is<AnyFunctionType>()) {
-    auto escapingAttr = dyn_cast<EscapingTypeAttr>(attr);
+  if (isFunctionAttribute(attr)) {
+    if (!resolvedType->is<AnyFunctionType>()) {
+      auto escapingAttr = dyn_cast<EscapingTypeAttr>(attr);
 
-    // Try to recognize `@escaping` placed on optional types.
-    if (escapingAttr) {
-      Type optionalObjectType = resolvedType->getOptionalObjectType();
-      if (optionalObjectType && optionalObjectType->is<AnyFunctionType>()) {
-        diagnose(escapingAttr->getAttrLoc(),
-                 diag::escaping_optional_type_argument)
-          .fixItRemove(attr->getSourceRange());
-        return;
+      // Try to recognize `@escaping` placed on optional types.
+      if (escapingAttr) {
+        Type optionalObjectType = resolvedType->getOptionalObjectType();
+        if (optionalObjectType && optionalObjectType->is<AnyFunctionType>()) {
+          diagnose(escapingAttr->getAttrLoc(),
+                   diag::escaping_optional_type_argument)
+              .warnUntilLanguageModeIf(downgradeToWarning, LanguageMode::future)
+              .fixItRemove(attr->getSourceRange());
+          return;
+        }
       }
-    }
 
-    auto diagnostic = diagnose(attr->getStartLoc(),
-                               diag::type_attr_requires_function_type, attr);
-    if (isa<EscapingTypeAttr>(attr))
-      diagnostic.fixItRemove(attr->getSourceRange());
-    return;
+      auto diagnostic = diagnose(attr->getStartLoc(),
+                                 diag::type_attr_requires_function_type, attr);
+      diagnostic.warnUntilLanguageModeIf(downgradeToWarning,
+                                         LanguageMode::future);
+      if (isa<EscapingTypeAttr>(attr))
+        diagnostic.fixItRemove(attr->getSourceRange());
+      return;
+    }
+    // If the function attribute is on an alias of a function type, emit a
+    // tailored diagnostic.
+    if (auto *alias =
+            dyn_cast<TypeAliasType>(resolvedType.get().getPointer())) {
+      diagnose(attr->getStartLoc(), diag::attribute_part_of_type, attr)
+          .warnUntilLanguageModeIf(downgradeToWarning, LanguageMode::future);
+
+      auto *aliasDecl = alias->getDecl();
+
+      // Suggest editing the typealias declaration when we can find it.
+      if (auto *aliasTypeRepr = aliasDecl->getUnderlyingTypeRepr()) {
+        // Unless the attribute is already on the type alias, then simply
+        // suggest removing it and bail.
+        auto *attributed = dyn_cast<AttributedTypeRepr>(aliasTypeRepr);
+        if (attributed && attributed->has(attr->getKind())) {
+          diagnose(attr->getStartLoc(), diag::redundant_attribute_on_alias,
+                   attr, alias)
+              .fixItRemove(attr->getSourceRange());
+          return;
+        }
+
+        auto note = diagnose(aliasDecl->getLoc(),
+                             diag::add_attribute_to_alias_def, attr, alias);
+
+        // Remove the attribute from the use of the alias.
+        note.fixItRemove(attr->getSourceRange());
+
+        // We need to get the underlying string to handle cases like
+        // @isolated(any)
+        auto &SM = ctx.SourceMgr;
+        auto CSR = Lexer::getCharSourceRangeFromSourceRange(
+            SM, attr->getSourceRange());
+        if (CSR.isValid()) {
+          auto attrText = SM.extractText(CSR);
+
+          // Add the attribute to the alias type.
+          note.fixItInsert(aliasTypeRepr->getStartLoc(),
+                           (attrText + " ").str());
+        }
+
+        // Fix-it should include preconcurrency to not change mangling when
+        // adding concurrency attributes.
+        if (isConcurrencyAttribute(attr) && !aliasDecl->preconcurrency()) {
+          note.fixItInsert(
+              aliasDecl->getAttributeInsertionLoc(/*forModifier=*/false),
+              "@preconcurrency ");
+        }
+      }
+      // Suggest inlining the alias if we got a use site.
+      if (useSiteRepr) {
+        diagnose(useSiteRepr->getLoc(), diag::expand_type_alias, alias, attr)
+            .fixItReplace(useSiteRepr->getSourceRange(),
+                          resolvedType->getDesugaredType()->getString());
+      }
+      return;
+    }
   }
 
-  ctx.Diags.diagnose(attr->getStartLoc(), diag::attribute_does_not_apply_to_type);
+  ctx.Diags
+      .diagnose(attr->getStartLoc(), diag::attribute_does_not_apply_to_type)
+      .warnUntilLanguageModeIf(downgradeToWarning, LanguageMode::future);
 }
 
 Type TypeResolver::resolveGlobalActor(SourceLoc loc, TypeResolutionOptions options,

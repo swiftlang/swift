@@ -12,4 +12,4 @@ public struct Foo {
 public func useExistential(_ x: KeyPath<Foo, CInt> & Sendable) {
 }
 
-// CHECK: Unavailable in C++: Swift global function 'useExistential(_:)'.
+// CHECK: Unavailable in C++: Swift global function 'useExistential(_:)'. Parameter 'x' of type {{.*}} is not representable in C++.

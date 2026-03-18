@@ -1,0 +1,27 @@
+// RUN: %scale-test --invert --begin 1 --end 7 --step 1 --select NumConstraintScopes %s
+// REQUIRES: asserts,no_asan
+
+// This version without the concrete overload of + was fast in 6.2,
+// but became slow in 6.3.
+//
+// Once we fix it, we can remove the concrete overload of + from
+// Foundation.Data.
+
+struct Data: RangeReplaceableCollection, RandomAccessCollection {
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return 0 }
+
+  subscript(_: Int) -> UInt8 {
+    get { return 0 }
+    set {}
+  }
+
+  func replaceSubrange(_: Range<Int>, with: some Collection<UInt8>) {}
+}
+
+func test(x: Data) {
+    let _ = x
+%for i in range(0, N):
+      + x
+%end
+}

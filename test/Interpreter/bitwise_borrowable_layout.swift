@@ -18,6 +18,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// rdar://169663198: test crashes when running on device
+// UNSUPPORTED: remote_run || device_run
+
 import BitwiseBorrowableLayoutResilientTypes
 
 struct NonBitwiseTakable {

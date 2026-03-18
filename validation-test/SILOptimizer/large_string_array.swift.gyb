@@ -11,7 +11,7 @@
 
 // RUN: %{python} %S/../../test/Inputs/timeout.py 300 %target-swift-frontend -O -parse-as-library -emit-sil %t/main.swift | %FileCheck %s
 
-// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: optimized_stdlib
 // REQUIRES: long_test
 // REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=aarch64
 

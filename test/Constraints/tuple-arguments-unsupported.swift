@@ -11,9 +11,9 @@ test3(.success()) // expected-error {{missing argument for parameter #1 in call}
 
 func toString(indexes: Int?...) -> String {
   let _ = indexes.reduce(0) { print($0); return $0.0 + ($0.1 ?? 0)}
-  // expected-error@-1 {{contextual closure type '(Int, Int?) throws -> Int' expects 2 arguments, but 1 was used in closure body}}
+  // expected-error@-1 {{contextual closure type '(Int, Int?) -> Int' expects 2 arguments, but 1 was used in closure body}}
   let _ = indexes.reduce(0) { (true ? $0 : (1, 2)).0 + ($0.1 ?? 0) }
-  // expected-error@-1 {{contextual closure type '(Int, Int?) throws -> Int' expects 2 arguments, but 1 was used in closure body}}
+  // expected-error@-1 {{contextual closure type '(Int, Int?) -> Int' expects 2 arguments, but 1 was used in closure body}}
   _ = ["Hello", "Foo"].sorted { print($0); return $0.0.count > ($0).1.count }
   // expected-error@-1 {{contextual closure type '(String, String) throws -> Bool' expects 2 arguments, but 1 was used in closure body}}
 }

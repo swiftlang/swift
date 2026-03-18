@@ -119,8 +119,31 @@ public:
   bool isValid() const { return Addr.isValid(); }
 };
 
-/// An address on the stack together with enough information to correctly
-/// deallocate it.
+/// An address allocated on the "stack", together with enough information
+/// to correctly deallocate it.
+///
+/// In non-coroutine functions, we can generally just allocate the memory
+/// with the LLVM alloca instruction. For static allocas (see below), LLVM
+/// is expected to just inline this into the C stack frame. For dynamic
+/// allocas, LLVM will perform a dynamic change to SP, and we may need
+/// to do a stacksave so that we can reset that adjustment on deallocation.
+///
+/// In coroutines, static allocas are still generally okay; the coroutine
+/// pass will just rewrite them to be part of the coroutine frame. The
+/// coroutine pass doesn't handle dynamic allocas well, however, so we
+/// generally need to turn those into something else --- either an intrinsic
+/// that preserves enough structure that the coroutine pass can more
+/// usefully lower it, or just a direct use of the stack allocator that we
+/// know the coroutine uses (e.g. the task allocator in async functions).
+///
+/// SIL also (for complicated reasons) supports non-nested "stack"
+/// allocations, where the allocation and deallocation are not necessarily
+/// FIFO w.r.t other stack allocations. Static allocas are still fine for
+/// these, because LLVM's algorithms for reusing space in the C stack /
+/// coroutine frame are based on overlap and don't assume a tree structure.
+/// Anything that would need dynamic stack allocation, however, generally
+/// cannot use a FIFO allocator and must use the appropriate non-nested
+/// allocator instead. Currently this is just malloc.
 class StackAddress {
 public:
   enum Kind {

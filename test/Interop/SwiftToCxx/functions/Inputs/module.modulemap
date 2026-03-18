@@ -1,0 +1,4 @@
+module CPointerTypes {
+  header "c-pointer-types.h"
+  export *
+}

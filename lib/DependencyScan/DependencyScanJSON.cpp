@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/DependencyScan/DependencyScanJSON.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/StringUtils.h"
@@ -35,8 +34,6 @@ std::string quote(StringRef unquoted) {
   }
   return buffer.str().str();
 }
-} // namespace
-
 
 /// Write a string value as JSON.
 void writeJSONValue(llvm::raw_ostream &out, StringRef value,
@@ -377,6 +374,7 @@ getAsClangDependencyModule(swiftscan_module_details_t details) {
     return &details->clang_details;
   return nullptr;
 }
+} // namespace
 
 namespace swift::dependencies {
 void writePrescanJSON(llvm::raw_ostream &out,

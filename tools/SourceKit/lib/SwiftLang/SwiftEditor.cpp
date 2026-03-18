@@ -157,10 +157,10 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
 
   SKInfo.ID = DiagnosticEngine::diagnosticIDStringFor(Info.ID).str();
 
-  if (Info.Category == "deprecation" ||
-      Info.Category.starts_with("Deprecated")) {
+  if (Info.getCategoryName() == "deprecation" ||
+      Info.getCategoryName().starts_with("Deprecated")) {
     SKInfo.Categories.push_back(DiagnosticCategory::Deprecation);
-  } else if (Info.Category == "no-usage") {
+  } else if (Info.getCategoryName() == "no-usage") {
     SKInfo.Categories.push_back(DiagnosticCategory::NoUsage);
   }
 
@@ -173,8 +173,8 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
   SKInfo.Description = Text.str();
 
-  if (!Info.CategoryDocumentationURL.empty())
-    SKInfo.EducationalNotePaths.push_back(Info.CategoryDocumentationURL);
+  if (!Info.getCategoryDocumentationURL().empty())
+    SKInfo.EducationalNotePaths.push_back(Info.getCategoryDocumentationURL().str());
 
   std::optional<unsigned> BufferIDOpt;
   if (Info.Loc.isValid()) {

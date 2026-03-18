@@ -86,7 +86,7 @@ public typealias G<T> = () async -> T
 public func testTypeAlias(_: @escaping F) {}
 
 // CHECK: public struct TestGenericTypeAlias {
-// CHECK:   public subscript<U>(_: nonisolated(nonsending) () async -> U) -> Swift::Bool {
+// CHECK:   public subscript<U>(_: A::G<U>) -> Swift::Bool {
 // CHECK:     get
 // CHECK:   }
 // CHECK: }

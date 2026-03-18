@@ -1,4 +1,4 @@
-// RUN: %swift -typecheck -verify -parse-stdlib -target arm64-apple-xros2.0 %s
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target arm64-apple-xros2.0 %s
 
 @available(visionOS, introduced: 1.0, deprecated: 1.5, obsoleted: 2.0,
            message: "you don't want to do that anyway")
