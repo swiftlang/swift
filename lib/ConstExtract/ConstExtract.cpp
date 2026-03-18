@@ -936,19 +936,41 @@ void writeValue(llvm::json::OStream &JSON,
   }
 
   case CompileTimeValue::ValueKind::MemberFunctionCall: {
-    auto memberFunctionCallValue = cast<MemberFunctionCallValue>(value);
+    // Collect the chain: walk baseValue pointers until we reach a non-MemberFunctionCall
+    struct CallStep {
+      std::string Label;
+      std::vector<FunctionParameter> Parameters;
+    };
+    std::vector<CallStep> chain;
+    std::shared_ptr<CompileTimeValue> cursor = Value;
+    while (cursor && cursor->getKind() == CompileTimeValue::ValueKind::MemberFunctionCall) {
+      auto *mfc = cast<MemberFunctionCallValue>(cursor.get());
+      chain.push_back({mfc->getLabel(), mfc->getParameters()});
+      cursor = mfc->getBaseValue();
+    }
+    // chain is in reverse order (outermost first), reverse so base is first
+    std::reverse(chain.begin(), chain.end());
+
     JSON.attribute("valueKind", "MemberFunctionCall");
     JSON.attributeObject("value", [&]() {
+      // Write the root (non-MemberFunctionCall) base once
       JSON.attributeObject("baseValue", [&] {
-        writeValue(JSON, memberFunctionCallValue->getBaseValue());
+        writeValue(JSON, cursor);
       });
-      JSON.attribute("memberLabel", memberFunctionCallValue->getLabel());
-      JSON.attributeArray("arguments", [&] {
-        for (auto FP : memberFunctionCallValue->getParameters()) {
+      // Flat list of call steps in order
+      JSON.attributeArray("calls", [&] {
+        for (auto &step : chain) {
           JSON.object([&] {
-            JSON.attribute("label", FP.Label);
-            JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
-            writeValue(JSON, FP.Value);
+            JSON.attribute("memberLabel", step.Label);
+            JSON.attributeArray("arguments", [&] {
+              for (auto FP : step.Parameters) {
+                JSON.object([&] {
+                  JSON.attribute("label", FP.Label);
+                  JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
+                  writeValue(JSON, FP.Value);
+                });
+              }
+            });
           });
         }
       });
