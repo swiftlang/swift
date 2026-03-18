@@ -197,6 +197,16 @@ extension _AbstractStringStorage {
         return 0
       }
       
+      let otherUTF16Count = _stdlib_binary_CFStringGetLength(other)
+      if shouldEarlyOut(
+        lhsByteCount: count,
+        lhsEncoding: isASCII ? _cocoaASCIIEncoding : _cocoaUTF8Encoding,
+        rhsByteCount: otherUTF16Count &* 2,
+        rhsEncoding: _cocoaUTF16Encoding
+      ) {
+        return 0
+      }
+      
       return unsafe _NSStringIsEqualToBytes(
         other,
         bytes: start,
@@ -565,6 +575,12 @@ fileprivate func shouldEarlyOut(
   rhsByteCount: Int,
   rhsEncoding: UInt
 ) -> Bool {
+  if lhsByteCount == 0 {
+    return rhsByteCount != 0
+  }
+  if rhsByteCount == 0 {
+    return true
+  }
   return switch (lhsEncoding, rhsEncoding) {
   case (_cocoaUTF8Encoding, _cocoaUTF8Encoding),
        (_cocoaUTF16Encoding, _cocoaUTF16Encoding),
@@ -745,14 +761,6 @@ fileprivate func isEqual(
   let selfNS = unsafe unsafeBitCast(rawSelf, to: _CocoaString.self)
   
   let selfCount = _stdlib_binary_CFStringGetLength(selfNS)
-  
-  if otherByteCount == 0 {
-    return selfCount == 0 ? 1 : 0
-  }
-  if selfCount == 0 {
-    return 0
-  }
-  
   // Even if self isn't UTF16, we got its length in UTF16 already
   if shouldEarlyOut(
     lhsByteCount: otherByteCount,
