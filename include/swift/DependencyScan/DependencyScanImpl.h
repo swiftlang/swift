@@ -70,6 +70,9 @@ struct swiftscan_dependency_info_s {
 
   /// Specific details of a particular kind of module.
   swiftscan_module_details_t details;
+
+  /// The library level of this module.
+  swiftscan_library_level_t library_level;
 };
 
 struct swiftscan_link_library_info_s {

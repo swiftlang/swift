@@ -2226,6 +2226,31 @@ ExplicitClangModuleMap *ASTContext::getExplicitClangModuleMap() {
   return nullptr;
 }
 
+std::optional<LibraryLevel>
+ASTContext::getExplicitModuleLibraryLevel(StringRef moduleName, bool isClang) {
+  auto getLevelStr = [&](auto *map) -> const std::optional<std::string> * {
+    if (!map)
+      return nullptr;
+    auto it = map->find(moduleName);
+    if (it == map->end())
+      return nullptr;
+    return &it->getValue().libraryLevel;
+  };
+
+  const std::optional<std::string> *levelStr =
+      isClang ? getLevelStr(getExplicitClangModuleMap())
+              : getLevelStr(getExplicitSwiftModuleMap());
+
+  if (!levelStr || !*levelStr)
+    return std::nullopt;
+
+  return llvm::StringSwitch<LibraryLevel>(**levelStr)
+      .Case("api", LibraryLevel::API)
+      .Case("spi", LibraryLevel::SPI)
+      .Case("ipi", LibraryLevel::IPI)
+      .Default(LibraryLevel::Other);
+}
+
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
                                  bool IsClang, bool IsDwarf, bool IsInterface,
                                  bool IsExplicit) {

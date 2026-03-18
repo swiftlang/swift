@@ -13,6 +13,7 @@ import C
 // CHECK: "mainModuleName": "deps"
 /// --------Main module
 // CHECK-LABEL: "modulePath": "deps.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: sourceFiles
 // CHECK-NEXT: FilterClangSearchPaths.swift
 // CHECK-NEXT: ],

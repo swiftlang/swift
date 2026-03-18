@@ -41,7 +41,7 @@ using llvm::BCVBR;
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 10;
 /// Increment this on every change.
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 7;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 8;
 
 /// Various identifiers in this format will rely on having their strings mapped
 /// using this ID.
@@ -68,6 +68,9 @@ using IsForceLoadField = BCFixed<1>;
 using IsOptionalImport = BCFixed<1>;
 /// A bit that indicates whether or not an import statement is @_exported
 using IsExportedImport = BCFixed<1>;
+
+/// Library level of a module (2 bits for 4 enum values: Other, IPI, SPI, API)
+using LibraryLevelField = BCFixed<2>;
 
 /// Source location fields
 using LineNumberField = BCFixed<32>;
@@ -226,17 +229,18 @@ using OptionalImportStatementArrayLayout =
 // - SwiftBinaryModuleDetails
 // - ClangModuleDetails
 using ModuleInfoLayout =
-    BCRecordLayout<MODULE_NODE,                    // ID
-                   IdentifierIDField,              // moduleName
-                   ImportArrayIDField,             // imports
-                   ImportArrayIDField,             // optionalImports
-                   LinkLibrariesArrayIDField,      // linkLibraries
-                   MacroDependenciesArrayIDField,  // macroDependencies
-                   DependencyIDArrayIDField,       // importedSwiftModules
-                   DependencyIDArrayIDField,       // importedClangModules
-                   DependencyIDArrayIDField,       // crossImportOverlayModules
-                   DependencyIDArrayIDField,       // swiftOverlayDependencies
-                   ModuleCacheKeyIDField           // moduleCacheKey
+    BCRecordLayout<MODULE_NODE,                   // ID
+                   IdentifierIDField,             // moduleName
+                   ImportArrayIDField,            // imports
+                   ImportArrayIDField,            // optionalImports
+                   LinkLibrariesArrayIDField,     // linkLibraries
+                   MacroDependenciesArrayIDField, // macroDependencies
+                   DependencyIDArrayIDField,      // importedSwiftModules
+                   DependencyIDArrayIDField,      // importedClangModules
+                   DependencyIDArrayIDField,      // crossImportOverlayModules
+                   DependencyIDArrayIDField,      // swiftOverlayDependencies
+                   ModuleCacheKeyIDField,         // moduleCacheKey
+                   LibraryLevelField              // libraryLevel
                    >;
 
 using SwiftInterfaceModuleDetailsLayout =

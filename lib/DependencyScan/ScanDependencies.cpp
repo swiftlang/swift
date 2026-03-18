@@ -932,6 +932,22 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
     moduleInfo->direct_dependencies = create_set(bridgeDependencyIDs(cache.getAllDependencies(moduleID)));
     moduleInfo->details = getModuleDetails();
 
+    // Set library level
+    switch (moduleDependencyInfo.getLibraryLevel()) {
+    case LibraryLevel::Other:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_OTHER;
+      break;
+    case LibraryLevel::IPI:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_IPI;
+      break;
+    case LibraryLevel::SPI:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_SPI;
+      break;
+    case LibraryLevel::API:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_API;
+      break;
+    }
+
     // Create a link libraries set for this module
     auto linkLibraries = moduleDependencyInfo.getLinkLibraries();
     swiftscan_link_library_set_t *linkLibrarySet =
