@@ -222,9 +222,14 @@ def update_single_repository(pool_args: UpdateArguments):
                     repo_path, ["rev-parse", "--verify", checkout_target], echo=verbose
                 )
             except Exception:
+                target_is_tag = confirm_tag_in_repo(repo_path, checkout_target, repo_name)
+                if target_is_tag:
+                    fetch_ref = f"refs/tags/{checkout_target}:refs/tags/{checkout_target}"
+                else:
+                    fetch_ref = checkout_target
                 Git.run(
                     repo_path,
-                    ["fetch", "--recurse-submodules=yes", "--tags"],
+                    ["fetch", "--recurse-submodules=yes", "origin", fetch_ref],
                     echo=verbose,
                     prefix=prefix,
                 )
