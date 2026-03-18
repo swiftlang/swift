@@ -416,6 +416,25 @@ enum class KnownLValueKind: uint8_t {
   LValue
 };
 
+/// Encodes the result of evaluating a new binding against an existing binding
+/// with BindingSet::subsumeBinding().
+enum class SubsumeBindingResult: uint8_t {
+  /// The new binding conflicts with some existing binding.
+  Conflict,
+
+  /// The new binding should not be added because it is strictly less precise
+  /// than the existing binding; recording it would give us no new information.
+  ExistingIsBetter,
+
+  /// The new binding is strictly more precise than the existing binding, so
+  /// the new binding should replace the existing binding.
+  NewIsBetter,
+
+  /// The new binding is independent of the existing binding. Keep the existing
+  /// binding and record the new one.
+  KeepBoth
+};
+
 class BindingSet {
   using BindingScore =
       std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
@@ -724,6 +743,8 @@ public:
 private:
   void computeLValueState();
 
+  void computeJoinsAndMeets();
+
   void markDirty() {
     IsDirty = true;
   }
@@ -741,8 +762,8 @@ private:
   /// adjacent conformance constraints.
   void reduceBinding(PotentialBinding &binding);
 
-  std::optional<bool> subsumeBinding(PotentialBinding &binding,
-                                     const PotentialBinding &existing);
+  SubsumeBindingResult subsumeBinding(const PotentialBinding &binding,
+                                      const PotentialBinding &existing);
 
   void addDefault(Constraint *constraint);
 

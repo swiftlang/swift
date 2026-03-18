@@ -120,11 +120,10 @@ do {
     Optional<String>.self, Int.self
   ].map { (ObjectIdentifier($0), false) })
 
-  // FIXME: This is broken
+  // This works!
   let _: [ObjectIdentifier: Bool] = .init(uniqueKeysWithValues: [
     String.self, Optional<String>.self, Array<String>.self
   ].map { (ObjectIdentifier($0), false) })
-  // expected-error@-1 {{argument type 'Any' expected to be an instance of a class or class-constrained type}}
 
   // This works too!
   let _: [ObjectIdentifier: Bool] = .init(uniqueKeysWithValues: [
