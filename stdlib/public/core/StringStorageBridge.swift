@@ -540,19 +540,62 @@ fileprivate extension RawSpan {
   }
 }
 
+@inline(always)
+fileprivate func shouldEarlyOut(
+  lhsUTF8ByteCount: Int,
+  rhsUTF16ByteCount: Int,
+) -> Bool {
+  // If the UTF8 buffer is entirely 3 byte characters, that will be 2 bytes in UTF16
+  let minimumUTF16CountForUTF8 = (lhsUTF8ByteCount * 2) / 3
+  if rhsUTF16ByteCount < minimumUTF16CountForUTF8 {
+    return true
+  }
+  // On the other hand if it's entirely 1 byte characters, that'll double in size
+  let maximumUTF16CountForUTF8 = lhsUTF8ByteCount * 2
+  if rhsUTF16ByteCount > maximumUTF16CountForUTF8 {
+    return true
+  }
+  return false
+}
+
+@inline(always)
+fileprivate func shouldEarlyOut(
+  lhsByteCount: Int,
+  lhsEncoding: UInt,
+  rhsByteCount: Int,
+  rhsEncoding: UInt
+) -> Bool {
+  return switch (lhsEncoding, rhsEncoding) {
+  case (_cocoaUTF8Encoding, _cocoaUTF8Encoding):
+  case (_cocoaUTF16Encoding, _cocoaUTF16Encoding):
+  case (_cocoaASCIIEncoding, _cocoaASCIIEncoding):
+  case (_cocoaASCIIEncoding, _cocoaUTF8Encoding):
+  case (_cocoaUTF8Encoding, _cocoaASCIIEncoding):
+    lhsByteCount != rhsByteCount
+  case (_cocoaUTF16Encoding, _cocoaASCIIEncoding):
+    lhsByteCount != rhsByteCount &* 2
+  case (_cocoaASCIIEncoding, _cocoaUTF16Encoding):
+    lhsByteCount &* 2 != rhsByteCount
+  case (_cocoaUTF8Encoding, _cocoaUTF16Encoding):
+    shouldEarlyOut(
+      lhsUTF8ByteCount: lhsByteCount, rhsUTF16ByteCount: rhsByteCount)
+  case (_cocoaUTF16Encoding, _cocoaUTF8Encoding):
+    shouldEarlyOut(
+      lhsUTF8ByteCount: rhsByteCount, rhsUTF16ByteCount: lhsByteCount)
+  }
+}
+
 @_effects(readonly)
 fileprivate func isEqual(
   utf8Bytes lhs: RawSpan,
   utf16Bytes rhs: RawSpan
 ) -> Bool {
-    // If the UTF8 buffer is entirely 3 byte characters, that will be 2 bytes in UTF16
-    let minimumUTF16CountForUTF8 = (lhs.byteCount * 2) / 3
-    if rhs.byteCount < minimumUTF16CountForUTF8 {
-      return false
-    }
-    // On the other hand if it's entirely 1 byte characters, that'll double in size
-    let maximumUTF16CountForUTF8 = lhs.byteCount * 2
-    if rhs.byteCount > maximumUTF16CountForUTF8 {
+    if shouldEarlyOut(
+      lhsByteCount: lhs.byteCount,
+      lhsEncoding: _cocoaUTF8Encoding,
+      rhsByteCount: rhs.byteCount,
+      rhsEncoding: _cocoaUTF16Encoding
+    ) {
       return false
     }
     
@@ -617,30 +660,35 @@ fileprivate func isEqual(
   asciiBytes lhs: RawSpan,
   utf16Bytes rhs: RawSpan
 ) -> Bool {
-    if lhs.byteCount * 2 != rhs.byteCount {
+  if shouldEarlyOut(
+    lhsByteCount: lhs.byteCount,
+    lhsEncoding: _cocoaASCIIEncoding,
+    rhsByteCount: rhs.byteCount,
+    rhsEncoding: _cocoaUTF16Encoding
+  ) {
+    return false
+  }
+  for lhsIdx in lhs.byteOffsets {
+    /*
+     Promote ascii to 2 byte rather than truncating utf16 to 1 byte to match
+     NSString's behavior, which guards against invalid utf16 contents.
+     
+     Bounds checking handled by looping over `byteOffsets`
+     */
+    let l = unsafe UInt16(lhs.unsafeLoadUnaligned(
+      fromUncheckedByteOffset: lhsIdx,
+      as: UInt8.self
+    ))
+    // Bounds checking handled by the count * 2 verification earlier
+    let r = unsafe rhs.unsafeLoadUnaligned(
+      fromUncheckedByteOffset: lhsIdx &* 2,
+      as: UInt16.self
+    )
+    if l != r {
       return false
     }
-    for lhsIdx in lhs.byteOffsets {
-      /*
-       Promote ascii to 2 byte rather than truncating utf16 to 1 byte to match
-       NSString's behavior, which guards against invalid utf16 contents.
-       
-       Bounds checking handled by looping over `byteOffsets`
-       */
-      let l = unsafe UInt16(lhs.unsafeLoadUnaligned(
-        fromUncheckedByteOffset: lhsIdx,
-        as: UInt8.self
-      ))
-      // Bounds checking handled by the count * 2 verification earlier
-      let r = unsafe rhs.unsafeLoadUnaligned(
-        fromUncheckedByteOffset: lhsIdx &* 2,
-        as: UInt16.self
-      )
-      if l != r {
-        return false
-      }
-    }
-    return true
+  }
+  return true
 }
 
 @_effects(readonly)
@@ -742,6 +790,15 @@ fileprivate func isEqual(
     }
   }
   
+  if shouldEarlyOut(
+    lhsByteCount: lhsByteCount,
+    lhsEncoding: lhsEncoding,
+    rhsByteCount: rhsCount &* 2,
+    rhsEncoding: _cocoaUTF16Encoding
+  ) {
+    return 0
+  }
+  
   var remainingLHSByteCount = lhsByteCount
   var offset = 0
   
@@ -802,7 +859,11 @@ fileprivate func isEqual(
       }
       remainingLHSByteCount &-= rhsChunkByteCount
       offset = remainingRange.lowerBound
-      return remainingLHSByteCount == 0 ? .equal : .continue
+      if remainingLHSByteCount == 0 {
+          return remainingRange.isEmpty ? .equal : .nonequal
+      } else {
+          return .continue
+      }
     }
   }
   
