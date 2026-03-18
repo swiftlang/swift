@@ -566,11 +566,11 @@ fileprivate func shouldEarlyOut(
   rhsEncoding: UInt
 ) -> Bool {
   return switch (lhsEncoding, rhsEncoding) {
-  case (_cocoaUTF8Encoding, _cocoaUTF8Encoding):
-  case (_cocoaUTF16Encoding, _cocoaUTF16Encoding):
-  case (_cocoaASCIIEncoding, _cocoaASCIIEncoding):
-  case (_cocoaASCIIEncoding, _cocoaUTF8Encoding):
-  case (_cocoaUTF8Encoding, _cocoaASCIIEncoding):
+  case (_cocoaUTF8Encoding, _cocoaUTF8Encoding),
+       (_cocoaUTF16Encoding, _cocoaUTF16Encoding),
+       (_cocoaASCIIEncoding, _cocoaASCIIEncoding),
+       (_cocoaASCIIEncoding, _cocoaUTF8Encoding),
+       (_cocoaUTF8Encoding, _cocoaASCIIEncoding):
     lhsByteCount != rhsByteCount
   case (_cocoaUTF16Encoding, _cocoaASCIIEncoding):
     lhsByteCount != rhsByteCount &* 2
@@ -734,15 +734,15 @@ fileprivate func isEqual(
 // NSString in Foundation via ObjC runtime shenanigans
 @_effects(readonly)
 @c internal func _swift_NSStringIsEqualToBytesImpl(
-  _ self: UnsafeRawPointer,
+  _ rawSelf: UnsafeRawPointer,
   _ _cmd: UInt, //SEL
   _ otherPtr: UnsafeRawPointer,
   _ otherByteCount: Int,
   _ otherEncoding: UInt
 ) -> Int8 {
-  let self = unsafe unsafeBitCast(ns, to: _CocoaString.self)
+  let selfNS = unsafe unsafeBitCast(rawSelf, to: _CocoaString.self)
   
-  let selfCount = _stdlib_binary_CFStringGetLength(ns)
+  let selfCount = _stdlib_binary_CFStringGetLength(selfNS)
   
   if otherByteCount == 0 {
     return selfCount == 0 ? 1 : 0
@@ -761,7 +761,7 @@ fileprivate func isEqual(
     return 0
   }
   
-  let result = unsafe withCocoaASCIIPointer(ns) { (selfPtr) -> Int8? in
+  let result = unsafe withCocoaASCIIPointer(selfNS) { (selfPtr) -> Int8? in
     //We know self is ASCII at this point
     let otherBytes = unsafe RawSpan(_unsafeStart: otherPtr, byteCount: otherByteCount)
     let selfBytes = unsafe Span(_unsafeStart: selfPtr, count: selfCount).bytes
@@ -781,10 +781,10 @@ fileprivate func isEqual(
     return result
   }
   
-  if let selfPtr = unsafe _stdlib_binary_CFStringGetCharactersPtr(ns) {
+  if let selfPtr = unsafe _stdlib_binary_CFStringGetCharactersPtr(selfNS) {
     //We know self is UTF16 at this point
     let otherBytes = unsafe RawSpan(_unsafeStart: otherPtr, byteCount: otherByteCount)
-    let selfBytes = unsafe Span(_unsafeStart: rhsPtr, count: rhsCount).bytes
+    let selfBytes = unsafe Span(_unsafeStart: selfPtr, count: selfCount).bytes
     switch otherEncoding {
     case _cocoaASCIIEncoding:
       return isEqual(asciiBytes: otherBytes, utf16Bytes: selfBytes) ? 1 : 0
@@ -829,7 +829,7 @@ fileprivate func isEqual(
        run out of contents or filled `chunkSize` bytes of output buffer
        */
       guard let selfChunkByteCount = unsafe _cocoaStringCopyBytes(
-        self,
+        selfNS,
         encoding: otherEncoding,
         into: buffer,
         options: 0,
