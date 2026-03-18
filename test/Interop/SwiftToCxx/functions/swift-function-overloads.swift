@@ -13,6 +13,6 @@ public func overloadedFuncArgLabel(y _: Float) { }
 // CHECK: void overloadedFunc(swift::Int x) noexcept
 // CHECK: void overloadedFuncArgLabel(swift::Int  _1) noexcept
 
-// CHECK: // Unavailable in C++: Swift global function 'overloadedFunc(_:)'.
+// CHECK: // Unavailable in C++: Swift global function 'overloadedFunc(_:)'. An overload with the same number of parameters already exists.
 
-// CHECK: // Unavailable in C++: Swift global function 'overloadedFuncArgLabel(y:)'.
+// CHECK: // Unavailable in C++: Swift global function 'overloadedFuncArgLabel(y:)'. An overload with the same number of parameters already exists.

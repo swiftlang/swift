@@ -9,7 +9,7 @@
 // CHECK:       namespace Functions SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Functions") {
 // CHECK-EMPTY:
 // CHECK-EMPTY:
-// CHECK-NEXT: // Unavailable in C++: Swift global function 'alwaysEmitIntoClientFunc(_:)'.
+// CHECK-NEXT: // Unavailable in C++: Swift global function 'alwaysEmitIntoClientFunc(_:)'.{{.*}}can not be exposed to C++ as it requires code to be emitted into client.
 // CHECK-EMPTY:
 // CHECK-NEXT:  } // namespace Functions
 
