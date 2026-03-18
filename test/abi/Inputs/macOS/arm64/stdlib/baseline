@@ -324,10 +324,13 @@ _$sSD4KeysV8_variantSD8_VariantVyxq__Gvs
 _$sSD4KeysV8endIndexSD0C0Vyxq__Gvg
 _$sSD4KeysV8endIndexSD0C0Vyxq__GvpMV
 _$sSD4KeysV9formIndex5afterySD0C0Vyxq__Gz_tF
+_$sSD4KeysV9hashValueSivpMV
 _$sSD4KeysVMa
 _$sSD4KeysVMn
 _$sSD4KeysVyxSD5IndexVyxq__Gcig
 _$sSD4KeysVyxSD5IndexVyxq__GcipMV
+_$sSD4KeysVyxq__GSHsMc
+_$sSD4KeysVyxq__GSHsWP
 _$sSD4KeysVyxq__GSQsMc
 _$sSD4KeysVyxq__GSQsWP
 _$sSD4KeysVyxq__GSTsMc
@@ -6221,13 +6224,16 @@ _$ss15CollectionOfOneV8endIndexSivg
 _$ss15CollectionOfOneV8endIndexSivpMV
 _$ss15CollectionOfOneVMa
 _$ss15CollectionOfOneVMn
+_$ss15CollectionOfOneVsSHRzlE9hashValueSivpMV
 _$ss15CollectionOfOneVyAByxGxcfC
 _$ss15CollectionOfOneVys5SliceVyAByxGGSnySiGciM
 _$ss15CollectionOfOneVys5SliceVyAByxGGSnySiGcig
 _$ss15CollectionOfOneVys5SliceVyAByxGGSnySiGcipMV
 _$ss15CollectionOfOneVys5SliceVyAByxGGSnySiGcis
+_$ss15CollectionOfOneVyxGSHsSHRzlMc
 _$ss15CollectionOfOneVyxGSKsMc
 _$ss15CollectionOfOneVyxGSMsMc
+_$ss15CollectionOfOneVyxGSQsSQRzlMc
 _$ss15CollectionOfOneVyxGSTsMc
 _$ss15CollectionOfOneVyxGSksMc
 _$ss15CollectionOfOneVyxGSlsMc
@@ -6383,6 +6389,7 @@ _$ss15EmptyCollectionV8IteratorVyx_GStsMc
 _$ss15EmptyCollectionV8distance4from2toS2i_SitF
 _$ss15EmptyCollectionV8endIndexSivg
 _$ss15EmptyCollectionV8endIndexSivpMV
+_$ss15EmptyCollectionV9hashValueSivpMV
 _$ss15EmptyCollectionVAByxGycfC
 _$ss15EmptyCollectionVMa
 _$ss15EmptyCollectionVMn
@@ -6390,6 +6397,8 @@ _$ss15EmptyCollectionVyAByxGSnySiGciM
 _$ss15EmptyCollectionVyAByxGSnySiGcig
 _$ss15EmptyCollectionVyAByxGSnySiGcipMV
 _$ss15EmptyCollectionVyAByxGSnySiGcis
+_$ss15EmptyCollectionVyxGSHsMc
+_$ss15EmptyCollectionVyxGSHsWP
 _$ss15EmptyCollectionVyxGSKsMc
 _$ss15EmptyCollectionVyxGSMsMc
 _$ss15EmptyCollectionVyxGSQsMc
