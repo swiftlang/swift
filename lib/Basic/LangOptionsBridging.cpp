@@ -191,12 +191,6 @@ void BridgedLangOptions_enumerateBuildConfigurationEntries(
     switch (kind) {
       case PlatformConditionKind::OS:
         callback(cLangOpts, callbackContext, BCKTargetOSName, StringRef(value));
-
-        // Special case that macOS is an alias of OSX.
-        if (value == "OSX") {
-          callback(cLangOpts, callbackContext, BCKTargetOSName,
-                   StringRef("macOS"));
-        }
         break;
 
       case PlatformConditionKind::Arch:

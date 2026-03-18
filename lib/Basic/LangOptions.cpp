@@ -263,12 +263,8 @@ LangOptions::getPlatformConditionValue(PlatformConditionKind Kind) const {
 
 bool LangOptions::
 checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
-  // Note: BridgedASTContext_enumerateBuildConfigurationEntries has a redundant
+  // Note: BridgedLangOptions_enumerateBuildConfigurationEntries has a redundant
   // copy of these special cases.
-
-  // Check a special case that "macOS" is an alias of "OSX".
-  if (Kind == PlatformConditionKind::OS && Value == "macOS")
-    return checkPlatformCondition(Kind, "OSX");
 
   // When compiling for iOS we consider "macCatalyst" to be a
   // synonym of "macabi". This enables the use of
@@ -523,24 +519,31 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
 
   bool UnsupportedOS = false;
 
+  auto addAppleOSPlatformConditionValues =
+      [this](ArrayRef<StringRef> platforms) {
+        for (auto platform : platforms) {
+          addPlatformConditionValue(PlatformConditionKind::OS, platform);
+        }
+        addPlatformConditionValue(PlatformConditionKind::OS, "anyAppleOS");
+      };
+
   // Set the "os" platform condition.
   switch (Target.getOS()) {
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
-    addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
+    addAppleOSPlatformConditionValues({"OSX", "macOS"});
     break;
   case llvm::Triple::TvOS:
-    addPlatformConditionValue(PlatformConditionKind::OS, "tvOS");
+    addAppleOSPlatformConditionValues({"tvOS"});
     break;
   case llvm::Triple::WatchOS:
-    addPlatformConditionValue(PlatformConditionKind::OS, "watchOS");
+    addAppleOSPlatformConditionValues({"watchOS"});
     break;
   case llvm::Triple::IOS:
-    addPlatformConditionValue(PlatformConditionKind::OS, "iOS");
+    addAppleOSPlatformConditionValues({"iOS"});
     break;
   case llvm::Triple::XROS:
-    addPlatformConditionValue(PlatformConditionKind::OS, "xrOS");
-    addPlatformConditionValue(PlatformConditionKind::OS, "visionOS");
+    addAppleOSPlatformConditionValues({"xrOS", "visionOS"});
     break;
   case llvm::Triple::Firmware:
     addPlatformConditionValue(PlatformConditionKind::OS, "Firmware");
