@@ -582,6 +582,8 @@ fileprivate func shouldEarlyOut(
   case (_cocoaUTF16Encoding, _cocoaUTF8Encoding):
     shouldEarlyOut(
       lhsUTF8ByteCount: rhsByteCount, rhsUTF16ByteCount: lhsByteCount)
+  default:
+    fatalError("Unsupported encoding")
   }
 }
 
