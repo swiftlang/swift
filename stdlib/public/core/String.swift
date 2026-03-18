@@ -18,7 +18,7 @@ import SwiftShims
 /// collection. Strings in Swift are Unicode correct and locale insensitive,
 /// and are designed to be efficient. The `String` type bridges with the
 /// Objective-C class `NSString` and offers interoperability with C functions
-/// that works with strings.
+/// that work with strings.
 ///
 /// You can create new strings using string literals or string interpolations.
 /// A *string literal* is a series of characters enclosed in quotes.
