@@ -751,6 +751,16 @@ fileprivate func isEqual(
     return 0
   }
   
+  // Even if self isn't UTF16, we got its length in UTF16 already
+  if shouldEarlyOut(
+    lhsByteCount: otherByteCount,
+    lhsEncoding: otherEncoding,
+    rhsByteCount: selfCount &* 2,
+    rhsEncoding: _cocoaUTF16Encoding
+  ) {
+    return 0
+  }
+  
   let result = unsafe withCocoaASCIIPointer(ns) { (selfPtr) -> Int8? in
     //We know self is ASCII at this point
     let otherBytes = unsafe RawSpan(_unsafeStart: otherPtr, byteCount: otherByteCount)
@@ -788,15 +798,6 @@ fileprivate func isEqual(
     default:
       fatalError("Unsupported combination of encodings")
     }
-  }
-  
-  if shouldEarlyOut(
-    lhsByteCount: otherByteCount,
-    lhsEncoding: otherEncoding,
-    rhsByteCount: selfCount &* 2,
-    rhsEncoding: _cocoaUTF16Encoding
-  ) {
-    return 0
   }
   
   var remainingOtherByteCount = otherByteCount
