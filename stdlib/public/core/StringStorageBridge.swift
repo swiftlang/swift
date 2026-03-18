@@ -142,19 +142,19 @@ extension _AbstractStringStorage {
     if otherByteCount == 0 {
       return false
     }
-    let lhs = unsafe Span(_unsafeStart: start, count: count).bytes
-    let rhs = unsafe RawSpan(_unsafeStart: ptr, byteCount: otherByteCount)
+    let selfBytes = unsafe Span(_unsafeStart: start, count: count).bytes
+    let otherBytes = unsafe RawSpan(_unsafeStart: ptr, byteCount: otherByteCount)
     switch encoding {
     case _cocoaASCIIEncoding, _cocoaUTF8Encoding:
-      if lhs.isIdentical(to: rhs) {
+      if selfBytes.isIdentical(to: otherBytes) {
         return true
       }
-      return isEqual(bytes: lhs, bytes: rhs)
+      return isEqual(bytes: selfBytes, bytes: otherBytes)
     case _cocoaUTF16Encoding:
       if isASCII {
-        return isEqual(asciiBytes: lhs, utf16Bytes: rhs)
+        return isEqual(asciiBytes: selfBytes, utf16Bytes: otherBytes)
       } else {
-        return isEqual(utf8Bytes: lhs, utf16Bytes: rhs)
+        return isEqual(utf8Bytes: selfBytes, utf16Bytes: otherBytes)
       }
     default:
       fatalError("Unsupported encoding")
@@ -467,7 +467,7 @@ extension __SharedStringStorage {
 
 fileprivate extension RawSpan {
   @inline(__always)
-  func decodeUTF8(ofWidth width: Int, at index: Int) -> UInt32? {
+  func decodeUTF8(ofByteWidth width: Int, at index: Int) -> UInt32? {
     guard index <= self.byteOffsets.upperBound &- width else {
       return nil
     }
@@ -498,7 +498,7 @@ fileprivate extension RawSpan {
   }
   
   @inline(__always)
-  func decodeUTF16(ofWidth width: Int, at index: Int) -> UInt32? {
+  func decodeUTF16(ofByteWidth width: Int, at index: Int) -> UInt32? {
     _debugPrecondition(width == 2 || width == 4)
     guard index <= self.byteOffsets.upperBound &- width else {
       return nil
@@ -587,32 +587,32 @@ fileprivate func shouldEarlyOut(
 
 @_effects(readonly)
 fileprivate func isEqual(
-  utf8Bytes lhs: RawSpan,
-  utf16Bytes rhs: RawSpan
+  utf8Bytes utf8: RawSpan,
+  utf16Bytes utf16: RawSpan
 ) -> Bool {
     if shouldEarlyOut(
-      lhsByteCount: lhs.byteCount,
+      lhsByteCount: utf8.byteCount,
       lhsEncoding: _cocoaUTF8Encoding,
-      rhsByteCount: rhs.byteCount,
+      rhsByteCount: utf16.byteCount,
       rhsEncoding: _cocoaUTF16Encoding
     ) {
       return false
     }
     
-    var lhsIdx = 0
-    var rhsIdx = 0
+    var utf8Idx = 0
+    var utf16Idx = 0
     
     while true {
-      guard let firstUTF8Byte = lhs.decodeUTF8(ofWidth: 1, at: lhsIdx) else {
+      guard let firstUTF8Byte = utf8.decodeUTF8(ofByteWidth: 1, at: utf8Idx) else {
         // If we've consumed everything in both buffers without finding an inequality, we're equal
-        return lhsIdx == lhs.byteOffsets.upperBound && rhsIdx == rhs.byteOffsets.upperBound
+        return utf8Idx == utf8.byteOffsets.upperBound && utf16Idx == utf16.byteOffsets.upperBound
       }
       let utf8Width: Int
       let utf16Width: Int
       if firstUTF8Byte < 128 {
         utf8Width = 1
         utf16Width = 2
-        guard let r = rhs.decodeUTF16(ofWidth: utf16Width, at: rhsIdx) else {
+        guard let r = utf16.decodeUTF16(ofByteWidth: utf16Width, at: utf16Idx) else {
           return false
         }
         if r != firstUTF8Byte {
@@ -622,16 +622,16 @@ fileprivate func isEqual(
         utf8Width = _utf8ScalarLength(UInt8(truncatingIfNeeded: firstUTF8Byte))
         utf16Width = utf8Width == 4 ? 4 : 2
         guard
-          let l = lhs.decodeUTF8(ofWidth: utf8Width, at: lhsIdx),
-          let r = rhs.decodeUTF16(ofWidth: utf16Width, at: rhsIdx) else {
+          let l = utf8.decodeUTF8(ofByteWidth: utf8Width, at: utf8Idx),
+          let r = utf16.decodeUTF16(ofByteWidth: utf16Width, at: utf16Idx) else {
           return false
         }
         if (l != r) {
           return false
         }
       }
-      lhsIdx &+= utf8Width
-      rhsIdx &+= utf16Width
+      utf8Idx &+= utf8Width
+      utf16Idx &+= utf16Width
     }
 }
 
@@ -657,31 +657,31 @@ fileprivate func isEqual(
 
 @_effects(readonly)
 fileprivate func isEqual(
-  asciiBytes lhs: RawSpan,
-  utf16Bytes rhs: RawSpan
+  asciiBytes ascii: RawSpan,
+  utf16Bytes utf16: RawSpan
 ) -> Bool {
   if shouldEarlyOut(
-    lhsByteCount: lhs.byteCount,
+    lhsByteCount: ascii.byteCount,
     lhsEncoding: _cocoaASCIIEncoding,
-    rhsByteCount: rhs.byteCount,
+    rhsByteCount: utf16.byteCount,
     rhsEncoding: _cocoaUTF16Encoding
   ) {
     return false
   }
-  for lhsIdx in lhs.byteOffsets {
+  for asciiIdx in ascii.byteOffsets {
     /*
      Promote ascii to 2 byte rather than truncating utf16 to 1 byte to match
      NSString's behavior, which guards against invalid utf16 contents.
      
      Bounds checking handled by looping over `byteOffsets`
      */
-    let l = unsafe UInt16(lhs.unsafeLoadUnaligned(
-      fromUncheckedByteOffset: lhsIdx,
+    let l = unsafe UInt16(ascii.unsafeLoadUnaligned(
+      fromUncheckedByteOffset: asciiIdx,
       as: UInt8.self
     ))
     // Bounds checking handled by the count * 2 verification earlier
-    let r = unsafe rhs.unsafeLoadUnaligned(
-      fromUncheckedByteOffset: lhsIdx &* 2,
+    let r = unsafe utf16.unsafeLoadUnaligned(
+      fromUncheckedByteOffset: asciiIdx &* 2,
       as: UInt16.self
     )
     if l != r {
@@ -734,35 +734,35 @@ fileprivate func isEqual(
 // NSString in Foundation via ObjC runtime shenanigans
 @_effects(readonly)
 @c internal func _swift_NSStringIsEqualToBytesImpl(
-  _ ns: UnsafeRawPointer,
+  _ self: UnsafeRawPointer,
   _ _cmd: UInt, //SEL
-  _ lhsPtr: UnsafeRawPointer,
-  _ lhsByteCount: Int,
-  _ lhsEncoding: UInt
+  _ otherPtr: UnsafeRawPointer,
+  _ otherByteCount: Int,
+  _ otherEncoding: UInt
 ) -> Int8 {
-  let ns = unsafe unsafeBitCast(ns, to: _CocoaString.self)
+  let self = unsafe unsafeBitCast(ns, to: _CocoaString.self)
   
-  let rhsCount = _stdlib_binary_CFStringGetLength(ns)
+  let selfCount = _stdlib_binary_CFStringGetLength(ns)
   
-  if lhsByteCount == 0 {
-    return rhsCount == 0 ? 1 : 0
+  if otherByteCount == 0 {
+    return selfCount == 0 ? 1 : 0
   }
-  if rhsCount == 0 {
+  if selfCount == 0 {
     return 0
   }
   
-  let result = unsafe withCocoaASCIIPointer(ns) { (rhsPtr) -> Int8? in
-    //We know RHS is ASCII at this point
-    let lhs = unsafe RawSpan(_unsafeStart: lhsPtr, byteCount: lhsByteCount)
-    let rhs = unsafe Span(_unsafeStart: rhsPtr, count: rhsCount).bytes
-    switch lhsEncoding {
+  let result = unsafe withCocoaASCIIPointer(ns) { (selfPtr) -> Int8? in
+    //We know self is ASCII at this point
+    let otherBytes = unsafe RawSpan(_unsafeStart: otherPtr, byteCount: otherByteCount)
+    let selfBytes = unsafe Span(_unsafeStart: selfPtr, count: selfCount).bytes
+    switch otherEncoding {
     case _cocoaASCIIEncoding, _cocoaUTF8Encoding:
-      if lhs.isIdentical(to: rhs) {
+      if otherBytes.isIdentical(to: selfBytes) {
         return 1
       }
-      return isEqual(bytes: lhs, bytes: rhs) ? 1 : 0
+      return isEqual(bytes: otherBytes, bytes: selfBytes) ? 1 : 0
     case _cocoaUTF16Encoding:
-      return isEqual(asciiBytes: rhs, utf16Bytes: lhs) ? 1 : 0
+      return isEqual(asciiBytes: selfBytes, utf16Bytes: otherBytes) ? 1 : 0
     default:
       fatalError("Unsupported combination of encodings")
     }
@@ -771,35 +771,35 @@ fileprivate func isEqual(
     return result
   }
   
-  if let rhsPtr = unsafe _stdlib_binary_CFStringGetCharactersPtr(ns) {
-    //We know RHS is UTF16 at this point
-    let lhs = unsafe RawSpan(_unsafeStart: lhsPtr, byteCount: lhsByteCount)
-    let rhs = unsafe Span(_unsafeStart: rhsPtr, count: rhsCount).bytes
-    switch lhsEncoding {
+  if let selfPtr = unsafe _stdlib_binary_CFStringGetCharactersPtr(ns) {
+    //We know self is UTF16 at this point
+    let otherBytes = unsafe RawSpan(_unsafeStart: otherPtr, byteCount: otherByteCount)
+    let selfBytes = unsafe Span(_unsafeStart: rhsPtr, count: rhsCount).bytes
+    switch otherEncoding {
     case _cocoaASCIIEncoding:
-      return isEqual(asciiBytes: lhs, utf16Bytes: rhs) ? 1 : 0
+      return isEqual(asciiBytes: otherBytes, utf16Bytes: selfBytes) ? 1 : 0
     case _cocoaUTF8Encoding:
-      return isEqual(utf8Bytes: lhs, utf16Bytes: rhs) ? 1 : 0
+      return isEqual(utf8Bytes: otherBytes, utf16Bytes: selfBytes) ? 1 : 0
     case _cocoaUTF16Encoding:
-      if lhs.isIdentical(to: rhs) {
+      if otherBytes.isIdentical(to: selfBytes) {
         return 1
       }
-      return isEqual(bytes: lhs, bytes: rhs) ? 1 : 0
+      return isEqual(bytes: otherBytes, bytes: selfBytes) ? 1 : 0
     default:
       fatalError("Unsupported combination of encodings")
     }
   }
   
   if shouldEarlyOut(
-    lhsByteCount: lhsByteCount,
-    lhsEncoding: lhsEncoding,
-    rhsByteCount: rhsCount &* 2,
+    lhsByteCount: otherByteCount,
+    lhsEncoding: otherEncoding,
+    rhsByteCount: selfCount &* 2,
     rhsEncoding: _cocoaUTF16Encoding
   ) {
     return 0
   }
   
-  var remainingLHSByteCount = lhsByteCount
+  var remainingOtherByteCount = otherByteCount
   var offset = 0
   
   enum ChunkResult {
@@ -810,13 +810,13 @@ fileprivate func isEqual(
   
   let tryCopyingChunk = { () -> ChunkResult in
     /*
-     Larger chunk sizes mean we read more out of `rhs` even if the difference
+     Larger chunk sizes mean we read more out of `self` even if the difference
      is early, which can be a bit expensive if it has to transcode or doesn't
      do bulk access (the latter is unusual but appears in our benchmark suite).
      
      Smaller chunk sizes mean more call overhead.
      */
-    let chunkSize = Swift.min(64, remainingLHSByteCount)
+    let chunkSize = Swift.min(64, remainingOtherByteCount)
     return unsafe withUnsafeTemporaryAllocation(
       of: UInt8.self,
       capacity: chunkSize
@@ -824,42 +824,42 @@ fileprivate func isEqual(
       let buffer = UnsafeMutableRawBufferPointer(tmpBuffer)
       var remainingRange = 0 ..< 0
       /*
-       Ask rhs to start transcoding from `offset` until it's either
+       Ask self to start transcoding from `offset` until it's either
        run out of contents or filled `chunkSize` bytes of output buffer
        */
-      guard let rhsChunkByteCount = unsafe _cocoaStringCopyBytes(
-        ns,
-        encoding: lhsEncoding,
+      guard let selfChunkByteCount = unsafe _cocoaStringCopyBytes(
+        self,
+        encoding: otherEncoding,
         into: buffer,
         options: 0,
-        UTF16Range: offset ..< rhsCount, //the remaining tail of rhs
+        UTF16Range: offset ..< selfCount, //the remaining tail of self
         remainingRange: &remainingRange
       ) else {
         return .nonequal
       }
       /*
-       rhsChunkByteCount is now the number of bytes occupied by the next
-       N UTF16 code units from rhs, when transcoded into `lhsEncoding`
+       selfChunkByteCount is now the number of bytes occupied by the next
+       N UTF16 code units from self, when transcoded into `otherEncoding`
        */
-      if rhsChunkByteCount > remainingLHSByteCount {
+      if selfChunkByteCount > remainingOtherByteCount {
         return .nonequal
       }
-      if remainingRange.isEmpty && rhsChunkByteCount != remainingLHSByteCount {
-        //We've processed all of RHS. If we don't have enough bytes now we never will
+      if remainingRange.isEmpty && selfChunkByteCount != remainingOtherByteCount {
+        //We've processed all of self. If we don't have enough bytes now we never will
         return .nonequal
       }
       
       let result = unsafe _swift_stdlib_memcmp(
-        lhsPtr + (lhsByteCount &- remainingLHSByteCount),
+        otherPtr + (otherByteCount &- remainingOtherByteCount),
         buffer.baseAddress.unsafelyUnwrapped,
-        rhsChunkByteCount
+        selfChunkByteCount
       )
       if result != 0 {
         return .nonequal
       }
-      remainingLHSByteCount &-= rhsChunkByteCount
+      remainingOtherByteCount &-= selfChunkByteCount
       offset = remainingRange.lowerBound
-      if remainingLHSByteCount == 0 {
+      if remainingOtherByteCount == 0 {
           return remainingRange.isEmpty ? .equal : .nonequal
       } else {
           return .continue
