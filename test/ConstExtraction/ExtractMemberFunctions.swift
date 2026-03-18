@@ -30,22 +30,26 @@ struct Statics: MyProto {
 // CHECK:       "valueKind": "MemberFunctionCall",
 // CHECK-NEXT:  "value": {
 // CHECK-NEXT:    "baseValue": {
-// CHECK-NEXT:        "valueKind": "InitCall",
-// CHECK-NEXT:        "value": {
-// CHECK-NEXT:          "type": "ExtractMemberFunctions.MyStruct",
-// CHECK-NEXT:          "arguments": []
-// CHECK-NEXT:        }
-// CHECK-NEXT:      },
-// CHECK-NEXT:      "memberLabel": "myMethod",
-// CHECK-NEXT:      "arguments": [
-// CHECK-NEXT:        {
-// CHECK-NEXT:          "label": "arg",
-// CHECK-NEXT:          "type": "Swift.String",
-// CHECK-NEXT:          "valueKind": "RawLiteral",
-// CHECK-NEXT:          "value": "struct arg"
-// CHECK-NEXT:        }
-// CHECK-NEXT:      ]
-// CHECK-NEXT:    }
+// CHECK-NEXT:      "valueKind": "InitCall",
+// CHECK-NEXT:      "value": {
+// CHECK-NEXT:        "type": "ExtractMemberFunctions.MyStruct",
+// CHECK-NEXT:        "arguments": []
+// CHECK-NEXT:      }
+// CHECK-NEXT:    },
+// CHECK-NEXT:    "calls": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "memberLabel": "myMethod",
+// CHECK-NEXT:        "arguments": [
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "label": "arg",
+// CHECK-NEXT:            "type": "Swift.String",
+// CHECK-NEXT:            "valueKind": "RawLiteral",
+// CHECK-NEXT:            "value": "struct arg"
+// CHECK-NEXT:          }
+// CHECK-NEXT:        ]
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ]
+// CHECK-NEXT:  }
 
 // CHECK:       "label": "prop2",
 // CHECK-NEXT:  "type": "Swift.Int",
@@ -58,13 +62,17 @@ struct Statics: MyProto {
 // CHECK-NEXT:        "arguments": []
 // CHECK-NEXT:      }
 // CHECK-NEXT:    },
-// CHECK-NEXT:    "memberLabel": "myMethod",
-// CHECK-NEXT:    "arguments": [
+// CHECK-NEXT:    "calls": [
 // CHECK-NEXT:      {
-// CHECK-NEXT:        "label": "arg",
-// CHECK-NEXT:        "type": "Swift.String",
-// CHECK-NEXT:        "valueKind": "RawLiteral",
-// CHECK-NEXT:        "value": "class arg"
+// CHECK-NEXT:        "memberLabel": "myMethod",
+// CHECK-NEXT:        "arguments": [
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "label": "arg",
+// CHECK-NEXT:            "type": "Swift.String",
+// CHECK-NEXT:            "valueKind": "RawLiteral",
+// CHECK-NEXT:            "value": "class arg"
+// CHECK-NEXT:          }
+// CHECK-NEXT:        ]
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  }
@@ -74,15 +82,14 @@ struct Statics: MyProto {
 // CHECK:       "valueKind": "MemberFunctionCall",
 // CHECK-NEXT:  "value": {
 // CHECK-NEXT:    "baseValue": {
-// CHECK-NEXT:      "valueKind": "MemberFunctionCall",
+// CHECK-NEXT:      "valueKind": "InitCall",
 // CHECK-NEXT:      "value": {
-// CHECK-NEXT:        "baseValue": {
-// CHECK-NEXT:          "valueKind": "InitCall",
-// CHECK-NEXT:          "value": {
-// CHECK-NEXT:            "type": "ExtractMemberFunctions.MyStruct",
-// CHECK-NEXT:            "arguments": []
-// CHECK-NEXT:          }
-// CHECK-NEXT:        },
+// CHECK-NEXT:        "type": "ExtractMemberFunctions.MyStruct",
+// CHECK-NEXT:        "arguments": []
+// CHECK-NEXT:      }
+// CHECK-NEXT:    },
+// CHECK-NEXT:    "calls": [
+// CHECK-NEXT:      {
 // CHECK-NEXT:        "memberLabel": "myMethod",
 // CHECK-NEXT:        "arguments": [
 // CHECK-NEXT:          {
@@ -92,8 +99,10 @@ struct Statics: MyProto {
 // CHECK-NEXT:            "value": "second struct"
 // CHECK-NEXT:          }
 // CHECK-NEXT:        ]
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "memberLabel": "lowercased",
+// CHECK-NEXT:        "arguments": []
 // CHECK-NEXT:      }
-// CHECK-NEXT:    },
-// CHECK-NEXT:    "memberLabel": "lowercased",
-// CHECK-NEXT:    "arguments": []
+// CHECK-NEXT:    ]
 // CHECK-NEXT:  }
