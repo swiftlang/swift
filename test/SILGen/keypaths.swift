@@ -1,7 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature KeyPathWithMethodMembers -Xllvm -sil-print-types -target %target-swift-5.1-abi-triple -parse-stdlib -module-name keypaths %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature KeyPathWithMethodMembers -Xllvm -sil-print-types -target %target-swift-5.1-abi-triple -module-name keypaths %s | %FileCheck %s
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
-
-import Swift
 
 struct S<T> {
   var x: T
@@ -825,4 +823,43 @@ class DynamicSelfTypeTestClass {
 
 func testDynamicSelfType() {
   DynamicSelfTypeTestClass.staticFunc()
+}
+
+// More regression tests
+do {
+  struct Root {}
+
+  protocol P: AnyObject {
+    var root: Root { get set }
+  }
+
+  func f1<T: P, Value>(t: T, keyPath: WritableKeyPath<Root, [Value]?>, value: Value) {
+    t.root[keyPath: keyPath]?.append(value)
+    t.root[keyPath: keyPath]?.removeLast()
+    t.root[keyPath: keyPath] = nil
+    if t.root[keyPath: keyPath]?.count == 0 {}
+    if t.root[keyPath: keyPath]?.count ?? 0 > 0 {}
+  }
+
+  func f2<T: P>(t: T, keyPath: ReferenceWritableKeyPath<T, Task<Void, any Error>?>) {
+    _ = t[keyPath: keyPath]!
+    t[keyPath: keyPath]?.cancel()
+  }
+
+  struct S {
+    func copy() -> Self { return self }
+  }
+
+  class C {
+    var root = Root()
+  }
+
+  func f3(c1: C, c2: C, keyPath: WritableKeyPath<Root, S?>) {
+      c1.root[keyPath: keyPath] = (c2.root[keyPath: keyPath]?.copy())
+  }
+
+  func f4(c: C, keyPath: ReferenceWritableKeyPath<C, Int?>) -> Int {
+    let a = c[keyPath: keyPath]!
+    return a
+  }
 }

@@ -466,7 +466,7 @@ func testKeyPathSubscriptExistentialBase(concreteBase: inout B,
   _ = concreteBase[keyPath: pkp]
 
   concreteBase[keyPath: kp] = s // expected-error {{cannot assign through subscript: 'kp' is a read-only key path}}
-  concreteBase[keyPath: wkp] = s // expected-error {{key path with root type 'any P' cannot be applied to a base of type 'B'}}
+  concreteBase[keyPath: wkp] = s // expected-error {{cannot assign through subscript: 'concreteBase' is immutable}}
   concreteBase[keyPath: rkp] = s
   concreteBase[keyPath: pkp] = s // expected-error {{cannot assign through subscript: 'pkp' is a read-only key path}}
 
