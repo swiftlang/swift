@@ -1,13 +1,13 @@
 #include "objc_async.h"
 #include <stdio.h>
 
-@implementation Butt
+@implementation MyNSInterfaceWithCallbackFunc
 
 - (instancetype)init {
   return [super init];
 }
 
-- (void)butt:(NSInteger)x completionHandler:(void (^)(NSInteger))handler {
+- (void)compute:(NSInteger)x completionHandler:(void (^)(NSInteger))handler {
   printf("starting %ld\n", (long)x);
   handler(679);
 }
