@@ -311,14 +311,14 @@ func callActorMethodFromGeneric(a: SomeActor) async {
 // NI-NS:          apply
 // NI-NS: } // end sil function '$s12initializers15makeActorInTaskyyYaF'
 
-// NI-LABEL: sil private [ossa] @$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYacfU_ : $@convention(thin) @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>) -> @out τ_0_0 for <SomeActor> {
+// NI-LABEL: sil private [ossa] @$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYacfU_ : $@convention(thin) @async @substituted <τ_0_0, τ_0_1> (@guaranteed Optional<any Actor>) -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, SomeActor> {
 // NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
 // NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:          apply
 // NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI: } // end sil function '$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYacfU_'
 
-// NI-NS-LABEL: sil private [ossa] @$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYacfU_ : $@convention(thin) @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>) -> @out τ_0_0 for <SomeActor> {
+// NI-NS-LABEL: sil private [ossa] @$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYacfU_ : $@convention(thin) @async @substituted <τ_0_0, τ_0_1> (@guaranteed Optional<any Actor>) -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, SomeActor> {
 // NI-NS:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
 // NI-NS-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI-NS:          apply
@@ -340,7 +340,7 @@ func makeActorInTask() async {
 // NI-NS:   hop_to_executor [[ACTOR]]
 // NI-NS: } // end sil function '$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF'
 
-// CHECK-LABEL: sil private [ossa] @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaFyyYacfU_ : $@convention(thin) @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>, @guaranteed SomeActor) -> @out τ_0_0 for <()> {
+// CHECK-LABEL: sil private [ossa] @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaFyyYacfU_ : $@convention(thin) @async @substituted <τ_0_0, τ_0_1> (@guaranteed Optional<any Actor>, @guaranteed SomeActor) -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, ()> {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // CHECK:          apply
