@@ -138,7 +138,8 @@ To add a new diagnostics group:
 5. Create a new entry in `DiagnosticGroups.def` that provides the name for your new diagnostic group along with the name of the file you added in step (4), without an extension.
 6. Find each diagnostic you want to make part of this group in the various `Diagnostics*.def` files. For each diagnostic, replace the `ERROR` or `WARNING` with `GROUPED_ERROR` or `GROUPED_WARNING`, respectively, and put the diagnostic group name after the string literal for the diagnostic message.
 7. If possible, rebuild the compiler and try recompiling your test program. Your new diagnostic group should appear as `[#<group name>]` at the end of the diagnostic, with a link to the diagnostic file.
-8. That's it! The new diagnostic group is now ready to be submitted as a pull request on GitHub.
+8. If possible, generate updated doc indexes by running `./utils/generate-doc-index.swift .`. Otherwise, the `userdoc_indices` test will fail, since your new diagnostic group won't be in `diagnostic-groups.md` yet.
+9. That's it! The new diagnostic group is now ready to be submitted as a pull request on GitHub.
 
 If you run into any issues or have questions while following the steps above, feel free to post a question on the Swift forums or open a work-in-progress pull request on GitHub.
 
