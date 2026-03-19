@@ -42,7 +42,7 @@ import Swift
 ///         }
 ///         return total
 ///     }
-///     print(sum(span))  // Prints "110"
+///     print(sum(span))  // Prints "150"
 ///
 /// ### Extracted Spans 
 /// 
