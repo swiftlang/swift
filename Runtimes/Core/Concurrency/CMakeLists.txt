@@ -1,8 +1,6 @@
 add_subdirectory(InternalShims)
 
-gyb_expand(Task+init.swift.gyb Task+init.swift)
 gyb_expand(TaskGroup+addTask.swift.gyb TaskGroup+addTask.swift)
-gyb_expand(Task+immediate.swift.gyb Task+immediate.swift)
 
 add_library(swift_Concurrency
   Actor.cpp
@@ -86,6 +84,8 @@ add_library(swift_Concurrency
   SourceCompatibilityShims.swift
   SuspendingClock.swift
   Task.swift
+  Task+immediate.swift
+  Task+init.swift
   Task+PriorityEscalation.swift
   Task+TaskExecutor.swift
   TaskCancellation.swift
@@ -94,9 +94,7 @@ add_library(swift_Concurrency
   TaskSleep.swift
   TaskSleepDuration.swift
   UnimplementedExecutor.swift
-  "${CMAKE_CURRENT_BINARY_DIR}/Task+init.swift"
-  "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
-  "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")
+  "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift")
 
 if(SwiftCore_ENABLE_STDLIB_TRACING)
   target_compile_definitions(swift_Concurrency

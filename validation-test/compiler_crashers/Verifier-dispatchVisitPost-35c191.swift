@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::ASTWalker::PostWalkResult<swift::DynamicTypeExpr*> (anonymous namespace)::Verifier::dispatchVisitPost<swift::DynamicTypeExpr*>(swift::DynamicTypeExpr*)"}
+// {"kind":"typecheck","signature":"swift::ASTWalker::PostWalkResult<swift::DynamicTypeExpr*> (anonymous namespace)::Verifier::dispatchVisitPost<swift::DynamicTypeExpr*>(swift::DynamicTypeExpr*)","signatureNext":"Verifier::walkToExprPost"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 class a {
 }

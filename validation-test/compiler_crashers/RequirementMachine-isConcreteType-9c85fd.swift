@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"379a5956","signature":"swift::rewriting::RequirementMachine::isConcreteType(swift::Type, swift::ProtocolDecl const*) const"}
+// {"kind":"typecheck","original":"379a5956","signature":"swift::rewriting::RequirementMachine::isConcreteType(swift::Type, swift::ProtocolDecl const*) const","signatureNext":"RequirementSignatureRequest::evaluate"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b: c where b.d == b

@@ -1526,7 +1526,6 @@ void BridgedInstruction::PartialApplyInst_setStackAllocationIsNested(bool isNest
            swift::StackAllocationIsNested_t(isNested));
 }
 
-
 bool BridgedInstruction::AllocStackInst_hasDynamicLifetime() const {
   return getAs<swift::AllocStackInst>()->hasDynamicLifetime();
 }
@@ -1553,6 +1552,15 @@ bool BridgedInstruction::AllocRefInstBase_isObjc() const {
 
 bool BridgedInstruction::AllocRefInstBase_canAllocOnStack() const {
   return getAs<swift::AllocRefInstBase>()->canAllocOnStack();
+}
+
+bool BridgedInstruction::AllocRefInstBase_isStackAllocationNested() const {
+  return getAs<swift::AllocRefInstBase>()->isStackAllocationNested();
+}
+
+void BridgedInstruction::AllocRefInstBase_setStackAllocationIsNested(bool isNested) const {
+  return getAs<swift::AllocRefInstBase>()->setStackAllocationIsNested(
+           swift::StackAllocationIsNested_t(isNested));
 }
 
 SwiftInt BridgedInstruction::AllocRefInstBase_getNumTailTypes() const {
@@ -1908,6 +1916,25 @@ SwiftInt BridgedInstruction::ScalarPackIndexInst_getComponentIndex() const {
 
 BridgedCanType BridgedInstruction::AnyPackIndexInst_getIndexedPackType() const {
   return getAs<swift::AnyPackIndexInst>()->getIndexedPackType();
+}
+
+bool BridgedInstruction::DifferentiableFunctionInst_hasExtractee(
+    SwiftInt extractee) const {
+  return getAs<swift::DifferentiableFunctionInst>()->hasExtractee(
+      swift::NormalDifferentiableFunctionTypeComponent(extractee));
+}
+
+BridgedValue BridgedInstruction::DifferentiableFunctionInst_getExtractee(
+    SwiftInt extractee) const {
+  return {getAs<swift::DifferentiableFunctionInst>()->getExtractee(
+      swift::NormalDifferentiableFunctionTypeComponent(extractee))};
+}
+
+SwiftInt
+BridgedInstruction::DifferentiableFunctionExtractInst_getExtractee() const {
+  return getAs<swift::DifferentiableFunctionExtractInst>()
+      ->getExtractee()
+      .rawValue;
 }
 
 //===----------------------------------------------------------------------===//
@@ -2411,11 +2438,12 @@ BridgedBuilder::createIntegerLiteral(BridgedType type, SwiftInt value,
 }
 
 BridgedInstruction BridgedBuilder::createAllocRef(BridgedType type,
-    bool objc, bool canAllocOnStack, bool isBare,
+    bool objc, bool canAllocOnStack, bool isBare, bool isNested,
     BridgedSILTypeArray elementTypes, BridgedValueArray elementCountOperands) const {
   llvm::SmallVector<swift::SILValue, 16> elementCountOperandsValues;
   return {unbridged().createAllocRef(
       regularLoc(), type.unbridged(), objc, canAllocOnStack, isBare,
+      swift::StackAllocationIsNested_t(isNested),
       elementTypes.typeArray.unbridged<swift::SILType>(),
       elementCountOperands.getValues(elementCountOperandsValues)
       )};
@@ -2757,16 +2785,15 @@ BridgedInstruction BridgedBuilder::createPartialApply(BridgedValue funcRef,
                                                       bool isOnStack,
                                                       bool isNested) const {
   llvm::SmallVector<swift::SILValue, 8> capturedArgs;
-  auto *pai = unbridged().createPartialApply(
+  return {unbridged().createPartialApply(
       regularLoc(), funcRef.getSILValue(), bridgedSubstitutionMap.unbridged(),
       bridgedCapturedArgs.getValues(capturedArgs),
       getParameterConvention(calleeConvention),
       hasUnknownIsolation ? swift::SILFunctionTypeIsolation::forUnknown()
                           : swift::SILFunctionTypeIsolation::forErased(),
       isOnStack ? swift::PartialApplyInst::OnStack
-                : swift::PartialApplyInst::NotOnStack);
-  pai->setStackAllocationIsNested(isNested ? swift::StackAllocationIsNested : swift::StackAllocationIsNotNested);
-  return {pai};
+                : swift::PartialApplyInst::NotOnStack,
+      swift::StackAllocationIsNested_t(isNested))};
 }
 
 BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, BridgedValueArray arguments) const {

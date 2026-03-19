@@ -1081,6 +1081,12 @@ public:
   ExplicitSwiftModuleMap *getExplicitSwiftModuleMap();
   ExplicitClangModuleMap *getExplicitClangModuleMap();
 
+  /// Look up the library level for a module from the explicit module map.
+  /// \param isClang Whether to look in the Clang module map (true) or the
+  ///                Swift module map (false).
+  std::optional<LibraryLevel>
+  getExplicitModuleLibraryLevel(StringRef moduleName, bool isClang);
+
   /// Adds a module loader to this AST context.
   ///
   /// \param loader The new module loader, which will be added after any

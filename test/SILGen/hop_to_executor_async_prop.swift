@@ -641,7 +641,7 @@ struct Blah {
     @StateObject private var coordinator = Coordinator()
 
     // closure #1 in Blah.test()
-    // CHECK-LABEL: sil private [ossa] @$s4test4BlahVAAyyFyyYacfU_ : $@convention(thin) @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>, Blah) -> @out τ_0_0 for <()> {
+    // CHECK-LABEL: sil private [ossa] @$s4test4BlahVAAyyFyyYacfU_ : $@convention(thin) @async @substituted <τ_0_0, τ_0_1> (@guaranteed Optional<any Actor>, Blah) -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, ()> {
     // CHECK:       [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
     // CHECK:       hop_to_executor {{%[0-9]+}} : $MainActor

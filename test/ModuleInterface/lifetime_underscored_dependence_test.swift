@@ -147,7 +147,7 @@ import lifetime_underscored_dependence
 // CHECK-NEXT: #endif
 
 // CHECK: #if compiler(>=5.3) && $ClosureLifetimes
-// CHECK-NEXT: @inlinable public func takeExplicitNestedType(f: @_lifetime(copy ne0) @_lifetime(ne1: copy ne0, copy ne1) ((lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView, _ ne0: consuming lifetime_underscored_dependence::AnotherView, _ ne1: inout lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView) {} 
+// CHECK-NEXT: @inlinable public func takeExplicitNestedType(f: lifetime_underscored_dependence::ExplicitNestedType) {}
 // CHECK-NEXT: #endif
 
 // CHECK: #if compiler(>=5.3) && $Lifetimes

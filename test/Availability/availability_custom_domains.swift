@@ -242,6 +242,8 @@ func testAlwaysEnabledDomainUnavailable() {
 
 @available(*, unavailable)
 func testUniversallyUnavailable() {
+  // expected-note@-1 {{add '@available' attribute to enclosing global function}}{{243:1-1=@available(EnabledDomain)\n}}
+  // expected-note@-2 {{add '@available' attribute to enclosing global function}}{{243:1-1=@available(DynamicDomain)\n}}
   alwaysAvailable()
   // FIXME: [availability] Diagnostic consistency: potentially unavailable declaration shouldn't be diagnosed
   // in contexts that are unavailable to broader domains

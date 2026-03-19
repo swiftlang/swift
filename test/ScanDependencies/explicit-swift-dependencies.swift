@@ -15,6 +15,7 @@ import F
 
 /// --------Main module
 // CHECK-LABEL: "modulePath": "deps.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: sourceFiles
 // CHECK-NEXT: explicit-swift-dependencies.swift
 // CHECK-NEXT: ],

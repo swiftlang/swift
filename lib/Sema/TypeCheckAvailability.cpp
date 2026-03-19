@@ -871,9 +871,7 @@ static void fixAvailabilityByAddingVersionCheck(
       .fixItReplace(RangeToWrap, IfText);
 }
 
-/// Emit suggested Fix-Its for a reference with to an unavailable symbol
-/// requiting the given OS version range.
-static void fixAvailability(SourceRange ReferenceRange,
+void swift::fixAvailability(SourceRange ReferenceRange,
                             const DeclContext *ReferenceDC,
                             AvailabilityDomain Domain,
                             const AvailabilityRange &RequiredAvailability,

@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"369523c9","signature":"swift::InFlightSubstitution::substType(swift::SubstitutableType*, unsigned int)","signatureAssert":"Assertion failed: (Ptr && \"Cannot dereference a null Type!\"), function operator->"}
+// {"kind":"typecheck","original":"369523c9","signature":"swift::InFlightSubstitution::substType(swift::SubstitutableType*, unsigned int)","signatureAssert":"Assertion failed: (Ptr && \"Cannot dereference a null Type!\"), function operator->","signatureNext":"TypeSubstituter::transformGenericTypeParamType"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 struct a {
   typealias b<c, d> = a

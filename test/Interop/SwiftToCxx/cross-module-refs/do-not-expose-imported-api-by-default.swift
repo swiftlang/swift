@@ -24,4 +24,4 @@ public func unavailableInHeaderFunc(_ x: StructSeveralI64) -> StructSeveralI64 {
     return Structs.passThroughStructSeveralI64(i: 0, x, j: 2)
 }
 
-// CHECK: // Unavailable in C++: Swift global function 'unavailableInHeaderFunc(_:)'.
+// CHECK: // Unavailable in C++: Swift global function 'unavailableInHeaderFunc(_:)'. Return type 'StructSeveralI64' is not representable in C++.

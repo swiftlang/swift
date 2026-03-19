@@ -3571,6 +3571,13 @@ public:
     TypeChecker::checkDistributedFunc(FD);
     checkEmbeddedRestrictionsInSignature(FD);
 
+    // Untyped throws might need to be diagnosed.
+    SourceLoc throwsLoc = FD->getThrowsLoc();
+    if (throwsLoc.isValid() && !FD->getThrownTypeRepr() &&
+        !FD->hasPolymorphicEffect(EffectKind::Throws)) {
+      diagnoseUntypedThrows(FD, throwsLoc);
+    }
+
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
       // override anything, complain.
@@ -3957,6 +3964,13 @@ public:
 
     if (CD->getAsyncLoc().isValid())
       TypeChecker::checkConcurrencyAvailability(CD->getAsyncLoc(), CD);
+
+    // Untyped throws might need to be diagnosed.
+    SourceLoc throwsLoc = CD->getThrowsLoc();
+    if (throwsLoc.isValid() && !CD->getThrownTypeRepr() &&
+        !CD->hasPolymorphicEffect(EffectKind::Throws)) {
+      diagnoseUntypedThrows(CD, throwsLoc);
+    }
 
     // Check whether this initializer overrides an initializer in its
     // superclass.

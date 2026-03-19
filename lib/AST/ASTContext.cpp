@@ -681,6 +681,10 @@ struct ASTContext::Implementation {
   /// The set of unique custom availability domains.
   llvm::FoldingSet<CustomAvailabilityDomain> CustomAvailabilityDomains;
 
+  /// The most specific platform AvailabilityDomain that corresponds to the
+  /// compilation's `-target`.
+  std::optional<AvailabilityDomain> TargetAvailabilityDomain;
+
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
   llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
@@ -2220,6 +2224,31 @@ ExplicitClangModuleMap *ASTContext::getExplicitClangModuleMap() {
   if (getImpl().TheExplicitSwiftModuleLoader)
     return getImpl().TheExplicitSwiftModuleLoader->getExplicitClangModuleMap();
   return nullptr;
+}
+
+std::optional<LibraryLevel>
+ASTContext::getExplicitModuleLibraryLevel(StringRef moduleName, bool isClang) {
+  auto getLevelStr = [&](auto *map) -> const std::optional<std::string> * {
+    if (!map)
+      return nullptr;
+    auto it = map->find(moduleName);
+    if (it == map->end())
+      return nullptr;
+    return &it->getValue().libraryLevel;
+  };
+
+  const std::optional<std::string> *levelStr =
+      isClang ? getLevelStr(getExplicitClangModuleMap())
+              : getLevelStr(getExplicitSwiftModuleMap());
+
+  if (!levelStr || !*levelStr)
+    return std::nullopt;
+
+  return llvm::StringSwitch<LibraryLevel>(**levelStr)
+      .Case("api", LibraryLevel::API)
+      .Case("spi", LibraryLevel::SPI)
+      .Case("ipi", LibraryLevel::IPI)
+      .Default(LibraryLevel::Other);
 }
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
@@ -7465,13 +7494,21 @@ ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
   llvm_unreachable("exhaustive switch");
 }
 
-AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
-  auto platform = swift::targetPlatform(LangOpts);
+static AvailabilityDomain
+targetAvailabilityDomainForPlatform(PlatformKind platform) {
   if (platform != PlatformKind::none)
     return AvailabilityDomain::forPlatform(platform);
 
   // Fall back to the universal domain for triples without a platform.
   return AvailabilityDomain::forUniversal();
+}
+
+AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
+  if (!getImpl().TargetAvailabilityDomain) {
+    getImpl().TargetAvailabilityDomain =
+        targetAvailabilityDomainForPlatform(swift::targetPlatform(LangOpts));
+  }
+  return *getImpl().TargetAvailabilityDomain;
 }
 
 GenericSignature &

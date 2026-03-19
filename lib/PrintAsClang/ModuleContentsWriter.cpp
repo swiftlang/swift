@@ -41,6 +41,7 @@
 #include "clang/Basic/Module.h"
 
 #include "llvm/Support/raw_ostream.h"
+#include <utility>
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -1005,8 +1006,8 @@ public:
         else if (auto SD = dyn_cast<StructDecl>(D))
           success = writeStruct(SD);
         else if (auto *vd = dyn_cast<ValueDecl>(D))
-          topLevelEmissionScope.additionalUnrepresentableDeclarations.push_back(
-              vd);
+          topLevelEmissionScope.additionalUnrepresentableDeclarations.insert(
+              {vd, ""});
       } else if (isa<ValueDecl>(D)) {
         if (auto PD = dyn_cast<ProtocolDecl>(D))
           success = writeProtocol(PD);
@@ -1053,9 +1054,10 @@ public:
     if (outputLangMode != OutputLanguageMode::Cxx)
       return;
     auto &emissionScope = topLevelEmissionScope;
+
     auto removedVDList = std::vector<const ValueDecl *>(
         removedValueDecls.begin(), removedValueDecls.end());
-    for (const auto *removedVD :
+    for (const auto &[removedVD, reason] :
          emissionScope.additionalUnrepresentableDeclarations)
       removedVDList.push_back(removedVD);
 
@@ -1095,24 +1097,29 @@ public:
     for (const auto *vd : removedVDList) {
       assert(!vd->isObjC());
       os << "\n";
-      auto emitStubComment = [&]() {
-        // Emit a generic comment for an handled declaration.
+      auto emitStubComment = [&](StringRef reason = "") {
         os << "// Unavailable in C++: Swift "
-           << vd->getDescriptiveKindName(vd->getDescriptiveKind()) << " '";
+           << Decl::getDescriptiveKindName(vd->getDescriptiveKind()) << " '";
         vd->getName().print(os);
-        os << "'.\n";
+        os << "'.";
+        if (!reason.empty())
+          os << " " << reason << ".";
+        os << "\n";
       };
 
       // Do not emit a C++ declaration with a specific C++ name more than once.
       auto cxxName = cxx_translation::getNameForCxx(vd);
-      if (emissionScope.emittedDeclarationNames.contains(cxxName)) {
-        emitStubComment();
-        continue;
-      }
-      emissionScope.emittedDeclarationNames.insert(cxxName);
+      bool isDuplicateName =
+          !emissionScope.emittedDeclarationNames.insert(cxxName).second;
 
       // Emit an unavailable stub for a Swift type.
       if (auto *nmtd = dyn_cast<NominalTypeDecl>(vd)) {
+        // Do not emit a C++ class stub if a declaration with this name was
+        // already emitted; just emit the comment.
+        if (isDuplicateName) {
+          emitStubComment();
+          continue;
+        }
         auto representation = cxx_translation::getDeclRepresentation(
             vd, [this](const NominalTypeDecl *decl) {
               return printer.isZeroSized(decl);
@@ -1144,10 +1151,33 @@ public:
         continue;
       }
 
-      // FIXME: Emit an unavailable stub for a function / function overload set
-      // / variable.
-      // FIXME: Note unrepresented type aliases too.
-      emitStubComment();
+      // Emit a comment with a reason for functions, variables, and other
+      // non-type value decls.
+      auto reasonIt =
+          emissionScope.additionalUnrepresentableDeclarations.find(vd);
+      if (reasonIt !=
+              emissionScope.additionalUnrepresentableDeclarations.end() &&
+          !reasonIt->second.empty()) {
+        emitStubComment(reasonIt->second);
+      } else {
+        auto representation = cxx_translation::getDeclRepresentation(
+            vd, [this](const NominalTypeDecl *decl) {
+              return printer.isZeroSized(decl);
+            });
+        std::string reasonStr;
+        if (representation.isUnsupported() &&
+            representation.error.has_value()) {
+          auto diag = cxx_translation::diagnoseRepresenationError(
+              *representation.error, const_cast<ValueDecl *>(vd));
+          auto diagString =
+              M.getASTContext().Diags.getFormatStringForDiagnostic(
+                  diag.getID());
+          llvm::raw_string_ostream reasonOS(reasonStr);
+          DiagnosticEngine::formatDiagnosticText(
+              reasonOS, diagString, diag.getArgs(), DiagnosticFormatOptions());
+        }
+        emitStubComment(reasonStr);
+      }
     }
   }
 };

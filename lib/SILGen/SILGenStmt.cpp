@@ -1053,6 +1053,40 @@ void StmtEmitter::visitPoundAssertStmt(PoundAssertStmt *stmt) {
       SGF.getLoweredType(resultType), {}, {i1Value, message});
 }
 
+/// Should we use "inline defer", which avoids emitting a separate
+/// defer function and instead just emits the body inline as a cleanup?
+///
+/// This is arguably a superior emission approach in general for small
+/// defer bodies, and even for large defer bodies if we found a way to
+/// avoid duplicating the code. But for now, limit to cases where we
+/// truly need it, like when there's a use/def relationship that we
+/// need to build in SIL. Those should all involve builtin calls.
+static bool shouldUseInlineDefer(FuncDecl *deferDecl) {
+  auto body = deferDecl->getBody();
+  assert(body);
+
+  // Require the body to have the exact form:
+  //   defer { Builtin.foo(...) }
+  // (possibly with try/unsafe/await markers)
+
+  auto expr = body->getSingleActiveExpression();
+  if (!expr) return false;
+  expr = expr->getSemanticsProvidingExpr();
+  auto call = dyn_cast<CallExpr>(expr);
+  if (!call) return false;
+  auto memberRef = dyn_cast<DotSyntaxBaseIgnoredExpr>(call->getFn());
+  if (!memberRef) return false;
+  auto fnRef = dyn_cast<DeclRefExpr>(memberRef->getRHS());
+  if (!fnRef) return false;
+  auto builtinFn = dyn_cast<FuncDecl>(fnRef->getDecl());
+  if (!builtinFn) return false;
+  if (!builtinFn->getModuleContext()->isBuiltinModule()) return false;
+
+  // We could limit this to specific builtins at this point, but that
+  // seems unnecessary.
+  return true;
+}
+
 namespace {
   // This is a little cleanup that ensures that there are no jumps out of a
   // defer body.  The cleanup is only active and installed when emitting the
@@ -1072,10 +1106,31 @@ namespace {
 #endif
     }
   };
-} // end anonymous namespace
 
+  class InlineDeferCleanup : public Cleanup {
+    SourceLoc deferLoc;
+    FuncDecl *deferDecl;
+  public:
+    InlineDeferCleanup(SourceLoc deferLoc, FuncDecl *deferDecl)
+      : deferLoc(deferLoc), deferDecl(deferDecl) {}
+    void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
+      SGF.Cleanups.pushCleanup<DeferEscapeCheckerCleanup>(deferLoc);
+      auto TheCleanup = SGF.Cleanups.getTopCleanup();
 
-namespace {
+      auto body = deferDecl->getBody()->getSingleActiveExpression();
+      SGF.emitIgnoredExpr(body);
+      
+      if (SGF.B.hasValidInsertionPoint())
+        SGF.Cleanups.setCleanupState(TheCleanup, CleanupState::Dead);
+    }
+    void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+      llvm::errs() << "InlineDeferCleanup\n"
+                   << "State: " << getState() << "\n";
+#endif
+    }
+  };
+
   class DeferCleanup : public Cleanup {
     SourceLoc deferLoc;
     Expr *call;
@@ -1100,12 +1155,18 @@ namespace {
   };
 } // end anonymous namespace
 
-
 void StmtEmitter::visitDeferStmt(DeferStmt *S) {
+  FuncDecl *deferDecl = S->getTempDecl();
+
+  // Check if the defer should use the inline defer mechanism.
+  if (shouldUseInlineDefer(deferDecl)) {
+    SGF.Cleanups.pushCleanup<InlineDeferCleanup>(S->getDeferLoc(), deferDecl);
+    return;
+  }
+
   // Emit the closure for the defer, along with its binding.
   // If the defer is at the top-level code, insert 'mark_escape_inst'
-  // to the top-level code to check initialization of any captured globals.
-  FuncDecl *deferDecl = S->getTempDecl();
+  // to the top-level code to check initialization of any captured globals.  
   auto *Ctx = deferDecl->getDeclContext();
   if (isa<TopLevelCodeDecl>(Ctx) && SGF.isEmittingTopLevelCode()) {
       auto Captures = deferDecl->getCaptureInfo();

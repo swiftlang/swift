@@ -15,6 +15,11 @@ struct StructIsNonCopyable: ~Copyable {
   var b = "Hello World"
 }
 
+struct StructWithMembersAndDescription: CustomStringConvertible {
+  var a = 1
+  var description: String { "Hello World" }
+}
+
 class ClassWithMembers {
   var a = 1
   var b = "Hello World"
@@ -64,6 +69,11 @@ let StringForPrintObjectTests = TestSuite("StringForPrintObject")
 StringForPrintObjectTests.test("StructWithMembers") {
   let printed = _stringForPrintObject(StructWithMembers())
   expectEqual(printed, "▿ StructWithMembers\n  - a : 1\n  - b : \"Hello World\"\n")
+}
+
+StringForPrintObjectTests.test("StructWithMembersAndDescription") {
+  let printed = _stringForPrintObject(StructWithMembersAndDescription())
+  expectEqual(printed, "Hello World\n")
 }
 
 #if _runtime(_ObjC)

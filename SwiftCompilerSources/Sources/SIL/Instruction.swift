@@ -1538,10 +1538,29 @@ final public class VectorBaseAddrInst : SingleValueInstruction, UnaryInstruction
   public var vector: Value { operand.value }
 }
 
-final public class DifferentiableFunctionInst: SingleValueInstruction {}
+public enum DifferentiableFunctionTypeComponent: Int {
+  case original = 0
+  case jvp = 1
+  case vjp = 2
+}
+
+final public class DifferentiableFunctionInst: SingleValueInstruction {
+  public func getExtractee(extractee: DifferentiableFunctionTypeComponent) -> Value? {
+    if bridged.DifferentiableFunctionInst_hasExtractee(extractee.rawValue) {
+      return bridged.DifferentiableFunctionInst_getExtractee(extractee.rawValue).value
+    }
+    return nil
+  }
+}
 
 final public class LinearFunctionInst: SingleValueInstruction {}
-final public class DifferentiableFunctionExtractInst: SingleValueInstruction {}
+
+final public class DifferentiableFunctionExtractInst: SingleValueInstruction {
+  public var extractee: DifferentiableFunctionTypeComponent {
+    DifferentiableFunctionTypeComponent(rawValue: bridged.DifferentiableFunctionExtractInst_getExtractee())!
+  }
+}
+
 final public class LinearFunctionExtractInst: SingleValueInstruction {}
 final public class DifferentiabilityWitnessFunctionInst: SingleValueInstruction {}
 
@@ -1584,6 +1603,17 @@ public class AllocRefInstBase : SingleValueInstruction, Allocation {
   public final func setIsStackAllocatable(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.AllocRefInstBase_setIsStackAllocatable()
+    context.notifyInstructionChanged(self)
+  }
+
+  public final var isStackAllocationNested: Bool {
+    bridged.AllocRefInstBase_isStackAllocationNested();
+  }
+
+  public final func setStackAllocationNested(_ isNested: Bool,
+                                             _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.AllocRefInstBase_setStackAllocationIsNested(isNested)
     context.notifyInstructionChanged(self)
   }
 

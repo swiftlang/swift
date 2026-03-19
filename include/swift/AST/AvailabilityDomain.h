@@ -49,7 +49,24 @@ enum class AvailabilityVersionKind {
 };
 
 /// Represents a dimension of availability (e.g. macOS platform or Swift
-/// language mode).
+/// language mode). The `Swift` domain is the bottom element of a lattice
+/// containing the platform domains representing ABI stable platforms like
+/// `macOS` and `iOS`:
+///
+///      *────────Swift──────SwiftLang──────Windows──...
+///  (universal)    │           Mode
+///                 │
+///             anyAppleOS
+///        ┌──────┬─┴──┬──────────────┐
+///        │      │    │              │
+///     watchOS macOS tvOS           iOS
+///        │      │    │       ┌──────┼───────────┐
+///     watchOS macOS tvOS     │      │           │
+///     AppExt AppExt AppExt iOS   visionOS   macCatalyst
+///                         AppExt    │           │
+///                                visionOS   macCatalyst
+///                                 AppExt      AppExt
+///
 class AvailabilityDomain final {
 public:
   enum class Kind : uint8_t {
@@ -292,15 +309,16 @@ public:
   ModuleDecl *getModule() const;
 
   /// Returns true if availability in `other` is a subset of availability in
-  /// this domain. The set of all availability domains form a lattice where the
-  /// universal domain (`*`) is the bottom element.
+  /// this domain or `this == other`.
   bool contains(const AvailabilityDomain &other) const;
 
   /// Returns true if availability in `other` is a subset of availability in
-  /// this domain or vice-versa.
-  bool isRelated(const AvailabilityDomain &other) const {
-    return contains(other) || other.contains(*this);
-  }
+  /// this domain and `this != other`.
+  bool isSupersetOf(const AvailabilityDomain &other) const;
+
+  /// Returns true if availability in `other` is a subset of availability in
+  /// this domain or vice-versa, or `this == other`.
+  bool isRelated(const AvailabilityDomain &other) const;
 
   /// Returns true for domains that are not contained by any domain other than
   /// the universal domain.

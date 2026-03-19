@@ -77,6 +77,12 @@ public:
     bits |= other.bits;
   }
 
+  /// Remove all of the invertible protocols from this one not present
+  /// in the other set.
+  void intersect(InvertibleProtocolSet other) {
+    bits &= other.bits;
+  }
+
   /// Remove the given invertible protocol from the set.
   void remove(InvertibleProtocolKind kind) {
     uint16_t mask = getMask(kind);

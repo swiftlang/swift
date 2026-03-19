@@ -3,7 +3,7 @@
 // RUN: %swift-ide-test -swift-version 4 -test-input-complete -source-filename=%s -target x86_64-apple-ios7.0-simulator
 
 #if !targetEnvironment(simulator)
-// This block should not parse.
+// This block should not be type checked.
 let i: Int = "Hello"
 #endif
 

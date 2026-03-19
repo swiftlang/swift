@@ -3288,9 +3288,13 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
 
     Type mainActor = context.getMainActorType();
     if (mainActor) {
-      auto extInfo = ASTExtInfoBuilder().withIsolation(
-          FunctionTypeIsolation::forGlobalActor(mainActor))
-        .withThrows(true, throwsTypeVar);
+      auto extInfo =
+          ASTExtInfoBuilder()
+              .withIsolation(FunctionTypeIsolation::forGlobalActor(mainActor))
+              .withThrows(true, throwsTypeVar)
+              .withSendable(context.LangOpts.hasFeature(
+                  Feature::GlobalActorIsolatedTypesUsability));
+
       mainTypes.push_back(FunctionType::get(
           /*params*/ {}, context.TheEmptyTupleType,
           extInfo.build()));
@@ -5525,7 +5529,7 @@ void AttributeChecker::checkBackDeployedAttrs(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    if (availability.containsUnavailableDomain(Domain)) {
+    if (availability.isUnavailableForDomain(Domain)) {
       diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
                Domain.getRemappedDomain(Ctx));
 

@@ -317,11 +317,13 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
                                    SILDebugLocation Loc,
                                    SILType ObjectType,
                                    bool objc, bool canBeOnStack, bool isBare,
+                                   StackAllocationIsNested_t isNested,
                                    ArrayRef<SILType> ElementTypes)
     : AllocationInst(Kind, Loc, ObjectType) {
   sharedUInt8().AllocRefInstBase.objC = objc;
   sharedUInt8().AllocRefInstBase.onStack = canBeOnStack;
   sharedUInt8().AllocRefInstBase.isBare = isBare;
+  sharedUInt8().AllocRefInstBase.isNested = bool(isNested);
   sharedUInt8().AllocRefInstBase.numTailTypes = ElementTypes.size();
   assert(sharedUInt8().AllocRefInstBase.numTailTypes ==
          ElementTypes.size() && "Truncation");
@@ -331,6 +333,7 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
 AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
                                    SILType ObjectType,
                                    bool objc, bool canBeOnStack, bool isBare,
+                                   StackAllocationIsNested_t isNested,
                                    ArrayRef<SILType> ElementTypes,
                                    ArrayRef<SILValue> ElementCountOperands) {
   assert(ElementTypes.size() == ElementCountOperands.size());
@@ -342,13 +345,14 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
                                                         ElementTypes.size());
   auto Buffer = F.getModule().allocateInst(Size, alignof(AllocRefInst));
   return ::new (Buffer) AllocRefInst(Loc, F, ObjectType, objc, canBeOnStack, isBare,
-                                     ElementTypes, AllOperands);
+                                     isNested, ElementTypes, AllOperands);
 }
 
 AllocRefDynamicInst *
 AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
                             SILValue metatypeOperand, SILType ty, bool objc,
                             bool canBeOnStack,
+                            StackAllocationIsNested_t isNested,
                             ArrayRef<SILType> ElementTypes,
                             ArrayRef<SILValue> ElementCountOperands) {
   SmallVector<SILValue, 8> AllOperands(ElementCountOperands.begin(),
@@ -359,8 +363,8 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
                                                         ElementTypes.size());
   auto Buffer = F.getModule().allocateInst(Size, alignof(AllocRefDynamicInst));
   return ::new (Buffer)
-      AllocRefDynamicInst(DebugLoc, ty, objc, canBeOnStack, ElementTypes,
-                          AllOperands);
+      AllocRefDynamicInst(DebugLoc, ty, objc, canBeOnStack, isNested,
+                          ElementTypes, AllOperands);
 }
 
 bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const {
@@ -745,6 +749,7 @@ PartialApplyInst::PartialApplyInst(
     SILDebugLocation Loc, SILValue Callee, SILType SubstCalleeTy,
     SubstitutionMap Subs, ArrayRef<SILValue> Args,
     ArrayRef<SILValue> TypeDependentOperands, SILType ClosureType,
+    StackAllocationIsNested_t IsNested,
     const GenericSpecializationInformation *SpecializationInfo)
     // FIXME: the callee should have a lowered SIL function type, and
     // PartialApplyInst
@@ -752,15 +757,15 @@ PartialApplyInst::PartialApplyInst(
     // type.
     : InstructionBase(Loc, Callee, SubstCalleeTy, Subs, Args,
                       TypeDependentOperands, SpecializationInfo, ClosureType) {
-  sharedUInt8().PartialApplyInst.isNested = true;
+  sharedUInt8().PartialApplyInst.isNested = uint8_t(IsNested);
 }
 
 PartialApplyInst *PartialApplyInst::create(
     SILDebugLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
     SubstitutionMap Subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation, SILFunction &F,
-    const GenericSpecializationInformation *SpecializationInfo,
-    OnStackKind onStack) {
+    const GenericSpecializationInformation *specializationInfo,
+    OnStackKind onStack, StackAllocationIsNested_t isNested) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
 
@@ -777,7 +782,7 @@ PartialApplyInst *PartialApplyInst::create(
   return ::new(Buffer) PartialApplyInst(Loc, Callee, SubstCalleeTy,
                                         Subs, Args,
                                         TypeDependentOperands, ClosureType,
-                                        SpecializationInfo);
+                                        isNested, specializationInfo);
 }
 
 TryApplyInstBase::TryApplyInstBase(SILInstructionKind kind,

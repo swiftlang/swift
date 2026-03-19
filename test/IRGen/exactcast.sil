@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-import-type
 
 // REQUIRES: PTRSIZE=64
+// UNSUPPORTED: CPU=arm64e
 
 sil_stage canonical
 

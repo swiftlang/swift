@@ -1527,7 +1527,8 @@ actor DeinitMutatingAsync {
 
   deinit {
     s.doWork() // expected-error {{cannot call mutating async function 'doWork()' on actor-isolated property 's'}}
-    // expected-error@-1 {{'async' call in a function that does not support concurrency}}
+    // expected-note@-1 {{'s' can be concurrently accessed during mutation, risking data races}}
+    // expected-error@-2 {{'async' call in a function that does not support concurrency}}
   }
 }
 
@@ -1764,8 +1765,7 @@ struct ReferenceSelfDotMethods {
   nonisolated
   private func testCurry() -> (Self) -> (@MainActor () -> Void) {
     let functionRef = Self.mainActorAffinedFunction
-    // warning goes away with InferSendableFromCaptures, see actor_isolation_swift6.swift
-    return functionRef // expected-warning {{converting non-Sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
+    return functionRef // Ok
   }
 
   @MainActor
