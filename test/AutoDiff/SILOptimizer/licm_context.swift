@@ -44,6 +44,7 @@ public extension Array where Element: Differentiable {
 
 extension B {
     @differentiable(reverse)
+    @inline(__always)
     mutating func a() {
         for idx in 0 ..< withoutDerivative(at: self.e.r).count {
             let z = self.e.r[idx].z;

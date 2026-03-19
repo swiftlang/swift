@@ -1,0 +1,101 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+// UNSUPPORTED: OS=wasip1
+
+// CHECK-NOT: = differentiable_function_extract
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+/// SIL below corresponds to the following Swift:
+///
+/// @differentiable(reverse)
+/// func foo<T: Differentiable & AdditiveArithmetic>(_ x: T, _ y: T) -> T {
+///   if x == T.zero {
+///     return y
+///   }
+///   return x
+/// }
+///
+/// @differentiable(reverse)
+/// func bar(_ x: Float, _ y: Float) -> Float {
+///   return foo(y, x)
+/// }
+
+// foo<A>(_:_:)
+sil @$s3src3fooyxx_xts18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlF : $@convention(thin) <T where T : AdditiveArithmetic, T : Differentiable> (@in_guaranteed T, @in_guaranteed T) -> @out T
+
+// forward-mode derivative of foo<A>(_:_:)
+sil @$s3src3fooyxx_xts18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlFsACRzAdERzlTJfSSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out τ_0_2 for <τ_0_0.TangentVector, τ_0_0.TangentVector, τ_0_0.TangentVector>)
+
+// reverse-mode derivative of foo<A>(_:_:)
+sil @$s3src3fooyxx_xts18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlFsACRzAdERzlTJrSSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <τ_0_0.TangentVector, τ_0_0.TangentVector, τ_0_0.TangentVector>)
+
+// reverse-mode derivative of bar(_:_:)
+sil [ossa] @$s3src3baryS2f_SftFTJrSSpSr : $@convention(thin) (Float, Float) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) {
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+// %0                                             // users: %8, %2
+// %1                                             // users: %6, %3
+bb0(%0 : $Float, %1 : $Float):
+  %4 = alloc_stack $Float                         // users: %28, %27, %21
+  %5 = alloc_stack $Float                         // users: %26, %21, %6
+  store %1 to [trivial] %5                        // id: %6
+  %7 = alloc_stack $Float                         // users: %25, %21, %8
+  store %0 to [trivial] %7                        // id: %8
+  // function_ref foo<A>(_:_:)
+  %9 = function_ref @$s3src3fooyxx_xts18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> @out τ_0_0 // user: %10
+  %10 = partial_apply [callee_guaranteed] %9<Float>() : $@convention(thin) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> @out τ_0_0 // user: %15
+  // function_ref forward-mode derivative of foo<A>(_:_:)
+  %11 = function_ref @$s3src3fooyxx_xts18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlFsACRzAdERzlTJfSSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out τ_0_2 for <τ_0_0.TangentVector, τ_0_0.TangentVector, τ_0_0.TangentVector>) // user: %12
+  %12 = partial_apply [callee_guaranteed] %11<Float>() : $@convention(thin) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out τ_0_2 for <τ_0_0.TangentVector, τ_0_0.TangentVector, τ_0_0.TangentVector>) // user: %15
+
+  // function_ref reverse-mode derivative of foo<A>(_:_:)
+  %13 = function_ref @$s3src3fooyxx_xts18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlFsACRzAdERzlTJrSSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <τ_0_0.TangentVector, τ_0_0.TangentVector, τ_0_0.TangentVector>) // user: %14
+  // CHECK: %[[#T0:]] = function_ref @$s3src3fooyxx_xts18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlFsACRzAdERzlTJrSSpSr
+
+  %14 = partial_apply [callee_guaranteed] %13<Float>() : $@convention(thin) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <τ_0_0.TangentVector, τ_0_0.TangentVector, τ_0_0.TangentVector>) // user: %15
+  // CHECK: %[[#T1:]] = partial_apply [callee_guaranteed] %[[#T0]]<Float>()
+  // CHECK: %[[#T2:]] = copy_value %[[#T1]]
+
+  %15 = differentiable_function [parameters 0 1] [results 0] %10 with_derivative {%12, %14} // users: %16, %20
+  // CHECK: %[[#T4:]] = differentiable_function [parameters 0 1] [results 0] %[[#]] with_derivative {%[[#]], %[[#T2]]} // user: %[[#T5:]]
+
+  %16 = begin_borrow %15                          // users: %19, %17
+  %17 = differentiable_function_extract [vjp] %16 // user: %18
+  %18 = copy_value %17                            // users: %22, %21
+  end_borrow %16                                  // id: %19
+
+  destroy_value %15                               // id: %20
+  // CHECK: destroy_value %[[#T4]] // id: %[[#T5]]
+
+  %21 = apply %18(%4, %5, %7) : $@callee_guaranteed (@in_guaranteed Float, @in_guaranteed Float) -> (@out Float, @owned @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)) // user: %24
+  // CHECK: %[[#]] = apply %[[#T0]]<Float>(%[[#]], %[[#]], %[[#]])
+
+  destroy_value %18                               // id: %22
+  // CHECK: destroy_value %[[#T1]]
+
+  // function_ref thunk for @escaping @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)
+  %23 = function_ref @$sS3fIegnrr_S3fIegydd_TR : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)) -> (Float, Float) // user: %24
+  %24 = partial_apply [callee_guaranteed] %23(%21) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)) -> (Float, Float) // user: %30
+  dealloc_stack %7                                // id: %25
+  dealloc_stack %5                                // id: %26
+  %27 = load [trivial] %4                         // user: %31
+  dealloc_stack %4                                // id: %28
+  // function_ref pullback of bar(_:_:)
+  %29 = function_ref @$s3src3baryS2f_SftFTJpSSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> (Float, Float) // user: %30
+  %30 = partial_apply [callee_guaranteed] %29(%24) : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> (Float, Float) // user: %31
+  %31 = tuple (%27, %30)                          // user: %32
+  return %31                                      // id: %32
+} // end sil function '$s3src3baryS2f_SftFTJrSSpSr'
+
+// pullback of bar(_:_:)
+sil @$s3src3baryS2f_SftFTJpSSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> (Float, Float)
+
+// thunk for @escaping @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)
+sil [transparent] [reabstraction_thunk] @$sS3fIegnrr_S3fIegydd_TR : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)) -> (Float, Float) 
+

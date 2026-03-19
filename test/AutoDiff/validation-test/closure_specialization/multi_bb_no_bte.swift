@@ -18,10 +18,10 @@
 //       eliminator is run before. Disabled tests below rely on the second
 //       pass run performing transformation, so they currently fail.
 //       https://github.com/swiftlang/swift/issues/84920
-// TODO: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK1
-// TODO: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK2
 // TODO: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK3
 
+// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK1
+// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK2
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK4
 
 import DifferentiationUnittest
@@ -34,7 +34,7 @@ typealias FloatArrayTan = Array<Float>.TangentVector
 AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test1") {
   // CHECK1-LABEL: {{^}}// reverse-mode derivative of sumFirstThreeConcatenating1 #1 (_:_:)
   // CHECK1-NEXT:  sil private @$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
-  // CHECK1:         %[[#E52:]] = function_ref @$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyg8_GIegno_G10AEIegyo_TRSfSa01_I0AE0K0RzlE0kO0VySf_GIegno_ADSfAIIegno_0f5Sf16_i26E7_vjpAdd3lhs3rhsSf5value_g17_SftSfc8pullbacktg1_y5FZSf_Y6SfcfU_ADSfAIIegno_AJTf1nnccccc_n0fh1_ijkl4E13_v32Subscript5indexx5value_SaA2aBRzlmnO59Vy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5ACSiAkCSiAkCSiTf1nnccc_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
+  // CHECK1:         %[[#E52:]] = function_ref @$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJpSSpSr0138$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaQ7FSf_TG5ACSiAdCSi0f5Sf16_h3E7_M59Add3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_AdCSiAETf1nnccccc_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
   // CHECK1:         %[[#E53:]] = partial_apply [callee_guaranteed] %[[#E52]](%[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]]) : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
   // CHECK1:         %[[#E55:]] = tuple (%[[#]], %[[#E53]])
   // CHECK1:         return %[[#E55]]
@@ -42,7 +42,7 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test1") {
 
   // CHECK1-NONE:  {{^}}// pullback of sumFirstThreeConcatenating1
   // CHECK1:       {{^}}// specialized pullback of sumFirstThreeConcatenating1
-  // CHECK1:       sil private @$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyg8_GIegno_G10AEIegyo_TRSfSa01_I0AE0K0RzlE0kO0VySf_GIegno_ADSfAIIegno_0f5Sf16_i26E7_vjpAdd3lhs3rhsSf5value_g17_SftSfc8pullbacktg1_y5FZSf_Y6SfcfU_ADSfAIIegno_AJTf1nnccccc_n0fh1_ijkl4E13_v32Subscript5indexx5value_SaA2aBRzlmnO59Vy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5ACSiAkCSiAkCSiTf1nnccc_nTf4ngnnnnnn_n : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
+  // CHECK1:       sil private {{.*}}@$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJpSSpSr0138$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaQ7FSf_TG5ACSiAdCSi0f5Sf16_h3E7_M59Add3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_AdCSiAETf1nnccccc_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
   func sumFirstThreeConcatenating1(_ a: [Float], _ b: [Float]) -> Float {
     let c = a + b
     return c[0] + c[1] + c[2]
@@ -62,7 +62,7 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test1") {
 AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test2") {
   // CHECK2-LABEL: {{^}}// reverse-mode derivative of sumFirstThreeConcatenating2 #1 (_:_:)
   // CHECK2-NEXT:  sil private @$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
-  // CHECK2:         %[[#E52:]] = function_ref @$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyg8_GIegno_G10AEIegyo_TRSfSa01_I0AE0K0RzlE0kO0VySf_GIegno_ADSfAIIegno_0f5Sf16_i26E7_vjpAdd3lhs3rhsSf5value_g17_SftSfc8pullbacktg1_y5FZSf_Y6SfcfU_ADSfAIIegno_AJTf1nnccccc_n0fh1_ijkl4E10_v25Appendyyt5value_SaA2aBRzlmno55Vy13TangentVectorQz_GAIzc8pullbacktSayxGz_AKtFZA2IzcfU_G4_Tg5Si0fh1_ijkl4E13_v32Subscript5indexx5value_SaA2aBRzlmnO59Vy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5ACSiAlCSiAlCSiTf1ncccc_n : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
+  // CHECK2:         %[[#E52:]] = function_ref @$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJpSSpSr144$sSa16_DifferentiationAA14DifferentiableRzlE10_vjpAppendyyt5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIzc8pullbacktSayxGz_AKtFZA2IzcfU_Sf_Tg5Si0fg1_hijk4E13_m23Subscript5indexx5value_opqrstuvwx29_GAIc8pullbacktSi_tFAKL_yAjiaQ7FSf_TG5ACSiAeCSi0f5Sf16_h3E7_M59Add3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_AeCSiAFTf1ncccccc_n : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
   // CHECK2:         %[[#E53:]] = partial_apply [callee_guaranteed] %[[#E52]](%[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]]) : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
   // CHECK2:         %[[#E55:]] = tuple (%[[#]], %[[#E53]])
   // CHECK2:         return %[[#E55]]
@@ -70,7 +70,7 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test2") {
 
   // CHECK2-NONE:  {{^}}// pullback of sumFirstThreeConcatenating2
   // CHECK2:       {{^}}// specialized pullback of sumFirstThreeConcatenating2
-  // CHECK2:       sil private @$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyg8_GIegno_G10AEIegyo_TRSfSa01_I0AE0K0RzlE0kO0VySf_GIegno_ADSfAIIegno_0f5Sf16_i26E7_vjpAdd3lhs3rhsSf5value_g17_SftSfc8pullbacktg1_y5FZSf_Y6SfcfU_ADSfAIIegno_AJTf1nnccccc_n0fh1_ijkl4E10_v25Appendyyt5value_SaA2aBRzlmno55Vy13TangentVectorQz_GAIzc8pullbacktSayxGz_AKtFZA2IzcfU_G4_Tg5Si0fh1_ijkl4E13_v32Subscript5indexx5value_SaA2aBRzlmnO59Vy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5ACSiAlCSiAlCSiTf1ncccc_n : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
+  // CHECK2:       sil private {{.*}}@$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJpSSpSr144$sSa16_DifferentiationAA14DifferentiableRzlE10_vjpAppendyyt5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIzc8pullbacktSayxGz_AKtFZA2IzcfU_Sf_Tg5Si0fg1_hijk4E13_m23Subscript5indexx5value_opqrstuvwx29_GAIc8pullbacktSi_tFAKL_yAjiaQ7FSf_TG5ACSiAeCSi0f5Sf16_h3E7_M59Add3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_AeCSiAFTf1ncccccc_n : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
 
   func sumFirstThreeConcatenating2(_ a: [Float], _ b: [Float]) -> Float {
     var c = a
