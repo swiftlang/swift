@@ -198,13 +198,21 @@ extension _AbstractStringStorage {
       }
       
       let otherUTF16Count = _stdlib_binary_CFStringGetLength(other)
-      if shouldEarlyOut(
-        lhsByteCount: count,
-        lhsEncoding: isASCII ? _cocoaASCIIEncoding : _cocoaUTF8Encoding,
-        rhsByteCount: otherUTF16Count &* 2,
-        rhsEncoding: _cocoaUTF16Encoding
-      ) {
-        return 0
+      if isASCII || hasBreadcrumbs  {
+        // UTF16Length is O(1) in these two cases
+        if otherUTF16Count != UTF16Length {
+          return 0
+        }
+      } else {
+        // Otherwise we have to do an imprecise check to avoid transcoding costs
+        if shouldEarlyOut(
+          lhsByteCount: count,
+          lhsEncoding: _cocoaUTF8Encoding,
+          rhsByteCount: otherUTF16Count &* 2,
+          rhsEncoding: _cocoaUTF16Encoding
+        ) {
+          return 0
+        }
       }
       
       return unsafe _NSStringIsEqualToBytes(
