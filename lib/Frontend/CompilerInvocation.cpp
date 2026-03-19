@@ -1955,11 +1955,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (auto A = Args.getLastArg(OPT_objc_call_swift_async_bridging)) {
     using Mode = LangOptions::ObjcToSwiftAsyncBridgingMode;
-    // TODO: validate the logic here
     auto value =
         llvm::StringSwitch<std::optional<Mode>>(A->getValue())
             .Case("task", Mode::Task)
-            .Case("task-immediate", Mode::TaskImmediate)
+            .Case("immediate", Mode::TaskImmediate)
             .Default(std::nullopt);
     if (value) {
       Opts.objcToSwiftAsyncBridgingMode = *value;

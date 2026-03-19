@@ -422,7 +422,7 @@ def checked_async_objc_bridging : Joined<["-"], "checked-async-objc-bridging=">,
 
 def objc_call_swift_async_bridging : Joined<["-"], "objc-call-swift-async-bridging=">,
   HelpText<"Select task creation mode for ObjC-to-Swift async bridging: "
-           "'task' (default), 'task-immediate'">;
+           "'task' (default, use Task.init), 'immediate' (use Task.immediate)">;
 
 def debug_constraints : Flag<["-"], "debug-constraints">,
   HelpText<"Debug the constraint-based type checker">;
