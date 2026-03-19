@@ -3747,8 +3747,9 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
                                                    unsigned NumElts) {
   LLVM_DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts
                           << " at " << *Inst);
-  auto stats = Inst->getFunction()->getASTContext().Stats;
-  if (stats) ++stats->getFrontendCounters().DINumLivenessAtInstQueries;
+  auto Stats = Inst->getFunction()->getASTContext().Stats;
+  if (Stats)
+    ++Stats->getFrontendCounters().DINumLivenessAtInstQueries;
   ++StatsNumLivenessAtInstQueries;
 
   AvailabilitySet Result(TheMemory.getNumElements());
@@ -3765,8 +3766,11 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
   SmallBitVector NeededElements(TheMemory.getNumElements());
   NeededElements.set(FirstElt, FirstElt+NumElts);
 
-  // When `true`, we can skip performing dataflow.
-  bool isResultLocallyDetermined = false;
+  // When true, we can skip performing dataflow. This occurs in the following
+  // cases:
+  //   1. The block contains the memory definition.
+  //   2. A local store to each element precedes the instruction.
+  bool IsResultLocallyDetermined = false;
 
   auto &BBInfo = getBlockInfo(InstBB);
 
@@ -3774,32 +3778,23 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
   // store is before or after the load.  If it is before, it may produce some of
   // the elements we are looking for.
   if (BBInfo.HasNonLoadUse) {
-    // First, check our cache to see if we've already computed local liveness
-    // info for this instruction.
+    // First, check our cache to see if we've already computed which elements
+    // are store to before this instruction.
     if (auto StoresBeforeInst = BBInfo.getStoredEltsBeforeInst(Inst)) {
       ++StatsNumLivenessCacheHits;
-
       LLVM_DEBUG({
         llvm::dbgs() << "  cache hit; stored elts before inst: ";
-        llvm::dbgs() << "0b";
-        for (int i = StoresBeforeInst->size() - 1; i >= 0; --i)
-          llvm::dbgs() << ((*StoresBeforeInst)[i] ? "1" : "0");
-        llvm::dbgs() << "\n";
+        swift::dumpBits(*StoresBeforeInst);
       });
 
       // Unset the elements that were locally written to before this inst.
       NeededElements.reset(*StoresBeforeInst);
 
-      // Now we check if either:
       //
-      //   1. The block contains the memory definition.
-      //   2. The cached info covered all requested elements.
-      //
-      // In each case, dataflow is not needed to determine the result.
       if (InstBB == TheMemory.getUninitializedValue()->getParent() ||
           NeededElements.none()) {
         ++StatsNumLivenessCacheHitSkipDataflow;
-        isResultLocallyDetermined = true;
+        IsResultLocallyDetermined = true;
       }
     } else {
       ++StatsNumLivenessCacheMisses;
@@ -3807,27 +3802,23 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
 
       // Otherwise, fall back to a local scan within the block.
       for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
-        if (stats)
-          ++stats->getFrontendCounters().DINumLivenessAtInstScans;
+        if (Stats)
+          ++Stats->getFrontendCounters().DINumLivenessAtInstScans;
         ++StatsNumLivenessAtInstScans;
 
         --BBI;
         SILInstruction *TheInst = &*BBI;
 
-        // TODO: add an assert that we don't hit an inst with cached liveness
+        // TODO: remove this
         // just to see if there are patterns in the test suite etc. that do.
-        if (BBInfo.getStoredEltsBeforeInst(TheInst)) {
-          TheInst->dump();
-          TheInst->getParent()->dump();
-          ASSERT(!BBInfo.getStoredEltsBeforeInst(TheInst) &&
-                 "unexpected cache hit");
-        }
+        ASSERT(!BBInfo.getStoredEltsBeforeInst(TheInst) &&
+               "unexpected cache hit");
 
         // If we found the allocation itself, then we are loading something that
         // is not defined at all yet.  Scan no further.
         if (TheInst == TheMemory.getUninitializedValue()) {
           // The result is perfectly decided locally.
-          isResultLocallyDetermined = true;
+          IsResultLocallyDetermined = true;
           break;
         }
 
@@ -3848,14 +3839,14 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
         // If that satisfied all of the elements we're looking for, then we're
         // done.  Otherwise, keep going.
         if (NeededElements.none()) {
-          isResultLocallyDetermined = true;
+          IsResultLocallyDetermined = true;
           break;
         }
       }
     }
   }
 
-  if (isResultLocallyDetermined) {
+  if (IsResultLocallyDetermined) {
     for (unsigned i = FirstElt, e = i + NumElts; i != e; ++i)
       Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
     return Result;
