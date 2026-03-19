@@ -325,9 +325,7 @@ bool PotentialBinding::isViableForJoin() const {
          !BindingType->hasLValueType() &&
          !BindingType->hasTypeVariable() &&
          !BindingType->hasPlaceholder() &&
-         !BindingType->hasUnboundGenericType() &&
-         !hasDefaultedLiteralProtocol() &&
-         !isDefaultableBinding();
+         !BindingType->hasUnboundGenericType();
 }
 
 namespace {
