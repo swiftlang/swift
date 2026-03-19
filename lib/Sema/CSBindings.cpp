@@ -1537,6 +1537,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
     if (!conforms) {
       // Our partial solution so far is contradictory. Promote this
       // binding to attempt immediately.
+      LLVM_DEBUG(llvm::dbgs() << "Exact binding doesn't conform: "
+                              << type.getString() << "\n");
       markConflicting();
 
       // Preserve the binding kind, which is Exact.
@@ -1554,6 +1556,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
       if (!isPossibleSupertypeOfFunctionType(binding.BindingType)) {
         // Our partial solution so far is contradictory. Promote this
         // binding to attempt immediately.
+        LLVM_DEBUG(llvm::dbgs() << "Conflict from bad closure subtype: "
+                                << binding.BindingType.getString() << "\n");
         markConflicting();
         binding.Kind = AllowedBindingKind::Exact;
         break;
@@ -1595,6 +1599,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
         LLVM_FALLTHROUGH;
 
       case KnownLValueKind::RValue:
+        LLVM_DEBUG(llvm::dbgs() << "Reduce subtype to exact: "
+                                << binding.BindingType.getString() << "\n");
         binding.Kind = AllowedBindingKind::Exact;
         break;
       }
@@ -1615,6 +1621,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
       if (!conforms) {
         // Our partial solution so far is contradictory. Promote this
         // binding to attempt immediately.
+        LLVM_DEBUG(llvm::dbgs() << "Subtype binding doesn't conform: "
+                                << binding.BindingType.getString() << "\n");
         markConflicting();
         binding.Kind = AllowedBindingKind::Exact;
         break;
@@ -1643,6 +1651,9 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
             for (unsigned i = 0; i < optionals.size(); ++i)
               superclassTy = OptionalType::get(superclassTy);
             binding.BindingType = superclassTy;
+
+            LLVM_DEBUG(llvm::dbgs() << "Reduce supertype of existential to superclass: "
+                                    << binding.BindingType.getString() << "\n");
           }
         }
       }
@@ -1663,6 +1674,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
       if (!conforms) {
         // Our partial solution so far is contradictory. Promote this
         // binding to attempt immediately.
+        LLVM_DEBUG(llvm::dbgs() << "Supertype doesn't conform: "
+                                << binding.BindingType.getString() << "\n");
         markConflicting();
         binding.Kind = AllowedBindingKind::Exact;
         break;
@@ -1681,6 +1694,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
       });
 
       if (condition) {
+        LLVM_DEBUG(llvm::dbgs() << "Reduce superclass to exact: "
+                                << binding.BindingType.getString() << "\n");
         binding.Kind = AllowedBindingKind::Exact;
         break;
       }
