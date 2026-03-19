@@ -516,3 +516,12 @@ bb0(%0 : @inferredImmutable @guaranteed $Klass):
   %9999 = tuple ()
   return %9999 : $()
 }
+
+// Make sure that we roundtrip if the isolation is specified in SIL.
+//
+// CHECK-LABEL: sil [isolation "nonisolated"] @isolation_test : $@convention(thin) () -> () {
+sil [isolation "nonisolated"] @isolation_test : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple ()
+  return %9999 : $()
+}

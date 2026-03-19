@@ -3794,9 +3794,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[available " << availability.getVersionString() << "] ";
   }
 
-  // This is here only for testing purposes.
-  if (SILPrintFunctionIsolationInfo) {
-    if (auto isolation = getActorIsolation()) {
+  if (auto isolation = getActorIsolation()) {
+    if (isolation->isSILParsed() || SILPrintFunctionIsolationInfo) {
       OS << "[isolation \"";
       isolation->printForSIL(OS);
       OS << "\"] ";
