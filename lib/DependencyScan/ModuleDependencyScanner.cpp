@@ -664,6 +664,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
 
   auto mainDependencies =
       ModuleDependencyInfo::forSwiftSourceModule({}, buildCommands, {}, {}, {});
+  mainDependencies.setLibraryLevel(ScanASTContext.LangOpts.LibraryLevel);
 
   llvm::StringSet<> alreadyAddedModules;
   // Compute Implicit dependencies of the main module
@@ -2101,6 +2102,33 @@ std::string ModuleDependencyScanner::remapPath(StringRef Path) const {
   return PrefixMapper->mapToString(Path);
 }
 
+LibraryLevel swift::libraryLevelFromPath(StringRef modulePath,
+                                         StringRef sdkPath,
+                                         const llvm::Triple &target) {
+  if (!target.isOSDarwin())
+    return LibraryLevel::API;
+
+  namespace path = llvm::sys::path;
+
+  auto hasSDKPrefix = [&](const Twine &a, const Twine &b = "",
+                          const Twine &c = "", const Twine &d = "",
+                          const Twine &e = "") -> bool {
+    SmallString<128> prefix(sdkPath);
+    path::append(prefix, a, b, c, d);
+    path::append(prefix, e);
+    return modulePath.starts_with(prefix);
+  };
+
+  if (hasSDKPrefix("AppleInternal", "Library", "Frameworks") ||
+      hasSDKPrefix("System", "Library", "PrivateFrameworks") ||
+      hasSDKPrefix("System", "iOSSupport", "System", "Library",
+                   "PrivateFrameworks") ||
+      hasSDKPrefix("usr", "local", "include"))
+    return LibraryLevel::SPI;
+
+  return LibraryLevel::API;
+}
+
 ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
     const clang::tooling::dependencies::ModuleDeps &clangModuleDep) {
   // File dependencies for this module.
@@ -2198,6 +2226,12 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
       pcmPath, mappedPCMPath, clangModuleDep.ClangModuleMapFile,
       clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, LinkLibraries,
       IncludeTree, /*module-cache-key*/ "", clangModuleDep.IsSystem);
+  bridgedDependencyInfo.setLibraryLevel(
+      clangModuleDep.ModuleMapIsPrivate
+          ? LibraryLevel::SPI
+          : libraryLevelFromPath(clangModuleDep.ClangModuleMapFile,
+                                 ScanASTContext.SearchPathOpts.getSDKPath(),
+                                 ScanASTContext.LangOpts.Target));
 
   std::vector<ModuleDependencyID> directDependencyIDs;
   for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {

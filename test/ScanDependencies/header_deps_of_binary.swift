@@ -31,6 +31,7 @@
 // CHECK: "swiftPrebuiltExternal": "Foo"
 // CHECK: "swiftPrebuiltExternal": "Foo"
 // CHECK: "modulePath": "{{.*}}Foo.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: "directDependencies": [
 // CHECK-DAG:    "swift": "Swift"
 // CHECK-DAG:    "swift": "SwiftOnoneSupport"

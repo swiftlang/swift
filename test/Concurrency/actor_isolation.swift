@@ -1527,7 +1527,8 @@ actor DeinitMutatingAsync {
 
   deinit {
     s.doWork() // expected-error {{cannot call mutating async function 'doWork()' on actor-isolated property 's'}}
-    // expected-error@-1 {{'async' call in a function that does not support concurrency}}
+    // expected-note@-1 {{'s' can be concurrently accessed during mutation, risking data races}}
+    // expected-error@-2 {{'async' call in a function that does not support concurrency}}
   }
 }
 

@@ -230,10 +230,11 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
 
   std::vector<ScannerImportStatementInfo> importStatements;
   std::vector<ScannerImportStatementInfo> optionalImportStatements;
+  LibraryLevel currentLibraryLevel = LibraryLevel::Other;
 
   auto addCommonDependencyInfo =
-      [&importedClangDependenciesIDs, &macroDependencies]
-      (ModuleDependencyInfo &moduleDep) {
+      [&importedClangDependenciesIDs, &macroDependencies,
+       &currentLibraryLevel](ModuleDependencyInfo &moduleDep) {
         // Add qualified dependencies of this module
         moduleDep.setImportedClangDependencies(importedClangDependenciesIDs);
 
@@ -242,6 +243,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
           moduleDep.addMacroDependency(md.first, md.second.LibraryPath,
                                        md.second.ExecutablePath);
 
+        moduleDep.setLibraryLevel(currentLibraryLevel);
         moduleDep.setIsFinalized(true);
       };
 
@@ -475,7 +477,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
           importedSwiftDependenciesIDsArrayID,
           importedClangDependenciesIDsArrayID,
           crossImportOverlayDependenciesIDsArrayID,
-          swiftOverlayDependenciesIDsArrayID, moduleCacheKeyID;
+          swiftOverlayDependenciesIDsArrayID, moduleCacheKeyID,
+          libraryLevelValue;
 
       ModuleInfoLayout::readRecord(Scratch, moduleNameID, moduleImportsArrayID,
                                    optionalImportsArrayID, linkLibraryArrayID,
@@ -484,7 +487,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
                                    importedClangDependenciesIDsArrayID,
                                    crossImportOverlayDependenciesIDsArrayID,
                                    swiftOverlayDependenciesIDsArrayID,
-                                   moduleCacheKeyID);
+                                   moduleCacheKeyID, libraryLevelValue);
       auto moduleName = getIdentifier(moduleNameID);
       if (!moduleName)
         llvm::report_fatal_error("Bad module name");
@@ -542,6 +545,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       if (!optionalMacroDependencies)
         llvm::report_fatal_error("Bad Macro Dependencies info");
       macroDependencies = *optionalMacroDependencies;
+      currentLibraryLevel = static_cast<LibraryLevel>(libraryLevelValue);
       break;
     }
 
@@ -1596,7 +1600,8 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
           ModuleIdentifierArrayKind::CrossImportOverlayDependenciesIDs),
       getIdentifierArrayID(
           moduleID, ModuleIdentifierArrayKind::SwiftOverlayDependenciesIDs),
-      getIdentifier(dependencyInfo.getModuleCacheKey()));
+      getIdentifier(dependencyInfo.getModuleCacheKey()),
+      static_cast<unsigned>(dependencyInfo.getLibraryLevel()));
 
   switch (dependencyInfo.getKind()) {
   case swift::ModuleDependencyKind::SwiftInterface: {

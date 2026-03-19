@@ -430,6 +430,27 @@ void writeJSON(llvm::raw_ostream &out,
     writeJSONSingleField(out, "modulePath", modulePath, /*indentLevel=*/3,
                          /*trailingComma=*/true);
 
+    // Library level.
+    {
+      StringRef levelStr;
+      switch (moduleInfo.library_level) {
+      case SWIFTSCAN_LIBRARY_LEVEL_OTHER:
+        levelStr = "other";
+        break;
+      case SWIFTSCAN_LIBRARY_LEVEL_IPI:
+        levelStr = "ipi";
+        break;
+      case SWIFTSCAN_LIBRARY_LEVEL_SPI:
+        levelStr = "spi";
+        break;
+      case SWIFTSCAN_LIBRARY_LEVEL_API:
+        levelStr = "api";
+        break;
+      }
+      writeJSONSingleField(out, "libraryLevel", levelStr, /*indentLevel=*/3,
+                           /*trailingComma=*/true);
+    }
+
     // Source files.
     if (swiftTextualDeps || clangDeps) {
       writeJSONSingleField(out, "sourceFiles", moduleInfo.source_files, 3,

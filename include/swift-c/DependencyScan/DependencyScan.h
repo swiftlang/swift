@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 2
-#define SWIFTSCAN_VERSION_MINOR 2
+#define SWIFTSCAN_VERSION_MINOR 3
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -112,6 +112,14 @@ typedef enum {
   SWIFTSCAN_ACCESS_LEVEL_PUBLIC = 4
 } swiftscan_access_level_t;
 
+// Must maintain consistency with swift::LibraryLevel
+typedef enum {
+  SWIFTSCAN_LIBRARY_LEVEL_OTHER = 0,
+  SWIFTSCAN_LIBRARY_LEVEL_IPI = 1,
+  SWIFTSCAN_LIBRARY_LEVEL_SPI = 2,
+  SWIFTSCAN_LIBRARY_LEVEL_API = 3
+} swiftscan_library_level_t;
+
 typedef struct {
   swiftscan_diagnostic_info_t *diagnostics;
   size_t count;
@@ -176,6 +184,9 @@ swiftscan_module_info_get_imports(swiftscan_dependency_info_t info);
 
 SWIFTSCAN_PUBLIC swiftscan_module_details_t
 swiftscan_module_info_get_details(swiftscan_dependency_info_t info);
+
+SWIFTSCAN_PUBLIC swiftscan_library_level_t
+swiftscan_module_info_get_library_level(swiftscan_dependency_info_t info);
 
 //=== Import Details Functions -------------------------------------------===//
 SWIFTSCAN_PUBLIC swiftscan_source_location_set_t *

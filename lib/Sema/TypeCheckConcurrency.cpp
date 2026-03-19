@@ -3749,11 +3749,13 @@ namespace {
           if (auto partialApply = dyn_cast<ApplyExpr>(apply->getFn())) {
             if (auto declRef = dyn_cast<DeclRefExpr>(partialApply->getFn())) {
               ValueDecl *fnDecl = declRef->getDecl();
-              ctx.Diags.diagnose(apply->getLoc(),
-                                 diag::actor_isolated_mutating_func,
-                                 fnDecl->getName(), decl)
+              ctx.Diags
+                  .diagnose(apply->getLoc(), diag::actor_isolated_mutating_func,
+                            fnDecl->getName(), decl)
                   .warnUntilLanguageModeIf(downgradeToWarning,
                                            LanguageMode::v6);
+              ctx.Diags.diagnose(partialApply->getArgs()->get(0).getStartLoc(),
+                                 diag::actor_isolated_mutating_func_note, decl);
               result = true;
               return;
             }

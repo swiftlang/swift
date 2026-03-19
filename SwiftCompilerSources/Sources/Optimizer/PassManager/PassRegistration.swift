@@ -154,6 +154,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(CheckedCastBranchInst.self, { run(CheckedCastBranchInst.self, $0) })
   registerForSILCombine(DereferenceBorrowInst.self, { run(DereferenceBorrowInst.self, $0) })
   registerForSILCombine(DereferenceAddrBorrowInst.self, { run(DereferenceAddrBorrowInst.self, $0) })
+  registerForSILCombine(DifferentiableFunctionInst.self, { run(DifferentiableFunctionInst.self, $0) })
 }
 
 private func registerSwiftAnalyses() {

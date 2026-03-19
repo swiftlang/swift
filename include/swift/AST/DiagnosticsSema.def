@@ -5864,9 +5864,12 @@ ERROR(actor_isolated_inout_state,none,
       "actor-isolated %kind0 cannot be passed 'inout' to"
       "%select{| implicitly}1 'async' function call",
       (const ValueDecl *, bool))
-ERROR(actor_isolated_mutating_func,none,
+GROUPED_ERROR(actor_isolated_mutating_func,ActorIsolatedMutatingAsync,none,
       "cannot call mutating async function %0 on actor-isolated %kind1",
       (DeclName, const ValueDecl *))
+NOTE(actor_isolated_mutating_func_note,none,
+      "%0 can be concurrently accessed during mutation, risking data races",
+      (const ValueDecl *))
 GROUPED_ERROR(actor_isolated_call,ActorIsolatedCall,none,
       "call to %0 function in a synchronous %1 context",
       (ActorIsolation, ActorIsolation))
