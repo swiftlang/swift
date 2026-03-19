@@ -251,7 +251,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       workerCompilerInvocation->getFrontendOptions()
           .SerializeModuleInterfaceDependencyHashes,
       workerCompilerInvocation->getFrontendOptions()
-          .shouldTrackSystemDependencies()
+          .shouldTrackSystemDependencies(),
+      CAS, ActionCache
       );
 
   auto loader = std::make_unique<PluginLoader>(

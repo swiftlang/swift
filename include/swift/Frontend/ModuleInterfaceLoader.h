@@ -661,6 +661,8 @@ private:
   llvm::StringSaver ArgSaver;
   std::vector<StringRef> GenericArgs;
   CompilerInvocation genericSubInvocation;
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(StringRef interfacePath,
@@ -693,7 +695,9 @@ public:
       StringRef backupModuleInterfaceDir,
       ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
       bool serializeDependencyHashes,
-      bool trackSystemDependencies);
+      bool trackSystemDependencies,
+      std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr,
+      std::shared_ptr<llvm::cas::ActionCache> ActionCache = nullptr);
 
   template<typename ...ArgTypes>
   static InFlightDiagnostic diagnose(StringRef interfacePath,

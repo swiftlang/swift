@@ -24,13 +24,13 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Serialization/Validation.h"
-#include "clang/CAS/CASOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/CAS/CASConfiguration.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/StringSaver.h"
 #include <optional>
@@ -1069,8 +1069,8 @@ class SwiftDependencyScanningService {
   /// StringSaver for data matching the life-time of ScanningService.
   llvm::StringSaver Saver;
 
-  /// The CASOption created the Scanning Service if used.
-  std::optional<clang::CASOptions> CASOpts;
+  /// The CAS configuration created the Scanning Service if used.
+  std::optional<llvm::cas::CASConfiguration> CASConfig;
 
   /// The persistent Clang dependency scanner service
   std::optional<clang::tooling::dependencies::DependencyScanningService>
