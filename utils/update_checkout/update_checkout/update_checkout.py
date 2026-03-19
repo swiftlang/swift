@@ -157,6 +157,12 @@ def update_single_repository(pool_args: UpdateArguments):
         if verbose:
             print(prefix + "Updating '" + repo_path + "'")
 
+        fetch_extra_args = []
+        if pool_args.skip_history:
+            fetch_extra_args.extend(["--depth", "1"])
+        if pool_args.partial_clone:
+            fetch_extra_args.extend(["--filter", "blob:none"])
+
         cross_repo = False
         checkout_target = None
         if pool_args.tag:
@@ -222,7 +228,7 @@ def update_single_repository(pool_args: UpdateArguments):
             except Exception:
                 Git.run(
                     repo_path,
-                    ["fetch", "--recurse-submodules=yes", "--tags"],
+                    ["fetch", "--recurse-submodules=yes", "--tags"] + fetch_extra_args,
                     echo=verbose,
                     prefix=prefix,
                 )
@@ -248,7 +254,7 @@ def update_single_repository(pool_args: UpdateArguments):
         # which branch was checked out during the fetch.
         Git.run(
             repo_path,
-            ["fetch", "--recurse-submodules=yes", "--tags"],
+            ["fetch", "--recurse-submodules=yes", "--tags"] + fetch_extra_args,
             echo=verbose,
             prefix=prefix,
         )
@@ -432,6 +438,8 @@ def update_all_repositories(
             clean=args.clean,
             stash=args.stash,
             cross_repos_pr=cross_repos_pr,
+            skip_history=args.skip_history,
+            partial_clone=args.partial_clone,
             output_prefix="Updating",
             verbose=args.verbose,
         )
@@ -465,6 +473,7 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
         print("Cloning '" + pool_args.repo_name + "'")
 
     if args.skip_history:
+        filter_args = ["--filter", "blob:none"] if args.partial_clone else []
         Git.run(
             args.source_root,
             [
@@ -477,7 +486,7 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
                 remote,
                 repo_name,
             ]
-            + (["--no-tags"] if skip_tags else []),
+            + (["--no-tags"] if skip_tags else []) + filter_args,
             env=env,
             echo=verbose,
         )
@@ -490,10 +499,11 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
             echo=verbose,
         )
     else:
+        filter_args = ["--filter", "blob:none"] if args.partial_clone else []
         Git.run(
             args.source_root,
             ["clone", "--recursive", remote, repo_name]
-            + (["--no-tags"] if skip_tags else []),
+            + (["--no-tags"] if skip_tags else []) + filter_args,
             env=env,
             echo=verbose,
         )

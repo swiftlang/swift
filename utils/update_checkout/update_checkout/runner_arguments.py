@@ -23,6 +23,8 @@ class UpdateArguments(RunnerArguments):
     clean: bool
     stash: bool
     cross_repos_pr: Dict[str, str]
+    skip_history: bool
+    partial_clone: bool
 
 
 @dataclass
