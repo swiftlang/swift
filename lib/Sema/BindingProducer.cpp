@@ -23,9 +23,7 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
-// Given a possibly-Optional type, return the direct superclass of the
-// (underlying) type wrapped in the same number of optional levels as
-// type.
+/// FIXME: Remove this.
 static Type getOptionalSuperclass(Type type) {
   int optionalLevels = 0;
   while (auto underlying = type->getOptionalObjectType()) {
@@ -80,10 +78,7 @@ static Type getOptionalSuperclass(Type type) {
   return superclass;
 }
 
-/// Enumerates all of the 'direct' supertypes of the given type.
-///
-/// The direct supertype S of a type T is a supertype of T (e.g., T < S)
-/// such that there is no type U where T < U and U < S.
+/// FIXME: Remove this.
 static SmallVector<Type, 4> enumerateDirectSupertypes(Type type) {
   SmallVector<Type, 4> result;
 
@@ -390,15 +385,17 @@ bool TypeVarBindingProducer::computeNext() {
         addNewBinding(binding.withSameSource(voidType, BindingKind::Exact));
       }
 
-      for (auto supertype : enumerateDirectSupertypes(type)) {
-        // If we're not allowed to try this binding, skip it.
-        if (checkTypeOfBinding(TypeVar, supertype)) {
-          // A key path type cannot be bound to type-erased key path variants.
-          if (TypeVar->getImpl().isKeyPathType() &&
-              isTypeErasedKeyPathType(supertype))
-            continue;
+      if (CS.getASTContext().TypeCheckerOpts.SolverEnableEnumerateSupertypes) {
+        for (auto supertype : enumerateDirectSupertypes(type)) {
+          // If we're not allowed to try this binding, skip it.
+          if (checkTypeOfBinding(TypeVar, supertype)) {
+            // A key path type cannot be bound to type-erased key path variants.
+            if (TypeVar->getImpl().isKeyPathType() &&
+                isTypeErasedKeyPathType(supertype))
+              continue;
 
-          addNewBinding(binding.withType(supertype));
+            addNewBinding(binding.withType(supertype));
+          }
         }
       }
     }

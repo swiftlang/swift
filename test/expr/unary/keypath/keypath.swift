@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -parse-as-library %s -verify
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -parse-as-library %s -verify -solver-disable-enumerate-supertypes
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 struct Sub: Hashable {
@@ -305,6 +305,7 @@ func tupleGeneric<T, U>(_ v: (T, U)) {
   // expected-note@-12 {{}}
   // expected-error@-2 {{generic parameter 'T' could not be inferred}}
   // expected-error@-3 {{generic parameter 'U' could not be inferred}}
+  // expected-error@-4 {{key path with root type '(T, U)' cannot be applied to a base of type '(String, String, String)'}}
 }
 
 struct Z { }

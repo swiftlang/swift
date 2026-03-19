@@ -996,8 +996,14 @@ def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-h
            "subsumed by subsequent improvements">;
 
 def solver_enable_performance_hacks : Flag<["-"], "solver-enable-performance-hacks">,
-  HelpText<"Enble various constraint solver performance optimizations that have been "
+  HelpText<"Enable various constraint solver performance optimizations that have been "
            "subsumed by subsequent improvements">;
+
+def solver_disable_enumerate_supertypes : Flag<["-"], "solver-disable-enumerate-supertypes">,
+  HelpText<"Disable an inefficient form of inference in the solver, which allows certain optimizations">;
+
+def solver_enable_enumerate_supertypes : Flag<["-"], "solver-enable-enumerate-supertypes">,
+  HelpText<"Enable an inefficient form of inference in the solver, which prevents certain optimizations">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;

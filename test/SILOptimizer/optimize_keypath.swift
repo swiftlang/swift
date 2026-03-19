@@ -1,24 +1,24 @@
 // RUN: %empty-directory(%t) 
-// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-print-types -emit-sil >%t/output.sil
+// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-print-types -emit-sil -solver-disable-enumerate-supertypes >%t/output.sil
 // RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK1 %s < %t/output.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output.sil
 
 // RUN: %empty-directory(%t) 
-// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-print-types -emit-sil -enable-sil-opaque-values >%t/output.sil
+// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-print-types -emit-sil -solver-disable-enumerate-supertypes -enable-sil-opaque-values >%t/output.sil
 // RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK1 %s < %t/output.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output.sil
 
-// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -swift-version 6 -Xllvm -sil-print-types -emit-sil >%t/output6.sil
+// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -swift-version 6 -Xllvm -sil-print-types -emit-sil -solver-disable-enumerate-supertypes >%t/output6.sil
 // RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK2 %s < %t/output6.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output6.sil
 
-// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -swift-version 6 -Xllvm -sil-print-types -emit-sil -enable-sil-opaque-values >%t/output6.sil
+// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -swift-version 6 -Xllvm -sil-print-types -emit-sil -enable-sil-opaque-values -solver-disable-enumerate-supertypes >%t/output6.sil
 // RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK2 %s < %t/output6.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output6.sil
 
 // Turning on force verification of analyses is exposing:
 // rdar://175520775 (RegionAnalysis crashes saying it cannot handle `assign` instruction)
-// TODO: %target-swift-frontend -primary-file %s -O -Xllvm -sil-verify-force-analysis=true -swift-version 6 -Xllvm -sil-print-types -emit-sil >%t/output2.sil
+// TODO: %target-swift-frontend -primary-file %s -O -Xllvm -sil-verify-force-analysis=true -swift-version 6 -Xllvm -sil-print-types -emit-sil -solver-disable-enumerate-supertypes >%t/output2.sil
 // TODO: %FileCheck --check-prefix=CHECK --check-prefix=CHECK2 %s < %t/output2.sil
 // TODO: %FileCheck -check-prefix=CHECK-ALL %s < %t/output2.sil
 
