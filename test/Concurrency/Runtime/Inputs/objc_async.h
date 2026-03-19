@@ -1,17 +1,17 @@
 #include <Foundation/Foundation.h>
 
-@interface Butt: NSObject
+@interface MyNSInterfaceWithCallbackFunc: NSObject
 
 - (instancetype _Nonnull)init;
 
-- (void)butt:(NSInteger)x completionHandler:(void (^ _Nonnull)(NSInteger))handler;
+- (void)compute:(NSInteger)x completionHandler:(void (^ _Nonnull)(NSInteger))handler;
 
 @end
 
-@interface MutableButt: Butt
+@interface MutableMyNSInterfaceWithCallbackFunc: MyNSInterfaceWithCallbackFunc
 @end
 
-@interface MutableButt_2Fast2Furious: MutableButt
+@interface MutableMyNSInterfaceWithCallbackFunc_v2: MutableMyNSInterfaceWithCallbackFunc
 @end
 
 @interface Farm: NSObject
@@ -24,4 +24,8 @@ __attribute__((swift_async_name("getter:catto()")));
 
 @end
 
-void scheduleButt(Butt *b, NSString *s);
+void scheduleCallback(MyNSInterfaceWithCallbackFunc * _Nonnull b, NSString * _Nonnull s);
+
+/// Call [b compute:x completionHandler:] and block until the handler fires.
+/// Returns the result delivered to the handler.
+NSInteger callComputeAndWaitSemaphore(MyNSInterfaceWithCallbackFunc * _Nonnull b, NSInteger x);
