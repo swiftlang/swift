@@ -28,6 +28,12 @@ struct GenError<T>: Error {
   var x: Int
 }
 
+protocol CP : AnyObject {
+}
+
+final class C : CP {
+}
+
 // CHECK-LABEL: sil @devirt_class_method :
 // CHECK:         [[F:%.*]] = function_ref @bar_foo
 // CHECK:         try_apply [[F]]
@@ -117,3 +123,39 @@ bb2(%10 : $GenError<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>
   unreachable
 }
 
+sil @callee_guaranteed : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> (Int, @error any Error)
+
+// CHECK-LABEL: sil [ossa] @propagate_class_existential :
+// CHECKO:         [[E:%.*]] = end_init_let_ref
+// CHECKO:         [[C:%.*]] = unchecked_ref_cast [[E]] to $@opened
+// CHECKO:         [[B:%.*]] = begin_borrow [[C]]
+// CHECKO:         [[C2:%.*]] = unchecked_ref_cast [[B]] to $C
+// CHECKO:         try_apply {{%[0-9]+}}<C>([[C2]])
+// CHECKO:       bb1({{.*}}):
+// CHECKO-NEXT:    end_borrow [[B]]
+// CHECKO:       bb2({{.*}}):
+// CHECKO-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'propagate_class_existential'
+sil [ossa] @propagate_class_existential : $@convention(thin) () -> () {
+bb0:
+  %0 = metatype $@thick C.Type
+  %1 = init_existential_metatype %0, $@thick any CP.Type
+  %2 = open_existential_metatype %1 to $@thick (@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self).Type
+  %3 = alloc_ref $C
+  %4 = end_init_let_ref %3
+  %5 = unchecked_ref_cast %4 to $@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self
+  %6 = function_ref @callee_guaranteed : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> (Int, @error any Error)
+  try_apply %6<@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%8: $Int):
+  br bb3
+
+bb2(%10 : $Error):
+  destroy_value %10
+  br bb3
+
+bb3:
+  destroy_value %5
+  %9 = tuple ()
+  return %9
+}

@@ -74,9 +74,9 @@ TEST_F(AvailabilityContextTest, UnavailableDomains) {
 
   auto macOS10_9 = AvailabilityContext::forDeploymentTarget(ctx);
   EXPECT_FALSE(macOS10_9.isUnavailable());
-  EXPECT_FALSE(macOS10_9.containsUnavailableDomain(domains.macOS));
-  EXPECT_FALSE(macOS10_9.containsUnavailableDomain(domains.macOSAppExt));
-  EXPECT_FALSE(macOS10_9.containsUnavailableDomain(domains.universal));
+  EXPECT_FALSE(macOS10_9.isUnavailableForDomain(domains.macOS));
+  EXPECT_FALSE(macOS10_9.isUnavailableForDomain(domains.macOSAppExt));
+  EXPECT_FALSE(macOS10_9.isUnavailableForDomain(domains.universal));
 
   // Constrain the deployment target context by adding unavailability on macOS.
   // The resulting context should be a new context that is less available than
@@ -84,10 +84,9 @@ TEST_F(AvailabilityContextTest, UnavailableDomains) {
   auto unavailableOnMacOS = macOS10_9;
   unavailableOnMacOS.constrainWithUnavailableDomain(domains.macOS, ctx);
   EXPECT_TRUE(unavailableOnMacOS.isUnavailable());
-  EXPECT_TRUE(unavailableOnMacOS.containsUnavailableDomain(domains.macOS));
-  EXPECT_TRUE(
-      unavailableOnMacOS.containsUnavailableDomain(domains.macOSAppExt));
-  EXPECT_FALSE(unavailableOnMacOS.containsUnavailableDomain(domains.universal));
+  EXPECT_TRUE(unavailableOnMacOS.isUnavailableForDomain(domains.macOS));
+  EXPECT_TRUE(unavailableOnMacOS.isUnavailableForDomain(domains.macOSAppExt));
+  EXPECT_FALSE(unavailableOnMacOS.isUnavailableForDomain(domains.universal));
   EXPECT_NE(unavailableOnMacOS, macOS10_9);
   EXPECT_TRUE(unavailableOnMacOS.isContainedIn(macOS10_9));
   EXPECT_FALSE(macOS10_9.isContainedIn(unavailableOnMacOS));
@@ -111,11 +110,10 @@ TEST_F(AvailabilityContextTest, UnavailableDomains) {
   auto unavailableUniversally = unavailableOnMacOS;
   unavailableUniversally.constrainWithUnavailableDomain(domains.universal, ctx);
   EXPECT_TRUE(unavailableUniversally.isUnavailable());
-  EXPECT_TRUE(unavailableUniversally.containsUnavailableDomain(domains.macOS));
+  EXPECT_TRUE(unavailableUniversally.isUnavailableForDomain(domains.macOS));
   EXPECT_TRUE(
-      unavailableUniversally.containsUnavailableDomain(domains.macOSAppExt));
-  EXPECT_TRUE(
-      unavailableUniversally.containsUnavailableDomain(domains.universal));
+      unavailableUniversally.isUnavailableForDomain(domains.macOSAppExt));
+  EXPECT_TRUE(unavailableUniversally.isUnavailableForDomain(domains.universal));
   EXPECT_NE(unavailableUniversally, unavailableOnMacOS);
   EXPECT_TRUE(unavailableUniversally.isContainedIn(unavailableOnMacOS));
   EXPECT_TRUE(unavailableUniversally.isContainedIn(macOS10_9));

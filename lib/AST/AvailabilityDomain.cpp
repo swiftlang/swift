@@ -358,22 +358,43 @@ ModuleDecl *AvailabilityDomain::getModule() const {
   return nullptr;
 }
 
-bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
-  switch (getKind()) {
-  case Kind::Universal:
-    return true;
-  case Kind::SwiftLanguageMode:
-  case Kind::StandaloneSwiftRuntime:
-  case Kind::PackageDescription:
-  case Kind::Embedded:
-  case Kind::Custom:
-    return other == *this;
-  case Kind::Platform:
-    if (getPlatformKind() == other.getPlatformKind())
-      return true;
-    return inheritsAvailabilityFromPlatform(other.getPlatformKind(),
-                                            getPlatformKind());
+/// Returns true if `child` is a strict subset of `parent`.
+static bool domainIsStrictSubsetOf(const AvailabilityDomain &child,
+                                   const AvailabilityDomain &parent) {
+  switch (parent.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::PackageDescription:
+  case AvailabilityDomain::Kind::Embedded:
+    // These domains do not have any children in the lattice.
+    return false;
+  case AvailabilityDomain::Kind::Platform:
+    return inheritsAvailabilityFromPlatform(child.getPlatformKind(),
+                                            parent.getPlatformKind());
+  case AvailabilityDomain::Kind::Custom:
+    // Custom domains do not yet support inheritance relationships.
+    return false;
   }
+}
+
+bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
+  if (other == *this)
+    return true;
+  return domainIsStrictSubsetOf(other, *this);
+}
+
+bool AvailabilityDomain::isSupersetOf(const AvailabilityDomain &other) const {
+  if (other == *this)
+    return false;
+  return domainIsStrictSubsetOf(other, *this);
+}
+
+bool AvailabilityDomain::isRelated(const AvailabilityDomain &other) const {
+  if (other == *this)
+    return true;
+  return domainIsStrictSubsetOf(other, *this) ||
+         domainIsStrictSubsetOf(*this, other);
 }
 
 bool AvailabilityDomain::isRoot() const {
@@ -393,6 +414,7 @@ bool AvailabilityDomain::isRoot() const {
 }
 
 AvailabilityDomain AvailabilityDomain::getRootDomain() const {
+  // Currently, all non-platform domains are root domains.
   if (!isPlatform())
     return *this;
 

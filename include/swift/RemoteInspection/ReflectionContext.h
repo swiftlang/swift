@@ -215,6 +215,7 @@ public:
     StoredPointer AllocatorSlabPtr;
     StoredPointer ParentTask;
     std::vector<StoredPointer> ChildTasks;
+    std::vector<StoredPointer> WaitingTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
     StoredPointer ResumeAsyncContext;
   };
@@ -2192,6 +2193,47 @@ private:
 
       RecordPtr =
           RemoteAddress(RecordObj->Parent, RemoteAddress::DefaultAddressSpace);
+    }
+
+    // Read the wait queue from the FutureFragment, if this is a future task.
+    if (Info.IsFuture && asyncTaskSize != 0) {
+      // The FutureFragment is located after AsyncTask, ChildFragment (if
+      // child), and GroupChildFragment (if group child).
+      // See AsyncTask::futureFragment() in include/swift/ABI/Task.h.
+      auto FutureFragmentAddr = AsyncTaskPtr + asyncTaskSize;
+      if (Info.IsChildTask)
+        FutureFragmentAddr =
+            FutureFragmentAddr + sizeof(ChildFragment<Runtime>);
+      if (Info.IsGroupChildTask)
+        FutureFragmentAddr =
+            FutureFragmentAddr + sizeof(GroupChildFragment<Runtime>);
+
+      auto FutureFragmentObj =
+          readObj<FutureFragment<Runtime>>(FutureFragmentAddr);
+      if (FutureFragmentObj) {
+        // The low 2 bits of WaitQueue are the status; the rest is the first
+        // waiting task pointer.
+        // See FutureFragment::WaitQueueItem in include/swift/ABI/Task.h.
+        const StoredPointer statusMask = 0x03;
+        StoredPointer WaitingTaskPtr =
+            FutureFragmentObj->WaitQueue & ~statusMask;
+
+        // Walk the singly linked list of waiting tasks.
+        unsigned WaitQueueLoopCount = 0;
+        while (WaitingTaskPtr && WaitQueueLoopCount++ < ChildTaskLimit) {
+          Info.WaitingTasks.push_back(WaitingTaskPtr);
+          // The next waiting task is stored in SchedulerPrivate[0] of the
+          // waiting task.
+          // See Job::NextWaitingTaskIndex and AsyncTask::getNextWaitingTask()
+          // in include/swift/ABI/Task.h.
+          RemoteAddress WaitingTaskAddress =
+              RemoteAddress(WaitingTaskPtr, RemoteAddress::DefaultAddressSpace);
+          auto WaitingTaskObj = readObj<AsyncTaskType>(WaitingTaskAddress);
+          if (!WaitingTaskObj)
+            break;
+          WaitingTaskPtr = WaitingTaskObj->SchedulerPrivate[0];
+        }
+      }
     }
 
     const auto TaskResumeContext = stripSignedPointer(

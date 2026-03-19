@@ -1715,6 +1715,12 @@ public:
         auto globalActor = newFnTy->getGlobalActor();
         auto addedActor = oldFnTy->getExtInfo().withGlobalActor(globalActor);
 
+        // With `GlobalActorIsolatedTypesUsability` enabled `@MainActor` always
+        // implies `@Sendable`.
+        if (oldFnTy->getASTContext().LangOpts.hasFeature(
+                Feature::GlobalActorIsolatedTypesUsability))
+          addedActor = addedActor.withSendable();
+
         return oldFnTy->withExtInfo(addedActor) == newFnTy;
       }
     }

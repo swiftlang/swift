@@ -876,6 +876,8 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool AllocBoxInst_hasDynamicLifetime() const;
   BRIDGED_INLINE bool AllocRefInstBase_isObjc() const;
   BRIDGED_INLINE bool AllocRefInstBase_canAllocOnStack() const;
+  BRIDGED_INLINE bool AllocRefInstBase_isStackAllocationNested() const;
+  BRIDGED_INLINE void AllocRefInstBase_setStackAllocationIsNested(bool) const;
   BRIDGED_INLINE SwiftInt AllocRefInstBase_getNumTailTypes() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSILTypeArray AllocRefInstBase_getTailAllocatedTypes() const;
   BRIDGED_INLINE bool AllocRefDynamicInst_isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const;
@@ -957,6 +959,12 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType PackLengthInst_getPackType() const;
   BRIDGED_INLINE SwiftInt ScalarPackIndexInst_getComponentIndex() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType AnyPackIndexInst_getIndexedPackType() const;
+  BRIDGED_INLINE bool
+  DifferentiableFunctionInst_hasExtractee(SwiftInt extractee) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue
+  DifferentiableFunctionInst_getExtractee(SwiftInt extractee) const;
+  BRIDGED_INLINE SwiftInt
+  DifferentiableFunctionExtractInst_getExtractee() const;
 
   // =========================================================================//
   //                   VarDeclInst and DebugVariableInst
@@ -1257,7 +1265,7 @@ struct BridgedBuilder{
       BridgedType type, SwiftInt value, bool treatAsSigned) const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAllocRef(BridgedType type,
-    bool objc, bool canAllocOnStack, bool isBare,
+    bool objc, bool canAllocOnStack, bool isBare, bool isNested,
     BridgedSILTypeArray elementTypes, BridgedValueArray elementCountOperands) const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction

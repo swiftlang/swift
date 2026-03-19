@@ -1,4 +1,4 @@
-// {"kind":"emit-sil","original":"af5c6219","signature":"(anonymous namespace)::LifetimeChecker::getLivenessAtInst(swift::SILInstruction*, unsigned int, unsigned int)","signatureAssert":"Assertion failed: (E <= size() && \"Attempted to set out-of-bounds range!\"), function set"}
+// {"kind":"emit-sil","original":"af5c6219","signature":"(anonymous namespace)::LifetimeChecker::getLivenessAtInst(swift::SILInstruction*, unsigned int, unsigned int)","signatureAssert":"Assertion failed: (E <= size() && \"Attempted to set out-of-bounds range!\"), function set","signatureNext":"LifetimeChecker::isInitializedAtUse"}
 // RUN: not --crash %target-swift-frontend -emit-sil %s
 struct a<b> {
   let c: String

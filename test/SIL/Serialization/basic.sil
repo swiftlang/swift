@@ -12,6 +12,8 @@ class TestArrayStorage {
   init()
 }
 
+class C {}
+
 struct TestArray2 {
   var storage : TestArrayStorage
   var someValue : Int32
@@ -27,6 +29,23 @@ struct EmptyStruct {}
 struct MoveOnlyStruct: ~Copyable {
   @_hasStorage var i: Int32
   deinit
+}
+
+// CHECK-LABEL: sil @alloc_ref_non_nested : $@convention(thin) () -> ()
+sil @alloc_ref_non_nested : $@convention(thin)  () -> () {
+bb0:
+  // CHECK: %0 = alloc_ref [stack] [non_nested] $C
+  %0 = alloc_ref [stack] [non_nested] $C
+  dealloc_stack_ref %0
+
+  %2 = metatype $@thick C.Type
+
+  // CHECK: %3 = alloc_ref_dynamic [stack] [non_nested] %2 : $@thick C.Type, $C
+  %3 = alloc_ref_dynamic [stack] [non_nested] %2 : $@thick C.Type, $C
+  dealloc_stack_ref %3
+
+  %result = tuple ()
+  return %result
 }
 
 // CHECK-LABEL: sil @async_test : $@convention(thin) @async

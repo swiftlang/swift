@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"63dee018","signature":"swift::rewriting::RequirementMachine::requiresProtocol(swift::Type, swift::ProtocolDecl const*) const"}
+// {"kind":"typecheck","original":"63dee018","signature":"swift::rewriting::RequirementMachine::requiresProtocol(swift::Type, swift::ProtocolDecl const*) const","signatureNext":"SubstitutionMap::lookupConformance"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b

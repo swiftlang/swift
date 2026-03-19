@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"63dee018","signature":"swift::rewriting::RequirementMachine::areReducedTypeParametersEqual(swift::Type, swift::Type) const"}
+// {"kind":"typecheck","original":"63dee018","signature":"swift::rewriting::RequirementMachine::areReducedTypeParametersEqual(swift::Type, swift::Type) const","signatureNext":"TypeResolution::areSameType"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b

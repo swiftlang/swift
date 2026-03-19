@@ -52,6 +52,7 @@ import SubE
 
 /// --------Main module
 // CHECK-LABEL: "modulePath": "deps.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: sourceFiles
 // CHECK-NEXT: module_deps_include_tree.swift
 // CHECK-NEXT: ],
@@ -124,6 +125,7 @@ import SubE
 
 /// --------Swift module F
 // CHECK:      "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: "sourceFiles": [
 // CHECK-NEXT: ],
 // CHECK-NEXT: "directDependencies": [

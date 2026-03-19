@@ -44,6 +44,11 @@ public struct S2: P2 {
   }
 }
 
+protocol CP : AnyObject {
+}
+
+final class C : CP {
+}
 
 sil @cl : $@convention(thin) () -> Int
 
@@ -227,5 +232,71 @@ bb0(%0 : $E, %1 : $E):
   %2 = function_ref @rawrepresentable_is_equal_wrong_convention : $@convention(thin) (E, E) -> Bool
   %3 = apply %2(%0, %1) : $@convention(thin) (E, E) -> Bool
   return %3
+}
+
+sil @callee_guaranteed : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> ()
+sil @callee_owned : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0) -> ()
+
+// CHECK-LABEL: sil @propagate_class_existential_non_ossa :
+// CHECKO:         [[E:%.*]] = end_init_let_ref
+// CHECKO:         [[C:%.*]] = unchecked_ref_cast [[E]] to $@opened
+// CHECKO:         [[C2:%.*]] = unchecked_ref_cast [[C]] to $C
+// CHECKO:         apply {{%[0-9]+}}<C>([[C2]])
+// CHECK:       } // end sil function 'propagate_class_existential_non_ossa'
+sil @propagate_class_existential_non_ossa : $@convention(thin) () -> () {
+bb0:
+  %0 = metatype $@thick C.Type
+  %1 = init_existential_metatype %0, $@thick any CP.Type
+  %2 = open_existential_metatype %1 to $@thick (@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self).Type
+  %3 = alloc_ref $C
+  %4 = end_init_let_ref %3
+  %5 = unchecked_ref_cast %4 to $@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self
+  %6 = function_ref @callee_guaranteed : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> ()
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @propagate_class_existential :
+// CHECKO:         [[E:%.*]] = end_init_let_ref
+// CHECKO:         [[C:%.*]] = unchecked_ref_cast [[E]] to $@opened
+// CHECKO:         [[B:%.*]] = begin_borrow [[C]]
+// CHECKO:         [[C2:%.*]] = unchecked_ref_cast [[B]] to $C
+// CHECKO:         apply {{%[0-9]+}}<C>([[C2]])
+// CHECKO-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'propagate_class_existential'
+sil [ossa] @propagate_class_existential : $@convention(thin) () -> () {
+bb0:
+  %0 = metatype $@thick C.Type
+  %1 = init_existential_metatype %0, $@thick any CP.Type
+  %2 = open_existential_metatype %1 to $@thick (@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self).Type
+  %3 = alloc_ref $C
+  %4 = end_init_let_ref %3
+  %5 = unchecked_ref_cast %4 to $@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self
+  %6 = function_ref @callee_guaranteed : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> ()
+  destroy_value %5
+  %9 = tuple ()
+  return %9
+}
+
+// CHECK-LABEL: sil [ossa] @propagate_class_existential_owned :
+// CHECKO:         [[E:%.*]] = end_init_let_ref
+// CHECKO:         [[C:%.*]] = unchecked_ref_cast [[E]] to $@opened
+// CHECKO:         [[C2:%.*]] = unchecked_ref_cast [[C]] to $C
+// CHECKO:         apply {{%[0-9]+}}<C>([[C2]])
+// CHECKO:       } // end sil function 'propagate_class_existential_owned'
+sil [ossa] @propagate_class_existential_owned : $@convention(thin) () -> () {
+bb0:
+  %0 = metatype $@thick C.Type
+  %1 = init_existential_metatype %0, $@thick any CP.Type
+  %2 = open_existential_metatype %1 to $@thick (@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self).Type
+  %3 = alloc_ref $C
+  %4 = end_init_let_ref %3
+  %5 = unchecked_ref_cast %4 to $@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self
+  %6 = function_ref @callee_owned : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0) -> ()
+  %7 = apply %6<@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0) -> ()
+  %9 = tuple ()
+  return %9
 }
 

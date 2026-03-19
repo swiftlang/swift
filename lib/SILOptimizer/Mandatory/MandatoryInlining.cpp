@@ -1110,6 +1110,7 @@ class MandatoryInlining : public SILModuleTransform {
       case IsThunk_t::IsThunk:
       case IsThunk_t::IsReabstractionThunk:
       case IsThunk_t::IsSignatureOptimizedThunk:
+      case IsThunk_t::IsDistributedThunk:
         // Don't inline into most thunks, even transparent callees.
         continue;
 

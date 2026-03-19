@@ -23,6 +23,7 @@ import TestModule
  // CHECK-NEXT:    },
  // CHECK-NEXT:    {
  // CHECK-NEXT:      "modulePath": "{{.*}}TestModule-{{.*}}.swiftmodule",
+ // CHECK-NEXT:      "libraryLevel":
  // CHECK-NEXT:      "sourceFiles": [
  // CHECK-NEXT:      ],
  // CHECK-NEXT:      "directDependencies": [

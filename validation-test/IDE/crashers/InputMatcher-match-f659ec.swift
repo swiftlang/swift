@@ -1,4 +1,4 @@
-// {"kind":"complete","original":"3a9a209d","signature":"(anonymous namespace)::InputMatcher::match(int, std::__1::function<bool (unsigned int, unsigned int)>)","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast"}
+// {"kind":"complete","original":"3a9a209d","signature":"(anonymous namespace)::InputMatcher::match(int, std::__1::function<bool (unsigned int, unsigned int)>)","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast","signatureNext":"CompareDeclSpecializationRequest::evaluate"}
 // RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 struct a: ExpressibleByStringInterpolation { stringInterpolation: b
 struct b: StringInterpolationProtocol {

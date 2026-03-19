@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"(anonymous namespace)::Verifier::checkSourceRanges(swift::SourceRange, swift::ASTWalker::ParentTy, llvm::function_ref<void ()>)"}
+// {"kind":"typecheck","signature":"(anonymous namespace)::Verifier::checkSourceRanges(swift::SourceRange, swift::ASTWalker::ParentTy, llvm::function_ref<void ()>)","signatureNext":"Verifier::walkToPatternPost"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 func == {
   switch {

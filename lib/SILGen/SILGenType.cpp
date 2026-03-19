@@ -876,12 +876,18 @@ SILFunction *SILGenModule::emitProtocolWitness(
     return f;
   ASSERT(!f);
 
+  // Distributed: Carry the distributed thunk kind from the requirement.
+  // Distributed accessors dispatch through the witness table at runtime,
+  // so `DeadFunctionElimination` must keep these entries alive even though
+  // they have no SIL callers.
+  auto thunkKind = requirement.isDistributedThunk() ? IsDistributedThunk : IsThunk;
+
   SILGenFunctionBuilder builder(*this);
   f = builder.createFunction(
       linkage, nameBuffer, witnessSILFnType, genericEnv,
       SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent,
       serializedKind, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-      ProfileCounter(), IsThunk, SubclassScope::NotApplicable, InlineStrategy);
+      ProfileCounter(), thunkKind, SubclassScope::NotApplicable, InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));

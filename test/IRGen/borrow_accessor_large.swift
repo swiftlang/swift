@@ -111,6 +111,16 @@ public struct LargeStruct {
       return largePropBorrow
     }
   }
+  var nestedLargeTupleBorrow: (Klass, Klass, Klass, Klass, Klass, Klass, Klass, Klass) {
+    borrow {
+      return largeTupleBorrow
+    }
+  }
+  var largeTrivialTupleBorrow: (Int, Int, Int, Int, Int, Int, Int, Int) {
+    borrow {
+      return _t
+    }
+  }
   var largeTrivialPropBorrow: LargeTrivialProp {
     borrow {
       return _largeTrivialProp
@@ -204,50 +214,16 @@ func nctest() {
 // CHECK-IRGEN:   ret ptr %._largeProp
 // CHECK-IRGEN: }
 
-// LoadableByAddress does not transform large tuples
-// CHECK: sil hidden @$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed (Klass, Klass, Klass, Klass, Klass, Klass, Klass, Klass) {
+// CHECK: sil hidden @$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed_address (Klass, Klass, Klass, Klass, Klass, Klass, Klass, Klass) {
 // CHECK: bb0([[REG0:%.*]] : $*LargeStruct):
-// CHECK:   [[REG2:%.*]] = struct_element_addr [[REG0]], #LargeStruct._largeTuple
-// CHECK:   [[REG3:%.*]] = load [[REG2]]
-// CHECK:   return [[REG3]]
+// CHECK:   [[REG1:%.*]] = struct_element_addr [[REG0]], #LargeStruct._largeTuple
+// CHECK:   return [[REG1]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc void @"$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias sret(<{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>) captures(none) [[REG0:%.*]], ptr noalias swiftself captures(none) dereferenceable(272) [[REG1:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias swiftself dereferenceable(272) [[REG0:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
-// CHECK-IRGEN:   %._largeTuple = getelementptr inbounds nuw %T21borrow_accessor_large11LargeStructV, ptr [[REG1]], i32 0, i32 2
-// CHECK-IRGEN:   %._largeTuple.elt = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr %._largeTuple, i32 0, i32 0
-// CHECK-IRGEN:   [[REG2:%.*]] = load ptr, ptr %._largeTuple.elt, align 8
-// CHECK-IRGEN:   %._largeTuple.elt1 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr %._largeTuple, i32 0, i32 1
-// CHECK-IRGEN:   [[REG3:%.*]] = load ptr, ptr %._largeTuple.elt1, align 8
-// CHECK-IRGEN:   %._largeTuple.elt2 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr %._largeTuple, i32 0, i32 2
-// CHECK-IRGEN:   [[REG4:%.*]] = load ptr, ptr %._largeTuple.elt2, align 8
-// CHECK-IRGEN:   %._largeTuple.elt3 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr %._largeTuple, i32 0, i32 3
-// CHECK-IRGEN:   [[REG5:%.*]] = load ptr, ptr %._largeTuple.elt3, align 8
-// CHECK-IRGEN:   %._largeTuple.elt4 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr %._largeTuple, i32 0, i32 4
-// CHECK-IRGEN:   [[REG6:%.*]] = load ptr, ptr %._largeTuple.elt4, align 8
-// CHECK-IRGEN:   %._largeTuple.elt5 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr %._largeTuple, i32 0, i32 5
-// CHECK-IRGEN:   [[REG7:%.*]] = load ptr, ptr %._largeTuple.elt5, align 8
-// CHECK-IRGEN:   %._largeTuple.elt6 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr %._largeTuple, i32 0, i32 6
-// CHECK-IRGEN:   [[REG8:%.*]] = load ptr, ptr %._largeTuple.elt6, align 8
-// CHECK-IRGEN:   %._largeTuple.elt7 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr %._largeTuple, i32 0, i32 7
-// CHECK-IRGEN:   [[REG9:%.*]] = load ptr, ptr %._largeTuple.elt7, align 8
-// CHECK-IRGEN:   %.elt = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr [[REG0]], i32 0, i32 0
-// CHECK-IRGEN:   store ptr [[REG2]], ptr %.elt, align 8
-// CHECK-IRGEN:   %.elt8 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr [[REG0]], i32 0, i32 1
-// CHECK-IRGEN:   store ptr [[REG3]], ptr %.elt8, align 8
-// CHECK-IRGEN:   %.elt9 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr [[REG0]], i32 0, i32 2
-// CHECK-IRGEN:   store ptr [[REG4]], ptr %.elt9, align 8
-// CHECK-IRGEN:   %.elt10 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr [[REG0]], i32 0, i32 3
-// CHECK-IRGEN:   store ptr [[REG5]], ptr %.elt10, align 8
-// CHECK-IRGEN:   %.elt11 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr [[REG0]], i32 0, i32 4
-// CHECK-IRGEN:   store ptr [[REG6]], ptr %.elt11, align 8
-// CHECK-IRGEN:   %.elt12 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr [[REG0]], i32 0, i32 5
-// CHECK-IRGEN:   store ptr [[REG7]], ptr %.elt12, align 8
-// CHECK-IRGEN:   %.elt13 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr [[REG0]], i32 0, i32 6
-// CHECK-IRGEN:   store ptr [[REG8]], ptr %.elt13, align 8
-// CHECK-IRGEN:   %.elt14 = getelementptr inbounds nuw <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr [[REG0]], i32 0, i32 7
-// CHECK-IRGEN:   store ptr [[REG9]], ptr %.elt14, align 8
-// CHECK-IRGEN:   ret void
+// CHECK-IRGEN:   %._largeTuple = getelementptr inbounds nuw %T21borrow_accessor_large11LargeStructV, ptr [[REG0]], i32 0, i32 2
+// CHECK-IRGEN:   ret ptr %._largeTuple
 // CHECK-IRGEN: }
 
 // CHECK: sil hidden @$s21borrow_accessor_large11LargeStructV06nestedD10PropBorrowAA0dG0Vvb : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed_address LargeProp {
@@ -262,6 +238,31 @@ func nctest() {
 // CHECK-IRGEN   [[REG1:%.*]] = call swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb"(ptr noalias swiftself dereferenceable(272) [[REG0]])
 // CHECK-IRGEN   ret ptr [[REG1]]
 // CHECK-IRGEN }
+
+// CHECK: sil hidden @$s21borrow_accessor_large11LargeStructV06nestedD11TupleBorrowAA5KlassC_A7Ftvb : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed_address (Klass, Klass, Klass, Klass, Klass, Klass, Klass, Klass) {
+// CHECK: bb0([[REG0:%.*]] : $*LargeStruct):
+// CHECK:   [[REG1:%.*]] = function_ref @$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed_address (Klass, Klass, Klass, Klass, Klass, Klass, Klass, Klass)
+// CHECK:   [[REG2:%.*]] = apply [[REG1]]([[REG0]]) : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed_address (Klass, Klass, Klass, Klass, Klass, Klass, Klass, Klass)
+// CHECK:   return [[REG2]]
+// CHECK: }
+
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV06nestedD11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias swiftself dereferenceable(272) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN: entry:
+// CHECK-IRGEN:   [[REG1:%.*]] = call swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias swiftself dereferenceable(272) [[REG0]])
+// CHECK-IRGEN:   ret ptr [[REG1]]
+// CHECK-IRGEN: }
+
+// CHECK: sil hidden @$s21borrow_accessor_large11LargeStructV0C18TrivialTupleBorrowSi_S7itvb : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed_address (Int, Int, Int, Int, Int, Int, Int, Int) {
+// CHECK: bb0([[REG0:%.*]] : $*LargeStruct):
+// CHECK:   [[REG1:%.*]] = struct_element_addr [[REG0]], #LargeStruct._t
+// CHECK:   return [[REG1]]
+// CHECK: }
+
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C18TrivialTupleBorrowSi_S7itvb"(ptr noalias swiftself dereferenceable(272) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN: entry:
+// CHECK-IRGEN:   %._t = getelementptr inbounds nuw %T21borrow_accessor_large11LargeStructV, ptr [[REG0]], i32 0, i32 1
+// CHECK-IRGEN:   ret ptr %._t
+// CHECK-IRGEN: }
 
 // CHECK: sil hidden @$s21borrow_accessor_large11LargeStructV0C17TrivialPropBorrowAA0dfG0Vvb : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed_address LargeTrivialProp {
 // CHECK: bb0(%0 : $*LargeStruct):

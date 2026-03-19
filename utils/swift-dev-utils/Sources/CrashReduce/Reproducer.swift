@@ -69,15 +69,13 @@ public struct Reproducer: Sendable {
           $0.cleanupTrivia(includingWhitespace: false)
         }
     )
-    var signatures = KnownSignatures(
-      Signature(symbol: header.signature, assertion: header.signatureAssert)
-    )
+    var signatures = KnownSignatures(header.sig)
     for alias in header.aliases ?? [] {
       // FIXME: Dropping asserts...
       if let assert = Assertion(from: alias) {
-        signatures.add(Signature(symbol: nil, assertion: assert))
+        signatures.add(Signature(symbols: [], assertion: assert))
       } else {
-        signatures.add(Signature(symbol: alias, assertion: nil))
+        signatures.add(Signature(symbols: [alias], assertion: nil))
       }
     }
     return Self(
@@ -206,6 +204,7 @@ public struct Reproducer: Sendable {
       kind: options.kind,
       isDeterministic: options.isDeterministic ? nil : false,
       signature: signatures.primary.description,
+      signatureNext: signatures.primary.symbols.dropFirst().first,
       signatureAssert: signatures.primary.assertion,
       stackOverflow: isStackOverflow ? true : nil,
       aliases: aliases.isEmpty ? nil : aliases.map(\.description),
@@ -288,6 +287,7 @@ extension Reproducer {
     var kind: Options.Kind?
     var isDeterministic: Bool?
     var signature: String
+    var signatureNext: String?
     var signatureAssert: Assertion?
     var stackOverflow: Bool?
     var aliases: [String]?
@@ -302,6 +302,15 @@ extension Reproducer {
     var original: String?
     var splits: [Int]?
     var frontendArgs: [String]?
+
+    var sig: Signature {
+      var symbols = [signature]
+      if let signatureNext {
+        symbols.append(signatureNext)
+      }
+      let result = Signature(symbols: symbols, assertion: signatureAssert)
+      return result
+    }
   }
 }
 
