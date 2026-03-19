@@ -3063,7 +3063,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
           llvm::any_of(M->Requirements, [cxx](const auto &Req) {
             if (Req.FeatureName == "swift")
               return !Req.RequiredState;
-            if (Req.FeatureName == "cplusplus")
+            if (StringRef(Req.FeatureName).starts_with("cplusplus"))
               return Req.RequiredState != cxx;
             return false;
           });
@@ -8962,7 +8962,7 @@ bool importer::requiresCPlusPlus(const clang::Module *module) {
   }
 
   return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
-    return req.FeatureName == "cplusplus";
+    return StringRef(req.FeatureName).starts_with("cplusplus");
   });
 }
 
