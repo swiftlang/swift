@@ -1224,6 +1224,11 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     return std::nullopt;
   };
 
+#define SUBSUME_DEBUG(str)                                                     \
+  LLVM_DEBUG(llvm::dbgs() << str << ": "                                       \
+                              << existing.BindingType.getString() << " vs "    \
+                              << binding.BindingType.getString() << "\n");
+
   // (Exact, Exact)
   if (existing.Kind == AllowedBindingKind::Exact &&
       binding.Kind == AllowedBindingKind::Exact) {
@@ -1235,6 +1240,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       // is unsatisfiable. Mark this binding set as conflicting, so that we
       // attempt it next and fail as soon as possible.
       if (result.has_value() && !*result) {
+        SUBSUME_DEBUG("Exact vs exact conflict");
         return SubsumeBindingResult::Conflict;
       }
 
@@ -1260,6 +1266,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       // Existing exact binding must be a supertype of the new lower bound.
       if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
                                GenericSignature())) {
+        SUBSUME_DEBUG("Exact vs supertype conflict");
         return SubsumeBindingResult::Conflict;
       }
 
@@ -1280,6 +1287,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       // Existing exact binding must be a subtype of the new upper bound.
       if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
                                GenericSignature())) {
+        SUBSUME_DEBUG("Exact vs subtype conflict");
         return SubsumeBindingResult::Conflict;
       }
 
@@ -1307,6 +1315,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       // Exact binding must be a supertype of the existing lower bound.
       if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
                                GenericSignature())) {
+        SUBSUME_DEBUG("Supertype vs exact conflict");
         return SubsumeBindingResult::Conflict;
       }
 
@@ -1355,6 +1364,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       // The existing lower bound should be a subtype of the new upper bound.
       if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
                                GenericSignature())) {
+        SUBSUME_DEBUG("Supertype vs subtype conflict");
         return SubsumeBindingResult::Conflict;
       }
     }
@@ -1401,6 +1411,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       // The new exact binding should be a subtype of the existing upper bound.
       if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
                                GenericSignature())) {
+        SUBSUME_DEBUG("Subtype vs exact conflict");
         return SubsumeBindingResult::Conflict;
       }
 
@@ -1428,6 +1439,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       // The new lower bound should be a subtype of the existing upper bound.
       if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
                                GenericSignature())) {
+        SUBSUME_DEBUG("Subtype vs supertype conflict");
         return SubsumeBindingResult::Conflict;
       }
     }
@@ -1497,6 +1509,8 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
   }
 
   return SubsumeBindingResult::KeepBoth;
+
+#undef SUBSUME_DEBUG
 }
 
 /// If a single binding in isolation, together with any conformance
