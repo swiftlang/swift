@@ -264,15 +264,7 @@ handle_fatal_signal(int signum,
   for (unsigned n = 0; n < lengthof(signalsToHandle); ++n)
     reset_signal(signalsToHandle[n]);
 
-  // Fill in crash info
-  crashInfo.crashing_thread = self.tid;
-  crashInfo.signal = signum;
-  crashInfo.fault_address = (uint64_t)pinfo->si_addr;
-
-  // Start the memory server
-  int fd = memserver_start();
-
-  // Display a progress message
+  // Find the program counter
   void *pc = 0;
   ucontext_t *ctx = (ucontext_t *)uctx;
 
@@ -290,12 +282,31 @@ handle_fatal_signal(int signum,
 #endif
 #endif
 
+  // Fill in crash info
+  crashInfo.crashing_thread = self.tid;
+  crashInfo.signal = signum;
+  switch (signum) {
+  case SIGILL:
+  case SIGFPE:
+  case SIGSEGV:
+  case SIGBUS:
+  case SIGTRAP:
+    crashInfo.fault_address = (uint64_t)pinfo->si_addr;
+    break;
+  default:
+    crashInfo.fault_address = (uint64_t)pc;
+  }
+
+  // Start the memory server
+  int fd = memserver_start();
+
+  // Display a progress message
   _swift_displayCrashMessage(signum, pc);
 
   if (_swift_backtraceSettings.closeFds) {
     closeFds(fd);
   }
-  
+
   // Actually start the backtracer
   if (!_swift_spawnBacktracer(&crashInfo, fd)) {
     const char *message = _swift_backtraceSettings.color == OnOffTty::On
