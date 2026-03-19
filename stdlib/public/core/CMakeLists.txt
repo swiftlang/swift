@@ -46,6 +46,7 @@ split_embedded_sources(
   EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
   EMBEDDED Borrow.swift
+  EMBEDDED BorrowingIteratorAlgorithms.swift
   EMBEDDED BorrowingSequence.swift
   EMBEDDED BorrowingSequenceAlgorithms.swift
     NORMAL BridgeObjectiveC.swift

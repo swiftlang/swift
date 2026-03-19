@@ -80,6 +80,7 @@
     "RangeSetRanges.swift",
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
+    "BorrowingIteratorAlgorithms.swift",
     "BorrowingSequence.swift",
     "BorrowingSequenceAlgorithms.swift",
     "Sequence.swift",
