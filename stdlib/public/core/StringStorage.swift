@@ -244,8 +244,12 @@ fileprivate func _allocateStringStorage(
   let pointerSize = MemoryLayout<Int>.stride
   let headerSize = Int(_StringObject.nativeBias)
   let codeUnitSize = capacity + 1 /* code units and null */
-  let needBreadcrumbs =
-    utf16Len != nil || capacity >= _StringBreadcrumbs.breadcrumbStride
+#if _pointerBitWidth(_64)
+  let needBreadcrumbs = utf16Len != nil ||
+    capacity >= _StringBreadcrumbs.breadcrumbStride
+#else
+  let needBreadcrumbs = capacity >= _StringBreadcrumbs.breadcrumbStride
+#endif
   let breadcrumbSize = needBreadcrumbs ? pointerSize : 0
 
   let (storage, numTailBytes) = _allocate(
@@ -360,15 +364,23 @@ extension __StringStorage {
       storage._capacityAndFlags._storage == capAndFlags._storage)
     _internalInvariant(
       storage.unusedCapacity == capAndFlags.capacity - countAndFlags.count)
+#if _pointerBitWidth(_64)
     _internalInvariant(
        ((utf16Len != nil) && storage.hasBreadcrumbs) || (utf16Len == nil)
     )
+#endif
     
+#if _pointerBitWidth(_64)
     if let utf16Len, utf16Len <= Int32.max {
       storage._oneCrumb = utf16Len
     } else if storage.hasBreadcrumbs {
       unsafe storage._breadcrumbsAddress.initialize(to: nil)
     }
+#else
+    if storage.hasBreadcrumbs {
+      unsafe storage._breadcrumbsAddress.initialize(to: nil)
+    }
+#endif
 
     unsafe storage.terminator.pointee = 0 // nul-terminated
 
@@ -448,11 +460,17 @@ extension __StringStorage {
   internal var hasBreadcrumbs: Bool { _capacityAndFlags.hasBreadcrumbs }
   
   internal var hasOneCrumb: Bool {
+#if _pointerBitWidth(_32) || _pointerBitWidth(_16)
+    // On 32-bit platforms, Int(Int32.max) == Int.max, so we can't distinguish
+    // a one-crumb integer from a valid pointer. Disable the optimization.
+    return false
+#else
     if !_capacityAndFlags.hasBreadcrumbs {
       return false
     }
     let crumbValue = _oneCrumb
     return crumbValue != 0 && crumbValue <= Int(Int32.max)
+#endif
   }
   
   internal var hasAllocatedBreadcrumbs: Bool {
@@ -510,7 +528,8 @@ extension __StringStorage {
     }
     @inline(__always) get {
       _internalInvariant(hasBreadcrumbs)
-      return unsafe UnsafeRawPointer(_realCapacityEnd).loadUnaligned(as: Int.self)
+      return Int(Builtin.atomicload_acquire_Word(
+        unsafe UnsafeMutableRawPointer(_realCapacityEnd)._rawValue))
     }
   }
   
@@ -897,24 +916,32 @@ extension _StringGuts {
   
   @_effects(releasenone)
   internal func getUTF16Count() -> Int {
-    if hasOneCrumb {
-      _internalInvariant(hasNativeStorage)
-      return _object.withNativeStorage { $0._oneCrumb }
-    } else {
-      let result:Int
-      if _useBreadcrumbs(forEncodedOffset: endIndex._encodedOffset) {
-        result = unsafe loadUnmanagedBreadcrumbs()._withUnsafeGuaranteedRef {
-          $0.utf16Length
-        }
-        _internalInvariant(result == String.UTF16View(self)._utf16Distance(
-          from: startIndex, to: endIndex))
-      } else {
-        result = String.UTF16View(self)._utf16Distance(
-          from: startIndex, to: endIndex
-        )
+    // Read the one-crumb value in a single atomic load to avoid a TOCTOU race
+    // with loadUnmanagedBreadcrumbs(), which can CAS the slot to zero or
+    // replace it with a real breadcrumbs pointer concurrently.
+    if hasNativeStorage {
+      let val = _object.withNativeStorage { storage -> Int in
+        guard storage.hasBreadcrumbs else { return -1 }
+        return storage._oneCrumb
       }
-      return result
+      if val > 0 && val <= Int(Int32.max) {
+        return val
+      }
     }
+
+    let result: Int
+    if _useBreadcrumbs(forEncodedOffset: endIndex._encodedOffset) {
+      result = unsafe loadUnmanagedBreadcrumbs()._withUnsafeGuaranteedRef {
+        $0.utf16Length
+      }
+      _internalInvariant(result == String.UTF16View(self)._utf16Distance(
+        from: startIndex, to: endIndex))
+    } else {
+      result = String.UTF16View(self)._utf16Distance(
+        from: startIndex, to: endIndex
+      )
+    }
+    return result
   }
 }
 
