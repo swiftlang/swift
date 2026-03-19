@@ -13605,8 +13605,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     // Let's make this fix as high impact so if there is a function or member
     // overload with e.g. argument-to-parameter type mismatches it would take
     // a higher priority.
-    return recordFix(fix, /*impact=*/3) ? SolutionKind::Error
-                                         : SolutionKind::Solved;
+
+    // If there are arguments that increases probability this should be a function,
+    // so let's skew the impact higher to compensate
+    auto numExtraArguments =
+       getArgumentList(
+          getConstraintLocator(outerLocator
+                               .withPathElement(ConstraintLocator::ApplyArgument)))->size();
+
+    auto baseImpact = 3;
+    return recordFix(fix,
+                     /*impact=*/ (5 * numExtraArguments) + baseImpact)
+        ? SolutionKind::Error
+        : SolutionKind::Solved;
   }
 
   return result;
