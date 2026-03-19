@@ -235,7 +235,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     
     if distance >= 0 {
       if _guts.isASCII {
-        let targetOffset = i._encodedOffset &+ distance
+        let targetOffset = i._encodedOffset + distance
         guard limit < start || targetOffset <= limit._encodedOffset else {
           return nil
         }
@@ -251,7 +251,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
       guard limit < start || i <= limit else { return nil }
     } else {
       if _guts.isASCII {
-        let targetOffset = i._encodedOffset &+ distance
+        let targetOffset = i._encodedOffset + distance
         guard limit > start || targetOffset >= limit._encodedOffset else {
           return nil
         }
