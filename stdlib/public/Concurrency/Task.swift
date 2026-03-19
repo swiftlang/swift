@@ -1166,14 +1166,19 @@ extension Task where Failure == Error {
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
-#if compiler(>=5.6)
   Task(operation: body)
-#else
-  Task<Int, Error> {
-    await body()
-    return 0
-  }
-#endif
+}
+
+/// Intrinsic used by SILGen to launch a task for bridging a Swift async method
+/// which was called through its ObjC-exported completion-handler-based API.
+///
+/// Uses Task.immediate for reduced scheduling overhead.
+/// Use of this bridging mode is opt-in via the `LangOptions::ObjcToSwiftAsyncBridgingMode` option.
+@available(SwiftStdlib 6.2, *)
+@_alwaysEmitIntoClient
+@usableFromInline
+internal func _runTaskImmediateForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
+  Task.immediate(operation: body)
 }
 #endif
 

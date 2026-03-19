@@ -415,6 +415,10 @@ FuncDecl *SILGenModule::getRunTaskForBridgedAsyncMethod() {
   return lookupConcurrencyIntrinsic(getASTContext(),
                                     "_runTaskForBridgedAsyncMethod");
 }
+FuncDecl *SILGenModule::getRunTaskImmediateForBridgedAsyncMethod() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    "_runTaskImmediateForBridgedAsyncMethod");
+}
 FuncDecl *SILGenModule::getCheckExpectedExecutor() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_checkExpectedExecutor");
 }

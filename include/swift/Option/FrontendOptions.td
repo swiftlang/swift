@@ -420,6 +420,10 @@ def checked_async_objc_bridging : Joined<["-"], "checked-async-objc-bridging=">,
   HelpText<"Control whether checked continuations are used when bridging "
            "async calls from Swift to ObjC: 'on', 'off' ">;
 
+def objc_call_swift_async_bridging : Joined<["-"], "objc-call-swift-async-bridging=">,
+  HelpText<"Select task creation mode for ObjC-to-Swift async bridging: "
+           "'task' (default), 'task-immediate'">;
+
 def debug_constraints : Flag<["-"], "debug-constraints">,
   HelpText<"Debug the constraint-based type checker">;
 
