@@ -180,6 +180,10 @@ struct MatchWitnessTypes {
   Type requirementThrows;
   /// The type the witness throws.
   Type witnessThrows;
+  /// The part of the requirement's type with lifetimes, if any.
+  Type requirementLifetimeType;
+  /// The part of the witness's type with lifetimes, if any.
+  Type witnessLifetimeType;
 };
 
 /// Match the given witness to the given requirement.
@@ -189,9 +193,7 @@ RequirementMatch matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
     llvm::function_ref<MatchWitnessTypes(void)> setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
-    llvm::function_ref<std::optional<RequirementMatch>(
-        const LifetimeDependentInterface &, const LifetimeDependentInterface &)>
-        matchLifetimes,
+    llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchLifetimes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
         finalize);
 

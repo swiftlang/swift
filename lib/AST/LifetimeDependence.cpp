@@ -164,6 +164,25 @@ getNameForParsedLifetimeDependenceKind(ParsedLifetimeDependenceKind kind) {
   }
 }
 
+bool canConvertLifetimeDependencies(ArrayRef<LifetimeDependenceInfo> from,
+                                    ArrayRef<LifetimeDependenceInfo> to) {
+  // If from and to are the same array, they naturally match. This case should
+  // be reasonably common because lifetime dependence info is canonicalized.
+  if (from == to) {
+    return true;
+  }
+
+  // Check each dependency target...
+  return llvm::all_of(from, [&](const LifetimeDependenceInfo &fromDeps) {
+    auto toDeps = getLifetimeDependenceFor(to, fromDeps.getTargetIndex());
+    if (!toDeps) {
+      // A lack of dependencies is equivalent to an immortal dependence.
+      // Only another immortal dependence can convert to it.
+      return fromDeps.isImmortal();
+    }
+    return fromDeps.canConvertTo(*toDeps);
+  });
+}
 } // namespace swift
 
 std::string LifetimeDependenceInfo::getString() const {
@@ -2081,6 +2100,35 @@ ArrayRef<LifetimeDependenceInfo> LifetimeDependenceInfo::uncurry(
   return ctx.AllocateCopy(uncurried);
 }
 
+bool LifetimeDependenceInfo::canConvertTo(
+    const LifetimeDependenceInfo &other) const {
+  if (*this == other) {
+    return true;
+  }
+
+  ASSERT(this->getTargetIndex() == other.getTargetIndex() &&
+         "The lifetime dependence target index must be the same.");
+  const auto isSubset = [](IndexSubset *from, IndexSubset *to) -> bool {
+    // The empty set is a subset of every set, and every set is a subset of
+    // itself. An empty set is represented with a nullptr.
+    if (!from || from == to)
+      return true;
+
+    ASSERT(!from->isEmpty() &&
+           "Empty dependence source lists are represented with nullptr.");
+
+    // If from is non-empty and to is empty, from cannot be a subset of to.
+    if (!to)
+      return false;
+
+    return from->isSubsetOf(to);
+  };
+  
+  return isSubset(this->getInheritIndices(), other.getInheritIndices()) &&
+         isSubset(this->getScopeIndices(), other.getScopeIndices()) &&
+         isSubset(this->getAddressableIndices(), other.getAddressableIndices());
+}
+
 void LifetimeDependenceInfo::dump() const {
   llvm::errs() << "target: " << getTargetIndex() << '\n';
   if (hasImmortalSpecifier()) {
@@ -2098,157 +2146,6 @@ void LifetimeDependenceInfo::dump() const {
     llvm::errs() << "  addressable: ";
     addressable->dump();
   }
-}
-
-// =============================================================================
-// MARK: LifetimeDependentInterface
-// =============================================================================
-
-LifetimeDependentInterface::LifetimeDependentInterface(
-    AbstractFunctionDecl *afd, AnyFunctionType *interface)
-    : interface(interface),
-      implicitSelfType(afd->isInstanceMethod()
-                           ? std::optional(afd->getImplicitSelfDecl()
-                                               ->toFunctionParam()
-                                               .getPlainType())
-                           : std::nullopt),
-      // Instance methods' lifetime dependencies are attached to the outer type
-      // of the method's interface (see LifetimeDependentInterface), so we must
-      // get them from there, rather than the normal interface type.
-      lifetimes(afd->isInstanceMethod()
-                    ? afd->getInterfaceType()
-                          ->castTo<AnyFunctionType>()
-                          ->getLifetimeDependencies()
-                    : interface->getLifetimeDependencies()) {}
-
-LifetimeDependentInterface::LifetimeDependentInterface(AnyFunctionType *type)
-    : interface(type), implicitSelfType(std::nullopt),
-      lifetimes(type->getLifetimeDependencies()) {}
-
-LifetimeDependentInterface
-LifetimeDependentInterface::fromValueDecl(ValueDecl *decl,
-                                          AnyFunctionType *type) {
-  if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-    return LifetimeDependentInterface(afd, type);
-  }
-  return LifetimeDependentInterface(type);
-}
-
-Type LifetimeDependentInterface::getSourceOrTargetType(unsigned index) const {
-  const auto numParams = interface->getNumParams();
-  if (index < numParams) {
-    return interface->getParams()[index].getPlainType();
-  }
-  if (index == numParams) {
-    return implicitSelfType ? *implicitSelfType : interface->getResult();
-  }
-  if (implicitSelfType && index == numParams + 1) {
-    return interface->getResult();
-  }
-  llvm_unreachable("Invalid lifetime source or target index.");
-}
-
-bool LifetimeDependentInterface::canConvertTo(
-    const LifetimeDependentInterface &other) const {
-  // If from and to are the same array, they naturally match. This case should
-  // be reasonably common because lifetime dependence info is canonicalized.
-  if (lifetimes == other.lifetimes) {
-    return true;
-  }
-
-  // Check each dependency target...
-  return llvm::all_of(lifetimes, [&](const LifetimeDependenceInfo &target) {
-    return canConvertTargetTo(target, other);
-  });
-}
-
-/// Determine whether type is "known" (see isTypeUnknown) and ~Escapable.
-static bool isTypeKnownAndEscapable(Type type) {
-  if (isTypeUnknown(type))
-    return false;
-  return type->isEscapable();
-}
-
-bool LifetimeDependentInterface::canConvertTargetTo(
-    const LifetimeDependenceInfo &fromDeps,
-    const LifetimeDependentInterface &to) const {
-  const auto targetIndex = fromDeps.getTargetIndex();
-  // Lifetime dependencies with Escapable targets, and 'copy' dependencies with
-  // Escapable sources are always ignored (see Dependency type requirements in
-  // LifetimeAnnotation.md).
-  //
-  // We only need to check if the target and sources are Escapable for the
-  // lifetime dependence we are converting from (this), not the one we are
-  // converting to (other). This is because we allow conversion to types with
-  // additional dependencies: even if some of the dependencies of 'other' should
-  // be ignored, they could not prevent convertibility unless 'this' had a
-  // conflicting dependence (with the same source & target as one of 'other's
-  // "ignorable" dependencies, but a different scope, copy vs borrow). In that
-  // case, we would detect a mismatch regardless, due to the conflicting
-  // dependence not being present in 'other'.
-
-  const auto other = getLifetimeDependenceFor(to.lifetimes, targetIndex);
-
-  // If the dependence target is Escapable, we ignore this lifetime dependence.
-  if (isTypeKnownAndEscapable(getSourceOrTargetType(targetIndex)))
-    return true;
-
-  // The target must be the same.
-  if (other && targetIndex != other->getTargetIndex()) {
-    return false;
-  }
-
-  // Immortal lifetimes are the least restrictive, so only immortal lifetimes
-  // can convert to them.
-  if (other && other->isImmortal()) {
-    return fromDeps.isImmortal();
-  }
-
-  // Accordingly, immortal lifetimes can convert to any non-immortal lifetimes.
-  if (fromDeps.isImmortal()) {
-    return true;
-  }
-
-  const auto isSubset = [&](IndexSubset *from, IndexSubset *to,
-                            bool ignoreEscapableSources = false) {
-    // The empty set is a subset of every set, and every set is a subset of
-    // itself. An empty set is represented with a nullptr.
-    if (!from || from == to)
-      return true;
-
-    ASSERT(!from->isEmpty() &&
-           "Empty dependence source lists are represented with nullptr.");
-
-    // The set 'from' is non-empty, so it cannot be a subset of an empty 'to'.
-    if (!to)
-      return false;
-
-    if (!ignoreEscapableSources) {
-      return from->isSubsetOf(to);
-    }
-
-    // Check whether from's set of (potentially) ~Escapable lifetime sources is
-    // a subset of to's.
-    return llvm::all_of(from->getIndices(), [&](const unsigned source) {
-      return to->contains(source) ||
-             isTypeKnownAndEscapable(getSourceOrTargetType(source));
-    });
-  };
-
-  return
-      // Ignore copy dependencies with an Escapable source if the
-      // getSourceOrTargetType predicate is supplied.
-      isSubset(fromDeps.getInheritIndices(),
-               other ? other->getInheritIndices() : nullptr,
-               /*ignoreEscapableSources=*/true) &&
-      isSubset(fromDeps.getScopeIndices(),
-               other ? other->getScopeIndices() : nullptr) &&
-      isSubset(fromDeps.getAddressableIndices(),
-               other ? other->getAddressableIndices() : nullptr);
-}
-
-bool LifetimeDependentInterface::hasTarget(unsigned targetIndex) const {
-  return getLifetimeDependenceFor(lifetimes, targetIndex).has_value();
 }
 
 // =============================================================================

@@ -768,9 +768,7 @@ RequirementMatch swift::matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
     llvm::function_ref<MatchWitnessTypes(void)> setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
-    llvm::function_ref<std::optional<RequirementMatch>(
-        const LifetimeDependentInterface &, const LifetimeDependentInterface &)>
-        matchLifetimes,
+    llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchLifetimes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
         finalize) {
   bool decomposeFunctionType = false;
@@ -784,12 +782,15 @@ RequirementMatch swift::matchWitness(
   // Set up the match, determining the requirement and witness types
   // in the process.
   Type reqType, witnessType, reqThrownError, witnessThrownError;
+  Type reqLifetimeType, witnessLifetimeType;
   {
     auto types = setup();
     reqType = types.requirement;
     witnessType = types.witness;
     reqThrownError = types.requirementThrows;
     witnessThrownError = types.witnessThrows;
+    reqLifetimeType = types.requirementLifetimeType;
+    witnessLifetimeType = types.witnessLifetimeType;
   }
 
   SmallVector<OptionalAdjustment, 2> optionalAdjustments;
@@ -912,9 +913,7 @@ RequirementMatch swift::matchWitness(
       }
 
       // Check that lifetime dependencies match
-      if (auto result = matchLifetimes(
-              LifetimeDependentInterface::fromValueDecl(witness, witnessFnType),
-              LifetimeDependentInterface::fromValueDecl(req, reqFnType))) {
+      if (auto result = matchLifetimes(reqLifetimeType, witnessLifetimeType)) {
         return std::move(result.value());
       }
 
@@ -1322,20 +1321,24 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
     openWitnessType = openWitnessTypeInfo.adjustedReferenceType;
     openWitnessType = openWitnessType->getRValueType();
-
+    std::optional<Type> openWitnessSelf;
+    if (auto *openWitnessAFD = dyn_cast<AnyFunctionType>(
+            openWitnessTypeInfo.referenceType.getPointer())) {
+      openWitnessSelf = openWitnessAFD->getResult();
+    }
     Type witnessThrownError = openWitnessTypeInfo.thrownErrorTypeOnAccess;
 
     return MatchWitnessTypes{reqType, openWitnessType, reqThrownError,
-                             witnessThrownError};
+                             witnessThrownError, reqTypeInfo.openedType, openWitnessTypeInfo.openedType};
   };
 
   // Attempt to add constraints to make the supplied function types match.
-  auto matchLifetimes = [&](const LifetimeDependentInterface &witnessInterface,
-                            const LifetimeDependentInterface &reqInterface)
-      -> std::optional<RequirementMatch> {
-    if (!cs->matchFunctionLifetimes(witnessInterface, reqInterface,
-                                    witnessLocator)) {
-      return RequirementMatch(witness, MatchKind::LifetimeConflict);
+  auto matchLifetimes = [&](Type requirement,
+                            Type witness) -> std::optional<RequirementMatch> {
+    FunctionType *witnessType = witness->getAs<FunctionType>();
+    FunctionType *requirementType = requirement->getAs<FunctionType>();
+    if (witnessType && requirementType) {
+      cs->matchFunctionLifetimes(witnessType, requirementType, witnessLocator);
     }
     return std::nullopt;
   };

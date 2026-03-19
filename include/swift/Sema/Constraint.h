@@ -210,6 +210,10 @@ enum class ConstraintKind : char {
   LValueObject,
   /// The first type is the sequence type. The second type is the element type.
   ForEachElement,
+  /// The first type's lifetime dependencies must be a subset of the second
+  /// type's, after removing dependencies with Escapable targets, and copy
+  /// dependencies with Escapable sources.
+  LifetimeSubset,
 };
 
 /// Classification of the different kinds of constraints.
@@ -708,6 +712,7 @@ public:
     case ConstraintKind::SameShape:
     case ConstraintKind::MaterializePackExpansion:
     case ConstraintKind::LValueObject:
+    case ConstraintKind::LifetimeSubset:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:

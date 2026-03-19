@@ -83,6 +83,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::CheckedCast:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::LifetimeSubset:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
@@ -166,6 +167,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::CheckedCast:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::LifetimeSubset:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
@@ -414,6 +416,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       Out << " dynamic callable applicable fn "; break;
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
+  case ConstraintKind::LifetimeSubset: Out << " lifetime subset of "; break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
   case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
   case ConstraintKind::FallbackType:
@@ -639,6 +642,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::ValueMember:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::LifetimeSubset:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
