@@ -86,4 +86,3 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
 
         result = _is_any_repository_locked(pool_args)
         self.assertEqual(result, set())
-

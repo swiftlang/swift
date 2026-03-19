@@ -152,11 +152,16 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
 
 def update_single_repository(pool_args):
     source_root, config, repo_name, scheme_name, scheme_map, tag, timestamp, \
-        reset_to_remote, should_clean, should_stash, cross_repos_pr = pool_args
+        reset_to_remote, should_clean, should_stash, cross_repos_pr, skip_history, partial_clone = pool_args
     repo_path = os.path.join(source_root, repo_name)
     if not os.path.isdir(repo_path) or os.path.islink(repo_path):
         return
 
+    fetch_extra_args = []
+    if skip_history:
+        fetch_extra_args.extend(["--depth", "1"])
+    if partial_clone:
+        fetch_extra_args.extend(["--filter", "blob:none"])
     try:
         prefix = "[{0}] ".format(os.path.basename(repo_path)).ljust(40)
         print(prefix + "Updating '" + repo_path + "'")
@@ -221,7 +226,7 @@ def update_single_repository(pool_args):
                     shell.run(['git', 'rev-parse', '--verify', checkout_target])
                 except Exception:
                     shell.run(["git", "fetch", "--recurse-submodules=yes",
-                               "--tags"],
+                               "--tags"] + fetch_extra_args,
                               echo=True, prefix=prefix)
 
                 try:
@@ -239,7 +244,7 @@ def update_single_repository(pool_args):
             # It's important that we checkout, fetch, and rebase, in order.
             # .git/FETCH_HEAD updates the not-for-merge attributes based on
             # which branch was checked out during the fetch.
-            shell.run(["git", "fetch", "--recurse-submodules=yes", "--tags"],
+            shell.run(["git", "fetch", "--recurse-submodules=yes", "--tags"] + fetch_extra_args,
                       echo=True, prefix=prefix)
 
             # If we were asked to reset to the specified branch, do the hard
@@ -388,7 +393,9 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
                    args.reset_to_remote,
                    args.clean,
                    args.stash,
-                   cross_repos_pr]
+                   cross_repos_pr,
+                   args.skip_history,
+                   args.partial_clone]
         pool_args.append(my_args)
 
     locked_repositories: set[str] = _is_any_repository_locked(pool_args)
@@ -402,7 +409,7 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
 
 def obtain_additional_swift_sources(pool_args):
     (args, repo_name, repo_info, repo_branch, remote, with_ssh, scheme_name,
-     skip_history, skip_tags, skip_repository_list) = pool_args
+     skip_history, partial_clone, skip_tags, skip_repository_list) = pool_args
 
     env = dict(os.environ)
     env.update({'GIT_TERMINAL_PROMPT': '0'})
@@ -411,15 +418,16 @@ def obtain_additional_swift_sources(pool_args):
 
         print("Cloning '" + repo_name + "'")
 
+        filter_args = ["--filter", "blob:none"] if partial_clone else []
         if skip_history:
             shell.run(['git', 'clone', '--recursive', '--depth', '1',
                        '--branch', repo_branch, remote, repo_name] +
-                      (['--no-tags'] if skip_tags else []),
+                      (['--no-tags'] if skip_tags else []) + filter_args,
                       env=env,
                       echo=True)
         else:
             shell.run(['git', 'clone', '--recursive', remote, repo_name] +
-                      (['--no-tags'] if skip_tags else []),
+                      (['--no-tags'] if skip_tags else []) + filter_args,
                       env=env,
                       echo=True)
         if scheme_name:
@@ -439,7 +447,7 @@ def obtain_additional_swift_sources(pool_args):
 
 
 def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
-                                        skip_history, skip_tags,
+                                        skip_history, partial_clone, skip_tags,
                                         skip_repository_list):
 
     pool_args = []
@@ -485,7 +493,7 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
                 continue
 
             pool_args.append([args, repo_name, repo_info, repo_branch, remote,
-                              with_ssh, scheme_name, skip_history, skip_tags,
+                              with_ssh, scheme_name, skip_history, partial_clone, skip_tags,
                               skip_repository_list])
 
     if not pool_args:
@@ -629,6 +637,13 @@ repositories.
         help="Skip histories when obtaining sources",
         action="store_true")
     parser.add_argument(
+        "--partial-clone",
+        help="Use partial clones (--filter=blob:none) to fetch only commits and "
+        "trees, deferring blob downloads until they are needed. Significantly "
+        "reduces clone size for CI. Requires Git 2.19 or later.",
+        action="store_true",
+    )
+    parser.add_argument(
         "--skip-tags",
         help="Skip tags when obtaining sources",
         action="store_true")
@@ -723,6 +738,7 @@ repositories.
     clone = args.clone
     clone_with_ssh = args.clone_with_ssh
     skip_history = args.skip_history
+    partial_clone = args.partial_clone
     skip_tags = args.skip_tags
     scheme_name = args.scheme
     github_comment = args.github_comment
@@ -759,6 +775,7 @@ repositories.
                                                             clone_with_ssh,
                                                             scheme_name,
                                                             skip_history,
+                                                            partial_clone,
                                                             skip_tags,
                                                             skip_repo_list)
 
