@@ -31,6 +31,9 @@ struct Partition::PartitionTester {
   unsigned getRegion(unsigned elt) const {
     return unsigned(p.elementToRegionMap.at(Element(elt)));
   }
+
+  auto begin() const { return p.elementToRegionMap.begin(); }
+  auto end() const { return p.elementToRegionMap.end(); }
 };
 
 namespace {
@@ -1001,7 +1004,8 @@ TEST(PartitionUtilsTest, TestHistory_JoiningTwoEmpty) {
   Partition p2(historyFactory.get());
 
   auto result = Partition::join(p1, p2);
-  EXPECT_TRUE(result.begin() == result.end());
+  PartitionTester resultTester(result);
+  EXPECT_TRUE(resultTester.begin() == resultTester.end());
   EXPECT_FALSE(result.hasHistory());
 }
 
@@ -1024,7 +1028,8 @@ TEST(PartitionUtilsTest, TestHistory_JoiningNotEmptyAndEmpty) {
   EXPECT_TRUE(p1.historySize() == 2);
   EXPECT_TRUE(p2.historySize() == 0);
   auto result = Partition::join(p1, p2);
-  EXPECT_TRUE(std::next(result.begin()) == result.end());
+  PartitionTester resultTester(result);
+  EXPECT_TRUE(std::next(resultTester.begin()) == resultTester.end());
   // Since p2 doesn't have any history, we do not actually perform any join and
   // thus do not insert a CFGHistory change.
   EXPECT_TRUE(result.historySize() == 2);
@@ -1049,7 +1054,8 @@ TEST(PartitionUtilsTest, TestHistory_JoiningEmptyAndNotEmpty) {
   EXPECT_TRUE(p1.historySize() == 2);
   EXPECT_TRUE(p2.historySize() == 0);
   auto result = Partition::join(p1, p2);
-  EXPECT_TRUE(std::next(result.begin()) == result.end());
+  PartitionTester resultTester(result);
+  EXPECT_TRUE(std::next(resultTester.begin()) == resultTester.end());
   // Since p2 doesn't have any history, we do not actually perform any join and
   // thus do not insert a CFGHistory change.
   EXPECT_TRUE(result.historySize() == 2);

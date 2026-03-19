@@ -4354,8 +4354,8 @@ TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
 // ref_element_addr to be merged into.
 TranslationSemantics
 PartitionOpTranslator::visitRefElementAddrInst(RefElementAddrInst *reai) {
-  // If our field is a NonSendableType...
-  if (!SILIsolationInfo::isNonSendable(reai)) {
+  // If our field is a Sendable type.
+  if (SILIsolationInfo::isSendable(reai)) {
     // And the field is a let... then ignore it. We know that we cannot race on
     // any writes to the field.
     if (reai->getField()->isLet()) {
@@ -4369,6 +4369,32 @@ PartitionOpTranslator::visitRefElementAddrInst(RefElementAddrInst *reai) {
     return TranslationSemantics::Require;
   }
 
+  // Ok, our field is non-Sendable.
+
+  // See if our field has a specific isolation and our parent doesn't match that
+  // explicitly. In such a case, we need to do the following:
+  //
+  // 1. Require the operand.
+  // 2. AssignFresh the field.
+  //
+  // The reason why this is safe is that The field will be isolated to whatever
+  // actor isolation it has at the AST level. So any time we escape it or send
+  // it, we will properly get an error. Any other ref_element_addr to the same
+  // field will be a different region, but that doesn't matter since they all
+  // will still be isolated ot the same actor isolation meaning merges will not
+  // cause problems.
+  if (auto fieldIsolation = SILIsolationInfo::get(reai);
+      fieldIsolation && fieldIsolation.isActorIsolated()) {
+    if (auto parentIsolation = SILIsolationInfo::get(reai->getOperand());
+        !parentIsolation || !parentIsolation.hasSameIsolation(fieldIsolation)) {
+      // Require the Operand.
+      translateSILRequire(reai->getOperand());
+      translateSILAssignFresh(reai);
+      return TranslationSemantics::Special;
+    }
+  }
+
+  // Otherwise, we want to treat it as an assign direct.
   return TranslationSemantics::AssignDirect;
 }
 
