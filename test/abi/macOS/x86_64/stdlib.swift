@@ -1265,5 +1265,16 @@ Added: _$ss5InoutVMa
 Added: _$ss5InoutVMn
 Added: _$ss5InoutVsRi_zrlE7pointerSpyxGvg
 
+// SE-0514 Hashable Conformance for Dictionary.Keys, CollectionOfOne and EmptyCollection
+Added: _$sSD4KeysV9hashValueSivpMV
+Added: _$sSD4KeysVyxq__GSHsMc
+Added: _$sSD4KeysVyxq__GSHsWP
+Added: _$ss15CollectionOfOneVsSHRzlE9hashValueSivpMV
+Added: _$ss15CollectionOfOneVyxGSHsSHRzlMc
+Added: _$ss15CollectionOfOneVyxGSQsSQRzlMc
+Added: _$ss15EmptyCollectionV9hashValueSivpMV
+Added: _$ss15EmptyCollectionVyxGSHsMc
+Added: _$ss15EmptyCollectionVyxGSHsWP
+
 // Cross-encoding strcmp for Foundation
 Added: __swift_unicodeBuffersEqual_nonNormalizing
