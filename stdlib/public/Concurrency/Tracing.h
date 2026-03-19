@@ -32,6 +32,25 @@ class TaskStatusRecord;
 namespace concurrency {
 namespace trace {
 
+using task_create_trace_hook_t = void (*)(
+    void *task, void *parent, void *group, void *asyncLet,
+    uint8_t jobPriority, bool isChildTask, bool isFuture,
+    bool isGroupChildTask, bool isAsyncLetTask, bool isDiscardingTask,
+    bool hasInitialTaskExecutorPreference, const char *taskName);
+
+using task_destroy_trace_hook_t = void (*)(void *task);
+
+} // namespace trace
+} // namespace concurrency
+
+extern concurrency::trace::task_create_trace_hook_t
+    swift_task_create_trace_hook;
+extern concurrency::trace::task_destroy_trace_hook_t
+    swift_task_destroy_trace_hook;
+
+namespace concurrency {
+namespace trace {
+
 // Actor trace calls.
 
 void actor_create(HeapObject *actor);
@@ -58,9 +77,29 @@ void actor_note_job_queue(HeapObject *actor, Job *first,
 
 void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
                  AsyncLet *asyncLet, uint8_t jobPriority, bool isChildTask,
-                 bool isFuture, bool isGroupChildTask, bool isAsyncLetTask);
+                 bool isFuture, bool isGroupChildTask, bool isAsyncLetTask,
+                 bool isDiscardingTask,
+                 bool hasInitialTaskExecutorPreference,
+                 const char *taskName);
 
 void task_destroy(AsyncTask *task);
+
+inline void invokeTaskCreateTraceHook(
+    AsyncTask *task, AsyncTask *parent, TaskGroup *group, AsyncLet *asyncLet,
+    uint8_t jobPriority, bool isChildTask, bool isFuture,
+    bool isGroupChildTask, bool isAsyncLetTask, bool isDiscardingTask,
+    bool hasInitialTaskExecutorPreference, const char *taskName) {
+  if (auto hook = ::swift::swift_task_create_trace_hook) {
+    hook(task, parent, group, asyncLet, jobPriority, isChildTask, isFuture,
+         isGroupChildTask, isAsyncLetTask, isDiscardingTask,
+         hasInitialTaskExecutorPreference, taskName);
+  }
+}
+
+inline void invokeTaskDestroyTraceHook(AsyncTask *task) {
+  if (auto hook = ::swift::swift_task_destroy_trace_hook)
+    hook(task);
+}
 
 void task_status_changed(AsyncTask *task, uint8_t maxPriority, bool isCancelled,
                          bool isEscalated, bool isStarting, bool isRunning,

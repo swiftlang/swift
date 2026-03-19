@@ -46,9 +46,14 @@ inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
                         bool isChildTask, bool isFuture, bool isGroupChildTask,
                         bool isAsyncLetTask, bool isDiscardingTask,
                         bool hasInitialTaskExecutorPreference,
-                        const char* taskName) {}
+                        const char* taskName) {
+  invokeTaskCreateTraceHook(task, parent, group, asyncLet, jobPriority,
+                            isChildTask, isFuture, isGroupChildTask,
+                            isAsyncLetTask, isDiscardingTask,
+                            hasInitialTaskExecutorPreference, taskName);
+}
 
-inline void task_destroy(AsyncTask *task) {}
+inline void task_destroy(AsyncTask *task) { invokeTaskDestroyTraceHook(task); }
 
 inline void task_wait(AsyncTask *task, AsyncTask *waitingOn, uintptr_t status) {}
 

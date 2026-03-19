@@ -33,6 +33,11 @@
 
 using namespace swift;
 
+swift::swift_task_create_trace_hook_t swift::swift_task_create_trace_hook =
+    nullptr;
+swift::swift_task_destroy_trace_hook_t swift::swift_task_destroy_trace_hook =
+    nullptr;
+
 // Define the external entry points; because the Impl functions use the C
 // types from `ExecutorHooks.h`, we need to make an Orig version containing
 // appropriate type casts in each case.

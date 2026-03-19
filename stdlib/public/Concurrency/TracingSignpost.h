@@ -189,6 +189,10 @@ inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
                         bool isAsyncLetTask, bool isDiscardingTask,
                         bool hasInitialTaskExecutorPreference,
                         const char* taskName) {
+  invokeTaskCreateTraceHook(task, parent, group, asyncLet, jobPriority,
+                            isChildTask, isFuture, isGroupChildTask,
+                            isAsyncLetTask, isDiscardingTask,
+                            hasInitialTaskExecutorPreference, taskName);
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   auto parentID = parent ? parent->getTaskId() : 0;
@@ -206,6 +210,7 @@ inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
 }
 
 inline void task_destroy(AsyncTask *task) {
+  invokeTaskDestroyTraceHook(task);
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   os_signpost_interval_end(TaskLog, id, SWIFT_LOG_TASK_LIFETIME_NAME,

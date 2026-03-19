@@ -881,6 +881,20 @@ void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
 
 #include "ConcurrencyHooks.def"
 
+typedef SWIFT_CC(c) void (*swift_task_create_trace_hook_t)(
+    void *task, void *parent, void *group, void *asyncLet,
+    uint8_t jobPriority, bool isChildTask, bool isFuture,
+    bool isGroupChildTask, bool isAsyncLetTask, bool isDiscardingTask,
+    bool hasInitialTaskExecutorPreference, const char *taskName);
+
+typedef SWIFT_CC(c) void (*swift_task_destroy_trace_hook_t)(void *task);
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+swift_task_create_trace_hook_t swift_task_create_trace_hook;
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+swift_task_destroy_trace_hook_t swift_task_destroy_trace_hook;
+
 // This is a compatibility hook, *not* a concurrency hook
 typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_original)();
 typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_override)(
