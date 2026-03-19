@@ -2151,9 +2151,11 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.getFrontendOptions().InputsAndOutputs
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
-  CompilerInstance subInstance;
+  // Diagnostic consumers must outlive subInstance, since subInstance's
+  // DiagnosticEngine holds raw pointers to them.
   ForwardingDiagnosticConsumer FDC(*Diags);
   NullDiagnosticConsumer noopConsumer;
+  CompilerInstance subInstance;
   if (!silenceErrors) {
     subInstance.addDiagnosticConsumer(&FDC);
   } else {
