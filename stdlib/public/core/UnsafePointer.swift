@@ -205,7 +205,7 @@
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen // unsafe-performance
 @unsafe
-public struct UnsafePointer<Pointee: ~Copyable>: Copyable {
+public struct UnsafePointer<Pointee: ~Copyable & ~Escapable>: Copyable, ~Escapable {
 
   /// The underlying raw (untyped) pointer.
   @_preInverseGenerics
@@ -220,13 +220,17 @@ public struct UnsafePointer<Pointee: ~Copyable>: Copyable {
   }
 }
 
+extension UnsafePointer: Escapable where Pointee: ~Copyable & Escapable {}
+
 @available(*, unavailable)
-extension UnsafePointer: Sendable where Pointee: ~Copyable {}
+extension UnsafePointer: Sendable where Pointee: ~Copyable & Escapable {}
 
 @_preInverseGenerics
-extension UnsafePointer: _Pointer where Pointee: ~Copyable {
+extension UnsafePointer: _Pointer where Pointee: ~Copyable & Escapable {
   /// A type that represents the distance between two pointers.
   public typealias Distance = Int
+  
+  public typealias Pointee = Pointee
 }
 
 @_preInverseGenerics
@@ -259,7 +263,7 @@ where Pointee: ~Copyable {}
 extension UnsafePointer: CustomReflectable where Pointee: ~Copyable {}
 #endif
 
-extension UnsafePointer where Pointee: ~Copyable {
+extension UnsafePointer where Pointee: ~Copyable & ~Escapable {
   /// Deallocates the memory block previously allocated at this pointer.
   ///
   /// This pointer must be a pointer to the start of a previously allocated
@@ -276,13 +280,14 @@ extension UnsafePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafePointer where Pointee: ~Copyable {
+extension UnsafePointer where Pointee: ~Copyable & ~Escapable {
   /// Accesses the instance referenced by this pointer.
   ///
   /// When reading from the `pointee` property, the instance referenced by
   /// this pointer must already be initialized.
   @_alwaysEmitIntoClient
   public var pointee: Pointee {
+    @_lifetime(copy self)
     @_transparent unsafeAddress {
       return unsafe self
     }
@@ -302,7 +307,7 @@ extension UnsafePointer {
   }
 }
 
-extension UnsafePointer where Pointee: ~Copyable {
+extension UnsafePointer where Pointee: ~Copyable & ~Escapable {
   /// Accesses the pointee at the specified offset from this pointer.
   ///
   /// For a pointer `p`, the memory at `p + i` must be initialized.
@@ -311,9 +316,12 @@ extension UnsafePointer where Pointee: ~Copyable {
   ///   instance, measured in strides of the pointer's `Pointee` type.
   @_alwaysEmitIntoClient
   public subscript(i: Int) -> Pointee {
+    @_lifetime(copy self)
     @_transparent
     unsafeAddress {
-      return unsafe self + i
+      // FIXME: No Strideable conformance with `~Escapable`, so can't use `self + i`
+      return unsafe Self(Builtin.gep_Word(
+        self._rawValue, i._builtinWordValue, Pointee.self))
     }
   }
 }

@@ -421,9 +421,11 @@ extension UnsafeRawPointer {
   /// - Returns: A typed pointer to the same memory as this raw pointer.
   @_transparent
   @_preInverseGenerics
-  public func assumingMemoryBound<T: ~Copyable>(
+  @_lifetime(immortal)
+  public func assumingMemoryBound<T: ~Copyable & ~Escapable>(
     to: T.Type
   ) -> UnsafePointer<T> {
+    // FIXME: immortal lifetime is obviously unsafe/scary - possible to fix? 
     return unsafe UnsafePointer<T>(_rawValue)
   }
 
