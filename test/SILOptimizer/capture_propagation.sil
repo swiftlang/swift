@@ -984,3 +984,62 @@ bb0(%0 : $*T):
   return %r : $()
 }
 
+sil @useClosure : $@convention(thin) (@noescape @callee_guaranteed () -> Builtin.Int32) -> ()
+
+// CHECK-LABEL: sil [ossa] @testClosureWithNonThinConvention :
+// CHECK:         [[C:%.*]] = function_ref @$s18cClosureWithStruct4main1SVs5Int32VSbTf3pSSi3Si0_n : $@convention(c) () -> Builtin.Int32
+// CHECK:         = partial_apply [callee_guaranteed] [[C]]() : $@convention(c) () -> Builtin.Int32
+// CHECK:       } // end sil function 'testClosureWithNonThinConvention'
+sil [ossa] @testClosureWithNonThinConvention : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 3
+  %1 = struct $Int32 (%0)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = struct $Bool (%2)
+  %4 = struct $S (%1, %3)
+  %5 = function_ref @cClosureWithStruct : $@convention(c) (S) -> Builtin.Int32
+  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(c) (S) -> Builtin.Int32
+  %7 = convert_escape_to_noescape %6 to $@noescape @callee_guaranteed () -> Builtin.Int32
+  %8 = function_ref @useClosure : $@convention(thin) (@noescape @callee_guaranteed () -> Builtin.Int32) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@noescape @callee_guaranteed () -> Builtin.Int32) -> ()
+  destroy_value %7
+  destroy_value %6
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil [ossa] @cClosureWithStruct : $@convention(c) (S) -> Builtin.Int32 {
+bb0(%1 : $S):
+  %2 = struct_extract %1, #S.i
+  %3 = struct_extract %2, #Int32._value
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @testClosureWithMethodConvention :
+// CHECK:         [[C:%.*]] = function_ref @$s23methodClosureWithStruct4main1SVs5Int32VSbTf3pSSi3Si0_n : $@convention(thin) () -> Builtin.Int32
+// CHECK:         = thin_to_thick_function [[C]] : $@convention(thin) () -> Builtin.Int32 to $@callee_guaranteed () -> Builtin.Int32
+// CHECK:       } // end sil function 'testClosureWithMethodConvention'
+sil [ossa] @testClosureWithMethodConvention : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 3
+  %1 = struct $Int32 (%0)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = struct $Bool (%2)
+  %4 = struct $S (%1, %3)
+  %5 = function_ref @methodClosureWithStruct : $@convention(method) (S) -> Builtin.Int32
+  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(method) (S) -> Builtin.Int32
+  %7 = convert_escape_to_noescape %6 to $@noescape @callee_guaranteed () -> Builtin.Int32
+  %8 = function_ref @useClosure : $@convention(thin) (@noescape @callee_guaranteed () -> Builtin.Int32) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@noescape @callee_guaranteed () -> Builtin.Int32) -> ()
+  destroy_value %7
+  destroy_value %6
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil [ossa] @methodClosureWithStruct : $@convention(method) (S) -> Builtin.Int32 {
+bb0(%1 : $S):
+  %2 = struct_extract %1, #S.i
+  %3 = struct_extract %2, #Int32._value
+  return %3
+}

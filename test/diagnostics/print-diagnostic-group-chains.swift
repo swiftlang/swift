@@ -14,5 +14,5 @@ func getAnimal() -> any Animal { return Tiger() }
 
 // Verify that both parent and child groups appear in footnotes.
 // CHECK-DAG: [#DeprecatedDeclaration]: <{{.*}}deprecated-declaration>
-// CHECK-DAG: [#ExistentialType]: <{{.*}}existential-type>
+// CHECK-DAG: [#ExistentialType]: <{{.*}}existential-type.md>
 // CHECK-DAG: [#PerformanceHints]: <{{.*}}performance-hints>
