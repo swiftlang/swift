@@ -19,6 +19,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
+#include "swift/Sema/Subtyping.h"
 
 using namespace swift;
 using namespace constraints;
