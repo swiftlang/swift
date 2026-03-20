@@ -77,7 +77,7 @@ Build Android SDKs. Requires Android NDK to be available.
 .PARAMETER AndroidNDKVersion
 The version number of the Android NDK to be used.
 Format: r{number}[{letter}] (e.g., r28c)
-Default: "r28c"
+Default: "r30"
 
 .PARAMETER AndroidAPILevel
 The API Level to target when building the Android SDKs. Must be between 21 and 36.
@@ -174,7 +174,7 @@ param
   # Android SDK Options
   [switch] $Android = $false,
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
-  [string] $AndroidNDKVersion = "r28c",
+  [string] $AndroidNDKVersion = "r30",
   [ValidateRange(21, 36)]
   [int] $AndroidAPILevel = 23,
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
@@ -474,6 +474,11 @@ $KnownNDKs = @{
     SHA256 = "6bec98ac2354d8a919760889a1a41d020132e5e8cfa1b1fe51610a72c36a466b"
     ClangVersion = 19
   }
+  r30 = @{
+    URL = "https://dl.google.com/android/repository/android-ndk-r30-beta2-windows.zip"
+    SHA256 = "e2c01b70794365a95ad84b5a68b7a52df11b7672097fc3f487cdfd205483d6b5"
+    ClangVersion = 21
+  }
 }
 
 $KnownSyft = @{
@@ -718,7 +723,7 @@ function Get-AndroidNDK {
 }
 
 function Get-AndroidNDKPath {
-  return Join-Path -Path $BinaryCache -ChildPath "android-ndk-$AndroidNDKVersion"
+  return Join-Path -Path $BinaryCache -ChildPath "android-ndk-$AndroidNDKVersion$(if ($AndroidNDKVersion -eq "r30") { "-beta2" })"
 }
 
 function Get-FlexExecutable {
@@ -1678,8 +1683,9 @@ function Get-Dependencies {
 
     if ($Android) {
       $NDK = Get-AndroidNDK
-      DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
-      Expand-ZipFile "android-ndk-$AndroidNDKVersion-windows.zip" -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+      $NDKSuffix = if ($AndroidNDKVersion -eq "r30") { "-beta2" } else { "" }
+      DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion$NDKSuffix-windows.zip" $NDK.SHA256
+      Expand-ZipFile "android-ndk-$AndroidNDKVersion$NDKSuffix-windows.zip" -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
       Write-Success "Android NDK $AndroidNDKVersion"
     }
 
