@@ -695,6 +695,13 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
                  functionKind, param->getName());
         diagnose(Context, param->getLoc(), diag::inout_param_defined_here,
                  param->getName());
+
+        auto name = param->getName();
+        std::string fixItStr = "[" + name.str() + " = " + name.str() + "] ";
+
+        diagnose(Context, PAI->getLoc(),
+                    diag::copy_inout_captured_by_escaping_closure, name)
+                    .fixItInsertAfter(PAI->getLoc().getSourceLoc(), fixItStr);
       }
     }
     if (functionKind != EscapingAutoClosure) {
