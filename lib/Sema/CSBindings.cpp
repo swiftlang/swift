@@ -279,6 +279,20 @@ void BindingSet::computeJoinsAndMeets() {
     commonSupertype = subtypeJoin(commonSupertype, ty, &existentialUpperBound);
   }
 
+  if (commonSupertype->is<JoinType>() || commonSupertype->is<MeetType>()) {
+    // This indicates we had parameter packs or something else the join
+    // code doesn't understand yet.
+    return;
+  }
+
+  // Don't allow this for now, because it leads to infinite recursion
+  // in constraint simplification. Once optional conversions are no
+  // longer presented as a disjunction, this case be removed.
+  if (auto objectType = commonSupertype->getOptionalObjectType()) {
+    if (objectType->is<JoinType>() || objectType->is<MeetType>())
+      return;
+  }
+
   // If the result was 'Any' or 'Any?' but none of the inputs were, don't
   // accept the join unless we have a default of 'Any'.
   if (!allowUpperBound && !isAcceptableJoin(commonSupertype)) {
@@ -310,7 +324,7 @@ void BindingSet::computeJoinsAndMeets() {
 
   for (const auto &binding : Bindings) {
     // Filter out supertype bindings that participated in the join.
-    if (binding.isViableForJoin())
+    if (binding.Kind == AllowedBindingKind::Supertypes)
       continue;
 
     // If the joined binding is in conflict with an existing subtype binding,
@@ -363,10 +377,6 @@ static bool isGenericParameter(TypeVariableType *TypeVar) {
 
 bool PotentialBinding::isViableForJoin() const {
   return Kind == AllowedBindingKind::Supertypes &&
-         !BindingType->hasLValueType() &&
-         !BindingType->hasTypeVariable() &&
-         !BindingType->hasPlaceholder() &&
-         !BindingType->hasUnboundGenericType() &&
          !BindingType->is<PackExpansionType>() &&
          /// FIXME: The old join code didn't understand existentials, so it
          /// did not join 'Any' with 'any Sendable'. The compatibility hack
@@ -1507,16 +1517,6 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       return SubsumeBindingResult::ExistingIsBetter;
 
     // Joins are handled in computeJoinsAndMeets().
-
-    // FIXME: Remove this.
-    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
-    if (result.has_value() && *result) {
-      if (binding.BindingType->hasTypeVariable())
-        return SubsumeBindingResult::ExistingIsBetter;
-
-      ASSERT(existing.BindingType->hasTypeVariable());
-      return SubsumeBindingResult::NewIsBetter;
-    }
   }
 
   // (Supertypes, Subtypes)
@@ -2032,7 +2032,7 @@ void BindingSet::possiblyDropDefaults() {
         anyNonJoinableSupertypeBindings = true;
     }
   }
-  
+
   if (!anySupertypeBindings || anyNonJoinableSupertypeBindings)
     return;
 
