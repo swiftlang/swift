@@ -56,8 +56,10 @@ class A {
     var a: MyArray<Int>
     init() {
         a = MyArray<Int // expected-error {{generic parameter 'Element' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
-       // expected-error@-1 {{binary operator '<' cannot be applied to operands of type 'MyArray<Element>.Type' and 'Int.Type'}}
-       // expected-error@-2 {{cannot assign value of type 'Bool' to type 'MyArray<Int>'}}
+       // expected-error@-1 {{type 'any Any.Type' cannot conform to 'Comparable'}}
+       // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+       // expected-note@-3 {{required by referencing operator function '<' on 'Comparable' where 'Self' = 'any Any.Type'}}
+       // expected-error@-4 {{cannot assign value of type 'Bool' to type 'MyArray<Int>'}}
     }
 }
 
