@@ -233,6 +233,10 @@ Type subtypeJoin(Type lhs, Type rhs, bool *existentialUpperBound);
 /// \returns the meet of the two types.
 Type subtypeMeet(Type lhs, Type rhs, bool *uninhabited);
 
+/// Replace JoinType and MeetType with fresh type variables.
+Type openTypeJoinsAndMeets(ConstraintSystem &cs, Type type,
+                           ConstraintLocator *locator);
+
 }  // end namespace constraints
 
 }  // end namespace swift

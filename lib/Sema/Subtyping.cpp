@@ -1552,6 +1552,115 @@ Type swift::constraints::subtypeMeet(Type lhs, Type rhs,
                              uninhabited);
 }
 
+/// This could almost use Type::transformWithPosition(), however that would give
+/// us no way to construct the correct locator.
+static Type openTypeJoinsAndMeetsRec(ConstraintSystem &cs, Type type,
+                                     ConstraintLocatorBuilder locator) {
+  auto rec = [&](Type type, LocatorPathElt elt,
+                 std::optional<LocatorPathElt> secondElt=std::nullopt) -> Type {
+    if (!type->hasJoinOrMeet())
+      return type;
+
+    auto subLocator = locator.withPathElement(elt);
+    return openTypeJoinsAndMeetsRec(cs, type,
+                                    (secondElt.has_value()
+                                     ? subLocator.withPathElement(*secondElt)
+                                     : subLocator));
+  };
+
+  if (type->is<MeetType>() || type->is<JoinType>()) {
+    unsigned options = TVO_PrefersSubtypeBinding | TVO_CanBindToHole;
+    return cs.createTypeVariable(cs.getConstraintLocator(locator), options);
+  }
+
+  switch (getConversionBehavior(type)) {
+  case ConversionBehavior::Optional: {
+    auto result = rec(type->getOptionalObjectType(),
+                      LocatorPathElt::GenericArgument(0));
+    return OptionalType::get(result);
+  }
+
+  case ConversionBehavior::Array: {
+    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto result = rec(boundTy->getGenericArgs()[0],
+                      LocatorPathElt::GenericArgument(0));
+    return ArraySliceType::get(result);
+  }
+
+  case ConversionBehavior::Dictionary: {
+    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto keyTy = rec(boundTy->getGenericArgs()[0],
+                      LocatorPathElt::GenericArgument(0));
+    auto valueTy = rec(boundTy->getGenericArgs()[1],
+                       LocatorPathElt::GenericArgument(1));
+    return DictionaryType::get(keyTy, valueTy);
+  }
+
+  case ConversionBehavior::Set: {
+    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto eltTy = rec(boundTy->getGenericArgs()[0],
+                     LocatorPathElt::GenericArgument(0));
+
+    auto &ctx = cs.getASTContext();
+    return BoundGenericType::get(ctx.getSetDecl(), Type(), eltTy);
+  }
+
+  case ConversionBehavior::Function: {
+    auto *funcTy = type->castTo<FunctionType>();
+
+    auto result = rec(funcTy->getResult(),
+                      ConstraintLocator::FunctionResult);
+
+    SmallVector<AnyFunctionType::Param, 4> params;
+    for (unsigned i : indices(funcTy->getParams())) {
+      const auto &param = funcTy->getParams()[i];
+      auto paramType = rec(param.getPlainType(),
+                           LocatorPathElt::FunctionArgument(),
+                           LocatorPathElt::TupleElement(i));
+      params.push_back(param.withType(paramType));
+    }
+
+    return FunctionType::get(params, result, funcTy->getExtInfo());
+  }
+
+  case ConversionBehavior::Metatype: {
+    auto instanceTy = rec(type->getMetatypeInstanceType(),
+                          ConstraintLocator::InstanceType);
+    return MetatypeType::get(instanceTy);
+  }
+
+  case ConversionBehavior::Tuple: {
+    auto *tupleTy = type->castTo<TupleType>();
+
+    SmallVector<TupleTypeElt, 2> elts;
+    for (unsigned i : indices(tupleTy->getElements())) {
+      const auto &elt = tupleTy->getElement(i);
+      auto eltTy = rec(elt.getType(),
+                       LocatorPathElt::TupleElement(i));
+      elts.emplace_back(eltTy, elt.getName());
+    }
+
+    return TupleType::get(elts, cs.getASTContext());
+  }
+
+  default:
+    ASSERT(!type->hasJoinOrMeet() && "Don't expect to see variance here");
+    return type;
+  }
+}
+
+/// Replace JoinType and MeetType with fresh type variables.
+Type swift::constraints::openTypeJoinsAndMeets(ConstraintSystem &cs, Type type,
+                                               ConstraintLocator *locator) {
+  if (!type->hasJoinOrMeet())
+    return type;
+
+  // These should never appear at the top level, or we'll enter an infinite loop.
+  ASSERT(!type->is<JoinType>() && !type->is<MeetType>());
+
+  return openTypeJoinsAndMeetsRec(cs, type, locator);
+}
+
 void swift::constraints::simple_display(llvm::raw_ostream &out,
                                         ConflictReason reason) {
   if (!reason)
