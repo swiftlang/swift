@@ -210,11 +210,8 @@ func test_unapplied_3(_ blobs: [Blob]) {
   let _: CGFloat = blobs.map(\.area).reduce(0, +)
   let _: CGFloat = blobs.map(\.area).reduce(0.0, +)
 
-  // FIXME
   let _: Double = blobs.map(\.circumference).reduce(0, +)
-  // expected-error@-1 {{cannot convert value of type '(Double) -> Double' to expected argument type '(Double, CGFloat) throws -> Double'}}
   let _: Double = blobs.map(\.circumference).reduce(0.0, +)
-  // expected-error@-1 {{cannot convert value of type '(Double) -> Double' to expected argument type '(Double, CGFloat) throws -> Double'}}
 
   let _: CGFloat = blobs.map(\.circumference).reduce(0, +)
   let _: CGFloat = blobs.map(\.circumference).reduce(0.0, +)
