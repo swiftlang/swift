@@ -17,7 +17,9 @@
 
 // RUN: %target-swift-frontend-plain -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   %s -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -load-plugin-library %t/plugins/%target-library-name(MacroDefinition)
+// RUN:   %s -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas \
+// RUN:   -load-plugin-library %t/plugins/%target-library-name(MacroDefinition) \
+// RUN:   -load-plugin-library %t/plugins/%target-library-name(NonExisting)
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json MyApp casFSRootID > %t/fs.casid
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS
@@ -28,12 +30,15 @@
 // RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -verify -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -module-name MyApp -O \
-// RUN:   -load-plugin-library %t/plugins/%target-library-name(MacroDefinition) \
+// RUN:   -resolved-plugin-verification \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %s @%t/MyApp.cmd
 
 @attached(extension, conformances: P, names: named(requirement))
 macro DelegatedConformance() = #externalMacro(module: "MacroDefinition", type: "DelegatedConformanceViaExtensionMacro")
+
+@attached(extension, conformances: P, names: named(requirement))
+macro NonExisting() = #externalMacro(module: "NonExisting", type: "DelegatedConformanceViaExtensionMacro") // expected-warning {{external macro implementation type 'NonExisting.DelegatedConformanceViaExtensionMacro' could not be found for macro 'NonExisting()'; plugin for module 'NonExisting' not found}}
 
 protocol P {
   static func requirement()
