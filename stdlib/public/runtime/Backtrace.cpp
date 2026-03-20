@@ -1135,8 +1135,8 @@ _swift_backtrace_demangle(const char *mangledName,
     char *result = __unDNameEx(outputBuffer,
                                mangledName,
                                *outputBufferSize,
-                               nullptr,
-                               nullptr,
+                               malloc,
+                               free,
                                nullptr,
                                0);
 

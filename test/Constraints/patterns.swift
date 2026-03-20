@@ -844,3 +844,30 @@ func testUndefinedInClosureVar() {
     for x: Undefined in [0] {} // expected-error {{cannot find type 'Undefined' in scope}}
   }
 }
+
+// Codify inconsistent behavior of 'guard let' with non-Optional bindings.
+do {
+  protocol P {}
+
+  class Base {}
+
+  class First: Base, P {}
+  class Second: Base, P {}
+
+  func invalidGuardLetInitializer(b: Bool, c1: First, c2: First?, c3: [First], d: Second) {
+    guard let _: P = b ? c1 : c1 else { return }
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+
+    guard let _: P = c2 != nil ? c2! : c1 else { return }
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+
+    guard let _: P = c3.first != nil ? c3.first! : c1 else { return }
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+
+    guard let _: P = b ? c1 : d else { return }  // FIXME: Should also be an error
+
+    guard let _: P = c2 != nil ? c2! : d else { return }  // FIXME: Should also be an error
+
+    guard let _: P = c3.first != nil ? c3.first! : d else { return }  // FIXME: Should also be an error
+  }
+}

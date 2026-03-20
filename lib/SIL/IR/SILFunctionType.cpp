@@ -1519,6 +1519,12 @@ public:
     case ValueOwnership::Shared:
       return ParameterConvention::Direct_Guaranteed;
     case ValueOwnership::Owned:
+      if (kind == ConventionsKind::ObjCSelectorFamily ||
+          kind == ConventionsKind::ObjCMethod) {
+        if (forSelf)
+          return getDirectSelfParameter(type);
+        return getDirectParameter(index, type, substTL);
+      }
       return ParameterConvention::Direct_Owned;
     }
     llvm_unreachable("unhandled ownership");

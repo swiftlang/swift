@@ -6720,7 +6720,7 @@ public:
     if (!innerIndex) return;
 
     auto packType = i->getIndexedPackType();
-    require(i->getComponentStartIndex() < packType->getNumElements(),
+    require(i->getComponentStartIndex() <= packType->getNumElements(),
             "component index must be in bounds for indexed pack type");
     verifySameShape(innerIndex->getIndexedPackType(), packType,
                     i->getComponentStartIndex(), i->getComponentEndIndex());

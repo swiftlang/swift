@@ -3470,13 +3470,6 @@ bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
     return false;
   }
 
-  if (seqConformanceRef.getConcrete()) {
-    auto protoAvail = AvailabilityContext::forDeclSignature(borrowingSeqProto);
-    auto availability = AvailabilityContext::forLocation(loc, dc);
-    if (!availability.isContainedIn(protoAvail))
-      return false;
-  }
-
   return true;
 }
 
@@ -3523,6 +3516,12 @@ public:
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
+    if (auto constraint = seqConformanceRef.getAvailabilityConstraint(
+            dc, stmt->getForLoc())) {
+      emitDiagnosticsForUnavailableConformance(seqType, constraint.value());
+      return nullptr;
+    }
+
     buildMakeIteratorVar();
 
     SmallVector<ASTNode, 2> stmts;
@@ -3540,6 +3539,21 @@ public:
   }
 
 private:
+  void
+  emitDiagnosticsForUnavailableConformance(Type seqType,
+                                           AvailabilityConstraint constraint) {
+    auto loc = stmt->getForLoc();
+    auto protoDecl = seqConformanceRef.getProtocol();
+
+    auto domainAndRange = constraint.getDomainAndRange(ctx);
+    ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
+                       seqType, protoDecl,
+                       domainAndRange.getDomain().getNameForAttributePrinting(),
+                       domainAndRange.getRange().getVersionString());
+    fixAvailability(loc, dc, domainAndRange.getDomain(),
+                    domainAndRange.getRange(), ctx);
+  }
+
   void buildMakeIteratorVar() {
     std::string name;
     {

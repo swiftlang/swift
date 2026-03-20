@@ -126,7 +126,6 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
 
   // Otherwise, if it's an actor instance, then it depends on async-ness.
   switch (typeIso.getKind()) {
-  case ActorIsolation::GlobalActor:
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:
@@ -139,6 +138,10 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
   case ActorIsolation::Erased:
     llvm_unreachable("constructor cannot have erased isolation");
 
+  case ActorIsolation::GlobalActor:
+    return ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
+               StrictConcurrency::Complete &&
+           !ctor->hasAsync();
   case ActorIsolation::ActorInstance:
     return !ctor->hasAsync(); // need flow-isolation for non-async.
   };
@@ -3749,11 +3752,13 @@ namespace {
           if (auto partialApply = dyn_cast<ApplyExpr>(apply->getFn())) {
             if (auto declRef = dyn_cast<DeclRefExpr>(partialApply->getFn())) {
               ValueDecl *fnDecl = declRef->getDecl();
-              ctx.Diags.diagnose(apply->getLoc(),
-                                 diag::actor_isolated_mutating_func,
-                                 fnDecl->getName(), decl)
+              ctx.Diags
+                  .diagnose(apply->getLoc(), diag::actor_isolated_mutating_func,
+                            fnDecl->getName(), decl)
                   .warnUntilLanguageModeIf(downgradeToWarning,
                                            LanguageMode::v6);
+              ctx.Diags.diagnose(partialApply->getArgs()->get(0).getStartLoc(),
+                                 diag::actor_isolated_mutating_func_note, decl);
               result = true;
               return;
             }
@@ -8584,8 +8589,6 @@ ActorReferenceResult ActorReferenceResult::Builder::build() {
     if (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete &&
         referencedActor && referencedActor->isSelf() &&
-        referencedActor->actor->isActorSelf() &&
-        !contextIsolation.isGlobalActor() &&
         checkedByFlowIsolation(fromDC, *referencedActor, decl, declRefLoc,
                                useKind))
       return forSameConcurrencyDomain(declIsolation, options);

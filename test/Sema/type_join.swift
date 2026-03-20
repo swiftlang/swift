@@ -34,7 +34,7 @@ func expectEqualType<T>(_: T.Type, _: T.Type) {}
 func commonSupertype<T>(_: T, _: T) -> T {} // expected-note 2 {{generic parameters are always considered '@escaping'}}
 
 expectEqualType(Builtin.type_join(Int.self, Int.self), Int.self)
-expectEqualType(Builtin.type_join_meta(D.self, C.self), C.self)
+expectEqualType(Builtin.type_join(D.Type.self, C.Type.self), C.Type.self)
 
 expectEqualType(Builtin.type_join(Int?.self, Int?.self), Int?.self)
 expectEqualType(Builtin.type_join(Int.self, Int?.self), Int?.self)

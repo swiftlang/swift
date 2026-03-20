@@ -57,6 +57,8 @@ class SwiftScanCAS {
 public:
   llvm::cas::ObjectStore &getCAS() const { return *CAS; }
   llvm::cas::ActionCache &getCache() const { return *Cache; }
+  std::shared_ptr<llvm::cas::ObjectStore> getSharedCAS() const { return CAS; }
+  std::shared_ptr<llvm::cas::ActionCache> getSharedCache() const { return Cache; }
 
   // Construct SwiftScanCAS.
   static llvm::Expected<SwiftScanCAS *>
@@ -910,7 +912,8 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
 
   std::string InstanceSetupError;
   if (Inst.setupForReplay(Instance.Invocation, InstanceSetupError,
-                          Instance.Args))
+                          Instance.Args,
+                          Comp.DB.getSharedCAS(), Comp.DB.getSharedCache()))
     return createStringError(inconvertibleErrorCode(), InstanceSetupError);
 
   auto *CDP = Inst.getCachingDiagnosticsProcessor();
@@ -991,7 +994,7 @@ SwiftScanCAS::createSwiftScanCAS(llvm::StringRef Path) {
 
 llvm::Expected<SwiftScanCAS *>
 SwiftScanCAS::createSwiftScanCAS(clang::CASOptions &CASOpts) {
-  auto DB = CASOpts.getOrCreateDatabases();
+  auto DB = CASOpts.CASConfiguration::createDatabases();
   if (!DB)
     return DB.takeError();
 

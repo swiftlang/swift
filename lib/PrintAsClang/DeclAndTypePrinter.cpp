@@ -51,6 +51,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -1126,7 +1127,10 @@ private:
       // same arity are ambiguous in C++.
       if (selfArity == arity) {
         owningPrinter.getCxxDeclEmissionScope()
-            .additionalUnrepresentableDeclarations.push_back(funcDecl);
+            .additionalUnrepresentableDeclarations.insert(
+                {funcDecl,
+                 "An overload with the same number of parameters already "
+                 "exists"});
         return false;
       }
     }
@@ -1578,6 +1582,38 @@ private:
     return representation;
   }
 
+  /// Returns a reason string describing why a function's signature can't be
+  /// represented in C++, identifying the specific unsupported type if possible.
+  std::string getUnsupportedTypeReason(AbstractFunctionDecl *FD) {
+    auto &mod = owningPrinter.M;
+    auto isUnsupported = [&](Type ty) {
+      return DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
+                 owningPrinter.typeMapping, owningPrinter.interopContext,
+                 owningPrinter, &mod, ty)
+          .isUnsupported();
+    };
+
+    if (auto *funcDecl = dyn_cast<FuncDecl>(FD)) {
+      auto resultTy = funcDecl->getResultInterfaceType();
+      if (resultTy && !resultTy->isVoid() && isUnsupported(resultTy))
+        return "Return type '" + resultTy->getString() +
+               "' is not representable in C++";
+    }
+
+    for (auto [i, param] : llvm::enumerate(*FD->getParameters())) {
+      auto paramTy = param->getInterfaceType();
+      if (isUnsupported(paramTy)) {
+        auto name = param->getNameStr();
+        if (name.empty() || name == "_")
+          return "Parameter #" + std::to_string(i) + " of type '" +
+                 paramTy->getString() + "' is not representable in C++";
+        return "Parameter '" + name.str() + "' of type '" +
+               paramTy->getString() + "' is not representable in C++";
+      }
+    }
+    return "";
+  }
+
   // Print out the extern C Swift ABI function signature.
   std::optional<FunctionSwiftABIInformation>
   printSwiftABIFunctionSignatureAsCxxFunction(
@@ -1927,7 +1963,8 @@ private:
                          .printSwiftABIFunctionSignatureAsCxxFunction(FD);
       if (!funcABI) {
         owningPrinter.getCxxDeclEmissionScope()
-            .additionalUnrepresentableDeclarations.push_back(FD);
+            .additionalUnrepresentableDeclarations.insert(
+                {FD, getUnsupportedTypeReason(FD)});
         return;
       }
       if (!canPrintOverloadOfFunction(FD))

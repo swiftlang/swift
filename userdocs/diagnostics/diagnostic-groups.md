@@ -33,6 +33,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:implementation-only-deprecated>
 - <doc:dynamic-exclusivity>
 - <doc:embedded-restrictions>
+- <doc:existential-type>
 - <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
@@ -55,6 +56,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:dynamic-callable-requirements>
 - <doc:always-available-domain>
 - <doc:trailing-closure-matching>
+- <doc:actor-isolated-mutating-async>
 - <doc:actor-isolated-call>
 - <doc:sendable-closure-captures>
 - <doc:compilation-caching>
@@ -63,6 +65,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:implementation-only-deprecated>
 - <doc:dynamic-exclusivity>
 - <doc:embedded-restrictions>
+- <doc:existential-type>
 - <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>

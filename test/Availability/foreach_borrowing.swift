@@ -7,20 +7,18 @@
 // REQUIRES: swift_feature_BorrowingSequence
 // REQUIRES: OS=macosx
 
-// Tests for the availability check in shouldUseBorrowingSequence.
+// Tests for the availability check in DesugarForEachStmt.
 //
 // BorrowingSequence is @available(SwiftStdlib 6.4, *). When a for-in loop
 // over a BorrowingSequence-conforming type appears in a context whose
-// availability does not cover SwiftStdlib 6.4, the compiler falls back to
-// treating the sequence as a Sequence. If the type does not also conform to
-// Sequence this produces a diagnostic.
+// availability does not cover SwiftStdlib 6.4, the compiler signals that.
 
-// Without @available(SwiftStdlib 6.4, *) on the enclosing function the
+// Without @available(SwiftStdlib 6.4, *) on the enclosing function, the
 // availability context does not cover SwiftStdlib 6.4.
-// The compiler tries the Sequence path, and because Span<Int> does not conform 
-// to Sequence a diagnostic is emitted.
 func testForLoopOverSpanWithoutAvailability(_ seq: Span<Int>) {
-  for x in seq { // expected-error {{for-in loop requires 'Span<Int>' to conform to 'Sequence'}}
+  for x in seq { // expected-error {{for-in loop requires 'Span<Int>' to conform to 'BorrowingSequence', which is only available in macOS 9999 or newer}}
+  // expected-note@-2 {{add '@available' attribute to enclosing global function}}
+  // expected-note@-2 {{add 'if #available' version check}}
     _ = x
   }
 }
@@ -68,7 +66,7 @@ func testInvalidBorrowingWithSequence(seq: BorrowingFallbackWithSequence) {
 
 // A type whose only sequence conformance is BorrowingSequence, available under
 // SwiftStdlib 6.4. In a context without that availability, the compiler falls
-// back to Sequence, finds no conformance, and emits a diagnostic.
+// emits an error.
 struct BorrowingFallbackNoSequence {}
 
 @available(SwiftStdlib 6.4, *)
@@ -81,7 +79,9 @@ extension BorrowingFallbackNoSequence: BorrowingSequence {
 }
 
 func testInvalidBorrowingNoSequence(seq: BorrowingFallbackNoSequence) {
-  for x in seq { // expected-error {{for-in loop requires 'BorrowingFallbackNoSequence' to conform to 'Sequence'}}
+  for x in seq { // expected-error {{for-in loop requires 'BorrowingFallbackNoSequence' to conform to 'BorrowingSequence', which is only available in macOS 9999 or newer}}
+  // expected-note@-2 {{add '@available' attribute to enclosing global function}}
+  // expected-note@-2 {{add 'if #available' version check}}
     _ = x
   }
 }

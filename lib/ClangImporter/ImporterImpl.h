@@ -459,6 +459,11 @@ public:
   /// Swift AST context.
   ASTContext &SwiftContext;
 
+  /// Shared CAS instance from the swift CompilerInstance.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  /// Shared ActionCache instance from the swift CompilerInstance.
+  std::shared_ptr<llvm::cas::ActionCache> ResultCache;
+
   // Associates a vector of import diagnostics with a ClangNode
   std::unordered_map<ImportDiagnosticTarget, std::vector<ImportDiagnostic>,
                      ImportDiagnosticTargetHasher>

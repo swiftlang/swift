@@ -145,6 +145,20 @@ struct CacheInputEntry {
 };
 } // namespace
 
+// Get the output config type from the output file type.
+static llvm::vfs::OutputConfig getOutputConfig(file_types::ID Type) {
+  llvm::vfs::OutputConfig Config;
+  switch(Type) {
+    case file_types::ID::TY_ModuleTrace:
+      // ModuleTrace always appends.
+      return Config.setAtomicWrite().setAppend();
+    default:
+      // By default, only write to the output file when different. This matches
+      // the behavior in `swift::withOutputPath()`.
+      return Config.setAtomicWrite().setOnlyIfDifferent();
+  }
+}
+
 static bool replayCachedCompilerOutputsImpl(
     ArrayRef<CacheInputEntry> Inputs, ObjectStore &CAS, DiagnosticEngine &Diag,
     const FrontendOptions &Opts, CachingDiagnosticsProcessor &CDP,
@@ -291,7 +305,7 @@ static bool replayCachedCompilerOutputsImpl(
 
   // Replay the result only when everything is resolved.
   for (auto &Output : OutputProxies) {
-    auto File = Backend.createFile(Output.Path);
+    auto File = Backend.createFile(Output.Path, getOutputConfig(Output.Kind));
     if (!File) {
       Diag.diagnose(SourceLoc(), diag::error_opening_output, Output.Path,
                     toString(File.takeError()));

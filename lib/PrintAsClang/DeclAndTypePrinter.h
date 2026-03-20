@@ -39,7 +39,11 @@ class SwiftToClangInteropContext;
 /// C++ scope.
 struct CxxDeclEmissionScope {
   /// Additional Swift declarations that are unrepresentable in C++.
-  std::vector<const ValueDecl *> additionalUnrepresentableDeclarations;
+  /// The string holds a reason why the declaration is unrepresentable;
+  /// empty string means the reason should be acqured from
+  /// 'getDeclRepresentation'.
+  llvm::DenseMap<const ValueDecl *, std::string>
+      additionalUnrepresentableDeclarations;
   /// Records the C++ declaration names already emitted in this lexical scope.
   llvm::StringSet<> emittedDeclarationNames;
   /// Records the names of the function overloads already emitted in this

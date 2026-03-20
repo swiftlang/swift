@@ -69,6 +69,8 @@ def main():
                     module["modulePath"] = os.path.basename(detail["modulePath"])
                 else:
                     module["modulePath"] = detail["modulePath"]
+            if "libraryLevel" in detail:
+                module["libraryLevel"] = detail["libraryLevel"]
             modules.append(module)
 
         # Write output response file if requested.

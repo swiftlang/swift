@@ -26,6 +26,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
@@ -280,6 +281,13 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
   if (code) {
     return code;
   }
+  // Compute library level based on the interface file path.
+  {
+    SmallString<256> modulePathBuf;
+    StringRef modulePath = moduleInterfacePath.toStringRef(modulePathBuf);
+    Result->setLibraryLevel(libraryLevelFromPath(
+        modulePath, Ctx.SearchPathOpts.getSDKPath(), Ctx.LangOpts.Target));
+  }
   return *Result;
 }
 
@@ -372,6 +380,13 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
       continue;
     dependencies.addMacroDependency(macro.ModuleName, deps->LibraryPath,
                                     deps->ExecutablePath);
+  }
+
+  // Compute library level based on the binary module path.
+  {
+    dependencies.setLibraryLevel(libraryLevelFromPath(
+        definingModulePath, Ctx.SearchPathOpts.getSDKPath(),
+        Ctx.LangOpts.Target));
   }
 
   return std::move(dependencies);

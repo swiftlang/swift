@@ -1801,6 +1801,18 @@ ERROR(attribute_requires_experimental_feature,none,
 ERROR(nominal_type_not_attribute,none,
       "%kind0 cannot be used as an attribute", (const ValueDecl *))
 
+ERROR(attribute_part_of_type,none,
+      "attribute %0 cannot be applied to a type alias", (const TypeAttribute *))
+NOTE(add_attribute_to_alias_def,none,
+      "add %0 to the definition of %1",
+      (const TypeAttribute *, Type))
+NOTE(redundant_attribute_on_alias,none,
+      "%0 is redundant on %1",
+      (const TypeAttribute *, Type))
+NOTE(expand_type_alias,none,
+      "expand %0 to apply %1",
+      (Type, const TypeAttribute *))
+
 ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
       (SelfAccessKind))
 ERROR(mutating_invalid_classes,none, "%0 is not valid on %kindonly1s in "
@@ -5618,6 +5630,12 @@ ERROR(tryless_throwing_call_in_nonexhaustive_catch,none,
       "the enclosing catch is not exhaustive", (StringRef))
 ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
+ERROR(throw_in_defer_body,none,
+      "errors cannot be thrown out of a defer body", ())
+ERROR(throwing_op_in_defer_body,none,
+      "%0 can throw, but errors cannot be thrown out of a defer body", (StringRef))
+ERROR(async_defer_in_non_async_context,none,
+      "'async' defer must appear within an 'async' context", ())
 
 #define EFFECTS_CONTEXT_KIND \
   "%select{<<ERROR>>|" \
@@ -5846,9 +5864,12 @@ ERROR(actor_isolated_inout_state,none,
       "actor-isolated %kind0 cannot be passed 'inout' to"
       "%select{| implicitly}1 'async' function call",
       (const ValueDecl *, bool))
-ERROR(actor_isolated_mutating_func,none,
+GROUPED_ERROR(actor_isolated_mutating_func,ActorIsolatedMutatingAsync,none,
       "cannot call mutating async function %0 on actor-isolated %kind1",
       (DeclName, const ValueDecl *))
+NOTE(actor_isolated_mutating_func_note,none,
+      "%0 can be concurrently accessed during mutation, risking data races",
+      (const ValueDecl *))
 GROUPED_ERROR(actor_isolated_call,ActorIsolatedCall,none,
       "call to %0 function in a synchronous %1 context",
       (ActorIsolation, ActorIsolation))
@@ -8456,6 +8477,11 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
 ERROR(borrowingsequence_experimental,none,
       "'%0' requires -enable-experimental-feature BorrowingSequence",
       (StringRef))
+
+ERROR(for_loop_sequence_conformance_unavailable,none,
+      "for-in loop requires %0 to conform to %1, which is "
+      "only available in %2 %3 or newer",
+      (Type, ProtocolDecl *, StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors

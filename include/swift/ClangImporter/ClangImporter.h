@@ -214,7 +214,9 @@ public:
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx, const IRGenOptions *IRGenOpts = nullptr,
          std::string swiftPCHHash = "", std::string casidForPCH = "",
-         DependencyTracker *tracker = nullptr, bool ignoreFileMapping = false);
+         DependencyTracker *tracker = nullptr, bool ignoreFileMapping = false,
+         std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr,
+         std::shared_ptr<llvm::cas::ActionCache> Cache = nullptr);
 
   static std::string getClangSystemOverlayFile(const SearchPathOptions &Opts);
 

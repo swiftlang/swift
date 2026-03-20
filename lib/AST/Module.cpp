@@ -3285,6 +3285,13 @@ LibraryLevel
 ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
                                     const ModuleDecl *module) const {
   auto &ctx = module->getASTContext();
+
+  // Check if the library level was explicitly provided via the explicit
+  // module map (e.g. from the dependency scanner).
+  if (auto level = ctx.getExplicitModuleLibraryLevel(
+          module->getName().str(), module->isNonSwiftModule()))
+    return *level;
+
   namespace path = llvm::sys::path;
   SmallString<128> scratch;
 

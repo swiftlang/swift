@@ -2,7 +2,7 @@
 // RUN: %swift-ide-test -test-input-complete -source-filename=%s -target i386-apple-ios7.0
 
 #if os(tvOS) || os(watchOS)
-// This block should not parse.
+// This block should not be type checked.
 // os(tvOS) or os(watchOS) does not imply os(iOS).
 let i: Int = "Hello"
 #endif
@@ -14,3 +14,9 @@ var x = C()
 #endif
 #endif
 var y = x
+
+#if os(anyAppleOS)
+// os(iOS) implies os(anyAppleOS)
+func hasAnyAppleOS() { }
+#endif
+hasAnyAppleOS()

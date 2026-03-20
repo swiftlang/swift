@@ -1046,6 +1046,9 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   CI.setDiagnostics(&*clang::CompilerInstance::createDiagnostics(
       Impl.Instance->getVirtualFileSystem(), diagOpts));
 
+  if (Impl.CAS)
+    CI.setCASDatabases(Impl.CAS, Impl.ResultCache);
+
   // Note: Reusing the file manager is safe; this is a component that's already
   // reused when building PCM files for the module cache.
   CI.setVirtualFileSystem(Impl.Instance->getVirtualFileSystemPtr());
@@ -1297,7 +1300,9 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     // compiler can be more efficient to compute swift cache key without having
     // the knowledge about clang command-line options.
     if (ctx.CASOpts.EnableCaching || ctx.CASOpts.ImportModuleFromCAS) {
-      CI->getCASOpts() = ctx.CASOpts.CASOpts;
+      CI->getCASOpts().CASPath = ctx.CASOpts.Config.CASPath;
+      CI->getCASOpts().PluginPath = ctx.CASOpts.Config.PluginPath;
+      CI->getCASOpts().PluginOptions = ctx.CASOpts.Config.PluginOptions;
       // When clangImporter is used to compile (generate .pcm or .pch), need to
       // inherit the include tree from swift args (last one wins) and clear the
       // input file.
@@ -1364,7 +1369,8 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
   // to missing files and report the error that clang would throw manually.
   // rdar://77516546 is tracking that the clang importer should be more
   // resilient and provide a module even if there were building it.
-  auto TempVFS = clang::createVFSFromCompilerInvocation(*CI, *clangDiags, VFS);
+  auto TempVFS = clang::createVFSFromCompilerInvocation(*CI, *clangDiags, VFS,
+                                                        Impl.CAS);
 
   std::vector<std::string> FilteredModuleMapFiles;
   for (const auto &ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
@@ -1428,9 +1434,14 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
 std::unique_ptr<ClangImporter>
 ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
                       std::string swiftPCHHash, std::string casidForPCH,
-                      DependencyTracker *tracker, bool ignoreFileMapping) {
+                      DependencyTracker *tracker, bool ignoreFileMapping,
+                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                      std::shared_ptr<llvm::cas::ActionCache> Cache) {
   std::unique_ptr<ClangImporter> importer{new ClangImporter(ctx, tracker)};
   auto &importerOpts = ctx.ClangImporterOpts;
+
+  importer->Impl.CAS = std::move(CAS);
+  importer->Impl.ResultCache = std::move(Cache);
 
   auto bridgingPCH = importerOpts.getPCHInputPath();
   if (!bridgingPCH.empty()) {
@@ -1516,6 +1527,9 @@ ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
   auto &instance = *importer->Impl.Instance;
   if (tracker)
     instance.addDependencyCollector(tracker->getClangCollector());
+
+  if (importer->Impl.CAS)
+    instance.setCASDatabases(importer->Impl.CAS, importer->Impl.ResultCache);
 
   // Now set up the real client for Clang diagnostics---configured with proper
   // options---as opposed to the temporary one we made above.
@@ -2036,12 +2050,9 @@ bool ClangImporter::bindBridgingHeader(ModuleDecl *adapter, SourceLoc diagLoc) {
 
 static llvm::Expected<llvm::cas::ObjectRef>
 setupIncludeTreeInput(clang::CompilerInvocation &invocation,
-                      StringRef headerPath, StringRef pchIncludeTree) {
-  auto DB = invocation.getCASOpts().getOrCreateDatabases();
-  if (!DB)
-    return DB.takeError();
-  auto CAS = DB->first;
-  auto Cache = DB->second;
+                      StringRef headerPath, StringRef pchIncludeTree,
+                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                      std::shared_ptr<llvm::cas::ActionCache> Cache) {
   auto ID = CAS->parseID(pchIncludeTree);
   if (!ID)
     return ID.takeError();
@@ -2086,7 +2097,8 @@ std::string ClangImporter::getBridgingHeaderContents(
     invocation->getFrontendOpts().Inputs.push_back(
         clang::FrontendInputFile(headerPath, clang::Language::ObjC));
   else if (auto err =
-               setupIncludeTreeInput(*invocation, headerPath, pchIncludeTree)
+               setupIncludeTreeInput(*invocation, headerPath, pchIncludeTree,
+                                     Impl.CAS, Impl.ResultCache)
                    .moveInto(includeTreeRef)) {
     Impl.diagnose({}, diag::err_rewrite_bridging_header,
                   toString(std::move(err)));
@@ -2098,6 +2110,10 @@ std::string ClangImporter::getBridgingHeaderContents(
   clang::CompilerInstance rewriteInstance(
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
       &Impl.Instance->getModuleCache());
+
+  if (Impl.CAS)
+    rewriteInstance.setCASDatabases(Impl.CAS, Impl.ResultCache);
+
   rewriteInstance.setVirtualFileSystem(
       Impl.Instance->getVirtualFileSystemPtr());
   rewriteInstance.setFileManager(Impl.Instance->getFileManagerPtr());
@@ -2202,6 +2218,9 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   auto clonedInstance = std::make_unique<clang::CompilerInstance>(
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
       &Impl.Instance->getModuleCache());
+
+  if (Impl.CAS)
+    clonedInstance->setCASDatabases(Impl.CAS, Impl.ResultCache);
   clonedInstance->setVirtualFileSystem(
       Impl.Instance->getVirtualFileSystemPtr());
   clonedInstance->setFileManager(Impl.Instance->getFileManagerPtr());
@@ -3063,7 +3082,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
           llvm::any_of(M->Requirements, [cxx](const auto &Req) {
             if (Req.FeatureName == "swift")
               return !Req.RequiredState;
-            if (Req.FeatureName == "cplusplus")
+            if (StringRef(Req.FeatureName).starts_with("cplusplus"))
               return Req.RequiredState != cxx;
             return false;
           });
@@ -8962,7 +8981,7 @@ bool importer::requiresCPlusPlus(const clang::Module *module) {
   }
 
   return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
-    return req.FeatureName == "cplusplus";
+    return StringRef(req.FeatureName).starts_with("cplusplus");
   });
 }
 

@@ -473,4 +473,10 @@ private:
   std::atomic<unsigned> NumLookups = 0;
 };
 
+/// Check if a module path is under one of the known SDK private framework
+/// directories, indicating the module is SPI. Returns the appropriate
+/// LibraryLevel (SPI or API) for a module at the given path.
+LibraryLevel libraryLevelFromPath(StringRef modulePath, StringRef sdkPath,
+                                  const llvm::Triple &target);
+
 } // namespace swift
