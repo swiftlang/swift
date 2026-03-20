@@ -265,15 +265,19 @@ void BindingSet::computeJoinsAndMeets() {
   MergedBinding supertypes;
   MergedBinding subtypes;
 
+  // FIXME: Remove this.
+  bool allowTypeVariableJoins =
+      CS.getASTContext().TypeCheckerOpts.SolverEnableTypeVariableJoins;
+
   for (const auto &binding : Bindings) {
     if (binding.Kind == AllowedBindingKind::Supertypes &&
-        binding.isViableForJoinOrMeet()) {
+        binding.isViableForJoinOrMeet(allowTypeVariableJoins)) {
       if (!isAcceptableJoin(binding.BindingType))
         allowUpperBound = true;
 
       supertypes.add(binding);
     } else if (binding.Kind == AllowedBindingKind::Subtypes &&
-               binding.isViableForJoinOrMeet()) {
+               binding.isViableForJoinOrMeet(allowTypeVariableJoins)) {
       subtypes.add(binding);
     }
   }
@@ -408,7 +412,7 @@ void BindingSet::computeJoinsAndMeets() {
     if (foundCommonSupertype) {
       // Filter out supertype bindings that participated in the join.
       if (binding.Kind == AllowedBindingKind::Supertypes &&
-          binding.isViableForJoinOrMeet()) {
+          binding.isViableForJoinOrMeet(allowTypeVariableJoins)) {
         continue;
       }
     }
@@ -416,7 +420,7 @@ void BindingSet::computeJoinsAndMeets() {
     if (foundCommonSubtype) {
       // Filter out supertype bindings that participated in the join.
       if (binding.Kind == AllowedBindingKind::Subtypes &&
-          binding.isViableForJoinOrMeet()) {
+          binding.isViableForJoinOrMeet(allowTypeVariableJoins)) {
         continue;
       }
     }
@@ -463,12 +467,12 @@ static bool isGenericParameter(TypeVariableType *TypeVar) {
   return locator && locator->isLastElement<LocatorPathElt::GenericParameter>();
 }
 
-bool PotentialBinding::isViableForJoinOrMeet() const {
-  return !BindingType->hasLValueType() &&
-         !BindingType->hasTypeVariable() &&
-         !BindingType->hasPlaceholder() &&
-         !BindingType->hasUnboundGenericType() &&
-         !BindingType->is<PackExpansionType>() &&
+bool PotentialBinding::isViableForJoinOrMeet(bool allowTypeVariableJoins) const {
+  // Temporary staging hack.
+  if (!allowTypeVariableJoins && BindingType->hasTypeVariable())
+    return false;
+
+  return !BindingType->is<PackExpansionType>() &&
          /// FIXME: The old join code didn't understand existentials, so it
          /// did not join 'Any' with 'any Sendable'. The compatibility hack
          /// where 'any Sendable' can bind to 'Any' relies on this behavior.
@@ -1610,13 +1614,17 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // Joins are handled in computeJoinsAndMeets().
 
     // FIXME: Remove this.
-    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
-    if (result.has_value() && *result) {
-      if (binding.BindingType->hasTypeVariable())
-        return SubsumeBindingResult::ExistingIsBetter;
+    bool allowTypeVariableJoins =
+        CS.getASTContext().TypeCheckerOpts.SolverEnableTypeVariableJoins;
+    if (!allowTypeVariableJoins) {
+      auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+      if (result.has_value() && *result) {
+        if (binding.BindingType->hasTypeVariable())
+          return SubsumeBindingResult::ExistingIsBetter;
 
-      ASSERT(existing.BindingType->hasTypeVariable());
-      return SubsumeBindingResult::NewIsBetter;
+        ASSERT(existing.BindingType->hasTypeVariable());
+        return SubsumeBindingResult::NewIsBetter;
+      }
     }
   }
 
@@ -2124,12 +2132,16 @@ void BindingSet::possiblyDropDefaults() {
   if (!Literals.empty())
     return;
 
+  // FIXME: Remove this.
+  bool allowTypeVariableJoins =
+      CS.getASTContext().TypeCheckerOpts.SolverEnableTypeVariableJoins;
+
   bool anySupertypeBindings = false;
   bool anyNonJoinableSupertypeBindings = false;
   for (const auto &binding : Bindings) {
     if (binding.Kind == AllowedBindingKind::Supertypes) {
       anySupertypeBindings = true;
-      if (!binding.isViableForJoinOrMeet())
+      if (!binding.isViableForJoinOrMeet(allowTypeVariableJoins))
         anyNonJoinableSupertypeBindings = true;
     }
   }

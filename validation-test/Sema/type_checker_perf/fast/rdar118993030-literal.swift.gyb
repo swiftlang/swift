@@ -1,5 +1,8 @@
 // RUN: %scale-test --begin 1 --end 7 --step 1 --select NumConstraintScopes %s
+// RUN: %scale-test --invert --begin 1 --end 5 --step 1 --select NumConstraintScopes %s -Xfrontend=-solver-enable-type-var-joins
 // REQUIRES: asserts,no_asan
+
+// FIXME: Fix this regression before enabling the flag.
 
 struct Root {
   enum E: Int, Comparable {
