@@ -335,7 +335,7 @@ swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
 
   // FIXME: Make this more precise.
   if (auto *lhsDecl = lhs->getAnyNominal()) {
-    if (!rhs->is<TypeVariableType>() && !rhs->isTypeParameter()) {
+    if (!rhs->isTypeVariableOrMember() && !rhs->isTypeParameter()) {
       auto *rhsDecl = rhs->getAnyNominal();
       return lhsDecl == rhsDecl;
     }
@@ -1126,16 +1126,42 @@ static Type superclassJoinMeetImpl(Operation op, Type lhs, Type rhs) {
   return Type();
 }
 
-static AnyFunctionType::ExtInfo
+static std::optional<AnyFunctionType::ExtInfo>
 extInfoJoinMeetImpl(Operation op,
                     AnyFunctionType::ExtInfo lhsInfo,
                     AnyFunctionType::ExtInfo rhsInfo) {
   bool noEscape, sendable, throwing;
+  Type sendableDep;
   Type thrownError;
+
+  // Concurrency is too hard to reason about here.
+  if (lhsInfo.getIsolation() != rhsInfo.getIsolation())
+    return std::nullopt;
+
+  auto lhsSendableDep = lhsInfo.getSendableDependentType();
+  auto rhsSendableDep = rhsInfo.getSendableDependentType();
 
   if (op == Operation::Join) {
     noEscape = lhsInfo.isNoEscape() || rhsInfo.isNoEscape();
-    sendable = lhsInfo.isSendable() && rhsInfo.isSendable();
+
+    if (lhsSendableDep && rhsSendableDep) {
+      // Form a tuple; its Sendable iff both components are Sendable.
+      SmallVector<TupleTypeElt, 2> elts;
+      elts.push_back(lhsSendableDep);
+      elts.push_back(rhsSendableDep);
+      sendableDep = TupleType::get(elts, lhsSendableDep->getASTContext());
+      sendable = false;
+    } else if (lhsSendableDep && !rhsSendableDep) {
+      if (rhsInfo.isSendable())
+        sendableDep = lhsSendableDep;
+      sendable = false;
+    } else if (!lhsSendableDep && rhsSendableDep) {
+      if (lhsInfo.isSendable())
+        sendableDep = rhsSendableDep;
+      sendable = false;
+    } else {
+      sendable = lhsInfo.isSendable() && rhsInfo.isSendable();
+    }
 
     throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
     Type thrownError;
@@ -1151,7 +1177,27 @@ extInfoJoinMeetImpl(Operation op,
     }
   } else {
     noEscape = lhsInfo.isNoEscape() && rhsInfo.isNoEscape();
-    sendable = lhsInfo.isSendable() || rhsInfo.isSendable();
+
+    if (lhsSendableDep && rhsSendableDep) {
+      // We cannot represent the meet of two sendable-dependent types.
+      return std::nullopt;
+    } else if (lhsSendableDep && !rhsSendableDep) {
+      if (rhsInfo.isSendable()) {
+        sendable = true;
+      } else {
+        sendable = false;
+        sendableDep = lhsSendableDep;
+      }
+    } else if (!lhsSendableDep && rhsSendableDep) {
+      if (lhsInfo.isSendable()) {
+        sendable = true;
+      } else {
+        sendable = false;
+        sendableDep = rhsSendableDep;
+      }
+    } else {
+      sendable = lhsInfo.isSendable() || rhsInfo.isSendable();
+    }
 
     throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();
     Type thrownError;
@@ -1175,6 +1221,7 @@ extInfoJoinMeetImpl(Operation op,
       .withNoEscape(noEscape)
       .withThrows(throwing, thrownError)
       .withSendable(sendable)
+      .withSendableDependentType(sendableDep)
       .build();
 }
 
@@ -1191,6 +1238,13 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
     return ctx.getNeverType();
   };
 
+  auto unknown = [&]() -> Type {
+    auto &ctx = lhs->getASTContext();
+    if (op == Operation::Join)
+      return ctx.TheJoinType;
+    return ctx.TheMeetType;
+  };
+
   auto rec = [&](Type lhs, Type rhs) -> Type {
     return subtypeJoinMeetImpl(op, lhs, rhs, failed);
   };
@@ -1200,7 +1254,7 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
 
   if (lhsKind == ConversionBehavior::Unknown ||
       rhsKind == ConversionBehavior::Unknown)
-    return fail();
+    return unknown();
 
   if (lhsKind == rhsKind) {
     switch (lhsKind) {
@@ -1209,13 +1263,27 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
       ASSERT(false && "Already handled above");
       break;
 
-    case ConversionBehavior::None:
-    case ConversionBehavior::LValue:
-    case ConversionBehavior::InOut:
+    case ConversionBehavior::None: {
       // These are either singleton types, or they're invariant.
-      //
-      // FIXME: Handle type variables here.
-      return fail();
+      auto result = isLikelyExactMatch(lhs, rhs);
+      if (result && !*result)
+        return fail();
+      if (!lhs->hasTypeVariable())
+        return lhs;
+      return rhs;
+    }
+
+    case ConversionBehavior::LValue:
+    case ConversionBehavior::InOut: {
+      // These are invariant.
+      auto result = isLikelyExactMatch(lhs->getWithoutSpecifierType(),
+                                       rhs->getWithoutSpecifierType());
+      if (result && !*result)
+        return fail();
+      if (!lhs->hasTypeVariable())
+        return lhs;
+      return rhs;
+    }
 
     case ConversionBehavior::Class: {
       // FIXME: CF toll-free bridging
@@ -1325,8 +1393,10 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
       auto extInfo = extInfoJoinMeetImpl(op,
                                          lhsFunc->getExtInfo(),
                                          rhsFunc->getExtInfo());
+      if(!extInfo.has_value())
+        return fail();
 
-      return FunctionType::get(params, result, extInfo);
+      return FunctionType::get(params, result, *extInfo);
     }
 
     case ConversionBehavior::Metatype: {
