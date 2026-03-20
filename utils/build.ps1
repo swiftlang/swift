@@ -3051,14 +3051,6 @@ function Write-SDKSettings([OS] $OS, [string] $Identifier = $OS.ToString()) {
 
 function Build-Dispatch([Hashtable] $Platform) {
   $SwiftSDK = Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK
-  $PlatformDefines = @{}
-
-  if ($Platform.OS -eq [OS]::Android) {
-    $PlatformDefines += @{
-      BUILD_TESTING = "NO";
-    }
-  }
-
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-libdispatch `
     -Bin (Get-ProjectBinaryCache $Platform Dispatch) `
@@ -3066,10 +3058,11 @@ function Build-Dispatch([Hashtable] $Platform) {
     -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
     -SwiftSDK $SwiftSDK `
-    -Defines ($PlatformDefines + @{
+    -Defines @{
+      BUILD_TESTING = "NO";
       ENABLE_SWIFT = "YES";
       dispatch_INSTALL_ARCH_SUBDIR = "YES";
-    })
+    }
 }
 
 function Test-Dispatch {
@@ -3084,6 +3077,7 @@ function Test-Dispatch {
       -SwiftSDK (Get-SwiftSDK -OS $BuildPlatform.OS -Identifier $BuildPlatform.DefaultSDK) `
       -BuildTargets default,ExperimentalTest `
       -Defines @{
+        BUILD_TESTING = "YES";
         ENABLE_SWIFT = "YES";
       }
   }
@@ -3364,14 +3358,6 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
 
   $SDKROOT = Get-SwiftSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental"
 
-  $PlatformDefines = @{}
-
-  if ($Platform.OS -eq [OS]::Android) {
-    $PlatformDefines += @{
-      BUILD_TESTING = "NO";
-    }
-  }
-
   if ($Platform.LinkModes.Contains("dynamic")) {
     Record-OperationTime $Platform "Build-ExperimentalDynamicDispatch" {
       Build-CMakeProject `
@@ -3381,13 +3367,14 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
         -Platform $Platform `
         -UseBuiltCompilers C,CXX,Swift `
         -SwiftSDK "${SDKROOT}" `
-        -Defines ($PlatformDefines + @{
+        -Defines @{
+          BUILD_TESTING = "NO";
           BUILD_SHARED_LIBS = "YES";
           CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
           ENABLE_SWIFT = "YES";
-        })
+        }
     }
 
     Record-OperationTime $Platform "Build-ExperimentalDynamicFoundation" {
@@ -3433,13 +3420,14 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
         -Platform $Platform `
         -UseBuiltCompilers C,CXX,Swift `
         -SwiftSDK "${SDKROOT}" `
-        -Defines ($PlatformDefines + @{
+        -Defines @{
+          BUILD_TESTING = "NO";
           BUILD_SHARED_LIBS = "NO";
           CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
           ENABLE_SWIFT = "YES";
-        })
+        }
     }
 
     Record-OperationTime $Platform "Build-ExperimentalStaticFoundation" {
