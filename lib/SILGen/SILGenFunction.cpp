@@ -125,6 +125,14 @@ SILGenFunction::~SILGenFunction() {
 // Function emission
 //===----------------------------------------------------------------------===//
 
+void SILGenFunction::finalizeEmission() {
+  mergeCleanupBlocks();
+
+  for (auto &finalizer : EmissionFinalizers) {
+    finalizer(*this);
+  }
+}
+
 // Get the #function name for a declaration.
 DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
   // For closures, use the parent name.
@@ -1149,7 +1157,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     emitEpilog(fd);
   }
 
-  mergeCleanupBlocks();
+  finalizeEmission();
 }
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
@@ -1673,7 +1681,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   }
 
   emitEpilog(Loc);
-  mergeCleanupBlocks();
+  finalizeEmission();
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
@@ -1766,7 +1774,7 @@ void SILGenFunction::emitGeneratorFunction(
   emitStmt(body);
 
   emitEpilog(loc);
-  mergeCleanupBlocks();
+  finalizeEmission();
 }
 
 InitializationPtr SILGenFunction::getSingleValueStmtInit(Expr *E) {

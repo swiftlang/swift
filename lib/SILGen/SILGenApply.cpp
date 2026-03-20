@@ -5799,10 +5799,17 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     }
   }
 
-  SILValue rawResult = SGF.B.createBuiltin(
+  auto rawResult = SGF.B.createBuiltin(
       loc, builtinName,
       substConv.getSILResultType(SGF.getTypeExpansionContext()),
       callee.getSubstitutions(), rawArgs);
+
+  // Handle some special cases for specific builtins.
+  if (builtinName.is(getBuiltinName(BuiltinValueKind::AddTaskLocalValue))) {
+    SGF.addEmissionFinalizer([rawResult](SILGenFunction &SGF) {
+      SGF.finalizeAddTaskLocalValue(rawResult);
+    });
+  }
 
   if (argScope.has_value())
     std::move(argScope)->pop();

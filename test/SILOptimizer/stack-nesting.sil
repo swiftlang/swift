@@ -601,3 +601,49 @@ bb0:
   %ret = tuple ()
   return %ret : $()
 }
+
+// The task local value builtins cannot be reordered.
+// CHECK-LABEL: sil [ossa] @test_task_local_non_nested :
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK:         [[BINDING:%.*]] = builtin "addTaskLocalValue"<Int>({{.*}}, [[A]])
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[D:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    dealloc_stack [[D]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:    builtin "removeTaskLocalValue"([[BINDING]])
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 4
+// CHECK-LABEL: // end sil function 'test_task_local_non_nested'
+sil [ossa] @test_task_local_non_nested : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+
+  %key = address_to_pointer %a to $Builtin.RawPointer
+  %binding = builtin "addTaskLocalValue"<Int>(%key, %a) : $Builtin.RawPointer
+
+  integer_literal $Builtin.Int32, 2
+
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+  %d = alloc_stack $Int
+
+  dealloc_stack %d
+  dealloc_stack %b
+
+  integer_literal $Builtin.Int32, 3
+
+  %out = builtin "removeTaskLocalValue"(%binding) : $()
+
+  dealloc_stack %a
+  dealloc_stack %c
+  integer_literal $Builtin.Int32, 4
+  %ret = tuple ()
+  return %ret : $()
+}

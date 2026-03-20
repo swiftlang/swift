@@ -59,12 +59,9 @@ enum class StackAllocationKind : uint8_t {
   /// deallocation is a BuiltinInst for the FinishAsyncLet builtin.
   BuiltinStartAsyncLet,
 
-  /// A BuiltinInst for the TaskLocalValuePush builtin. The deallocation
-  /// is a BuiltinInst for the TaskLocalValuePop builtin.
-  ///
-  /// FIXME: this one doesn't work because we didn't actually give it a use/def
-  /// relationship!
-  BuiltinTaskLocalValuePush,
+  /// A BuiltinInst for the AddTaskLocalValue builtin. The deallocation
+  /// is a BuiltinInst for the RemoveTaskLocalValue builtin.
+  BuiltinAddTaskLocalValue,
 
   /// A BuiltinInst for the TaskAddPriorityEscalationHandler builtin. The
   /// deallocation is a BuiltinInst for the TaskRemovePriorityEscalationHandler

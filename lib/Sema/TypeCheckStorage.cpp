@@ -3014,7 +3014,7 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
   }
 
   // Non-exported storage has no ABI to keep stable.
-  if (isExported(storage) == ExportedLevel::None)
+  if (isExported(storage) != ExportedLevel::Exported)
     return false;
 
   // The non-underscored accessor is not present, the underscored accessor

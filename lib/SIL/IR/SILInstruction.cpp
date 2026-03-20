@@ -1346,7 +1346,7 @@ SILInstruction::getStackAllocation() const {
       BUILTIN_CASE(StackAlloc, StackAlloc)
       BUILTIN_CASE(UnprotectedStackAlloc, UnprotectedStackAlloc)
       BUILTIN_CASE(StartAsyncLetWithLocalBuffer, StartAsyncLet)
-      //BUILTIN_CASE(TaskLocalValuePush, TaskLocalValuePush)
+      BUILTIN_CASE(AddTaskLocalValue, AddTaskLocalValue)
       BUILTIN_CASE(TaskAddPriorityEscalationHandler,
                    TaskAddPriorityEscalationHandler)
       BUILTIN_CASE(TaskAddCancellationHandler, TaskAddCancellationHandler)
@@ -1453,7 +1453,7 @@ SILInstruction::getStackDeallocation() const {
                                                StackAllocationKind::ID); \
       }
       BUILTIN_CASE(FinishAsyncLet, BuiltinStartAsyncLet)
-      //BUILTIN_CASE(TaskLocalValuePop, BuiltinTaskLocalValuePush)
+      BUILTIN_CASE(RemoveTaskLocalValue, BuiltinAddTaskLocalValue)
       BUILTIN_CASE(TaskRemovePriorityEscalationHandler,
                    BuiltinTaskAddPriorityEscalationHandler)
       BUILTIN_CASE(TaskRemoveCancellationHandler,

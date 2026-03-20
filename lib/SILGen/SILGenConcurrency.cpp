@@ -21,6 +21,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -916,4 +917,44 @@ SILGenFunction::emitDistributedActorAsAnyActor(SILLocation loc,
       loc, distributedActorCanType, distributedActorTL, anyActorTL,
       ctx.AllocateCopy(conformances), SGFContext(),
       [actorValue](SGFContext) { return actorValue; });
+}
+
+void SILGenFunction::finalizeAddTaskLocalValue(BuiltinInst *BI) {
+  // SILGen creates a temporary as part of emitting the argument, and there
+  // doesn't seem to be a way to avoid that without messing with the consume
+  // passes. Unfortunately, that temporary is not properly nested with the
+  // builtin, so we have to fix that nesting as a finalization step.
+  //
+  // Basically, the code we get out of SILGen is this:
+  //
+  //   %0 = alloc_stack
+  //   ...
+  //   %1 = builtin "addTaskLocalValue"<T>(..., %0)
+  //   ...
+  //   dealloc_stack %0
+  //   ...
+  //   builtin "removeTaskLocalValue"(%1)
+  //
+  // We need that to be:
+  //
+  //   %0 = alloc_stack
+  //   ...
+  //   %1 = builtin "addTaskLocalValue"<T>(..., %0)
+  //   ...
+  //   builtin "removeTaskLocalValue"(%1)
+  //   dealloc_stack %0
+  //
+  // Using StackNesting is better than doing some kind of more specific hack
+  // that would essentially hard-code the code patterns of specific stdlib
+  // functions. The overhead is okay because we only trigger it on the
+  // functions that directly call to this builtin.
+  //
+  // It would be better to not need this at all, of course. One option would be
+  // to make the builtin model fully safe, which would require some kind of
+  // higher-order builtin that SILGen would lower to the two SIL builtins.
+  // That might be a better approach in the long term, especially once we don't
+  // need some of the compatibility hacks to make the swiftinterface parseable
+  // by old compilers. Another would be to just find a way to guarantee that
+  // SILGen emits the argument without a temporary.
+  StackNesting::fixNesting(&F);
 }

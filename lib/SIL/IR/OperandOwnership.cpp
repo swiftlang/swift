@@ -1079,6 +1079,9 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemovePriorityEscalationHandler)
 // This is a trivial use since our first operand is a Builtin.RawPointer and our
 // second is an address to our generic Value.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskLocalValuePush)
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AddTaskLocalValue)
+// Trivial use of the token result of AddTaskLocalValue.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, RemoveTaskLocalValue)
 
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPush)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)

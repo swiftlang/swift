@@ -449,6 +449,10 @@ public:
   /// This records information about the currently active cleanups.
   CleanupManager Cleanups;
 
+  /// Features that might require cleanup at the end of emission.
+  using EmissionFinalizer = std::function<void(SILGenFunction&)>;
+  std::vector<EmissionFinalizer> EmissionFinalizers;
+
   /// The current context where formal evaluation cleanups are managed.
   FormalEvaluationContext FormalEvalContext;
 
@@ -1325,6 +1329,31 @@ public:
   void eraseBasicBlock(SILBasicBlock *block);
 
   void mergeCleanupBlocks();
+
+  void finalizeEmission();
+  void finalizeAddTaskLocalValue(BuiltinInst *builtin);
+
+  /// Add a callback that will run when emission is complete for the
+  /// current function. The callback is expected to have signature:
+  ///
+  ///   void (SILGenFunction &)
+  ///
+  /// The callback escapes the local scope and therefore must not capture
+  /// local variables by reference (i.e. do not use `[&]` in your lambda).
+  ///
+  /// Using this is generally a sign of a hack. Most "clean-up" work
+  /// should be handled by inserting instructions normally, either
+  /// immediately during emission or using a Cleanup object that will
+  /// insert code along exits from the current language-level scope. And
+  /// if the clean-up requires any kind of sophisticated analysis, it
+  /// probably deserves to go in a proper pass. An emission finalizer
+  /// might be appropriate for a hack that solves a narrow problem that
+  /// you can't justify solving in a more principled way, like patching
+  /// up scopes around a specific builtin call.
+  template <class Fn>
+  void addEmissionFinalizer(Fn &&fn) {
+    EmissionFinalizers.emplace_back(std::forward<Fn>(fn));
+  }
 
   //===--------------------------------------------------------------------===//
   // Concurrency

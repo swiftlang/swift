@@ -2430,6 +2430,16 @@ static ValueDecl *getTaskLocalValuePop(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
 }
 
+static ValueDecl *getAddTaskLocalValue(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
+                            _parameters(_rawPointer, _consuming(_typeparam(0))),
+                            _rawPointer);
+}
+
+static ValueDecl *getRemoveTaskLocalValue(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer), _void);
+}
+
 static ValueDecl *getMakeBorrow(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
 
@@ -3564,6 +3574,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TaskLocalValuePop:
     return getTaskLocalValuePop(Context, Id);
+
+  case BuiltinValueKind::AddTaskLocalValue:
+    return getAddTaskLocalValue(Context, Id);
+
+  case BuiltinValueKind::RemoveTaskLocalValue:
+    return getRemoveTaskLocalValue(Context, Id);
 
   case BuiltinValueKind::MakeBorrow:
     return getMakeBorrow(Context, Id);
