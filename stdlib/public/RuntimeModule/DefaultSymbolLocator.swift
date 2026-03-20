@@ -132,7 +132,7 @@ open class DefaultSymbolLocator: SymbolLocator {
       return source
     }
 
-    if let uuid = image.uuid, let (imagePath, result) =
+    if let uuid = image.uuid, let (_, result) =
       findElf(image: image, paths: findElfSymbolPaths(image: image)) {
       let source = toSymbolSource(result)
       cache[.uuid(uuid)] = source
