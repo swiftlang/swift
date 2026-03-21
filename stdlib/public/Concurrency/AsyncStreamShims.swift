@@ -108,7 +108,7 @@ extension _Storage.Continuation.YieldResult {
   }
 }
 
-// MARK: - AsyncThrowingStream
+// MARK: - AsyncThrowingStream Shims
 
 // BufferingPolicy
 
