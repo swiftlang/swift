@@ -6,14 +6,17 @@ func takesNonEscaping(_ fn: () -> ()) { fn() }
 
 func badClosureCaptureInOut1(x: inout Int) { // expected-note {{parameter 'x' is declared 'inout'}}
   takesEscaping { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
+  // expected-note@-1 {{capture 'x' explicitly to copy it into the closure}} {{18-18= [x = x] in}}
     x += 1 // expected-note {{captured here}}
   }
 }
 
 func badClosureCaptureInOut2(x: inout Int, b: Bool) { // expected-note 2{{parameter 'x' is declared 'inout'}}
   takesEscaping(b ? { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
+  // expected-note@-1 {{capture 'x' explicitly to copy it into the closure}} {{21-21= [x = x] in}}
                   x += 1 // expected-note {{captured here}}
                 } : { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
+  // expected-note@-1 {{capture 'x' explicitly to copy it into the closure}} {{21-21= [x = x] in}}
                   x -= 1 // expected-note {{captured here}}
                 })
 }
@@ -141,6 +144,7 @@ func takesEscapingGeneric<T>(_: @escaping () -> T) {}
 
 func testGenericClosureReabstraction(x: inout Int) { // expected-note {{parameter 'x' is declared 'inout'}}
   takesEscapingGeneric { () -> Int in // expected-error {{escaping closure captures 'inout' parameter 'x'}}
+    // expected-note@-1 {{capture 'x' explicitly to copy it into the closure}} {{24-24= [x = x]}}
     x += 1 // expected-note {{captured here}}
     return 0
   }
@@ -169,12 +173,14 @@ func ~> <Target, Arg0, Result>(x: inout Target, f: @escaping (_: inout Target, _
   // expected-note@-1 {{parameter 'x' is declared 'inout'}}
   return { f(&x, $0) } // expected-note {{captured here}}
   // expected-error@-1 {{escaping closure captures 'inout' parameter 'x'}}
+  // expected-note@-2 {{capture 'x' explicitly to copy it into the closure}} {{10-10= [x = x] in}}
 }
 
 func ~> (x: inout Int, f: @escaping (_: inout Int, _: Target) -> Target) -> (Target) -> Target {
   // expected-note@-1 {{parameter 'x' is declared 'inout'}}
   return { f(&x, $0) } // expected-note {{captured here}}
   // expected-error@-1 {{escaping closure captures 'inout' parameter 'x'}}
+  // expected-note@-2 {{capture 'x' explicitly to copy it into the closure}} {{10-10= [x = x] in}}
 }
 
 func addHandler(_: @escaping () -> ()) {}
@@ -221,7 +227,7 @@ func badTransitiveCaptureInClosures(x: inout Int) -> ((Int) -> Void) {
   // Test capture of x by an autoclosure within an escaping closure.
   let escapingClosure = { (y: Int) in
       // expected-error@-1 {{escaping closure captures 'inout' parameter 'x'}}
-
+      // expected-note@-2 {{capture 'x' explicitly to copy it into the closure}} {{25-25= [x = x]}}
     autoclosureTakesEscaping(x + y)
       // expected-note@-1 {{captured indirectly by this call}}
       // expected-note@-2 {{captured here}}
