@@ -1884,37 +1884,37 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
   // a path-relative component into dependency scanning and defeat the purpose
   // of prefix mapping. Additionally, if everything is prefix mapped, the
   // embedded header path is also prefix mapped, thus it can't be found anyway.
-  bool useImportHeader = !hasPathMapping();
   auto FS = ScanASTContext.SourceMgr.getFileSystem();
 
   auto chainBridgingHeader = [&](StringRef moduleName, StringRef headerPath,
-                                 StringRef binaryModulePath,
-                                 bool useHeader) -> llvm::Error {
-    if (useHeader) {
-      if (auto buffer = FS->getBufferForFile(headerPath)) {
-        outOS << "#include \"" << headerPath << "\"\n";
-        return llvm::Error::success();
-      }
+                                 StringRef binaryModulePath) -> llvm::Error {
+    auto remapped = remapPath(headerPath);
+    outOS << "#if __has_include(\"" << remapped << "\")\n";
+    outOS << "#import \"" << remapped << "\"\n";
+    outOS << "#else\n";
+
+    if (binaryModulePath.empty()) {
+      outOS << "#error failed to find bridging header for module " << moduleName
+            << "\n";
+    } else {
+      // Extract the embedded bridging header
+      auto moduleBuf = FS->getBufferForFile(binaryModulePath);
+      if (!moduleBuf)
+        return llvm::errorCodeToError(moduleBuf.getError());
+
+      auto content = extractEmbeddedBridgingHeaderContent(
+          std::move(*moduleBuf), /*headerPath=*/"", ScanASTContext);
+      if (!content)
+        return llvm::createStringError("can't load embedded header from " +
+                                       binaryModulePath);
+
+      outOS << "# 1 \"<module-" << moduleName
+            << "-embedded-bridging-header>\" 1\n";
+      outOS << content->getBuffer() << "\n";
     }
 
-    if (binaryModulePath.empty())
-      return llvm::createStringError("failed to load bridging header " +
-                                     headerPath);
+    outOS << "#endif\n";
 
-    // Extract the embedded bridging header
-    auto moduleBuf = FS->getBufferForFile(binaryModulePath);
-    if (!moduleBuf)
-      return llvm::errorCodeToError(moduleBuf.getError());
-
-    auto content = extractEmbeddedBridgingHeaderContent(
-        std::move(*moduleBuf), /*headerPath=*/"", ScanASTContext);
-    if (!content)
-      return llvm::createStringError("can't load embedded header from " +
-                                     binaryModulePath);
-
-    outOS << "# 1 \"<module-" << moduleName
-          << "-embedded-bridging-header>\" 1\n";
-    outOS << content->getBuffer() << "\n";
     return llvm::Error::success();
   };
 
@@ -1931,9 +1931,9 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
       if (binaryMod->headerImport.empty())
         continue;
 
-      if (auto E = chainBridgingHeader(
-              moduleID.ModuleName, binaryMod->headerImport,
-              binaryMod->compiledModulePath, useImportHeader))
+      if (auto E =
+              chainBridgingHeader(moduleID.ModuleName, binaryMod->headerImport,
+                                  binaryMod->compiledModulePath))
         return E;
     }
   }
@@ -1963,8 +1963,7 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
     if (mainModule->textualModuleDetails.bridgingHeaderFile) {
       if (auto E = chainBridgingHeader(
               rootModuleID.ModuleName,
-              *mainModule->textualModuleDetails.bridgingHeaderFile, "",
-              /*useHeader=*/true))
+              *mainModule->textualModuleDetails.bridgingHeaderFile, ""))
         return E;
     }
 

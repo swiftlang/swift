@@ -18,6 +18,13 @@ def writeOutputResponseFile(filename, cmd):
             output.write('"{}"\n'.format(c))
 
 
+def apply_prefix_maps(path, prefix_maps):
+    for old, new in prefix_maps:
+        if path.startswith(old):
+            return new + path[len(old):]
+    return path
+
+
 def build_module(swift_frontend, mode, detail):
     cmd = [swift_frontend] + detail['details'][mode]['commandLine']
     subprocess.check_call(cmd)
@@ -33,6 +40,10 @@ def main():
                         help="output response file for building main module")
     parser.add_argument('-b', '--bridging-header-resp', metavar="<response file>",
                         help="output response file for building bridging header")
+    parser.add_argument('--prefix-map', metavar=("<old_path>", "<new_path>"), nargs=2,
+                        action='append', default=[],
+                        help="remap path prefix when writing chainedBridgingHeaderPath "
+                             "(may be specified multiple times)")
     args = parser.parse_args()
 
     with open(args.input, 'r') as file:
@@ -98,7 +109,8 @@ def main():
             cmd = info['bridgingHeader']['commandLine'][1:]
             # print input file name if using chained bridging header.
             if "chainedBridgingHeaderPath" in info:
-                cmd.append(info['chainedBridgingHeaderPath'])
+                path = apply_prefix_maps(info['chainedBridgingHeaderPath'], args.prefix_map)
+                cmd.append(path)
             writeOutputResponseFile(args.bridging_header_resp, cmd)
 
 
