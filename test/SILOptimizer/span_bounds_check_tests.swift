@@ -334,3 +334,45 @@ public func inout_span_sum_iterate_to_unknown_with_trap_dontopt(_ v: inout Span<
   return sum
 }
 
+// CHECK-SIL-LABEL: sil @$s23span_bounds_check_tests0A6_4_sum1p1iSis4SpanVySiG_SitF :
+// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-SIL-NOT: cond_fail
+// CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests0A6_4_sum1p1iSis4SpanVySiG_SitF'
+// CHECK-IR: define {{.*}} @"$s23span_bounds_check_tests0A6_4_sum1p1iSis4SpanVySiG_SitF"
+// CHECK-IR: @llvm.vector.reduce.add
+public func span_4_sum(p: borrowing Span<Int>, i: Int) -> Int {
+    let a = p[i]
+    let b = p[i &+ 1]
+    let c = p[i &+ 2]
+    let d = p[i &+ 3]
+
+    return a &+ b &+ c &+ d
+}
+
+// CHECK-SIL-LABEL: sil {{.*}}@$ss4SpanV23span_bounds_check_testss5UInt8VRszlE16loadLittleEndian5indexs6UInt32VSi_tF :
+// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-SIL-NOT: cond_fail
+// CHECK-SIL-LABEL: } // end sil function '$ss4SpanV23span_bounds_check_testss5UInt8VRszlE16loadLittleEndian5indexs6UInt32VSi_tF'
+// TODO: LLVM should generate a wide load for this
+extension Span<UInt8> {
+  public func loadLittleEndian(index: Int) -> UInt32 {
+    precondition(index >= self.indices.lowerBound && index < self.indices.upperBound)
+    return (
+      UInt32(self[index]) |
+      UInt32(self[index &+ 1]) << 8 |
+      UInt32(self[index &+ 2]) << 16 |
+      UInt32(self[index &+ 3]) << 24
+    )
+  }
+}
+
+// CHECK-SIL-LABEL: sil @$s23span_bounds_check_tests0A19_different_self_sum1p1q1iSis4SpanVySiG_AHSitF :
+// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-SIL-LABEL: } // end sil function
+public func span_different_self_sum(p: borrowing Span<Int>, q: borrowing Span<Int>, i: Int) -> Int {
+    let a = p[i]
+    let b = q[i]
+    return a &+ b
+}
+
