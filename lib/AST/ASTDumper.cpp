@@ -6263,6 +6263,8 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinImplicitActor, builtin_implicit_isolated_actor)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
     TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
+    TRIVIAL_TYPE_PRINTER(Join, join)
+    TRIVIAL_TYPE_PRINTER(Meet, meet)
 
     void visitBuiltinVectorType(BuiltinVectorType *T, Label label) {
       printCommon("builtin_vector_type", label);

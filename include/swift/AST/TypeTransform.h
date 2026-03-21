@@ -117,6 +117,8 @@ case TypeKind::Id:
     case TypeKind::Module:
     case TypeKind::BuiltinTuple:
     case TypeKind::Integer:
+    case TypeKind::Join:
+    case TypeKind::Meet:
       return t;
 
     // BuiltinGenericType subclasses

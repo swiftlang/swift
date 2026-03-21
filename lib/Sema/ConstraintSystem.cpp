@@ -1077,7 +1077,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
 
   if (auto depMemType = type->getAs<DependentMemberType>()) {
     auto baseTy = depMemType->getBase();
-    if (!baseTy->hasTypeVariable() && !baseTy->hasDependentMember())
+    if (!baseTy->hasTypeVariable())
       return type;
 
     // FIXME: Perform a more limited simplification?

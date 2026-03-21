@@ -9287,9 +9287,6 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
       finalPatternType = computeWrappedValueType(wrappedVar, finalPatternType);
   }
 
-  if (finalPatternType->hasDependentMember())
-    return std::nullopt;
-
   finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
 
   auto tryRewritePattern = [&](Pattern *EP, Type ty) {

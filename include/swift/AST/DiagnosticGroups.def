@@ -91,6 +91,7 @@ GROUP(TemporaryPointers,none,"temporary-pointers")
 GROUP(TrailingClosureMatching,none,"trailing-closure-matching")
 GROUP(UnknownWarningGroup,none,"unknown-warning-group")
 GROUP(UntypedThrows,DefaultIgnoreWarnings,"untyped-throws")
+GROUP(UseAnyAppleOSAvailability,DefaultIgnoreWarnings,"use-any-apple-os-availability")
 GROUP(WeakMutability,none,"weak-mutability")
 
 GROUP_LINK(PerformanceHints,ExistentialType)

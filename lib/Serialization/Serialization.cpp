@@ -5743,7 +5743,7 @@ public:
                                   S.addTypeRef(ty->getOriginalType()));
       return;
     }
-    llvm_unreachable("should not serialize an ErrorType");
+    ABORT("should not serialize an ErrorType");
   }
 
   void visitPlaceholderType(const PlaceholderType *) {
@@ -5754,28 +5754,26 @@ public:
           cast<ErrorType>(ErrorType::get(S.getASTContext()).getPointer()));
       return;
     }
-    llvm_unreachable("should not serialize a PlaceholderType");
+    ABORT("should not serialize a PlaceholderType");
   }
 
-  void visitModuleType(const ModuleType *) {
-    llvm_unreachable("modules are currently not first-class values");
-  }
+#define UNSUPPORTED_TYPE(type)                                                  \
+    void visit##type##Type(const type##Type *t) {                               \
+      ABORT([&](llvm::raw_ostream &out) {                                       \
+        out << "Don't know how to serialize this kind of type:\n";              \
+        t->dump(out);                                                           \
+      });                                                                       \
+    }
 
-  void visitInOutType(const InOutType *) {
-    llvm_unreachable("inout types are only used in function type parameters");
-  }
+  UNSUPPORTED_TYPE(Module)
+  UNSUPPORTED_TYPE(InOut)
+  UNSUPPORTED_TYPE(LValue)
+  UNSUPPORTED_TYPE(TypeVariable)
+  UNSUPPORTED_TYPE(ErrorUnion)
+  UNSUPPORTED_TYPE(Join)
+  UNSUPPORTED_TYPE(Meet)
 
-  void visitLValueType(const LValueType *) {
-    llvm_unreachable("lvalue types are only used in function bodies");
-  }
-
-  void visitTypeVariableType(const TypeVariableType *) {
-    llvm_unreachable("type variables should not escape the type checker");
-  }
-
-  void visitErrorUnionType(const ErrorUnionType *) {
-    llvm_unreachable("error union types do not persist in the AST");
-  }
+#undef UNSUPPORTED_TYPE
 
   void visitLocatableType(const LocatableType *LT) {
     visit(LT->getSinglyDesugaredType());

@@ -164,8 +164,8 @@ public:
     /// This type contains an Error type without an underlying original type.
     HasBareError         = 0x100,
 
-    /// This type contains a DependentMemberType.
-    HasDependentMember   = 0x200,
+    /// Whether this type contains a JoinType or MeetType.
+    HasJoinOrMeet        = 0x200,
 
     /// This type contains an OpaqueTypeArchetype.
     HasOpaqueArchetype   = 0x400,
@@ -238,10 +238,6 @@ public:
   /// Does this type contain an error without an original type?
   bool hasBareError() const { return Bits & HasBareError; }
 
-  /// Does this type contain a dependent member type, possibly with a
-  /// non-type parameter base, such as a type variable or concrete type?
-  bool hasDependentMember() const { return Bits & HasDependentMember; }
-
   /// Does a type with these properties structurally contain an
   /// opened existential archetype?
   bool hasOpenedExistential() const { return Bits & HasOpenedExistential; }
@@ -286,6 +282,8 @@ public:
 
   bool isUnsafe() const { return Bits & IsUnsafe; }
 
+  bool hasJoinOrMeet() const { return Bits & HasJoinOrMeet; }
+
   /// Does a type with these properties structurally contain a
   /// parameterized existential type?
   bool hasParameterizedExistential() const {
@@ -315,11 +313,6 @@ public:
   /// Remove the HasTypeParameter property from this set.
   void removeHasTypeParameter() {
     Bits &= ~HasTypeParameter;
-  }
-
-  /// Remove the HasDependentMember property from this set.
-  void removeHasDependentMember() {
-    Bits &= ~HasDependentMember;
   }
 
   /// Remove the IsUnsafe property from this set.
@@ -823,6 +816,10 @@ public:
     return getRecursiveProperties().hasParameterizedExistential();
   }
 
+  /// Determine whether the type involves the 'join' or 'meet' type, produced by
+  /// the algorithms in lib/Sema/Subtyping.cpp.
+  bool hasJoinOrMeet() const { return getRecursiveProperties().hasJoinOrMeet(); }
+
   /// Determine whether the type involves a local archetype from the given
   /// environment.
   bool hasLocalArchetypeFromEnvironment(GenericEnvironment *env) const;
@@ -958,12 +955,6 @@ public:
   /// Whether this is a top-level ErrorType without an underlying original
   /// type, i.e prints as `_`.
   bool isBareErrorType() const;
-
-  /// Does this type contain a dependent member type, possibly with a
-  /// non-type parameter base, such as a type variable or concrete type?
-  bool hasDependentMember() const {
-    return getRecursiveProperties().hasDependentMember();
-  }
 
   /// Whether this type represents a generic constraint.
   bool isConstraintType() const;
@@ -8023,6 +8014,42 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
+
+/// A type to represent a type join between a type variable and a concrete type.
+///
+/// For now, this is a singleton type that does not store the constituent parts
+/// of the join. If we want, we can add this in the future, in service of
+/// diagnostics for example.
+class JoinType final : public TypeBase {
+  friend class ASTContext;
+  JoinType(const ASTContext &C)
+    : TypeBase(TypeKind::Join, &C, RecursiveTypeProperties::HasJoinOrMeet) {}
+public:
+  // The singleton instance of this type is ASTContext::TheJoinType.
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Join;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(JoinType, Type)
+
+/// A type to represent a type meet between a type variable and a concrete type.
+///
+/// For now, this is a singleton type that does not store the constituent parts
+/// of the meet. If we want, we can add this in the future, in service of
+/// diagnostics for example.
+class MeetType final : public TypeBase {
+  friend class ASTContext;
+  MeetType(const ASTContext &C)
+    : TypeBase(TypeKind::Meet, &C, RecursiveTypeProperties::HasJoinOrMeet) {}
+public:
+  // The singleton instance of this type is ASTContext::TheMeetType.
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Meet;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(MeetType, Type)
 
 /// PackType - The type of a pack of arguments provided to a
 /// \c PackExpansionType to guide the pack expansion process.

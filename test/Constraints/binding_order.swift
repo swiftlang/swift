@@ -1,4 +1,11 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: not --crash %target-typecheck-verify-swift -verify-ignore-unrelated -DSALVAGE
+
+// The next two sets of examples cause difficulties because our
+// subtype lattice is not distributive. We cannot always compute
+// an accurate upper bound, because of existential types; if
+// we pick the wrong upper bound too early, certain expressions
+// will fail.
 
 // Originally from rdar://35088384:
 //
@@ -54,6 +61,39 @@ do {
   perform4([Undo.self, Cut.self, Copy.self])
 }
 
+// rdar://problem/38159133
+// https://github.com/apple/swift/issues/49673
+// Swift 4.1 Xcode 9.3b4 regression
+
+do {
+  protocol Command {}
+
+  class Super {}
+  class A: Super, Command {}
+  class B: Super, Command {}
+
+  func rdar38159133(a: A, b: B, aOpt: A?, bOpt: B?) {
+    let _ = Array<any Command>([a, b])
+    let _: [any Command] = [a, b]
+    let _: [any Command] = Array([a, b])
+    let _: [any Command] = [a, b].filter { _ in true }
+    let _: [any Command] = [aOpt, bOpt].compactMap { $0 }
+
+    // Some of these might be hard to resolve, but we should produce better diagnostics.
+
+    let _: [any Command] = [aOpt, bOpt].filter { $0 != nil }
+    // expected-error@-1 {{no exact matches in call to instance method 'filter'}}
+    let _: [any Command] = [a, b].map { $0 }
+    // expected-error@-1 {{failed to produce diagnostic for expression}}
+    let _: [any Command] = [a, b].flatMap { [$0] }
+    // expected-error@-1 {{cannot convert value of type 'Super' to expected element type 'any Command'}}
+
+    #if SALVAGE
+    let _: [any Command] = [[a], [b]].flatMap { $0 }
+    #endif
+  }
+}
+
 do {
   // This works!
   let _: [ObjectIdentifier: Bool] = .init(uniqueKeysWithValues: [
@@ -94,22 +134,6 @@ do {
   let _: Dictionary<Double, StaticString> = .init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
 }
 
-// rdar://problem/38159133
-// https://github.com/apple/swift/issues/49673
-// Swift 4.1 Xcode 9.3b4 regression
-
-protocol P_38159133 {}
-
-do {
-  class Super {}
-  class A: Super, P_38159133 {}
-  class B: Super, P_38159133 {}
-
-  func rdar38159133(_ a: A?, _ b: B?) {
-    let _: [P_38159133] = [a, b].compactMap { $0 } // Ok
-  }
-}
-
 // Tests for a special form of inference where we have both a
 // subtype and a supertype binding for a type variable, and the
 // subtype binding contains a type variable but the supertype
@@ -132,6 +156,105 @@ do {
     let _: [(String, String)] = v + Array(v)
     let _: [(String, String)] = Array(v) + v
     let _: [(String, String)] = Array(v) + Array(v)
+  }
+}
+
+protocol P {}
+
+extension String: P {}
+extension Int: P {}
+extension Optional: P where Wrapped: P {}
+
+do {
+  class C {
+    var string = ""
+    var integer = 0
+    var data = Data()
+    var optData: Data? = nil
+    var optOptData: Data?? = nil
+    var dictionary: [AnyHashable: Any]? = nil
+
+    static func _data(_: [AnyHashable: Any]?) -> Data {
+      return Data()
+    }
+
+    static func _optData(_: [AnyHashable: Any]?) -> Data? {
+      return nil
+    }
+  }
+
+  struct Data: P {}
+
+  func f1<T: Collection, U: Collection>(_: T)
+    where T.Element == U, U.Element == any P {}
+  // expected-note@-2 5{{where 'U.Element' = 'Any'}}
+
+  func test1(_ elts: [C]) {
+    f1(elts.map { c in [c.string] })
+
+    f1(elts.map { c in [c.string, c.integer] })
+    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
+
+    f1(elts.map { c in [c.string, c.integer, c.data] })
+    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
+
+    f1(elts.map { c in [c.string, c.integer, c.optData] })
+    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
+
+    f1(elts.map { c in [c.string, c.integer, c.optOptData] })
+
+    f1(elts.map { c in [c.string, c.integer, c.data, c.optData] })
+    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
+
+    f1(elts.map { c in [c.string, c.integer, c.data, c.optData, c.optOptData] })
+
+    f1(elts.map { c in [c.string, c.integer, c.dictionary.map { C._data($0) }] })
+    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
+
+    f1(elts.map { c in [c.string, c.integer, c.dictionary.map { C._optData($0) }] })
+  }
+
+  struct Literal: ExpressibleByStringInterpolation {
+    init(stringInterpolation: Interpolation) {}
+    init(stringLiteral: String) {}
+
+    struct Interpolation: StringInterpolationProtocol {
+      typealias StringLiteralType = String
+
+      init(literalCapacity: Int, interpolationCount: Int) {}
+
+      func appendLiteral(_: String) {}
+      func appendInterpolation<T: Collection, U: Collection>(_: T)
+        where T.Element == U, U.Element == any P {}
+        // expected-note@-2 5{{where 'U.Element' = 'Any'}}
+    }
+  }
+
+  func f2(_: Literal) {}
+
+  func test2(_ elts: [C]) {
+    f2("\(elts.map { c in [c.string] })")
+
+    f2("\(elts.map { c in [c.string, c.integer] })")
+    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
+
+    f2("\(elts.map { c in [c.string, c.integer, c.data] })")
+    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
+
+    f2("\(elts.map { c in [c.string, c.integer, c.optData] })")
+    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
+
+    f2("\(elts.map { c in [c.string, c.integer, c.optOptData ] })")
+
+    f2("\(elts.map { c in [c.string, c.integer, c.data, c.optData] })")
+    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
+
+    f2("\(elts.map { c in [c.string, c.integer, c.data, c.optData, c.optOptData] })")
+
+    f2("\(elts.map { c in [c.string, c.integer, c.dictionary.map { C._data($0) }] })")
+    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
+
+    f2("\(elts.map { c in [c.string, c.integer, c.dictionary.map { C._optData($0) }] })")
   }
 }
 

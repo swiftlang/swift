@@ -7383,7 +7383,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::SubclassOf:
-  case ConstraintKind::NonisolatedConformsTo:
+    case ConstraintKind::NonisolatedConformsTo:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::TransitivelyConformsTo:
     case ConstraintKind::Defaultable:
@@ -7506,17 +7506,21 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (desugar1->getKind() == desugar2->getKind()) {
     switch (desugar1->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
-#define TYPE(id, parent)
-#include "swift/AST/TypeNodes.def"
-      llvm_unreachable("Type has not been desugared completely");
-
 #define ARTIFICIAL_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-      llvm_unreachable("artificial type in constraint");
-
     case TypeKind::BuiltinTuple:
-      llvm_unreachable("BuiltinTupleType in constraint");
+    case TypeKind::Join:
+    case TypeKind::Meet:
+    case TypeKind::Error:
+    case TypeKind::GenericTypeParam:
+    case TypeKind::TypeVariable:
+    case TypeKind::GenericFunction:
+    case TypeKind::UnboundGeneric:
+      ABORT([&](llvm::raw_ostream &out) {
+        out << "Bad type in matchTypes():\n";
+        desugar1->dump(out);
+      });
 
     // Mismatched builtin types
 #define BUILTIN_GENERIC_TYPE(id, parent)
@@ -7524,9 +7528,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
       return getTypeMatchFailure(locator);
-
-    case TypeKind::Error:
-      llvm_unreachable("Rejected above");
 
     // BuiltinGenericType subclasses
     case TypeKind::BuiltinBorrow:
@@ -7563,12 +7564,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       return getTypeMatchFailure(locator);
     }
-
-    case TypeKind::GenericTypeParam:
-      llvm_unreachable("unmapped dependent type in type checker");
-
-    case TypeKind::TypeVariable:
-      llvm_unreachable("type variables should have already been handled by now");
 
     case TypeKind::DependentMember: {
       // If types are identical, let's consider this constraint solved
@@ -7860,9 +7855,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return result;
     }
 
-    case TypeKind::GenericFunction:
-      llvm_unreachable("Polymorphic function type should have been opened");
-
     case TypeKind::Existential:
     case TypeKind::ProtocolComposition:
     case TypeKind::ParameterizedProtocol:
@@ -7909,9 +7901,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                         cast<InOutType>(desugar2)->getObjectType(),
                         ConstraintKind::Bind, subflags,
                   locator.withPathElement(ConstraintLocator::LValueConversion));
-
-    case TypeKind::UnboundGeneric:
-      llvm_unreachable("Unbound generic type should have been opened");
 
     case TypeKind::BoundGenericClass:
     case TypeKind::BoundGenericEnum:
@@ -8534,25 +8523,24 @@ ConstraintSystem::simplifyConstructionConstraint(
 
   switch (desugarValueType->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
-#define TYPE(id, parent)
-#include "swift/AST/TypeNodes.def"
-    llvm_unreachable("Type has not been desugared completely");
-
 #define ARTIFICIAL_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-      llvm_unreachable("artificial type in constraint");
-
   case TypeKind::BuiltinTuple:
-    llvm_unreachable("BuiltinTupleType in constraint");
+  case TypeKind::GenericFunction:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::UnboundGeneric:
+  case TypeKind::Integer:
+  case TypeKind::Join:
+  case TypeKind::Meet:
+    ABORT([&](llvm::raw_ostream &out) {
+      out << "Bad type in simplifyConstructionConstraint():\n";
+      desugarValueType->dump(out);
+    });
     
   case TypeKind::Error:
   case TypeKind::Placeholder:
     return SolutionKind::Error;
-
-  case TypeKind::GenericFunction:
-  case TypeKind::GenericTypeParam:
-    llvm_unreachable("unmapped dependent type");
 
   case TypeKind::TypeVariable:
   case TypeKind::DependentMember:
@@ -8636,9 +8624,6 @@ ConstraintSystem::simplifyConstructionConstraint(
     // Break out to handle the actual construction below.
     break;
 
-  case TypeKind::UnboundGeneric:
-    llvm_unreachable("Unbound generic type should have been opened");
-
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
@@ -8657,10 +8642,6 @@ ConstraintSystem::simplifyConstructionConstraint(
       break;
 
     return SolutionKind::Error;
-  }
-
-  case TypeKind::Integer: {
-    llvm_unreachable("implement me");
   }
   }
 

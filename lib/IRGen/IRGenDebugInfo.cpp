@@ -1957,13 +1957,20 @@ private:
 
     // Here goes!
     switch (BaseTy->getKind()) {
+    case TypeKind::LValue:
+    case TypeKind::TypeVariable:
+    case TypeKind::ErrorUnion:
+    case TypeKind::Placeholder:
+    case TypeKind::Join:
+    case TypeKind::Meet:
+    case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
-      llvm_unreachable("not a real type");
+    case TypeKind::BuiltinBorrow:
+      ABORT([&](llvm::raw_ostream &out) {
+        out << "Don't know how to emit debug info for type:\n";
+        BaseTy->dump(out);
+      });
 
-    case TypeKind::BuiltinBorrow: {
-      llvm_unreachable("todo");
-
-    }
     case TypeKind::BuiltinFixedArray: {
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
         auto *FixedArray = llvm::cast<swift::BuiltinFixedArrayType>(BaseTy);
@@ -2416,11 +2423,6 @@ private:
     // The following types exist primarily for internal use by the type
     // checker.
     case TypeKind::Error:
-    case TypeKind::LValue:
-    case TypeKind::TypeVariable:
-    case TypeKind::ErrorUnion:
-    case TypeKind::Placeholder:
-    case TypeKind::Module:
     case TypeKind::SILBlockStorage:
     case TypeKind::SILToken:
     case TypeKind::BuiltinUnsafeValueBuffer:
