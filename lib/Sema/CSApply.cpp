@@ -7330,26 +7330,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::CGFloatToDouble:
     case ConversionRestrictionKind::DoubleToCGFloat: {
-      // OK: Implicit conversion, no module selector to drop here.
-      DeclNameRef initRef(ctx, /*module selector=*/Identifier(),
-                          DeclBaseName::createConstructor(), { Identifier() });
+      auto decl = (knownRestriction->second == ConversionRestrictionKind::CGFloatToDouble
+                    ? ctx.getDoubleInitDecl() : ctx.getCGFloatInitDecl());
 
-      ConstructorDecl *decl = nullptr;
-      SmallVector<ValueDecl *, 2> candidates;
-      dc->lookupQualified(toType->getAnyNominal(), initRef, SourceLoc(),
-                          NL_QualifiedDefault, candidates);
-      for (auto *candidate : candidates) {
-        auto *ctor = cast<ConstructorDecl>(candidate);
-        auto fnType = ctor->getMethodInterfaceType()->castTo<FunctionType>();
-        if (fnType->getNumParams() == 1 &&
-            fnType->getParams()[0].getPlainType()->isEqual(fromType) &&
-            fnType->getResult()->isEqual(toType)) {
-          decl = ctor;
-          break;
-        }
-      }
-
-      if (decl == nullptr) {
+      if (!decl) {
         ctx.Diags.diagnose(expr->getLoc(), diag::broken_stdlib_type,
                            toType->getAnyNominal()->getName().str());
         auto *errorExpr = new (ctx) ErrorExpr(SourceRange(), toType);
@@ -7358,11 +7342,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         return errorExpr;
       }
 
+      auto *initType = decl.getDecl()->getInterfaceType()->castTo<FunctionType>();
+
       auto *ctorRefExpr =  new (ctx) DeclRefExpr(decl, DeclNameLoc(), /*Implicit=*/true);
-      ctorRefExpr->setType(decl->getInterfaceType());
+      ctorRefExpr->setType(initType);
       auto *typeExpr = TypeExpr::createImplicit(toType, ctx);
       auto *innerCall = ConstructorRefCallExpr::create(ctx, ctorRefExpr, typeExpr,
-                                                       decl->getMethodInterfaceType());
+                                                       initType->getResult());
       cs.cacheExprTypes(innerCall);
 
       auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {cs.coerceToRValue(expr)});

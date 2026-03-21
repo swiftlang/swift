@@ -1772,6 +1772,48 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
   return ConcreteDeclRef(foundDecl, subs);
 }
 
+
+static ConcreteDeclRef getCGFloatOrDoubleInitDecl(
+    ASTContext &ctx, Type fromType, Type toType) {
+  if (!toType || !fromType)
+    return ConcreteDeclRef();
+
+  // OK: Implicit conversion, no module selector to drop here.
+  DeclNameRef initRef(ctx, /*module selector=*/Identifier(),
+                      DeclBaseName::createConstructor(), { Identifier() });
+
+  auto *toDecl = toType->getAnyNominal();
+  SmallVector<ValueDecl *, 2> candidates;
+
+  // Using the nominal type as the declaration context bypasses access
+  // control. But there is only going to be one overload that exactly
+  // with no label and the right argument type.
+  toDecl->lookupQualified(toDecl, initRef, SourceLoc(),
+                          NL_QualifiedDefault, candidates);
+
+  for (auto *candidate : candidates) {
+    auto *ctor = cast<ConstructorDecl>(candidate);
+    auto fnType = ctor->getMethodInterfaceType()->castTo<FunctionType>();
+    if (fnType->getNumParams() == 1 &&
+        fnType->getParams()[0] == AnyFunctionType::Param(fromType) &&
+        fnType->getResult()->isEqual(toType)) {
+      return ConcreteDeclRef(ctor);
+    }
+  }
+
+  return ConcreteDeclRef();
+}
+
+ConcreteDeclRef ASTContext::getCGFloatInitDecl() const {
+  return getCGFloatOrDoubleInitDecl(const_cast<ASTContext &>(*this),
+                                    getDoubleType(), getCGFloatType());
+}
+
+ConcreteDeclRef ASTContext::getDoubleInitDecl() const {
+  return getCGFloatOrDoubleInitDecl(const_cast<ASTContext &>(*this),
+                                    getCGFloatType(), getDoubleType());
+}
+
 static
 FuncDecl *getBinaryComparisonOperatorIntDecl(const ASTContext &C, StringRef op,
                                              FuncDecl *&cached) {

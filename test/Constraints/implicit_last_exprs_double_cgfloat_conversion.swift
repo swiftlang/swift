@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ImplicitLastExprResults %clang-importer-sdk
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ImplicitLastExprResults
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_ImplicitLastExprResults
