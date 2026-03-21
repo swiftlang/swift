@@ -49,7 +49,7 @@ extension AsyncIteratorProtocol {
   /// Default implementation of `next()` in terms of `next(isolation:)`, which
   /// is required to maintain backward compatibility with existing async
   /// iterators.
-  @available(SwiftStdlib 6.0, *)
+  @available(SwiftStdlib 6.1, *)
   @inlinable
   public mutating func next() async throws(Failure) -> sending Element? {
     return try await next(isolation: nil)
@@ -70,4 +70,3 @@ public struct FakeMapSequence<T> : AsyncIteratorProtocol {
     fatalError()
   }
 }
-
