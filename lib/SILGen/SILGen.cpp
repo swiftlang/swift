@@ -880,6 +880,8 @@ bool SILGenModule::shouldSkipDecl(Decl *D) {
 }
 
 void SILGenModule::visit(Decl *D) {
+  PrettyStackTraceDecl debugStack("silgen visitDecl", D);
+
   if (shouldSkipDecl(D))
     return;
 
