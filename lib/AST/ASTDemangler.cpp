@@ -916,7 +916,7 @@ Type ASTBuilder::createExistentialMetatypeType(
 Type ASTBuilder::createConstrainedExistentialType(
     Type base, ArrayRef<BuiltRequirement> constraints,
     ArrayRef<BuiltInverseRequirement> inverseRequirements) {
-  llvm::SmallDenseMap<AssociatedTypeDecl *, Type> primaryAssociatedTypes;
+  llvm::SmallMapVector<AssociatedTypeDecl *, Type, 2> primaryAssociatedTypes;
   llvm::SmallDenseSet<AssociatedTypeDecl *> claimed;
 
   for (const auto &req : constraints) {
@@ -931,8 +931,9 @@ Type ASTBuilder::createConstrainedExistentialType(
       if (auto *memberTy = req.getFirstType()->getAs<DependentMemberType>()) {
         if (memberTy->getBase()->is<GenericTypeParamType>()) {
           // This is the only case we understand so far.
-          if (auto *assocTy = memberTy->getAssocType())
+          if (auto *assocTy = memberTy->getAssocType()) {
             primaryAssociatedTypes[assocTy] = req.getSecondType();
+          }
 
           continue;
         }
@@ -945,25 +946,71 @@ Type ASTBuilder::createConstrainedExistentialType(
     return Type();
   }
 
-  auto maybeFormParameterizedProtocolType = [&](ProtocolType *protoTy) -> Type {
-    auto *proto = protoTy->getDecl();
-
-    llvm::SmallVector<Type, 4> args;
-    for (auto *assocTy : proto->getPrimaryAssociatedTypes()) {
-      auto found = primaryAssociatedTypes.find(assocTy);
-      if (found != primaryAssociatedTypes.end()) {
-        args.push_back(found->second);
-        claimed.insert(found->first);
-        continue;
-      }
+  auto getPrimaryAssociatedTypeConstraint =
+      [&](AssociatedTypeDecl *assocTy,
+          bool allowAnchoredMatch)
+          -> std::optional<std::pair<Type, AssociatedTypeDecl *>> {
+    if (auto found = primaryAssociatedTypes.find(assocTy);
+        found != primaryAssociatedTypes.end()) {
+      return std::pair<Type, AssociatedTypeDecl *>(found->second, found->first);
     }
 
-    // We may not have any arguments because the constrained existential is a
-    // plain protocol with an inverse requirement.
-    if (args.empty())
+    if (!allowAnchoredMatch)
+      return std::nullopt;
+
+    auto *assocTyAnchor = assocTy->getAssociatedTypeAnchor();
+    for (const auto &entry : primaryAssociatedTypes) {
+      if (entry.first->getAssociatedTypeAnchor() == assocTyAnchor)
+        return std::pair<Type, AssociatedTypeDecl *>(entry.second, entry.first);
+    }
+
+    return std::nullopt;
+  };
+
+  struct ParameterizedProtocolTypeMatch {
+    Type type;
+    SmallVector<AssociatedTypeDecl *, 4> matchedAssocTypes;
+  };
+
+  auto maybeGetParameterizedProtocolTypeMatch =
+      [&](ProtocolType *protoTy, bool allowAnchoredMatch)
+          -> std::optional<ParameterizedProtocolTypeMatch> {
+    auto *proto = protoTy->getDecl();
+    auto primaryAssocTypes = proto->getPrimaryAssociatedTypes();
+
+    if (primaryAssocTypes.empty())
+      return std::nullopt;
+
+    llvm::SmallVector<Type, 4> args;
+    SmallVector<AssociatedTypeDecl *, 4> matchedAssocTypes;
+    for (auto *assocTy : primaryAssocTypes) {
+      auto found =
+          getPrimaryAssociatedTypeConstraint(assocTy, allowAnchoredMatch);
+      if (!found)
+        return std::nullopt;
+
+      args.push_back(found->first);
+      matchedAssocTypes.push_back(found->second);
+    }
+
+    ParameterizedProtocolTypeMatch match{
+        ParameterizedProtocolType::get(Ctx, protoTy, args), {}};
+    match.matchedAssocTypes.append(matchedAssocTypes.begin(),
+                                   matchedAssocTypes.end());
+    return match;
+  };
+
+  auto maybeFormParameterizedProtocolType =
+      [&](ProtocolType *protoTy, bool allowAnchoredMatch) -> Type {
+    auto match =
+        maybeGetParameterizedProtocolTypeMatch(protoTy, allowAnchoredMatch);
+    if (!match)
       return protoTy;
 
-    return ParameterizedProtocolType::get(Ctx, protoTy, args);
+    for (auto *assocTy : match->matchedAssocTypes)
+      claimed.insert(assocTy);
+
+    return match->type;
   };
 
   SmallVector<Type, 2> members;
@@ -973,7 +1020,8 @@ Type ASTBuilder::createConstrainedExistentialType(
   // We're given either a single protocol type, or a composition of protocol
   // types. Transform each protocol type to add arguments, if necessary.
   if (auto protoTy = base->getAs<ProtocolType>()) {
-    members.push_back(maybeFormParameterizedProtocolType(protoTy));
+    members.push_back(
+        maybeFormParameterizedProtocolType(protoTy, /*allowAnchoredMatch=*/false));
   } else {
     auto compositionTy = base->castTo<ProtocolCompositionType>();
     hasExplicitAnyObject = compositionTy->hasExplicitAnyObject();
@@ -981,7 +1029,8 @@ Type ASTBuilder::createConstrainedExistentialType(
 
     for (auto member : compositionTy->getMembers()) {
       if (auto *protoTy = member->getAs<ProtocolType>()) {
-        members.push_back(maybeFormParameterizedProtocolType(protoTy));
+        members.push_back(maybeFormParameterizedProtocolType(
+            protoTy, /*allowAnchoredMatch=*/false));
         continue;
       }
       ASSERT(member->getClassOrBoundGenericClass());
