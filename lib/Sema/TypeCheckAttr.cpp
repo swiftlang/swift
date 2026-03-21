@@ -102,14 +102,34 @@ public:
   /// Emits a diagnostic if there is no availability specified for the given
   /// platform, as required by the given attribute. Returns true if a diagnostic
   /// was emitted.
-  bool diagnoseMissingAvailability(DeclAttribute *attr, PlatformKind platform) {
+  bool diagnoseMissingAvailability(OriginallyDefinedInAttr *attr, PlatformKind platform) {
     auto IntroVer = D->getIntroducedOSVersion(platform);
-    if (IntroVer.has_value())
-      return false;
-
-    diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
-             attr, D, prettyPlatformString(platform));
-    return true;
+    if (IntroVer.has_value()) {
+      if (IntroVer.value() > attr->getMovedVersion()) {
+        diagnose(attr->AtLoc,
+                 diag::originally_definedin_must_not_before_available_version);
+        return true;
+      }
+    } else {
+      // Also accept explicit unconditional unavailability as sufficient
+      // availability annotation. This handles the case where @_spi_available is
+      // rewritten to @available(platform, unavailable) in the public
+      // swiftinterface. Only apply this relaxation when parsing a textual
+      // interface file, since meaningful introductory version is necessary for us
+      // to emit linker directives while compiling source code.
+      if (D->getDeclContext()->isInSwiftinterface()) {
+        for (auto semanticAttr :
+             D->getSemanticAvailableAttrs(/*includeInactive=*/true)) {
+          if (semanticAttr.getPlatform() == platform &&
+              semanticAttr.isUnconditionallyUnavailable())
+            return false;
+        }
+      }
+      diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
+               attr, D, prettyPlatformString(platform));
+      return true;
+    }
+    return false;
   }
 
   void checkIsolatedDeinitAttr(DeclAttribute *attr) {
@@ -5254,13 +5274,6 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
 
     if (diagnoseMissingAvailability(Attr, Platform))
       return;
-
-    auto IntroVer = D->getIntroducedOSVersion(Platform);
-    if (IntroVer.value() > Attr->getMovedVersion()) {
-      diagnose(AtLoc,
-               diag::originally_definedin_must_not_before_available_version);
-      return;
-    }
   }
 }
 
