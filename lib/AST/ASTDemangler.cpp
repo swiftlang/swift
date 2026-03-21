@@ -1014,13 +1014,31 @@ Type ASTBuilder::createConstrainedExistentialType(
   };
 
   SmallVector<Type, 2> members;
+  llvm::SmallDenseSet<ProtocolDecl *, 2> memberProtocols;
   bool hasExplicitAnyObject = false;
   InvertibleProtocolSet inverses;
+
+  auto extractProtocolDecl = [](Type member) -> ProtocolDecl * {
+    if (auto *protoTy = member->getAs<ProtocolType>())
+      return protoTy->getDecl();
+
+    if (auto *paramProtoTy = member->getAs<ParameterizedProtocolType>())
+      return paramProtoTy->getProtocol();
+
+    return nullptr;
+  };
+
+  auto addMember = [&](Type member) {
+    members.push_back(member);
+
+    if (auto *proto = extractProtocolDecl(member))
+      memberProtocols.insert(proto);
+  };
 
   // We're given either a single protocol type, or a composition of protocol
   // types. Transform each protocol type to add arguments, if necessary.
   if (auto protoTy = base->getAs<ProtocolType>()) {
-    members.push_back(
+    addMember(
         maybeFormParameterizedProtocolType(protoTy, /*allowAnchoredMatch=*/false));
   } else {
     auto compositionTy = base->castTo<ProtocolCompositionType>();
@@ -1029,13 +1047,116 @@ Type ASTBuilder::createConstrainedExistentialType(
 
     for (auto member : compositionTy->getMembers()) {
       if (auto *protoTy = member->getAs<ProtocolType>()) {
-        members.push_back(maybeFormParameterizedProtocolType(
+        addMember(maybeFormParameterizedProtocolType(
             protoTy, /*allowAnchoredMatch=*/false));
         continue;
       }
       ASSERT(member->getClassOrBoundGenericClass());
-      members.push_back(member);
+      addMember(member);
     }
+  }
+
+  // The mangled base type may canonicalize away an inherited protocol while the
+  // requirement list still constrains one of its primary associated types. In
+  // that case, reintroduce the inherited protocol member so we can faithfully
+  // reconstruct the original constrained existential shape.
+  llvm::SmallDenseSet<ProtocolDecl *, 2> protocolsToAdd;
+
+  auto protocolCanClaimAssociatedType =
+      [](ProtocolDecl *proto, AssociatedTypeDecl *assocTy) {
+    auto *assocTyAnchor = assocTy->getAssociatedTypeAnchor();
+    return llvm::any_of(proto->getPrimaryAssociatedTypes(),
+                        [&](AssociatedTypeDecl *primaryAssocTy) {
+                          return primaryAssocTy->getAssociatedTypeAnchor() ==
+                                 assocTyAnchor;
+                        });
+  };
+
+  auto matchClaimsNewAssociatedType =
+      [&](const ParameterizedProtocolTypeMatch &match) {
+        return llvm::any_of(match.matchedAssocTypes,
+                            [&](AssociatedTypeDecl *assocTy) {
+                              return !claimed.contains(assocTy);
+                            });
+      };
+
+  auto addRecoverableProtocolsInSourceOrder =
+      [&](auto &&addRecoverableProtocolsInSourceOrder, ProtocolDecl *proto,
+          llvm::SmallSetVector<ProtocolDecl *, 4> &recoverableProtocols,
+          llvm::SmallDenseSet<ProtocolDecl *, 4> &visitedInheritedProtocols)
+          -> void {
+    for (auto *inheritedProto : proto->getInheritedProtocols()) {
+      if (!visitedInheritedProtocols.insert(inheritedProto).second)
+        continue;
+
+      if (!memberProtocols.contains(inheritedProto))
+        recoverableProtocols.insert(inheritedProto);
+
+      addRecoverableProtocolsInSourceOrder(addRecoverableProtocolsInSourceOrder,
+                                           inheritedProto,
+                                           recoverableProtocols,
+                                           visitedInheritedProtocols);
+    }
+  };
+
+  llvm::SmallSetVector<ProtocolDecl *, 4> recoverableProtocolsInSourceOrder;
+  for (auto member : members) {
+    auto *memberProto = extractProtocolDecl(member);
+    if (!memberProto)
+      continue;
+
+    llvm::SmallDenseSet<ProtocolDecl *, 4> visitedInheritedProtocols;
+    addRecoverableProtocolsInSourceOrder(addRecoverableProtocolsInSourceOrder,
+                                         memberProto,
+                                         recoverableProtocolsInSourceOrder,
+                                         visitedInheritedProtocols);
+  }
+
+  for (const auto &entry : primaryAssociatedTypes) {
+    auto *assocTy = entry.first;
+    if (claimed.contains(assocTy))
+      continue;
+
+    SmallVector<ProtocolDecl *, 2> viableCandidateProtocols;
+    for (auto *candidateProto : recoverableProtocolsInSourceOrder) {
+      if (!protocolCanClaimAssociatedType(candidateProto, assocTy))
+        continue;
+
+      auto *candidateProtoTy =
+          candidateProto->getDeclaredInterfaceType()->castTo<ProtocolType>();
+      auto candidateMatch = maybeGetParameterizedProtocolTypeMatch(
+          candidateProtoTy, /*allowAnchoredMatch=*/true);
+      if (!candidateMatch || !matchClaimsNewAssociatedType(*candidateMatch))
+        continue;
+
+      viableCandidateProtocols.push_back(candidateProto);
+    }
+
+    for (auto *candidateProto : viableCandidateProtocols) {
+      bool shadowedByMoreSpecificProtocol = llvm::any_of(
+          viableCandidateProtocols, [&](ProtocolDecl *otherProto) {
+            return otherProto != candidateProto &&
+                   otherProto->inheritsFrom(candidateProto);
+          });
+      if (shadowedByMoreSpecificProtocol)
+        continue;
+
+      protocolsToAdd.insert(candidateProto);
+    }
+  }
+
+  for (auto *proto : recoverableProtocolsInSourceOrder) {
+    if (!protocolsToAdd.count(proto))
+      continue;
+
+    auto claimedSize = claimed.size();
+    auto *protoTy = proto->getDeclaredInterfaceType()->castTo<ProtocolType>();
+    auto member =
+        maybeFormParameterizedProtocolType(protoTy, /*allowAnchoredMatch=*/true);
+    if (claimed.size() == claimedSize)
+      continue;
+
+    addMember(member);
   }
 
   // Make sure that all arguments were actually used.
