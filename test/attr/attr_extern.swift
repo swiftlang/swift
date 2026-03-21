@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -disable-availability-checking
 
+// https://github.com/swiftlang/swift/issues/88008
+// REQUIRES: github88008
 // REQUIRES: swift_feature_Extern
 
 @_extern(wasm, module: "m1", name: "f1")
