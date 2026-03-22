@@ -1969,11 +1969,9 @@ TypeExpr *TypeExprSimplifier::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   options |= TypeResolutionFlags::AllowPackReferences;
   auto BaseTy = TypeResolution::resolveContextualType(
       InnerTypeRepr, DC, options,
-      [](auto unboundTy) {
-        // FIXME: Don't let unbound generic types escape type resolution.
-        // For now, just return the unbound generic type.
-        return unboundTy;
-      },
+      // FIXME: Don't let unbound generic types escape type resolution.
+      // For now, just return the unbound generic type.
+      TypeResolution::defaultUnboundTypeOpener,
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
       PlaceholderType::get,
@@ -2799,11 +2797,9 @@ Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   } else {
     const auto result = TypeResolution::resolveContextualType(
         typeExpr->getTypeRepr(), DC, TypeResolverContext::InExpression,
-        [](auto unboundTy) {
-          // FIXME: Don't let unbound generic types escape type resolution.
-          // For now, just return the unbound generic type.
-          return unboundTy;
-        },
+        // FIXME: Don't let unbound generic types escape type resolution.
+        // For now, just return the unbound generic type.
+        TypeResolution::defaultUnboundTypeOpener,
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get,
