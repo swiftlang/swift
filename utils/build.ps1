@@ -4432,16 +4432,16 @@ if (-not $SkipBuild) {
 
 Install-HostToolchain
 
+if (-not $SkipBuild -and -not $IsCrossCompiling) {
+  Invoke-BuildStep Build-DocC $HostPlatform
+}
+
 if (-not $SkipBuild) {
   Invoke-BuildStep Build-mimalloc $HostPlatform
 }
 
 if (-not $SkipBuild -and $IncludeNoAsserts) {
   Build-NoAssertsToolchain
-}
-
-if (-not $SkipBuild -and -not $IsCrossCompiling) {
-  Invoke-BuildStep Build-DocC $HostPlatform
 }
 
 if (-not $SkipBuild) {
