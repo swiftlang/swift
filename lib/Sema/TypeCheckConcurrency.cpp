@@ -1491,12 +1491,16 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
     }
   }
 
-  // Note to supress Sendable conformance is feature is enabled.
-  if (ctx.LangOpts.hasFeature(Feature::TildeSendable)) {
+  {
     auto note = nominal->diagnose(diag::suppress_sendable_conformance);
     auto inheritance = nominal->getInherited();
     if (inheritance.empty()) {
-      note.fixItInsertAfter(nominal->getNameLoc(), ": ~Sendable");
+      // If a nominal has any generic params, insert new conformance right
+      // after them.
+      auto *genericParams = nominal->getGenericParams();
+      auto insertionLoc =
+          genericParams ? genericParams->getRAngleLoc() : nominal->getNameLoc();
+      note.fixItInsertAfter(insertionLoc, ": ~Sendable");
     } else {
       note.fixItInsertAfter(inheritance.getEndLoc(), ", ~Sendable");
     }

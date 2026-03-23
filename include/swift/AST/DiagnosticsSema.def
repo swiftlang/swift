@@ -9148,10 +9148,6 @@ ERROR(attr_inline_always_on_accessor,none,
 //===----------------------------------------------------------------------===//
 // MARK: `~Sendable`
 //===----------------------------------------------------------------------===//
-ERROR(tilde_sendable_requires_feature_flag,none,
-      "'~Sendable' requires -enable-experimental-feature TildeSendable",
-      ())
-
 NOTE(sendable_conformance_is_suppressed, none,
      "%kind0 explicitly suppresses conformance to 'Sendable' protocol",
      (const NominalTypeDecl *))

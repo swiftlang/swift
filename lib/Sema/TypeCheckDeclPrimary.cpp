@@ -124,14 +124,6 @@ public:
       return Type();
     }
 
-    if (rpk == RepressibleProtocolKind::Sendable) {
-      if (!ctx.LangOpts.hasFeature(Feature::TildeSendable)) {
-        diagnoseInvalid(repr, repr.getLoc(),
-                        diag::tilde_sendable_requires_feature_flag);
-        return Type();
-      }
-    }
-
     if (auto *TD = dyn_cast<const TypeDecl *>(decl)) {
       if (rpk == RepressibleProtocolKind::Sendable) {
         auto *C = dyn_cast<ClassDecl>(TD);

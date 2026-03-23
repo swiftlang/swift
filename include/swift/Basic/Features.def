@@ -282,6 +282,7 @@ LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
 BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude private initialized properties from memberwise init")
 LANGUAGE_FEATURE(BuiltinMarkDependence, 0, "markDependence Builtin")
 LANGUAGE_FEATURE(BuiltinAddTaskLocalValue, 0, "addTaskLocalValue and removeTaskLocalValue builtins")
+SUPPRESSIBLE_LANGUAGE_FEATURE(TildeSendable, 518, "~Sendable for explicitly marking non-Sendable types")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
@@ -588,9 +589,6 @@ EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 /// 'Swift' availability is always standalone, even when targeting platforms
 /// that have a built-in Swift runtime. Implies 'SwiftRuntimeAvailability'.
 EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
-
-/// Allow use of `~Sendable`.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
 
 /// Allow use of protocol typed values in Embedded mode (`Any` and friends)
 EXPERIMENTAL_FEATURE(EmbeddedExistentials, true)
