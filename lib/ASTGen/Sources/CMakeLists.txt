@@ -1,4 +1,5 @@
 add_subdirectory(BasicSwift)
 add_subdirectory(ASTGen)
+add_subdirectory(InterfaceTool)
 add_subdirectory(MacroEvaluation)
 add_subdirectory(SwiftIDEUtilsBridging)

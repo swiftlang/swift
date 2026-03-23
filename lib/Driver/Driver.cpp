@@ -113,6 +113,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("swift-cache-tool", DriverKind::CacheTool)
           .Case("swift-parse-test", DriverKind::ParseTest)
           .Case("swift-synthesize-interface", DriverKind::SynthesizeInterface)
+          .Case("swift-interface-tool", DriverKind::InterfaceTool)
           .Default(std::nullopt);
 
   if (Kind.has_value())
@@ -3160,6 +3161,7 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::CacheTool:
   case DriverKind::ParseTest:
   case DriverKind::SynthesizeInterface:
+  case DriverKind::InterfaceTool:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

@@ -62,6 +62,23 @@ void *_Nullable swift_ASTGen_parseSourceFile(BridgedStringRef buffer,
                                              BridgedGeneratedSourceFileKind);
 void swift_ASTGen_destroySourceFile(void *_Nonnull sourceFile);
 
+/// Minimize parsed source for .swiftinterface generation.
+/// Takes an ExportedSourceFile* from swift_ASTGen_parseSourceFile.
+/// When internalImportByDefault is true, bare imports (without an explicit
+/// access modifier) are treated as internal and removed.
+/// The result is heap-allocated; free with swift_ASTGen_freeBridgedString.
+void swift_ASTGen_minimizeSourceForInterface(
+    void *_Nonnull sourceFile,
+    bool internalImportByDefault,
+    BridgedStringRef *_Nonnull resultOut);
+
+/// Extract only import statements from parsed source.
+/// Takes an ExportedSourceFile* from swift_ASTGen_parseSourceFile.
+/// The result is heap-allocated; free with swift_ASTGen_freeBridgedString.
+void swift_ASTGen_extractImports(
+    void *_Nonnull sourceFile,
+    BridgedStringRef *_Nonnull resultOut);
+
 /// Check whether the given source file round-trips correctly. Returns 0 if
 /// round-trip succeeded, non-zero otherwise.
 int swift_ASTGen_roundTripCheck(void *_Nonnull sourceFile);
