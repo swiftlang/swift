@@ -6,8 +6,12 @@ let _: Set = [kBlue, kGreen]        // construct a set from blue and green
 let _: Set = [kBlue, kBlue]         // construct a valid set from two blues
 
 // Not allowed to mix and match elements of a set.
-let _: Set = [kBlue, kTwo]          // expected-error {{conflicting arguments to generic parameter 'Element' ('Int' vs. 'Color')}}
-let _: Set = [kBlue, Pet.dogcow]    // expected-error {{conflicting arguments to generic parameter 'Element' ('Pet' vs. 'Color')}}
+let _: Set = [kBlue, kTwo]          // expected-error {{type 'Any' cannot conform to 'Hashable'}}
+// expected-note@-1 {{required by generic struct 'Set' where 'Element' = 'Any'}}
+// expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+let _: Set = [kBlue, Pet.dogcow]    // expected-error {{type 'Any' cannot conform to 'Hashable'}}
+// expected-note@-1 {{required by generic struct 'Set' where 'Element' = 'Any'}}
+// expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 
 let s: Set<Pet> = []                // construct an empty, type-annotated set
 let _ = s.contains(Pet.goat)        // query the empty set using a key

@@ -218,21 +218,40 @@ void BindingSet::computeJoinsAndMeets() {
     }
   }
 
+  // If we didn't join any supertype bindings, there is nothing else to do.
   if (!anyJoined)
     return;
 
+  // We don't allow a join of type 'Any' or 'Any?', unless we're looking at
+  // an array element, dictionary value, or dictionary key. We detect this
+  // by checking for a default constraint with type 'Any' (or 'AnyHashable'
+  // in the dictionary key case). In this situation, we promote the default
+  // constraint to a supertype binding.
   auto isAcceptableJoin = [](Type type) {
     return !type->isAny() && (!type->getOptionalObjectType() ||
                               !type->getOptionalObjectType()->isAny());
   };
 
-  if (!isAcceptableJoin(supertypeBinding->BindingType))
-    return;
+  if (!isAcceptableJoin(supertypeBinding->BindingType)) {
+    auto found = llvm::find_if(Defaults, [](Constraint *constraint) {
+          return (constraint->getKind() == ConstraintKind::Defaultable &&
+                  (constraint->getSecondType()->isAny() ||
+                   constraint->getSecondType()->isAnyHashable()));
+        });
+
+    if (found == Defaults.end())
+      return;
+
+    supertypeBinding = PotentialBinding((*found)->getSecondType(),
+                                        AllowedBindingKind::Supertypes,
+                                        *found);
+  }
 
   LLVM_DEBUG(llvm::dbgs() << "Computed join of supertype bindings: ";
              dump(llvm::dbgs(), 0);
              llvm::dbgs() << "\n");
 
+  // Record the new binding and remove bindings that participated in the join.
   SmallVector<PotentialBinding, 4> newBindings;
   newBindings.push_back(*supertypeBinding);
 
@@ -251,10 +270,8 @@ void BindingSet::computeJoinsAndMeets() {
       return;
     }
 
-    // Keep any bindings that didn't participate above.
-    if (!binding.isViableForJoin()) {
-      newBindings.push_back(binding);
-    }
+    // Keep all other bindings.
+    newBindings.push_back(binding);
   }
 
   // All good.
@@ -1855,6 +1872,35 @@ void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
   }
 }
 
+void BindingSet::possiblyDropDefaults() {
+  if (Defaults.empty())
+    return;
+
+  if (!Literals.empty())
+    return;
+
+  bool anySupertypeBindings = false;
+  bool anyNonJoinableSupertypeBindings = false;
+  for (const auto &binding : Bindings) {
+    if (binding.Kind == AllowedBindingKind::Supertypes) {
+      anySupertypeBindings = true;
+      if (!binding.isViableForJoin())
+        anyNonJoinableSupertypeBindings = true;
+    }
+  }
+  
+  if (!anySupertypeBindings || anyNonJoinableSupertypeBindings)
+    return;
+
+  auto found = llvm::find_if(Defaults, [](Constraint *constraint) {
+        return (constraint->getKind() == ConstraintKind::Defaultable &&
+                (constraint->getSecondType()->isAny() ||
+                 constraint->getSecondType()->isAnyHashable()));
+      });
+  if (found != Defaults.end())
+    Defaults.erase(found);
+}
+
 void PotentialBindings::inferFromLiteral(Constraint *constraint,
                                          bool recordChange) {
   ASSERT(TypeVar);
@@ -2162,8 +2208,10 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
     }
   }
 
-  if (bestBindings)
+  if (bestBindings) {
     bestBindings->coalesceIntegerAndFloatLiteralRequirements();
+    bestBindings->possiblyDropDefaults();
+  }
 
   return bestBindings;
 }

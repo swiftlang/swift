@@ -706,6 +706,9 @@ public:
   /// could satisfy both requirements is `Double`.
   void coalesceIntegerAndFloatLiteralRequirements();
 
+  /// Drop default requirements if we had supertype bindings and no literals.
+  void possiblyDropDefaults();
+
   /// Check whether the given binding set covers any of the literal protocols
   /// associated with this type variable. The idea is that if a type variable
   /// has a binding like Int and also it has a conformance requirement to
