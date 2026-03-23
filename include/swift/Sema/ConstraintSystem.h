@@ -1086,11 +1086,11 @@ public:
   llvm::DenseMap<NominalTypeDecl *, DynamicCallableMethods>
       DynamicCallableCache;
 
-  /// A cache of implicitly generated dot-member expressions used as roots
+  /// A cache of implicitly generated dot-member expressions and argument lists
   /// for some `.callAsFunction` calls. The key here is "base" locator for
   /// the `.callAsFunction` member reference.
-  llvm::SmallDenseMap<ConstraintLocator *, UnresolvedDotExpr *, 2>
-      ImplicitCallAsFunctionRoots;
+  llvm::SmallDenseMap<ConstraintLocator *, ImplicitCallAsFunctionInfo, 2>
+      ImplicitCallAsFunctions;
 
   /// The set of conformances synthesized during solving (i.e. for
   /// ad-hoc distributed `SerializationRequirement` conformances).
@@ -2069,8 +2069,15 @@ public:
   void recordMatchCallArgumentResult(ConstraintLocator *locator,
                                      MatchCallArgumentResult result);
 
-  void recordImplicitCallAsFunctionRoot(
-      ConstraintLocator *locator, UnresolvedDotExpr *root);
+  /// Record a new implicit `callAsFunction` call for a split argument list
+  /// e.g `T(...) {}` -> `T(...).callAsFunction {}`
+  ///
+  /// \param root The member access to \c callAsFunction
+  /// \param baseArgs The new arguments for the base \c T(...) call. The
+  /// arguments for the \c callAsFunction call are recorded on the \c root
+  void recordImplicitCallAsFunction(ConstraintLocator *locator,
+                                    UnresolvedDotExpr *root,
+                                    ArgumentList *baseArgs);
 
   /// Record root, value, and declContext of keypath expression for use across
   /// constraint system, and add a change to the trail.

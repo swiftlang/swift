@@ -13223,10 +13223,9 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
 
 /// Create an implicit dot-member reference expression to be used
 /// as a root for injected `.callAsFunction` call.
-static UnresolvedDotExpr *
-createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
-                                    ArgumentList *arguments,
-                                    ConstraintLocator *calleeLocator) {
+static UnresolvedDotExpr *createImplicitRootForCallAsFunction(
+    ConstraintSystem &cs, Type refType, ArgumentList *baseArgs,
+    ArgumentList *trailingArgs, ConstraintLocator *calleeLocator) {
   auto &ctx = cs.getASTContext();
   auto *baseExpr = castToExpr(calleeLocator->getAnchor());
 
@@ -13235,17 +13234,17 @@ createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
   // for new argument list that only has trailing closures in it.
   auto *implicitRef = UnresolvedDotExpr::createImplicit(
       ctx, baseExpr, {ctx.Id_callAsFunction},
-      arguments->getArgumentLabels(closureLabelsScratch));
+      trailingArgs->getArgumentLabels(closureLabelsScratch));
 
   {
     // Record a type of the new reference in the constraint system.
     cs.setType(implicitRef, refType);
     // Record new `.callAsFunction` in the constraint system.
-    cs.recordImplicitCallAsFunctionRoot(calleeLocator, implicitRef);
+    cs.recordImplicitCallAsFunction(calleeLocator, implicitRef, baseArgs);
 
     auto *implicitRefLocator = cs.getConstraintLocator(
         implicitRef, ConstraintLocator::ApplyArgument);
-    cs.associateArgumentList(implicitRefLocator, arguments);
+    cs.associateArgumentList(implicitRefLocator, trailingArgs);
   }
 
   return implicitRef;
@@ -13482,7 +13481,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
                                          /*firstTrailingClosureIndex=*/0);
 
         auto *implicitRef = createImplicitRootForCallAsFunction(
-            *this, callAsFunctionResultTy, implicitCallArgumentList, calleeLoc);
+            *this, callAsFunctionResultTy, newArgumentList,
+            implicitCallArgumentList, calleeLoc);
 
         auto callAsFunctionArguments =
             FunctionType::get(trailingClosureTypes, callAsFunctionResultTy,
@@ -15389,13 +15389,15 @@ void ConstraintSystem::recordMatchCallArgumentResult(
     recordChange(SolverTrail::Change::RecordedMatchCallArgumentResult(locator));
 }
 
-void ConstraintSystem::recordImplicitCallAsFunctionRoot(
-    ConstraintLocator *locator, UnresolvedDotExpr *root) {
-  bool inserted = ImplicitCallAsFunctionRoots.insert({locator, root}).second;
+void ConstraintSystem::recordImplicitCallAsFunction(ConstraintLocator *locator,
+                                                    UnresolvedDotExpr *root,
+                                                    ArgumentList *baseArgs) {
+  ImplicitCallAsFunctionInfo info{root, baseArgs};
+  bool inserted = ImplicitCallAsFunctions.insert({locator, info}).second;
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::RecordedImplicitCallAsFunctionRoot(locator));
+    recordChange(SolverTrail::Change::RecordedImplicitCallAsFunction(locator));
 }
 
 void ConstraintSystem::recordKeyPath(const KeyPathExpr *keypath,
