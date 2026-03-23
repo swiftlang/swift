@@ -2408,6 +2408,105 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
 
   $InstallRoot = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
 
+  # Pre-baked compiler-rt configure check results for Windows MSVC targets.
+  # Each check compiles a small test program, which is relatively slow on
+  # Windows. The results are platform fundamentals that do not change:
+  # - Unix-only flags (fPIC, visibility, unwind, etc.) never work on MSVC
+  # - Core clang/MSVC flags (warnings, /GR, /Zi, etc.) always work
+  # Arch-specific flags (SSE, CRC, etc.) are left for cmake to detect.
+  $CompilerRTFlagCache = @{
+    # Unix/POSIX flags -- never work on Windows MSVC
+    COMPILER_RT_HAS_FFREESTANDING_FLAG = "0";
+    COMPILER_RT_HAS_FNO_EXCEPTIONS_FLAG = "0";
+    COMPILER_RT_HAS_FNO_FUNCTION_SECTIONS_FLAG = "0";
+    COMPILER_RT_HAS_FNO_PARTIAL_INLINING_FLAG = "0";
+    COMPILER_RT_HAS_FNO_RTTI_FLAG = "0";
+    COMPILER_RT_HAS_FNO_STACK_PROTECTOR_FLAG = "0";
+    COMPILER_RT_HAS_FOMIT_FRAME_POINTER_FLAG = "0";
+    COMPILER_RT_HAS_FPIC_FLAG = "0";
+    COMPILER_RT_HAS_FPIE_FLAG = "0";
+    COMPILER_RT_HAS_FRTTI_FLAG = "0";
+    COMPILER_RT_HAS_FTLS_MODEL_INITIAL_EXEC = "0";
+    COMPILER_RT_HAS_FUNWIND_TABLES_FLAG = "0";
+    COMPILER_RT_HAS_FVISIBILITY_HIDDEN_FLAG = "0";
+    COMPILER_RT_HAS_NOSTDINCXX_FLAG = "0";
+    COMPILER_RT_HAS_NOSTDLIBXX_FLAG = "0";
+    COMPILER_RT_HAS_OMIT_FRAME_POINTER_FLAG = "0";
+    COMPILER_RT_HAS_STD_C11_FLAG = "0";
+    COMPILER_RT_HAS_SYSROOT_FLAG = "0";
+    COMPILER_RT_HAS_VERSION_SCRIPT = "0";
+    COMPILER_RT_HAS_Z_TEXT = "0";
+    COMPILER_RT_HAS_XRAY_COMPILER_FLAG = "0";
+    COMPILER_RT_TARGET_HAS_FCNTL_LCK = "0";
+    COMPILER_RT_TARGET_HAS_FLOCK = "0";
+    COMPILER_RT_TARGET_HAS_UNAME = "0";
+    CXX_SUPPORTS_UNWINDLIB_NONE_FLAG = "0";
+    C_SUPPORTS_NODEFAULTLIBS_FLAG = "0";
+    # Core clang warning and diagnostic flags
+    COMPILER_RT_HAS_ARRAY_BOUNDS_FLAG = "1";
+    COMPILER_RT_HAS_ARRAY_BOUNDS_POINTER_ARITHMETIC_FLAG = "1";
+    COMPILER_RT_HAS_BUILTIN_FORMAL_SECURITY_FLAG = "1";
+    COMPILER_RT_HAS_BUILTIN_MEMCPY_CHK_SIZE_FLAG = "1";
+    COMPILER_RT_HAS_EMPTY_BODY_FLAG = "1";
+    COMPILER_RT_HAS_EXTERNAL_FLAG = "1";
+    COMPILER_RT_HAS_FORMAT_INSUFFICIENT_ARGS_FLAG = "1";
+    COMPILER_RT_HAS_RETURN_STACK_ADDRESS_FLAG = "1";
+    COMPILER_RT_HAS_SHADOW_FLAG = "1";
+    COMPILER_RT_HAS_SIZEOF_ARRAY_ARGUMENT_FLAG = "1";
+    COMPILER_RT_HAS_SIZEOF_ARRAY_DECAY_FLAG = "1";
+    COMPILER_RT_HAS_SIZEOF_ARRAY_DIV_FLAG = "1";
+    COMPILER_RT_HAS_SIZEOF_POINTER_DIV_FLAG = "1";
+    COMPILER_RT_HAS_SIZEOF_POINTER_MEMACCESS_FLAG = "1";
+    COMPILER_RT_HAS_SUSPICIOUS_MEMACCESS_FLAG = "1";
+    COMPILER_RT_HAS_UNINITIALIZED_FLAG = "1";
+    COMPILER_RT_HAS_WALL_FLAG = "1";
+    COMPILER_RT_HAS_WC99_EXTENSIONS_FLAG = "1";
+    COMPILER_RT_HAS_WCOVERED_SWITCH_DEFAULT_FLAG = "1";
+    COMPILER_RT_HAS_WERROR_FLAG = "1";
+    COMPILER_RT_HAS_WFRAME_LARGER_THAN_FLAG = "1";
+    COMPILER_RT_HAS_WGLOBAL_CONSTRUCTORS_FLAG = "1";
+    COMPILER_RT_HAS_WGNU_ANONYMOUS_STRUCT_FLAG = "1";
+    COMPILER_RT_HAS_WGNU_FLAG = "1";
+    COMPILER_RT_HAS_WNO_FORMAT = "1";
+    COMPILER_RT_HAS_WNO_FORMAT_PEDANTIC = "1";
+    COMPILER_RT_HAS_WNO_PEDANTIC = "1";
+    COMPILER_RT_HAS_WSUGGEST_OVERRIDE_FLAG = "1";
+    COMPILER_RT_HAS_WTHREAD_SAFETY_BETA_FLAG = "1";
+    COMPILER_RT_HAS_WTHREAD_SAFETY_FLAG = "1";
+    COMPILER_RT_HAS_WTHREAD_SAFETY_REFERENCE_FLAG = "1";
+    COMPILER_RT_HAS_WUNUSED_PARAMETER_FLAG = "1";
+    COMPILER_RT_HAS_WVARIADIC_MACROS_FLAG = "1";
+    # MSVC-specific flags
+    COMPILER_RT_HAS_W4_FLAG = "1";
+    COMPILER_RT_HAS_WD4146_FLAG = "1";
+    COMPILER_RT_HAS_WD4206_FLAG = "1";
+    COMPILER_RT_HAS_WD4221_FLAG = "1";
+    COMPILER_RT_HAS_WD4291_FLAG = "1";
+    COMPILER_RT_HAS_WD4391_FLAG = "1";
+    COMPILER_RT_HAS_WD4722_FLAG = "1";
+    COMPILER_RT_HAS_WD4800_FLAG = "1";
+    COMPILER_RT_HAS_WX_FLAG = "1";
+    COMPILER_RT_HAS_GR_FLAG = "1";
+    COMPILER_RT_HAS_GS_FLAG = "1";
+    COMPILER_RT_HAS_G_FLAG = "1";
+    COMPILER_RT_HAS_MT_FLAG = "1";
+    COMPILER_RT_HAS_Oy_FLAG = "1";
+    COMPILER_RT_HAS_Zi_FLAG = "1";
+    # Compiler/linker capabilities
+    COMPILER_RT_HAS_FNO_BUILTIN_FLAG = "1";
+    COMPILER_RT_HAS_FNO_COVERAGE_MAPPING_FLAG = "1";
+    COMPILER_RT_HAS_FNO_LTO_FLAG = "1";
+    COMPILER_RT_HAS_FNO_PROFILE_GENERATE_FLAG = "1";
+    COMPILER_RT_HAS_FNO_PROFILE_INSTR_GENERATE_FLAG = "1";
+    COMPILER_RT_HAS_FNO_PROFILE_INSTR_USE_FLAG = "1";
+    COMPILER_RT_HAS_FNO_SANITIZE_SAFE_STACK_FLAG = "1";
+    COMPILER_RT_HAS_FUSE_LD_LLD_FLAG = "1";
+    COMPILER_RT_HAS_GLINE_TABLES_ONLY_FLAG = "1";
+    COMPILER_RT_HAS_NO_DEFAULT_CONFIG_FLAG = "1";
+    COMPILER_RT_HAS_TRIVIAL_AUTO_INIT = "1";
+    COMPILER_RT_TARGET_HAS_ATOMICS = "1";
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt\lib\builtins `
     -Bin "$(Get-ProjectBinaryCache $Platform ClangBuiltins)" `
@@ -2415,11 +2514,11 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
     -Platform $Platform `
     -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
-    -Defines @{
+    -Defines ($CompilerRTFlagCache + @{
       LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
-    }
+    })
 
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt `
@@ -2428,7 +2527,7 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
     -Platform $Platform `
     -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
-    -Defines @{
+    -Defines ($CompilerRTFlagCache + @{
       LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
@@ -2439,7 +2538,7 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
       COMPILER_RT_BUILD_XRAY = "NO";
       COMPILER_RT_BUILD_PROFILE = "YES";
       COMPILER_RT_BUILD_SANITIZERS = "YES";
-    }
+    })
 }
 
 function Build-Brotli([Hashtable] $Platform) {
