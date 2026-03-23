@@ -173,6 +173,12 @@ public:
     bool isPackageOnly() const {
       return getImportControl() == ImportFilterKind::PackageOnly;
     }
+    bool isSPIOnly() const {
+      return getImportControl() == ImportFilterKind::SPIOnly;
+    }
+    bool isDefault() const {
+      return getImportControl() == ImportFilterKind::Default;
+    }
 
     bool isHeader() const { return IsHeader; }
     bool isScoped() const { return IsScoped; }

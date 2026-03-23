@@ -11,11 +11,13 @@
 //===----------------------------------------------------------------------===//
 //
 // Utility tool for minimizing Swift source files for .swiftinterface
-// generation or extracting import statements.
+// generation, extracting import statements, or extracting imports from
+// compiled .swiftmodule files.
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Serialization/ModuleImportExtractor.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/OptTable.h"
@@ -36,6 +38,7 @@ enum class InterfaceToolAction {
   Invalid,
   MinimizeSource,
   ExtractImports,
+  ExtractModuleImports,
 };
 
 enum ID {
@@ -94,6 +97,8 @@ int swift_interface_tool_main(ArrayRef<const char *> Args, const char *Argv0,
                     .Case("minimize-source", InterfaceToolAction::MinimizeSource)
                     .Case("extract-imports", InterfaceToolAction::ExtractImports)
 #endif
+                    .Case("extract-module-imports",
+                          InterfaceToolAction::ExtractModuleImports)
                     .Default(InterfaceToolAction::Invalid);
 
   if (Action == InterfaceToolAction::Invalid) {
@@ -108,6 +113,12 @@ int swift_interface_tool_main(ArrayRef<const char *> Args, const char *Argv0,
     return 1;
   }
   StringRef InputFile = Inputs.front();
+
+  // For extract-module-imports, operate directly on the binary .swiftmodule
+  // without parsing as source text.
+  if (Action == InterfaceToolAction::ExtractModuleImports) {
+    return extractModuleImports(InputFile, outs());
+  }
 
   // Source-based actions require SWIFT_BUILD_SWIFT_SYNTAX for ASTGen.
 #if SWIFT_BUILD_SWIFT_SYNTAX
@@ -141,6 +152,7 @@ int swift_interface_tool_main(ArrayRef<const char *> Args, const char *Argv0,
   case InterfaceToolAction::ExtractImports:
     swift_ASTGen_extractImports(sourceFile, &result);
     break;
+  case InterfaceToolAction::ExtractModuleImports:
   case InterfaceToolAction::Invalid:
     llvm_unreachable("handled above");
   }

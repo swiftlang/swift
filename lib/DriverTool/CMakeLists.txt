@@ -29,7 +29,9 @@ add_swift_host_library(swiftDriverTool STATIC
 )
 target_link_libraries(swiftDriverTool
                       PUBLIC
-                      ${driver_common_libs})
+                      ${driver_common_libs}
+                      PRIVATE
+                      swiftSerialization)
 
 if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftDriverTool

@@ -9,7 +9,7 @@ def help : Flag<["-", "--"], "help">,
 
 def action : JoinedOrSeparate<["-"], "action">,
   HelpText<"Swift Interface Tool action">,
-  MetaVarName<"<minimize-source|extract-imports>">;
+  MetaVarName<"<minimize-source|extract-imports|extract-module-imports>">;
 
 def internal_import_by_default : Flag<["-"], "internal-import-by-default">,
   HelpText<"Treat bare imports without an explicit access modifier as internal "
