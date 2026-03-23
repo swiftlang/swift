@@ -3061,10 +3061,6 @@ public:
     return Context(Kind::CatchGuard, dc);
   }
 
-  static Context forPatternBinding(PatternBindingDecl *binding) {
-    return getContextForPatternBinding(binding);
-  }
-
   Context withInterpolatedString(InterpolatedStringLiteralExpr *E) const {
     Context copy = *this;
     copy.InterpolatedString = E;
@@ -5090,14 +5086,6 @@ void TypeChecker::checkEnumElementEffects(EnumElementDecl *elt, Expr *E) {
   CheckEffectsCoverage checker(ctx, Context::forEnumElementInitializer(elt));
   E->walk(checker);
   E->walk(LocalFunctionEffectsChecker());
-}
-
-void TypeChecker::checkPropertyWrapperEffects(
-    PatternBindingDecl *binding, Expr *expr) {
-  auto &ctx = binding->getASTContext();
-  CheckEffectsCoverage checker(ctx, Context::forPatternBinding(binding));
-  expr->walk(checker);
-  expr->walk(LocalFunctionEffectsChecker());
 }
 
 std::optional<Type> TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
