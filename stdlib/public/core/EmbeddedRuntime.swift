@@ -224,7 +224,7 @@ public func swift_allocObjectTyped(metadata: Builtin.RawPointer, requiredSize: I
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
   var _p: UnsafeMutableRawPointer? = nil
   unsafe _swift_typedAllocate(&_p, requiredSize, requiredAlignmentMask, typeId)
-  let p = _p!
+  let p = unsafe _p!
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutablePointer<ClassMetadata>(metadata))
   unsafe object.pointee.refcount = 1
