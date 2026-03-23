@@ -1053,6 +1053,117 @@ _findContextDescriptor(Demangle::NodePointer node,
   return foundContext;
 }
 
+/// Given a class descriptor, locate the descriptor of its superclass using the
+/// SuperclassType mangled name.
+///
+/// Returns nullptr if the class has no superclass, if the superclass
+/// descriptor cannot be found, or if the superclass is generic.
+///
+/// Note: _swift_copyNongenericSubclasses depends on this returning nullptr when
+/// the superclass is generic.
+static const ClassDescriptor *
+_findSuperclassDescriptor(const ClassDescriptor *classDesc) {
+  auto superclassNameBase = classDesc->SuperclassType.get();
+  if (!superclassNameBase)
+    return nullptr;
+
+  DemanglerForRuntimeTypeResolution<> demangler;
+  auto name = Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
+  auto node = demangler.demangleTypeRef(name);
+  if (!node)
+    return nullptr;
+
+  // Unwrap a Type node if necessary.
+  if (node->getKind() == Demangle::Node::Kind::Type)
+    node = node->getChild(0);
+
+  return dyn_cast_or_null<ClassDescriptor>(
+      _findContextDescriptor(node, demangler));
+}
+
+/// Check whether a class descriptor is a (non-strict) subclass of the given
+/// target descriptor, walking the superclass chain at the descriptor level.
+static bool _isSubclassDescriptor(const ClassDescriptor *classDesc,
+                                  const ContextDescriptor *targetDesc) {
+  const ClassDescriptor *current = classDesc;
+  while (current) {
+    if (equalContexts(current, targetDesc))
+      return true;
+
+    current = _findSuperclassDescriptor(current);
+  }
+  return false;
+}
+
+SWIFT_CC(swift)
+const Metadata *_Nonnull const *_Nonnull swift::_swift_copyNongenericSubclasses(
+    const Metadata *superclass) {
+  auto *targetDesc = superclass->getTypeContextDescriptor();
+
+  // Collect matching descriptors first, then instantiate metadata.
+  llvm::SmallVector<const TypeContextDescriptor *, 16> matchingDescs;
+
+  // Don't attempt to find subclasses of generic classes. We don't implement
+  // checking of the specialization, so a concrete subclass of Foo<Int> would
+  // show up as a subclass of Foo<String>.
+  if (!targetDesc->isGeneric()) {
+    auto &T = TypeMetadataRecords.get();
+
+    // Scan all type metadata record sections.
+    auto scanSections = [&](auto &sections) {
+      for (auto &section : sections.snapshot()) {
+        for (const auto &record : section) {
+          auto *context = record.getContextDescriptor();
+          auto *classDesc = dyn_cast_or_null<ClassDescriptor>(context);
+          if (!classDesc)
+            continue;
+
+          // Skip generic classes. We can't meaningfully return them.
+          if (classDesc->isGeneric())
+            continue;
+
+          // Skip the target class itself.
+          if (equalContexts(classDesc, targetDesc))
+            continue;
+
+          // If it's a subclass, add it.
+          if (_isSubclassDescriptor(classDesc, targetDesc))
+            matchingDescs.push_back(cast<TypeContextDescriptor>(classDesc));
+        }
+      }
+    };
+
+    scanSections(T.SectionsToScan);
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+    scanSections(T.SharedCacheSectionsToScan);
+#endif
+  }
+
+  // Allocate the result array (matching classes + NULL terminator).
+  auto **result = static_cast<const Metadata **>(
+      swift_slowAlloc(matchingDescs.size_in_bytes() + sizeof(const Metadata *),
+                      alignof(const Metadata *) - 1));
+
+  // Instantiate metadata for each matching class.
+  size_t i = 0;
+  for (auto *desc : matchingDescs) {
+    auto accessFn = desc->getAccessFunction();
+    if (!accessFn) {
+      // Shouldn't happen, but just in case, we'll skip this entry.
+      continue;
+    }
+    auto response = accessFn(MetadataRequest(MetadataState::Complete));
+    // We should never get NULL, but just in case we do, we'll skip this entry.
+    if (response.Value)
+      result[i++] = response.Value;
+  }
+
+  // Terminating nullptr.
+  result[i] = nullptr;
+
+  return result;
+}
+
 /// Function to check whether we're currently running on the given global
 /// actor.
 bool (* __ptrauth_swift_is_global_actor_function SWIFT_CC(swift)

@@ -1021,6 +1021,21 @@ SWIFT_RUNTIME_STDLIB_SPI
 bool _swift_class_isSubclass(const Metadata *subclass,
                              const Metadata *superclass);
 
+/// Returns a NULL-terminated array of class metadata pointers for all known
+/// subclasses of a class. All classes involved must be non-generic: concrete
+/// subclasses of a generic will not be returned. Returns an empty array if
+/// superclass is generic. The caller must free the returned array with
+/// swift_slowDealloc or UnsafeMutablePointer.deallocate.
+///
+/// Any metadata returned will be fully instantiated before being returned.
+/// Availability is not checked, and the runtime will attempt to instantiate and
+/// return subclasses that are marked as requiring a newer OS than what it's
+/// running on.
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+const Metadata *_Nonnull const *_Nonnull _swift_copyNongenericSubclasses(
+    const Metadata *_Nonnull superclass);
+
 #if !NDEBUG
 /// Verify that the given metadata pointer correctly roundtrips its
 /// mangled name through the demangler.
