@@ -2113,6 +2113,7 @@ function Build-WiXProject() {
   $MSBuildArgs += "-binaryLogger:$BinaryCache\$($Platform.Triple)\msi\$($Platform.Architecture.VSName)-$([System.IO.Path]::GetFileNameWithoutExtension($FileName)).binlog"
   $MSBuildArgs += "-detailedSummary:False"
 
+  Write-Host "$msbuild $MSBuildArgs"
   Invoke-Program $msbuild @MSBuildArgs
 }
 
