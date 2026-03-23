@@ -246,7 +246,7 @@ public struct ObservationRegistrar: Sendable {
         if let ptr = _ThreadLocal.value {
           flagDirty = !$0.trackingLists.contains(ptr)
         } else {
-          flagDirty = true
+          flagDirty = false
         }
         if flagDirty, case .clean = $0.dirty {
           $0.dirty = .willSet(keyPath) 
@@ -267,7 +267,7 @@ public struct ObservationRegistrar: Sendable {
         if let ptr = _ThreadLocal.value {
           flagDirty = !$0.trackingLists.contains(ptr)
         } else {
-          flagDirty = true
+          flagDirty = false
         }
         if flagDirty, case .clean = $0.dirty {
           $0.dirty = .didSet(keyPath)
