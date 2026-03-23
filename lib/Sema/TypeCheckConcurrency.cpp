@@ -4539,11 +4539,30 @@ namespace {
       if (!declRef)
         return false;
 
+      auto *const decl = declRef.getDecl();
+
       // Make sure isolated conformances are formed in the right context.
       checkIsolatedConformancesInContext(declRef, loc, getDeclContext(),
                                          RefineConformances{*this});
 
-      auto *const decl = declRef.getDecl();
+      // Also, prevent isolated conformances to "escape" the isolated context through
+      // calls to async functions because these may either run on a different executor
+      // (escaped-to-func is @concurrent), or may pass the conformance along to another
+      // function which would then violate safety even if the first method we called did
+      // dynamically inherit the right context (escaped-to-func is nonisolated(nonsending)).
+      //
+      // This applies to every async callee whose isolation differs from the conformance — nonisolated,
+      // nonisolated(nonsending), and even callees isolated to a *different* global actor.
+      //
+      // Synchronous callees are safe because they cannot change the executor, and they can't escape the
+      // passed parameter without hitting Sendable safeguards.
+      if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
+        if (funcDecl->hasAsync()) {
+          checkIsolatedConformancesInContext(declRef, loc,
+                                             funcDecl,
+                                             RefineConformances{*this});
+        }
+      }
 
       // If this declaration is a callee from the enclosing application,
       // it's already been checked via the call.
