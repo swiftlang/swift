@@ -701,12 +701,12 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
           if (CE->getBracketRange().isValid()) {
             SourceLoc insertLoc = CE->getBracketRange().Start.getAdvancedLoc(1);
             bool isEmpty = (insertLoc == CE->getBracketRange().End);
-            std::string capture = name.str() + " = " + name.str();
+            std::string capture = name.str();
             diagnose(Context, PAI->getLoc(),
                      diag::copy_inout_captured_by_escaping_closure, name)
                 .fixItInsert(insertLoc, isEmpty ? capture : capture + ", ");
           } else {
-            std::string fix = " [" + name.str() + " = " + name.str() + "]";
+            std::string fix = " [" + name.str() + "]";
             if (CE->getInLoc().isInvalid())
               fix += " in";
             diagnose(Context, PAI->getLoc(),
