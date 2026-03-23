@@ -5247,6 +5247,23 @@ SourceLoc MissingArgumentsFailure::getLoc() const {
 bool MissingArgumentsFailure::diagnoseAsError() {
   auto *locator = getLocator();
 
+  if (locator->directlyAt<AssignExpr>()) {
+    auto *assignment = castToExpr<AssignExpr>(locator->getAnchor());
+    auto destTy = getType(assignment->getDest());
+    if (auto *closure = getAsExpr<ClosureExpr>(assignment->getSrc())) {
+      return diagnoseClosure(
+          closure,
+          destTy->lookThroughAllOptionalTypes()->castTo<FunctionType>());
+    }
+
+    // TODO: Attempting to assign a function value results in a generic
+    // conversion mismatch just like initialization would. But it would
+    // be great to pin-point what is missing.
+    emitDiagnostic(diag::cannot_convert_assign, getType(assignment->getSrc()),
+                   destTy);
+    return true;
+  }
+
   if (!(locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
         locator->isLastElement<LocatorPathElt::ContextualType>() ||
         locator->isLastElement<LocatorPathElt::ApplyArgument>() ||
@@ -5547,15 +5564,17 @@ bool MissingArgumentsFailure::diagnoseClosure(const ClosureExpr *closure) {
   auto *locator = getLocator();
   if (locator->isForContextualType()) {
     if (auto contextualType = getContextualType(locator->getAnchor())) {
-      funcType = contextualType->getAs<FunctionType>();
+      funcType = resolveType(contextualType)->getAs<FunctionType>();
     }
   } else if (auto info = getFunctionArgApplyInfo(locator)) {
-    auto paramType = info->getParamType();
+    auto paramType = resolveType(info->getParamType());
     // Drop a single layer of optionality because argument could get injected
     // into optional and that doesn't contribute to the problem.
     if (auto objectType = paramType->getOptionalObjectType())
       paramType = objectType;
     funcType = paramType->getAs<FunctionType>();
+  } else if (locator->directlyAt<ClosureExpr>()) {
+    funcType = getType(getRawAnchor())->castTo<FunctionType>();
   } else if (locator->isLastElement<LocatorPathElt::ClosureResult>() ||
              locator->isLastElement<LocatorPathElt::ClosureBody>()) {
     // Based on the locator we know this is something like this:
@@ -5569,8 +5588,13 @@ bool MissingArgumentsFailure::diagnoseClosure(const ClosureExpr *closure) {
   if (!funcType)
     return false;
 
+  return diagnoseClosure(closure, funcType);
+}
+
+bool MissingArgumentsFailure::diagnoseClosure(const ClosureExpr *closure,
+                                              FunctionType *expectedType) {
   unsigned numSynthesized = SynthesizedArgs.size();
-  auto diff = funcType->getNumParams() - numSynthesized;
+  auto diff = expectedType->getNumParams() - numSynthesized;
 
   // If the closure didn't specify any arguments and it is in a context that
   // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
@@ -5580,10 +5604,10 @@ bool MissingArgumentsFailure::diagnoseClosure(const ClosureExpr *closure) {
                          diag::closure_argument_list_missing, numSynthesized);
 
     std::string fixText; // Let's provide fixits for up to 10 args.
-    if (funcType->getNumParams() <= 10) {
+    if (expectedType->getNumParams() <= 10) {
       fixText += " ";
       interleave(
-          funcType->getParams(),
+          expectedType->getParams(),
           [&fixText](const AnyFunctionType::Param &param) {
             if (param.hasLabel()) {
               fixText += param.getLabel().str();
@@ -5617,9 +5641,9 @@ bool MissingArgumentsFailure::diagnoseClosure(const ClosureExpr *closure) {
       std::all_of(params->begin(), params->end(),
                   [](ParamDecl *param) { return !param->hasName(); });
 
-  auto diag = emitDiagnosticAt(
-      params->getStartLoc(), diag::closure_argument_list_tuple,
-      resolveType(funcType), funcType->getNumParams(), diff, diff == 1);
+  auto diag = emitDiagnosticAt(params->getStartLoc(),
+                               diag::closure_argument_list_tuple, expectedType,
+                               expectedType->getNumParams(), diff, diff == 1);
 
   // If the number of parameters is less than number of inferred
   // let's try to suggest a fix-it with the rest of the missing parameters.
