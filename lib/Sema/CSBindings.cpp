@@ -192,25 +192,29 @@ void BindingSet::computeJoinsAndMeets() {
         continue;
       }
 
-      auto joinType = Type::join(supertypeBinding->BindingType, binding.BindingType);
-      if (joinType) {
-        // Result of the join has to use new binding because it refers
-        // to the constraint that triggered the join that replaced the
-        // existing binding.
-        //
-        // For "join" to be transitive, both bindings have to be as
-        // well, otherwise we consider it a refinement of a direct
-        // binding.
-        auto *originator =
-            binding.isTransitive() && supertypeBinding->isTransitive()
-            ? binding.Originator : nullptr;
+      // FIXME: Remove isAcceptableJoin() and check existentialUpperBound
+      // instead.
+      bool existentialUpperBound = false;
+      auto joinType =
+          subtypeJoin(supertypeBinding->BindingType, binding.BindingType,
+                      &existentialUpperBound);
 
-        supertypeBinding = PotentialBinding(*joinType,
-                                            AllowedBindingKind::Supertypes,
-                                            binding.BindingSource,
-                                            originator);
-        anyJoined = true;
-      }
+      // Result of the join has to use new binding because it refers
+      // to the constraint that triggered the join that replaced the
+      // existing binding.
+      //
+      // For "join" to be transitive, both bindings have to be as
+      // well, otherwise we consider it a refinement of a direct
+      // binding.
+      auto *originator =
+          binding.isTransitive() && supertypeBinding->isTransitive()
+          ? binding.Originator : nullptr;
+
+      supertypeBinding = PotentialBinding(joinType,
+                                          AllowedBindingKind::Supertypes,
+                                          binding.BindingSource,
+                                          originator);
+      anyJoined = true;
     }
   }
 
@@ -224,6 +228,10 @@ void BindingSet::computeJoinsAndMeets() {
 
   if (!isAcceptableJoin(supertypeBinding->BindingType))
     return;
+
+  LLVM_DEBUG(llvm::dbgs() << "Computed join of supertype bindings: ";
+             dump(llvm::dbgs(), 0);
+             llvm::dbgs() << "\n");
 
   SmallVector<PotentialBinding, 4> newBindings;
   newBindings.push_back(*supertypeBinding);

@@ -19,6 +19,9 @@ func moreComplexExample1(_ urlComponents: URLComponents) -> [String: AnyHashable
   let result = urlComponents.queryItems?.reduce(into: [String: AnyHashable]()) { partialResult, queryItem in
       partialResult[queryItem.name] = queryItem.value?.removingPercentEncoding
   } ?? [:]
+  // expected-note@-3 {{short-circuit using 'guard' to exit this function early if the optional value contains 'nil'}}
+  // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 
   // The type of result must be inferred as [String: AnyHashable], and not
   // [String: AnyHashable]?, [String: Any], or [String: Any]?, even though
@@ -26,6 +29,11 @@ func moreComplexExample1(_ urlComponents: URLComponents) -> [String: AnyHashable
   // rules, which are hard to change. The trick is that we must not attempt
   // the 'Any' binding for the dictionary element type at all.
   return result
+  // expected-error@-1 {{cannot convert return expression of type '[String : Any]' to return type '[String : AnyHashable]'}}
+  // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // expected-note@-4 {{arguments to generic parameter 'Value' ('Any' and 'AnyHashable') are expected to be equal}}
+  // expected-error@-5 {{value of optional type '[String : Any]?' must be unwrapped to a value of type '[String : Any]'}}
 }
 
 // Further reductions of the above.

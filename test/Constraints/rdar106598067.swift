@@ -6,8 +6,7 @@ enum E: Error { case e }
 let fn = {
   do {} catch let x as? E {}
   // expected-error@-1 {{cannot conditionally downcast in a type-casting pattern}}{{23-24=}}
-  // expected-error@-2 {{expression pattern of type 'E?' cannot match values of type 'any Error'}}
-  // expected-warning@-3 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  // expected-warning@-2 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
 }
 
 // https://github.com/swiftlang/swift/issues/44631
