@@ -2408,7 +2408,7 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
 
   $InstallRoot = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
 
-  $CompilerRTCache = "$SourceCache\swift\cmake\caches\compiler-rt-Windows.cmake"
+  $CompilerRTCache = "$SourceCache\swift\cmake\caches\CompilerRuntime.cmake"
 
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt\lib\builtins `
