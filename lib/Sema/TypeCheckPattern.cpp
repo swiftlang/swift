@@ -449,7 +449,7 @@ public:
     }
 
     const auto options = TypeResolutionOptions(std::nullopt) |
-                         TypeResolutionFlags::SilenceErrors;
+                         TypeResolutionFlags::SilenceDiagnostics;
 
     // See if the repr resolves to a type.
     const auto ty = TypeResolution::resolveContextualType(
@@ -566,7 +566,7 @@ public:
       auto *qualIdentTR = cast<QualifiedIdentTypeRepr>(repr);
 
       const auto options = TypeResolutionOptions(std::nullopt) |
-                           TypeResolutionFlags::SilenceErrors;
+                           TypeResolutionFlags::SilenceDiagnostics;
 
       // See first if the entire repr resolves to a type.
       const Type enumTy = TypeResolution::resolveContextualType(

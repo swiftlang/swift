@@ -894,7 +894,7 @@ A set of flags to control various esoteric behaviors:
 \item \texttt{TypeResolutionFlags::SILMode}: used when resolving a position where ordinary AST types appear, but in textual SIL, which enables special syntax, for example \verb|@dynamic_self| for the dynamic \tSelf\ type.
 \item \texttt{TypeResolutionFlags::FromNonInferredPattern}: when resolving an explicitly-stated type annotation in a pattern binding, muffles warnings where the type of a variable binding is inferred as \texttt{()} or \texttt{Never}, which suggests a programmer mistake unless the type was explicitly stated.
 \item \texttt{TypeResolutionFlags::Direct}: set when resolving the top-level type representation, and cleared when type resolution recurses on a child. Allows certain type representations which cannot be nested inside other type representations, such as \texttt{inout T} for an \texttt{inout} parameter type.
-\item \texttt{TypeResolutionFlags::SilenceErrors}: disables diagnostics, simply returning an error type if type resolution fails. Used in pattern resolution when it is not known if a pattern refers to a type or some other member.
+\item \texttt{TypeResolutionFlags::SilenceDiagnostics}: disables diagnostics, simply returning an error type if type resolution fails. Used in pattern resolution when it is not known if a pattern refers to a type or some other member.
 \item \texttt{TypeResolutionFlags::AllowModule}: allows an identifier type representation with a single component to resolve to a \texttt{ModuleType}, which is usually prohibited.
 \item \texttt{TypeResolutionFlags::AllowUsableFromInline}: makes internal type declarations annotated with the \texttt{@usableFromInline} attribute visible, which is used in the implementation of the \verb|@_specialize| attribute.
 \item \texttt{TypeResolutionFlags::DisallowOpaqueTypes}: prevents opaque parameter declarations from appearing in contexts where they would otherwise be allowed, such as the generic arguments of a parameterized protocol type \verb|any P<some Q>|.
@@ -1028,7 +1028,7 @@ Key source files:
 \apiref{resolveNestedIdentTypeComponent()}{function}
 Resolves subsequent components of an identifier type representation. Performs a qualified lookup, disambiguates results, applies generic arguments if they were provided, and diagnoses errors.
 
-\apiref{TypeResolution::resolveDependentMemberType()}{function}
+\apiref{TypeResolver::resolveDependentMemberType()}{function}
 Implements the special behavior where a member type of a type parameter directly resolves to an unbound dependent member type in the structural resolution stage, or via name lookup to a bound dependent member type or type alias type in the interface resolution stage.
 
 \apiref{TypeChecker::lookupMemberType()}{function}
