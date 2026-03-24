@@ -1705,8 +1705,6 @@ Preparing to run this script
 
   See README.md for instructions on cloning Swift subprojects.
 
-If you intend to use the -l, -L, --lldb, or --debug-lldb options.
-
 That's it; you're ready to go!
 
 Examples
