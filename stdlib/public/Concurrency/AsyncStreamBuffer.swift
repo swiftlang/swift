@@ -194,8 +194,6 @@ extension _Storage {
     ): (Continuation.YieldResult, YieldAction) = unsafe withLock {
       switch unsafe self.state {
       case var .idle(buffer):
-        let bufferCount = buffer.count
-
         switch self.bufferingPolicy {
         case .unbounded:
           buffer.append(value)
@@ -205,12 +203,12 @@ extension _Storage {
             action: .none)
 
         case let .bufferingOldest(limit):
-          switch bufferCount < limit {
+          switch buffer.count < limit {
           case true:
             buffer.append(value)
             unsafe self.state = unsafe .idle(buffer: buffer)
             return unsafe (
-              result: .enqueued(remaining: limit - bufferCount),
+              result: .enqueued(remaining: limit - buffer.count),
               action: .none)
 
           case false:
@@ -226,11 +224,11 @@ extension _Storage {
               result: .dropped(value),
               action: .none)
 
-          case let limit where bufferCount < limit:
+          case let limit where buffer.count < limit:
             buffer.append(value)
             unsafe self.state = unsafe .idle(buffer: buffer)
             return unsafe (
-              result: .enqueued(remaining: limit - bufferCount),
+              result: .enqueued(remaining: limit - buffer.count),
               action: .none)
 
           default:
