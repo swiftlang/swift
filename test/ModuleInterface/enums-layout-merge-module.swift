@@ -1,6 +1,7 @@
+// REQUIRES: legacy_swift_driver
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -whole-module-optimization -emit-module-interface-path %t/Lib.swiftinterface -emit-module -o %t/unused.swiftmodule -enable-library-evolution -Xfrontend -enable-objc-interop -Xfrontend -disable-objc-attr-requires-foundation-module -swift-version 5 %S/Inputs/enums-layout-helper.swift -module-name Lib
-// RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK-SINGLE-FRONTEND %S/Inputs/enums-layout-helper.swift < %t/Lib.swiftinterface
+// RUN: %target-build-swift -no-emit-module-separately -emit-module-interface-path %t/Lib.swiftinterface -emit-module -o %t/unused.swiftmodule -enable-library-evolution -Xfrontend -enable-objc-interop -Xfrontend -disable-objc-attr-requires-foundation-module -swift-version 5 %S/Inputs/enums-layout-helper.swift -module-name Lib
+// RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK-MULTI-FILE %S/Inputs/enums-layout-helper.swift < %t/Lib.swiftinterface
 // RUN: %target-swift-frontend -enable-objc-interop -compile-module-from-interface %t/Lib.swiftinterface -o  %t/compiled-from-interface.swiftmodule -module-name Lib
 // RUN: %target-swift-frontend -enable-objc-interop -O -emit-ir -primary-file %s -I %t -Xllvm -swiftmergefunc-threshold=0 | %FileCheck %s
 

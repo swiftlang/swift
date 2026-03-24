@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/json.exe
+// RUN: %target-build-swift %s -parse-as-library -module-name JSONTest -Onone -g -o %t/json.exe
 // RUN: %target-codesign %t/json.exe
 // RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash.json %target-run %t/json.exe 2>&1
 // RUN: %validate-json %t/crash.json | %FileCheck %s --check-prefixes CHECK,UNSANITIZED,DEMANGLED,IMAGES,OMITTEDIMAGES,SYMBOLICATED,CAPTUREDMEM
@@ -99,7 +99,7 @@ struct Crash {
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "programCounter",
 // CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
-// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s4json6level5yyF",
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s8JSONTest6level5yyF",
 // SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
 // DEMANGLED-NEXT:     "description": "level5() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "json.exe",
@@ -113,7 +113,7 @@ struct Crash {
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
 // CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
-// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s4json6level4yyF",
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s8JSONTest6level4yyF",
 // SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
 // DEMANGLED-NEXT:     "description": "level4() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "json.exe",
@@ -127,7 +127,7 @@ struct Crash {
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
 // CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
-// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s4json6level3yyF",
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s8JSONTest6level3yyF",
 // SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
 // DEMANGLED-NEXT:     "description": "level3() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "json.exe",
@@ -141,7 +141,7 @@ struct Crash {
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
 // CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
-// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s4json6level2yyF",
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s8JSONTest6level2yyF",
 // SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
 // DEMANGLED-NEXT:     "description": "level2() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "json.exe",
@@ -155,7 +155,7 @@ struct Crash {
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
 // CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
-// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s4json6level1yyF",
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s8JSONTest6level1yyF",
 // SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
 // DEMANGLED-NEXT:     "description": "level1() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "json.exe",
@@ -169,7 +169,7 @@ struct Crash {
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
 // CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
-// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s4json5CrashV4mainyyFZ",
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s8JSONTest5CrashV4mainyyFZ",
 // SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
 // DEMANGLED-NEXT:     "description": "static Crash.main() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "json.exe",
@@ -184,7 +184,7 @@ struct Crash {
 // CHECK-NEXT:         "kind": "returnAddress",
 // CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
 // SYMBOLICATED-NEXT:  "system": true,
-// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s4json5CrashV5$mainyyFZ",
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s8JSONTest5CrashV5$mainyyFZ",
 // SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
 // DEMANGLED-NEXT:     "description": "static Crash.$main() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "json.exe",
