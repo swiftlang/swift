@@ -2801,17 +2801,27 @@ Expr *PatternBindingDecl::getExecutableInit(unsigned i) const {
   return idxInit;
 }
 
-bool VarDecl::isInitExposedToClients() const {
+ExportedLevel VarDecl::getInitExposedLevel() const {
   // 'lazy' initializers are emitted inside the getter, which is never
   // @inlinable.
   if (getAttrs().hasAttribute<LazyAttr>())
-    return false;
+    return ExportedLevel::None;
 
-  return hasInitialValue() &&
-         isLayoutExposedToClients() == ExportedLevel::Exported;
+  if (!hasInitialValue())
+    return ExportedLevel::None;
+
+  return isLayoutExposedToClients(/*forceCheckClasses=*/true);
 }
 
-ExportedLevel VarDecl::isLayoutExposedToClients() const {
+bool VarDecl::isInitExposedToClients() const {
+  auto level = getInitExposedLevel();
+  auto minToBeExported = getASTContext().LangOpts.hasFeature(Feature::Embedded)
+                         ? ExportedLevel::ImplicitlyExported
+                         : ExportedLevel::Exported;
+  return level >= minToBeExported;
+}
+
+ExportedLevel VarDecl::isLayoutExposedToClients(bool forceCheckClasses) const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
   if (!parent) return ExportedLevel::None;
   if (isStatic()) return ExportedLevel::None;
@@ -2838,7 +2848,8 @@ ExportedLevel VarDecl::isLayoutExposedToClients() const {
     return ExportedLevel::None;
 
   // Class layouts are not exposed to clients, except for subclassing.
-  if (isa<ClassDecl>(parent) &&
+  if (!forceCheckClasses &&
+      isa<ClassDecl>(parent) &&
       !parent->hasOpenAccess(getDeclContext())) {
 
     if (!parent->getASTContext().LangOpts.hasFeature(Feature::Embedded))
