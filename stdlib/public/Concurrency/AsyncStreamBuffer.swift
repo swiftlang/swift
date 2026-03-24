@@ -65,6 +65,36 @@ struct _UnsafeSendable<Value: ~Copyable>: @unchecked Sendable, ~Copyable {
   }
 }
 
+/// The state-machine backing `Async{Throwing}Stream`.
+///
+/// - States:
+///   - `idle`:  The stream is active with no consumers present
+///   and may be accepting new elements.
+///   - `waiting`: The stream is active with consumers present;
+///   new elements are delivered directly to consumers.
+///   - `draining`: The stream no longer accepts new elements;
+///   consumers drain the buffered elements.
+///   - `terminated`: The stream is in a terminal state;
+///   no new elements are accepted, and consumers return immediately.
+///
+/// - Transitions:
+/// ```text
+/// Current State   Possible Next States
+/// -------------   -------------------
+/// idle          ->  idle, waiting, terminated
+/// waiting       ->  idle, waiting, draining
+/// draining      ->  draining, terminated
+/// terminated    ->  terminated
+/// ```
+///
+/// - Transition-Actions:
+///   - `YieldAction`: The action to take after the `yield(_:)`
+///   method exits its critical section.
+///   - `NextAction`: The action to take after the `next(_:)`
+///   method exits its critical section.
+///   - `TerminateAction`: The action to take after the `terminate(_:)`
+///   method exits its critical section.
+///
 @safe
 internal
 final class _Storage<Element, Failure: Error>: @unchecked Sendable {
