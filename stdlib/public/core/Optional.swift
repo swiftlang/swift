@@ -162,27 +162,12 @@ where Wrapped: ~Copyable & ~Escapable {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
-  /// Creates an instance that stores the given value.
-  @_transparent
-  @_preInverseGenerics
-  public init(_ value: consuming Wrapped) {
-    // FIXME: Merge this with the generalization below.
-    // This is the original initializer, preserved to avoid breaking source
-    // compatibility with clients that use the `Optional.init` syntax to create
-    // a function reference. The ~Escapable generalization is currently breaking
-    // that. (rdar://147533059)
-    self = .some(value)
-  }
-}
-
 extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Creates an instance that stores the given value.
   @_transparent
-  @_alwaysEmitIntoClient
+  @_preInverseGenerics
   @lifetime(copy value)
   public init(_ value: consuming Wrapped) {
-    // FIXME: Merge this into the original entry above.
     self = .some(value)
   }
 }
