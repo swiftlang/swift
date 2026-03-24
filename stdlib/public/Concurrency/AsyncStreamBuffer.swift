@@ -52,19 +52,6 @@ func _lock(_ ptr: UnsafeRawPointer)
 func _unlock(_ ptr: UnsafeRawPointer)
 #endif
 
-fileprivate
-struct _UnsafeSendable<Value: ~Copyable>: @unchecked Sendable, ~Copyable {
-  private let value: Value
-
-  init(_ value: consuming Value) {
-    self.value = value
-  }
-
-  consuming func take() -> sending Value {
-    return self.value
-  }
-}
-
 /// The state-machine backing `Async{Throwing}Stream`.
 ///
 /// - States:
@@ -272,7 +259,6 @@ extension _Storage {
 
     switch unsafe action {
     case let .resume(consumer, element):
-      let element = _UnsafeSendable(element).take()
       unsafe consumer.resume(returning: .success(element))
       return result
 
