@@ -51,16 +51,6 @@ private extension MarkDependenceInstruction {
       //
       // Note: the mark_dependence is still needed for lifetime diagnostics. So it's important that this
       //       simplification does not run before the lifetime diagnostic pass.
-      //
-      // For non-escapable types, the mark_dependence carries lifetime dependency
-      // information and participates in ownership forwarding. Removing it when
-      // the value operand is non-escapable can create ownership violations
-      // (double consume) because earlier passes like PredictableDeadAllocationElimination
-      // may have inserted a destroy_value of the forwarded-from value when
-      // promoting the mark_dependence base from an alloc_stack to the stored value.
-      if !valueOrAddress.type.isEscapable(in: parentFunction) {
-        return false
-      }
       return true
     }
     // If the value is an address projection from the base the mark_dependence is not needed because the
