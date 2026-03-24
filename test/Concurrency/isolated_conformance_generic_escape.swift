@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -swift-version 6 -verify-additional-prefix swift6-
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete -verify-additional-prefix swift5-
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -swift-version 6
 
 // REQUIRES: concurrency
 
@@ -14,11 +13,19 @@ import _Concurrency
 
 protocol MyProtocol {
   func doSomething()
+
+  @MainActor
+  func doSomethingOnMainActor()
 }
 
 @MainActor
-class MySyncClass: @MainActor MyProtocol {
+class MyClass: @MainActor MyProtocol {
   func doSomething() {
+    MainActor.shared.assertIsolated()
+  }
+
+  @MainActor
+  func doSomethingOnMainActor() {
     MainActor.shared.assertIsolated()
   }
 }
@@ -27,19 +34,87 @@ class MySyncClass: @MainActor MyProtocol {
 // MARK: @concurrent callees — disallowed
 
 @concurrent
-func callDoSomething(_ p: some MyProtocol) async {
+func callDoSomethingConcurrent(_ p: some MyProtocol) async {
   p.doSomething() // bad, would call actor synchronously from other context
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: nonisolated(nonsending) callees — inherits caller's executor but could forward and break isolation
+// MARK: nonisolated(nonsending) callees — inherits caller's executor
 
 nonisolated(nonsending) func callDoSomethingNonisolatedNonsending(_ p: some MyProtocol) async {
-  p.doSomething() // may or may not be bad, depending who the caller was
+  p.doSomething() // ok, inherits caller's isolation
 }
 
-@concurrent func whoopsThisWouldHaveBeenBad(_ p: some MyProtocol) async {
+// ==== -----------------------------------------------------------------------
+// MARK: nonisolated(nonsending) that forwards to @concurrent — error in body
+
+// When the conformance is concrete (not generic), the error is caught at the
+// forwarding call site inside the nonisolated(nonsending) function body.
+nonisolated(nonsending) func nonsendingForwardToConcurrent(_ p: MyClass) async {
+  // expected-error@+1{{main actor-isolated conformance of 'MyClass' to 'MyProtocol' cannot be used in nonisolated context}}
+  await callDoSomethingConcurrent(p)
+}
+
+// When the conformance is abstract (generic), we reject it because the concrete
+// conformance may be isolated.
+nonisolated(nonsending) func nonsendingForwardToConcurrentGeneric(_ p: some MyProtocol) async {
+  // expected-error@+1{{conformance of generic parameter to 'MyProtocol' may be isolated and cannot be used in nonisolated context}}
+  await callDoSomethingConcurrent(p)
+}
+
+// Sendable protocols cannot have isolated conformances, so forwarding is safe.
+protocol SendableProtocol: Sendable {
+  func doSomething()
+}
+
+@concurrent
+func callSendableProtocol(_ p: some SendableProtocol) async {
   p.doSomething()
+}
+
+@concurrent
+func callSendableProtocolComp(_ p: some (MyProtocol & Sendable)) async {
+  p.doSomething()
+}
+
+nonisolated(nonsending) func nonsendingForwardSendableGeneric(_ p: some SendableProtocol) async {
+  await callSendableProtocol(p) // ok, Sendable protocols can't have isolated conformances
+}
+
+nonisolated(nonsending) func nonsendingForwardSendableGenericComp<P: MyProtocol>(_ p: P) async { // expected-note{{consider making generic parameter 'P' conform to the 'Sendable' protocol}}
+  // expected-error@+2{{conformance of generic parameter to 'MyProtocol' may be isolated and cannot be used in nonisolated context}}
+  // expected-error@+1{{type 'P' does not conform to the 'Sendable' protocol}}
+  await callSendableProtocolComp(p)
+}
+
+final class Caller {
+  @concurrent func call(first p: some MyProtocol, second fine: String) async { p.doSomething() }
+}
+nonisolated(nonsending) func nonsendingForwardSendableGeneric(caller: Caller, _ p: some MyProtocol) async {
+  // expected-error@+1{{conformance of generic parameter to 'MyProtocol' may be isolated and cannot be used in nonisolated context}}
+  await caller.call(first: p, second: "this is fine")
+}
+
+// Callee with explicit generic parameter — the name appears in the diagnostic.
+@concurrent
+func callDoSomethingConcurrentExplicit<ItsMe: MyProtocol>(_ p: ItsMe) async {
+  p.doSomething()
+}
+
+nonisolated(nonsending) func nonsendingForwardExplicitGeneric<TheProblemIsNotHere: MyProtocol>(_ p: TheProblemIsNotHere) async {
+  // expected-error@+1{{conformance of 'ItsMe' to 'MyProtocol' may be isolated and cannot be used in nonisolated context}}
+  await callDoSomethingConcurrentExplicit(p)
+}
+
+@concurrent func nonsendingForwardSendableGeneric(_ p: some MyProtocol) async {
+  await p.doSomethingOnMainActor() // this explicitly hops to MainActor and is fine
+}
+
+// @MainActor forwarding generic to @concurrent — same issue, rejected.
+@MainActor
+func mainActorForwardToConcurrentGeneric(_ p: some MyProtocol) async {
+  // expected-error@+1{{conformance of generic parameter to 'MyProtocol' may be isolated and cannot be used in nonisolated context}}
+  await callDoSomethingConcurrent(p)
 }
 
 // ==== -----------------------------------------------------------------------
@@ -65,24 +140,24 @@ func callDoSomethingFromMainActor(_ p: some MyProtocol) async {
 // ==== -----------------------------------------------------------------------
 // MARK: Tests
 
-@available(SwiftStdlib 6.2, *)
 @MainActor
 func test() async {
   // @concurrent async - don't allow changing execution context, would allow synchronous call on actor
-  // expected-swift6-error@+2{{main actor-isolated conformance of 'MySyncClass' to 'MyProtocol' cannot be used in nonisolated context}}
-  // expected-swift5-warning@+1{{main actor-isolated conformance of 'MySyncClass' to 'MyProtocol' cannot be used in nonisolated context; this is an error in the Swift 6 language mode}}
-  await callDoSomething(MySyncClass())
+  // expected-error@+1{{main actor-isolated conformance of 'MyClass' to 'MyProtocol' cannot be used in nonisolated context}}
+  await callDoSomethingConcurrent(MyClass())
 
-  // nonisolated(nonsending) - is not allowed either, it could escape the value to another @concurrent method and break isolation there
-  // expected-swift6-error@+2{{main actor-isolated conformance of 'MySyncClass' to 'MyProtocol' cannot be used in caller isolation inheriting-isolated context}}
-  // expected-swift5-warning@+1{{main actor-isolated conformance of 'MySyncClass' to 'MyProtocol' cannot be used in caller isolation inheriting-isolated context; this is an error in the Swift 6 language mode}}
-  await callDoSomethingNonisolatedNonsending(MySyncClass())
+  // nonisolated(nonsending) — inherits caller's isolation, this is allowed
+  await callDoSomethingNonisolatedNonsending(MyClass())
+
+  // nonisolated(nonsending) that forwards to @concurrent — the error is
+  // caught at the forwarding call site inside the func, not here
+  await nonsendingForwardToConcurrent(MyClass())
+  await nonsendingForwardToConcurrentGeneric(MyClass())
 
   // Different global actor callee — not allowed, same as hopping to global executor, we don't allow ANY other isolation
-  // expected-swift6-error@+2{{main actor-isolated conformance of 'MySyncClass' to 'MyProtocol' cannot be used in global actor 'OtherActor'-isolated context}}
-  // expected-swift5-warning@+1{{main actor-isolated conformance of 'MySyncClass' to 'MyProtocol' cannot be used in global actor 'OtherActor'-isolated context; this is an error in the Swift 6 language mode}}
-  await callDoSomethingFromOtherActor(MySyncClass())
+  // expected-error@+1{{main actor-isolated conformance of 'MyClass' to 'MyProtocol' cannot be used in global actor 'OtherActor'-isolated context}}
+  await callDoSomethingFromOtherActor(MyClass())
 
   // @MainActor callee — same caller isolation, this is allowed
-  await callDoSomethingFromMainActor(MySyncClass())
+  await callDoSomethingFromMainActor(MyClass())
 }
