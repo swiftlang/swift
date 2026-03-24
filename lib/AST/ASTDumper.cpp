@@ -5000,7 +5000,10 @@ public:
   void visitGenericArgumentExprTypeRepr(GenericArgumentExprTypeRepr *T,
                                         Label label) {
     printCommon("generic_argument_expr", label);
-    printRec(T->getArgExpr(), Label::optional("arg_expr"));
+    auto *argExpr = T->getArgExpr();
+    if (!argExpr)
+      argExpr = T->getOriginalArgExpr();
+    printRec(argExpr, Label::optional("arg_expr"));
     printFoot();
   }
 };
