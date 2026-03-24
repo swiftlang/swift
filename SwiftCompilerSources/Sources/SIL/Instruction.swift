@@ -1005,6 +1005,9 @@ class OpenExistentialBoxValueInst : SingleValueInstruction, UnaryInstruction {}
 final public
 class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {
   public var metatype: Value { operand.value }
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitExistentialMetatypeInst_getConformances())
+  }
 }
 
 final public
@@ -1018,7 +1021,11 @@ class ValueMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 final public
 class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class ObjCProtocolInst : SingleValueInstruction {}
+final public class ObjCProtocolInst : SingleValueInstruction {
+  public var protocolDecl: ProtocolDecl {
+    bridged.ObjCProtocolInst_getProtocol().getAs(ProtocolDecl.self)
+  }
+}
 
 final public class TypeValueInst: SingleValueInstruction, UnaryInstruction {
   public var paramType: CanonicalType {
@@ -1104,6 +1111,12 @@ final public class IntegerLiteralInst : SingleValueInstruction {
 }
 
 final public class FloatLiteralInst : SingleValueInstruction {
+  /// The bit pattern of the literal as an integer.
+  /// Returns nil if the bit pattern does not fit in an Int (e.g. Float80).
+  public var bits: Int? {
+    let b = bridged.FloatLiteralInst_getBits()
+    return b.hasValue ? b.value : nil
+  }
 }
 
 final public class StringLiteralInst : SingleValueInstruction {

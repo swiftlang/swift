@@ -75,7 +75,10 @@ public func registerOptimizerTests() {
     escapeInfoTest,
     addressEscapeInfoTest,
     aliasingTest,
-    memoryEffectsTest
+    memoryEffectsTest,
+    scopedHashTableTest,
+    scopedHashTableInsertLookupTest,
+    scopedHashTablePopTest
   )
 
   registerModuleTest(functionUsesTest, { functionUsesTest.pass.run($0) })

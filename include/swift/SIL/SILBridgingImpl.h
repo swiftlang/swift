@@ -1332,6 +1332,11 @@ BridgedOptionalInt BridgedInstruction::IntegerLiteralInst_getValue() const {
   return getFromAPInt(result);
 }
 
+BridgedOptionalInt BridgedInstruction::FloatLiteralInst_getBits() const {
+  llvm::APInt result = getAs<swift::FloatLiteralInst>()->getBits();
+  return getFromAPInt(result);
+}
+
 BridgedStringRef BridgedInstruction::StringLiteralInst_getValue() const {
   return getAs<swift::StringLiteralInst>()->getValue();
 }
@@ -1498,6 +1503,14 @@ BridgedDeclObj BridgedInstruction::WitnessMethodInst_getLookupProtocol() const {
 
 BridgedConformance BridgedInstruction::WitnessMethodInst_getConformance() const {
   return getAs<swift::WitnessMethodInst>()->getConformance();
+}
+
+BridgedDeclObj BridgedInstruction::ObjCProtocolInst_getProtocol() const {
+  return {getAs<swift::ObjCProtocolInst>()->getProtocol()};
+}
+
+BridgedConformanceArray BridgedInstruction::InitExistentialMetatypeInst_getConformances() const {
+  return {getAs<swift::InitExistentialMetatypeInst>()->getConformances()};
 }
 
 SwiftInt BridgedInstruction::ObjectInst_getNumBaseElements() const {
