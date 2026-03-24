@@ -41,8 +41,7 @@ func testClosures() {
   // expected-error@-1 {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() throws(Never) -> Void'}}
 
   let _: () throws(Never) -> Void = {
-    // expected-error@-1 {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() throws(Never) -> Void'}}
-    throw MyError.fail
+    throw MyError.fail // expected-error {{thrown expression type 'MyError' cannot be converted to error type 'Never'}}
   }
 
   let _: () throws(Never) -> Void = { () throws in
@@ -71,4 +70,24 @@ func testThrowsMismatch(fn: () throws -> Void) {
 
   test(fn)
   // expected-error@-1 {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() throws(Never) -> Void'}}
+}
+
+func testOverloadingWithConcreteErrorType() throws {
+  func test<E>(_: () throws(E) -> Void) throws(E) {
+  }
+
+  struct S<T> {
+    init(_: () throws -> T) throws {}
+    init(_: () throws(MyError) -> T) throws(MyError) {}
+  }
+
+  struct Q {
+    init() throws {}
+  }
+
+  try test {
+    _ = try S {
+      try Q() // Ok
+    }
+  }
 }

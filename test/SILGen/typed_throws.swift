@@ -413,6 +413,28 @@ extension ArraySlice where Element == UInt8 {
   ) throws(E) -> R { fatalError() }
 }
 
+func testOverloadingWithConcreteErrorType() throws {
+  func test<E>(_: () throws(E) -> Void) throws(E) {
+  }
+
+  struct S<T> {
+    init(_: () throws -> T) throws {}
+    init(_: () throws(MyError) -> T) throws(MyError) {}
+  }
+
+  struct Q {
+    init() throws {}
+  }
+
+  // CHECK-LABEL: sil private [ossa] @$s12typed_throws36testOverloadingWithConcreteErrorTypeyyKFyyKXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <any Error>
+  try test {
+    // CHECK-LABEL: sil private [ossa] @$s12typed_throws36testOverloadingWithConcreteErrorTypeyyKFyyKXEfU_AaByyKF1QL_VyKXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Q>
+    _ = try S {
+      try Q() // Ok
+    }
+  }
+}
+
 // CHECK-LABEL:      sil_vtable MySubclass {
 // CHECK-NEXT:   #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws10MySubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]
 // CHECK-NEXT:  #MyClass.f: (MyClass) -> () throws -> () : @$s12typed_throws10MySubclassC1fyyAA0C5ErrorOYKFAA0C5ClassCADyyKFTV [override]
