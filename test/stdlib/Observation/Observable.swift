@@ -287,7 +287,7 @@ final class CowTest {
   var container = CowContainer()
 }
 
-
+@available(SwiftStdlib 6.2, *)
 @Observable
 final class DirtyBitContainer {
   var observableProperty1 = 42
@@ -647,6 +647,7 @@ struct Validator {
     }
 
     suite.test("dirty bit tracking") {
+      guard #available(SwiftStdlib 6.2, *) else { return }
       let container = DirtyBitContainer()
       try? await Task.sleep(for: .seconds(0.1))
       expectEqual(container.changed, 1)
