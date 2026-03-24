@@ -65,9 +65,18 @@ extension Context {
       AST.`Type`(bridged: _bridged.getTupleTypeWithLabels(types, labels))}}
   }
 
-  public var swiftArrayDecl: NominalTypeDecl {
-    _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
-  }
+  public var swiftArrayDecl: NominalTypeDecl { _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self) }
+  public var swiftIntDecl: NominalTypeDecl { _bridged.getSwiftIntDecl().getAs(NominalTypeDecl.self) }
+  public var swiftInt64Decl: NominalTypeDecl { _bridged.getSwiftInt64Decl().getAs(NominalTypeDecl.self) }
+  public var swiftInt32Decl: NominalTypeDecl { _bridged.getSwiftInt32Decl().getAs(NominalTypeDecl.self) }
+  public var swiftInt16Decl: NominalTypeDecl { _bridged.getSwiftInt16Decl().getAs(NominalTypeDecl.self) }
+  public var swiftInt8Decl: NominalTypeDecl { _bridged.getSwiftInt8Decl().getAs(NominalTypeDecl.self) }
+  public var swiftUIntDecl: NominalTypeDecl { _bridged.getSwiftUIntDecl().getAs(NominalTypeDecl.self) }
+  public var swiftUInt64Decl: NominalTypeDecl { _bridged.getSwiftUInt64Decl().getAs(NominalTypeDecl.self) }
+  public var swiftUInt32Decl: NominalTypeDecl { _bridged.getSwiftUInt32Decl().getAs(NominalTypeDecl.self) }
+  public var swiftUInt16Decl: NominalTypeDecl { _bridged.getSwiftUInt16Decl().getAs(NominalTypeDecl.self) }
+  public var swiftUInt8Decl: NominalTypeDecl { _bridged.getSwiftUInt8Decl().getAs(NominalTypeDecl.self) }
+  public var swiftStringDecl: NominalTypeDecl { _bridged.getSwiftStringDecl().getAs(NominalTypeDecl.self) }
 
   public var swiftMutableSpan: NominalTypeDecl {
     _bridged.getSwiftMutableSpanDecl().getAs(NominalTypeDecl.self)

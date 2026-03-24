@@ -1537,6 +1537,17 @@ struct BridgedContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getTupleTypeWithLabels(
       BridgedArrayRef elementTypes, BridgedArrayRef labels) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftArrayDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftIntDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftInt64Decl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftInt32Decl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftInt16Decl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftInt8Decl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftUIntDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftUInt64Decl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftUInt32Decl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftUInt16Decl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftUInt8Decl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftStringDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftMutableSpanDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE

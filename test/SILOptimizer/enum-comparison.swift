@@ -103,6 +103,21 @@ func compare5(_ x: CustomRawValue) -> Bool {
   return x == .b
 }
 
+struct NonUnqiueRawValue: Equatable, ExpressibleByStringLiteral {
+  init() {}
+  init(stringLiteral _: String) {}
+}
+
+enum NU: NonUnqiueRawValue {
+  case a = "a"
+  case b = "b"
+}
+
+@inline(never)
+func compare6() -> Bool {
+  return NU.a == NU.b
+}
+
 // OUT: 1: false
 print("1: \(compareeq(.c, .long_case_name_for_testing))")
 
@@ -141,4 +156,7 @@ print("12: \(compare4(.e3(27)))")
 
 // OUT: 13: true
 print("13: \(compare5(.a))")
+
+// OUT: 14: true
+print("14: \(compare6())")
 

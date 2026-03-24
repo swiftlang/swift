@@ -99,7 +99,7 @@ public class NominalTypeDecl: GenericTypeDecl {
 }
 
 final public class EnumDecl: NominalTypeDecl {
-  public var hasRawType: Bool { bridged.Enum_hasRawType() }
+  public var rawType: Type? { Type(bridgedOrNil: bridged.Enum_getRawType()) }
 
   public static func create(
     declContext: DeclContext, enumKeywordLoc: SourceLoc?, name: String,

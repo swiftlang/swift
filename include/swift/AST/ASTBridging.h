@@ -347,7 +347,7 @@ struct BridgedDeclObj {
   NominalType_getDeclaredInterfaceType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType NominalType_getSelfInterfaceType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
-  BRIDGED_INLINE bool Enum_hasRawType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Enum_getRawType() const;
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;

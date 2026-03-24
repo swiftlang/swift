@@ -3197,6 +3197,50 @@ BridgedDeclObj BridgedContext::getSwiftArrayDecl() const {
   return {context->getModule()->getASTContext().getArrayDecl()};
 }
 
+BridgedDeclObj BridgedContext::getSwiftIntDecl() const {
+  return {context->getModule()->getASTContext().getIntDecl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftInt64Decl() const {
+  return {context->getModule()->getASTContext().getInt64Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftInt32Decl() const {
+  return {context->getModule()->getASTContext().getInt32Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftInt16Decl() const {
+  return {context->getModule()->getASTContext().getInt16Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftInt8Decl() const {
+  return {context->getModule()->getASTContext().getInt8Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftUIntDecl() const {
+  return {context->getModule()->getASTContext().getUIntDecl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftUInt64Decl() const {
+  return {context->getModule()->getASTContext().getUInt64Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftUInt32Decl() const {
+  return {context->getModule()->getASTContext().getUInt32Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftUInt16Decl() const {
+  return {context->getModule()->getASTContext().getUInt16Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftUInt8Decl() const {
+  return {context->getModule()->getASTContext().getUInt8Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftStringDecl() const {
+  return {context->getModule()->getASTContext().getStringDecl()};
+}
+
 BridgedDeclObj BridgedContext::getSwiftMutableSpanDecl() const {
   return {context->getModule()->getASTContext().getMutableSpanDecl()};
 }
