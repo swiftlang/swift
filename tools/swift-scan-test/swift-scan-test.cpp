@@ -48,7 +48,7 @@ llvm::cl::opt<std::string> CASID("id", llvm::cl::desc("<casid>"),
                                  llvm::cl::cat(Category));
 llvm::cl::opt<std::string> Input("input", llvm::cl::desc("<file|index>"),
                                  llvm::cl::cat(Category));
-llvm::cl::opt<unsigned> Threads("threads",
+llvm::cl::opt<unsigned> Threads("scan-threads",
                                 llvm::cl::desc("<number of threads>"),
                                 llvm::cl::cat(Category), cl::init(1));
 llvm::cl::opt<std::string> WorkingDirectory("cwd", llvm::cl::desc("<path>"),
