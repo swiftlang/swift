@@ -1357,19 +1357,19 @@ namespace {
       auto structAccessible = IsABIAccessible_t(
         IGM.getSILModule().isTypeMetadataAccessible(TheStruct));
 
-      // For ~Copyable types with a deinit that contain @_rawLayout fields,
-      // force VWT-based destruction. Element-wise destruction generates
-      // incorrect invariant.load IR under -O for public types when
-      // @_rawLayout fields are present.
-      // See: https://github.com/swiftlang/swift/issues/86652
-      auto *nom = TheStruct->getAnyNominal();
-      if (nom && !TheStruct->isCopyable() && nom->getValueTypeDestructor()) {
+      // For ~Copyable types that contain @_rawLayout fields, force VWT-based
+      // destruction. Element-wise destruction generates incorrect
+      // invariant.load IR under -O for public types when @_rawLayout fields
+      // are present.
+      if (!TheStruct->isCopyable()) {
         bool hasRawLayoutField = false;
         for (auto &field : fields) {
           if (auto *fieldNom = field.getType(IGM, SILType::getPrimitiveAddressType(TheStruct))
                   .getASTType()->getAnyNominal()) {
-            if (fieldNom->getAttrs().hasAttribute<RawLayoutAttr>())
+            if (fieldNom->getAttrs().hasAttribute<RawLayoutAttr>()) {
               hasRawLayoutField = true;
+              break;
+            }
           }
         }
         if (hasRawLayoutField) {
