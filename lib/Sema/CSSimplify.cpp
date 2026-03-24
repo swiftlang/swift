@@ -42,6 +42,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/Score.h"
 #include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -2829,6 +2830,16 @@ matchFunctionThrowing(ConstraintSystem &cs,
   Type thrownError2 = func2->getEffectiveThrownErrorTypeOrNever();
   if (!thrownError1 || !thrownError2)
     return cs.getTypeMatchSuccess();
+
+  // An attempt to erase typed throws into `throws` requires a function
+  // conversion and a heap allocation for the error type, so if there is an
+  // overload that takes typed throws it should be preferred.
+  if (func1->getThrownError() && !func2->getThrownError() &&
+      thrownError2->isErrorExistentialType()) {
+    cs.increaseScore(
+        SK_FunctionConversion,
+        locator.withPathElement(LocatorPathElt::ThrownErrorType()));
+  }
 
   switch (compareThrownErrorsForSubtyping(thrownError1, thrownError2, cs.DC)) {
   case ThrownErrorSubtyping::DropsThrows: {
