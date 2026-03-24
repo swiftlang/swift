@@ -134,6 +134,10 @@ extension MutatingContext {
     _bridged.notifyChanges(.Effects)
   }
 
+  public func hasChanged(_ kind: BridgedContext.NotificationKind) -> Bool {
+    _bridged.hasChangeNotification(kind)
+  }
+
   public func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool, markedAsUsed: Bool) -> GlobalVariable {
     let gv = name._withBridgedStringRef {
       _bridged.createGlobalVariable($0, type.bridged, linkage.bridged, isLet,

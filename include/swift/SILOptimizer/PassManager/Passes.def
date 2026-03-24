@@ -67,6 +67,10 @@ PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
      "Assume Single-Threaded Environment")
 PASS(BooleanLiteralFolding, "boolean-literal-folding",
      "Constant folds initializers of boolean literals")
+PASS(CommonSubexpressionElimination, "common-subexpression-elimination",
+     "Common Subexpression Elimination (Swift)")
+PASS(HighLevelCommonSubexpressionElimination, "high-level-common-subexpression-elimination",
+     "Common Subexpression Elimination on High-Level SIL (Swift)")
 PASS(DestroyHoisting, "destroy-hoisting",
      "Hoist destroy_value instructions")
 PASS(MandatoryDestroyHoisting, "mandatory-destroy-hoisting",

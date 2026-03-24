@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -common-subexpression-elimination | %FileCheck --check-prefix=SWIFT-CSE %s
 
 sil_stage canonical
 
@@ -24,6 +25,9 @@ class Ping {
 // CHECK-LABEL: sil [ossa] @dead_inst_elimination_one_bb :
 // CHECK-NOT: integer_literal $Builtin.Int64, 24
 // CHECK-LABEL: } // end sil function 'dead_inst_elimination_one_bb'
+// SWIFT-CSE-LABEL: sil [ossa] @dead_inst_elimination_one_bb :
+// SWIFT-CSE-NOT: integer_literal $Builtin.Int64, 24
+// SWIFT-CSE-LABEL: } // end sil function 'dead_inst_elimination_one_bb'
 sil [ossa] @dead_inst_elimination_one_bb : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int64, 24
   %1 = tuple()
@@ -36,6 +40,12 @@ sil [ossa] @dead_inst_elimination_one_bb : $@convention(thin) () -> () {
 // CHECK: bb1
 // CHECK-NOT: integer_literal $Builtin.Int64, 48
 // CHECK-LABEL: } // end sil function 'dead_inst_elimination_diamond'
+// SWIFT-CSE-LABEL: sil [ossa] @dead_inst_elimination_diamond :
+// SWIFT-CSE: bb0
+// SWIFT-CSE-NOT: integer_literal $Builtin.Int64, 24
+// SWIFT-CSE: bb1
+// SWIFT-CSE-NOT: integer_literal $Builtin.Int64, 48
+// SWIFT-CSE-LABEL: } // end sil function 'dead_inst_elimination_diamond'
 sil [ossa] @dead_inst_elimination_diamond : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   %1 = integer_literal $Builtin.Int64, 24
@@ -67,6 +77,17 @@ sil [ossa] @random_counter : $@convention(thin) () -> Builtin.Int1
 // CHECK-NOT: integer_literal
 // CHECK: tuple
 // CHECK-LABEL: } // end sil function 'dead_inst_elimination_loop'
+// SWIFT-CSE-LABEL: sil [ossa] @dead_inst_elimination_loop :
+// SWIFT-CSE: bb0
+// SWIFT-CSE-NOT: integer_literal
+// SWIFT-CSE: bb1
+// SWIFT-CSE: function_ref
+// SWIFT-CSE: apply
+// SWIFT-CSE-NOT: integer_literal
+// SWIFT-CSE: bb2
+// SWIFT-CSE-NOT: integer_literal
+// SWIFT-CSE: tuple
+// SWIFT-CSE-LABEL: } // end sil function 'dead_inst_elimination_loop'
 sil [ossa] @dead_inst_elimination_loop : $@convention(thin) () -> () {
 bb0:
   %1 = integer_literal $Builtin.Int64, 24
@@ -98,6 +119,11 @@ sil [ossa] @exit : $@convention(thin) () -> Never
 // CHECK: unchecked_ref_cast
 // CHECK-NOT: unchecked_bitwise_cast
 // CHECK: } // end sil function 'removeTriviallyDeadInstructions'
+// SWIFT-CSE-LABEL: sil [ossa] @removeTriviallyDeadInstructions :
+// SWIFT-CSE: store
+// SWIFT-CSE: unchecked_ref_cast
+// SWIFT-CSE-NOT: unchecked_bitwise_cast
+// SWIFT-CSE-LABEL: } // end sil function 'removeTriviallyDeadInstructions'
 sil [ossa] @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : @owned $B):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
@@ -118,6 +144,9 @@ bb0(%0 : @owned $B):
 // CHECK: cond_br
 // CHECK-NOT: unchecked_ref_cast
 // CHECK-LABEL: } // end sil function 'removeTriviallyDeadCrossBasicBlocks'
+// SWIFT-CSE-LABEL: sil [ossa] @removeTriviallyDeadCrossBasicBlocks :
+// SWIFT-CSE: cond_br
+// SWIFT-CSE-LABEL: } // end sil function 'removeTriviallyDeadCrossBasicBlocks'
 sil [ossa] @removeTriviallyDeadCrossBasicBlocks : $@convention(thin) (@owned B, Builtin.Int1) -> () {
 bb0(%0: @owned $B, %1: $Builtin.Int1):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
@@ -140,6 +169,10 @@ bb3:
 // CHECK: alloc_stack
 // CHECK: dealloc_stack
 // CHECK-LABEL: } // end sil function 'dead_use_of_alloc_stack'
+// SWIFT-CSE-LABEL: sil [ossa] @dead_use_of_alloc_stack :
+// SWIFT-CSE: alloc_stack
+// SWIFT-CSE: dealloc_stack
+// SWIFT-CSE-LABEL: } // end sil function 'dead_use_of_alloc_stack'
 sil [ossa] @dead_use_of_alloc_stack : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_stack $((), (), ())
@@ -152,6 +185,8 @@ bb0:
 // CHECK-LABEL: sil [ossa] @tuple_extract :
 // CHECK: bb
 // CHECK-LABEL: } // end sil function 'tuple_extract'
+// SWIFT-CSE-LABEL: sil [ossa] @tuple_extract :
+// SWIFT-CSE-LABEL: } // end sil function 'tuple_extract'
 sil [ossa] @tuple_extract : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = tuple (%0 : $Int64, %0 : $Int64)
@@ -168,6 +203,9 @@ bb0(%0 : $Int64):
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: br bb
 // CHECK-LABEL: } // end sil function 'do_not_fold_integer_literal'
+// SWIFT-CSE-LABEL: sil [ossa] @do_not_fold_integer_literal :
+// SWIFT-CSE: cond_br
+// SWIFT-CSE-LABEL: } // end sil function 'do_not_fold_integer_literal'
 sil [ossa] @do_not_fold_integer_literal : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb3
@@ -196,6 +234,9 @@ enum BoolLike { case true_, false_ }
 // CHECK-NOT: enum
 // CHECK-NEXT: br bb
 // CHECK-LABEL: } // end sil function 'fold_enum'
+// SWIFT-CSE-LABEL: sil [ossa] @fold_enum :
+// SWIFT-CSE: switch_enum
+// SWIFT-CSE-LABEL: } // end sil function 'fold_enum'
 sil [ossa] @fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
@@ -222,6 +263,9 @@ bb3(%3 : $BoolLike):
 // CHECK-NEXT: enum
 // CHECK-NEXT: br bb
 // CHECK-LABEL: } // end sil function 'do_not_fold_enum'
+// SWIFT-CSE-LABEL: sil [ossa] @do_not_fold_enum :
+// SWIFT-CSE: switch_enum
+// SWIFT-CSE-LABEL: } // end sil function 'do_not_fold_enum'
 sil [ossa] @do_not_fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
@@ -253,6 +297,10 @@ bb3(%3 : $BoolLike):
 // CHECK-NEXT: [[DECOY2:%[0-9]+]] = integer_literal $Builtin.Int8, 1
 // CHECK-NEXT: tuple ([[TARGET]] : $Builtin.Int8, [[TARGET]] : $Builtin.Int8, [[DECOY1]] : $Builtin.Int16, [[DECOY2]] : $Builtin.Int8)
 // CHECK-LABEL: } // end sil function 'test0'
+// SWIFT-CSE-LABEL: sil [ossa] @test0 :
+// SWIFT-CSE: integer_literal $Builtin.Int8, 8
+// SWIFT-CSE-NOT: integer_literal $Builtin.Int8, 8
+// SWIFT-CSE-LABEL: } // end sil function 'test0'
 sil [ossa] @test0 : $@convention(thin) () -> (Builtin.Int8, Builtin.Int8, Builtin.Int16,
                            Builtin.Int8) {
     %0 = integer_literal $Builtin.Int8, 8
@@ -278,6 +326,10 @@ sil [ossa] @test0 : $@convention(thin) () -> (Builtin.Int8, Builtin.Int8, Builti
 // CHECK: bb3([[PHI:%[0-9]+]] : $Builtin.Int8):
 // CHECK-NEXT: tuple ([[TARGET]] : $Builtin.Int8, [[PHI]] : $Builtin.Int8, [[TARGET]] : $Builtin.Int8)
 // CHECK-LABEL: } // end sil function 'test1'
+// SWIFT-CSE-LABEL: sil [ossa] @test1 :
+// SWIFT-CSE: integer_literal $Builtin.Int8, 8
+// SWIFT-CSE-NOT: integer_literal $Builtin.Int8, 8
+// SWIFT-CSE-LABEL: } // end sil function 'test1'
 sil [ossa] @test1 : $@convention(thin) () -> (Builtin.Int8, Builtin.Int8, Builtin.Int8) {
 bb0:
     %0 = integer_literal $Builtin.Int8, 8
@@ -304,6 +356,10 @@ sil [ossa] @evil : $@convention(thin) (@inout Builtin.Int8) -> ()
 // CHECK: function_ref @evil : $@convention(thin) (@inout Builtin.Int8) -> ()
 // CHECK-NOT: function_ref @evil : $@convention(thin) (@inout Builtin.Int8) -> ()
 // CHECK-LABEL: } // end sil function 'functionrefinst'
+// SWIFT-CSE-LABEL: sil [ossa] @functionrefinst :
+// SWIFT-CSE: function_ref @evil
+// SWIFT-CSE-NOT: function_ref @evil
+// SWIFT-CSE-LABEL: } // end sil function 'functionrefinst'
 sil [ossa] @functionrefinst : $@convention(thin) (@inout Builtin.Int8) -> () {
 bb0(%0 : $*Builtin.Int8):
   %1 = function_ref @evil : $@convention(thin) (@inout Builtin.Int8) -> ()
@@ -321,6 +377,10 @@ sil_global @global_target : $Builtin.Int64
 // CHECK: global_addr @global_target
 // CHECK-NOT: global_addr
 // CHECK-LABEL: } // end sil function 'globaladdr_inst'
+// SWIFT-CSE-LABEL: sil [ossa] @globaladdr_inst :
+// SWIFT-CSE: global_addr @global_target
+// SWIFT-CSE-NOT: global_addr
+// SWIFT-CSE-LABEL: } // end sil function 'globaladdr_inst'
 sil [ossa] @globaladdr_inst : $@convention(thin) () -> (Builtin.Int64) {
   %0 = global_addr @global_target : $*Builtin.Int64
   %1 = global_addr @global_target : $*Builtin.Int64
@@ -336,6 +396,10 @@ sil [ossa] @globaladdr_inst : $@convention(thin) () -> (Builtin.Int64) {
 // CHECK: float_literal $Builtin.FPIEEE32, 0x3F800000
 // CHECK-NOT: float_literal $Builtin.FPIEEE32, 0x3F800000
 // CHECK-LABEL: } // end sil function 'floatliteral'
+// SWIFT-CSE-LABEL: sil [ossa] @floatliteral :
+// SWIFT-CSE: float_literal $Builtin.FPIEEE32, 0x3F800000
+// SWIFT-CSE-NOT: float_literal $Builtin.FPIEEE32, 0x3F800000
+// SWIFT-CSE-LABEL: } // end sil function 'floatliteral'
 sil [ossa] @floatliteral : $@convention(thin) () -> (Builtin.FPIEEE32) {
   %0 = float_literal $Builtin.FPIEEE32, 0x3F800000
   %1 = float_literal $Builtin.FPIEEE32, 0x3F800000
@@ -353,6 +417,10 @@ sil [ossa] @string_use : $@convention(thin) (Builtin.RawPointer, Builtin.Word, B
 // CHECK-NOT: string_literal "First"
 // CHECK: apply {{%[0-9]+}}([[TARGET]], [[LEN]], [[ASCII]], {{%[0-9]+}}, [[TARGET]], [[LEN]], [[ASCII]], {{%[0-9]+}})
 // CHECK-LABEL: } // end sil function 'stringliteral'
+// SWIFT-CSE-LABEL: sil [ossa] @stringliteral :
+// SWIFT-CSE: string_literal utf8 "First"
+// SWIFT-CSE-NOT: string_literal utf8 "First"
+// SWIFT-CSE-LABEL: } // end sil function 'stringliteral'
 sil [ossa] @stringliteral : $@convention(thin) () -> () {
   %0 = string_literal utf8 "First"
   %1 = string_literal utf8 "First"
@@ -389,6 +457,10 @@ sil @print_fake_interval : $@convention(thin) (FakeInterval) -> ()
 // CHECK: [[PRINT_FAKEINTERVAL_FUN:%[0-9]+]] = function_ref @print_fake_interval
 // CHECK: apply [[PRINT_FAKEINTERVAL_FUN]]([[DECOY]])
 // CHECK-LABEL: } // end sil function 'structliteral'
+// SWIFT-CSE-LABEL: sil [ossa] @structliteral :
+// SWIFT-CSE: struct $Interval
+// SWIFT-CSE-NOT: struct $Interval
+// SWIFT-CSE-LABEL: } // end sil function 'structliteral'
 sil [ossa] @structliteral : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = struct $Interval (%0 : $Builtin.Int32, %1 : $Builtin.Int32)
@@ -409,6 +481,10 @@ sil [ossa] @sadd_with_address : $@convention(thin) (@inout Builtin.Int32, @inout
 // CHECK: struct_element_addr {{%[0-9]+}} : $*Interval, #Interval.start
 // CHECK-NOT: struct_element_addr {{%[0-9]+}} : $*Interval, #Interval.start
 // CHECK-LABEL: } // end sil function 'structelementaddr_test'
+// SWIFT-CSE-LABEL: sil [ossa] @structelementaddr_test :
+// SWIFT-CSE: struct_element_addr {{%[0-9]+}} : $*Interval, #Interval.start
+// SWIFT-CSE-NOT: struct_element_addr {{%[0-9]+}} : $*Interval, #Interval.start
+// SWIFT-CSE-LABEL: } // end sil function 'structelementaddr_test'
 sil  [ossa] @structelementaddr_test : $@convention(thin) (@inout Interval) -> (Builtin.Int32) {
 bb0(%0 : $*Interval):
   %1 = struct_element_addr %0 : $*Interval, #Interval.start
@@ -422,6 +498,10 @@ bb0(%0 : $*Interval):
 // CHECK: project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
 // CHECK-NOT: project_box
 // CHECK-LABEL: } // end sil function 'project_box_test'
+// SWIFT-CSE-LABEL: sil [ossa] @project_box_test :
+// SWIFT-CSE: project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+// SWIFT-CSE-NOT: project_box
+// SWIFT-CSE-LABEL: } // end sil function 'project_box_test'
 sil [ossa] @project_box_test : $(@owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> Builtin.Int32 {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
@@ -438,6 +518,10 @@ sil [ossa] @tuple_function : $@convention(thin) ((Builtin.Int32, Builtin.Int32),
 // CHECK: tuple ({{%[0-9]+}} : $Builtin.Int32, {{%[0-9]+}} : $Builtin.Int32)
 // CHECK-NOT: tuple ({{%[0-9]+}} : $Builtin.Int32, {{%[0-9]+}} : $Builtin.Int32)
 // CHECK-LABEL: } // end sil function 'tuple_test'
+// SWIFT-CSE-LABEL: sil [ossa] @tuple_test :
+// SWIFT-CSE: tuple ({{%[0-9]+}} : $Builtin.Int32, {{%[0-9]+}} : $Builtin.Int32)
+// SWIFT-CSE-NOT: tuple ({{%[0-9]+}} : $Builtin.Int32, {{%[0-9]+}} : $Builtin.Int32)
+// SWIFT-CSE-LABEL: } // end sil function 'tuple_test'
 sil [ossa] @tuple_test : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> (Builtin.Int32) {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = tuple(%0 : $Builtin.Int32, %1 : $Builtin.Int32)
@@ -453,6 +537,10 @@ sil [ossa] @generate_tuple : $@convention(thin) () -> ((Builtin.Int32, Builtin.I
 // CHECK: tuple_extract {{%[0-9]}} : $(Builtin.Int32, Builtin.Int32), 0
 // CHECK-NOT: tuple_extract {{%[0-9]}} : $(Builtin.Int32, Builtin.Int32), 0
 // CHECK-LABEL: } // end sil function 'tupleextract_test'
+// SWIFT-CSE-LABEL: sil [ossa] @tupleextract_test :
+// SWIFT-CSE: tuple_extract {{%[0-9]}} : $(Builtin.Int32, Builtin.Int32), 0
+// SWIFT-CSE-NOT: tuple_extract {{%[0-9]}} : $(Builtin.Int32, Builtin.Int32), 0
+// SWIFT-CSE-LABEL: } // end sil function 'tupleextract_test'
 sil [ossa] @tupleextract_test : $@convention(thin) () -> (Builtin.Int32) {
   %0 = function_ref @generate_tuple : $@convention(thin) () -> ((Builtin.Int32, Builtin.Int32))
   %1 = apply %0() : $@convention(thin) () -> ((Builtin.Int32, Builtin.Int32))
@@ -470,6 +558,10 @@ sil [ossa] @init_tuple_addr : $@convention(thin) () -> @out (Builtin.Int32, Buil
 // CHECK: tuple_element_addr {{%[0-9]}} : $*(Builtin.Int32, Builtin.Int32), 0
 // CHECK-NOT: tuple_element_addr {{%[0-9]}} : $*(Builtin.Int32, Builtin.Int32), 0
 // CHECK-LABEL: } // end sil function 'tupleelementaddr_test'
+// SWIFT-CSE-LABEL: sil [ossa] @tupleelementaddr_test :
+// SWIFT-CSE: tuple_element_addr {{%[0-9]}} : $*(Builtin.Int32, Builtin.Int32), 0
+// SWIFT-CSE-NOT: tuple_element_addr {{%[0-9]}} : $*(Builtin.Int32, Builtin.Int32), 0
+// SWIFT-CSE-LABEL: } // end sil function 'tupleelementaddr_test'
 sil [ossa] @tupleelementaddr_test : $@convention(thin) () -> (Builtin.Int32) {
   %0 = alloc_stack $(Builtin.Int32, Builtin.Int32)
   %1 = function_ref @init_tuple_addr : $@convention(thin) () -> (@out (Builtin.Int32, Builtin.Int32))
@@ -493,6 +585,10 @@ sil [ossa] @metatype_user : $@convention(thin) (@thin String.Type) -> ()
 // CHECK: apply {{%[0-9]+}}([[TARGET]])
 // CHECK: apply {{%[0-9]+}}([[TARGET]])
 // CHECK-LABEL: } // end sil function 'metatype_test'
+// SWIFT-CSE-LABEL: sil [ossa] @metatype_test :
+// SWIFT-CSE: metatype $@thin String.Type
+// SWIFT-CSE-NOT: metatype $@thin String.Type
+// SWIFT-CSE-LABEL: } // end sil function 'metatype_test'
 sil [ossa] @metatype_test : $@convention(thin) () -> () {
   %0 = metatype $@thin String.Type
   %1 = metatype $@thin String.Type
@@ -513,6 +609,8 @@ struct StringData {
 // instead of the whole string literal. Otherwise we run into arity
 // issues.
 // CHECK-LABEL: } // end sil function 'sil_extract_of_string'
+// SWIFT-CSE-LABEL: sil [ossa] @sil_extract_of_string :
+// SWIFT-CSE-LABEL: } // end sil function 'sil_extract_of_string'
 sil [ossa] @sil_extract_of_string : $@convention(thin) () -> Builtin.Word {
   %0 = string_literal utf8 ""
   %l1 = integer_literal $Builtin.Word, 0
@@ -528,6 +626,8 @@ sil [ossa] @helper2 : $@convention(thin) (UInt8, UInt8) -> Builtin.Word
 // CHECK:      [[T0:%.*]] = function_ref @helper
 // CHECK-NEXT: apply [[T0]](%0, %1)
 // CHECK-LABEL: } // end sil function 'sil_string_different_encodings'
+// SWIFT-CSE-LABEL: sil [ossa] @sil_string_different_encodings :
+// SWIFT-CSE-LABEL: } // end sil function 'sil_string_different_encodings'
 sil [ossa] @sil_string_different_encodings : $@convention(thin) () -> Builtin.Word {
   %0 = string_literal utf8 "help"
   %1 = string_literal objc_selector "help"
@@ -540,6 +640,9 @@ sil [ossa] @sil_string_different_encodings : $@convention(thin) () -> Builtin.Wo
 // CHECK: pointer_to_address
 // CHECK: pointer_to_address
 // CHECK-LABEL: } // end sil function 'raw_idx_cse'
+// SWIFT-CSE-LABEL: sil [ossa] @raw_idx_cse :
+// SWIFT-CSE: pointer_to_address
+// SWIFT-CSE-LABEL: } // end sil function 'raw_idx_cse'
 sil [ossa] @raw_idx_cse: $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
   %X = function_ref @helper2 : $@convention(thin) (UInt8, UInt8) -> Builtin.Word
@@ -573,6 +676,12 @@ enum FakeOptional {
 // CHECK-NEXT: apply [[FUNC]]([[SOME]]) : $@convention(thin) (FakeOptional) -> ()
 // CHECK-NEXT: tuple
 // CHECK-LABEL: } // end sil function 'enum_cse'
+// SWIFT-CSE-LABEL: sil [ossa] @enum_cse :
+// SWIFT-CSE: enum $FakeOptional, #FakeOptional.none!enumelt
+// SWIFT-CSE-NOT: enum $FakeOptional, #FakeOptional.none!enumelt
+// SWIFT-CSE: enum $FakeOptional, #FakeOptional.some!enumelt
+// SWIFT-CSE-NOT: enum $FakeOptional, #FakeOptional.some!enumelt
+// SWIFT-CSE-LABEL: } // end sil function 'enum_cse'
 sil [ossa] @unknown_fake_optional_user : $@convention(thin) (FakeOptional) -> ()
 sil [ossa] @enum_cse : $@convention(thin) () -> () {
 bb0:
@@ -601,6 +710,10 @@ sil [ossa] @int32_user : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT: apply [[FUNC]]([[INT]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT: tuple
 // CHECK-LABEL: } // end sil function 'unchecked_enum_data_cse'
+// SWIFT-CSE-LABEL: sil [ossa] @unchecked_enum_data_cse :
+// SWIFT-CSE: unchecked_enum_data
+// SWIFT-CSE-NOT: unchecked_enum_data
+// SWIFT-CSE-LABEL: } // end sil function 'unchecked_enum_data_cse'
 sil [ossa] @unchecked_enum_data_cse : $@convention(thin) (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
   %1 = function_ref @int32_user : $@convention(thin) (Builtin.Int32) -> ()
@@ -618,6 +731,10 @@ bb0(%0 : $FakeOptional):
 // CHECK: function_ref
 // CHECK: apply
 // CHECK-LABEL: } // end sil function 'test2cse'
+// SWIFT-CSE-LABEL: sil [ossa] @test2cse :
+// SWIFT-CSE: ref_to_raw_pointer
+// SWIFT-CSE-NOT: ref_to_raw_pointer
+// SWIFT-CSE-LABEL: } // end sil function 'test2cse'
 sil [ossa] @test2cse : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
   %1 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
@@ -637,6 +754,10 @@ sil [ossa] @helperCD : $@convention(thin) (@owned C, @owned C) -> Builtin.Word
 // CHECK-NEXT: address_to_pointer
 // CHECK-NEXT: tuple
 // CHECK-LABEL: } // end sil function 'cse_index_addr_inst'
+// SWIFT-CSE-LABEL: sil [ossa] @cse_index_addr_inst :
+// SWIFT-CSE: index_addr
+// SWIFT-CSE-NOT: index_addr
+// SWIFT-CSE-LABEL: } // end sil function 'cse_index_addr_inst'
 sil [ossa] @cse_index_addr_inst : $@convention(thin) (@in D, Builtin.Word) -> (Builtin.RawPointer, Builtin.RawPointer) {
 bb0(%0 : $*D, %1 : $Builtin.Word):
   %2 = index_addr %0 : $*D, %1 : $Builtin.Word
@@ -657,6 +778,10 @@ sil [ossa] [readnone] @readnonefun : $@convention(thin) (@inout Builtin.Int8) ->
 // CHECK-NOT: function_ref @readnonefun
 // CHECK-NOT: apply
 // CHECK-LABEL: } // end sil function 'cse_readnone'
+// SWIFT-CSE-LABEL: sil [ossa] @cse_readnone :
+// SWIFT-CSE: function_ref @readnonefun
+// SWIFT-CSE-NOT: function_ref @readnonefun
+// SWIFT-CSE-LABEL: } // end sil function 'cse_readnone'
 sil [ossa] @cse_readnone : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int8):
   %1 = function_ref @readnonefun : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
@@ -671,6 +796,10 @@ bb0(%0 : $*Builtin.Int8):
 // CHECK-NOT: raw_pointer_to_ref
 // CHECK: tuple
 // CHECK-LABEL: } // end sil function 'cse_raw_pointer_to_ref'
+// SWIFT-CSE-LABEL: sil [ossa] @cse_raw_pointer_to_ref :
+// SWIFT-CSE: raw_pointer_to_ref
+// SWIFT-CSE-NOT: raw_pointer_to_ref
+// SWIFT-CSE-LABEL: } // end sil function 'cse_raw_pointer_to_ref'
 sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> @owned (C, C) {
 bb0(%0 : $Builtin.RawPointer):
   %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
@@ -686,6 +815,10 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK: struct_element_addr
 // CHECK: tuple
 // CHECK-LABEL: } // end sil function 'cse_unchecked_addr_cast'
+// SWIFT-CSE-LABEL: sil [ossa] @cse_unchecked_addr_cast :
+// SWIFT-CSE: unchecked_addr_cast
+// SWIFT-CSE-NOT: unchecked_addr_cast
+// SWIFT-CSE-LABEL: } // end sil function 'cse_unchecked_addr_cast'
 sil [ossa] @cse_unchecked_addr_cast : $@convention(thin) () -> (Builtin.RawPointer, Builtin.RawPointer) {
 bb0:
    %1 = alloc_stack $OpaquePointer
@@ -710,6 +843,10 @@ enum Enum1 {
 // CHECK-NOT: select_enum
 // CHECK: tuple
 // CHECK-LABEL: } // end sil function 'cse_select_enum'
+// SWIFT-CSE-LABEL: sil [ossa] @cse_select_enum :
+// SWIFT-CSE: select_enum
+// SWIFT-CSE-NOT: select_enum
+// SWIFT-CSE-LABEL: } // end sil function 'cse_select_enum'
 sil [ossa] @cse_select_enum : $@convention(thin) (@guaranteed Enum1) -> (Builtin.Int1, Builtin.Int1) {
 bb0(%0 : $Enum1):
   %t = integer_literal $Builtin.Int1, 1
@@ -725,6 +862,10 @@ bb0(%0 : $Enum1):
 // CHECK-NOT:       bridge_object_to_word
 // CHECK:           tuple ([[REF]] : $Builtin.Word, [[REF]] : $Builtin.Word)
 // CHECK-LABEL: } // end sil function 'cse_bridge_object_to_word'
+// SWIFT-CSE-LABEL: sil [ossa] @cse_bridge_object_to_word :
+// SWIFT-CSE: bridge_object_to_word
+// SWIFT-CSE-NOT: bridge_object_to_word
+// SWIFT-CSE-LABEL: } // end sil function 'cse_bridge_object_to_word'
 sil [ossa] @cse_bridge_object_to_word : $@convention(thin) (@owned Builtin.BridgeObject) -> (Builtin.Word, Builtin.Word) {
 bb0(%0 : @owned $Builtin.BridgeObject):
   %1 = bridge_object_to_word %0 : $Builtin.BridgeObject to $Builtin.Word
@@ -741,6 +882,10 @@ sil [ossa] [_semantics "array.get_count"] @getCount : $@convention(method) (@gua
 // CHECK:           [[R2:%[0-9]+]] = apply
 // CHECK:           tuple ([[R1]] : $Int, [[R2]] : $Int)
 // CHECK-LABEL: } // end sil function 'dont_cse_get_count_on_low_level_sil'
+// SWIFT-CSE-LABEL: sil [ossa] @dont_cse_get_count_on_low_level_sil :
+// SWIFT-CSE: apply
+// SWIFT-CSE: apply
+// SWIFT-CSE-LABEL: } // end sil function 'dont_cse_get_count_on_low_level_sil'
 sil [ossa] @dont_cse_get_count_on_low_level_sil : $@convention(thin) (@guaranteed Array<Int>) -> (Int, Int) {
 bb0(%0 : @guaranteed $Array<Int>):
   %f1 = function_ref @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
@@ -763,6 +908,10 @@ sil [ossa]  @_TFC4main4PingcfMS0_FT_S0_ : $@convention(method) (@owned Ping) -> 
 // CHECK-NEXT:      apply
 // CHECK-NEXT:      apply
 // CHECK-LABEL: } // end sil function '_TF4main4ringFCS_4PingT_'
+// SWIFT-CSE-LABEL: sil [ossa] @_TF4main4ringFCS_4PingT_ :
+// SWIFT-CSE: class_method
+// SWIFT-CSE-NOT: class_method
+// SWIFT-CSE-LABEL: } // end sil function '_TF4main4ringFCS_4PingT_'
 sil [ossa] @_TF4main4ringFCS_4PingT_ : $@convention(thin) (@owned Ping) -> () {
 bb0(%0 : @owned $Ping):
   %1 = class_method %0 : $Ping, #Ping.ping : (Ping) -> () -> Ping, $@convention(method) (@guaranteed Ping) -> @owned Ping
@@ -857,6 +1006,10 @@ bb0(%0 : $*T):
 // CHECK-NEXT:      tuple
 // p.foo <A where A: p.Reachable> (A, a : Swift.Int) -> ()
 // CHECK-LABEL: } // end sil function '_TF1p3foouRq_S_9Reachable_FTq_1aSi_T_'
+// SWIFT-CSE-LABEL: sil hidden [ossa] @_TF1p3foouRq_S_9Reachable_FTq_1aSi_T_ :
+// SWIFT-CSE: witness_method
+// SWIFT-CSE-NOT: = witness_method
+// SWIFT-CSE-LABEL: } // end sil function '_TF1p3foouRq_S_9Reachable_FTq_1aSi_T_'
 sil hidden [ossa] @_TF1p3foouRq_S_9Reachable_FTq_1aSi_T_ : $@convention(thin) <T where T : Reachable> (@in T, Int) -> () {
 bb0(%0 : $*T, %1 : $Int):
   %4 = witness_method $T, #Reachable.reach : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
@@ -934,6 +1087,8 @@ bb0(%0 : $*Airplane):
 // CHECK-NEXT:      tuple
 // p2.trytofly (p2.Flyable) -> ()
 // CHECK-LABEL: } // end sil function '_TF2p28trytoflyFPS_7Flyable_T_'
+// SWIFT-CSE-LABEL: sil hidden [ossa] @_TF2p28trytoflyFPS_7Flyable_T_ :
+// SWIFT-CSE-LABEL: } // end sil function '_TF2p28trytoflyFPS_7Flyable_T_'
 sil hidden [ossa] @_TF2p28trytoflyFPS_7Flyable_T_ : $@convention(thin) (@in Flyable) -> () {
 bb0(%0 : $*Flyable):
   %2 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self
@@ -967,6 +1122,8 @@ protocol Pingable { func ping() }
 // CHECK: witness_method
 // CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self>(%2)
 // CHECK-LABEL: } // end sil function 'CSE_Existential_Simple'
+// SWIFT-CSE-LABEL: sil hidden [ossa] @CSE_Existential_Simple :
+// SWIFT-CSE-LABEL: } // end sil function 'CSE_Existential_Simple'
 sil hidden [ossa] @CSE_Existential_Simple : $@convention(thin) (@in Pingable) -> () {
 bb0(%0 : $*Pingable):
   debug_value %0 : $*Pingable, expr op_deref // let x
@@ -1019,11 +1176,17 @@ bb3:
   return %19 : $()
 }
 // CHECK-LABEL: } // end sil function 'CSE_Existential_Calls_With_Control_Flow'
+// SWIFT-CSE-LABEL: sil hidden [ossa] @CSE_Existential_Calls_With_Control_Flow :
+// SWIFT-CSE-LABEL: } // end sil function 'CSE_Existential_Calls_With_Control_Flow'
 
 // CHECK-LABEL: sil [ossa] @cse_mark_dependence :
 // CHECK: mark_dependence
 // CHECK-NOT: mark_dependence
 // CHECK-LABEL: } // end sil function 'cse_mark_dependence'
+// SWIFT-CSE-LABEL: sil [ossa] @cse_mark_dependence :
+// SWIFT-CSE: mark_dependence
+// SWIFT-CSE-NOT: mark_dependence
+// SWIFT-CSE-LABEL: } // end sil function 'cse_mark_dependence'
 sil [ossa] @cse_mark_dependence : $@convention(thin) (@inout Builtin.Int64, @guaranteed Builtin.NativeObject) -> (Builtin.Int64, Builtin.Int64) {
 bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
   %2 = mark_dependence %0 : $*Builtin.Int64 on %1 : $Builtin.NativeObject
@@ -1044,6 +1207,10 @@ protocol Proto : AnyObject {
 // CHECK: open_existential_ref
 // CHECK: open_existential_ref
 // CHECK-LABEL: } // end sil function 'dont_cse_open_existential_ref'
+// SWIFT-CSE-LABEL: sil [ossa] @dont_cse_open_existential_ref :
+// SWIFT-CSE: open_existential_ref
+// SWIFT-CSE: open_existential_ref
+// SWIFT-CSE-LABEL: } // end sil function 'dont_cse_open_existential_ref'
 sil [ossa] @dont_cse_open_existential_ref : $@convention(thin) (@guaranteed Proto & Ping) -> @owned Ping {
 bb0(%0 : @guaranteed $Proto & Ping):
   %4 = open_existential_ref %0 : $Proto & Ping to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self
@@ -1062,6 +1229,10 @@ sil [ossa] [global_init] @$s4test10testGlobalSivau : $@convention(thin) () -> Bu
 // CHECK:   pointer_to_address
 // CHECK:   pointer_to_address
 // CHECK: // end sil function 'cse_global_init'
+// SWIFT-CSE-LABEL: sil [ossa] @cse_global_init :
+// SWIFT-CSE: pointer_to_address
+// SWIFT-CSE-NOT: pointer_to_address
+// SWIFT-CSE-LABEL: } // end sil function 'cse_global_init'
 sil [ossa] @cse_global_init : $@convention(thin) () -> Int64 {
 bb0:
   %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
@@ -1091,6 +1262,10 @@ public enum SpecialEnum : SomeP {}
 // CHECK-NOT: init_existential_metatype
 // CHECK:   builtin "is_same_metatype"([[EMT]] : $@thick any Any.Type, [[EMT]] : $@thick any Any.Type) : $Builtin.Int1
 // CHECK-LABEL: }  // end sil function 'testCSEInitExistentialMetatype'
+// SWIFT-CSE-LABEL: sil [ossa] @testCSEInitExistentialMetatype :
+// SWIFT-CSE: init_existential_metatype
+// SWIFT-CSE-NOT: init_existential_metatype
+// SWIFT-CSE-LABEL: } // end sil function 'testCSEInitExistentialMetatype'
 sil [ossa] @testCSEInitExistentialMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
 bb0(%0 : $@thick SpecialEnum.Type):
   %1 = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
@@ -1132,6 +1307,10 @@ sil [ossa] @take_int : $@convention(thin) (Int64) -> ()
 // CHECK:   apply [[GETTER]]
 // CHECK:   apply [[GETTER]]
 // CHECK: } // end sil function 'dont_cse_lazy_property_of_overwritten_struct'
+// SWIFT-CSE-LABEL: sil [ossa] @dont_cse_lazy_property_of_overwritten_struct :
+// SWIFT-CSE: apply
+// SWIFT-CSE: apply
+// SWIFT-CSE-LABEL: } // end sil function 'dont_cse_lazy_property_of_overwritten_struct'
 sil [ossa] @dont_cse_lazy_property_of_overwritten_struct : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $StructWithLazyProperty
@@ -1154,6 +1333,10 @@ bb0:
 // CHECK: mark_dependence
 // CHECK: mark_dependence
 // CHECK-LABEL: } // end sil function 'cse_mark_dependence2'
+// SWIFT-CSE-LABEL: sil [ossa] @cse_mark_dependence2 :
+// SWIFT-CSE: mark_dependence
+// SWIFT-CSE: mark_dependence
+// SWIFT-CSE-LABEL: } // end sil function 'cse_mark_dependence2'
 sil [ossa] @cse_mark_dependence2 : $@convention(thin) (@inout Builtin.Int64, @guaranteed Builtin.NativeObject) -> (Builtin.Int64, Builtin.Int64) {
 bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
   %2 = mark_dependence %0 : $*Builtin.Int64 on %1 : $Builtin.NativeObject
@@ -1217,6 +1400,10 @@ bb3(%15 : $Int64):
 // CHECK:   apply [[GETTER]]
 // CHECK:   apply [[GETTER]]
 // CHECK: } // end sil function 'dont_cse_nonossa_getter'
+// SWIFT-CSE-LABEL: sil [ossa] @dont_cse_nonossa_getter :
+// SWIFT-CSE: apply
+// SWIFT-CSE: apply
+// SWIFT-CSE-LABEL: } // end sil function 'dont_cse_nonossa_getter'
 sil [ossa] @dont_cse_nonossa_getter : $@convention(thin) (@guaranteed LazyKlass) -> (Int64, Int64) {
 bb0(%0 : @guaranteed $LazyKlass):
   %getter = function_ref @lazy_class_getter_nonossa : $@convention(method) (@guaranteed LazyKlass) -> Int64
@@ -1231,6 +1418,11 @@ bb0(%0 : @guaranteed $LazyKlass):
 // CHECK:   apply [[GETTER]]
 // CHECK-NOT:   apply [[GETTER]]
 // CHECK: } // end sil function 'cse_ossa_getter'
+// SWIFT-CSE-LABEL: sil @cse_ossa_getter :
+// SWIFT-CSE:   [[GETTER:%[0-9]+]] = function_ref @lazy_class_getter_ossa
+// SWIFT-CSE:   apply [[GETTER]]
+// SWIFT-CSE-NOT:   apply [[GETTER]]
+// SWIFT-CSE: } // end sil function 'cse_ossa_getter'
 sil @cse_ossa_getter : $@convention(thin) (@guaranteed LazyKlass) -> (Int64, Int64) {
 bb0(%0 : $LazyKlass):
   %1 = function_ref @lazy_class_getter_ossa : $@convention(method) (@guaranteed LazyKlass) -> Int64
@@ -1244,6 +1436,10 @@ bb0(%0 : $LazyKlass):
 // CHECK:       upcast
 // CHECK-NOT:   upcast
 // CHECK: } // end sil function 'test_end_lifetime'
+// SWIFT-CSE-LABEL: sil [ossa] @test_end_lifetime :
+// SWIFT-CSE: upcast
+// SWIFT-CSE: upcast
+// SWIFT-CSE-LABEL: } // end sil function 'test_end_lifetime'
 sil [ossa] @test_end_lifetime : $@convention(method) (@owned E) -> () {
 bb0(%0 : @owned $E):
   %copy = copy_value %0 : $E
@@ -1274,6 +1470,10 @@ struct S {
 // CHECK:         struct_extract
 // CHECK:         struct_extract
 // CHECK-LABEL: } // end sil function 'dont_rauw_guaranteed_with_nondominated_reborrow'
+// SWIFT-CSE-LABEL: sil [ossa] @dont_rauw_guaranteed_with_nondominated_reborrow :
+// SWIFT-CSE: struct_extract
+// SWIFT-CSE: struct_extract
+// SWIFT-CSE-LABEL: } // end sil function 'dont_rauw_guaranteed_with_nondominated_reborrow'
 sil [ossa] @dont_rauw_guaranteed_with_nondominated_reborrow : $@convention(thin) (@owned S) -> @owned C {
 bb0(%0 : @owned $S):
   cond_br undef, bb1, bb2
@@ -1307,6 +1507,10 @@ bb3(%14 : @guaranteed $C, %15 : @reborrow $S, %16 : @owned $S):
 // CHECK:         type_value
 // CHECK-NOT:     type_value
 // CHECK-LABEL: } // end sil function 'type_value_test'
+// SWIFT-CSE-LABEL: sil [ossa] @type_value_test :
+// SWIFT-CSE: type_value
+// SWIFT-CSE-NOT: type_value
+// SWIFT-CSE-LABEL: } // end sil function 'type_value_test'
 sil [ossa] @type_value_test : $@convention(thin) <let N : Int> (@in_guaranteed InlineArray<N, Int>, Int) -> () {
 bb0(%0 : $*InlineArray<N, Int>, %1 : $Int):
   %2 = integer_literal $Builtin.Int64, 0
@@ -1330,6 +1534,10 @@ struct Pair<let x: Int, let y: Int> {}
 // CHECK:         type_value
 // CHECK:         type_value
 // CHECK-LABEL: } // end sil function 'dont_cse_different_type_values'
+// SWIFT-CSE-LABEL: sil [ossa] @dont_cse_different_type_values :
+// SWIFT-CSE: type_value
+// SWIFT-CSE: type_value
+// SWIFT-CSE-LABEL: } // end sil function 'dont_cse_different_type_values'
 sil [ossa] @dont_cse_different_type_values : $@convention(method) <let x : Int, let y : Int> (Pair<x, y>) -> (Int, Int) {
 [global: ]
 bb0(%0 : $Pair<x, y>):
@@ -1343,6 +1551,10 @@ bb0(%0 : $Pair<x, y>):
 // CHECK:       bb1:
 // CHECK-NEXT:    destroy_value
 // CHECK-LABEL: } // end sil function 'dead_end_block'
+// SWIFT-CSE-LABEL: sil [ossa] @dead_end_block :
+// SWIFT-CSE: upcast
+// SWIFT-CSE: upcast
+// SWIFT-CSE-LABEL: } // end sil function 'dead_end_block'
 sil [ossa] @dead_end_block : $@convention(thin) (Builtin.RawPointer) -> @owned B {
 bb0(%0 : $Builtin.RawPointer):
   %4 = raw_pointer_to_ref %0 to $E
@@ -1382,6 +1594,9 @@ class Element {
 // CHECK-LABEL: sil [ossa] @testUnownedPhi : {{.*}} {
 // CHECK:  unmanaged_to_ref %{{.*}} to $Element
 // CHECK-LABEL: } // end sil function 'testUnownedPhi'
+// SWIFT-CSE-LABEL: sil [ossa] @testUnownedPhi :
+// SWIFT-CSE: unmanaged_to_ref
+// SWIFT-CSE-LABEL: } // end sil function 'testUnownedPhi'
 sil [ossa] @testUnownedPhi : $@convention(thin) (Optional<Unmanaged<Element>>) -> () {
 bb0(%0 : $Optional<Unmanaged<Element>>):
   br bb1(%0)
@@ -1442,6 +1657,9 @@ bb6:
 // CHECK-LABEL: sil [ossa] @testReplaceUnownedPhiWithGuaranteed : {{.*}} {
 // CHECK: unmanaged_to_ref %{{.*}} to $Element
 // CHECK-LABEL: } // end sil function 'testReplaceUnownedPhiWithGuaranteed'
+// SWIFT-CSE-LABEL: sil [ossa] @testReplaceUnownedPhiWithGuaranteed :
+// SWIFT-CSE: unmanaged_to_ref
+// SWIFT-CSE-LABEL: } // end sil function 'testReplaceUnownedPhiWithGuaranteed'
 sil [ossa] @testReplaceUnownedPhiWithGuaranteed : $@convention(thin) (Optional<Unmanaged<Element>>) -> () {
 bb0(%0 : $Optional<Unmanaged<Element>>):
   br bb1(%0)
