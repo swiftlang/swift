@@ -5773,7 +5773,7 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
 // to the imported base member, or it's the synthesized C++ method thunk
 // used in another synthesized derived thunk that acts as a base member here.
 static const clang::CXXMethodDecl *
-getCalledBaseCxxMethod(FuncDecl *baseMember) {
+getCalledBaseCxxMethod(const FuncDecl *baseMember) {
   if (baseMember->getClangDecl())
     return dyn_cast<clang::CXXMethodDecl>(baseMember->getClangDecl());
   // Another synthesized derived thunk is used as a base member here,
@@ -7973,6 +7973,11 @@ ClangImporter::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
 
 ValueDecl *ClangImporter::getOriginalForClonedMember(const ValueDecl *decl) {
   return Impl.getOriginalForClonedMember(decl);
+}
+
+ValueDecl *ClangImporter::getCalledBaseCxxMethod(const ValueDecl *decl) {
+  return cast<ValueDecl>(
+      importDeclDirectly(::getCalledBaseCxxMethod(cast<FuncDecl>(decl))));
 }
 
 bool ClangImporter::isMemberSynthesizedPerType(const ValueDecl *decl) {

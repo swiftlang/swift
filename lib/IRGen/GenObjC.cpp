@@ -1735,10 +1735,9 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
 
 void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
     ValueDecl *fn, llvm::Value *value, bool needsNullCheck) {
-  if (auto originalDecl = fn->getASTContext()
-                              .getClangModuleLoader()
-                              ->getOriginalForClonedMember(fn))
-    fn = originalDecl;
+  auto loader = fn->getASTContext().getClangModuleLoader();
+  if (loader->getOriginalForClonedMember(fn))
+    fn = loader->getCalledBaseCxxMethod(fn);
 
   assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
 
