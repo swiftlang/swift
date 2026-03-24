@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature BorrowingSequence)
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature BorrowingSequence -enable-experimental-feature Lifetimes)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
@@ -63,10 +63,19 @@ suite.test("BORROWING")
   expectEqual(array.reduce(0, +), span.reduce(0, +))
   expectEqual(array.reduce(into: 0, +=), span.reduce(into: 0, +=))
 
-  var prefixed = span.borrowing.prefix(while: { $0 < 5 })
+  
+  
+  var prefixed = span
+    .makeBorrowingIterator()
+//    .borrowing
+    .prefix(while: { $0 < 5 })
+  
   let prefixSpan = prefixed.nextSpan(maximumCount: .max)
   expectEqual(prefixSpan.reduce(0, +), 10)
 
+  
+  
+  
   let inline: [8 of Int] = [1, 2, 3, 4, 5, 6, 7, 8]
   let inlineCollected = inline.collectViaBorrowing()
   expectTrue(inline.elementsEqual(inline))
@@ -83,4 +92,46 @@ suite.test("BORROWING")
 //  expectTrue(nocopyInline.elementsEqual(nocopyBuffer))
 //  expectTrue(nocopyBuffer.elementsEqual(nocopyBuffer))
 //  expectTrue(nocopyBuffer.elementsEqual(nocopyInline))
+}
+
+
+
+
+
+protocol BarBorrowable: ~Copyable, ~Escapable {
+    @_lifetime(borrow self)
+    func borrowBar() -> Bar
+}
+
+extension BarBorrowable where Self: ~Copyable & ~Escapable {
+    var borrowedBar: Bar {
+        @_lifetime(borrow self)
+        get {
+            borrowBar()
+        }
+    }
+}
+
+struct Foo: BarBorrowable, ~Copyable, ~Escapable {
+    @_lifetime(immortal)
+    init() {}
+    
+    @_lifetime(borrow self)
+    func borrowBar() -> Bar {
+        Bar(borrowing: self)
+    }
+}
+
+struct Bar: ~Copyable, ~Escapable {
+    @_lifetime(borrow foo)
+    init(borrowing foo: borrowing Foo) {}
+    
+    consuming func doTheThing() -> Int { 0 }
+}
+
+func baz() {
+    let foo = Foo()
+    
+    let v = foo.borrowBar().doTheThing()
+    let u = foo.borrowedBar.doTheThing()
 }

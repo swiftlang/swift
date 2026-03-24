@@ -230,7 +230,7 @@ extension Sequence where Self: BorrowingSequence {
 @available(SwiftStdlib 6.4, *)
 extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   public var borrowing: BorrowingIterator {
-    @_lifetime(borrow self)
+    @lifetime(borrow self)
     get {
       makeBorrowingIterator()
     }
