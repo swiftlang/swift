@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -constant-capture-propagation | %FileCheck %s
+// REQUIRES: PTRSIZE=64
 
 // Regression test for an ODR violation in ConstantCapturePropagation.
 sil_stage raw
