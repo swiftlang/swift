@@ -1957,13 +1957,20 @@ private:
 
     // Here goes!
     switch (BaseTy->getKind()) {
+    case TypeKind::LValue:
+    case TypeKind::TypeVariable:
+    case TypeKind::ErrorUnion:
+    case TypeKind::Placeholder:
+    case TypeKind::Join:
+    case TypeKind::Meet:
+    case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
-      llvm_unreachable("not a real type");
+    case TypeKind::BuiltinBorrow:
+      ABORT([&](llvm::raw_ostream &out) {
+        out << "Don't know how to emit debug info for type:\n";
+        BaseTy->dump(out);
+      });
 
-    case TypeKind::BuiltinBorrow: {
-      llvm_unreachable("todo");
-
-    }
     case TypeKind::BuiltinFixedArray: {
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
         auto *FixedArray = llvm::cast<swift::BuiltinFixedArrayType>(BaseTy);
@@ -2321,9 +2328,12 @@ private:
           return createSpecializedEnumType(EnumTy, Decl, MangledName,
                                            SizeInBits, AlignInBits, Scope, File,
                                            FwdDeclLine, Flags);
-        if (CompletedDbgTy)
-          return createEnumType(*CompletedDbgTy, Decl, MangledName, AlignInBits,
-                                Scope, L.File, L.Line, Flags);
+        // If we do not know the size of this type, pass a size of 0.
+        // FIXME: createEnumType should not require a sized debug info type.
+        if (!CompletedDbgTy)
+          CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy, 0);
+        return createEnumType(*CompletedDbgTy, Decl, MangledName, AlignInBits,
+                              Scope, L.File, L.Line, Flags);
       }
       return createOpaqueStructWithSizedContainer(
           Scope, Decl->getName().str(), L.File, FwdDeclLine, SizeInBits,
@@ -2413,11 +2423,6 @@ private:
     // The following types exist primarily for internal use by the type
     // checker.
     case TypeKind::Error:
-    case TypeKind::LValue:
-    case TypeKind::TypeVariable:
-    case TypeKind::ErrorUnion:
-    case TypeKind::Placeholder:
-    case TypeKind::Module:
     case TypeKind::SILBlockStorage:
     case TypeKind::SILToken:
     case TypeKind::BuiltinUnsafeValueBuffer:
@@ -2831,12 +2836,15 @@ private:
     if (auto *Decl = DbgTy.getDecl())
       Name = Decl->getName().str();
 
-    // If this is a forward decl, create one for this mangled name and don't
-    // cache it.
-    if (!isa<PrimaryArchetypeType>(DbgTy.getType()) &&
-        !isa<TypeAliasType>(DbgTy.getType()) &&
-        (DbgTy.isForwardDecl() || DbgTy.isFixedBuffer() ||
-         !completeType(DbgTy))) {
+    // If this type can have a definition that provides us with its layout/size,
+    // then only emit a forward declaration.
+    // TODO: This check can probably be simplified and generalized.
+    const bool RequiresSize = !isa<PrimaryArchetypeType>(DbgTy.getType()) &&
+                              !DbgTy.getType()->hasArchetype() &&
+                              !isa<TypeAliasType>(DbgTy.getType());
+    const bool HasNoFixedSize =
+        DbgTy.isForwardDecl() || DbgTy.isFixedBuffer() || !completeType(DbgTy);
+    if (RequiresSize && HasNoFixedSize) {
       // In LTO type uniquing is performed based on the UID. Forward
       // declarations may not have a unique ID to avoid a forward declaration
       // winning over a full definition.

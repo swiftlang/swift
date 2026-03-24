@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -swift-version 5 -enable-experimental-feature TildeSendable -Wwarning ExplicitSendable
-
-// REQUIRES: swift_feature_TildeSendable
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -swift-version 5 -Wwarning ExplicitSendable
 
 protocol P: ~Sendable { // expected-error {{conformance to 'Sendable' can only be suppressed on structs, classes, and enums}}
 }

@@ -341,8 +341,8 @@ public:
       auto NPA = B.createPartialApply(getClosure()->getLoc(), V, {}, Args,
                                       PA->getCalleeConvention(),
                                       PA->getResultIsolation(),
-                                      PA->isOnStack());
-      NPA->setStackAllocationIsNested(PA->isStackAllocationNested());
+                                      PA->isOnStack(),
+                                      PA->isStackAllocationNested());
       return NPA;
     }
 
@@ -885,8 +885,7 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
     auto NewPA = Builder.createPartialApply(
         CallSiteDesc.getLoc(), FunRef, {}, {calleeValue},
         PAI->getCalleeConvention(), PAI->getResultIsolation(),
-        PAI->isOnStack());
-    NewPA->setStackAllocationIsNested(PAI->isStackAllocationNested());
+        PAI->isOnStack(), PAI->isStackAllocationNested());
     // If the partial_apply is on stack we will emit a dealloc_stack in the
     // epilog.
     NeedsRelease.push_back(NewPA);

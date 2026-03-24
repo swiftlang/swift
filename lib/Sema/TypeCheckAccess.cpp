@@ -2298,6 +2298,24 @@ public:
     }
   }
 
+  /// Pick the appropriate \c ExportabilityReason for stored properties.
+  ExportabilityReason getVarDeclExportabilityReason() const {
+    // If explicit use library-evolution style reason.
+    if (Where.getExportedLevel() != ExportedLevel::ImplicitlyExported)
+      return ExportabilityReason::PublicVarDecl;
+
+    // Reasons specific to classes in non-library-evolution mode or embedded.
+    auto *CD = dyn_cast_or_null<ClassDecl>(Where.getDeclContext()->getAsDecl());
+    if (CD) {
+      if (CD->getFormalAccess() == AccessLevel::Open)
+        return ExportabilityReason::ImplicitlyPublicVarDeclOpenClass;
+      else if (CD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+        return ExportabilityReason::ImplicitlyPublicVarDeclClassDeinit;
+    }
+
+    return ExportabilityReason::ImplicitlyPublicVarDecl;
+  }
+
   void checkAvailabilityDomains(const Decl *D) {
     D = D->getAbstractSyntaxDeclForAttributes();
 
@@ -2396,10 +2414,7 @@ public:
     if (seenVars.count(theVar))
       return;
 
-    ExportabilityReason reason =
-      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
-        ExportabilityReason::ImplicitlyPublicVarDecl :
-        ExportabilityReason::PublicVarDecl;
+    auto reason = getVarDeclExportabilityReason();
     checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar,
               reason);
 
@@ -2422,10 +2437,7 @@ public:
       anyVar = V;
     });
 
-    ExportabilityReason reason =
-      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
-        ExportabilityReason::ImplicitlyPublicVarDecl :
-        ExportabilityReason::PublicVarDecl;
+    auto reason = getVarDeclExportabilityReason();
     checkType(TP->hasType() ? TP->getType() : Type(),
               TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD,
               reason);

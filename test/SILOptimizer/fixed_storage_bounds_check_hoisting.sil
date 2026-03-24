@@ -1,0 +1,192 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -bcopts | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Klass {
+  init()
+}
+
+struct NonTrivialWrapper {
+  @_hasStorage let k: Klass { get }
+  @_hasStorage let i: Int { get }
+}
+
+sil [_semantics "fixed_storage.check_index"] @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+
+sil @use : $@convention(thin) (Int) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_struct_extract_guaranteed_nontrivial :
+// CHECK: [[CHECK:%[0-9]+]] = function_ref @checkIndex
+// CHECK: apply [[CHECK]]
+// CHECK-NEXT: apply [[CHECK]]
+// CHECK-LABEL: } // end sil function 'test_struct_extract_guaranteed_nontrivial'
+sil [ossa] @test_struct_extract_guaranteed_nontrivial : $@convention(thin) (@guaranteed Span<Int>, @guaranteed NonTrivialWrapper, @guaranteed NonTrivialWrapper) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $Span<Int>, %1 : @guaranteed $NonTrivialWrapper, %2 : @guaranteed $NonTrivialWrapper):
+  %idx1 = struct_extract %1, #NonTrivialWrapper.i
+  %check_fn = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%idx1, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %use_fn = function_ref @use : $@convention(thin) (Int) -> ()
+  %u1 = apply %use_fn(%idx1) : $@convention(thin) (Int) -> ()
+  %idx2 = struct_extract %2, #NonTrivialWrapper.i
+  %c2 = apply %check_fn(%idx2, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %u2 = apply %use_fn(%idx2) : $@convention(thin) (Int) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_struct_extract_owned_borrow :
+// CHECK: [[CHECK:%[0-9]+]] = function_ref @checkIndex
+// CHECK: apply [[CHECK]]
+// CHECK-NOT: apply [[CHECK]]
+// CHECK: function_ref @use
+// CHECK: apply [[CHECK]]
+// CHECK-LABEL: } // end sil function 'test_struct_extract_owned_borrow'
+sil [ossa] @test_struct_extract_owned_borrow : $@convention(thin) (@guaranteed Span<Int>, @owned NonTrivialWrapper, @owned NonTrivialWrapper) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $Span<Int>, %1 : @owned $NonTrivialWrapper, %2 : @owned $NonTrivialWrapper):
+  %b1 = begin_borrow %1
+  %idx1 = struct_extract %b1, #NonTrivialWrapper.i
+  %check_fn = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%idx1, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  end_borrow %b1
+  %use_fn = function_ref @use : $@convention(thin) (Int) -> ()
+  %u1 = apply %use_fn(%idx1) : $@convention(thin) (Int) -> ()
+  %b2 = begin_borrow %2
+  %idx2 = struct_extract %b2, #NonTrivialWrapper.i
+  %c2 = apply %check_fn(%idx2, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  end_borrow %b2
+  %u2 = apply %use_fn(%idx2) : $@convention(thin) (Int) -> ()
+  destroy_value %1
+  destroy_value %2
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_destructure_struct_owned :
+// CHECK: [[CHECK:%[0-9]+]] = function_ref @checkIndex
+// CHECK: apply [[CHECK]]
+// CHECK-NOT: apply [[CHECK]]
+// CHECK: function_ref @use
+// CHECK: apply [[CHECK]]
+// CHECK-LABEL: } // end sil function 'test_destructure_struct_owned'
+sil [ossa] @test_destructure_struct_owned : $@convention(thin) (@guaranteed Span<Int>, @owned NonTrivialWrapper, @owned NonTrivialWrapper) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $Span<Int>, %1 : @owned $NonTrivialWrapper, %2 : @owned $NonTrivialWrapper):
+  (%k1, %a1) = destructure_struct %1
+  %check_fn = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%a1, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %use_fn = function_ref @use : $@convention(thin) (Int) -> ()
+  %u1 = apply %use_fn(%a1) : $@convention(thin) (Int) -> ()
+  (%k2, %a2) = destructure_struct %2
+  %c2 = apply %check_fn(%a2, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %u2 = apply %use_fn(%a2) : $@convention(thin) (Int) -> ()
+  destroy_value %k1
+  destroy_value %k2
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_destructure_struct_guaranteed :
+// CHECK: [[CHECK:%[0-9]+]] = function_ref @checkIndex
+// CHECK: apply [[CHECK]]
+// CHECK-NEXT: apply [[CHECK]]
+// CHECK-LABEL: } // end sil function 'test_destructure_struct_guaranteed'
+sil [ossa] @test_destructure_struct_guaranteed : $@convention(thin) (@guaranteed Span<Int>, @guaranteed NonTrivialWrapper, @guaranteed NonTrivialWrapper) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $Span<Int>, %1 : @guaranteed $NonTrivialWrapper, %2 : @guaranteed $NonTrivialWrapper):
+  (%k1, %a1) = destructure_struct %1
+  %check_fn = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%a1, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %use_fn = function_ref @use : $@convention(thin) (Int) -> ()
+  %u1 = apply %use_fn(%a1) : $@convention(thin) (Int) -> ()
+  (%k2, %a2) = destructure_struct %2
+  %c2 = apply %check_fn(%a2, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %u2 = apply %use_fn(%a2) : $@convention(thin) (Int) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_destructure_tuple_owned :
+// CHECK: [[CHECK:%[0-9]+]] = function_ref @checkIndex
+// CHECK: apply [[CHECK]]
+// CHECK-NOT: apply [[CHECK]]
+// CHECK: function_ref @use
+// CHECK: apply [[CHECK]]
+// CHECK-LABEL: } // end sil function 'test_destructure_tuple_owned'
+sil [ossa] @test_destructure_tuple_owned : $@convention(thin) (@guaranteed Span<Int>, @owned (Klass, Int), @owned (Klass, Int)) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $Span<Int>, %1 : @owned $(Klass, Int), %2 : @owned $(Klass, Int)):
+  (%k1, %a1) = destructure_tuple %1
+  %check_fn = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%a1, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %use_fn = function_ref @use : $@convention(thin) (Int) -> ()
+  %u1 = apply %use_fn(%a1) : $@convention(thin) (Int) -> ()
+  (%k2, %a2) = destructure_tuple %2
+  %c2 = apply %check_fn(%a2, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %u2 = apply %use_fn(%a2) : $@convention(thin) (Int) -> ()
+  destroy_value %k1
+  destroy_value %k2
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_destructure_tuple_guaranteed :
+// CHECK: [[CHECK:%[0-9]+]] = function_ref @checkIndex
+// CHECK: apply [[CHECK]]
+// CHECK-NEXT: apply [[CHECK]]
+// CHECK-LABEL: } // end sil function 'test_destructure_tuple_guaranteed'
+sil [ossa] @test_destructure_tuple_guaranteed : $@convention(thin) (@guaranteed Span<Int>, @guaranteed (Klass, Int), @guaranteed (Klass, Int)) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $Span<Int>, %1 : @guaranteed $(Klass, Int), %2 : @guaranteed $(Klass, Int)):
+  (%k1, %a1) = destructure_tuple %1
+  %check_fn = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%a1, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %use_fn = function_ref @use : $@convention(thin) (Int) -> ()
+  %u1 = apply %use_fn(%a1) : $@convention(thin) (Int) -> ()
+  (%k2, %a2) = destructure_tuple %2
+  %c2 = apply %check_fn(%a2, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %u2 = apply %use_fn(%a2) : $@convention(thin) (Int) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_index_arithmetic_from_nontrivial_struct :
+// CHECK: [[CHECK:%[0-9]+]] = function_ref @checkIndex
+// CHECK: apply [[CHECK]]
+// CHECK-NEXT: apply [[CHECK]]
+// CHECK-LABEL: } // end sil function 'test_index_arithmetic_from_nontrivial_struct'
+sil [ossa] @test_index_arithmetic_from_nontrivial_struct : $@convention(thin) (@guaranteed Span<Int>, @guaranteed NonTrivialWrapper) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $Span<Int>, %1 : @guaranteed $NonTrivialWrapper):
+  %idx_base = struct_extract %1, #NonTrivialWrapper.i
+  %check_fn = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%idx_base, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %use_fn = function_ref @use : $@convention(thin) (Int) -> ()
+  %u1 = apply %use_fn(%idx_base) : $@convention(thin) (Int) -> ()
+  %idx_raw = struct_extract %idx_base, #Int._value
+  %one = integer_literal $Builtin.Int64, 1
+  %zero = integer_literal $Builtin.Int1, 0
+  %add_result = builtin "sadd_with_overflow_Int64"(%idx_raw : $Builtin.Int64, %one : $Builtin.Int64, %zero : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %sum = tuple_extract %add_result : $(Builtin.Int64, Builtin.Int1), 0
+  %idx2 = struct $Int (%sum : $Builtin.Int64)
+  %c2 = apply %check_fn(%idx2, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %u2 = apply %use_fn(%idx2) : $@convention(thin) (Int) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_no_clone_needed :
+// CHECK: [[CHECK:%[0-9]+]] = function_ref @checkIndex
+// CHECK: apply [[CHECK]]
+// CHECK-NEXT: apply [[CHECK]]
+// CHECK-LABEL: } // end sil function 'test_no_clone_needed'
+sil [ossa] @test_no_clone_needed : $@convention(thin) (@guaranteed Span<Int>, @guaranteed NonTrivialWrapper, @guaranteed NonTrivialWrapper) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $Span<Int>, %1 : @guaranteed $NonTrivialWrapper, %2 : @guaranteed $NonTrivialWrapper):
+  %idx1 = struct_extract %1, #NonTrivialWrapper.i
+  %idx2 = struct_extract %2, #NonTrivialWrapper.i
+  %check_fn = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%idx1, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %use_fn = function_ref @use : $@convention(thin) (Int) -> ()
+  %u1 = apply %use_fn(%idx1) : $@convention(thin) (Int) -> ()
+  %c2 = apply %check_fn(%idx2, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %u2 = apply %use_fn(%idx2) : $@convention(thin) (Int) -> ()
+  %t = tuple ()
+  return %t : $()
+}

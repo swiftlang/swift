@@ -10,6 +10,7 @@ class CliArguments(argparse.Namespace):
     clone_with_ssh: bool
     skip_history: bool
     skip_tags: bool
+    partial_clone: bool
     skip_repository_list: List[str]
     all_repositories: bool
     scheme: Optional[str]
@@ -55,6 +56,13 @@ repositories.
         )
         parser.add_argument(
             "--skip-tags", help="Skip tags when obtaining sources", action="store_true"
+        )
+        parser.add_argument(
+            "--partial-clone",
+            help="Use partial clones (--filter=blob:none) to fetch only commits and "
+            "trees, deferring blob downloads until they are needed. Significantly "
+            "reduces clone size for CI. Requires Git 2.19 or later.",
+            action="store_true",
         )
         parser.add_argument(
             "--skip-repository",

@@ -762,7 +762,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 
   ASSERT(argumentType);
 
-  if (argumentType->hasTypeVariable() || argumentType->hasDependentMember())
+  if (argumentType->hasTypeVariable())
     return DisjunctionInfo::none();
 
   SmallVector<Constraint *, 2> favoredChoices;

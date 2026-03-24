@@ -863,7 +863,7 @@ actor SomeActorWithInits {
   // expected-note@+1 4 {{mutation of this property is only permitted within the actor}}
   var mutableState: Int = 17
   var otherMutableState: Int
-  let nonSendable: SomeClass // expected-note {{mutation of this property is only permitted within the actor}}
+  let nonSendable: SomeClass
 
   // Sema should not complain about referencing non-Sendable members
   // in an actor init or deinit, as those are diagnosed later by flow-isolation.
@@ -934,7 +934,7 @@ actor SomeActorWithInits {
   @MainActor init(i5 x: SomeClass) {
     self.mutableState = 42
     self.otherMutableState = 17
-    self.nonSendable = x // expected-warning {{actor-isolated property 'nonSendable' can not be mutated from the main actor}}
+    self.nonSendable = x
 
     self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
     self.nonisolated()
@@ -1527,7 +1527,8 @@ actor DeinitMutatingAsync {
 
   deinit {
     s.doWork() // expected-error {{cannot call mutating async function 'doWork()' on actor-isolated property 's'}}
-    // expected-error@-1 {{'async' call in a function that does not support concurrency}}
+    // expected-note@-1 {{'s' can be concurrently accessed during mutation, risking data races}}
+    // expected-error@-2 {{'async' call in a function that does not support concurrency}}
   }
 }
 
@@ -1665,12 +1666,12 @@ actor ActorWithNonSendableLet: NonisolatedProtocol {
 
 actor ProtectNonSendable {
   // expected-note@+1 {{property declared here}}
-  let ns = NonSendable() // expected-note {{property declared here}}
+  let ns = NonSendable()
 
   init() {}
 
   @MainActor init(fromMain: Void) {
-    _ = self.ns // expected-warning {{actor-isolated property 'ns' can not be referenced from the main actor}}
+    _ = self.ns
   }
 }
 
@@ -1764,8 +1765,7 @@ struct ReferenceSelfDotMethods {
   nonisolated
   private func testCurry() -> (Self) -> (@MainActor () -> Void) {
     let functionRef = Self.mainActorAffinedFunction
-    // warning goes away with InferSendableFromCaptures, see actor_isolation_swift6.swift
-    return functionRef // expected-warning {{converting non-Sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
+    return functionRef // Ok
   }
 
   @MainActor

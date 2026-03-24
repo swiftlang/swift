@@ -252,7 +252,6 @@ GuaranteedOwnershipExtension::checkLifetimeExtension(
     auto *user = use->getUser();
     if (use->isConsuming()) {
       ownedLifetime.updateForUse(user, true);
-      ownedConsumeBlocks.push_back(user->getParent());
     }
   }
   if (ownedLifetime.areUsesWithinBoundary(newUses, &deBlocks))
@@ -268,17 +267,17 @@ void GuaranteedOwnershipExtension::transform(Status status) {
     return;
   case ExtendBorrow: {
     PrunedLivenessBoundary guaranteedBoundary;
-    guaranteedLiveness.computeBoundary(guaranteedBoundary, ownedConsumeBlocks);
+    guaranteedLiveness.computeBoundary(guaranteedBoundary);
     extendLocalBorrow(beginBorrow, guaranteedBoundary, deleter);
     break;
   }
   case ExtendLifetime: {
     ownedLifetime.extendAcrossLiveness(guaranteedLiveness);
     PrunedLivenessBoundary ownedBoundary;
-    ownedLifetime.computeBoundary(ownedBoundary, ownedConsumeBlocks);
+    ownedLifetime.computeBoundary(ownedBoundary);
     extendOwnedLifetime(beginBorrow->getOperand(), ownedBoundary, deleter);
     PrunedLivenessBoundary guaranteedBoundary;
-    guaranteedLiveness.computeBoundary(guaranteedBoundary, ownedConsumeBlocks);
+    guaranteedLiveness.computeBoundary(guaranteedBoundary);
     extendLocalBorrow(beginBorrow, guaranteedBoundary, deleter);
     break;
   }

@@ -1318,7 +1318,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       isBare = ar->isBare();
     Args.push_back((unsigned)ARI->isObjC() |
                    ((unsigned)ARI->canAllocOnStack() << 1) |
-                   ((unsigned)isBare << 2));
+                   ((unsigned)isBare << 2) |
+                   ((unsigned)ARI->isStackAllocationNested() << 3));
     ArrayRef<SILType> TailTypes = ARI->getTailAllocatedTypes();
     ArrayRef<Operand> AllOps = ARI->getAllOperands();
     unsigned NumTailAllocs = TailTypes.size();

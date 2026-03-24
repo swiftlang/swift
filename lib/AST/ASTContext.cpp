@@ -681,6 +681,10 @@ struct ASTContext::Implementation {
   /// The set of unique custom availability domains.
   llvm::FoldingSet<CustomAvailabilityDomain> CustomAvailabilityDomains;
 
+  /// The most specific platform AvailabilityDomain that corresponds to the
+  /// compilation's `-target`.
+  std::optional<AvailabilityDomain> TargetAvailabilityDomain;
+
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
   llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
@@ -1768,6 +1772,48 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
   return ConcreteDeclRef(foundDecl, subs);
 }
 
+
+static ConcreteDeclRef getCGFloatOrDoubleInitDecl(
+    ASTContext &ctx, Type fromType, Type toType) {
+  if (!toType || !fromType)
+    return ConcreteDeclRef();
+
+  // OK: Implicit conversion, no module selector to drop here.
+  DeclNameRef initRef(ctx, /*module selector=*/Identifier(),
+                      DeclBaseName::createConstructor(), { Identifier() });
+
+  auto *toDecl = toType->getAnyNominal();
+  SmallVector<ValueDecl *, 2> candidates;
+
+  // Using the nominal type as the declaration context bypasses access
+  // control. But there is only going to be one overload that exactly
+  // with no label and the right argument type.
+  toDecl->lookupQualified(toDecl, initRef, SourceLoc(),
+                          NL_QualifiedDefault, candidates);
+
+  for (auto *candidate : candidates) {
+    auto *ctor = cast<ConstructorDecl>(candidate);
+    auto fnType = ctor->getMethodInterfaceType()->castTo<FunctionType>();
+    if (fnType->getNumParams() == 1 &&
+        fnType->getParams()[0] == AnyFunctionType::Param(fromType) &&
+        fnType->getResult()->isEqual(toType)) {
+      return ConcreteDeclRef(ctor);
+    }
+  }
+
+  return ConcreteDeclRef();
+}
+
+ConcreteDeclRef ASTContext::getCGFloatInitDecl() const {
+  return getCGFloatOrDoubleInitDecl(const_cast<ASTContext &>(*this),
+                                    getDoubleType(), getCGFloatType());
+}
+
+ConcreteDeclRef ASTContext::getDoubleInitDecl() const {
+  return getCGFloatOrDoubleInitDecl(const_cast<ASTContext &>(*this),
+                                    getCGFloatType(), getDoubleType());
+}
+
 static
 FuncDecl *getBinaryComparisonOperatorIntDecl(const ASTContext &C, StringRef op,
                                              FuncDecl *&cached) {
@@ -2220,6 +2266,31 @@ ExplicitClangModuleMap *ASTContext::getExplicitClangModuleMap() {
   if (getImpl().TheExplicitSwiftModuleLoader)
     return getImpl().TheExplicitSwiftModuleLoader->getExplicitClangModuleMap();
   return nullptr;
+}
+
+std::optional<LibraryLevel>
+ASTContext::getExplicitModuleLibraryLevel(StringRef moduleName, bool isClang) {
+  auto getLevelStr = [&](auto *map) -> const std::optional<std::string> * {
+    if (!map)
+      return nullptr;
+    auto it = map->find(moduleName);
+    if (it == map->end())
+      return nullptr;
+    return &it->getValue().libraryLevel;
+  };
+
+  const std::optional<std::string> *levelStr =
+      isClang ? getLevelStr(getExplicitClangModuleMap())
+              : getLevelStr(getExplicitSwiftModuleMap());
+
+  if (!levelStr || !*levelStr)
+    return std::nullopt;
+
+  return llvm::StringSwitch<LibraryLevel>(**levelStr)
+      .Case("api", LibraryLevel::API)
+      .Case("spi", LibraryLevel::SPI)
+      .Case("ipi", LibraryLevel::IPI)
+      .Default(LibraryLevel::Other);
 }
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
@@ -5622,7 +5693,6 @@ CanSILFunctionType SILFunctionType::get(
   // revisit this.
   if (genericSig || patternSubs) {
     properties.removeHasTypeParameter();
-    properties.removeHasDependentMember();
   }
 
   auto outerSubs = genericSig ? invocationSubs : patternSubs;
@@ -5792,7 +5862,6 @@ InOutType *InOutType::get(Type objectTy) {
 
 DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
   auto properties = base->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(name);
@@ -5811,7 +5880,6 @@ DependentMemberType *DependentMemberType::get(Type base,
                                               AssociatedTypeDecl *assocType) {
   assert(assocType && "Missing associated type");
   auto properties = base->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(assocType);
@@ -7465,13 +7533,21 @@ ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
   llvm_unreachable("exhaustive switch");
 }
 
-AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
-  auto platform = swift::targetPlatform(LangOpts);
+static AvailabilityDomain
+targetAvailabilityDomainForPlatform(PlatformKind platform) {
   if (platform != PlatformKind::none)
     return AvailabilityDomain::forPlatform(platform);
 
   // Fall back to the universal domain for triples without a platform.
   return AvailabilityDomain::forUniversal();
+}
+
+AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
+  if (!getImpl().TargetAvailabilityDomain) {
+    getImpl().TargetAvailabilityDomain =
+        targetAvailabilityDomainForPlatform(swift::targetPlatform(LangOpts));
+  }
+  return *getImpl().TargetAvailabilityDomain;
 }
 
 GenericSignature &

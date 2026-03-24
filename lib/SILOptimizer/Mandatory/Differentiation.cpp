@@ -1030,6 +1030,10 @@ static SILFunction *createEmptyVJP(ADContext &context,
       original->isRuntimeAccessible());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
 
+  if (original->getInlineStrategy() == AlwaysInline ||
+      original->getInlineStrategy() == HeuristicAlwaysInline)
+    vjp->setInlineStrategy(HeuristicAlwaysInline);
+
   LLVM_DEBUG(llvm::dbgs() << "VJP type: " << vjp->getLoweredFunctionType()
                           << "\n");
   return vjp;
@@ -1073,6 +1077,10 @@ static SILFunction *createEmptyJVP(ADContext &context,
       original->isDistributed(),
       original->isRuntimeAccessible());
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
+
+  if (original->getInlineStrategy() == AlwaysInline ||
+      original->getInlineStrategy() == HeuristicAlwaysInline)
+    jvp->setInlineStrategy(HeuristicAlwaysInline);
 
   LLVM_DEBUG(llvm::dbgs() << "JVP type: " << jvp->getLoweredFunctionType()
                           << "\n");

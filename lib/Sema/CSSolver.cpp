@@ -242,8 +242,8 @@ Solution ConstraintSystem::finalize() {
     solution.argumentLists.insert(argListMapping);
   }
 
-  for (const auto &implicitRoot : ImplicitCallAsFunctionRoots) {
-    solution.ImplicitCallAsFunctionRoots.insert(implicitRoot);
+  for (const auto &implicitInfo : ImplicitCallAsFunctions) {
+    solution.ImplicitCallAsFunctions.insert(implicitInfo);
   }
 
   for (const auto &env : PackExpansionEnvironments) {
@@ -440,9 +440,11 @@ void ConstraintSystem::replaySolution(const Solution &solution,
       recordArgumentList(argListMapping.first, argListMapping.second);
   }
 
-  for (auto &implicitRoot : solution.ImplicitCallAsFunctionRoots) {
-    if (ImplicitCallAsFunctionRoots.count(implicitRoot.first) == 0)
-      recordImplicitCallAsFunctionRoot(implicitRoot.first, implicitRoot.second);
+  for (auto &implicitInfo : solution.ImplicitCallAsFunctions) {
+    if (ImplicitCallAsFunctions.count(implicitInfo.first) == 0)
+      recordImplicitCallAsFunction(implicitInfo.first,
+                                   implicitInfo.second.Member,
+                                   implicitInfo.second.BaseArgs);
   }
 
   for (auto &synthesized : solution.SynthesizedConformances) {

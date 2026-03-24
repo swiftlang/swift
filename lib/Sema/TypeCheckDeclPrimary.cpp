@@ -124,14 +124,6 @@ public:
       return Type();
     }
 
-    if (rpk == RepressibleProtocolKind::Sendable) {
-      if (!ctx.LangOpts.hasFeature(Feature::TildeSendable)) {
-        diagnoseInvalid(repr, repr.getLoc(),
-                        diag::tilde_sendable_requires_feature_flag);
-        return Type();
-      }
-    }
-
     if (auto *TD = dyn_cast<const TypeDecl *>(decl)) {
       if (rpk == RepressibleProtocolKind::Sendable) {
         auto *C = dyn_cast<ClassDecl>(TD);
@@ -3328,6 +3320,13 @@ public:
       }
     }
 
+    // Actors require the concurrency module.
+    if (CD->isActor() && !Ctx.getLoadedModule(Ctx.Id_Concurrency)) {
+      auto sourceFile = CD->getParentSourceFile();
+      if (sourceFile && sourceFile->Kind != SourceFileKind::SIL)
+        CD->diagnose(diag::no_concurrency_module, "actor");
+    }
+
     // Check distributed actors
     TypeChecker::checkDistributedActor(SF, CD);
 
@@ -3570,6 +3569,13 @@ public:
     TypeChecker::checkDeclAttributes(FD);
     TypeChecker::checkDistributedFunc(FD);
     checkEmbeddedRestrictionsInSignature(FD);
+
+    // Untyped throws might need to be diagnosed.
+    SourceLoc throwsLoc = FD->getThrowsLoc();
+    if (throwsLoc.isValid() && !FD->getThrownTypeRepr() &&
+        !FD->hasPolymorphicEffect(EffectKind::Throws)) {
+      diagnoseUntypedThrows(FD, throwsLoc);
+    }
 
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
@@ -3957,6 +3963,13 @@ public:
 
     if (CD->getAsyncLoc().isValid())
       TypeChecker::checkConcurrencyAvailability(CD->getAsyncLoc(), CD);
+
+    // Untyped throws might need to be diagnosed.
+    SourceLoc throwsLoc = CD->getThrowsLoc();
+    if (throwsLoc.isValid() && !CD->getThrownTypeRepr() &&
+        !CD->hasPolymorphicEffect(EffectKind::Throws)) {
+      diagnoseUntypedThrows(CD, throwsLoc);
+    }
 
     // Check whether this initializer overrides an initializer in its
     // superclass.

@@ -235,22 +235,22 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
   /// Implementation for withValue that consumes valueDuringOperation.
   ///
-  /// Because Builtin.taskLocalValuePush and Builtin.taskLocalValuePop involve
+  /// Because Builtin.addTaskLocalValue and Builtin.removeTaskLocalValue involve
   /// calls to swift_task_alloc/swift_task_dealloc respectively unbeknownst to
   /// the compiler, compiler-emitted calls to swift_task_de/alloc must be
   /// avoided in a function that calls them.
   ///
   /// A copy of valueDuringOperation is required because withValue borrows its
-  /// argument but Builtin.taskLocalValuePush consumes its.  Because
+  /// argument but Builtin.addTaskLocalValue consumes it.  Because
   /// valueDuringOperation is of generic type, its size is not generally known,
   /// so such a copy entails a stack allocation and a copy to that allocation.
   /// That stack traffic gets lowered to calls to
   /// swift_task_alloc/swift_task_deallloc.
   ///
-  /// Split the calls Builtin.taskLocalValuePush/Pop from the compiler-emitted calls
-  /// to swift_task_de/alloc for the copy as follows:
+  /// Split the calls Builtin.{add,remove}TaskLocalValue from the compiler-emitted
+  /// calls to swift_task_de/alloc for the copy as follows:
   /// - withValue contains the compiler-emitted calls swift_task_de/alloc.
-  /// - withValueImpl contains the calls to Builtin.taskLocalValuePush/Pop
+  /// - withValueImpl contains the calls to Builtin.{add,remove}TaskLocalValue
   @inlinable
   @discardableResult
   @available(SwiftStdlib 5.1, *)
@@ -259,9 +259,9 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
                                  operation: () async throws -> R,
                                  isolation: isolated (any Actor)?,
                                  file: String = #fileID, line: UInt = #line) async rethrows -> R {
-#if $BuiltinConcurrencyStackNesting
-    Builtin.taskLocalValuePush(key, consume valueDuringOperation)
-    defer { Builtin.taskLocalValuePop() }
+#if $BuiltinAddTaskLocalValue
+    let binding = Builtin.addTaskLocalValue(key, consume valueDuringOperation)
+    defer { Builtin.removeTaskLocalValue(binding) }
 #else
     _taskLocalValuePush(key: key, value: consume valueDuringOperation)
     defer { _taskLocalValuePop() }
@@ -280,9 +280,9 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     operation: () async throws -> R,
     file: String = #fileID, line: UInt = #line
   ) async rethrows -> R {
-#if $BuiltinConcurrencyStackNesting
-    Builtin.taskLocalValuePush(key, consume valueDuringOperation)
-    defer { Builtin.taskLocalValuePop() }
+#if $BuiltinAddTaskLocalValue
+    let binding = Builtin.addTaskLocalValue(key, consume valueDuringOperation)
+    defer { Builtin.removeTaskLocalValue(binding) }
 #else
     _taskLocalValuePush(key: key, value: consume valueDuringOperation)
     defer { _taskLocalValuePop() }
@@ -309,9 +309,9 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @discardableResult
   public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
                            file: String = #fileID, line: UInt = #line) rethrows -> R {
-#if $BuiltinConcurrencyStackNesting
-    Builtin.taskLocalValuePush(key, valueDuringOperation)
-    defer { Builtin.taskLocalValuePop() }
+#if $BuiltinAddTaskLocalValue
+    let binding = Builtin.addTaskLocalValue(key, valueDuringOperation)
+    defer { Builtin.removeTaskLocalValue(binding) }
 #else
     _taskLocalValuePush(key: key, value: valueDuringOperation)
     defer { _taskLocalValuePop() }

@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::TypeBase::getContextSubstitutionMap()","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast"}
+// {"kind":"typecheck","signature":"swift::TypeBase::getContextSubstitutionMap()","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast","signatureNext":"TypeAliasType::getSubstitutionMap"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 struct a<b> {
   typealias c<d> = b where b == Int

@@ -2157,6 +2157,8 @@ private:
   NEVER_VISIT(PackElementType)
   NEVER_VISIT(TypeVariableType)
   NEVER_VISIT(ErrorUnionType)
+  NEVER_VISIT(JoinType)
+  NEVER_VISIT(MeetType)
 
   VISIT(SugarType, recurse)
 

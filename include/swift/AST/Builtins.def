@@ -1188,8 +1188,6 @@ BUILTIN_SANITIZER_OPERATION(TSanInoutAccess, "tsanInoutAccess", "")
 #endif
 
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoin, type_join)
-BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinInout, type_join_inout)
-BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinMeta, type_join_meta)
 BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagnostic)
 
 // BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.
@@ -1230,15 +1228,31 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddPriorityEscalationHandler,
 BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
                        "taskRemovePriorityEscalationHandler", "", Special)
 
-/// Equivalent to calling swift_task_localValuePush.
+/// Equivalent to calling swift_task_localValuePush. Deprecated because
+/// it doesn't properly pair the allocation and deallocation with a
+/// use-def relationship. We no longer use this in the standard library,
+/// but it can't just be removed because it shares a feature test
+/// (BuiltinConcurrencyStackNesting) with other builtins that aren't
+/// deprecated.
 ///
 /// Signature: <Value> (key: Builtin.RawPointer, value: __owned Value) -> ()
 BUILTIN_MISC_OPERATION(TaskLocalValuePush, "taskLocalValuePush", "", Special)
 
-/// Equivalent to calling swift_task_localValuePop.
+/// Equivalent to calling swift_task_localValuePop. Deprecated; see
+/// TaskLocalValuePush.
 ///
 /// Signature: () -> ()
 BUILTIN_MISC_OPERATION(TaskLocalValuePop, "taskLocalValuePop", "", Special)
+
+/// Add a task-local binding within a scope.
+///
+/// Signature: <Value> (UnsafeRawPointer, value: __owned Value) -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION(AddTaskLocalValue, "addTaskLocalValue", "", Special)
+
+/// End the scope of a task-local binding.
+///
+/// Signature: (UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(RemoveTaskLocalValue, "removeTaskLocalValue", "", Special)
 
 /// Equivalent to calling swift_task_cancellationShieldPush.
 ///

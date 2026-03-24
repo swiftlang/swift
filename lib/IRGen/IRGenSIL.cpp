@@ -6708,6 +6708,11 @@ buildTailArrays(IRGenSILFunction &IGF,
 }
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
+  // We can ignore isStackAllocationNested() here because we currently only
+  // use static allocas for the stack promotion optimization. If we ever do
+  // want to try dynamic allocations, we'll need to pay attention
+  // (probably by just disabling the optimization).
+
   int StackAllocSize = -1;
   if (i->canAllocOnStack()) {
     estimateStackSize();
@@ -6731,6 +6736,11 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
+  // We can ignore isStackAllocationNested() here because we currently only
+  // use static allocas for the stack promotion optimization. If we ever do
+  // want to try dynamic allocations, we'll need to pay attention
+  // (probably by just disabling the optimization).
+
   int StackAllocSize = -1;
   if (i->canAllocOnStack()) {
     assert(i->isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType());
@@ -8574,13 +8584,23 @@ bool IRGenSILFunction::shouldUseDispatchThunk(SILDeclRef method) {
   AccessLevel methodAccess = method.getDecl()->getEffectiveAccess();
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
   bool shouldUseDispatchThunk = false;
-  // Because typechecking for the debugger has more lax rules, check the access
-  // level of the getter to decide whether to use a dispatch thunk for the
-  // debugger.
+  bool isResilient =
+      IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal);
   bool inDebugger = classDecl->getASTContext().LangOpts.DebuggerSupport;
-  bool shouldUseDispatchThunkIfInDebugger = methodAccess >= AccessLevel::Public;
-  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal) &&
-      (!inDebugger || shouldUseDispatchThunkIfInDebugger)) {
+  bool shouldUseDispatchThunkIfInDebugger = false;
+  if (inDebugger && isResilient) {
+    // Because typechecking for the debugger has more lax rules, check the
+    // access level of the method to decide whether to use a dispatch thunk for
+    // the debugger.
+    shouldUseDispatchThunkIfInDebugger = methodAccess >= AccessLevel::Public;
+
+    // This is only legal if the method actually has a vtable.
+    auto hasVtable =
+        IGM.getClassMetadataLayout(classDecl).getStoredMethodInfoIfPresent(
+            method);
+    shouldUseDispatchThunkIfInDebugger |= !hasVtable;
+  }
+  if (isResilient && (!inDebugger || shouldUseDispatchThunkIfInDebugger)) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().VirtualFunctionElimination) {
     // For VFE, use a thunk if the target class is in another module. This

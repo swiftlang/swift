@@ -18,6 +18,16 @@
 
 import Swift
 internal import WinSDK
+internal import BacktracingImpl.OS.Windows
+
+extension WIN32_IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY {
+  var Flag: UInt32 { UnwindData & 0x3 }
+  var FunctionLength: UInt32 { (UnwindData >> 2) & 0x3ff }
+}
+
+extension WIN32_IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY_XDATA {
+  var FunctionLength: UInt32 { PackedFields & 0x3ffff }
+}
 
 // We use this protocol to work around the problem of not being able to
 // pass a function as a C function if it has captured generic parameters.
@@ -238,7 +248,8 @@ extension Win32Unwinder: Win32UnwinderSupport {
       return nil
     }
 
-    let addrOffset = addrBase - DWORD64(self.images[ndx].baseAddress)!
+    let baseAddress = self.images[ndx].baseAddress
+    let addrOffset = addrBase - DWORD64(baseAddress)!
 
     switch self.images.exceptionTable(at: ndx) {
     case .arm64(let wrapper):
@@ -254,12 +265,36 @@ extension Win32Unwinder: Win32UnwinderSupport {
           continue
         }
 
-        if mid == table.count - 1 || table[mid + 1].BeginAddress > addrOffset {
+        // ARM64 stores function lengths in words; we have to compute end
+        let end: UInt32
+        if table[mid].Flag != 0 {
+          end = table[mid].BeginAddress + table[mid].FunctionLength * 4
+        } else {
+          // Don't fetch XDATA if we don't have to
+          if mid + 1 < table.count && table[mid + 1].BeginAddress <= addrOffset {
+            min = mid + 1
+            continue
+          }
+
+          // Fetch the XDATA to find the length in words
+          let xDataPtr = M.Address(baseAddress)!
+            + M.Address(table[mid].UnwindData)
+          if let xData = try? self.reader.fetch(
+               from: xDataPtr,
+               as: WIN32_IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY_XDATA.self
+             ) {
+            end = table[mid].BeginAddress + xData.FunctionLength * 4
+          } else {
+            end = table[mid].BeginAddress
+          }
+        }
+
+        if addrOffset < end {
           let ptr = UnsafeRawPointer(table.baseAddress! + mid)!
           return UnsafeMutableRawPointer(mutating: ptr)
         }
 
-        min = mid
+        min = mid + 1
       }
       return nil
     case .amd64(let wrapper):
@@ -275,12 +310,12 @@ extension Win32Unwinder: Win32UnwinderSupport {
           continue
         }
 
-        if mid == table.count - 1 || table[mid + 1].BeginAddress > addrOffset {
+        if table[mid].EndAddress > addrOffset {
           let ptr = UnsafeRawPointer(table.baseAddress! + mid)!
           return UnsafeMutableRawPointer(mutating: ptr)
         }
 
-        min = mid
+        min = mid + 1
       }
       return nil
     case .i386(let wrapper):
@@ -315,7 +350,7 @@ extension Win32Unwinder: Win32UnwinderSupport {
           return UnsafeMutableRawPointer(mutating: ptr)
         }
 
-        min = mid
+        min = mid + 1
       }
       return nil
     default:

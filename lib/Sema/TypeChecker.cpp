@@ -515,11 +515,9 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
 
   return TypeResolution::forInterface(
              DC, GenericSig, options,
-             [](auto unboundTy) {
-               // FIXME: Don't let unbound generic types escape type resolution.
-               // For now, just return the unbound generic type.
-               return unboundTy;
-             },
+             // FIXME: Don't let unbound generic types escape type resolution.
+             // For now, just return the unbound generic type.
+             TypeResolution::defaultUnboundTypeOpener,
              // FIXME: Don't let placeholder types escape type resolution.
              // For now, just return the placeholder type.
              PlaceholderType::get,

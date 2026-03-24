@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::NormalProtocolConformance::getAssociatedConformance(swift::Type, swift::ProtocolDecl*) const","signatureAssert":"Assertion failed: (!AssociatedConformances[index]), function setAssociatedConformance"}
+// {"kind":"typecheck","signature":"swift::NormalProtocolConformance::getAssociatedConformance(swift::Type, swift::ProtocolDecl*) const","signatureAssert":"Assertion failed: (!AssociatedConformances[index]), function setAssociatedConformance","signatureNext":"SubstitutionMap::lookupConformance"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a{typealias b : IteratorProtocol} extension a{typealias Element =
                                                            b.Element} protocol c

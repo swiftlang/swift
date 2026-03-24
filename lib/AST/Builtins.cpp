@@ -1961,25 +1961,6 @@ static ValueDecl *getTypeJoinOperation(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
-static ValueDecl *getTypeJoinInoutOperation(ASTContext &Context,
-                                            Identifier Id) {
-  // <T,U,V> (inout T, U.Type) -> V.Type
-  BuiltinFunctionBuilder builder(Context, 3);
-  builder.addParameter(makeGenericParam(0), ParamSpecifier::InOut);
-  builder.addParameter(makeMetatype(makeGenericParam(1)));
-  builder.setResult(makeMetatype(makeGenericParam(2)));
-  return builder.build(Id);
-}
-
-static ValueDecl *getTypeJoinMetaOperation(ASTContext &Context, Identifier Id) {
-  // <T,U,V> (T.Type, U.Type) -> V.Type
-  BuiltinFunctionBuilder builder(Context, 3);
-  builder.addParameter(makeMetatype(makeGenericParam(0)));
-  builder.addParameter(makeMetatype(makeGenericParam(1)));
-  builder.setResult(makeMetatype(makeGenericParam(2)));
-  return builder.build(Id);
-}
-
 static ValueDecl *getTriggerFallbackDiagnosticOperation(ASTContext &Context,
                                                         Identifier Id) {
   // () -> Void
@@ -2447,6 +2428,16 @@ static ValueDecl *getTaskLocalValuePush(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getTaskLocalValuePop(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
+}
+
+static ValueDecl *getAddTaskLocalValue(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
+                            _parameters(_rawPointer, _consuming(_typeparam(0))),
+                            _rawPointer);
+}
+
+static ValueDecl *getRemoveTaskLocalValue(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer), _void);
 }
 
 static ValueDecl *getMakeBorrow(ASTContext &ctx, Identifier id) {
@@ -3489,12 +3480,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::TypeJoin:
     return getTypeJoinOperation(Context, Id);
 
-  case BuiltinValueKind::TypeJoinInout:
-    return getTypeJoinInoutOperation(Context, Id);
-
-  case BuiltinValueKind::TypeJoinMeta:
-    return getTypeJoinMetaOperation(Context, Id);
-
   case BuiltinValueKind::TriggerFallbackDiagnostic:
     return getTriggerFallbackDiagnosticOperation(Context, Id);
 
@@ -3589,6 +3574,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TaskLocalValuePop:
     return getTaskLocalValuePop(Context, Id);
+
+  case BuiltinValueKind::AddTaskLocalValue:
+    return getAddTaskLocalValue(Context, Id);
+
+  case BuiltinValueKind::RemoveTaskLocalValue:
+    return getRemoveTaskLocalValue(Context, Id);
 
   case BuiltinValueKind::MakeBorrow:
     return getMakeBorrow(Context, Id);

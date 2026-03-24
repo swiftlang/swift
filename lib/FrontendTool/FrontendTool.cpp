@@ -1429,7 +1429,8 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
       *Instance.getCompilerBaseKey(), Instance.getDiags(),
       Instance.getInvocation().getFrontendOptions(), *CDP,
       Instance.getInvocation().getCASOptions().EnableCachingRemarks,
-      Instance.getInvocation().getIRGenOptions().UseCASBackend);
+      Instance.getInvocation().getIRGenOptions().UseCASBackend,
+      Instance.getInvocation().getCASOptions().WriteOutputHashXAttr);
 
   // If we didn't replay successfully, re-start capture.
   if (!replayed)
@@ -1481,9 +1482,9 @@ static bool generateReproducer(CompilerInstance &Instance,
   llvm::sys::path::append(casPath, "cas");
   clang::CASOptions newCAS;
   newCAS.CASPath = casPath.str();
-  newCAS.PluginPath = casOpts.CASOpts.PluginPath;
-  newCAS.PluginOptions = casOpts.CASOpts.PluginOptions;
-  auto db = newCAS.getOrCreateDatabases();
+  newCAS.PluginPath = casOpts.Config.PluginPath;
+  newCAS.PluginOptions = casOpts.Config.PluginOptions;
+  auto db = newCAS.CASConfiguration::createDatabases();
   if (!db) {
     diags.diagnose(SourceLoc(), diag::error_cas_initialization,
                    toString(db.takeError()));

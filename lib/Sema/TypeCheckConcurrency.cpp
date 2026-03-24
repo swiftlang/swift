@@ -126,7 +126,6 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
 
   // Otherwise, if it's an actor instance, then it depends on async-ness.
   switch (typeIso.getKind()) {
-  case ActorIsolation::GlobalActor:
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:
@@ -139,6 +138,10 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
   case ActorIsolation::Erased:
     llvm_unreachable("constructor cannot have erased isolation");
 
+  case ActorIsolation::GlobalActor:
+    return ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
+               StrictConcurrency::Complete &&
+           !ctor->hasAsync();
   case ActorIsolation::ActorInstance:
     return !ctor->hasAsync(); // need flow-isolation for non-async.
   };
@@ -1488,12 +1491,16 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
     }
   }
 
-  // Note to supress Sendable conformance is feature is enabled.
-  if (ctx.LangOpts.hasFeature(Feature::TildeSendable)) {
+  {
     auto note = nominal->diagnose(diag::suppress_sendable_conformance);
     auto inheritance = nominal->getInherited();
     if (inheritance.empty()) {
-      note.fixItInsertAfter(nominal->getNameLoc(), ": ~Sendable");
+      // If a nominal has any generic params, insert new conformance right
+      // after them.
+      auto *genericParams = nominal->getGenericParams();
+      auto insertionLoc =
+          genericParams ? genericParams->getRAngleLoc() : nominal->getNameLoc();
+      note.fixItInsertAfter(insertionLoc, ": ~Sendable");
     } else {
       note.fixItInsertAfter(inheritance.getEndLoc(), ", ~Sendable");
     }
@@ -3749,11 +3756,13 @@ namespace {
           if (auto partialApply = dyn_cast<ApplyExpr>(apply->getFn())) {
             if (auto declRef = dyn_cast<DeclRefExpr>(partialApply->getFn())) {
               ValueDecl *fnDecl = declRef->getDecl();
-              ctx.Diags.diagnose(apply->getLoc(),
-                                 diag::actor_isolated_mutating_func,
-                                 fnDecl->getName(), decl)
+              ctx.Diags
+                  .diagnose(apply->getLoc(), diag::actor_isolated_mutating_func,
+                            fnDecl->getName(), decl)
                   .warnUntilLanguageModeIf(downgradeToWarning,
                                            LanguageMode::v6);
+              ctx.Diags.diagnose(partialApply->getArgs()->get(0).getStartLoc(),
+                                 diag::actor_isolated_mutating_func_note, decl);
               result = true;
               return;
             }
@@ -4891,16 +4900,12 @@ ActorIsolationChecker::determineClosureIsolation(AbstractClosureExpr *closure,
     // global actor, nonisolated/@concurrent attributes and doesn't have
     // isolated parameters. If our closure is nonisolated and we have a
     // conversion to nonisolated(nonsending), then we should respect that.
-    if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
-        isIsolationBoundary || !normalIsolation.isGlobalActor()) {
+    if (isIsolationBoundary || normalIsolation.isNonisolated()) {
       if (auto *fce = dyn_cast_or_null<FunctionConversionExpr>(context)) {
         auto expectedIsolation =
             fce->getType()->castTo<FunctionType>()->getIsolation();
-        if (expectedIsolation.isNonIsolatedCaller()) {
-          auto captureInfo = explicitClosure->getCaptureInfo();
-          if (!captureInfo.getIsolatedParamCapture())
-            return ActorIsolation::forCallerIsolationInheriting();
-        }
+        if (expectedIsolation.isNonIsolatedCaller())
+          return ActorIsolation::forCallerIsolationInheriting();
       }
     }
 
@@ -7977,6 +7982,17 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   innerFnType = innerFnType->withExtInfo(
       innerFnType->getExtInfo().withIsolation(*funcIsolation));
 
+  // When `GlobalActorIsolatedTypesUsability` feature is enabled, inner type
+  // should be marked as `@Sendable` when inferred to be global-actor isolated.
+  {
+    auto &ctx = decl->getASTContext();
+    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability) &&
+        funcIsolation->isGlobalActor()) {
+      innerFnType =
+          innerFnType->withExtInfo(innerFnType->getExtInfo().withSendable());
+    }
+  }
+
   // Rebuild the outer function type around it.
   if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(
@@ -8577,8 +8593,6 @@ ActorReferenceResult ActorReferenceResult::Builder::build() {
     if (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete &&
         referencedActor && referencedActor->isSelf() &&
-        referencedActor->actor->isActorSelf() &&
-        !contextIsolation.isGlobalActor() &&
         checkedByFlowIsolation(fromDC, *referencedActor, decl, declRefLoc,
                                useKind))
       return forSameConcurrencyDomain(declIsolation, options);

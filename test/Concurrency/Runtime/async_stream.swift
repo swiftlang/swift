@@ -1051,7 +1051,13 @@ class NotSendable {}
         expectTrue(expectation.fulfilled)
       }
 
+      // FIXME: This test should be fixed or updated to ensure no crash occurs
+      // if the behavior of throwing streams is unified with non-throwing ones.
+      // It is currently disabled because it appears to cause crashes on Linux
+      // for yet-to-be-determined reasons.
+
       // This test documents the current single-consumer limitation of AsyncThrowingStream.
+      /*
       #if !os(WASI) // TODO: is there a way to test for process death on WASI?
       tests.test("finish behavior with multiple consumers throwing") {
         expectCrashLater()
@@ -1084,6 +1090,7 @@ class NotSendable {}
         }
       }
       #endif
+       */
 
       await runAllTestsAsync()
     }

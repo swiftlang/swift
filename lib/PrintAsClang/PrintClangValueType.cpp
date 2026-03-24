@@ -215,7 +215,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     if (typeSizeAlign && typeSizeAlign->size == 0) {
       // FIXME: How to represent 0 sized structs?
       declAndTypePrinter.getCxxDeclEmissionScope()
-          .additionalUnrepresentableDeclarations.push_back(typeDecl);
+          .additionalUnrepresentableDeclarations.insert({typeDecl, ""});
       return;
     }
   }

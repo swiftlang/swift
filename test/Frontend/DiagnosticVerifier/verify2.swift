@@ -1,7 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: not %target-swift-frontend -typecheck -verify -serialize-diagnostics-path %t/serialized.dia %s 2>&1 | %FileCheck %s --check-prefixes CHECK,CHECK-WARNINGS-AS-WARNINGS --implicit-check-not error: --implicit-check-not note: --implicit-check-not warning:
-// RUN: not %target-swift-frontend -typecheck -verify -warnings-as-errors %s 2>&1 | %FileCheck %s -check-prefixes CHECK,CHECK-WARNINGS-AS-ERRORS --implicit-check-not error: --implicit-check-not note: --implicit-check-not warning:
+
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/BoolLib.swiftmodule -parse-as-library %S/Inputs/BoolLib.swift
+
+// RUN: not %target-swift-frontend -typecheck -verify -serialize-diagnostics-path %t/serialized.dia %s -I %t 2>&1 | %FileCheck %s --check-prefixes CHECK,CHECK-WARNINGS-AS-WARNINGS --implicit-check-not error: --implicit-check-not note: --implicit-check-not warning:
+// RUN: not %target-swift-frontend -typecheck -verify -warnings-as-errors %s -I %t 2>&1 | %FileCheck %s -check-prefixes CHECK,CHECK-WARNINGS-AS-ERRORS --implicit-check-not error: --implicit-check-not note: --implicit-check-not warning:
 // RUN: %FileCheck %s -check-prefix CHECK-SERIALIZED <%t/serialized.dia
+
+import BoolLib
 
 // Wrong message
 let x: Int = "hello, world!" // expected-error {{foo bar baz}}
@@ -18,13 +23,13 @@ let z: Int = "hello, world!" as Any
 // CHECK: error: expected fix-it not seen; actual fix-it seen: {{[{][{]}}36-36= as! Int{{[}][}]}}
 
 // Expected no fix-it
-let a: Bool = "hello, world!" as Any
+let a: MyBool = "hello, world!" as Any
 // expected-error@-1 {{cannot convert value of type}} {{none}}
-// CHECK: error: expected no fix-its; actual fix-it seen: {{[{][{]}}37-37= as! Bool{{[}][}]}}
+// CHECK: error: expected no fix-its; actual fix-it seen: {{[{][{]}}39-39= as! MyBool{{[}][}]}}
 
 // Unexpected error
-_ = foo()
-// CHECK: error: unexpected error produced: cannot find 'foo' in scope
+_ = Myfoo()
+// CHECK: error: unexpected error produced: cannot find 'Myfoo' in scope
 
 func b() {
   let c = 2
@@ -42,8 +47,8 @@ extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') c
 extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') cannot be extended}} {{documentation-file=nominal-types,foo-bar-baz}}
 // CHECK: error: expected documentation file not seen; actual documentation file: {{[{][{]}}documentation-file=nominal-types{{[}][}]}}
 
-// CHECK: error: unexpected note produced: 'Bool' declared here
-// CHECK: note: file 'Swift.Bool' is not parsed for 'expected' statements. Use '-verify-additional-file Swift.Bool' to enable, or '-verify-ignore-unrelated' to ignore diagnostics in this file
+// CHECK: error: unexpected note produced: 'MyBool' declared here
+// CHECK: note: file 'BoolLib.MyBool' is not parsed for 'expected' statements. Use '-verify-additional-file BoolLib.MyBool' to enable, or '-verify-ignore-unrelated' to ignore diagnostics in this file
 
 // Verify the serialized diags have the right magic at the top.
 // CHECK-SERIALIZED: DIA

@@ -131,12 +131,14 @@ extension TestActor {
   }
 
   func callMutatingFunctionOnStruct() async {
-    // expected-error@+3:20{{cannot call mutating async function 'setComponents(x:y:)' on actor-isolated property 'position'}}
+    // expected-error@+4:20{{cannot call mutating async function 'setComponents(x:y:)' on actor-isolated property 'position'}}
+    // expected-note@+3:11{{'position' can be concurrently accessed during mutation, risking data races}}
     // expected-error@+2:38{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
     // expected-error@+1:58{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
     await position.setComponents(x: &nextPosition.x, y: &nextPosition.y)
 
-    // expected-error@+3:20{{cannot call mutating async function 'setComponents(x:y:)' on actor-isolated property 'position'}}
+    // expected-error@+4:20{{cannot call mutating async function 'setComponents(x:y:)' on actor-isolated property 'position'}}
+    // expected-note@+3:11{{'position' can be concurrently accessed during mutation, risking data races}}
     // expected-error@+2:38{{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
     // expected-error@+1:50{{actor-isolated property 'value2' cannot be passed 'inout' to 'async' function call}}
     await position.setComponents(x: &value1, y: &value2)
@@ -314,5 +316,6 @@ actor ProtectDictionary {
   func invalid() async {
     await dict[0].mutate()
     // expected-warning@-1 {{cannot call mutating async function 'mutate()' on actor-isolated property 'dict'; this is an error in the Swift 6 language mode}}
+    // expected-note@-2{{'dict' can be concurrently accessed during mutation, risking data races}}
   }
 }

@@ -258,12 +258,14 @@ struct ExplicitSwiftModuleInputInfo {
       std::optional<std::string> moduleSourceInfoPath,
       std::optional<std::vector<std::string>> headerDependencyPaths,
       bool isFramework = false, bool isSystem = false,
-      std::optional<std::string> moduleCacheKey = std::nullopt)
+      std::optional<std::string> moduleCacheKey = std::nullopt,
+      std::optional<std::string> libraryLevel = std::nullopt)
       : modulePath(modulePath), moduleAlias(moduleAlias),
         moduleDocPath(moduleDocPath),
         moduleSourceInfoPath(moduleSourceInfoPath),
         headerDependencyPaths(headerDependencyPaths), isFramework(isFramework),
-        isSystem(isSystem), moduleCacheKey(moduleCacheKey) {}
+        isSystem(isSystem), moduleCacheKey(moduleCacheKey),
+        libraryLevel(libraryLevel) {}
   /// Path of the .swiftmodule file.
   std::string modulePath;
   /// Any alias for this module.
@@ -280,6 +282,8 @@ struct ExplicitSwiftModuleInputInfo {
   bool isSystem = false;
   /// The cache key for clang module.
   std::optional<std::string> moduleCacheKey;
+  /// The library level of this module (e.g. "api", "spi").
+  std::optional<std::string> libraryLevel;
 };
 
 /// Explicitly-specified Clang module inputs.
@@ -288,11 +292,12 @@ struct ExplicitClangModuleInputInfo {
       std::string moduleMapPath, std::string modulePath,
       std::optional<std::string> moduleAlias, bool isFramework = false,
       bool isSystem = false, bool isBridgingHeaderDependency = true,
-      std::optional<std::string> moduleCacheKey = std::nullopt)
+      std::optional<std::string> moduleCacheKey = std::nullopt,
+      std::optional<std::string> libraryLevel = std::nullopt)
       : moduleMapPath(moduleMapPath), modulePath(modulePath),
         moduleAlias(moduleAlias), isFramework(isFramework), isSystem(isSystem),
         isBridgingHeaderDependency(isBridgingHeaderDependency),
-        moduleCacheKey(moduleCacheKey) {}
+        moduleCacheKey(moduleCacheKey), libraryLevel(libraryLevel) {}
   /// Path of the Clang module map file.
   std::string moduleMapPath;
   /// Path of a compiled Clang explicit module file (pcm).
@@ -307,6 +312,8 @@ struct ExplicitClangModuleInputInfo {
   bool isBridgingHeaderDependency = true;
   /// The cache key for clang module.
   std::optional<std::string> moduleCacheKey;
+  /// The library level of this module (e.g. "api", "spi").
+  std::optional<std::string> libraryLevel;
 };
 
 struct ExplicitSwiftModuleMap
@@ -398,7 +405,7 @@ private:
     StringRef moduleName;
     std::optional<std::string> swiftModulePath, swiftModuleDocPath,
         swiftModuleSourceInfoPath, swiftModuleCacheKey, clangModuleCacheKey,
-        moduleAlias;
+        moduleAlias, libraryLevel;
     std::optional<std::vector<std::string>> headerDependencyPaths;
     std::string clangModuleMapPath = "", clangModulePath = "";
     bool isFramework = false, isSystem = false,
@@ -437,6 +444,8 @@ private:
           isBridgingHeaderDependency = parseBoolValue(val);
         } else if (key == "moduleAlias") {
           moduleAlias = val.str();
+        } else if (key == "libraryLevel") {
+          libraryLevel = val.str();
         } else {
           // Being forgiving for future fields.
           continue;
@@ -454,15 +463,16 @@ private:
       ExplicitSwiftModuleInputInfo entry(
           swiftModulePath.value(), moduleAlias, swiftModuleDocPath,
           swiftModuleSourceInfoPath, headerDependencyPaths, isFramework,
-          isSystem, swiftModuleCacheKey);
+          isSystem, swiftModuleCacheKey, libraryLevel);
       didInsert = swiftModuleMap.try_emplace(moduleName, std::move(entry)).second;
     } else {
       assert((!clangModuleMapPath.empty() ||
               !clangModulePath.empty()) &&
              "Expected Clang dependency module");
-      ExplicitClangModuleInputInfo entry(
-          clangModuleMapPath, clangModulePath, moduleAlias, isFramework,
-          isSystem, isBridgingHeaderDependency, clangModuleCacheKey);
+      ExplicitClangModuleInputInfo entry(clangModuleMapPath, clangModulePath,
+                                         moduleAlias, isFramework, isSystem,
+                                         isBridgingHeaderDependency,
+                                         clangModuleCacheKey, libraryLevel);
       didInsert = clangModuleMap.try_emplace(moduleName, std::move(entry)).second;
     }
     if (!didInsert)
@@ -651,6 +661,8 @@ private:
   llvm::StringSaver ArgSaver;
   std::vector<StringRef> GenericArgs;
   CompilerInvocation genericSubInvocation;
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(StringRef interfacePath,
@@ -683,7 +695,9 @@ public:
       StringRef backupModuleInterfaceDir,
       ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
       bool serializeDependencyHashes,
-      bool trackSystemDependencies);
+      bool trackSystemDependencies,
+      std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr,
+      std::shared_ptr<llvm::cas::ActionCache> ActionCache = nullptr);
 
   template<typename ...ArgTypes>
   static InFlightDiagnostic diagnose(StringRef interfacePath,

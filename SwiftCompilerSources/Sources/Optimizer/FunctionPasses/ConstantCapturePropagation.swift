@@ -58,6 +58,10 @@ import AST
 let constantCapturePropagation = FunctionPass(name: "constant-capture-propagation") {
   (function: Function, context: FunctionPassContext) in
 
+  guard function.hasOwnership else {
+    return
+  }
+
   for inst in function.instructions {
     guard let partialApply = inst as? PartialApplyInst,
           // Only support closures which - after generic specialization - are not generic anymore.
@@ -155,15 +159,30 @@ private func specializeClosure(specializedName: String,
                   callee.convention.results.contains { $0.type.hasTypeParameter } ||
                   callee.convention.errorResult?.type.hasTypeParameter ?? false
 
+  let representation = partialApply.callee.type.functionTypeRepresentation
+  // We are removing arguments from the original function. If the removed argument is the
+  // "self" argument, the specialized function cannot be a "method" anymore. It's in general
+  // safe to make it a "thin" function (even if "self" was not removed).
+  let newRepr = representation == .method ? .thin : representation
+
   let specializedClosure = context.createSpecializedFunctionDeclaration(from: callee,
                                                                         withName: specializedName,
                                                                         withParams: newParams,
+                                                                        withRepresentation: newRepr,
                                                                         preserveGenericSignature: isGeneric)
 
   context.buildSpecializedFunction(specializedFunction: specializedClosure) { (specializedClosure, specContext) in
-    cloneAndSpecializeFunction(from: callee, toEmpty: specializedClosure,
-                               substitutions: partialApply.substitutionMap,
-                               specContext)
+    if isGeneric {
+      // When the specialized closure is still generic, clone without type substitutions.
+      // The mangled name only encodes constant values, not type substitutions, so the body
+      // must stay generic to avoid ODR violations when different concrete types produce the
+      // same symbol but with different type-substituted bodies.
+      cloneFunction(from: callee, toEmpty: specializedClosure, specContext)
+    } else {
+      cloneAndSpecializeFunction(from: callee, toEmpty: specializedClosure,
+                                 substitutions: partialApply.substitutionMap,
+                                 specContext)
+    }
 
     let entryBlock = specializedClosure.entryBlock
     for constArgOp in constantArguments {
@@ -224,7 +243,7 @@ private func rewritePartialApply(_ partialApply: PartialApplyInst, withSpecializ
   let builder = Builder(before: partialApply, context)
   let fri = builder.createFunctionRef(specialized)
   let newClosure: Value
-  if arguments.isEmpty {
+  if arguments.isEmpty, specialized.genericSignature.isEmpty, fri.type.functionTypeRepresentation == .thin {
     newClosure = builder.createThinToThickFunction(thinFunction: fri, resultType: partialApply.type)
     context.erase(instructions: partialApply.uses.users(ofType: DeallocStackInst.self))
   } else {
@@ -318,7 +337,7 @@ private extension PartialApplyInst {
     for argOp in argumentOperands {
       // In non-OSSA we don't know where to insert the compensating release for a propagated keypath.
       // Therefore bail if a keypath has multiple uses.
-      switch argOp.value.isConstant(requireSingleUse: !parentFunction.hasOwnership && !isOnStack) {
+      switch argOp.value.isConstant() {
       case .constant:
         constArgs.append(argOp)
       case .constantWithKeypath:
@@ -370,17 +389,17 @@ private enum ConstantKind {
 }
 
 private extension Value {
-  func isConstant(requireSingleUse: Bool) -> ConstantKind {
+  func isConstant() -> ConstantKind {
     // All instructions handled here must also be handled in
     // `FunctionSignatureSpecializationMangler::mangleConstantProp`.
     let result: ConstantKind
     switch self {
     case let si as StructInst:
       result = si.operands.reduce(.constant, {
-        $0.merge(with: $1.value.isConstant(requireSingleUse: requireSingleUse))
+        $0.merge(with: $1.value.isConstant())
       })
     case is ThinToThickFunctionInst, is ConvertFunctionInst, is UpcastInst, is OpenExistentialRefInst:
-      result = (self as! UnaryInstruction).operand.value.isConstant(requireSingleUse: requireSingleUse)
+      result = (self as! UnaryInstruction).operand.value.isConstant()
     case is StringLiteralInst, is IntegerLiteralInst, is FloatLiteralInst, is FunctionRefInst, is GlobalAddrInst:
       result = .constant
     case let keyPath as KeyPathInst:
@@ -392,9 +411,6 @@ private extension Value {
       }
       result = .constantWithKeypath
     default:
-      return .notConstant
-    }
-    if requireSingleUse, result == .constantWithKeypath, !uses.ignoreDebugUses.isSingleUse {
       return .notConstant
     }
     return result

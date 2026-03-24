@@ -24,6 +24,7 @@ internal import BacktracingImpl.OS.Darwin
 
 #if os(Windows)
 internal import WinSDK
+internal import BacktracingImpl.OS.Windows
 #endif
 
 /// Holds a map of the process's address space.
@@ -51,7 +52,7 @@ public struct ImageMap: Collection, Sendable, Hashable {
 
   #if os(Windows)
   enum ExceptionTable {
-    case arm64(ExceptionTableWrapper<IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY>)
+    case arm64(ExceptionTableWrapper<WIN32_IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY>)
     case amd64(ExceptionTableWrapper<_IMAGE_RUNTIME_FUNCTION_ENTRY>)
     case i386(ExceptionTableWrapper<FPO_DATA>)
   }

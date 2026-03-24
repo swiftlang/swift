@@ -60,3 +60,18 @@ func testMultipleClosureInference(_ d: Double, i: Int) {
   func foo<T>(_: S<T>, _: T) {}
   foo(S({ CGFloat(i) }, { _ in }), d)
 }
+
+struct JoinIs<T> {}
+
+func testOptionalJoin(x1: Double, x2: CGFloat, y1: Double?, y2: CGFloat?) {
+  func same<T>(_: T, _: T) -> JoinIs<T> {}
+
+  let _: JoinIs<Double?> = same(x1, y1)
+
+  // FIXME: This violates the proposal's "widening conversion preferred" rule.
+  // We should be converting y2 to Double?, instead of x1 to CGFloat.
+  let _: JoinIs<CGFloat?> = same(x1, y2)
+
+  let _: JoinIs<Double?> = same(x2, y1)
+  let _: JoinIs<CGFloat?> = same(x2, y2)
+}

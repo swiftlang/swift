@@ -589,17 +589,15 @@ bool DiagnosticEngine::finishProcessing() {
 
 bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (getCheckSyntacticControls()) {
-    if (!sf || !sf->getExportedSourceFile())
-      return !state.isIgnoredDiagnosticGroupTree(groupID);
+  if (getCheckSyntacticControls() && sf &&
+      sf->Kind != SourceFileKind::Interface && sf->getExportedSourceFile()) {
     auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
     return swift_ASTGen_isWarningGroupEnabledInFile(
-            sf->getExportedSourceFile(),
-            BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
-            StringRef(getDiagGroupInfoByID(groupID).name));
-  } else {
-    return !state.isIgnoredDiagnosticGroupTree(groupID);
+        sf->getExportedSourceFile(),
+        BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
+        StringRef(getDiagGroupInfoByID(groupID).name));
   }
+  return !state.isIgnoredDiagnosticGroupTree(groupID);
 #else
   // Fallback to checking only the command-line configuration
   return !state.isIgnoredDiagnosticGroupTree(groupID);
@@ -1367,7 +1365,10 @@ DiagnosticState::determineUserControlledWarningBehavior(
         sourceMgr.findBufferContainingLoc(loc));
     if (!sourceFiles.empty()) {
       SourceFile *SF = sourceFiles.front();
-      if (SF && SF->getExportedSourceFile()) {
+      // Don't run syntactic @warn controls for .swiftinterface files.
+      if (getCheckSyntacticControls() && SF &&
+          SF->Kind != SourceFileKind::Interface &&
+          SF->getExportedSourceFile()) {
         auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
         WarningGroupBehavior behavior =
             swift_ASTGen_warningGroupBehaviorAtPosition(
@@ -1434,15 +1435,10 @@ DiagnosticState::determineBehavior(const Diagnostic &diag,
   //   3) If the user substituted a different behavior for this warning, apply
   //      that change
   if (lvl == DiagnosticBehavior::Warning) {
-    auto userControlBehavior =
-        determineUserControlledWarningBehavior(diag, sourceMgr);
-    if (userControlBehavior)
+    if (auto userControlBehavior =
+            determineUserControlledWarningBehavior(diag, sourceMgr))
       lvl = *userControlBehavior;
-
-    // Suppress all warnings when `-suppress-warnings` is used, except those
-    // *lexically* (`@warn`) escalated to error.
-    // (`-Werror` is not compatible with `-suppress-warnings`).
-    if (suppressWarnings && lvl != DiagnosticBehavior::Error)
+    if (suppressWarnings)
       lvl = DiagnosticBehavior::Ignore;
   }
 
@@ -1553,17 +1549,17 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   }
 
   auto groupID = diagnostic.getGroupID();
-  StringRef Category;
+  StringRef CategoryName;
   if (auto wrapped = diagnostic.getWrappedDiagnostic())
-    Category = wrapped.value()->Category;
+    CategoryName = wrapped.value()->getCategoryName();
   else if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
-    Category = "api-digester-breaking-change";
+    CategoryName = "api-digester-breaking-change";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
-    Category = "no-usage";
+    CategoryName = "no-usage";
   else if (groupID != DiagGroupID::no_group)
-    Category = getDiagGroupInfoByID(groupID).name;
+    CategoryName = getDiagGroupInfoByID(groupID).name;
   else if (isDeprecationDiagnostic(diagnostic.getID()))
-    Category = "deprecation";
+    CategoryName = "deprecation";
 
   auto fixIts = diagnostic.getFixIts();
   if (loc.isValid()) {
@@ -1592,7 +1588,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
       getFormatStringForDiagnostic(diagnostic, includeDiagnosticName);
 
   return DiagnosticInfo(diagnostic.getID(), loc, toDiagnosticKind(behavior),
-                        formatString, diagnostic.getArgs(), Category,
+                        formatString, diagnostic.getArgs(), CategoryName,
                         getDefaultDiagnosticLoc(),
                         /*child note info*/ {}, diagnostic.getRanges(), fixIts,
                         diagnostic.isChildNote());
@@ -1740,26 +1736,50 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     info->ChildDiagnosticInfo = childInfoPtrs;
 
     // Capture information about the diagnostic group and its documentation
-    // URL.
+    // URL. Build the full category chain (leaf + parents).
     auto groupID = diagnostic.getGroupID();
     if (groupID != DiagGroupID::no_group) {
       const auto &diagGroup = getDiagGroupInfoByID(groupID);
 
-      if (diagGroup.toolchainLocalDocumentation) {
-        std::string localPath(getLocalDiagnosticDocumentationPath());
-        if (!localPath.empty()) {
-          if (localPath.back() != '/')
-            localPath += "/";
-          localPath += diagGroup.documentationFile;
-          localPath += ".md";
-          info->CategoryDocumentationURL = std::move(localPath);
+      auto getDiagnosticGroupDocURL =
+          [&](const DiagGroupInfo &diagGroup) -> std::string {
+        if (diagGroup.toolchainLocalDocumentation) {
+          std::string localPath(getLocalDiagnosticDocumentationPath());
+          if (!localPath.empty()) {
+            if (localPath.back() != '/')
+              localPath += "/";
+            localPath += diagGroup.documentationFile;
+            localPath += ".md";
+            return localPath;
+          }
+          return "";
         }
-      } else {
+
         std::string docURL(getDiagnosticDocumentationPath());
         if (!docURL.empty() && docURL.back() != '/')
           docURL += "/";
         docURL += diagGroup.documentationFile;
-        info->CategoryDocumentationURL = std::move(docURL);
+        return docURL;
+      };
+
+      // Set the leaf category's documentation URL.
+      info->setCategoryDocumentationURL(getDiagnosticGroupDocURL(diagGroup));
+
+      // Append parent groups by walking up supergroups.
+      auto currentID = groupID;
+      while (true) {
+        const auto &current = getDiagGroupInfoByID(currentID);
+        if (current.supergroups.empty())
+          break;
+        auto parentID = current.supergroups[0];
+        const auto &parent = getDiagGroupInfoByID(parentID);
+        std::string parentDocURL(getDiagnosticDocumentationPath());
+        if (!parentDocURL.empty() && parentDocURL.back() != '/')
+          parentDocURL += "/";
+        parentDocURL += parent.documentationFile;
+        info->CategoryChain.push_back(
+            {StringRef(parent.name), std::move(parentDocURL)});
+        currentID = parentID;
       }
     }
 

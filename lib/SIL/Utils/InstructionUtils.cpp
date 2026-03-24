@@ -1508,14 +1508,26 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   return (numFields <= 6);
 }
 
+void InstructionIndices::indexBlock(SILBasicBlock &block) {
+  unsigned idx = 1;
+  for (SILInstruction &inst : block) {
+    indices.set(inst.asSILNode(), idx);
+    if (indices.fits(idx + 1)) {
+      idx += 1;
+    } else {
+      indicesOverflowed = true;
+    }
+  }
+}
+
 InstructionIndices::InstructionIndices(SILFunction *f)
     : indices(f, numIndexBits) {
   for (SILBasicBlock &block : *f) {
-    unsigned idx = 1;
-    for (SILInstruction &inst : block) {
-      indices.set(inst.asSILNode(), idx);
-      if (indices.fits(idx + 1))
-        idx += 1;
-    }
+    indexBlock(block);
   }
+}
+
+InstructionIndices::InstructionIndices(SILBasicBlock *block)
+    : indices(block->getFunction(), numIndexBits) {
+  indexBlock(*block);
 }

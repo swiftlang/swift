@@ -166,9 +166,9 @@ versions for you that are verified to work, so installing different versions of 
    * [CentOS 7](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/centos/7/Dockerfile)
    * [Amazon Linux 2](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/amazon-linux/2/Dockerfile)
 
-   Note that [a prebuilt Swift release toolchain](https://www.swift.org/download/)
+   Note that [a prebuilt Swift release toolchain](https://www.swift.org/install/)
    is installed and added to the `PATH` in all these Docker containers: it is
-   recommended that you do the same, in order to build the portions of the Swift
+   required that you do the same, in order to build the portions of the Swift
    compiler written in Swift.
 
 2. To install [Sccache][] (optional):
@@ -261,8 +261,7 @@ Build the toolchain with optimizations, debuginfo, and assertions, using Ninja:
   ```sh
   utils/build-script --skip-build-benchmarks \
     --swift-darwin-supported-archs "$(uname -m)" \
-    --release-debuginfo --swift-disable-dead-stripping \
-    --bootstrapping=hosttools
+    --release-debuginfo --swift-disable-dead-stripping
   ```
 - Linux:
   ```sh
@@ -284,6 +283,27 @@ If the build fails, see [Troubleshooting build issues](#troubleshooting-build-is
 In the following sections, for simplicity, we will assume that you are using a
 `Ninja-RelWithDebInfoAssert` build on macOS, unless explicitly mentioned otherwise.
 You will need to slightly tweak the paths for other build configurations.
+
+While the compiler alone is useful for some initial exploration and testing, you
+will want the Testing library and Swift package manager to build most Swift
+packages. To build those, you must add the following `build-script` flags on macOS:
+```sh
+--install-llvm --install-swift --swift-testing-macros --swift-testing \
+--install-swift-testing-macros --install-swift-testing -b -p --install-swiftpm \
+--swift-driver --install-swift-driver
+```
+On Linux, you will also need to add these flags to that list to build and
+install the core libraries:
+```sh
+--xctest --install-libdispatch --install-foundation --install-xctest
+```
+This will produce a working toolchain in the above build directory, which
+you can then use to build and test Swift packages:
+```sh
+cd swift-crypto/
+../build/Ninja-RelWithDebInfoAssert/toolchain-macosx-arm64/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build
+../build/Ninja-RelWithDebInfoAssert/toolchain-macosx-arm64/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift test
+```
 
 ### Troubleshooting build issues
 

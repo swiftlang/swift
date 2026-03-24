@@ -23,6 +23,7 @@ import ImportsMacroSpecificClangModule
 //CHECK-NEXT:    },
 //CHECK-NEXT:    {
 //CHECK-NEXT:      "modulePath": "{{.*}}{{/|\\}}ImportsMacroSpecificClangModule-{{.*}}.swiftmodule",
+//CHECK-NEXT:      "libraryLevel":
 //CHECK-NEXT:      "sourceFiles": [
 //CHECK-NEXT:      ],
 //CHECK-NEXT:      "directDependencies": [
@@ -36,6 +37,7 @@ import ImportsMacroSpecificClangModule
 //CHECK-NEXT:    },
 //CHECK-NEXT:    {
 //CHECK-NEXT:      "modulePath": "{{.*}}{{/|\\}}SubImportsMacroSpecificClangModule-{{.*}}.swiftmodule",
+//CHECK-NEXT:      "libraryLevel":
 //CHECK-NEXT:      "sourceFiles": [
 //CHECK-NEXT:      ],
 //CHECK-NEXT:      "directDependencies": [
@@ -48,6 +50,7 @@ import ImportsMacroSpecificClangModule
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "modulePath": "{{.*}}{{/|\\}}OnlyWithMacro-{{.*}}.pcm",
+// CHECK-NEXT:      "libraryLevel":
 // CHECK-NEXT:      "sourceFiles": [
 // CHECK-DAG:        "{{.*}}OnlyWithMacro.h"
 // CHECK-DAG:        "{{.*}}module.modulemap"

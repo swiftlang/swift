@@ -123,10 +123,16 @@ DeclAvailabilityConstraints::getPrimaryConstraint() const {
     if (lhs.getReason() != rhs.getReason())
       return lhs.getReason() < rhs.getReason();
 
-    // Pick the constraint from the broader domain.
-    if (lhs.getDomain() != rhs.getDomain())
-      return rhs.getDomain().contains(lhs.getDomain());
-    
+    if (lhs.getDomain() != rhs.getDomain()) {
+      // Constraints in the universal domain are the strongest.
+      if (rhs.getDomain().isUniversal())
+        return true;
+
+      // Otherwise, pick the constraint from the broader domain.
+      if (lhs.getDomain() != rhs.getDomain())
+        return rhs.getDomain().contains(lhs.getDomain());
+    }
+
     return false;
   };
 
@@ -189,7 +195,18 @@ shouldIgnoreConstraintInContext(const Decl *decl,
   if (!canIgnoreConstraintInUnavailableContexts(decl, constraint, flags))
     return false;
 
-  return context.containsUnavailableDomain(constraint.getDomain());
+  // If the constraint's domain is a superset of the compilation's target
+  // availability domain, use the more specific target availability domain
+  // instead. This allows declarations that are @available(macOS, unavailable)
+  // to be used in contexts that are @available(macOSApplicationExtension,
+  // unavailable), for example.
+  auto &ctx = decl->getASTContext();
+  auto domain = constraint.getDomain();
+  auto targetDomain = ctx.getTargetAvailabilityDomain();
+  if (domain.isSupersetOf(targetDomain))
+    domain = targetDomain;
+
+  return context.isUnavailableForDomain(domain);
 }
 
 /// Returns the `AvailabilityConstraint` that describes how \p attr restricts

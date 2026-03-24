@@ -199,7 +199,10 @@ static void createDealloc(SILBuilder &B, SILLocation loc, SILInstruction *alloc)
     return;
   }
   case StackAllocationKind::BuiltinStartAsyncLet:
-    llvm_unreachable("cannot insert finishAsyncLet builtin; not safely reorderable");
+  case StackAllocationKind::BuiltinAddTaskLocalValue:
+  case StackAllocationKind::BuiltinTaskAddPriorityEscalationHandler:
+  case StackAllocationKind::BuiltinTaskAddCancellationHandler:
+    llvm_unreachable("cannot insert this builtin; not safely reorderable");
     return;
   case StackAllocationKind::AllocPackMetadata:
     B.createDeallocPackMetadata(loc, allocation->getValue());
@@ -227,8 +230,12 @@ static bool isUnreorderableAllocation(StackAllocation allocation) {
   case StackAllocationKind::CalleeAllocatedBeginApply:
     return false;
 
-  // The finish of an async let cannot be reordered across.
+  // These deallocations cannot be reordered across because they are
+  // associated with semantic effects.
   case StackAllocationKind::BuiltinStartAsyncLet:
+  case StackAllocationKind::BuiltinAddTaskLocalValue:
+  case StackAllocationKind::BuiltinTaskAddPriorityEscalationHandler:
+  case StackAllocationKind::BuiltinTaskAddCancellationHandler:
     return true;
   }
   llvm_unreachable("unknown stack allocation");

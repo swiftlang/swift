@@ -705,9 +705,22 @@ ManagedValue Transform::transform(ManagedValue v,
 
   //  - existentials
   if (outputSubstType->isAnyExistentialType()) {
-    // We have to re-abstract payload if its a metatype or a function
-    v = SGF.emitSubstToOrigValue(Loc, v, AbstractionPattern::getOpaque(),
-                                 inputSubstType);
+    // We might have to re-abstract the payload if its a metatype, function,
+    // tuple, or optional.
+
+    auto loweredTy = v.getType();
+    auto inputLoweredTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                             inputSubstType);
+    // FIXME: Gross workaround for incorrect opaque type erasure
+    if (loweredTy.getNominalOrBoundGenericNominal() &&
+        inputLoweredTy.is<OpaqueTypeArchetypeType>()) {
+      // Woohoo!
+      inputSubstType = loweredTy.getASTType();
+    } else {
+      v = SGF.emitSubstToOrigValue(Loc, v, AbstractionPattern::getOpaque(),
+                                   inputSubstType);
+    }
+
     return SGF.emitTransformExistential(Loc, v,
                                         inputSubstType, outputSubstType,
                                         ctxt);
