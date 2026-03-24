@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -solver-scope-threshold=2000
+// RUN: %target-swift-frontend %s -typecheck -solver-scope-threshold=300
 
 // REQUIRES: objc_interop
 
-// FIXME: This should be a scale-test but it doesn't allow passing `%clang-importer-sdk`
+// FIXME: This should be a scale-test but it doesn't allow importing SDK frameworks.
 
 // This import is important because it brings CGFloat and
 // enables Double<->CGFloat implicit conversion that affects
