@@ -4548,6 +4548,15 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  // If we don't have the concurrency library, reject the use of 'async'.
+  if (repr->isAsync() &&
+      !ctx.getLoadedModule(ctx.Id_Concurrency) &&
+      !ctx.SILOpts.ParseStdlib) {
+    diagnoseInvalid(repr, repr->getAsyncLoc(),
+                    diag::no_concurrency_module,
+                    "async");
+  }
+
   // Diagnose a couple of things that we can parse in SIL mode but we don't
   // allow in formal types.
   if (auto patternParams = repr->getPatternGenericParams()) {

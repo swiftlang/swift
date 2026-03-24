@@ -3164,7 +3164,7 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     if (!concurrencyModule) {
       context.Diags.diagnose(mainFunction->getAsyncLoc(),
                              diag::no_concurrency_module, "async main");
-      auto result = new (context) ErrorExpr(mainFunction->getSourceRange());
+      auto result = new (context) ErrorExpr(mainFunction->getSourceRange(), ErrorType::get(context));
       ASTNode stmts[] = {result};
       auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc(),
                                     /*Implicit*/ true);

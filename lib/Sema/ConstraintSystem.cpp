@@ -1417,6 +1417,15 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
     if (expr->getThrowsLoc().isValid() && !expr->getExplicitThrownTypeRepr())
       diagnoseUntypedThrows(expr, expr->getThrowsLoc());
 
+    // If we don't have the concurrency library, reject the use of 'async'.
+    ASTContext &ctx = expr->getASTContext();
+    if (async &&
+        !ctx.getLoadedModule(ctx.Id_Concurrency) &&
+        !ctx.SILOpts.ParseStdlib) {
+      ctx.Diags.diagnose(expr->getAsyncLoc(),
+                         diag::no_concurrency_module, "async");
+    }
+
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
       .withAsync(async)

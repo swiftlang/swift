@@ -3320,6 +3320,13 @@ public:
       }
     }
 
+    // Actors require the concurrency module.
+    if (CD->isActor() && !Ctx.getLoadedModule(Ctx.Id_Concurrency)) {
+      auto sourceFile = CD->getParentSourceFile();
+      if (sourceFile && sourceFile->Kind != SourceFileKind::SIL)
+        CD->diagnose(diag::no_concurrency_module, "actor");
+    }
+
     // Check distributed actors
     TypeChecker::checkDistributedActor(SF, CD);
 
