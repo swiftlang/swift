@@ -156,7 +156,7 @@ final class _Storage<Element, Failure: Error>: @unchecked Sendable {
   }
 
   private var state: State
-  private var bufferPolicy: Continuation.BufferingPolicy
+  private var bufferingPolicy: Continuation.BufferingPolicy
   private var onTermination: TerminationHandler?
 
   private init(_doNotCallMe: ()) {
@@ -194,7 +194,9 @@ extension _Storage {
     ): (Continuation.YieldResult, YieldAction) = unsafe withLock {
       switch unsafe self.state {
       case var .idle(buffer):
-        switch self.bufferPolicy {
+        let bufferCount = buffer.count
+
+        switch self.bufferingPolicy {
         case .unbounded:
           buffer.append(value)
           unsafe self.state = unsafe .idle(buffer: buffer)
@@ -203,12 +205,12 @@ extension _Storage {
             action: .none)
 
         case let .bufferingOldest(limit):
-          switch buffer.count < limit {
+          switch bufferCount < limit {
           case true:
             buffer.append(value)
             unsafe self.state = unsafe .idle(buffer: buffer)
             return unsafe (
-              result: .enqueued(remaining: limit - buffer.count),
+              result: .enqueued(remaining: limit - bufferCount),
               action: .none)
 
           case false:
@@ -224,11 +226,11 @@ extension _Storage {
               result: .dropped(value),
               action: .none)
 
-          case let limit where buffer.count < limit:
+          case let limit where bufferCount < limit:
             buffer.append(value)
             unsafe self.state = unsafe .idle(buffer: buffer)
             return unsafe (
-              result: .enqueued(remaining: limit - buffer.count),
+              result: .enqueued(remaining: limit - bufferCount),
               action: .none)
 
           default:
@@ -251,7 +253,7 @@ extension _Storage {
           unsafe self.state = unsafe .waiting(consumers: consumers)
         }
 
-        switch self.bufferPolicy {
+        switch self.bufferingPolicy {
         case .unbounded:
           return unsafe (
             result: .enqueued(remaining: .max),
@@ -464,7 +466,7 @@ extension _Storage {
   }
 
   static func create(
-    bufferPolicy limit: Continuation.BufferingPolicy
+    bufferingPolicy limit: Continuation.BufferingPolicy
   ) -> _Storage {
     let minimumCapacity = _lockWordCount()
 
@@ -474,11 +476,11 @@ extension _Storage {
       UnsafeRawPointer.self
     )
 
-    let bufferPolicyPtr =
+    let bufferingPolicyPtr =
     unsafe UnsafeMutablePointer<Continuation.BufferingPolicy>(
-      Builtin.addressof(&storage.bufferPolicy)
+      Builtin.addressof(&storage.bufferingPolicy)
     )
-    unsafe bufferPolicyPtr.initialize(to: limit)
+    unsafe bufferingPolicyPtr.initialize(to: limit)
 
     let statePtr =
     unsafe UnsafeMutablePointer<State>(
