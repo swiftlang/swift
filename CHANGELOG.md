@@ -5,6 +5,20 @@
 
 ## Swift (next)
 
+* [SE-0518][]:
+  Introduced `~Sendable` conformance syntax to explicitly suppress a conformance to `Sendable`,
+  which prevents automatic `Sendable` inference on types, and provides an alternative way
+  to mark types as non-`Sendable` without inheritance impact.
+
+  ```swift
+  // The `Base` type has been audited and determined to be non-`Sendable`, sub-classes
+  // can introduce non-`Sendable` mutable state or protect their state / make everything
+  // constant and thus may be marked as `Sendable`.
+  public class Base: ~Sendable {
+    // ...
+  }
+  ```
+
 * The checking for illegal forward references to local variables is now consistent regardless of
   whether the reference appears in a closure. Previously the type-checker could incorrectly permit
   forward references within a closure that it would reject outside of the closure, however this
@@ -11093,6 +11107,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
+[SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

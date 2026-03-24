@@ -138,8 +138,8 @@ public struct WrapOverloadedInits {
     }
 }
 
-// CHECK: static SWIFT_INLINE_THUNK WrapOverloadedInits init
-// CHECK-SAME: (swift::Int x) SWIFT_SYMBOL("s:4Init19WrapOverloadedInitsVyACSicfc");
+// CHECK: static SWIFT_INLINE_THUNK WrapOverloadedInits init(swift::Int x) SWIFT_SYMBOL("s:4Init19WrapOverloadedInitsVyACSicfc");
+// CHECK-NEXT: static SWIFT_INLINE_THUNK WrapOverloadedInits init(float
 // CHECK-NOT: WrapOverloadedInits init(
 
 // CHECK: BaseClass BaseClass::init(swift::Int x, swift::Int y) {

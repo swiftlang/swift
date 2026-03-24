@@ -1102,6 +1102,32 @@ private:
            sel.getSelectorPieces().front().str() == "init";
   }
 
+  /// Returns the C++ parameter type strings for a function as they would
+  /// appear in the C++ inline thunk signature.
+  llvm::SmallVector<std::string, 4>
+  getCxxParamTypes(const AbstractFunctionDecl *funcDecl) const {
+    llvm::SmallVector<std::string, 4> result;
+    auto *params = funcDecl->getParameters();
+    if (!params)
+      return result;
+    auto *emittedModule = funcDecl->getModuleContext();
+    for (auto *param : *params) {
+      auto type = param->getInterfaceType();
+      // In C++ different integer types have different bitwidths. To
+      // avoid producing redefinition errors, we are conservative with
+      // these types and consider all integral types the same.
+      if (type->isStdlibInteger()) {
+        result.push_back("int");
+      } else {
+        std::string typeStr;
+        llvm::raw_string_ostream typeOS(typeStr);
+        owningPrinter.printTypeName(typeOS, type, emittedModule);
+        result.push_back(typeStr);
+      }
+    }
+    return result;
+  }
+
   /// Returns true if the given function overload is safe to emit in the current
   /// C++ lexical scope.
   bool canPrintOverloadOfFunction(const AbstractFunctionDecl *funcDecl) const {
@@ -1109,32 +1135,24 @@ private:
     auto &overloads =
         owningPrinter.getCxxDeclEmissionScope().emittedFunctionOverloads;
     auto cxxName = cxx_translation::getNameForCxx(funcDecl);
-    auto overloadIt = overloads.find(cxxName);
-    if (overloadIt == overloads.end()) {
-      overloads.insert(std::make_pair(
-          cxxName,
-          llvm::SmallVector<const AbstractFunctionDecl *>({funcDecl})));
+    auto paramTypes = getCxxParamTypes(funcDecl);
+    auto [overloadIt, inserted] = overloads.try_emplace(
+        cxxName,
+        llvm::SmallVector<CxxDeclEmissionScope::EmittedFunctionOverload, 2>(
+            {{funcDecl, paramTypes}}));
+    if (inserted)
       return true;
-    }
-    auto selfArity =
-        funcDecl->getParameters() ? funcDecl->getParameters()->size() : 0;
-    for (const auto *overload : overloadIt->second) {
-      auto arity =
-          overload->getParameters() ? overload->getParameters()->size() : 0;
-      // Avoid printing out an overload with the same and arity, as that might
-      // be an ambiguous overload on the C++ side.
-      // FIXME: we should take types into account, not all overloads with the
-      // same arity are ambiguous in C++.
-      if (selfArity == arity) {
+    for (const auto &overload : overloadIt->second) {
+      if (overload.cxxParamTypes == paramTypes) {
         owningPrinter.getCxxDeclEmissionScope()
             .additionalUnrepresentableDeclarations.insert(
                 {funcDecl,
-                 "An overload with the same number of parameters already "
+                 "An overload with the same C++ parameter types already "
                  "exists"});
         return false;
       }
     }
-    overloadIt->second.push_back(funcDecl);
+    overloadIt->second.push_back({funcDecl, paramTypes});
     return true;
   }
 
