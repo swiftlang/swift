@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 
 /// Test parallel dependency scanning from libSwiftScan APIs.
- // RUN: %swift-scan-test -action scan_dependency -cas-path %t/cas -threads 5 -- \
+ // RUN: %swift-scan-test -action scan_dependency -cas-path %t/cas -scan-threads 5 -- \
 // RUN:   %target-swift-frontend -scan-dependencies -target arm64-apple-macos26 -module-name Test -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/main.swift -o %t/deps.json -sdk %sdk -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/include > %t/deps.json
