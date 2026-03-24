@@ -766,10 +766,11 @@ static PossibleEffects getEffects(ValueDecl *value);
 
 RequirementMatch swift::matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-    llvm::function_ref<
-        std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type>(void)>
-        setup,
+    llvm::function_ref<MatchWitnessTypes(void)> setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
+    llvm::function_ref<std::optional<RequirementMatch>(
+        const LifetimeDependentInterface &, const LifetimeDependentInterface &)>
+        matchLifetimes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
         finalize) {
   bool decomposeFunctionType = false;
@@ -784,11 +785,11 @@ RequirementMatch swift::matchWitness(
   // in the process.
   Type reqType, witnessType, reqThrownError, witnessThrownError;
   {
-    std::optional<RequirementMatch> result;
-    std::tie(result, reqType, witnessType, reqThrownError, witnessThrownError) = setup();
-    if (result) {
-      return std::move(result.value());
-    }
+    auto types = setup();
+    reqType = types.requirement;
+    witnessType = types.witness;
+    reqThrownError = types.requirementThrows;
+    witnessThrownError = types.witnessThrows;
   }
 
   SmallVector<OptionalAdjustment, 2> optionalAdjustments;
@@ -908,6 +909,13 @@ RequirementMatch swift::matchWitness(
       if (!witnessFnType->getExtInfo().isAsync() &&
             (req->isObjC() && reqFnType->getExtInfo().isAsync())) {
         return RequirementMatch(witness, MatchKind::AsyncConflict);
+      }
+
+      // Check that lifetime dependencies match
+      if (auto result = matchLifetimes(
+              LifetimeDependentInterface::fromValueDecl(witness, witnessFnType),
+              LifetimeDependentInterface::fromValueDecl(req, reqFnType))) {
+        return std::move(result.value());
       }
 
       if (!reqThrownError) {
@@ -1253,7 +1261,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
   // Set up the constraint system for matching.
   auto setup =
-      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type> {
+      [&]() -> MatchWitnessTypes {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
@@ -1317,8 +1325,19 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
     Type witnessThrownError = openWitnessTypeInfo.thrownErrorTypeOnAccess;
 
-    return std::make_tuple(std::nullopt, reqType, openWitnessType,
-                           reqThrownError, witnessThrownError);
+    return MatchWitnessTypes{reqType, openWitnessType, reqThrownError,
+                             witnessThrownError};
+  };
+
+  // Attempt to add constraints to make the supplied function types match.
+  auto matchLifetimes = [&](const LifetimeDependentInterface &witnessInterface,
+                            const LifetimeDependentInterface &reqInterface)
+      -> std::optional<RequirementMatch> {
+    if (!cs->matchFunctionLifetimes(witnessInterface, reqInterface,
+                                    witnessLocator)) {
+      return RequirementMatch(witness, MatchKind::LifetimeConflict);
+    }
+    return std::nullopt;
   };
 
   // Match a type in the requirement to a type in the witness.
@@ -1411,7 +1430,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     return result;
   };
 
-  return matchWitness(dc, req, witness, setup, matchTypes, finalize);
+  return matchWitness(dc, req, witness, setup, matchTypes, matchLifetimes,
+                      finalize);
 }
 
 bool
@@ -3346,6 +3366,10 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
       diags.diagnose(witness, diag::protocol_witness_borrow_mutate_conflict,
                      diagMsg);
     }
+    break;
+  }
+  case MatchKind::LifetimeConflict: {
+    diags.diagnose(match.Witness, diag::protocol_witness_lifetime_conflict);
     break;
   }
   }

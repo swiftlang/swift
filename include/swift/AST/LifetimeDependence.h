@@ -21,6 +21,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Ownership.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
@@ -407,6 +408,104 @@ public:
   }
   
   SWIFT_DEBUG_DUMPER(dump());
+};
+
+/// The interface of a function or method with lifetime dependencies.
+///
+/// This type abstracts over inconsistencies in the representation of function
+/// type lifetime dependencies.
+///
+/// The lifetime dependencies of normal function types are attached directly
+/// to the function type:
+///
+///     @_lifetime(...) (Params...) -> Result
+///
+/// Instance methods have curried function types. Since lifetime dependencies
+/// can involve the self parameter, they are attached to the outer type:
+///
+///     @_lifetime(...) (Self) -> (Params...) -> Result
+///
+/// Static methods cannot have lifetime dependencies involving self, so their
+/// lifetime dependencies are attached to the actual interface type.
+///
+///     (Self.Type) -> @_lifetime(...) (Params...) -> Result
+class LifetimeDependentInterface {
+  /// (Params...) -> Result: The function's interface type.
+  AnyFunctionType *interface;
+  /// Self: The type of self, if it exists.
+  std::optional<Type> implicitSelfType;
+  /// @_lifetime(...): The lifetime dependencies of the interface.
+  ArrayRef<LifetimeDependenceInfo> lifetimes;
+
+public:
+  /// Construct a lifetime-dependent interface for a function declaration with
+  /// the specified interface type.
+  ///
+  /// For methods, the interface type should be the "inner" function type.
+  /// I.e. (Params...) -> Result
+  LifetimeDependentInterface(AbstractFunctionDecl *afd,
+                             AnyFunctionType *interface);
+
+  /// Construct a lifetime-dependent interface for a function type.
+  LifetimeDependentInterface(AnyFunctionType *type);
+
+  /// Construct a LifetimeDependentInterface from a ValueDecl and interface
+  /// type. If the ValueDecl is an instance of AbstractFunctionDecl, call the
+  /// (AbstractFunctionDecl*, AnyFunctionType*) constructor. Otherwise, call the
+  /// (AnyFunctionType*) constructor with 'interface'.
+  static LifetimeDependentInterface fromValueDecl(ValueDecl *decl,
+                                                  AnyFunctionType *interface);
+
+  ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
+    return lifetimes;
+  }
+
+  /// Get the type of the lifetime source or target with the given index.
+  Type getSourceOrTargetType(unsigned index) const;
+
+  /// Determine whether this interface's lifetime dependencies
+  /// are compatible with those specified by 'to'. If they are, and all
+  /// other aspects of the types are compatible, a function with this interface
+  /// can be cast to type 'to'.
+  ///
+  /// This is determined according to the Lifetime Subtyping rules in
+  /// ‎docs/ReferenceGuides/LifetimeAnnotation.md.
+  ///
+  /// Examples:
+  ///   struct NE: ~Escapable {}
+  ///   @_lifetime(copy ne0, copy ne1)
+  ///   func copying01(ne0: NE, ne1: NE) -> NE {
+  ///     return ne1
+  ///   }
+  ///   @_lifetime(copy ne0)
+  ///   func copying0(ne0: NE, ne1: NE) -> NE {
+  ///     return ne0
+  ///   }
+  ///   func takeCopying01(
+  ///     f: @_lifetime(copy ne0, copy ne1)
+  ///       (_ ne0: NE, _ ne1: NE) -> NE) {}
+  ///   func takeCopying0(
+  ///     f: @_lifetime(copy ne0)
+  ///       (_ ne0: NE, _ ne1: NE) -> NE) {}
+  ///
+  ///   takeCopying0(f: copying0)    // OK: Dependencies match exactly.
+  ///   takeCopying01(f: copying01)  // OK: Dependencies match exactly.
+  ///   takeCopying01(f: copying0)   // OK: No dependencies are dropped.
+  ///   takeCopying0(f: copying01)   // Error: The dependence on the second
+  ///   parameter is dropped.
+  bool canConvertTo(const LifetimeDependentInterface &to) const;
+
+  /// Whether the lifetime dependencies 'fromDeps' are convertible to those
+  /// of the target with the same index in 'to'.
+  /// See canConvertTo.
+  ///
+  /// 'fromDeps' is assumed to be a member of this->lifetimes.
+  bool canConvertTargetTo(const LifetimeDependenceInfo &fromDeps,
+                          const LifetimeDependentInterface &to) const;
+
+  /// Whether this interface has a lifetime dependence target with the given
+  /// index.
+  bool hasTarget(unsigned targetIndex) const;
 };
 
 std::optional<LifetimeDependenceInfo>
