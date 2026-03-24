@@ -178,10 +178,7 @@ extension ContinuousObservation.State {
             return
           }
           withObservationTracking(options: options) {
-            // This is safe since we have already been isolated to the tracking isolation.
-            // It can be asserted to be isolated by
-            apply.isolation?.assertIsolated()
-            let fn = apply as @Sendable (borrowing ObservationTracking.Event) -> Void
+            let fn = TrackingClosure(apply).toSynchronous()
             // This ends up also being how the `didSet` is called because this will occur
             // on the next iteration of the while loop from `trackingLoop` after the
             // onChange.
@@ -206,6 +203,23 @@ extension ContinuousObservation.State {
       },
       isolation: apply.isolation
     )
+  }
+
+  // Workaround for "converting @isolated(any) function of type ... to
+  // synchronous function type ... is not allowed".
+  fileprivate struct TrackingClosure {
+    typealias Event = ObservationTracking.Event
+    typealias Isolated = @isolated(any) @Sendable (borrowing Event) -> Void
+    typealias Synchronous = @Sendable (borrowing Event) -> Void
+    let fn: Isolated
+    init(_ fn: @escaping Isolated) {
+      self.fn = fn
+    }
+    func toSynchronous() -> Synchronous {
+      // This is safe since we have already been isolated to the tracking isolation.
+      fn.isolation?.assertIsolated()
+      return unsafeBitCast(self, to: Synchronous.self)
+    }
   }
 }
 

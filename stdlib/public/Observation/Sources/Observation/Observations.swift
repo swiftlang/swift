@@ -181,10 +181,10 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
         return try withObservationTracking(options: [.willSet, .deinit]) { () throws(Failure) -> Observations<Element, Failure>.Iteration in
           switch emit {
           case .element(let element):
-            let extracted: () throws(Failure) -> Element = element
+            let extracted = ElementClosure(element).toSynchronous()
             return try Iteration.next(extracted())
           case .iteration(let iteration):
-            let extracted: () throws(Failure) -> Iteration = iteration
+            let extracted = IterationClosure(iteration).toSynchronous()
             return try extracted()
           }
         } onChange: { [state] (event) in
@@ -197,10 +197,10 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
           do {
             switch emit {
             case .element(let element):
-              let extracted: () throws(Failure) -> Element = element
+              let extracted = ElementClosure(element).toSynchronous()
               return .success(try Iteration.next(extracted()))
             case .iteration(let iteration):
-              let extracted: () throws(Failure) -> Iteration = iteration
+              let extracted = IterationClosure(iteration).toSynchronous()
               return .success(try extracted())
             }
           } catch {
@@ -272,6 +272,34 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
       } catch {
         // the user threw a failure in the closure so propagate that outwards and terminate the sequence
         return try terminate(throwing: error, id: id)
+      }
+    }
+
+    // Workaround for "converting @isolated(any) function of type ... to
+    // synchronous function type ... is not allowed".
+    fileprivate struct ElementClosure {
+      typealias Isolated = @isolated(any) @Sendable () throws(Failure) -> Element
+      typealias Synchronous = () throws(Failure) -> Element
+      let fn: Isolated
+      init(_ fn: @escaping Isolated) {
+        self.fn = fn
+      }
+      func toSynchronous() -> Synchronous {
+        return unsafeBitCast(self, to: Synchronous.self)
+      }
+    }
+
+    // Workaround for "converting @isolated(any) function of type ... to
+    // synchronous function type ... is not allowed".
+    fileprivate struct IterationClosure {
+      typealias Isolated = @isolated(any) @Sendable () throws(Failure) -> Iteration
+      typealias Synchronous = () throws(Failure) -> Iteration
+      let fn: Isolated
+      init(_ fn: @escaping Isolated) {
+        self.fn = fn
+      }
+      func toSynchronous() -> Synchronous {
+        return unsafeBitCast(self, to: Synchronous.self)
       }
     }
   }
