@@ -139,8 +139,7 @@ def get_branch_for_repo(
                 [
                     "fetch",
                     "origin",
-                    "pull/{0}/merge:{1}".format(pr_id, repo_branch),
-                    "--tags",
+                    "pull/{0}/merge:{1}".format(pr_id, repo_branch)
                 ],
                 echo=True,
             )
@@ -229,9 +228,14 @@ def update_single_repository(pool_args: UpdateArguments):
                     repo_path, ["rev-parse", "--verify", checkout_target], echo=verbose
                 )
             except Exception:
+                target_is_tag = confirm_tag_in_repo(repo_path, checkout_target, repo_name)
+                if target_is_tag:
+                    fetch_ref = f"refs/tags/{checkout_target}:refs/tags/{checkout_target}"
+                else:
+                    fetch_ref = checkout_target
                 Git.run(
                     repo_path,
-                    ["fetch", "--recurse-submodules=yes", "--tags"] + fetch_extra_args,
+                    ["fetch", "--recurse-submodules=yes", "origin", fetch_ref] + fetch_extra_args,
                     echo=verbose,
                     prefix=prefix,
                 )
@@ -255,9 +259,12 @@ def update_single_repository(pool_args: UpdateArguments):
         # It's important that we checkout, fetch, and rebase, in order.
         # .git/FETCH_HEAD updates the not-for-merge attributes based on
         # which branch was checked out during the fetch.
+        fetch_args = ["fetch", "--recurse-submodules=yes"]
+        if pool_args.tag:
+            fetch_args.append("--tags")
         Git.run(
             repo_path,
-            ["fetch", "--recurse-submodules=yes", "--tags"] + fetch_extra_args,
+            fetch_args + fetch_extra_args,
             echo=verbose,
             prefix=prefix,
         )
