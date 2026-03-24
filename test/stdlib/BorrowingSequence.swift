@@ -63,6 +63,10 @@ suite.test("BORROWING")
   expectEqual(array.reduce(0, +), span.reduce(0, +))
   expectEqual(array.reduce(into: 0, +=), span.reduce(into: 0, +=))
 
+  var prefixed = span.borrowing.prefix(while: { $0 < 5 })
+  let prefixSpan = prefixed.nextSpan(maximumCount: .max)
+  expectEqual(prefixSpan.reduce(0, +), 10)
+
   let inline: [8 of Int] = [1, 2, 3, 4, 5, 6, 7, 8]
   let inlineCollected = inline.collectViaBorrowing()
   expectTrue(inline.elementsEqual(inline))
