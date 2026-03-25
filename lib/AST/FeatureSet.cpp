@@ -418,6 +418,10 @@ static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinTaskCancellationShield(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinAddTaskLocalValue(Decl *decl) {
   return false;
 }
