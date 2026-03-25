@@ -45,7 +45,7 @@ from .tsan_libdispatch import TSanLibDispatch
 from .wasisysroot import WASILibc, WasmLLVMRuntimeLibs
 from .wasmkit import WasmKit
 from .wasmstdlib import WasmStdlib, WasmThreadsStdlib
-from .wasmswiftsdk import WasiSwiftSDK
+from .wasiswiftsdk import WasiSwiftSDK
 from .xctest import XCTest
 from .zlib import Zlib
 

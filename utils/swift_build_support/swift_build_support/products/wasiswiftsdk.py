@@ -1,4 +1,4 @@
-# swift_build_support/products/wasmswiftsdk.py ------------------*- python -*-
+# swift_build_support/products/wasiswiftsdk.py ------------------*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
