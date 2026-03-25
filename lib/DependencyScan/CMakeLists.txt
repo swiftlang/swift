@@ -19,3 +19,14 @@ target_link_libraries(swiftDependencyScan PRIVATE
 
 target_link_libraries(swiftDependencyScan PUBLIC
   swiftDependencyScanImpl)
+
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftDependencyScan
+    PRIVATE
+    swiftInterfaceTool
+  )
+
+  add_dependencies(swiftInterfaceTool
+    swiftInterfaceTool
+  )
+endif()

@@ -57,6 +57,11 @@ public:
   /// Cache key for imported bridging header.
   std::string BridgingHeaderPCHCacheKey;
 
+  /// Use minimized source files during dependency scanning.
+  /// When enabled, the scanner generates minimized source and builds a CAS
+  /// filesystem with it in place of the real source files.
+  bool EnableMinimizedSourceScanning = false;
+
   /// Has immutable file system input.
   bool HasImmutableFileSystem = false;
 

@@ -2339,6 +2339,11 @@ def cache_compile_job:  Flag<["-"], "cache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Enable compiler caching">;
 
+def scan_dependencies_minimized_source :
+  Flag<["-"], "scan-dependencies-minimized-source">,
+  Flags<[FrontendOption, NewDriverOnlyOption, HelpHidden]>,
+  HelpText<"Use minimized source files during dependency scanning">;
+
 def no_cache_compile_job:  Flag<["-"], "no-cache-compile-job">,
   Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
   HelpText<"Disable compiler caching">;

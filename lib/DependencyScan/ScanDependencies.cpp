@@ -455,9 +455,34 @@ private:
     // Collect CAS info from current resolving module.
     if (auto *sourceDep = resolvingDepInfo.getAsSwiftSourceModule()) {
       tracker->startTracking();
-      llvm::for_each(sourceDep->sourceFiles, [this](const std::string &file) {
-        tracker->trackFile(file);
-      });
+
+      bool useMinimizedSource = scanner.isMinimizingSource();
+      if (useMinimizedSource) {
+        if (instance.getDiags().hadAnyError())
+          return true;
+        for (const auto &file : sourceDep->sourceFiles) {
+          auto minimized = scanner.getMinimizedSource(file);
+          if (!minimized) {
+            instance.getDiags().diagnose(SourceLoc(),
+                                          diag::error_open_input_file, file,
+                                          "minimized content not found");
+            return true;
+          }
+          auto trackErr = tracker->trackFileWithContent(file, *minimized);
+          if (trackErr) {
+            instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
+                                          "storing minimized source in CAS",
+                                          llvm::toString(std::move(trackErr)));
+            return true;
+          }
+        }
+      } else {
+        llvm::for_each(sourceDep->sourceFiles,
+                       [this](const std::string &file) {
+                         tracker->trackFile(file);
+                       });
+      }
+
       llvm::for_each(
           sourceDep->auxiliaryFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
@@ -503,6 +528,9 @@ private:
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
       fileListRefs.push_back(root->getRef());
+
+      if (useMinimizedSource)
+        commandline.push_back("-parse-as-interface");
     } else if (auto *textualDep =
                    resolvingDepInfo.getAsSwiftInterfaceModule()) {
       tracker->startTracking();
