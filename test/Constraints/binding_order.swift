@@ -2,10 +2,13 @@
 // RUN: not --crash %target-typecheck-verify-swift -verify-ignore-unrelated -DSALVAGE
 
 // The next two sets of examples cause difficulties because our
-// subtype lattice is not distributive. We cannot always compute
-// an accurate upper bound, because of existential types; if
-// we pick the wrong upper bound too early, certain expressions
-// will fail.
+// subtype lattice is not actually a lattice; existentials fail
+// to satisfy the absorbtion laws. In other words, given two
+// concrete types, we cannot always compute an accurate upper
+// bound, because we don't know what protocol conformances they
+// might have in common; all we can fall back on is their
+// superclass. So if we bind the join type too soon, certain
+// expressions will fail.
 
 protocol Command {
   var name: String { get }
@@ -62,12 +65,12 @@ do {
   func perform4<S: Sequence>(_: S) where S.Element == Any.Type? {}
   perform4([Undo.self, Cut.self, Copy.self])
 
-  let _: [Int: any Command] = Dictionary(
+  let _: [String: any Command] = Dictionary(
     uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
   // expected-error@-1 {{value of type 'Any' has no member 'name'}}
   // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
 
-  let _: [Int: (any Command)?] = Dictionary(
+  let _: [String: (any Command)?] = Dictionary(
     uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
   // expected-error@-1 {{value of type 'Any' has no member 'name}}
   // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
