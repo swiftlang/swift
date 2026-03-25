@@ -1285,6 +1285,7 @@ AvailabilityScope *AvailabilityScope::getOrBuildForSourceFile(SourceFile &SF) {
   case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::SourceInterface:
   case SourceFileKind::Interface:
     break;
   }

@@ -1703,6 +1703,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     switch (SF->Kind) {
     case SourceFileKind::SIL:
     case SourceFileKind::Interface:
+    case SourceFileKind::SourceInterface:
       return;
     case SourceFileKind::DefaultArgument:
     case SourceFileKind::Library:
@@ -2665,6 +2666,7 @@ public:
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
+          case SourceFileKind::SourceInterface:
           case SourceFileKind::MacroExpansion:
             var->diagnose(diag::opaque_type_var_no_init);
             break;
@@ -2690,6 +2692,7 @@ public:
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
+          case SourceFileKind::SourceInterface:
           case SourceFileKind::MacroExpansion:
             break;
           }
@@ -2712,6 +2715,7 @@ public:
             return;
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Library:
+          case SourceFileKind::SourceInterface:
           case SourceFileKind::MacroExpansion:
             break;
           }

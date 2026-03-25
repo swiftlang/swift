@@ -372,6 +372,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case main            /// A .swift file that can have top-level code.
     case sil             /// Came from a .sil file.
     case interface       /// Came from a .swiftinterface file, representing another module.
+    case sourceInterface /// A .swift file parsed as interface (-parse-as-interface).
     case macroExpansion  /// Came from a macro expansion.
     case defaultArgument /// Came from default argument at caller side
   };
@@ -382,6 +383,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case .Main: return .main
     case .SIL: return .sil
     case .Interface: return .interface
+    case .SourceInterface: return .sourceInterface
     case .MacroExpansion: return .macroExpansion
     case .DefaultArgument: return .defaultArgument
     case .None: return nil

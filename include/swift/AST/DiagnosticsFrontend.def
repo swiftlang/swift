@@ -254,6 +254,8 @@ ERROR(error_repl_requires_no_input_files,none,
       "REPL mode requires no input files", ())
 ERROR(error_mode_requires_one_input_file,none,
       "this mode requires a single input file", ())
+ERROR(error_mode_incompatible_with_interface_input,none,
+      "the requested action is not compatible with '-parse-as-interface'", ())
 ERROR(error_mode_requires_an_input_file,none,
       "this mode requires at least one input file", ())
 ERROR(error_mode_requires_one_sil_multi_sib,none,

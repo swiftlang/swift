@@ -1088,7 +1088,8 @@ ParserResult<Pattern> Parser::parsePattern() {
     // Treat them as an implicitly synthesized NamedPattern with a nameless
     // VarDecl inside.
     if (CurDeclContext->isTypeContext() &&
-        SF.Kind == SourceFileKind::Interface) {
+        (SF.Kind == SourceFileKind::Interface ||
+         SF.Kind == SourceFileKind::SourceInterface)) {
       auto VD = new (Context) VarDecl(
         /*IsStatic*/false, introducer,
         consumeToken(tok::kw__), Identifier(), CurDeclContext);

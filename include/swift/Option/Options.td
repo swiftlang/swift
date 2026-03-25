@@ -1411,6 +1411,9 @@ def migrator_update_swift: Flag<["-"], "migrator-update-swift">,
 def parse_as_library : Flag<["-"], "parse-as-library">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Parse the input file(s) as libraries, not scripts">;
+def parse_as_interface : Flag<["-"], "parse-as-interface">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Parse the input file(s) as module interface">;
 def parse_sil : Flag<["-"], "parse-sil">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Parse the input file as SIL code, not Swift source">;

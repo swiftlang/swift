@@ -2959,13 +2959,14 @@ static bool requiresDefinition(Decl *decl) {
       return false;
   }
 
-  // Declarations in SIL and module interface files don't require
-  // definitions.
+  // Declarations in SIL, module interface, and source interface files don't
+  // require definitions.
   auto dc = decl->getDeclContext();
   if (auto sourceFile = dc->getParentSourceFile()) {
     switch (sourceFile->Kind) {
     case SourceFileKind::SIL:
     case SourceFileKind::Interface:
+    case SourceFileKind::SourceInterface:
       return false;
     case SourceFileKind::Library:
     case SourceFileKind::Main:

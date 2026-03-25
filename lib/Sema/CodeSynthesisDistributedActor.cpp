@@ -650,6 +650,7 @@ addDistributedActorCodableConformance(
           return nullptr;
 
         case SourceFileKind::Library:
+        case SourceFileKind::SourceInterface:
         case SourceFileKind::Main:
         case SourceFileKind::MacroExpansion:
         case SourceFileKind::SIL:

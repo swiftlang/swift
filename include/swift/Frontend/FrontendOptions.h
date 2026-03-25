@@ -233,6 +233,7 @@ public:
     Swift,
     SwiftLibrary,
     SwiftModuleInterface,
+    SwiftSourceInterface,
     SIL,
   };
   ParseInputMode InputMode = ParseInputMode::Swift;
@@ -653,6 +654,7 @@ private:
 public:
   static bool doesActionGenerateSIL(ActionType);
   static bool doesActionGenerateIR(ActionType);
+  static bool isActionCompatibleWithInterfaceInput(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool doesActionBuildModuleFromInterface(ActionType);

@@ -732,6 +732,7 @@ public:
 
     case SourceFileKind::Library:
     case SourceFileKind::Interface:
+    case SourceFileKind::SourceInterface:
     case SourceFileKind::SIL:
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
