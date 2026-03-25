@@ -453,18 +453,21 @@ class InheritedProtocolCollector {
       return cache.value();
 
     cache.emplace();
+    llvm::SmallVector<SemanticAvailableAttr, 8> pendingAttrs;
     while (D) {
       for (auto nextAttr : D->getSemanticAvailableAttrs()) {
         // FIXME: This is just approximating the effects of nested availability
         // attributes for the same platform; formally they'd need to be merged.
         bool alreadyHasMoreSpecificAttrForThisPlatform = llvm::any_of(
             *cache, [nextAttr](SemanticAvailableAttr existingAttr) {
-              return existingAttr.getDomain() == nextAttr.getDomain();
+              return existingAttr.getDomain().contains(nextAttr.getDomain());
             });
         if (alreadyHasMoreSpecificAttrForThisPlatform)
           continue;
-        cache->push_back(nextAttr);
+        pendingAttrs.push_back(nextAttr);
       }
+      cache->append(pendingAttrs);
+      pendingAttrs.clear();
       D = D->getDeclContext()->getAsDecl();
     }
 
