@@ -320,7 +320,6 @@ MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, LanguageMode::future)
 MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, LanguageMode::future)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, LanguageMode::future)
 UPCOMING_FEATURE(ImmutableWeakCaptures, 481, LanguageMode::future)
-UPCOMING_FEATURE(StrictAccessControl, 0, LanguageMode::future)
 
 //===----------------------------------------------------------------------===//
 // MARK: - Optional features
@@ -623,6 +622,9 @@ EXPERIMENTAL_FEATURE(BorrowInout, true)
 
 /// Allow access to the BorrowingSequence protocols/types outside the stdlib.
 EXPERIMENTAL_FEATURE(BorrowingSequence, true)
+
+/// Turns some source breaking access control warnings into errors.
+EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
