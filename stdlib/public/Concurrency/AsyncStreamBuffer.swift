@@ -342,17 +342,17 @@ extension _Storage {
   }
 
   func terminate(_ terminationReason: Continuation.Termination) {
+    let failure: Failure?
+
+    switch terminationReason {
+    case let .finished(withFailure):
+      failure = withFailure
+
+    case .cancelled:
+      failure = nil
+    }
+
     let action: TerminateAction = unsafe withLock {
-      let failure: Failure?
-
-      switch terminationReason {
-      case let .finished(withFailure):
-        failure = withFailure
-
-      case .cancelled:
-        failure = nil
-      }
-
       switch unsafe self.state {
       case let .idle(buffer):
         switch buffer.isEmpty {
