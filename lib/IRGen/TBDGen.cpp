@@ -718,7 +718,7 @@ class APIGenRecorder final : public APIRecorder {
         return true;
     }
 
-    return decl->isSPI() || getAvailability(decl).spiAvailable;
+    return decl->isSPI();
   }
 
 public:
