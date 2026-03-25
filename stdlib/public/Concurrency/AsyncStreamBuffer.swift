@@ -65,6 +65,7 @@ func _unlock(_ ptr: UnsafeRawPointer)
 ///   no new elements are accepted, and consumers return immediately.
 ///
 /// - Transitions:
+///
 /// ```text
 /// Current State   Possible Next States
 /// -------------   -------------------
