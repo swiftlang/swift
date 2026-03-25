@@ -6,7 +6,6 @@
 
 protocol MyProto {}
 
-
 struct MyStruct {
     func myMethod(arg: String) -> String { 
         "" 
