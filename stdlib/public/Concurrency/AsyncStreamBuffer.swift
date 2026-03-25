@@ -206,24 +206,24 @@ extension _Storage {
 
         case let .bufferingNewest(limit):
           switch limit {
-          case let limit where limit <= .zero:
-            return unsafe (
-              result: .dropped(value),
-              action: .none)
-
-          case let limit where buffer.count < limit:
+          case _ where buffer.count < limit && limit > .zero:
             buffer.append(value)
             unsafe self.state = unsafe .idle(buffer: buffer)
             return unsafe (
               result: .enqueued(remaining: limit - buffer.count),
               action: .none)
 
-          default:
+          case _ where buffer.count >= limit && limit > .zero:
             let droppedValue = buffer.removeFirst()
             buffer.append(value)
             unsafe self.state = unsafe .idle(buffer: buffer)
             return unsafe (
               result: .dropped(droppedValue),
+              action: .none)
+
+          default:
+            return unsafe (
+              result: .dropped(value),
               action: .none)
           }
         }
