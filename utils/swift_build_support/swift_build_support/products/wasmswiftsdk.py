@@ -19,7 +19,7 @@ from .cmake_product import CMakeProduct
 from .. import shell
 
 
-class WasmSwiftSDK(product.Product):
+class WasiSwiftSDK(product.Product):
     @classmethod
     def product_source_name(cls):
         return "swift-sdk-generator"
