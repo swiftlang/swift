@@ -45,7 +45,6 @@ takesAnyObject(C(), S(), C())  // expected-error {{failed to produce diagnostic 
 
 // Same-type requirements
 
-// expected-note@+1 {{where '(each T).Element' = 'String', '(each U).Element' = 'Int'}}
 func takesParallelSequences<each T, each U>(t: repeat each T, u: repeat each U)
     where repeat each T: Sequence,
           repeat each U: Sequence,
@@ -53,7 +52,9 @@ func takesParallelSequences<each T, each U>(t: repeat each T, u: repeat each U)
 takesParallelSequences()  // ok
 takesParallelSequences(t: Array<Int>(), u: Set<Int>())  // ok
 takesParallelSequences(t: Array<String>(), Set<Int>(), u: Set<String>(), Array<Int>())  // ok
-takesParallelSequences(t: Array<String>(), Set<Int>(), u: Array<Int>(), Set<String>())  // expected-error {{global function 'takesParallelSequences(t:u:)' requires the types 'String' and 'Int' be equivalent}}
+takesParallelSequences(t: Array<String>(), Set<Int>(), u: Array<Int>(), Set<String>())  // expected-error 2{{cannot convert value of type 'Array<String>' to expected argument type '[Int]'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+// expected-note@-2 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
 
 // Same-shape requirements
 

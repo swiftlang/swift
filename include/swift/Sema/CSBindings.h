@@ -303,6 +303,12 @@ struct PotentialBindings {
   /// $T0 conv [$T1]
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 1> SupertypeDelay;
 
+  /// $T0's ElementTypes contains either of these bind constraints:
+  ///
+  /// $T0.Element bind X
+  /// X bind $T0.Element
+  llvm::SmallVector<Constraint *, 1> ElementTypes;
+
   /// The set of protocol conformance requirements imposed on this type variable.
   llvm::SmallVector<Constraint *, 4> Protocols;
 

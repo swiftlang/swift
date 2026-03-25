@@ -53,6 +53,41 @@ static bool isDirectRequirement(ConstraintSystem &cs,
   return false;
 }
 
+/// Check for a situation like this:
+///
+/// Array<(Int, String)> conv $T0
+/// $T0.Element bind (x: Int, y: String)
+///
+/// Or this:
+///
+/// Set<Int> conv $T0
+/// $T0.Element bind AnyHashable
+///
+/// When the element type of the collection is fixed via a bind constraint
+/// in this way, we must replace the element type of the collection with a
+/// fresh type variable, eg:
+///
+/// Array<$T1> conv $T0
+///
+/// Once we attempt this binding, the element type constraint can then be
+/// simplified immediately:
+///
+/// $T1 bind (x: Int, y: String)
+static Type applyElementTypeToBinding(Type type) {
+  auto *boundTy = type->getAs<BoundGenericStructType>();
+  if (!boundTy)
+    return type;
+
+  auto &ctx = boundTy->getASTContext();
+  auto *decl = boundTy->getDecl();
+  if (decl == ctx.getArrayDecl())
+    return ArraySliceType::get(ctx.TheJoinType);
+  else if (decl == ctx.getSetDecl())
+    return BoundGenericType::get(decl, /*parent=*/Type(), {ctx.TheJoinType});
+
+  return type;
+}
+
 BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
     : CS(CS), TypeVar(TypeVar), Info(info) {
@@ -80,8 +115,17 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
   }
 
   // Now, the subtype and supertype bindings.
-  for (const auto &binding : info.Bindings)
+  for (const auto &binding : info.Bindings) {
+    if (!Info.ElementTypes.empty() &&
+        (binding.Kind == AllowedBindingKind::Subtypes ||
+         binding.Kind == AllowedBindingKind::Supertypes)) {
+      addBinding(binding.withType(
+        applyElementTypeToBinding(binding.BindingType)));
+      continue;
+    }
+
     addBinding(binding);
+  }
 
   // Finally, the defaults.
   for (auto *constraint : info.Defaults) {
@@ -2632,6 +2676,35 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
   return bindings;
 }
 
+/// Check whether this is a dependent member type T.[P]Element where P is some
+/// protocol inheriting from Sequence, or T.[P]ArrayLiteralElement where P is
+/// some protocol inheriting from ExpressibleByArrayLiteral.
+static bool isInterestingElementType(Type type, TypeVariableType *forBase) {
+  auto *memberTy = type->getAs<DependentMemberType>();
+  if (!memberTy)
+    return false;
+
+  if (memberTy->getBase()->getAs<TypeVariableType>() != forBase)
+    return false;
+
+  auto *assocTypeDecl = memberTy->getAssocType();
+  if (!assocTypeDecl)
+    return false;
+
+  auto &ctx = memberTy->getASTContext();
+  KnownProtocolKind kind;
+  if (assocTypeDecl->getName() == ctx.Id_Element) {
+    kind = KnownProtocolKind::Sequence;
+  } else if (assocTypeDecl->getName() == ctx.Id_ArrayLiteralElement) {
+    kind = KnownProtocolKind::ExpressibleByArrayLiteral;
+  } else {
+    return false;
+  }
+
+  auto *proto = assocTypeDecl->getAssociatedTypeAnchor()->getProtocol();
+  return proto->isSpecificProtocol(kind);
+}
+
 std::optional<PotentialBinding>
 PotentialBindings::inferFromRelational(Constraint *constraint) {
   ASSERT(TypeVar);
@@ -2717,6 +2790,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     if (!firstTypeVar && !secondTypeVar) {
       // This constraint will simplify into smaller constraints.
       // Don't record anything.
+      DEBUG_BAILOUT("Neither side has a type variable root");
       return std::nullopt;
     }
 
@@ -2760,6 +2834,21 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
         recordSubtypeDelay(secondTypeVar, constraint);
       if (result.contravariant.count(TypeVar))
         recordSupertypeDelay(secondTypeVar, constraint);
+    }
+
+    // If we have a constraint that looks like this, record an element type:
+    //
+    // $T0.Element bind X
+    if (firstTypeVar == TypeVar &&
+        isInterestingElementType(first, TypeVar)) {
+      recordElementType(constraint);
+
+    // And the other direction:
+    //
+    // X bind $T0.Element
+    } else if (secondTypeVar == TypeVar &&
+               isInterestingElementType(second, TypeVar)) {
+      recordElementType(constraint);
     }
 
     return std::nullopt;
@@ -3260,7 +3349,8 @@ void PotentialBindings::retract(Constraint *constraint) {
                  << AdjacentVars.size() << " " << SubtypeDelay.size() << " "
                  << SupertypeDelay.size() << " " << DelayedBy.size() << " "
                  << LValueOf.size() << " " << SubtypeOf.size() << " "
-                 << SupertypeOf.size() << " " << EquivalentTo.size() << "\n");
+                 << SupertypeOf.size() << " " << EquivalentTo.size() << " "
+                 << ElementTypes.size() << "\n");
 
   Bindings.erase(
       llvm::remove_if(Bindings,
@@ -3336,6 +3426,7 @@ void PotentialBindings::reset() {
     ASSERT(SubtypeDelay.empty());
     ASSERT(SupertypeOf.empty());
     ASSERT(SupertypeDelay.empty());
+    ASSERT(ElementTypes.empty());
   }
 
   TypeVar = nullptr;
@@ -3344,11 +3435,13 @@ void PotentialBindings::reset() {
 
 void PotentialBindings::printVars(llvm::raw_ostream &out, unsigned indent,
                                   bool showVia) const {
+  auto PO = PrintOptions::forDebugging();
+
   auto printVars = [&](ArrayRef<std::pair<TypeVariableType *, Constraint *>> pairs) {
     interleave(
         pairs,
         [&](std::pair<TypeVariableType *, Constraint *> pair) {
-          out << pair.first->getString(PrintOptions::forDebugging());
+          out << pair.first->getString(PO);
           if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
             out << " (fixed)";
           if (showVia) {
@@ -3393,6 +3486,20 @@ void PotentialBindings::printVars(llvm::raw_ostream &out, unsigned indent,
   if (!SubtypeDelay.empty()) {
     out << "[subtype delayed by: ";
     printVars(SubtypeDelay);
+    out << "] ";
+  }
+
+  if (!ElementTypes.empty()) {
+    out << "[element types: ";
+    interleave(
+        ElementTypes,
+        [&](Constraint *constraint) {
+          if (constraint->getFirstType()->getDependentMemberRoot()->isEqual(TypeVar))
+            out << constraint->getSecondType().getString(PO);
+          else
+            out << constraint->getFirstType().getString(PO);
+        },
+        [&out]() { out << ", "; });
     out << "] ";
   }
 }
