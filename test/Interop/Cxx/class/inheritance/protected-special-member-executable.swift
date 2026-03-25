@@ -2,9 +2,8 @@
 //
 // REQUIRES: executable_test
 //
-// REQUIRES: rdar168302720
-// Fails on Windows：  https://github.com/swiftlang/swift/issues/67288
-// Fails on non-macOS: https://github.com/swiftlang/swift/issues/86426
+// UNSUPPORTED: OS=windows-msvc
+// Fails on Windows due to https://github.com/swiftlang/swift/issues/67288
 
 import StdlibUnittest
 import ProtectedSpecialMember
@@ -38,26 +37,31 @@ ProtectedSpecialMemberTestSuite.test("class that privately inherits protected de
 
 ProtectedSpecialMemberTestSuite.test("class that inherits protected copy constructor") {
   let c1 = InheritsProtectedCopy()
-  let c2 = c1
+  var c2 = c1
+  c2.fakeMutation() // ensure c2 is a distinct copy
+
   expectEqual(111, c1.getFromBase())
   expectEqual(112, c2.getFromBase())
 
   var c3 = InheritsProtectedCopy()
   c3.setFromBase(66)
-  let c4 = c3
+  var c4 = c3
+  c4.fakeMutation() // ensure c4 is a distinct copy
   expectEqual(66, c3.getFromBase())
   expectEqual(67, c4.getFromBase())
 }
 
 ProtectedSpecialMemberTestSuite.test("classes that privately inherit protected copy constructor") {
   let c1 = PrivatelyInheritsProtectedCopy()
-  let c2 = c1
+  var c2 = c1
+  c2.fakeMutation()
   expectEqual(111, c1.getFromBase())
   expectEqual(112, c2.getFromBase())
 
   var c3 = PrivatelyInheritsProtectedCopy()
   c3.setFromBase(66)
-  let c4 = c3
+  var c4 = c3
+  c4.fakeMutation()
   expectEqual(66, c3.getFromBase())
   expectEqual(67, c4.getFromBase())
 
@@ -71,10 +75,15 @@ ProtectedSpecialMemberTestSuite.test("class that contains vector of class that i
   expectEqual(201, v1.get(1))
   expectEqual(301, v1.get(2))
 
-  let v2 = v1 // Invokes copy ctor of std::vector<InheritsProtectedCopy>,
+  var v2 = v1 // Invokes copy ctor of std::vector<InheritsProtectedCopy>,
               // which invokes copy ctor of InheritsProtectedCopy elements,
               // thus incrementing each value
 
+  v2.fakeMutation() // ensure v2 is a distinct copy
+
+  expectEqual(101, v1.get(0))
+  expectEqual(201, v1.get(1))
+  expectEqual(301, v1.get(2))
   expectEqual(102, v2.get(0))
   expectEqual(202, v2.get(1))
   expectEqual(302, v2.get(2))
@@ -99,7 +108,8 @@ ProtectedSpecialMemberTestSuite.test("class with public move and protected copy"
 ProtectedSpecialMemberTestSuite.test("class that inherits public move and protected copy") {
   var c3 = InheritsProtectedCopyWithMove()
   c3.setFromBase(66)
-  let c4 = c3
+  var c4 = c3
+  c4.fakeMutation()
   expectEqual(66, c3.getFromBase())
   expectEqual(67, c4.getFromBase())
 }

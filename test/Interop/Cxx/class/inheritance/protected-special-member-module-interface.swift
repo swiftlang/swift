@@ -20,12 +20,14 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func getFromBase() -> Int32
 // CHECK-NEXT:   mutating func setFromBase(_ x: Int32)
+// CHECK-NEXT:   mutating func fakeMutation()
 // CHECK-NEXT: }
 
 // CHECK:      struct PrivatelyInheritsProtectedCopy {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func getFromBase() -> Int32
 // CHECK-NEXT:   mutating func setFromBase(_ x: Int32)
+// CHECK-NEXT:   mutating func fakeMutation()
 // CHECK-NEXT: }
 
 // CHECK:      struct PrivatelyInheritsPrivatelyInheritsProtectedCopy {
@@ -36,6 +38,7 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func getFromBase() -> Int32
 // CHECK-NEXT:   mutating func setFromBase(_ x: Int32)
+// CHECK-NEXT:   mutating func fakeMutation()
 // CHECK-NEXT: }
 
 // CHECK:      struct ProtectedCopyWithMove : ~Copyable {
@@ -48,4 +51,5 @@
 // CHECK-NEXT:   var fromBase: Int32
 // CHECK-NEXT:   func getFromBase() -> Int32
 // CHECK-NEXT:   mutating func setFromBase(_ x: Int32)
+// CHECK-NEXT:   mutating func fakeMutation()
 // CHECK-NEXT: }

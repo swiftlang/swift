@@ -38,20 +38,27 @@ struct ProtectedDtorBaseAndField : ProtectedDtor {
 struct ProtectedCopy {
   int fromBase = 111;
   ProtectedCopy() = default;
+
 protected:
   // NOTE: the copy has an incremented fromBase, so we can check at runtime that
   // the correct custom copy operation took place
   ProtectedCopy(const ProtectedCopy &c) : fromBase{c.fromBase + 1} {}
 };
 
-struct InheritsProtectedCopy : ProtectedCopy {
+struct InheritsProtectedCopy : public ProtectedCopy {
   int getFromBase(void) const { return fromBase; }
   void setFromBase(int x) { fromBase = x; }
+
+  // This is used to fake out the Swift optimizer to ensure that copies aren't elided.
+  void fakeMutation() {}
 };
 
 struct PrivatelyInheritsProtectedCopy : private ProtectedCopy {
   int getFromBase(void) const { return fromBase; }
   void setFromBase(int x) { fromBase = x; }
+
+  // This is used to fake out the Swift optimizer to ensure that copies aren't elided.
+  void fakeMutation() {}
 };
 
 struct PrivatelyInheritsPrivatelyInheritsProtectedCopy : private PrivatelyInheritsProtectedCopy {};
@@ -82,6 +89,9 @@ struct FieldVecOfInheritsProtectedCopy {
     v[2].setFromBase(z);
   }
   int get(unsigned idx) const { return v[idx].getFromBase(); }
+
+  // This is used to fake out the Swift optimizer to ensure that copies aren't elided.
+  void fakeMutation() {}
 };
 
 // suppressed-note@+1 {{record 'ProtectedMove' is not automatically available}}
@@ -95,6 +105,9 @@ protected:
 struct InheritsProtectedMove : ProtectedMove {
   int getFromBase(void) const { return fromBase; }
   void setFromBase(int x) { fromBase = x; }
+
+  // This is used to fake out the Swift optimizer to ensure that copies aren't elided.
+  void fakeMutation() {}
 };
 
 using VecOfProtectedMove = std::vector<ProtectedMove>;
@@ -108,6 +121,7 @@ struct ProtectedCopyWithMove {
   int fromBase = 111;
   ProtectedCopyWithMove() = default;
   ProtectedCopyWithMove(ProtectedCopyWithMove &&) = default;
+
 protected:
   // NOTE: the copy has an incremented fromBase, so we can check at runtime that
   // the correct custom copy operation took place
@@ -117,6 +131,9 @@ protected:
 struct InheritsProtectedCopyWithMove : ProtectedCopyWithMove {
   int getFromBase(void) const { return fromBase; }
   void setFromBase(int x) { fromBase = x; }
+
+  // This is used to fake out the Swift optimizer to ensure that copies aren't elided.
+  void fakeMutation() {}
 };
 
 struct ProtectedCopyWithMoveField {
