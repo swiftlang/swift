@@ -12,21 +12,21 @@
 
 #include "ScanFixture.h"
 #include "swift-c/DependencyScan/DependencyScan.h"
-#include "swift/DependencyScan/StringUtils.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Option/Options.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include <vector>
-#include <unordered_set>
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/Path.h"
 #include "gtest/gtest.h"
+#include <string>
+#include <vector>
 
 using namespace swift;
 using namespace swift::unittest;
 
 TEST_F(ScanTest, TestTargetInfoQuery) {
   std::vector<std::string> CommandStrArr = {
-    std::string("-print-target-info"),
-    std::string("-target"), std::string("x86_64-apple-macosx12.0")};
+      std::string("-print-target-info"), std::string("-target"),
+      std::string("x86_64-apple-macosx12.0")};
   // On Windows we need to add an extra escape for path separator characters because otherwise
   // the command line tokenizer will treat them as escape characters.
   for (size_t i = 0; i < CommandStrArr.size(); ++i) {
@@ -36,21 +36,25 @@ TEST_F(ScanTest, TestTargetInfoQuery) {
   for (auto &str : CommandStrArr)
     Compilation.push_back(str.c_str());
 
-  SmallString<128> pathRoot("base");
-  SmallString<128> compilerPath(pathRoot);
+  llvm::SmallString<128> pathRoot("base");
+  llvm::SmallString<128> compilerPath(pathRoot);
   llvm::sys::path::append(compilerPath, "foo", "bar", "bin", "swift-frontend");
-  SmallString<128> relativeLibPath(pathRoot);
-  llvm::sys::path::append(relativeLibPath, "foo", "bar", "lib", "swift");;
+  llvm::SmallString<128> relativeLibPath(pathRoot);
+  llvm::sys::path::append(relativeLibPath, "foo", "bar", "lib", "swift");
 
-  auto targetInfo = swift::dependencies::getTargetInfo(Compilation, compilerPath.c_str());
-  if (targetInfo.getError()) {
-    llvm::errs() << "For compilation: ";
-    for (auto &str : Compilation)
-      llvm::errs() << str << " ";
-    llvm::errs() << "\nERROR:" << targetInfo.getError().message() << "\n";
-  }
+  auto invocation = swiftscan_scan_invocation_create();
+  swiftscan_scan_invocation_set_working_directory(invocation, "");
+  swiftscan_scan_invocation_set_argv(invocation,
+                                     static_cast<int>(Compilation.size()),
+                                     (const char **)Compilation.data());
+  auto targetInfo =
+      swiftscan_compiler_target_info_query_v2(invocation, compilerPath.c_str());
+  swiftscan_scan_invocation_dispose(invocation);
 
-  auto targetInfoStr = std::string(swift::c_string_utils::get_C_string(targetInfo.get()));
+  auto targetInfoStr = std::string(static_cast<const char *>(targetInfo.data),
+                                   targetInfo.length);
+  ASSERT_FALSE(targetInfoStr.empty());
+
   EXPECT_NE(targetInfoStr.find("\"triple\": \"x86_64-apple-macosx12.0\""), std::string::npos);
   EXPECT_NE(targetInfoStr.find("\"librariesRequireRPath\": true"), std::string::npos);
 

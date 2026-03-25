@@ -11,4 +11,5 @@ target_link_libraries(swiftScanTests
     libSwiftScan)
 
 target_compile_definitions(swiftScanTests PRIVATE
-  SWIFTLIB_DIR=\"${SWIFTLIB_DIR}\")
+  SWIFTLIB_DIR="${SWIFTLIB_DIR}"
+  SWIFTLIB_PLATFORM_SUBDIR="${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")

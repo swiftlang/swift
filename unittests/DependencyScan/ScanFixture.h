@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift-c/DependencyScan/DependencyScan.h"
-#include "swift/DependencyScan/DependencyScanningTool.h"
 #include "gtest/gtest.h"
 #include <string>
 
@@ -24,14 +23,18 @@ public:
   ~ScanTest();
 
 protected:
-  // The tool used to execute tests' scanning queries
-  swift::dependencies::DependencyScanningTool ScannerTool;
+  // The scanner instance used to execute tests' scanning queries
+  swiftscan_scanner_t Scanner;
 
   // Test workspace directory
   llvm::SmallString<256> TemporaryTestWorkspace;
 
   // Path to where the Swift standard library can be found
   llvm::SmallString<128> StdLibDir;
+
+  // Helper method to perform a scan
+  swiftscan_dependency_graph_t
+  performScan(const std::vector<const char *> &Command);
 };
 
 } // end namespace unittest

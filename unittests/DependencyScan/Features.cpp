@@ -15,9 +15,10 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Option/Options.h"
 #include "llvm/ADT/StringRef.h"
-#include <vector>
-#include <unordered_set>
+#include "llvm/Option/Option.h"
 #include "gtest/gtest.h"
+#include <unordered_set>
+#include <vector>
 
 using namespace swift;
 using namespace swift::unittest;
