@@ -284,19 +284,6 @@ bool TypeVarBindingProducer::computeNext() {
       }
     }
 
-    if (getLocator()->directlyAt<ForceValueExpr>() &&
-        TypeVar->getImpl().canBindToLValue() &&
-        !binding.BindingType->is<LValueType>()) {
-      // Result of force unwrap is always connected to its base
-      // optional type via `OptionalObject` constraint which
-      // preserves l-valueness, so in case where object type got
-      // inferred before optional type (because it got the
-      // type from context e.g. parameter type of a function call),
-      // we need to test type with and without l-value after
-      // delaying bindings for as long as possible.
-      addNewBinding(binding.withType(LValueType::get(binding.BindingType)));
-    }
-
     // There is a tailored fix for optional key path root references,
     // let's not create ambiguity by attempting unwrap when it's
     // not allowed.
