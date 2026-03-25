@@ -287,6 +287,48 @@ final class CowTest {
   var container = CowContainer()
 }
 
+@available(SwiftStdlib 6.2, *)
+@Observable
+final class DirtyBitContainer {
+  var observableProperty1 = 42
+  var observableProperty2: NotEquatable?
+  @ObservationIgnored var changed = 0
+  
+  init(isolation: isolated any Actor = #isolation) {
+    self.observationTask = observeAndReconfigureContentChanges()
+  }
+  var observationTask: Task<Void, Never>?
+  deinit {
+    observationTask?.cancel()
+  }
+  
+  private func observeAndReconfigureContentChanges(isolation: isolated any Actor = #isolation) -> Task<Void, Never> {
+    let observationsAsyncSequence = Observations.untilFinished { [weak self] in
+      _ = isolation // establish isolation
+
+      if let strongSelf = self {
+        return .next(strongSelf.observableProperty1)
+      } else {
+        return .finish
+      }
+    }
+
+    return Task { [weak self] in
+      _ = isolation // establish isolation
+
+      for await _ in observationsAsyncSequence {
+        guard let strongSelf = self else { break }
+        strongSelf.observableProperty2 = nil
+        strongSelf.changed += 1
+      }
+    }
+  }
+}
+
+struct NotEquatable {
+}
+
+
 @main
 struct Validator {
   @MainActor
@@ -602,6 +644,13 @@ struct Validator {
       test.firstName = "e"
       try! await Task.sleep(for: .seconds(0.1))
       expectEqual(changed.state, 3)
+    }
+
+    suite.test("dirty bit tracking") {
+      guard #available(SwiftStdlib 6.2, *) else { return }
+      let container = DirtyBitContainer()
+      try? await Task.sleep(for: .seconds(0.1))
+      expectEqual(container.changed, 1)
     }
 
     await runAllTestsAsync()
