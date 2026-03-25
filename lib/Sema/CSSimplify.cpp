@@ -1735,65 +1735,28 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         }
       }
 
-      auto shouldOpenExistentialArgument =
-          [&]() -> std::optional<std::pair<TypeVariableType *, Type>> {
-        Type argTypeForOpening = argTy;
-        // 1) First try: the normal path.
-        auto opened = shouldOpenExistentialCallArgument(
-            callee, paramIdx, paramTy, argTypeForOpening, argExpr, cs);
-
-        if (opened)
-          return opened;
-
-        // 2) If opening failed, consider ForceOptional ONLY if fixes are
-        // enabled
-        //    and arg is Optional whose object is an existential any ... with
-        //    protocols and not class-constrained.
-        if (!cs.shouldAttemptFixes())
-          return std::nullopt;
-
-        if (Type optObject = argTy->getOptionalObjectType()) {
-          Type unwrapped = optObject->lookThroughAllOptionalTypes();
-          // ignore Any
-          if (unwrapped->isAny())
-            return std::nullopt;
-
-          if (!unwrapped->isAnyExistentialType())
-            return std::nullopt;
-
-          auto layout = unwrapped->getExistentialLayout();
-          if (layout.requiresClass())
-            return std::nullopt;
-
-          auto openedAfterPeel = shouldOpenExistentialCallArgument(
-              callee, paramIdx, paramTy, unwrapped, argExpr, cs);
-          if (!openedAfterPeel || !paramTy->getOptionalObjectType())
-            return std::nullopt;
-
-          cs.recordFix(ForceOptional::create(cs, argTy, unwrapped,
-                                             cs.getConstraintLocator(loc)));
-          return openedAfterPeel;
-        }
-        return std::nullopt;
-      };
-
-      if (auto typeVarAndBindingTy = shouldOpenExistentialArgument()) {
+      // If the argument is an existential type and the parameter is generic,
+      // consider opening the existential type.
+      if (auto typeVarAndBindingTy = shouldOpenExistentialCallArgument(
+              callee, paramIdx, paramTy, argTy, argExpr, cs)) {
+        // My kingdom for a decent "if let" in C++.
         TypeVariableType *typeVar;
         Type bindingTy;
         std::tie(typeVar, bindingTy) = *typeVarAndBindingTy;
 
-        ExistentialArchetypeType *openedArchetype = nullptr;
+        ExistentialArchetypeType *openedArchetype;
 
         // Open the argument type.
         argTy = argTy.transformRec([&](TypeBase *t) -> std::optional<Type> {
-          if (!t->isAnyExistentialType())
-            return std::nullopt;
+          if (t->isAnyExistentialType()) {
+            Type openedTy;
+            std::tie(openedTy, openedArchetype) =
+                cs.openAnyExistentialType(t, cs.getConstraintLocator(loc));
 
-          Type openedTy;
-          std::tie(openedTy, openedArchetype) =
-              cs.openAnyExistentialType(t, cs.getConstraintLocator(loc));
+            return openedTy;
+          }
 
-          return openedTy;
+          return std::nullopt;
         });
 
         openedExistentials.push_back({typeVar, openedArchetype});
