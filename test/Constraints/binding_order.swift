@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
-// RUN: not --crash %target-typecheck-verify-swift -verify-ignore-unrelated -DSALVAGE
 
 // The next two sets of examples cause difficulties because our
 // subtype lattice is not actually a lattice; existentials fail
@@ -74,6 +73,7 @@ do {
     uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
   // expected-error@-1 {{value of type 'Any' has no member 'name}}
   // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+  // expected-error@-3 {{tuple type '(_, Any)' is not convertible to tuple type '(String, (any Command)?)'}}
 
   let _: [Int: any Command.Type] = Dictionary(
     uniqueKeysWithValues: [Undo.self, Cut.self, Copy.self, Paste.self].map { ($0.id, $0) })
@@ -108,9 +108,7 @@ do {
     let _: [any Command] = [a, b].flatMap { [$0] }
     // expected-error@-1 {{cannot convert value of type 'Super' to expected element type 'any Command'}}
 
-    #if SALVAGE
     let _: [any Command] = [[a], [b]].flatMap { $0 }
-    #endif
   }
 }
 

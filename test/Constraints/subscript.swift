@@ -204,7 +204,7 @@ func test_generic_subscript_requirements_mismatch_diagnostics() {
   _ = s[42] // expected-error {{subscript 'subscript(_:)' requires that 'Int' conform to 'StringProtocol'}}
 
   var arr: [Int] = []
-  let _: [String] = s[v: arr] // expected-error {{cannot convert value of type '[Int]' to expected argument type '[String]'}}
+  let _: [String] = s[v: arr] // expected-error {{cannot assign value of type '[Int]' to type '[String]'}}
   // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
 
   s[number: ["hello"]] // expected-error {{subscript 'subscript(number:)' requires that 'String' conform to 'BinaryInteger'}}
