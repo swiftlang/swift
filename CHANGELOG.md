@@ -204,6 +204,19 @@
   }
   ```
 
+## Swift 6.3
+
+* [SE-0489][]:
+  When you encounter errors while encoding or decoding `Codable` types, the resulting error messages are now more human-readable thanks to improved `debugDescription` output.
+
+  Before:
+
+  `typeMismatch(Swift.String, Swift.DecodingError.Context(codingPath: [_CodingKey(stringValue: "Index 0", intValue: 0), CodingKeys(stringValue: "address", intValue: nil), CodingKeys(stringValue: "city", intValue: nil), CodingKeys(stringValue: "birds", intValue: nil), _CodingKey(stringValue: "Index 1", intValue: 1), CodingKeys(stringValue: "name", intValue: nil)], debugDescription: "Expected to decode String but found number instead.", underlyingError: nil))`
+
+  After:
+
+  `DecodingError.typeMismatch: expected value of type String. Path: [0].address.city.birds[1].name. Debug description: Expected to decode String but found number instead.`
+
 * The raw span accessor properties of `Span` and `MutableSpan` (`bytes` and
   `mutableBytes`) as well as the two generic `append()` methods of
   `OutputRawSpan` are newly marked with `@unsafe`. These changes are corrections
@@ -230,19 +243,6 @@
   applies when the memory is to later be used again as `Element`. In that case,
   the non-padding bytes of `Element` must allow every bit pattern to be
   permissible in a valid value of `Element`.
-
-## Swift 6.3
-
-* [SE-0489][]:
-  When you encounter errors while encoding or decoding `Codable` types, the resulting error messages are now more human-readable thanks to improved `debugDescription` output.
-
-  Before:
-
-  `typeMismatch(Swift.String, Swift.DecodingError.Context(codingPath: [_CodingKey(stringValue: "Index 0", intValue: 0), CodingKeys(stringValue: "address", intValue: nil), CodingKeys(stringValue: "city", intValue: nil), CodingKeys(stringValue: "birds", intValue: nil), _CodingKey(stringValue: "Index 1", intValue: 1), CodingKeys(stringValue: "name", intValue: nil)], debugDescription: "Expected to decode String but found number instead.", underlyingError: nil))`
-
-  After:
-
-  `DecodingError.typeMismatch: expected value of type String. Path: [0].address.city.birds[1].name. Debug description: Expected to decode String but found number instead.`
 
 * [SE-0491][]:
   You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
