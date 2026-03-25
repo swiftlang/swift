@@ -303,6 +303,12 @@ struct PotentialBindings {
   /// $T0 conv [$T1]
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 1> SupertypeDelay;
 
+  /// $T0's ElementTypes contains either of these bind constraints:
+  ///
+  /// $T0.Element bind X
+  /// X bind $T0.Element
+  llvm::SmallVector<std::pair<Type, Constraint *>, 1> ElementTypes;
+
   /// The set of protocol conformance requirements imposed on this type variable.
   llvm::SmallVector<Constraint *, 4> Protocols;
 
@@ -315,10 +321,12 @@ struct PotentialBindings {
 
   ASTNode AssociatedCodeCompletionToken = ASTNode();
 
-#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+#define BINDING_CONSTRAINT_ADDITION(PropertyName, Storage)                      \
   void record##PropertyName(Constraint *constraint);
-#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+#define BINDING_VAR_RELATION_ADDITION(RelationName, Storage)                    \
   void record##RelationName(TypeVariableType *typeVar, Constraint *originator);
+#define BINDING_TYPE_RELATION_ADDITION(RelationName, Storage)                   \
+  void record##RelationName(Type type, Constraint *originator);
 #include "swift/Sema/CSTrail.def"
 
   PotentialBindings(ConstraintSystem &cs, TypeVariableType *typeVar)
