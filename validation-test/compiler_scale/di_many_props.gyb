@@ -1,0 +1,14 @@
+// RUN: %scale-test --invert-result --begin 1 --end 10 --step 1 --select NumInstScansDuringLivenessQueries -Xfrontend=-emit-sil %s
+// REQUIRES: asserts
+
+class C${N} {
+% for i in range(N):
+    var prop${i}: Int
+% end
+
+    init() {
+        % for i in range(N):
+        self.prop${i} = 0
+        % end
+    }
+}
