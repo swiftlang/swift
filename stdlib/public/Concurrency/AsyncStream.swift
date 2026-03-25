@@ -245,6 +245,10 @@ public struct AsyncStream<Element> {
       self.storage = storage
       self.produce = produce
     }
+
+    deinit {
+      storage?.terminate(.cancelled)
+    }
   }
 
   let context: _Context
