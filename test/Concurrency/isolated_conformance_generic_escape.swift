@@ -58,8 +58,15 @@ nonisolated(nonsending) func nonsendingForwardToConcurrent(_ p: MyClass) async {
 // When the conformance is abstract (generic), we reject it because the concrete
 // conformance may be isolated.
 nonisolated(nonsending) func nonsendingForwardToConcurrentGeneric(_ p: some MyProtocol) async {
-  // expected-error@+1{{conformance of generic parameter to 'MyProtocol' may be isolated and cannot be used in nonisolated context}}
+  // expected-error@+1{{conformance of underlying type of 'some MyProtocol' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
   await callDoSomethingConcurrent(p)
+}
+
+struct Container<T: MyProtocol> {
+  nonisolated(nonsending) func nonsendingForwardToConcurrentGeneric(_ p: T) async {
+    // expected-error@+1{{conformance of 'T' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
+    await callDoSomethingConcurrent(p)
+  }
 }
 
 // Sendable protocols cannot have isolated conformances, so forwarding is safe.
@@ -129,6 +136,13 @@ func callDoSomethingFromOtherActor(_ p: some MyProtocol) async {
   p.doSomething()
 }
 
+@MainActor
+func test1() async {
+  // Different global actor callee — not allowed, same as hopping to global executor, we don't allow ANY other isolation
+  // expected-error@+1{{main actor-isolated conformance of 'MyClass' to 'MyProtocol' cannot be used in global actor 'OtherActor'-isolated context}}
+  await callDoSomethingFromOtherActor(MyClass())
+}
+
 // ==== -----------------------------------------------------------------------
 // MARK: @MainActor callee — same isolation domain, ok
 
@@ -153,10 +167,6 @@ func test() async {
   // caught at the forwarding call site inside the func, not here
   await nonsendingForwardToConcurrent(MyClass())
   await nonsendingForwardToConcurrentGeneric(MyClass())
-
-  // Different global actor callee — not allowed, same as hopping to global executor, we don't allow ANY other isolation
-  // expected-error@+1{{main actor-isolated conformance of 'MyClass' to 'MyProtocol' cannot be used in global actor 'OtherActor'-isolated context}}
-  await callDoSomethingFromOtherActor(MyClass())
 
   // @MainActor callee — same caller isolation, this is allowed
   await callDoSomethingFromMainActor(MyClass())
