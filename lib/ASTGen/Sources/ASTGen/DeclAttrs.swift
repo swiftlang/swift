@@ -198,8 +198,8 @@ extension ASTGenVisitor {
         return handle(self.generateStorageRestrictionAttr(attribute: node)?.asDeclAttribute)
       case .SwiftNativeObjCRuntimeBase:
         return handle(self.generateSwiftNativeObjCRuntimeBaseAttr(attribute: node)?.asDeclAttribute)
-      case .Warn:
-        return handle(self.generateWarnAttr(attribute: node)?.asDeclAttribute)
+      case .Diagnose:
+        return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
       case .Transpose:
         return handle(self.generateTransposeAttr(attribute: node)?.asDeclAttribute)
       case .TypeEraser:
@@ -228,6 +228,9 @@ extension ASTGenVisitor {
       case nil where attrName == "_versioned":
         // TODO: Diagnose.
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .UsableFromInline))
+      case nil where attrName == "warn":
+        // TODO: Diagnose. 'warn' is renamed to 'diagnose'
+        return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
 
       // Simple attributes.
       case .AddressableSelf,
@@ -2182,9 +2185,9 @@ extension ASTGenVisitor {
   
   /// E.g.:
   ///   ```
-  ///   @warn(DiagGroupID, as: Behavior, reason: String?)
+  ///   @diagnose(DiagGroupID, as: Behavior, reason: String?)
   ///   ```
-  func generateWarnAttr(attribute node: AttributeSyntax) -> BridgedWarnAttr? {
+  func generateDiagnoseAttr(attribute node: AttributeSyntax) -> BridgedDiagnoseAttr? {
     guard let diagGroupIdentifier: swift.Identifier = self.generateWithLabeledExprListArguments(attribute: node, { args in
       self.generateConsumingAttrOption(args: &args, label: nil) { expr in
         guard let declRefExpr = expr.as(DeclReferenceExprSyntax.self) else {

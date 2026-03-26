@@ -1,7 +1,7 @@
 // REQUIRES: swift_feature_SourceWarningControl
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature SourceWarningControl -Wwarning PerformanceHints
 
-@warn(ReturnTypeImplicitCopy, as: error)
+@diagnose(ReturnTypeImplicitCopy, as: error)
 func foo() -> [Int] { // expected-error {{Performance: 'foo()' returns an array, leading to implicit copies. Consider using an 'inout' parameter instead.}}
     return [1,2,3]
 }
