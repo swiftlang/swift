@@ -2483,12 +2483,40 @@ function Build-XML2([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
+      LIBXML2_WITH_C14N = "NO";
+      LIBXML2_WITH_CATALOG = "NO";
+      LIBXML2_WITH_DEBUG = "NO";
+      LIBXML2_WITH_FTP = "NO";
+      LIBXML2_WITH_HTML = "NO";
+      LIBXML2_WITH_HTTP = "NO";
+      # NOTE(compnerd) this is technically needed for transcoding non-UTF-8 documents.
       LIBXML2_WITH_ICONV = "NO";
       LIBXML2_WITH_ICU = "NO";
+      LIBXML2_WITH_ISO8859X = "NO";
+      LIBXML2_WITH_LEGACY = "NO";
       LIBXML2_WITH_LZMA = "NO";
+      LIBXML2_WITH_MEM_DEBUG = "NO";
+      LIBXML2_WITH_MODULES = "NO";
+      LIBXML2_WITH_OUTPUT = "YES";
+      LIBXML2_WITH_PATTERN = "NO";
+      LIBXML2_WITH_PROGRAMS = "NO";
+      LIBXML2_WITH_PUSH = "YES";
       LIBXML2_WITH_PYTHON = "NO";
+      LIBXML2_WITH_READER = "NO";
+      LIBXML2_WITH_REGEXPS = "YES";
+      LIBXML2_WITH_SAX1 = "NO";
+      LIBXML2_WITH_SCHEMAS = "NO";
+      LIBXML2_WITH_SCHEMATRON = "NO";
       LIBXML2_WITH_TESTS = "NO";
+      LIBXML2_WITH_THREAD_ALLOC = "NO";
       LIBXML2_WITH_THREADS = "YES";
+      LIBXML2_WITH_TREE = "YES";
+      LIBXML2_WITH_VALID = "YES";
+      LIBXML2_WITH_WRITER = "NO";
+      LIBXML2_WITH_XINCLUDE = "NO";
+      LIBXML2_WITH_XPATH = "YES";
+      LIBXML2_WITH_XPTR = "NO";
+      LIBXML2_WITH_XPTR_LOCS = "NO";
       LIBXML2_WITH_ZLIB = "NO";
     }
 }
