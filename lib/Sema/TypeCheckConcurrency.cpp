@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckConcurrency.h"
+#include "../AST/AbstractConformance.h"
 #include "MiscDiagnostics.h"
 #include "NonisolatedNonsendingByDefaultMigration.h"
 #include "TypeCheckDistributed.h"
@@ -9079,46 +9080,39 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
   if (diagnosed)
     return diagnosed;
 
+  auto &ctx = dc->getASTContext();
+  auto *sendableMetatypeProto =
+      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+
   // Also check for abstract conformances, since if we can't prove they are nonisolated,
   // we must conservatively reject them.
-  //
-  // For protocol member calls, the Self conformance is used for witness
-  // dispatch and doesn't escape to another context, so we skip it.
-  // However, any other generic parameters on the method ARE forwarded.
   if (auto subs = declRef.getSubstitutions()) {
-    auto &ctx = dc->getASTContext();
-    auto *sendableMetatypeProto =
-        ctx.getProtocol(KnownProtocolKind::SendableMetatype);
-
-    // Determine if the callee is a protocol member, in which case
-    // the Self conformance is used for dispatch, not forwarding.
+    // For protocol member calls, the Self conformance is used for witness
+    // dispatch and doesn't escape to another context, so we skip it.
     Type selfInterfaceType;
     if (auto *calleeProto =
             declRef.getDecl()->getDeclContext()->getSelfProtocolDecl()) {
       selfInterfaceType = calleeProto->getSelfInterfaceType();
     }
 
-    auto genericSig = subs.getGenericSignature();
-    auto conformances = subs.getConformances();
-    unsigned confIdx = 0;
-    for (auto req : genericSig.getRequirements()) {
-      if (req.getKind() != RequirementKind::Conformance)
-        continue;
-
-      auto conf = conformances[confIdx++];
-
+    for (auto conf : subs.getConformances()) {
       // We're only checking abstract conformances here; concrete ones
       // were checked above already.
       if (!conf.isAbstract())
         continue;
 
+      auto *abstract = conf.getAbstract();
+      auto *proto = abstract->getProtocol();
+      Type conformingType = abstract->getType();
+
       // Skip Self conformances for protocol members — these are used
       // for witness dispatch, not forwarded to the callee body.
-      if (selfInterfaceType &&
-          req.getFirstType()->isEqual(selfInterfaceType))
-        continue;
-
-      auto *proto = conf.getProtocol();
+      if (selfInterfaceType) {
+        if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
+          if (archetype->getInterfaceType()->isEqual(selfInterfaceType))
+            continue;
+        }
+      }
 
       // Marker protocols have no requirements and can never be isolated.
       if (proto->isMarkerProtocol())
@@ -9130,27 +9124,18 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
           proto->inheritsFrom(sendableMetatypeProto))
         continue;
 
-      // Get the generic type parameter unless it's a 'some' type
+      // Get the name of the generic type parameter for the diagnostic.
+      // For opaque types ('some Protocol'), we leave the name empty so
+      // the diagnostic uses "underlying type of 'some Proto'" instead.
       Identifier genericParamName;
-      if (auto *gp = req.getFirstType()->getAs<GenericTypeParamType>()) {
-        if (auto *genericCtx =
-                dyn_cast<GenericContext>(declRef.getDecl())) {
-          if (auto *paramList = genericCtx->getGenericParams()) {
-            for (auto *paramDecl : paramList->getParams()) {
-              if (paramDecl->getDepth() == gp->getDepth() &&
-                  paramDecl->getIndex() == gp->getIndex() &&
-                  !paramDecl->isOpaqueType()) {
-                genericParamName = paramDecl->getName();
-                break;
-              }
-            }
-          }
-        }
+      if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
+        if (!archetype->getAs<OpaqueTypeArchetypeType>())
+          genericParamName = archetype->getName();
       }
 
       ctx.Diags
           .diagnose(loc, diag::isolated_conformance_may_cross_isolation,
-                    genericParamName, proto->getName(), targetIsolation)
+                    genericParamName, proto->getName().str(), targetIsolation)
           .warnUntilLanguageMode(LanguageMode::v6);
       diagnosed = true;
     }

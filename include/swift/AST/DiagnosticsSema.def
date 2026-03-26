@@ -8997,9 +8997,9 @@ GROUPED_ERROR(isolated_conformance_to_sendable_metatype,IsolatedConformances,non
     "cannot form %0 conformance of %1 to SendableMetatype-inheriting %kind2",
     (ActorIsolation, Type, const ValueDecl *))
 GROUPED_ERROR(isolated_conformance_may_cross_isolation,IsolatedConformances,none,
-    "conformance of %select{generic parameter|%0}0 to %1 may be isolated and "
-    "cannot be used in %2 context",
-    (Identifier, DeclName, ActorIsolation))
+    "conformance of %select{underlying type of 'some %1'|%0}0 to protocol "
+    "'%1' may be isolated and cannot be passed to %2 context",
+    (Identifier, StringRef, ActorIsolation))
 
 //===----------------------------------------------------------------------===//
 // MARK: @_inheritActorContext

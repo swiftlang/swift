@@ -89,7 +89,7 @@ nonisolated(nonsending) func nonsendingForwardSendableGeneric(_ p: some Sendable
 }
 
 nonisolated(nonsending) func nonsendingForwardSendableGenericComp<P: MyProtocol>(_ p: P) async { // expected-note{{consider making generic parameter 'P' conform to the 'Sendable' protocol}}
-  // expected-error@+2{{conformance of generic parameter to 'MyProtocol' may be isolated and cannot be used in nonisolated context}}
+  // expected-error@+2{{conformance of 'P' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
   // expected-error@+1{{type 'P' does not conform to the 'Sendable' protocol}}
   await callSendableProtocolComp(p)
 }
@@ -98,7 +98,7 @@ final class Caller {
   @concurrent func call(first p: some MyProtocol, second fine: String) async { p.doSomething() }
 }
 nonisolated(nonsending) func nonsendingForwardSendableGeneric(caller: Caller, _ p: some MyProtocol) async {
-  // expected-error@+1{{conformance of generic parameter to 'MyProtocol' may be isolated and cannot be used in nonisolated context}}
+  // expected-error@+1{{conformance of underlying type of 'some MyProtocol' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
   await caller.call(first: p, second: "this is fine")
 }
 
@@ -109,18 +109,18 @@ func callDoSomethingConcurrentExplicit<ItsMe: MyProtocol>(_ p: ItsMe) async {
 }
 
 nonisolated(nonsending) func nonsendingForwardExplicitGeneric<TheProblemIsNotHere: MyProtocol>(_ p: TheProblemIsNotHere) async {
-  // expected-error@+1{{conformance of 'ItsMe' to 'MyProtocol' may be isolated and cannot be used in nonisolated context}}
+  // expected-error@+1{{conformance of 'TheProblemIsNotHere' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
   await callDoSomethingConcurrentExplicit(p)
 }
 
 @concurrent func nonsendingForwardSendableGeneric(_ p: some MyProtocol) async {
-  await p.doSomethingOnMainActor() // this explicitly hops to MainActor and is fine
+  await p.doSomethingOnMainActor() // ok: requirement is @MainActor, hop is explicit
 }
 
 // @MainActor forwarding generic to @concurrent — same issue, rejected.
 @MainActor
 func mainActorForwardToConcurrentGeneric(_ p: some MyProtocol) async {
-  // expected-error@+1{{conformance of generic parameter to 'MyProtocol' may be isolated and cannot be used in nonisolated context}}
+  // expected-error@+1{{conformance of underlying type of 'some MyProtocol' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
   await callDoSomethingConcurrent(p)
 }
 
