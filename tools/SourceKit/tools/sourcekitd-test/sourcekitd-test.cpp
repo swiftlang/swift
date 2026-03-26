@@ -269,10 +269,21 @@ static void skt_main(skt_args *args) {
     llvm::SmallString<256> tmpDir;
     auto errCode = llvm::sys::fs::createUniqueDirectory("sourcekitd-test-cwd",
                                                         tmpDir);
-    assert(!errCode && "Failed to create temporary dir for sourcekitd-test");
+    if (errCode) {
+      llvm::report_fatal_error(
+          llvm::Twine("Failed to create temporary dir for sourcekitd-test: ") +
+          errCode.message());
+    }
     errCode = realFS->getRealPath(tmpDir, tmpWorkingDir);
-    assert(!errCode && !tmpWorkingDir.empty() &&
-           "Failed to resolve temporary dir real path");
+    if (errCode) {
+      llvm::report_fatal_error(
+          llvm::Twine("Failed to resolve temporary dir real path: ") +
+          errCode.message());
+    }
+    if (tmpWorkingDir.empty()) {
+      llvm::report_fatal_error(
+          "Failed to resolve temporary dir real path: empty path");
+    }
     realFS->setCurrentWorkingDirectory(tmpWorkingDir);
   }
   SWIFT_DEFER {
