@@ -2304,6 +2304,8 @@ static ValueDecl *getDistributedActorAsAnyActor(ASTContext &ctx, Identifier id) 
   BuiltinFunctionBuilder builder(ctx);
   auto *distributedActorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor);
   auto *actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+  if (!distributedActorProto || !actorProto)
+    return nullptr;
 
   // Create type parameters and add conformance constraints.
   auto actorParam = makeGenericParam();
