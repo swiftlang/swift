@@ -402,6 +402,25 @@ func test_global_actor_mismatch() {
   func g<T> ( _ fn: @escaping @GA () -> T) {
     let _: @MainActor () -> T = fn // expected-error{{cannot convert value actor-isolated to 'GA' to specified type actor-isolated to 'MainActor'}}
   }
+
+  func testAsync<T>(_: @GA () async -> T) {}
+
+  testAsync { @MainActor in // expected-error {{cannot convert value actor-isolated to 'MainActor' to expected argument type actor-isolated to 'GA'}}
+  }
+
+  testAsync { @MainActor () async -> Int in // expected-error {{cannot convert value actor-isolated to 'MainActor' to expected argument type actor-isolated to 'GA'}}
+    42
+  }
+
+  actor A {
+    func test() {
+      testAsync { @MainActor [self] in // expected-error {{cannot convert value actor-isolated to 'MainActor' to expected argument type actor-isolated to 'GA'}}
+        await doSomething()
+      }
+    }
+
+    func doSomething() async {}
+  }
 }
 
 struct GlobalType {}
