@@ -822,19 +822,24 @@ func _embeddedReportExclusivityViolation(
   newAction: Access.Action, newPC: UnsafeRawPointer?,
   pointer: UnsafeRawPointer
 ) {
-  print("Simultaneous access to 0x", terminator: "")
-  printAsHex(Int(bitPattern: pointer), terminator: "")
-  print(", but modification requires exclusive access")
+  if _isDebugAssertConfiguration() {
+    print("Simultaneous access to 0x", terminator: "")
+    printAsHex(Int(bitPattern: pointer), terminator: "")
+    print(", but modification requires exclusive access")
 
-  print("Previous access (a ", terminator: "")
-  oldAction.printName()
-  print(") started at 0x", terminator: "")
-  printAsHex(Int(bitPattern: oldPC))
+    print("Previous access (a ", terminator: "")
+    oldAction.printName()
+    print(") started at 0x", terminator: "")
+    printAsHex(Int(bitPattern: oldPC))
 
-  print("Current access (a ", terminator: "")
-  newAction.printName()
-  print(") started at 0x", terminator: "")
-  printAsHex(Int(bitPattern: newPC))
+    print("Current access (a ", terminator: "")
+    newAction.printName()
+    print(") started at 0x", terminator: "")
+    printAsHex(Int(bitPattern: newPC))
+  }
+  Builtin.condfail_message(
+    true._value, StaticString("dynamic exclusivity violation").unsafeRawPointer)
+  Builtin.int_trap()
 }
 
 // CXX Exception Personality
