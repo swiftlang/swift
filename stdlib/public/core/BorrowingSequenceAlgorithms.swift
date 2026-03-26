@@ -606,6 +606,52 @@ extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyab
   }
 }
 
+//===----------------------------------------------------------------------===//
+// prefix(_ count:)
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 6.4, *)
+public struct PrefixBorrowingIterator<Base: BorrowingIteratorProtocol>: BorrowingIteratorProtocol, ~Copyable, ~Escapable
+  where Base: ~Copyable & ~Escapable, Base.Element: ~Copyable
+{
+  public typealias Element = Base.Element
+  
+  var base: Base
+  var remaining: Int
+
+  @_lifetime(copy base)
+  init(_ base: consuming Base, count: Int) {
+    self.base = base
+    self.remaining = count
+  }
+  
+  @_lifetime(&self)
+  public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
+    if remaining == 0 {
+      return Span()
+    }
+    
+    let span = base.nextSpan(maximumCount: remaining)
+    remaining -= span.count
+    if span.count == 0 {
+      remaining = 0
+    }
+    return span
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element: ~Copyable {
+  @_lifetime(copy self)
+  public consuming func prefix(_ count: Int) -> PrefixBorrowingIterator<Self> {
+    .init(self, count: count)
+  }
+}
+
+
+//===----------------------------------------------------------------------===//
+// prefix(while:)
+//===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.4, *)
 public struct PrefixWhileBorrowingIterator<Base: BorrowingIteratorProtocol>: BorrowingIteratorProtocol, ~Copyable, ~Escapable
@@ -662,62 +708,62 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
 //
 
 
-
-@available(SwiftStdlib 6.4, *)
-public struct PrefixWhileBorrowingSequence<Base: BorrowingSequence>: BorrowingSequence, ~Copyable, ~Escapable
-  where Base: ~Copyable /* & ~Escapable */, Base.Element: ~Copyable
-{
-  public typealias Element = Base.Element
-  
-  var base: Borrow<Base>
-  var predicate: (borrowing Base.Element) -> Bool
-  
-  @_lifetime(borrow base)
-  init(_ base: borrowing Base, predicate: @escaping (borrowing Base.Element) -> Bool) {
-    self.base = Borrow(base)
-    self.predicate = predicate
-  }
-  
-  @_lifetime(borrow self)
-  public func makeBorrowingIterator() -> BorrowingIterator {
-    BorrowingIterator(
-      iterator: base.value.makeBorrowingIterator(),
-      predicate: predicate)
-  }
-  
-  public struct BorrowingIterator: BorrowingIteratorProtocol, ~Copyable, ~Escapable {
-    var iterator: Base.BorrowingIterator
-    var predicate: (borrowing Base.Element) -> Bool
-    var foundNonMatchingElement: Bool = false
-    
-    @_lifetime(copy iterator)
-    init(iterator: consuming Base.BorrowingIterator, predicate: @escaping (borrowing Base.Element) -> Bool) {
-      self.iterator = iterator
-      self.predicate = predicate
-    }
-
-    @_lifetime(&self)
-    public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
-      if foundNonMatchingElement {
-        return Span()
-      }
-      
-      let span = iterator.nextSpan(maximumCount: maximumCount)
-      for i in span.indices {
-        if !predicate(span[i]) {
-          foundNonMatchingElement = true
-          return span.extracting(first: i)
-        }
-      }
-      return span
-    }
-  }
-}
-
-@available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: ~Copyable /* & ~Escapable */, Element: ~Copyable {
-  @_lifetime(borrow self)
-  public func prefix(while predicate: @escaping (borrowing Element) -> Bool) -> PrefixWhileBorrowingSequence<Self> {
-    .init(self, predicate: predicate)
-  }
-}
+//
+//@available(SwiftStdlib 6.4, *)
+//public struct PrefixWhileBorrowingSequence<Base: BorrowingSequence>: BorrowingSequence, ~Copyable, ~Escapable
+//  where Base: ~Copyable & ~Escapable, Base.Element: ~Copyable
+//{
+//  public typealias Element = Base.Element
+//  
+//  var base: Borrow<Base>
+//  var predicate: (borrowing Base.Element) -> Bool
+//  
+//  @_lifetime(borrow base)
+//  init(_ base: borrowing Base, predicate: @escaping (borrowing Base.Element) -> Bool) {
+//    self.base = Borrow(base)
+//    self.predicate = predicate
+//  }
+//  
+//  @_lifetime(borrow self)
+//  public func makeBorrowingIterator() -> BorrowingIterator {
+//    BorrowingIterator(
+//      iterator: base.borrowedValue.makeBorrowingIterator(),
+//      predicate: predicate)
+//  }
+//  
+//  public struct BorrowingIterator: BorrowingIteratorProtocol, ~Copyable, ~Escapable {
+//    var iterator: Base.BorrowingIterator
+//    var predicate: (borrowing Base.Element) -> Bool
+//    var foundNonMatchingElement: Bool = false
+//    
+//    @_lifetime(copy iterator)
+//    init(iterator: consuming Base.BorrowingIterator, predicate: @escaping (borrowing Base.Element) -> Bool) {
+//      self.iterator = iterator
+//      self.predicate = predicate
+//    }
+//
+//    @_lifetime(&self)
+//    public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
+//      if foundNonMatchingElement {
+//        return Span()
+//      }
+//      
+//      let span = iterator.nextSpan(maximumCount: maximumCount)
+//      for i in span.indices {
+//        if !predicate(span[i]) {
+//          foundNonMatchingElement = true
+//          return span.extracting(first: i)
+//        }
+//      }
+//      return span
+//    }
+//  }
+//}
+//
+//@available(SwiftStdlib 6.4, *)
+//extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable {
+//  @_lifetime(borrow self)
+//  public func prefix(while predicate: @escaping (borrowing Element) -> Bool) -> PrefixWhileBorrowingSequence<Self> {
+//    .init(self, predicate: predicate)
+//  }
+//}

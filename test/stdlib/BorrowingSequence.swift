@@ -64,7 +64,7 @@ suite.test("BORROWING")
   expectEqual(array.reduce(into: 0, +=), span.reduce(into: 0, +=))
 
   
-  
+  // prefix(while:) used on an iterator
   var prefixed = span
     .makeBorrowingIterator()
 //    .borrowing
@@ -73,9 +73,17 @@ suite.test("BORROWING")
   let prefixSpan = prefixed.nextSpan(maximumCount: .max)
   expectEqual(prefixSpan.reduce(0, +), 10)
 
+// prefix(while:) used on a borrowingsequence
+// note: this doesn't work
+//  let prefix = span.prefix(while: { $0 < 5 })
+//  expectEqual(prefix.reduce(0, +), 10)
   
-  
-  
+  var prefixed4 = span
+    .makeBorrowingIterator()
+    .prefix(4)
+  let prefixed4Span = prefixed4.nextSpan(maximumCount: .max)
+  expectEqual(prefixed4Span.reduce(0, +), 10)
+
   let inline: [8 of Int] = [1, 2, 3, 4, 5, 6, 7, 8]
   let inlineCollected = inline.collectViaBorrowing()
   expectTrue(inline.elementsEqual(inline))
