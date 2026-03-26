@@ -148,6 +148,7 @@ class ExtendedValidationInfo {
     unsigned SerializePackageEnabled: 1;
     unsigned StrictMemorySafety: 1;
     unsigned DeferredCodeGen: 1;
+    unsigned AggressiveCMOEnabled : 1;
   } Bits;
 
 public:
@@ -263,6 +264,13 @@ public:
   }
   void setDeferredCodeGen(bool val = true) {
     Bits.DeferredCodeGen = val;
+  }
+
+  bool isAggressiveCMOEnabled() const {
+    return Bits.AggressiveCMOEnabled;
+  }
+  void setAggressiveCMOEnabled(bool val = true) {
+    Bits.AggressiveCMOEnabled = val;
   }
 
   bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }

@@ -795,6 +795,17 @@ public:
   void setSerializePackageEnabled(bool flag = true) {
     Bits.ModuleDecl.SerializePackageEnabled = flag;
   }
+  // Returns true if aggressive cross-module-optimzation was enabled.
+  // Aggressive CMO assumes non-public types are accessible from outside the
+  // module (in contrast to default CMO which only assumes public types are
+  // accessible) .
+  bool isAggressiveCMOEnabled() const {
+    return Bits.ModuleDecl.AggressiveCMOEnabled;
+  }
+
+  void setAggressiveCMOEnabled(bool flag = true) {
+    Bits.ModuleDecl.AggressiveCMOEnabled = flag;
+  }
 
   /// Returns true if this module is a non-Swift module that was imported into
   /// Swift.

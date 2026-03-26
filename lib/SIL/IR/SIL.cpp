@@ -44,6 +44,9 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   if (SILDeclRef::declHasNonUniqueDefinition(D))
     return FormalLinkage::PublicUnique;
 
+  if (D->getModuleContext()->isAggressiveCMOEnabled())
+    return FormalLinkage::PublicUnique;
+
   switch (D->getEffectiveAccess()) {
   case AccessLevel::Package:
     return FormalLinkage::PackageUnique;
@@ -93,6 +96,12 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
   auto typeDecl = C->getDeclContext()->getSelfNominalTypeDecl();
   AccessLevel access = std::min(C->getProtocol()->getEffectiveAccess(),
                                 typeDecl->getEffectiveAccess());
+
+  // Aggressive CMO "makes" all types "public".
+  if (typeDecl->getModuleContext()->isAggressiveCMOEnabled()) {
+    access = AccessLevel::Public;
+  }
+
   switch (access) {
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:

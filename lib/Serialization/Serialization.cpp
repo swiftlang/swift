@@ -889,6 +889,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
   BLOCK_RECORD(options_block, STRICT_MEMORY_SAFETY);
   BLOCK_RECORD(options_block, DEFERRED_CODE_GEN);
+  BLOCK_RECORD(options_block, AGGRESSIVE_CMO);
   BLOCK_RECORD(options_block, CXX_STDLIB_KIND);
   BLOCK_RECORD(options_block, PUBLIC_MODULE_NAME);
   BLOCK_RECORD(options_block, SWIFT_INTERFACE_COMPILER_VERSION);
@@ -1220,6 +1221,11 @@ void Serializer::writeHeader() {
         options_block::CXXStdlibKindLayout CXXStdlibKind(Out);
         CXXStdlibKind.emit(ScratchRecord,
                            static_cast<uint8_t>(M->getCXXStdlibKind()));
+      }
+
+      if (M->isAggressiveCMOEnabled()) {
+        options_block::AggressiveCMOEnabledLayout AggressiveCMOEnabled(Out);
+        AggressiveCMOEnabled.emit(ScratchRecord);
       }
 
       if (Options.SerializeOptionsForDebugging) {

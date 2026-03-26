@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 988; // re-order platform kinds
+const uint16_t SWIFTMODULE_VERSION_MINOR = 989; // cmo immutable ast fix
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1003,6 +1003,7 @@ namespace options_block {
     STRICT_MEMORY_SAFETY,
     DEFERRED_CODE_GEN,
     OSLOG_STRING_SECTION_NAME,
+    AGGRESSIVE_CMO,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1105,6 +1106,10 @@ namespace options_block {
 
   using DeferredCodeGenLayout = BCRecordLayout<
     DEFERRED_CODE_GEN
+  >;
+
+  using AggressiveCMOEnabledLayout = BCRecordLayout<
+    AGGRESSIVE_CMO
   >;
 
   using PublicModuleNameLayout = BCRecordLayout<

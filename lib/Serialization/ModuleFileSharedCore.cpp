@@ -234,6 +234,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::OSLOG_STRING_SECTION_NAME:
       extendedInfo.setOSLogStringSectionName(blobData);
       break;
+    case options_block::AGGRESSIVE_CMO:
+      extendedInfo.setAggressiveCMOEnabled(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1588,6 +1591,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
       Bits.StrictMemorySafety = extInfo.strictMemorySafety();
       Bits.DeferredCodeGen = extInfo.deferredCodeGen();
+      Bits.AggressiveCMOEnabled = extInfo.isAggressiveCMOEnabled();
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();

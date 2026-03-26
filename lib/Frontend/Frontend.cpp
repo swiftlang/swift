@@ -1552,6 +1552,9 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().hasFeature(Feature::Embedded) &&
         Invocation.getLangOptions().hasFeature(Feature::DeferredCodeGen))
       MainModule->setDeferredCodeGen(true);
+    if (Invocation.getSILOptions().CMOMode ==
+        CrossModuleOptimizationMode::Aggressive)
+      MainModule->setAggressiveCMOEnabled(true);
 
     configureAvailabilityDomains(getASTContext(),
                                  Invocation.getFrontendOptions(), MainModule);

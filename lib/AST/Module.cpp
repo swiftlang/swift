@@ -782,6 +782,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.SerializePackageEnabled = 0;
   Bits.ModuleDecl.StrictMemorySafety = 0;
   Bits.ModuleDecl.DeferredCodeGen = 0;
+  Bits.ModuleDecl.AggressiveCMOEnabled = 0;
 
   // Populate the module's files.
   SmallVector<FileUnit *, 2> files;

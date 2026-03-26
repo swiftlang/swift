@@ -778,7 +778,7 @@ protected:
     HasLazyUnderlyingSubstitutions : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -850,7 +850,11 @@ protected:
     StrictMemorySafety : 1,
 
     /// Whether this module uses deferred code generation in Embedded Swift.
-    DeferredCodeGen : 1
+    DeferredCodeGen : 1,
+
+    /// Whether this module was compile with "aggressive" CMO i.e
+    /// the flag: -cross-module-optimization.
+    AggressiveCMOEnabled : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
