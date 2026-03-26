@@ -19,13 +19,17 @@
 #endif
 
 #ifndef SWIFTSCAN_PUBLIC
-# ifdef _WIN32
-#  ifdef libSwiftScan_EXPORTS
-#    define SWIFTSCAN_PUBLIC __declspec(dllexport)
-#  else
-#    define SWIFTSCAN_PUBLIC __declspec(dllimport)
-#  endif
-# else
+# ifdef SWIFTSCAN_NO_EXPORTS
 #  define SWIFTSCAN_PUBLIC
-# endif
-#endif
+# else  // SWIFTSCAN_NO_EXPORTS
+#  ifdef _WIN32
+#   ifdef SWIFTSCAN_EXPORTS
+#     define SWIFTSCAN_PUBLIC __declspec(dllexport)
+#   else  // SWIFTSCAN_EXPORTS
+#     define SWIFTSCAN_PUBLIC __declspec(dllimport)
+#   endif  // SWIFTSCAN_EXPORTS
+#  else  // _WIN32
+#   define SWIFTSCAN_PUBLIC
+#  endif  // _WIN32
+# endif  // SWIFTSCAN_NO_EXPORTS
+#endif  // SWIFTSCAN_PUBLIC
