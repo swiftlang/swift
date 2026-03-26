@@ -4,10 +4,25 @@ set(SWIFT_SCAN_LIB_NAME "_InternalSwiftScan")
 set(LLVM_EXPORTED_SYMBOL_FILE
     ${CMAKE_CURRENT_SOURCE_DIR}/libSwiftScan.exports)
 
-add_swift_host_library(libSwiftScan SHARED
+add_swift_host_library(swiftScanImpl STATIC
   libSwiftScan.cpp
+  SwiftCaching.cpp)
+
+target_compile_definitions(swiftScanImpl PRIVATE SWIFTSCAN_EXPORTS)
+
+add_dependencies(swiftScanImpl
+  clang
+  swiftDependencyScan)
+
+target_link_libraries(swiftScanImpl PRIVATE
+    swiftDependencyScan
+    swiftDriverTool
+    swiftStaticMirror
+    swiftRemoteInspection
+    swiftCompilerModules)
+
+add_swift_host_library(libSwiftScan SHARED
   c-include-check.c
-  SwiftCaching.cpp
   HAS_SWIFT_MODULES)
 
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -16,16 +31,8 @@ if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
                LINK_FLAGS " -lobjc ")
 endif()
 
-add_dependencies(libSwiftScan
-  clang
-  swiftDependencyScan)
-
 target_link_libraries(libSwiftScan PRIVATE
-    swiftDependencyScan
-    swiftDriverTool
-    swiftStaticMirror
-    swiftRemoteInspection
-    swiftCompilerModules)
+    swiftScanImpl)
 
 set_target_properties(libSwiftScan
     PROPERTIES
