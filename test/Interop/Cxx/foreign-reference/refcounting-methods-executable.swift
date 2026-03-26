@@ -7,18 +7,18 @@
 // UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
-import LifetimeOperationMethods
+import RefCountingMethods
 
-var LifetimeMethodsTestSuite = TestSuite("Lifetime operations that are instance methods")
+var RefCountingMethodsTestSuite = TestSuite("Ref counting operations that are instance methods")
 
-LifetimeMethodsTestSuite.test("retain/release methods") {
+RefCountingMethodsTestSuite.test("retain/release methods") {
   let a = RefCountedBox(123)
   expectEqual(a.value, 123)
   expectTrue(a.refCount > 0)
   expectTrue(a.refCount < 10) // optimizations would affect the exact number
 }
 
-LifetimeMethodsTestSuite.test("retain/release methods from base type") {
+RefCountingMethodsTestSuite.test("retain/release methods from base type") {
   let a = DerivedRefCountedBox(321, 456)
   expectEqual(a.value, 321)
   expectEqual(a.secondValue, 456)
@@ -29,14 +29,14 @@ LifetimeMethodsTestSuite.test("retain/release methods from base type") {
   expectEqual(a.secondValue, 789)
 }
 
-LifetimeMethodsTestSuite.test("retain in base type, release in derived type") {
+RefCountingMethodsTestSuite.test("retain in base type, release in derived type") {
   let a = DerivedHasRelease(321)
   expectEqual(a.value, 321)
   expectTrue(a.refCount > 0)
   expectTrue(a.refCount < 10) // optimizations would affect the exact number
 }
 
-LifetimeMethodsTestSuite.test("retain in base type, release in derived templated type") {
+RefCountingMethodsTestSuite.test("retain in base type, release in derived templated type") {
   let a = TemplatedDerivedHasReleaseInt(456)
   expectEqual(a.value, 456)
   expectTrue(a.refCount > 0)
@@ -46,21 +46,21 @@ LifetimeMethodsTestSuite.test("retain in base type, release in derived templated
   expectEqual(b.value, 5.66)
 }
 
-LifetimeMethodsTestSuite.test("CRTP") {
+RefCountingMethodsTestSuite.test("CRTP") {
   let a = CRTPDerived(789)
   expectEqual(a.value, 789)
   expectTrue(a.refCount > 0)
   expectTrue(a.refCount < 10) // optimizations would affect the exact number
 }
 
-LifetimeMethodsTestSuite.test("virtual retain/release") {
+RefCountingMethodsTestSuite.test("virtual retain/release") {
   let a = VirtualRetainRelease(456)
   expectEqual(a.value, 456)
   expectTrue(a.refCount > 0)
   expectTrue(a.refCount < 10) // optimizations would affect the exact number
 }
 
-LifetimeMethodsTestSuite.test("overridden virtual retain/release") {
+RefCountingMethodsTestSuite.test("overridden virtual retain/release") {
   let a = DerivedVirtualRetainRelease(456)
   expectEqual(a.value, 456)
   expectFalse(a.calledBase) // in optimized builds, we might not call retain/release at all
@@ -68,7 +68,7 @@ LifetimeMethodsTestSuite.test("overridden virtual retain/release") {
   expectTrue(a.refCount < 10) // optimizations would affect the exact number
 }
 
-LifetimeMethodsTestSuite.test("overridden pure virtual retain/release") {
+RefCountingMethodsTestSuite.test("overridden pure virtual retain/release") {
   let a = DerivedPureVirtualRetainRelease(789)
   expectEqual(a.value, 789)
   expectTrue(a.refCount > 0)

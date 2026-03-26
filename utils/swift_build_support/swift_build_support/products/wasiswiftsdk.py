@@ -1,4 +1,4 @@
-# swift_build_support/products/wasmswiftsdk.py ------------------*- python -*-
+# swift_build_support/products/wasiswiftsdk.py ------------------*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
@@ -19,7 +19,7 @@ from .cmake_product import CMakeProduct
 from .. import shell
 
 
-class WasmSwiftSDK(product.Product):
+class WASISwiftSDK(product.Product):
     @classmethod
     def product_source_name(cls):
         return "swift-sdk-generator"

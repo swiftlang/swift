@@ -694,6 +694,9 @@ public:
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
+  void checkCalledClangFunction(const ValueDecl *funcDecl,
+                                SourceLoc callSiteLoc) override;
+
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
   void diagnoseTopLevelValue(const DeclName &name) override;
@@ -856,73 +859,14 @@ matchSwiftAttr(const clang::Decl *decl,
   return std::nullopt;
 }
 
-/// Like `matchSwiftAttr`, but also searches C++ base classes.
-///
-/// \param decl The Clang declaration to inspect.
-/// \param patterns List of (attribute name, value) pairs.
-/// \returns The matched value from this decl or its bases, or `std::nullopt`.
-template <typename T>
-std::optional<T> matchSwiftAttrConsideringInheritance(
-    const clang::Decl *decl,
-    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
-  if (!decl)
-    return std::nullopt;
-
-  if (auto match = matchSwiftAttr<T>(decl, patterns))
-    return match;
-
-  if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
-    std::optional<T> result;
-    if (recordDecl->isCompleteDefinition()) {
-      recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
-        if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
-          result = baseMatch;
-          return false;
-        }
-
-        return true;
-      });
-
-      return result;
-    }
-  }
-
-  return std::nullopt;
-}
-
-/// Matches a `swift_attr("...")` on the record type pointed to by the given
-/// Clang type, searching base classes if it's a C++ class.
-///
-/// \param type A Clang pointer or reference type.
-/// \param patterns List of attribute name-value pairs to match.
-/// \returns Matched value or std::nullopt.
-template <typename T>
-std::optional<T> matchSwiftAttrOnRecordPtr(
-    const clang::QualType &type,
-    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
-  clang::QualType pointeeType;
-  if (const auto *ptrType = type->getAs<clang::PointerType>()) {
-    pointeeType = ptrType->getPointeeType();
-  } else if (const auto *refType = type->getAs<clang::ReferenceType>()) {
-    pointeeType = refType->getPointeeType();
-  } else {
-    return std::nullopt;
-  }
-
-  if (const auto *recordDecl = pointeeType->getAsRecordDecl()) {
-    return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
-  }
-  return std::nullopt;
-}
-
-/// Determines the C++ reference ownership convention for the return value
+/// Determines the foreign reference ownership convention for the return value
 /// using `SWIFT_RETURNS_(UN)RETAINED` on the API; falls back to
 /// `SWIFT_RETURNED_AS_(UN)RETAINED_BY_DEFAULT` on the pointee record type.
 ///
 /// \param decl The Clang function or method declaration to inspect.
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
-getCxxRefConventionWithAttrs(const clang::Decl *decl);
+getOwnershipOfReturnedFRT(const clang::NamedDecl *decl);
 
 enum class RefCountedPtrError {
   NotAnnotated,

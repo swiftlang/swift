@@ -1529,20 +1529,6 @@ public:
     }
     llvm_unreachable("unhandled ownership");
   }
-
-  // Determines the ownership ResultConvention (owned/unowned) of the return
-  // value using the SWIFT_RETURNS_(UN)RETAINED annotation on the C++ API; if
-  // not explicitly annotated, falls back to the
-  // SWIFT_RETURNED_AS_(UN)RETAINED_BY_DEFAULT annotation on the C++
-  // SWIFT_SHARED_REFERENCE type.
-  std::optional<ResultConvention>
-  getCxxRefConventionWithAttrs(const TypeLowering &tl,
-                               const clang::Decl *decl) const {
-    if (!tl.getLoweredType().isForeignReferenceType())
-      return std::nullopt;
-
-    return importer::getCxxRefConventionWithAttrs(decl);
-  }
 };
 
 static bool isBorrowAccessor(std::optional<SILDeclRef> constant) {
@@ -3983,8 +3969,8 @@ public:
       return ResultConvention::Owned;
 
     if (tl.getLoweredType().isForeignReferenceType())
-      return getCxxRefConventionWithAttrs(tl, Method)
-          .value_or(ResultConvention::Unowned);
+      return importer::getOwnershipOfReturnedFRT(Method).value_or(
+          ResultConvention::Unowned);
 
     return ResultConvention::Autoreleased;
   }
@@ -4133,8 +4119,10 @@ public:
       return ResultConvention::Indirect;
     }
 
-    if (auto resultConventionOpt = getCxxRefConventionWithAttrs(tl, TheDecl))
-      return *resultConventionOpt;
+    if (tl.getLoweredType().isForeignReferenceType()) {
+      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl))
+        return convention.value();
+    }
 
     if (isCFTypedef(tl, TheDecl->getReturnType())) {
       // The CF attributes aren't represented in the type, so we need
@@ -4215,14 +4203,14 @@ public:
       return ResultConvention::Indirect;
     }
 
-    if (auto resultConventionOpt =
-            getCxxRefConventionWithAttrs(resultTL, TheDecl))
-      return *resultConventionOpt;
+    if (resultTL.getLoweredType().isForeignReferenceType()) {
+      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl))
+        return convention.value();
 
-    if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>() &&
-        resultTL.getLoweredType().isForeignReferenceType()) {
-      return ResultConvention::Owned;
+      if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>())
+        return ResultConvention::Owned;
     }
+
     return CFunctionTypeConventions::getResult(resultTL);
   }
   static bool classof(const Conventions *C) {

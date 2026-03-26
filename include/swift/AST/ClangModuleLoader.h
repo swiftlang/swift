@@ -231,6 +231,10 @@ public:
   /// clone it for the derived classes.
   virtual bool isMemberSynthesizedPerType(const ValueDecl *decl) = 0;
 
+  /// Check and emit diagnostics for calls to \param funcDecl.
+  virtual void checkCalledClangFunction(const ValueDecl *funcDecl,
+                                        SourceLoc callSiteLoc) = 0;
+
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
   virtual void diagnoseTopLevelValue(const DeclName &name) = 0;

@@ -9173,41 +9173,6 @@ bool importer::isSymbolicCircularBase(const clang::CXXRecordDecl *symbolicClass,
          specializedBase->getSpecializedTemplate()->getCanonicalDecl();
 }
 
-std::optional<ResultConvention>
-swift::importer::getCxxRefConventionWithAttrs(const clang::Decl *decl) {
-  using RC = ResultConvention;
-
-  if (auto result =
-          matchSwiftAttr<RC>(decl, {{"returns_unretained", RC::Unowned},
-                                    {"returns_retained", RC::Owned}}))
-    return result;
-
-  const clang::Type *returnTy = nullptr;
-  if (const auto *ctor = dyn_cast<clang::CXXConstructorDecl>(decl))
-    returnTy = ctor->getParent()->getTypeForDecl();
-  else if (const auto *func = llvm::dyn_cast<clang::FunctionDecl>(decl))
-    returnTy = func->getReturnType().getTypePtrOrNull();
-  else if (const auto *method = llvm::dyn_cast<clang::ObjCMethodDecl>(decl))
-    returnTy = method->getReturnType().getTypePtrOrNull();
-
-  if (!returnTy)
-    return std::nullopt;
-
-  const clang::Type *desugaredReturnTy =
-      returnTy->getUnqualifiedDesugaredType();
-
-  if (const auto *ptrType =
-          llvm::dyn_cast<clang::PointerType>(desugaredReturnTy)) {
-    if (const clang::RecordDecl *record =
-            ptrType->getPointeeType()->getAsRecordDecl()) {
-      return matchSwiftAttrConsideringInheritance<RC>(
-          record, {{"returned_as_unretained_by_default", RC::Unowned}});
-    }
-  }
-
-  return std::nullopt;
-}
-
 static const std::vector<std::vector<std::pair<StringRef, StringRef>>>
     ConflictingSwiftAttrs = {
         {{"Escapable", "SWIFT_ESCAPABLE"},

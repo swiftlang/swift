@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=upcoming-swift -I %swift_src_root/lib/ClangImporter/SwiftBridging -module-to-print=LifetimeOperationMethods -I %S/Inputs -source-filename=x | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=upcoming-swift -I %swift_src_root/lib/ClangImporter/SwiftBridging -module-to-print=RefCountingMethods -I %S/Inputs -source-filename=x | %FileCheck %s
 
 // CHECK: class RefCountedBox {
 // CHECK:   func doRetain()

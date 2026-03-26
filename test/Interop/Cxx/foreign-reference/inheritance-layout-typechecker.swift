@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -disable-availability-checking -I %S/Inputs
 
-import Inheritance
+import InheritanceLayout
 
 // A function whose explicit type annotations specializes the cxxCast function.
 //
