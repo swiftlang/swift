@@ -97,11 +97,13 @@ with pre-built Swift compiler, you can use the following command:
 
 ```console
 $ SWIFT_TOOLS_PATH=path/to/swift-development-snapshot/usr/bin
+$ export PATH=$SWIFT_TOOLS_PATH:$PATH
 $ ./utils/build-script \
     --skip-build-llvm \
     --skip-build-swift \
     --skip-build-cmark \
     --build-wasm-stdlib \
+    --skip-test-wasm-stdlib \
     --native-swift-tools-path="$SWIFT_TOOLS_PATH" \
     --native-clang-tools-path="$SWIFT_TOOLS_PATH" \
     --native-llvm-tools-path="$SWIFT_TOOLS_PATH"
