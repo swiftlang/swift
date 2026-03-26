@@ -10,7 +10,7 @@ import Foundation
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=26)
 // CHECK: @end
 
-// CHECK-LABEL: SWIFT_CLASS("{{.*}}availability13PropertyClass{{.*}}")
+// CHECK-LABEL: SWIFT_CLASS("{{.*}}PropertyClass{{.*}}")
 // CHECK: @property{{.*}}propertyWithAvailability
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=26)
 // CHECK: @end

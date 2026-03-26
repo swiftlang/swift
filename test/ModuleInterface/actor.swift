@@ -9,30 +9,44 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 // RUN: %FileCheck %s --check-prefixes=CHECK < %t/Library.swiftinterface
 
-// CHECK-LABEL: public actor TestActor {
+// CHECK-NOT:     $Actors
+// CHECK-LABEL:   @_hasMissingDesignatedInitializers public actor BasicActor {
+public actor BasicActor {
+  // CHECK:       {{@objc deinit|deinit}}
+  // CHECK-NEXT:  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency::UnownedSerialExecutor {
+  // CHECK-NEXT:    get
+  // CHECK-NEXT:  }
+}
+
+// CHECK-LABEL: public actor ActorWithConvenienceInitializers {
 @available(SwiftStdlib 5.5, *)
-public actor TestActor {
+public actor ActorWithConvenienceInitializers {
   private var x: Int
 
-  // CHECK: public convenience init(convenience x: Swift::Int)
+  // CHECK-NEXT: public convenience init(convenience x: Swift::Int)
   public init(convenience x: Int) {
     self.init(designated: x)
   }
 
-  // CHECK: public init()
+  // CHECK-NEXT: public init()
   public init() {
     self.x = 0
   }
 
-  // CHECK: public init(designated x: Swift::Int)
+  // CHECK-NEXT: public init(designated x: Swift::Int)
   public init(designated x: Int) {
     self.x = x
   }
+
+  // CHECK:       {{@objc deinit|deinit}}
+  // CHECK-NEXT:  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency::UnownedSerialExecutor {
+  // CHECK-NEXT:    get
+  // CHECK-NEXT:  }
 }
 
-// CHECK-LABEL: extension Library::TestActor {
+// CHECK-LABEL: extension Library::ActorWithConvenienceInitializers {
 @available(SwiftStdlib 5.5, *)
-extension TestActor {
+extension ActorWithConvenienceInitializers {
   // CHECK: public convenience init(convenienceInExtension x: Swift::Int)
   public init(convenienceInExtension x: Int) {
     self.init(designated: x)

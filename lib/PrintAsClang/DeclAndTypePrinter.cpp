@@ -1839,9 +1839,16 @@ public:
 
       auto platKind = AvAttr.getPlatform();
       if (platKind == PlatformKind::anyAppleOS) {
-        if (auto domainAndRange =
-                AvAttr.getIntroducedDomainAndRange(D->getASTContext()))
-          platKind = domainAndRange->getDomain().getPlatformKind();
+        auto domainAndRange =
+            AvAttr.getIntroducedDomainAndRange(D->getASTContext());
+        if (!domainAndRange)
+          continue;
+
+        platKind = domainAndRange->getDomain().getPlatformKind();
+
+        // Skip the attribute if it cannot be remapped.
+        if (platKind == PlatformKind::anyAppleOS)
+          continue;
       }
       const char *plat;
       switch (platKind) {
