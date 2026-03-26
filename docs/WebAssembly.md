@@ -93,7 +93,8 @@ swift sdk install ../swift-sdk-generator/Bundles/swift-DEVELOPMENT-SNAPSHOT_wasm
 ## Building Swift SDK for WebAssembly without building the compiler
 
 Building the Swift compiler is a time-consuming process. If you only want to build the Swift standard library
-with pre-built Swift compiler, you can use the following command:
+Building the Swift compiler is a time-consuming process. If you have a pre-built Swift compiler that's sufficiently recent and you only want to build the Swift standard library
+with this pre-built Swift compiler, you can use the following command:
 
 ```console
 $ SWIFT_TOOLS_PATH=path/to/swift-development-snapshot/usr/bin
