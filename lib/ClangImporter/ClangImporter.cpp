@@ -7240,17 +7240,38 @@ swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
 
 clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
     ASTContext &ctx, clang::FunctionTemplateDecl *func, SubstitutionMap subst) {
-  SmallVector<clang::TemplateArgument, 4> templateSubst;
-  std::unique_ptr<TemplateInstantiationError> error =
-      ctx.getClangTemplateArguments(func->getTemplateParameters(),
-                                    subst.getReplacementTypes(), templateSubst);
-
   auto getFuncName = [&]() -> std::string {
     std::string funcName;
     llvm::raw_string_ostream funcNameStream(funcName);
     func->printQualifiedName(funcNameStream);
     return funcName;
   };
+
+  for (auto type : subst.getReplacementTypes()) {
+    const auto *funcType = type->getAs<AnyFunctionType>();
+    if (!funcType)
+      continue;
+
+    // Disallow substituting template params with Swift functions that have
+    // inout params, since they cannot be lowered in SILGen.
+    bool hasInOutParam =
+        llvm::any_of(funcType->getParams(),
+                     [](const auto &param) { return param.isInOut(); });
+    if (hasInOutParam) {
+      // TODO: Use the location of the apply here.
+      Impl.diagnose(
+          HeaderLoc(func->getBeginLoc()),
+          diag::
+              unable_to_substitute_cxx_template_argument_with_swift_closure_inout_param,
+          getFuncName(), type);
+      return nullptr;
+    }
+  }
+
+  SmallVector<clang::TemplateArgument, 4> templateSubst;
+  std::unique_ptr<TemplateInstantiationError> error =
+      ctx.getClangTemplateArguments(func->getTemplateParameters(),
+                                    subst.getReplacementTypes(), templateSubst);
 
   if (error) {
     std::string failedTypesStr;
