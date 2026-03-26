@@ -521,7 +521,7 @@ private:
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
 
-  std::optional<ForeignAsyncConvention::Info> considerAsyncImport(
+  static std::optional<ForeignAsyncConvention::Info> considerAsyncImport(
       const clang::ObjCMethodDecl *clangDecl, StringRef baseName,
       SmallVectorImpl<StringRef> &paramNames,
       ArrayRef<const clang::ParmVarDecl *> params, bool isInitializer,

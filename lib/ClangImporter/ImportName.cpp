@@ -288,12 +288,8 @@ static bool isSwiftReservedName(StringRef name) {
 /// name.
 static bool shouldLowercaseValueName(StringRef name) {
   // If we see any lowercase characters, we can lowercase.
-  for (auto c : name) {
-    if (clang::isLowercase(c)) return true;
-  }
-
   // Otherwise, lowercasing will either be a no-op or we have ALL_CAPS.
-  return false;
+  return llvm::any_of(name, clang::isLowercase);
 }
 
 /// Will recursively print out the fully qualified context for the given name.
@@ -849,11 +845,7 @@ static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
     return false;
   }
 
-  if (determineFactoryInitializerKind(method))
-    return true;
-
-  // Not imported as an initializer.
-  return false;
+  return static_cast<bool>(determineFactoryInitializerKind(method));
 }
 
 /// Attempt to omit needless words from the given function name.

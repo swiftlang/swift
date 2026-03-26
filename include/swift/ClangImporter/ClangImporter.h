@@ -213,7 +213,7 @@ public:
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx, const IRGenOptions *IRGenOpts = nullptr,
-         std::string swiftPCHHash = "", std::string casidForPCH = "",
+         StringRef swiftPCHHash = "", std::string casidForPCH = "",
          DependencyTracker *tracker = nullptr, bool ignoreFileMapping = false,
          std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr,
          std::shared_ptr<llvm::cas::ActionCache> Cache = nullptr);
@@ -626,7 +626,7 @@ public:
   /// \param isExplicit true if the PCH filename was passed directly
   /// with -import-objc-header option.
   getPCHFilename(const ClangImporterOptions &ImporterOptions,
-                 StringRef SwiftPCHHash, bool &isExplicit);
+                 StringRef SwiftPCHHash, bool &isExplicit) const;
 
   const clang::Type *parseClangFunctionType(StringRef type,
                                             SourceLoc loc) const override;
@@ -667,7 +667,8 @@ public:
 
   FuncDecl *getAvailabilityDomainPredicate(const clang::VarDecl *var) override;
 
-  bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
+  static bool isAnnotatedWith(const clang::CXXMethodDecl *method,
+                              StringRef attr);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

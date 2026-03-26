@@ -70,7 +70,7 @@ class ParmVarDecl;
 class Parser;
 class QualType;
 class TypedefNameDecl;
-}
+} // namespace clang
 
 namespace swift {
 
@@ -625,13 +625,14 @@ public:
   }
 
   /// Writes the mangled name of \p clangDecl to \p os.
-  void getMangledName(clang::MangleContext *mangler,
-                      const clang::NamedDecl *clangDecl, raw_ostream &os);
+  static void getMangledName(clang::MangleContext *mangler,
+                             const clang::NamedDecl *clangDecl,
+                             raw_ostream &os);
 
   /// Writes the Itanium mangled name (even on platforms that do not use Itanium
   /// mangling, such as Windows) of \p clangDecl to \p os.
-  void getItaniumMangledName(const clang::NamedDecl *clangDecl,
-                             raw_ostream &os);
+  static void getItaniumMangledName(const clang::NamedDecl *clangDecl,
+                                    raw_ostream &os);
 
 private:
   /// The Importer may be configured to load modules of a different OS Version
@@ -752,9 +753,9 @@ public:
 
   bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
 
-  bool needsClosureConstructor(const clang::CXXRecordDecl *recordDecl) const;
+  static bool needsClosureConstructor(const clang::CXXRecordDecl *recordDecl);
 
-  bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const;
+  static bool isSwiftFunctionWrapper(const clang::RecordDecl *decl);
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance);
@@ -928,7 +929,7 @@ public:
   std::optional<std::string> CASIDForPCH = std::nullopt;
 
   void addBridgeHeaderTopLevelDecls(clang::Decl *D);
-  bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
+  static bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
 private:
   /// When set, ClangImporter is disabled, and all requests go to the
@@ -961,7 +962,7 @@ public:
   ModuleDecl *loadModule(SourceLoc importLoc,
                          ImportPath::Module path);
 
-  void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
+  static void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
     if (!isIUO)
       return;
 
@@ -1103,7 +1104,7 @@ public:
   /// the Swift name. If the Clang name does not start with this prefix,
   /// nothing is removed.
   Identifier importIdentifier(const clang::IdentifierInfo *identifier,
-                              StringRef removePrefix = "");
+                              StringRef removePrefix = "") const;
 
   /// Import an Objective-C selector.
   ObjCSelector importSelector(clang::Selector selector);
@@ -1293,8 +1294,8 @@ public:
                                    ClangNode ClangN, AccessLevel access);
 
   /// Add a synthesized typealias to the given nominal type.
-  void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
-                               Type underlyingType);
+  static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
+                                      Type underlyingType);
 
   void addSynthesizedProtocolAttrs(
       NominalTypeDecl *nominal,
@@ -1302,8 +1303,8 @@ public:
       bool isUnchecked = false,
       bool isSuppressed = false);
 
-  void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
-                    AccessorDecl *setter);
+  static void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
+                           AccessorDecl *setter);
 
   /// Retrieve the standard library module.
   ModuleDecl *getStdlibModule();
@@ -1315,7 +1316,7 @@ public:
   /// \returns The named module, or null if the module has not been imported.
   ModuleDecl *getNamedModule(StringRef name);
 
-  ImportPath::Builder getSwiftModulePath(const clang::Module *M);
+  ImportPath::Builder getSwiftModulePath(const clang::Module *M) const;
 
   /// Returns the "Foundation" module, if it can be loaded.
   ///
@@ -1369,8 +1370,8 @@ public:
 
   /// Determines whether the type declared by the given declaration
   /// is over-aligned.
-  bool isOverAligned(const clang::TypeDecl *typeDecl);
-  bool isOverAligned(clang::QualType type);
+  bool isOverAligned(const clang::TypeDecl *typeDecl) const;
+  bool isOverAligned(clang::QualType type) const;
 
   /// Determines whether the given Clang type is serializable in a
   /// Swift AST.  This should only be called after successfully importing
@@ -1670,7 +1671,7 @@ public:
 
   /// Return whether a global of the given type should be imported as a
   /// 'let' declaration as opposed to 'var'.
-  bool shouldImportGlobalAsLet(clang::QualType type);
+  static bool shouldImportGlobalAsLet(clang::QualType type);
 
   /// Record the set of imported protocols for the given declaration,
   /// to be used by member loading.
@@ -1863,7 +1864,7 @@ public:
 
   /// Add implicit typealiases required when turning the given nominal type
   /// into an option set.
-  void addOptionSetTypealiases(NominalTypeDecl *nominal);
+  void addOptionSetTypealiases(NominalTypeDecl *nominal) const;
 
   void swiftify(AbstractFunctionDecl *MappedDecl);
 
@@ -1889,8 +1890,8 @@ public:
   ///
   /// FIXME: this is an elaborate hack to badly reflect Clang's
   /// submodule visibility into Swift.
-  bool isVisibleClangEntry(const clang::NamedDecl *clangDecl);
-  bool isVisibleClangEntry(SwiftLookupTable::SingleEntry entry);
+  bool isVisibleClangEntry(const clang::NamedDecl *clangDecl) const;
+  bool isVisibleClangEntry(SwiftLookupTable::SingleEntry entry) const;
 
   /// Look for namespace-scope values with the given name in the given
   /// Swift lookup table.
@@ -1934,7 +1935,7 @@ public:
   void diagnoseTargetDirectly(ImportDiagnosticTarget target);
 
 private:
-  ImportDiagnosticTarget importDiagnosticTargetFromLookupTableEntry(
+  static ImportDiagnosticTarget importDiagnosticTargetFromLookupTableEntry(
       SwiftLookupTable::SingleEntry entry);
 
   bool emitDiagnosticsForTarget(
