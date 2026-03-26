@@ -9105,8 +9105,7 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
       auto *proto = abstract->getProtocol();
       Type conformingType = abstract->getType();
 
-      // Skip Self conformances for protocol members — these are used
-      // for witness dispatch, not forwarded to the callee body.
+      // Skip Self conformances; these should be diagnosed already in other ways
       if (selfInterfaceType) {
         if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
           if (archetype->getInterfaceType()->isEqual(selfInterfaceType))
@@ -9123,6 +9122,21 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
       if (sendableMetatypeProto &&
           proto->inheritsFrom(sendableMetatypeProto))
         continue;
+
+      // If the conforming type is Sendable, its conformances cannot be
+      // isolated — isolated conformances require non-Sendable types.
+      if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
+        if (auto *sendableProto =
+                ctx.getProtocol(KnownProtocolKind::Sendable)) {
+          bool isSendable =
+              llvm::any_of(archetype->getConformsTo(), [&](ProtocolDecl *p) {
+                return p == sendableProto || p->inheritsFrom(sendableProto);
+              });
+
+          if (isSendable)
+            continue;
+        }
+      }
 
       // Get the name of the generic type parameter for the diagnostic.
       // For opaque types ('some Protocol'), we leave the name empty so
