@@ -8333,7 +8333,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       ctx.Diags
           .diagnose(attr->getStartLoc(),
                     diag::nonisolated_unsafe_uneffective_on_funcs, VD)
-          .fixItReplace(attr->getStartLoc(), "nonisolated");
+          .fixItReplace(attr->getRange(), "nonisolated");
     }
 
     (void)getActorIsolation(VD);

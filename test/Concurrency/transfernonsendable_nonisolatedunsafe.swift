@@ -521,7 +521,7 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
   case second
 
   nonisolated(unsafe) var nonIsolatedUnsafeVarObject: NonSendableKlass { NonSendableKlass() }
-  // expected-warning@-1{{'nonisolated(unsafe)' has no effect on property 'nonIsolatedUnsafeVarObject', consider using 'nonisolated'}}
+  // expected-warning@-1{{'nonisolated(unsafe)' has no effect on property 'nonIsolatedUnsafeVarObject', consider using 'nonisolated'}}{{3-22=nonisolated}}
 
   func test() async {
     await transferToMainDirect(nonIsolatedUnsafeVarObject)
