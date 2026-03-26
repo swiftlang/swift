@@ -28,21 +28,26 @@ if #available(SwiftStdlib 6.0, *) {
 
 // CHECK-NEXT: foo - withTaskExecutorPreference
 
+// After each continuation resumes, hop_to_executor hops back to the caller's
+// expected executor (rdar://173371163). When the caller is nonisolated inside
+// withTaskExecutorPreference, the hop goes through the task executor.
 // CHECK: foo - withTaskExecutorPreference - withCheckedContinuation
+// CHECK-NEXT: [executor][task-executor] Enqueue (2)
 // CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedContinuation done
 
 // CHECK: foo - withTaskExecutorPreference - withUnsafeContinuation
+// CHECK-NEXT: [executor][task-executor] Enqueue (3)
 // CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeContinuation done
 
 // CHECK: foo - withTaskExecutorPreference - withCheckedThrowingContinuation
+// CHECK-NEXT: [executor][task-executor] Enqueue (4)
 // CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedThrowingContinuation done
 
 // CHECK: foo - withTaskExecutorPreference - withUnsafeThrowingContinuation
+// CHECK-NEXT: [executor][task-executor] Enqueue (5)
 // CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeThrowingContinuation done
 
-// By checking that this is the second enqueue here,
-// we check that there was no stray enqueues between with... invocations:
-// CHECK-NEXT: [executor][task-executor] Enqueue (2)
+// CHECK-NEXT: [executor][task-executor] Enqueue (6)
 
 // CHECK-NEXT: foo - withTaskExecutorPreference done
 
