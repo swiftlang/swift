@@ -457,7 +457,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 
   /// Wait for all of the group's remaining tasks to complete.
   @_alwaysEmitIntoClient
-  @_disfavoredOverload
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async {
     await awaitAllRemainingTasks(isolation: isolation)
@@ -670,7 +669,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   }
 
   @_alwaysEmitIntoClient
-  @_disfavoredOverload
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async throws {
     var firstError: Error? = nil
@@ -816,7 +814,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   }
 
   @_alwaysEmitIntoClient
-  @_disfavoredOverload
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func nextResult(isolation: isolated (any Actor)? = #isolation) async -> Result<ChildTaskResult, Failure>? {
     return try! await nextResultForABI()
