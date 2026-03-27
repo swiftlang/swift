@@ -49,21 +49,21 @@ public struct Outer {
   }
 }
 
-/// Struct without explicit init — default values are stripped when type
-/// annotation is present.
+/// Struct without explicit init — default values preserved.
 public struct Config {
   public var timeout: Int = 30
   public var name: String = "default"
   private var counter: Int = 0
 }
 
-/// Struct with explicit init — default values can be stripped because
-/// the memberwise init is suppressed.
+/// Struct with explicit init — default values preserved.
 public struct ConfigWithInit {
   public var timeout: Int = 30
   public var name: String = "default"
   private var counter: Int = 0
   internal var hidden: Int = 0
+  public static let maxTimeout: Int = 3600
+  public static var instanceCount: Int = 0
 
   public init(timeout: Int) {
     self.timeout = timeout
@@ -73,7 +73,7 @@ public struct ConfigWithInit {
   }
 }
 
-/// Class with explicit init — default values stripped.
+/// Class with explicit init — default values preserved.
 public class Widget {
   public var label: String = "untitled"
   private var id: Int = 0
@@ -83,14 +83,13 @@ public class Widget {
   }
 }
 
-/// Class without explicit init — default values stripped.
+/// Class without explicit init — default values preserved.
 public class DefaultWidget {
   public var label: String = "untitled"
   private var id: Int = 0
 }
 
-/// Struct with init but no type annotation on a property — default kept
-/// because the type is inferred from the initializer.
+/// Struct with init but no type annotation on a property — default preserved.
 public struct InferredType {
   public var name: String = "hello"
   public var count = 42
@@ -100,8 +99,7 @@ public struct InferredType {
   }
 }
 
-/// Lazy variables — initializer stripped when type annotation is present,
-/// kept when type is inferred.
+/// Lazy variables — default values preserved.
 public class LazyProps {
   public lazy var typedLazy: Int = { 42 }()
   public lazy var inferredLazy = { 42 }()
@@ -178,16 +176,18 @@ public struct Config {
 }
 
 public struct ConfigWithInit {
-  public var timeout: Int
-  public var name: String
-  private var counter: Int
+  public var timeout: Int = 30
+  public var name: String = "default"
+  private var counter: Int = 0
+  public static let maxTimeout: Int = 3600
+  public static var instanceCount: Int = 0
 
   public init(timeout: Int)
 }
 
 public class Widget {
-  public var label: String
-  private var id: Int
+  public var label: String = "untitled"
+  private var id: Int = 0
 
   public init(label: String)
 }
@@ -198,18 +198,22 @@ public class DefaultWidget {
 }
 
 public struct InferredType {
-  public var name: String
+  public var name: String = "hello"
   public var count = 42
 
   public init(name: String)
 }
 
 public class LazyProps {
-  public lazy var typedLazy: Int
+  public lazy var typedLazy: Int = {
+      42
+  }()
   public lazy var inferredLazy = {
       42
   }()
-  private lazy var privateLazy: String
+  private lazy var privateLazy: String = {
+      "hello"
+  }()
 
   public init()
 }

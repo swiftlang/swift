@@ -95,9 +95,9 @@ public struct WithInitAllAccess {
 //--- expected.swift
 
 public struct StoredProps {
-  public var pubVar: Int
-  private var privVar: Int
-  package var pkgVar: Int
+  public var pubVar: Int = 1
+  private var privVar: Int = 2
+  package var pkgVar: Int = 5
 
   public init()
 }
@@ -115,7 +115,7 @@ public struct ComputedProps {
 }
 
 public struct UsableFromInlineProps {
-  @usableFromInline internal var ufiVar: Int
+  @usableFromInline internal var ufiVar: Int = 10
   @usableFromInline internal var ufiComputed: Int {
       get
   }
@@ -125,23 +125,23 @@ public struct UsableFromInlineProps {
 
 @_spi(Testing)
 public struct SPIStruct {
-  public var spiPubVar: Int
-  private var spiPrivVar: Int
+  public var spiPubVar: Int = 1
+  private var spiPrivVar: Int = 2
 
   public init()
 }
 
 open class OpenClass {
-  open var openVar: Int
-  public var pubVar: Int
-  private var privVar: Int
+  open var openVar: Int = 1
+  public var pubVar: Int = 2
+  private var privVar: Int = 3
 
   public init()
 }
 
 public struct MixedAccessProps {
-  public private(set) var readOnly: Int
-  public internal(set) var pubInternalSet: Int
+  public private(set) var readOnly: Int = 0
+  public internal(set) var pubInternalSet: Int = 0
 
   public init()
 }
@@ -162,9 +162,9 @@ public struct NoInitAllAccess {
 }
 
 public struct WithInitAllAccess {
-  public var pubVar: Int
-  private var privVar: Int
-  package var pkgVar: Int
+  public var pubVar: Int = 1
+  private var privVar: Int = 2
+  package var pkgVar: Int = 5
 
   public init()
 }

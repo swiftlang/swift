@@ -53,10 +53,9 @@ extension SyntaxProtocol {
 /// the default visibility of members.
 private enum DeclContext {
   case topLevel
-  case publicType(hasExplicitInit: Bool)
+  case publicType
   case protocolDecl
-  case publicExtension
-  case otherExtension
+  case extensionDecl(isPublic: Bool)
 
   /// Whether this context is inside a public type declaration.
   var isPublicType: Bool {
@@ -255,7 +254,7 @@ class InterfaceMinimizer: SyntaxRewriter {
     {
       // In a public extension, members without an explicit access modifier
       // inherit the extension's public access level and should be kept.
-      if case .publicExtension = currentContext,
+      if case .extensionDecl(isPublic: true) = currentContext,
         !hasExplicitAccessModifier(withModifiers.modifiers)
       {
         return .keep
@@ -308,15 +307,15 @@ class InterfaceMinimizer: SyntaxRewriter {
 
   override func visit(_ node: ExtensionDeclSyntax) -> DeclSyntax {
     let level = accessLevel(of: node.modifiers)
-    let context: DeclContext
+    let isPublic: Bool
     switch level {
     case .public, .open, .package:
-      context = .publicExtension
+      isPublic = true
     default:
-      context = .otherExtension
+      isPublic = false
     }
 
-    contextStack.append(context)
+    contextStack.append(.extensionDecl(isPublic: isPublic))
     defer { contextStack.removeLast() }
 
     let newMembers = filterMemberBlockItems(node.memberBlock.members)
@@ -330,10 +329,7 @@ class InterfaceMinimizer: SyntaxRewriter {
     _ node: D,
     makeDeclSyntax: (D) -> DeclSyntax
   ) -> DeclSyntax {
-    let hasExplicitInit = node.memberBlock.members.contains { member in
-      member.decl.is(InitializerDeclSyntax.self)
-    }
-    contextStack.append(.publicType(hasExplicitInit: hasExplicitInit))
+    contextStack.append(.publicType)
     defer { contextStack.removeLast() }
 
     let newMembers = filterMemberBlockItems(node.memberBlock.members)
@@ -391,23 +387,6 @@ class InterfaceMinimizer: SyntaxRewriter {
         let newAccessorBlock = stripAccessorBodies(accessorBlock)
         if newAccessorBlock.id != accessorBlock.id {
           newBinding = newBinding.with(\.accessorBlock, newAccessorBlock)
-          changed = true
-        }
-      }
-
-      // Strip initializers from stored properties (no accessor block) only
-      // when the containing type has an explicit initializer. When there is
-      // no explicit init, the memberwise initializer is synthesized and
-      // default values determine which parameters have defaults.
-      // Keep initializers when the binding has no type annotation (type is
-      // inferred from the default).
-      if binding.initializer != nil, !preserveBody, binding.accessorBlock == nil,
-        binding.typeAnnotation != nil
-      {
-        if case .publicType(hasExplicitInit: false) = currentContext {
-          // No explicit init: keep default values for init synthesis.
-        } else {
-          newBinding = newBinding.with(\.initializer, nil)
           changed = true
         }
       }

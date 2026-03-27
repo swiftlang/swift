@@ -25,6 +25,12 @@ extension MyType: CustomStringConvertible {
     return "MyType"
   }
 }
+
+/// static let/var in extension — initializers must be preserved.
+public extension MyType {
+  static let defaultName: String = "MyType"
+  static var mutableDefault: Int = 0
+}
 //--- expected.swift
 public struct MyType {
 }
@@ -37,4 +43,9 @@ extension MyType: CustomStringConvertible {
   public var description: String {
       get
   }
+}
+
+public extension MyType {
+  static let defaultName: String = "MyType"
+  static var mutableDefault: Int = 0
 }

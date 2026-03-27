@@ -174,6 +174,11 @@ public protocol Describable {
   }
 }
 
+// Extension with static let — initializer must survive minimization
+extension Point {
+  public static let origin: Point = Point(x: 0, y: 0)
+}
+
 //--- Uses.swift
 import Foundation
 

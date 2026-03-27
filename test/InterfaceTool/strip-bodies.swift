@@ -26,6 +26,10 @@ fileprivate func fileprivateFunc() {
   print("fileprivate")
 }
 
+public let globalLet: Int = 42
+public var globalVar: Int = 0
+let internalGlobalLet: Int = 10
+
 public struct PublicStruct {
   public var x: Int
   internal var y: Int
@@ -80,6 +84,10 @@ func implicitInternalFunc()
 private func privateFunc()
 
 fileprivate func fileprivateFunc()
+
+public let globalLet: Int = 42
+public var globalVar: Int = 0
+let internalGlobalLet: Int = 10
 
 public struct PublicStruct {
   public var x: Int
