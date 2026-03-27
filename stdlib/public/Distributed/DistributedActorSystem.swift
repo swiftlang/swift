@@ -436,6 +436,12 @@ extension DistributedActorSystem {
     let targetName = target.identifier
     let targetNameUTF8 = Array(targetName.utf8)
 
+    if #available(SwiftStdlib 6.4, *) {
+      // TODO: include more information like the number of decoded args etc?
+      _traceDistributedExecuteTarget(
+        targetActor: actor, targetIdentifier: target.identifier)
+    }
+
     // Gen the generic environment (if any) associated with the target.
     let genericEnv =
       unsafe targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in

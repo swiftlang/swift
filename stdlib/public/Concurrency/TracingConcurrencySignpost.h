@@ -18,7 +18,7 @@
 #define SWIFT_CONCURRENCY_TRACINGSIGNPOST_H
 
 #include "TaskPrivate.h"
-#include "Tracing.h"
+#include "TracingConcurrency.h"
 #include "swift/ABI/Task.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Casting.h"
