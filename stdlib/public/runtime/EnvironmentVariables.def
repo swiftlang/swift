@@ -155,4 +155,10 @@ VARIABLE(SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR, bool, true,
          "call malloc/free. Direct use of malloc/free enables use of memory "
          "debugging tools for async stack allocations.")
 
+VARIABLE(SWIFT_CONCURRENCY_TRACING_SUBSYSTEM, string, "",
+         "Override the os_signpost subsystem used for concurrency tracing. "
+         "When set, signposts are emitted under this subsystem instead of "
+         "com.apple.swift.concurrency. Useful for testing, since the default "
+         "subsystem has signposts disabled by system logging preferences.")
+
 #undef VARIABLE

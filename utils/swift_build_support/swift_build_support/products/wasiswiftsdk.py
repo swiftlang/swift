@@ -270,9 +270,9 @@ class WASISwiftSDK(product.Product):
         ]:
             stdlib_build_path = os.path.join(
                 build_root, '%s-%s' % (build_basename, host_target))
-            wasi_sysroot = wasisysroot.WASILibc.sysroot_install_path(
+            wasi_sysroot = wasisysroot.WASISysroot.sysroot_install_path(
                 build_root, clang_multiarch_triple)
-            wasi_resource_dir = wasisysroot.WASILibc.resource_dir_install_path(
+            wasi_resource_dir = wasisysroot.WASISysroot.resource_dir_install_path(
                 build_root, clang_multiarch_triple)
             llvm_runtime_libs_build_path = os.path.join(
                 build_root, '%s-%s' % ('wasmllvmruntimelibs', host_target),

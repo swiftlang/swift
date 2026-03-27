@@ -2752,7 +2752,7 @@ protected:
         SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
         Substitutions(subs.getCanonical()) {
-    assert(!!subs == !!callee->getType().castTo<SILFunctionType>()
+    ASSERT(!!subs == !!callee->getType().castTo<SILFunctionType>()
         ->getInvocationGenericSignature());
 
     // Initialize the operands.
