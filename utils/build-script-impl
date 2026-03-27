@@ -2339,6 +2339,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE:PATH=${LIBDISPATCH_SOURCE_DIR}
                     -DXCTEST_PATH_TO_LIBDISPATCH_BUILD:PATH=$(build_directory ${host} libdispatch)
                     -DXCTEST_PATH_TO_FOUNDATION_BUILD:PATH=${FOUNDATION_BUILD_DIR}
+                    -DXCTEST_PATH_TO_SWIFT_TESTING_BUILD:PATH=$(build_directory ${host} swifttesting)
+                    -DXCTEST_PATH_TO_SWIFT_TESTING_MACROS_BUILD:PATH=$(build_directory ${host} swifttestingmacros)
                     -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                     -DCMAKE_PREFIX_PATH:PATH=$(build_directory ${host} llvm)
 

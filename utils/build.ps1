@@ -3264,6 +3264,8 @@ function Test-XCTest {
         XCTEST_PATH_TO_FOUNDATION_BUILD = $(Get-ProjectBinaryCache $BuildPlatform DynamicFoundation);
         XCTEST_PATH_TO_LIBDISPATCH_BUILD = $(Get-ProjectBinaryCache $BuildPlatform Dispatch);
         XCTEST_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
+        XCTEST_PATH_TO_SWIFT_TESTING_BUILD = $(Get-ProjectBinaryCache $BuildPlatform Testing);
+        XCTEST_PATH_TO_SWIFT_TESTING_MACROS_BUILD = $(Get-ProjectBinaryCache $BuildPlatform TestingMacros);
       }
   }
 }
