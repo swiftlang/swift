@@ -5323,7 +5323,6 @@ void suggestAnyAppleOSAvailability(const Decl *D,
   llvm::SmallDenseMap<llvm::VersionTuple,
                       llvm::SmallVector<const AvailableAttr *, 6>>
       attrsByIntroVersion;
-  llvm::SmallSet<PlatformKind, 8> seenPlatforms;
 
   for (const AvailableAttr *attr : attrs) {
     auto semAttr = D->getSemanticAvailableAttr(attr);
@@ -5345,8 +5344,6 @@ void suggestAnyAppleOSAvailability(const Decl *D,
     if (isApplicationExtensionPlatform(platform))
       continue;
 
-    seenPlatforms.insert(platform);
-
     // anyAppleOS only supports versions 26 and later.
     auto rawIntroduced = attr->getRawIntroduced();
     if (!rawIntroduced || rawIntroduced->getMajor() < 26)
@@ -5356,15 +5353,6 @@ void suggestAnyAppleOSAvailability(const Decl *D,
   }
 
   if (attrsByIntroVersion.empty())
-    return;
-
-  // Don't suggest anyAppleOS unless there are existing availability attributes
-  // for each of the base Apple platforms.
-  static const PlatformKind requiredPlatforms[] = {
-      PlatformKind::macOS, PlatformKind::iOS, PlatformKind::tvOS,
-      PlatformKind::watchOS};
-  if (!llvm::all_of(requiredPlatforms,
-                    [&](PlatformKind p) { return seenPlatforms.contains(p); }))
     return;
 
   llvm::VersionTuple commonVersion;

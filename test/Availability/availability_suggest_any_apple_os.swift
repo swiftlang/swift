@@ -49,6 +49,17 @@ func allSixOSesAligned() { } // expected-warning {{use '@available(anyAppleOS 26
 // expected-note@-4 {{'allFourOSesAlignedMinorVersion()' is available in watchOS 26.4 or newer}}
 func allFourOSesAlignedMinorVersion() { } // expected-warning {{use '@available(anyAppleOS 26.4, *)' instead of platform specific '@available' attributes with the same version}}{{-5:45-61=anyAppleOS 26.4, *}}
 
+@available(macOS 26, iOS 26, tvOS 26, *)
+// expected-note@-1 {{'onlyThreeOSes()' is available in macOS 26 or newer}}
+// expected-note@-2 {{'onlyThreeOSes()' is available in iOS 26 or newer}}
+// expected-note@-3 {{'onlyThreeOSes()' is available in tvOS 26 or newer}}
+func onlyThreeOSes() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-4:30-41=anyAppleOS 26, *}}
+
+@available(macOS 26, iOS 26, *)
+// expected-note@-1 {{'onlyTwoOSes()' is available in macOS 26 or newer}}
+// expected-note@-2 {{'onlyTwoOSes()' is available in iOS 26 or newer}}
+func onlyTwoOSes() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-3:22-32=anyAppleOS 26, *}}
+
 @available(macOS 26, iOS 26, tvOS 26, watchOS 26.4, *)
 // expected-note@-1 {{'threeOSesAlignedOneUnaligned()' is available in macOS 26 or newer}}
 // expected-note@-2 {{'threeOSesAlignedOneUnaligned()' is available in iOS 26 or newer}}
@@ -149,9 +160,6 @@ func alreadyUsesAnyAppleOS() { }
 @available(anyAppleOS 26, watchOS 26.4, tvOS 26.4, *)
 func alreadyUsesAnyAppleOSWithExceptions() { }
 
-@available(macOS 26, iOS 26, tvOS 26, *)
-func onlyThreePlatforms() { }
-
 @available(macOS 26, iOS 26.1, tvOS 26.2, watchOS 26.3, *)
 func noCommonVersions() { }
 
@@ -178,3 +186,6 @@ func fourAppExtensionVersions() { }
 @available(tvOSApplicationExtension, introduced: 26)
 @available(watchOSApplicationExtension, introduced: 26)
 func fourAppExtensionVersionsLongForm() { }
+
+@available(Windows 26, Android 26, *)
+func nonAppleOSesAligned() { }
