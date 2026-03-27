@@ -19,16 +19,20 @@ import swiftASTGen
 /// Takes an `ExportedSourceFile*` from `swift_ASTGen_parseSourceFile`.
 /// When `internalImportByDefault` is true, bare imports (without an explicit
 /// access modifier) are treated as internal and removed.
+/// When `removeInternalDecls` is true, internal/fileprivate declarations are
+/// removed; when false only function/accessor bodies are stripped.
 /// The result is heap-allocated; free with `swift_ASTGen_freeBridgedString`.
 @_cdecl("swift_ASTGen_minimizeSourceForInterface")
 public func minimizeSourceForInterface(
   sourceFilePtr: UnsafeMutablePointer<UInt8>,
   internalImportByDefault: Bool,
+  removeInternalDecls: Bool,
   resultOut: UnsafeMutablePointer<BridgedStringRef>
 ) {
   sourceFilePtr.withMemoryRebound(to: ExportedSourceFile.self, capacity: 1) { sf in
     let minimized = sf.pointee.syntax.minimizedForInterface(
-      internalImportByDefault: internalImportByDefault
+      internalImportByDefault: internalImportByDefault,
+      removeInternalDecls: removeInternalDecls
     )
     resultOut.pointee = allocateBridgedString(minimized.formatted().description)
   }

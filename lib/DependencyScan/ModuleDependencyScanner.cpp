@@ -550,6 +550,8 @@ void ModuleDependencyScanner::beginSourceMinimization(
       swift_ASTGen_minimizeSourceForInterface(
           sf,
           ScanASTContext.LangOpts.hasFeature(Feature::InternalImportsByDefault),
+          ScanCompilerInvocation.getCASOptions()
+              .RemoveInternalDeclsOnMinimization,
           &bridgedResult);
       swift_ASTGen_destroySourceFile(sf);
 

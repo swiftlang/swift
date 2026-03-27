@@ -14,3 +14,7 @@ def action : JoinedOrSeparate<["-"], "action">,
 def internal_import_by_default : Flag<["-"], "internal-import-by-default">,
   HelpText<"Treat bare imports without an explicit access modifier as internal "
            "(removed during minimization) instead of public (kept)">;
+
+def remove_internal_decls : Flag<["-"], "remove-internal-decls">,
+  HelpText<"Remove internal and fileprivate declarations during minimization "
+           "(by default only function bodies are stripped)">;

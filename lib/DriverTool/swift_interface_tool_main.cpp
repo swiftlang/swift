@@ -145,8 +145,10 @@ int swift_interface_tool_main(ArrayRef<const char *> Args, const char *Argv0,
   case InterfaceToolAction::MinimizeSource: {
     bool internalImportByDefault =
         ParsedArgs.hasArg(OPT_internal_import_by_default);
+    bool removeInternalDecls = ParsedArgs.hasArg(OPT_remove_internal_decls);
     swift_ASTGen_minimizeSourceForInterface(sourceFile,
-                                            internalImportByDefault, &result);
+                                            internalImportByDefault,
+                                            removeInternalDecls, &result);
     break;
   }
   case InterfaceToolAction::ExtractImports:

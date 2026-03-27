@@ -24,8 +24,10 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   @%t/MyApp.cmd -swift-version 5 -language-mode 5 -enable-library-evolution -Rcache-compile-job 2>&1 | %FileCheck %s --check-prefix=MISS
 
-/// Append private function and expect cache hit.
-// RUN: echo "internal func internalFunc() {}" >> %t/Test.swift
+/// Append comments and expect cache hit (minimizer strips comments but
+/// preserves all declarations, so content-affecting changes only come from
+/// declaration or body modifications).
+// RUN: echo "// Add comments" >> %t/Test.swift
 
 // RUN: %target-swift-frontend-plain -scan-dependencies -module-name Test -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \

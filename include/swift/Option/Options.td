@@ -2344,6 +2344,11 @@ def scan_dependencies_minimized_source :
   Flags<[FrontendOption, NewDriverOnlyOption, HelpHidden]>,
   HelpText<"Use minimized source files during dependency scanning">;
 
+def scan_dependencies_remove_internal_decls :
+  Flag<["-"], "scan-dependencies-remove-internal-decls">,
+  Flags<[FrontendOption, NewDriverOnlyOption, HelpHidden]>,
+  HelpText<"Remove internal/fileprivate declarations during minimized source scanning">;
+
 def no_cache_compile_job:  Flag<["-"], "no-cache-compile-job">,
   Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
   HelpText<"Disable compiler caching">;

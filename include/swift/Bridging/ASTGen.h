@@ -66,10 +66,13 @@ void swift_ASTGen_destroySourceFile(void *_Nonnull sourceFile);
 /// Takes an ExportedSourceFile* from swift_ASTGen_parseSourceFile.
 /// When internalImportByDefault is true, bare imports (without an explicit
 /// access modifier) are treated as internal and removed.
+/// When removeInternalDecls is true, internal/fileprivate declarations are
+/// removed; when false only function/accessor bodies are stripped.
 /// The result is heap-allocated; free with swift_ASTGen_freeBridgedString.
 void swift_ASTGen_minimizeSourceForInterface(
     void *_Nonnull sourceFile,
     bool internalImportByDefault,
+    bool removeInternalDecls,
     BridgedStringRef *_Nonnull resultOut);
 
 /// Extract only import statements from parsed source.

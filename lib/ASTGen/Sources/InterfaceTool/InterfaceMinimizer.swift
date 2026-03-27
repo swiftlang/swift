@@ -14,28 +14,36 @@ import SwiftSyntax
 
 extension SyntaxProtocol {
   /// Produce a copy of this syntax node that has been minimized for interface
-  /// generation by removing non-public declarations and stripping function
-  /// bodies that are not required for inlining.
+  /// generation by stripping function bodies that are not required for inlining,
+  /// and optionally removing non-public declarations.
   ///
-  /// The output retains all information needed to generate every interface
-  /// level (public, private/SPI, and package). Specifically:
+  /// When `removeInternalDecls` is false (the default), all declarations are
+  /// kept regardless of access level and only function/accessor bodies are
+  /// stripped. When true, the output retains only interface-visible
+  /// declarations:
   ///
   /// - `public`, `open`, `package`, and `private` declarations are kept
   /// - `@usableFromInline` declarations are kept
   /// - `@_spi` declarations are kept
   /// - `fileprivate` and plain `internal` declarations are removed
+  ///
+  /// In both modes:
   /// - Function bodies are stripped unless `@inlinable`, `@_transparent`,
   ///   `@_alwaysEmitIntoClient`, or `@backDeployed`
-  /// - `@_implementationOnly` imports are preserved
-  /// - When `internalImportByDefault` is false (the default), imports without
-  ///   an explicit access modifier are preserved; when true, they are removed
-  /// - Imports with explicit `internal`/`fileprivate` are removed
   /// - `#if` blocks are preserved unchanged (the compiler evaluates them)
+  ///
+  /// Import handling depends on `removeInternalDecls`:
+  /// - When false, all imports are kept unconditionally
+  /// - When true, `@_implementationOnly` imports are preserved,
+  ///   bare imports follow `internalImportByDefault`, and imports with
+  ///   explicit `internal`/`fileprivate` are removed
   public func minimizedForInterface(
-    internalImportByDefault: Bool = false
+    internalImportByDefault: Bool = false,
+    removeInternalDecls: Bool = false
   ) -> Syntax {
     let rewriter = InterfaceMinimizer(
-      internalImportByDefault: internalImportByDefault
+      internalImportByDefault: internalImportByDefault,
+      removeInternalDecls: removeInternalDecls
     )
     return rewriter.rewrite(Syntax(self)).strippingComments()
   }
@@ -57,14 +65,18 @@ private enum DeclContext {
   }
 }
 
-/// A `SyntaxRewriter` that strips non-public declarations and non-inlinable
-/// function bodies to produce a minimized source suitable for
-/// `.swiftinterface` generation.
+/// A `SyntaxRewriter` that strips non-inlinable function bodies and optionally
+/// removes non-public declarations to produce a minimized source suitable for
+/// `.swiftinterface` generation or dependency scanning.
 class InterfaceMinimizer: SyntaxRewriter {
 
   /// When true, bare imports (without an explicit access modifier) are treated
   /// as internal and removed during minimization.
   private let internalImportByDefault: Bool
+
+  /// When true, internal/fileprivate declarations are removed. When false
+  /// (the default), all declarations are kept and only bodies are stripped.
+  private let removeInternalDecls: Bool
 
   private var contextStack: [DeclContext] = [.topLevel]
 
@@ -72,8 +84,9 @@ class InterfaceMinimizer: SyntaxRewriter {
     contextStack.last ?? .topLevel
   }
 
-  init(internalImportByDefault: Bool = false) {
+  init(internalImportByDefault: Bool = false, removeInternalDecls: Bool = false) {
     self.internalImportByDefault = internalImportByDefault
+    self.removeInternalDecls = removeInternalDecls
     super.init()
   }
 
@@ -187,6 +200,12 @@ class InterfaceMinimizer: SyntaxRewriter {
       return .keep
     }
 
+    // In body-stripping-only mode, keep all declarations regardless of access
+    // level. Only function/accessor bodies are stripped (handled elsewhere).
+    if !removeInternalDecls {
+      return .keep
+    }
+
     // Protocols are always kept regardless of access level because they
     // may be used as conformance targets by kept declarations.
     if decl.is(ProtocolDeclSyntax.self) {
@@ -208,6 +227,8 @@ class InterfaceMinimizer: SyntaxRewriter {
       return .keep
     }
 
+    // @_exported imports are always kept — they re-export the module
+    // and are part of the public interface regardless of access level.
     // @_implementationOnly imports are kept (the compiler needs them for
     // type-checking the interface).
     // Bare imports (no explicit access modifier) are kept when
@@ -216,6 +237,9 @@ class InterfaceMinimizer: SyntaxRewriter {
     // Imports with explicit internal/fileprivate fall through to
     // shouldKeepDecl and are removed; private imports are kept.
     if let importDecl = decl.as(ImportDeclSyntax.self) {
+      if hasAttribute(in: importDecl.attributes, named: "_exported") {
+        return .keep
+      }
       if hasAttribute(in: importDecl.attributes, named: "_implementationOnly") {
         return .keep
       }

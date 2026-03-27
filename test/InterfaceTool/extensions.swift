@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %swift-interface-tool -action minimize-source %t/input.swift > %t/output.swift
+// RUN: %swift-interface-tool -action minimize-source -remove-internal-decls %t/input.swift > %t/output.swift
 // RUN: %diff %t/output.swift %t/expected.swift
 
 //--- input.swift
