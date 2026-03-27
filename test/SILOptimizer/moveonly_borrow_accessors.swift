@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil  -enable-experimental-feature BorrowAndMutateAccessors %s
+// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil  %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 public struct NC : ~Copyable {}
 

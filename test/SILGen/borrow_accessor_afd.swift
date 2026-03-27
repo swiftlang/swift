@@ -1,6 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature AddressableTypes %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature AddressableTypes %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 // REQUIRES: swift_feature_AddressableTypes
 
 // When the `self` and/or result type of a borrow accessor is addressable-for-

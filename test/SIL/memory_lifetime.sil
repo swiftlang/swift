@@ -915,3 +915,65 @@ bb0(%0 : @owned $BoolAndObj, %1 : @owned $AnyObject):
   return undef : $()
 }
 
+sil [ossa] @test_switch_value_default_block : $@convention(thin) (@in_guaranteed Optional<T>, @in_guaranteed T) -> () {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  %stk = alloc_stack $Optional<T>
+  %2 = init_enum_data_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  copy_addr %1 to [init] %2 : $*T
+  inject_enum_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  %val = integer_literal $Builtin.Int1, 0
+  %true_val = integer_literal $Builtin.Int1, -1
+  switch_value %val : $Builtin.Int1, case %true_val: bb1, default bb2
+
+bb1:
+  destroy_addr %stk : $*Optional<T>
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb2:
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+class Klass {}
+
+enum TripleCaseEnum {
+  case none
+  case some1(Klass)
+  case some2(Int)
+}
+
+sil [ossa] @test_switch_value_case_block : $@convention(thin) (@in_guaranteed TripleCaseEnum, @in_guaranteed Int) -> () {
+bb0(%0 : $*TripleCaseEnum, %1 : $*Int):
+  %stk = alloc_stack $TripleCaseEnum
+  %2 = init_enum_data_addr %stk : $*TripleCaseEnum, #TripleCaseEnum.some2!enumelt
+  copy_addr %1 to [init] %2 : $*Int
+  inject_enum_addr %stk : $*TripleCaseEnum, #TripleCaseEnum.some2!enumelt
+  %val = integer_literal $Builtin.Int32, 2
+  %none_val = integer_literal $Builtin.Int32, 0
+  %some1_val = integer_literal $Builtin.Int32, 1
+  %some2_val = integer_literal $Builtin.Int32, 2
+  switch_value %val, case %none_val: bb1, case %some1_val: bb2, case %some2_val: bb3
+
+bb1:
+  dealloc_stack %stk : $*TripleCaseEnum
+  br bb4
+
+bb2:
+  destroy_addr %stk : $*TripleCaseEnum
+  dealloc_stack %stk : $*TripleCaseEnum
+  br bb4
+
+bb3:
+  dealloc_stack %stk : $*TripleCaseEnum
+  br bb4
+
+bb4:
+  %r = tuple ()
+  return %r : $()
+}
+

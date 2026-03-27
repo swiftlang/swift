@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
-// RUN:     -enable-experimental-feature BorrowAndMutateAccessors \
 // RUN:     -o %t/borrow_accessors.swiftmodule \
 // RUN:     -emit-module-interface-path %t/borrow_accessors.swiftinterface \
 // RUN:     %S/Inputs/borrow_accessors.swift
@@ -13,13 +12,10 @@
 // See if we can compile a module through just the interface and typecheck using it.
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
-// RUN:    -enable-experimental-feature BorrowAndMutateAccessors \
 // RUN:    %t/borrow_accessors.swiftinterface -o %t/borrow_accessors.swiftmodule
 
-// RUN: %target-swift-frontend -typecheck -I %t %s \
-// RUN:    -enable-experimental-feature BorrowAndMutateAccessors
+// RUN: %target-swift-frontend -typecheck -I %t %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 import borrow_accessors
 

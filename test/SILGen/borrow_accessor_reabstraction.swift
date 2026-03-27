@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -enable-experimental-feature BorrowAndMutateAccessors -emit-silgen %s -verify
-// RUN: %target-swift-frontend -enable-experimental-feature BorrowAndMutateAccessors -emit-silgen -enable-library-evolution %s -verify
+// RUN: %target-swift-frontend -emit-silgen %s -verify
+// RUN: %target-swift-frontend -emit-silgen -enable-library-evolution %s -verify
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 public protocol P {
   associatedtype Element

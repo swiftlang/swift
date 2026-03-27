@@ -575,7 +575,7 @@ EXPERIMENTAL_FEATURE(DeprecateCompatMemberwiseInit, false)
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 
 /// Enable borrow/mutate accessors
-EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, true)
+LANGUAGE_FEATURE(BorrowAndMutateAccessors, 507, "borrow and mutate accessors")
 
 /// Enable borrowing for-in loops
 EXPERIMENTAL_FEATURE(BorrowingForLoop, false)

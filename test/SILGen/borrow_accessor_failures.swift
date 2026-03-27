@@ -1,6 +1,5 @@
-// RUN:%target-swift-frontend -emit-silgen %s -enable-experimental-feature BorrowAndMutateAccessors -sil-verify-none -verify
+// RUN:%target-swift-frontend -emit-silgen %s -sil-verify-none -verify
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 public class Klass {
   var id: Int = 0

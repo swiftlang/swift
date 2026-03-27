@@ -1,6 +1,5 @@
-// RUN:%target-swift-frontend -emit-silgen %s -verify  -enable-experimental-feature BorrowAndMutateAccessors  -strict-memory-safety | %FileCheck %s
+// RUN:%target-swift-frontend -emit-silgen %s -verify   -strict-memory-safety | %FileCheck %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 @safe
 public struct Container<Element: ~Copyable >: ~Copyable {

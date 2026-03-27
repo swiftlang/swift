@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature BuiltinModule -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableTypes -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableTypes -emit-ir %s | %FileCheck %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 // REQUIRES: swift_feature_BuiltinModule
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableTypes
