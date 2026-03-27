@@ -62,7 +62,7 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.Element: ~Copy
       return Span()
     }
 
-    let rawPtr = unsafe self.current.__operatorStar()._rawValue
+    let rawPtr = self.current.__operatorStar()._rawValue
     self.current = self.current.successor()
     return unsafe _cxxOverrideLifetime(
         Span(_unsafeStart: UnsafePointer(rawPtr), count: 1),
@@ -90,7 +90,7 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: U
       return Span()
     }
 
-    let rawPtr = unsafe self.current.__operatorStar()._rawValue
+    let rawPtr = self.current.__operatorStar()._rawValue
     let distance = min(count, maximumCount)
     self.current += T.RawIterator.Distance(distance)
     return unsafe _cxxOverrideLifetime(
