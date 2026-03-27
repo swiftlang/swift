@@ -417,14 +417,47 @@ OptionalTests.test("unsafelyUnwrapped") {
 }
 
 OptionalTests.test("unsafelyUnwrapped nil")
-  .require(.crashTesting)
-  .xfail(.custom(
-    { !_isDebugAssertConfiguration() },
-    reason: "assertions are disabled in Release and Unchecked mode"))
-  .code {
+.require(.crashTesting)
+.xfail(.custom(
+  { !_isDebugAssertConfiguration() },
+  reason: "assertions are disabled in Release and Unchecked mode"))
+.code {
   let empty: Int? = nil
   expectCrashLater()
   _blackHole(empty.unsafelyUnwrapped)
+}
+
+OptionalTests.test("Span from Optional.none")
+.require(.stdlib_6_2).code {
+  var o = Optional<[Int]>.none
+  do {
+    let span = o.span
+    // o = [1, 2, 3] // Does not compile, exclusivity violation
+    expectEqual(span.count, 0)
+
+    // make it fail at test time if exclusivity was violated
+    expectNil(o, "fail due to exclusivity violation")
+  }
+  o = nil
+}
+
+OptionalTests.test("Span from Optional.some")
+.require(.stdlib_6_2).code {
+  let a: [Int] = [1, 2, 3]
+  var o: Optional = a
+  do {
+    let span = o.span
+    // o = nil // Does not compile, exclusivity violation
+    expectEqual(span.count, 1)
+    expectEqual(span[0], o, "accessed mysterious memory location")
+
+    expectNotNil(o, "fail due to exclusivity violation")
+
+    let b = [4, 5, 6]
+    // o = b // Does not compile, exclusivity violation
+    expectNotEqual(span[0], b, "accessed mysterious memory location")
+  }
+  o = nil
 }
 
 OptionalTests.test("_span() from Optional.none")
@@ -452,4 +485,29 @@ OptionalTests.test("_span() from Optional.some")
   let b = [4, 5, 6]
   // o = b // Does not compile, exclusivity violation
   expectNotEqual(span[0], b, "accessed mysterious memory location")
+}
+
+OptionalTests.test("MutableSpan from Optional.none")
+.require(.stdlib_6_2).code {
+  var o = Optional<[Int]>.none
+  let span = o.mutableSpan
+  // o = [1, 2, 3] // Does not compile, exclusivity violation
+  expectEqual(span.count, 0)
+}
+
+OptionalTests.test("MutableSpan from Optional.some")
+.require(.stdlib_6_2).code {
+  var a: [Int] = [1, 2, 3]
+  var o: Optional = a
+  var span = o.mutableSpan
+  // o = nil // Does not compile, exclusivity violation
+  expectEqual(span.count, 1)
+  expectEqual(span[0], a, "accessed mysterious memory location")
+
+  a = [4, 5, 6]
+  span[0] = a
+  _ = consume span
+  // exclusive access through `span` ends here
+
+  expectEqual(o, a)
 }
