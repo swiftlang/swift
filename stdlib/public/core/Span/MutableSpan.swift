@@ -100,6 +100,14 @@ extension MutableSpan where Element: ~Copyable {
     let ms = unsafe MutableSpan(_unsafeElements: buffer)
     self = unsafe _overrideLifetime(ms, borrowing: start)
   }
+
+  @_alwaysEmitIntoClient
+  @lifetime(&value)
+  public init(_ value: inout Element) {
+    let address = Builtin.unprotectedAddressOfBorrow(value)
+    let span = unsafe MutableSpan(_unchecked: .init(address), count: 1)
+    self = unsafe _overrideLifetime(span, mutating: &value)
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
