@@ -432,6 +432,7 @@ extension Optional where Wrapped: ~Copyable & Escapable {
     @_addressableSelf
     @lifetime(borrow self)
     borrowing get {
+      // FIXME: rdar://173472004. The `_span()` function below works as expected.
       if self == nil {
         return Span()
       }
