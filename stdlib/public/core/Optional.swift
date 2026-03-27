@@ -426,6 +426,19 @@ extension Optional where Wrapped: ~Copyable & Escapable {
     let s = unsafe Span<Wrapped>(_unsafeStart: .init(a), count: 1)
     return unsafe _overrideLifetime(s, borrowing: self)
   }
+
+  public var mutableSpan: MutableSpan<Wrapped> {
+    @_alwaysEmitIntoClient
+    @lifetime(&self)
+    mutating get {
+      if self == nil {
+        return MutableSpan()
+      }
+      let a = Builtin.unprotectedAddressOfBorrow(self)
+      let s = unsafe MutableSpan<Wrapped>(_unsafeStart: .init(a), count: 1)
+      return unsafe _overrideLifetime(s, borrowing: self)
+    }
+  }
 }
 
 extension Optional where Wrapped: ~Copyable & ~Escapable {
