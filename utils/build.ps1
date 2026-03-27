@@ -2454,6 +2454,7 @@ function Build-Brotli([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
+      BROTLI_BUILD_TOOLS = "NO";
     }
 }
 
