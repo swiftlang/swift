@@ -10,6 +10,8 @@
 
 // REQUIRES: rdar83246843
 
+let printCounters = false
+
 @available(SwiftStdlib 5.1, *)
 actor Counter {
   private var value = 0
@@ -45,7 +47,9 @@ func worker(identity: Int, counters: [Counter], numIterations: Int) async {
     let counterIndex = Int.random(in: 0 ..< counters.count)
     let counter = counters[counterIndex]
     let nextValue = await counter.next()
-    print("Worker \(identity) calling counter \(counterIndex) produced \(nextValue)")
+    if printCounters {
+      print("Worker \(identity) calling counter \(counterIndex) produced \(nextValue)")
+    }
   }
 }
 
