@@ -709,6 +709,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::TypecheckModuleFromInterface;
   if (Opt.matches(OPT_emit_supported_arguments))
     return FrontendOptions::ActionType::PrintArguments;
+  if (Opt.matches(OPT_emit_polyglot_ast))
+    return FrontendOptions::ActionType::EmitPolyglotAST;
   llvm_unreachable("Unhandled mode option");
 }
 

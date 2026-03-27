@@ -359,6 +359,37 @@ static bool dumpPrecompiledClangModule(const CompilerInstance &Instance) {
       opts.InputsAndOutputs.getSingleOutputFilename());
 }
 
+static bool printPolyglotAST(CompilerInstance &Instance) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &opts = Invocation.getFrontendOptions();
+  auto &Context = Instance.getASTContext();
+  auto *clangImporter = static_cast<ClangImporter *>(
+      Context.getClangModuleLoader());
+  for (auto unloadedImport :
+       Instance.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Context.getModule(unloadedImport.module.getModulePath());
+  }
+
+  // The first input file is the target header or implementation file.
+  StringRef headerPath = opts.InputsAndOutputs.getFilenameOfFirstInput();
+  clangImporter->importBridgingHeader(headerPath, Instance.getMainModule(),
+                                      /*diagLoc=*/{},
+                                      /*trackParsedSymbols=*/true);
+
+  std::string outputPath = opts.InputsAndOutputs.getSingleOutputFilename();
+  std::error_code EC;
+  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::OF_None);
+  if (out.has_error() || EC) {
+    Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
+                           EC.message());
+    out.clear_error();
+    return true;
+  }
+
+  clangImporter->printPolyglotAST(headerPath, out);
+  return Context.hadError();
+}
+
 static bool buildModuleFromInterface(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const FrontendOptions &FEOpts = Invocation.getFrontendOptions();
@@ -1307,6 +1338,8 @@ static bool performAction(CompilerInstance &Instance, int &ReturnValue,
     return precompileClangModule(Instance);
   case FrontendOptions::ActionType::DumpPCM:
     return dumpPrecompiledClangModule(Instance);
+  case FrontendOptions::ActionType::EmitPolyglotAST:
+    return printPolyglotAST(Instance);
 
   // MARK: Module Interface Actions
   case FrontendOptions::ActionType::CompileModuleFromInterface:

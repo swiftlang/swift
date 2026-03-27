@@ -219,6 +219,8 @@ public:
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
 
+    EmitPolyglotAST, ///< Emit polyglot AST as JSON
+
     ScanDependencies, ///< Scan dependencies of Swift source files
     PrintVersion,     ///< Print version information.
     PrintArguments,   ///< Print supported arguments of this compiler
