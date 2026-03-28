@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -409,6 +409,22 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
       return x
     }
     _internalInvariantFailure("_uncheckedUnwrapped of nil optional")
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Optional where Wrapped: ~Copyable & Escapable {
+  @_alwaysEmitIntoClient
+  @_addressableSelf
+  @lifetime(borrow self)
+  public func _span() -> Span<Wrapped> {
+    if self == nil {
+      return Span()
+    }
+    let a = Builtin.unprotectedAddressOfBorrow(self)
+    let s = unsafe Span<Wrapped>(_unsafeStart: .init(a), count: 1)
+    return unsafe _overrideLifetime(s, borrowing: self)
   }
 }
 
@@ -1001,22 +1017,3 @@ extension Optional: _ObjectiveCBridgeable {
   }
 }
 #endif
-
-extension Optional where Wrapped: ~Copyable {
-  @available(SwiftStdlib 6.3, *)
-  @_transparent
-  public var _span: Span<Wrapped> {
-    @_addressableSelf
-    @lifetime(borrow self)
-    get {
-      guard self != nil else {
-        return Span()
-      }
-
-      let ptr = Builtin.unprotectedAddressOfBorrow(self)
-      return unsafe _overrideLifetime(
-        Span(_unsafeStart: UnsafePointer(ptr), count: 1),
-        borrowing: self)
-    }
-  }
-}

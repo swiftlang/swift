@@ -1191,7 +1191,6 @@ Added: _$s17BorrowingIterators0A8SequencePTl
 Added: _$s7Elements17BorrowingSequencePTl
 Added: _$s7Elements25BorrowingIteratorProtocolPTl
 Added: _$sSTss17BorrowingSequenceRzrlE04makeA8Iterators0aD7AdapterVy0D0STQzGyF
-Added: _$sSqsRi_zrlE5_spans4SpanVyxGvg
 Added: _$ss11InlineArrayVyxq_Gs17BorrowingSequencesRi__rlMc
 Added: _$ss11MutableSpanVyxGs17BorrowingSequencesRi_zrlMc
 Added: _$ss14MutableRawSpanVs17BorrowingSequencesMc
