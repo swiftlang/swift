@@ -15,8 +15,11 @@ import Swift
 
 // ==== Task.immediate(Detached) ---------------------------------------------------------
 
+// ==== -----------------------------------------------------------------------
+// MARK: Task.immediate - non-throwing
+
 @available(SwiftStdlib 6.2, *)
-extension Task { // throwing Failure error type
+extension Task where Failure == Never {
 
   /// Create and immediately start running a new task in the context of the calling thread/task.
   ///
@@ -51,7 +54,7 @@ extension Task { // throwing Failure error type
     name: String? = nil,
     priority: TaskPriority? = nil,
     executorPreference taskExecutor: consuming (any TaskExecutor)? = nil,
-    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws(Failure)  -> Success
+    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async -> Success
   ) -> Task<Success, Failure> {
 
     let builtinSerialExecutor =
@@ -141,8 +144,239 @@ extension Task { // throwing Failure error type
   }
 }
 
+// ==== -----------------------------------------------------------------------
+// MARK: Task.immediate - throwing
+
+#if $Embedded
 @available(SwiftStdlib 6.2, *)
 extension Task { // throwing Failure error type
+
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @discardableResult
+  public static func immediate(
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    executorPreference taskExecutor: consuming (any TaskExecutor)? = nil,
+    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws(Failure) -> Success
+  ) -> Task<Success, Failure> {
+
+    let builtinSerialExecutor =
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
+    let flagsMustNotCrash: UInt64 = 0
+    let canRunSynchronously: Bool =
+    if let builtinSerialExecutor {
+      _taskIsCurrentExecutor(executor: builtinSerialExecutor, flags: flagsMustNotCrash)
+    } else {
+      true
+    }
+
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: true,
+      inheritContext: true,
+      enqueueJob: !canRunSynchronously,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: true
+    )
+
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            initialTaskExecutorConsuming: taskExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #else
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #endif
+    }
+    #endif
+
+    if task == nil {
+      assert(name == nil)
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+      #else
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        initialTaskExecutor: executorBuiltin,
+        operation: operation).0
+      #endif
+    }
+
+    if task == nil {
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        operation: operation).0
+    }
+
+    if canRunSynchronously {
+      _startTaskImmediately(task!, targetExecutor: builtinSerialExecutor)
+    }
+    return Task<Success, Failure>(task!)
+  }
+}
+
+#else
+@available(SwiftStdlib 6.2, *)
+extension Task where Failure == Error { // throwing Failure error type
+
+  /// Create and immediately start running a new task in the context of the calling thread/task.
+  ///
+  /// This function _starts_ the created task on the calling context.
+  /// The task will continue executing on the caller's context until it suspends,
+  /// and after suspension will resume on the adequate executor. For a nonisolated
+  /// operation this means running on the global concurrent pool, and on an isolated
+  /// operation it means the appropriate executor of that isolation context.
+  ///
+  /// As indicated by the lack of `async` on this method, this method does _not_
+  /// suspend, and instead takes over the calling task's (thread's) execution in
+  /// a synchronous manner.
+  ///
+  /// Other than the execution semantics discussed above, the created task
+  /// is semantically equivalent to a task created using
+  /// the ``Task/init`` initializer.
+  ///
+  /// - Parameters:
+  ///   - name: The high-level human-readable name given for this task
+  ///   - priority: The priority of the task.
+  ///     Pass `nil` to use the ``Task/basePriority`` of the current task (if there is one).
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
+  ///      Explicitly passing `nil` as the executor preference is equivalent to no preference,
+  ///      and effectively means to inherit the outer context's executor preference.
+  ///      You can also pass the ``globalConcurrentExecutor`` global executor explicitly.
+  ///   - operation: the operation to be run immediately upon entering the task.
+  /// - Returns: A reference to the unstructured task which may be awaited on.
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @discardableResult
+  public static func immediate(
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    executorPreference taskExecutor: consuming (any TaskExecutor)? = nil,
+    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws -> Success
+  ) -> Task<Success, Failure> {
+
+    let builtinSerialExecutor =
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
+    // Determine if we're switching isolation dynamically.
+    // If not, we can run the task synchronously and therefore MUST NOT "enqueue" it.
+    let flagsMustNotCrash: UInt64 = 0
+    let canRunSynchronously: Bool =
+    if let builtinSerialExecutor {
+      _taskIsCurrentExecutor(executor: builtinSerialExecutor, flags: flagsMustNotCrash)
+    } else {
+      true // if there is no target executor, we can run synchronously
+    }
+
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: true,
+      inheritContext: true,
+      enqueueJob: !canRunSynchronously,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: true
+    )
+
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            initialTaskExecutorConsuming: taskExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #else // no $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    } // let name
+    #endif // $BuiltinCreateAsyncTaskName
+
+    // Task name was not set, or task name createTask is unavailable
+    if task == nil {
+      assert(name == nil)
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+      #else
+      // legacy branch for the non-consuming task executor
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        initialTaskExecutor: executorBuiltin,
+        operation: operation).0
+      #endif
+    }
+
+    if task == nil {
+      // either no task name was set, or names are unsupported
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        operation: operation).0
+    }
+
+    if canRunSynchronously {
+      _startTaskImmediately(task!, targetExecutor: builtinSerialExecutor)
+    }
+    return Task<Success, Failure>(task!)
+  }
+
+} // extension Task where Failure == Error ...
+#endif
+
+// ==== -----------------------------------------------------------------------
+// MARK: Task.immediateDetached - non-throwing
+
+@available(SwiftStdlib 6.2, *)
+extension Task where Failure == Never {
 
   /// Create and immediately start running a new detached task in the context of the calling thread/task.
   ///
@@ -177,7 +411,7 @@ extension Task { // throwing Failure error type
     name: String? = nil,
     priority: TaskPriority? = nil,
     executorPreference taskExecutor: consuming (any TaskExecutor)? = nil,
-    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws(Failure)  -> Success
+    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async -> Success
   ) -> Task<Success, Failure> {
 
     let builtinSerialExecutor =
@@ -266,6 +500,237 @@ extension Task { // throwing Failure error type
     return Task<Success, Failure>(task!)
   }
 }
+
+// ==== -----------------------------------------------------------------------
+// MARK: Task.immediateDetached - throwing
+
+#if $Embedded
+@available(SwiftStdlib 6.2, *)
+extension Task { // throwing Failure error type
+
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @discardableResult
+  public static func immediateDetached(
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    executorPreference taskExecutor: consuming (any TaskExecutor)? = nil,
+    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws(Failure) -> Success
+  ) -> Task<Success, Failure> {
+
+    let builtinSerialExecutor =
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
+    let flagsMustNotCrash: UInt64 = 0
+    let canRunSynchronously: Bool =
+    if let builtinSerialExecutor {
+      _taskIsCurrentExecutor(executor: builtinSerialExecutor, flags: flagsMustNotCrash)
+    } else {
+      true
+    }
+
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: false /* detached */,
+      inheritContext: false /* detached */,
+      enqueueJob: !canRunSynchronously,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: true
+    )
+
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            initialTaskExecutorConsuming: taskExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #else
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #endif
+    }
+    #endif
+
+    if task == nil {
+      assert(name == nil)
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+      #else
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        initialTaskExecutor: executorBuiltin,
+        operation: operation).0
+      #endif
+    }
+
+    if task == nil {
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        operation: operation).0
+    }
+
+    if canRunSynchronously {
+      _startTaskImmediately(task!, targetExecutor: builtinSerialExecutor)
+    }
+    return Task<Success, Failure>(task!)
+  }
+
+}
+
+#else // !$Embedded
+
+@available(SwiftStdlib 6.2, *)
+extension Task where Failure == Error { // throwing
+
+  /// Create and immediately start running a new detached task in the context of the calling thread/task.
+  ///
+  /// This function _starts_ the created task on the calling context.
+  /// The task will continue executing on the caller's context until it suspends,
+  /// and after suspension will resume on the adequate executor. For a nonisolated
+  /// operation this means running on the global concurrent pool, and on an isolated
+  /// operation it means the appropriate executor of that isolation context.
+  ///
+  /// As indicated by the lack of `async` on this method, this method does _not_
+  /// suspend, and instead takes over the calling task's (thread's) execution in
+  /// a synchronous manner.
+  ///
+  /// Other than the execution semantics discussed above, the created task
+  /// is semantically equivalent to a task created using
+  /// the ``Task/detached`` function.
+  ///
+  /// - Parameters:
+  ///   - name: The high-level human-readable name given for this task
+  ///   - priority: The priority of the task.
+  ///     Pass `nil` to use the ``Task/basePriority`` of the current task (if there is one).
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
+  ///      Explicitly passing `nil` as the executor preference is equivalent to no preference,
+  ///      and effectively means to inherit the outer context's executor preference.
+  ///      You can also pass the ``globalConcurrentExecutor`` global executor explicitly.
+  ///   - operation: the operation to be run immediately upon entering the task.
+  /// - Returns: A reference to the unstructured task which may be awaited on.
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @discardableResult
+  public static func immediateDetached(
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    executorPreference taskExecutor: consuming (any TaskExecutor)? = nil,
+    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws -> Success
+  ) -> Task<Success, Failure> {
+
+    let builtinSerialExecutor =
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
+    // Determine if we're switching isolation dynamically.
+    // If not, we can run the task synchronously and therefore MUST NOT "enqueue" it.
+    let flagsMustNotCrash: UInt64 = 0
+    let canRunSynchronously: Bool =
+    if let builtinSerialExecutor {
+      _taskIsCurrentExecutor(executor: builtinSerialExecutor, flags: flagsMustNotCrash)
+    } else {
+      true // if there is no target executor, we can run synchronously
+    }
+
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: false /* detached */,
+      inheritContext: false /* detached */,
+      enqueueJob: !canRunSynchronously,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: true
+    )
+
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            initialTaskExecutorConsuming: taskExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #else // no $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    } // let name
+    #endif // $BuiltinCreateAsyncTaskName
+
+    // Task name was not set, or task name createTask is unavailable
+    if task == nil {
+      assert(name == nil)
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+      #else
+      // legacy branch for the non-consuming task executor
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        initialTaskExecutor: executorBuiltin,
+        operation: operation).0
+      #endif
+    }
+
+    if task == nil {
+      // either no task name was set, or names are unsupported
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        operation: operation).0
+    }
+
+    if canRunSynchronously {
+      _startTaskImmediately(task!, targetExecutor: builtinSerialExecutor)
+    }
+    return Task<Success, Failure>(task!)
+  }
+
+}
+
+#endif // $Embedded
 
 @available(SwiftStdlib 6.2, *)
 extension TaskGroup {
