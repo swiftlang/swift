@@ -1719,7 +1719,8 @@ public:
   TupleInst *createTuple(SILLocation Loc, SILType Ty,
                          ArrayRef<SILValue> Elements,
                          ValueOwnershipKind forwardingOwnershipKind) {
-    ASSERT(isLoadableOrOpaque(Ty));
+    ASSERT(isLoadableOrOpaque(Ty) ||
+           (isInsertingIntoGlobal() && getTypeLowering(Ty).isFixedABI()));
     return insert(TupleInst::create(getSILDebugLocation(Loc), Ty, Elements,
                                     getModule(), forwardingOwnershipKind));
   }
