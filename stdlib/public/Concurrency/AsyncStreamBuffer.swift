@@ -158,14 +158,14 @@ final class _Storage<Element, Failure: Error>: @unchecked Sendable {
 
 extension _Storage {
   func getOnTermination() -> TerminationHandler? {
-    unsafe withLock {
+    unsafe withLock { _ in
       return self.onTermination
     }
   }
 
   func setOnTermination(_ newValue: TerminationHandler?) {
-    unsafe withLock {
-      switch unsafe self.state {
+    unsafe withLock { state in
+      switch unsafe state {
       case .idle, .waiting:
         self.onTermination = newValue
 
@@ -179,13 +179,13 @@ extension _Storage {
     let (
       result,
       action
-    ): (Continuation.YieldResult, YieldAction) = unsafe withLock {
-      switch unsafe self.state {
+    ): (Continuation.YieldResult, YieldAction) = unsafe withLock { state in
+      switch unsafe state {
       case var .idle(buffer):
         switch self.bufferingPolicy {
         case .unbounded:
           buffer.append(value)
-          unsafe self.state = unsafe .idle(buffer: buffer)
+          unsafe state = unsafe .idle(buffer: buffer)
           return unsafe (
             result: .enqueued(remaining: .max),
             action: .none)
@@ -194,7 +194,7 @@ extension _Storage {
           switch buffer.count < limit {
           case true:
             buffer.append(value)
-            unsafe self.state = unsafe .idle(buffer: buffer)
+            unsafe state = unsafe .idle(buffer: buffer)
             return unsafe (
               result: .enqueued(remaining: limit - buffer.count),
               action: .none)
@@ -209,7 +209,7 @@ extension _Storage {
           switch limit {
           case _ where buffer.count < limit && limit > .zero:
             buffer.append(value)
-            unsafe self.state = unsafe .idle(buffer: buffer)
+            unsafe state = unsafe .idle(buffer: buffer)
             return unsafe (
               result: .enqueued(remaining: limit - buffer.count),
               action: .none)
@@ -217,7 +217,7 @@ extension _Storage {
           case _ where buffer.count >= limit && limit > .zero:
             let droppedValue = buffer.removeFirst()
             buffer.append(value)
-            unsafe self.state = unsafe .idle(buffer: buffer)
+            unsafe state = unsafe .idle(buffer: buffer)
             return unsafe (
               result: .dropped(droppedValue),
               action: .none)
@@ -234,9 +234,9 @@ extension _Storage {
 
         switch unsafe consumers.isEmpty {
         case true:
-          unsafe self.state = unsafe .idle(buffer: [])
+          unsafe state = unsafe .idle(buffer: [])
         case false:
-          unsafe self.state = unsafe .waiting(consumers: consumers)
+          unsafe state = unsafe .waiting(consumers: consumers)
         }
 
         switch self.bufferingPolicy {
@@ -270,29 +270,29 @@ extension _Storage {
 
   private
   func next(_ consumer: Consumer) {
-    let action: NextAction = unsafe withLock {
-      switch unsafe self.state {
+    let action: NextAction = unsafe withLock { state in
+      switch unsafe state {
       case var .idle(buffer):
         switch buffer.isEmpty {
         case true:
-          unsafe self.state = unsafe .waiting(consumers: [consumer])
+          unsafe state = unsafe .waiting(consumers: [consumer])
           return .suspend
 
         case false:
           let element = buffer.removeFirst()
-          unsafe self.state = unsafe .idle(buffer: buffer)
+          unsafe state = unsafe .idle(buffer: buffer)
           return .resume(element: element)
         }
 
       case var .waiting(consumers):
         unsafe consumers.append(consumer)
-        unsafe self.state = .waiting(consumers: consumers)
+        unsafe state = .waiting(consumers: consumers)
         return .suspend
 
       case .draining(var buffer, let failure):
         switch buffer.isEmpty {
         case true:
-          unsafe self.state = unsafe .terminated()
+          unsafe state = unsafe .terminated()
           switch failure {
           case .none:
             return .resume(element: nil)
@@ -303,12 +303,12 @@ extension _Storage {
 
         case false:
           let element = buffer.removeFirst()
-          unsafe self.state = unsafe .draining(buffer: buffer, failure: failure)
+          unsafe state = unsafe .draining(buffer: buffer, failure: failure)
           return .resume(element: element)
         }
 
       case let .terminated(failure):
-        unsafe self.state = unsafe .terminated()
+        unsafe state = unsafe .terminated()
         switch failure {
         case .none:
           return .resume(element: nil)
@@ -353,21 +353,21 @@ extension _Storage {
       failure = nil
     }
 
-    let action: TerminateAction = unsafe withLock {
-      switch unsafe self.state {
+    let action: TerminateAction = unsafe withLock { state in
+      switch unsafe state {
       case let .idle(buffer):
         switch buffer.isEmpty {
         case true:
-          unsafe self.state = unsafe .terminated(failure: failure)
+          unsafe state = unsafe .terminated(failure: failure)
 
         case false:
-          unsafe self.state = unsafe .draining(buffer: buffer, failure: failure)
+          unsafe state = unsafe .draining(buffer: buffer, failure: failure)
         }
         return unsafe .callHandler(
           terminationHandler: self.onTermination.take())
 
       case let .waiting(consumers):
-        unsafe self.state = .terminated()
+        unsafe state = .terminated()
         return unsafe .callHandlerAndResume(
           terminationHandler: self.onTermination.take(),
           consumers: consumers,
@@ -435,11 +435,10 @@ extension _Storage {
 
 extension _Storage {
   private
-  func withLock<T, E: Error>(
-    _ action: () throws(E) -> T
-  ) throws(E) -> T {
-    let ptr =
-    unsafe UnsafeRawPointer(
+  func withLock<Value>(
+    _ action: (inout State) -> Value
+  ) -> Value {
+    let ptr = unsafe UnsafeRawPointer(
       Builtin.projectTailElems(self, UnsafeRawPointer.self)
     )
 
@@ -447,7 +446,7 @@ extension _Storage {
 
     defer { unsafe _unlock(ptr) }
 
-    return try action()
+    return unsafe action(&self.state)
   }
 
   static func create(
