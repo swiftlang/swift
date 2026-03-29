@@ -19,7 +19,7 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(anyAppleOS)
 internal import Darwin
 #elseif os(Windows)
 internal import WinSDK
@@ -29,7 +29,7 @@ internal import Glibc
 internal import Musl
 #endif
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(anyAppleOS)
 internal import BacktracingImpl.OS.Darwin
 #elseif os(Windows)
 internal import BacktracingImpl.OS.Windows
@@ -436,7 +436,7 @@ extension arm_gprs {
     return (framePointer & 0xf) == 0
   }
 
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(anyAppleOS)
   internal static var coreSymbolicationArchitecture: CSArchitecture {
     return kCSArchitectureX86_64
   }
@@ -619,7 +619,7 @@ extension arm_gprs {
     return (framePointer & 0xf) == 8
   }
 
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(anyAppleOS)
   internal static var coreSymbolicationArchitecture: CSArchitecture {
     return kCSArchitectureI386
   }
@@ -830,7 +830,7 @@ extension arm_gprs {
     return (framePointer & 1) == 0
   }
 
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(anyAppleOS)
   public static func stripPtrAuth(address: Address) -> Address {
     // Is there a better way to do this?  It'd be easy if we just wanted to
     // strip for the *host*, but we might conceivably want this under other
@@ -980,7 +980,7 @@ extension arm_gprs {
     return (framePointer & 1) == 0
   }
 
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(anyAppleOS)
   internal static var coreSymbolicationArchitecture: CSArchitecture {
     return kCSArchitectureArmV7K
   }
@@ -1025,7 +1025,7 @@ extension arm_gprs {
 
 // .. Darwin specifics .........................................................
 
-#if (os(macOS) || os(iOS) || os(watchOS) || os(tvOS))
+#if os(anyAppleOS)
 private func thread_get_state<T>(_ thread: thread_t,
                                  _ flavor: CInt,
                                  _ result: inout T) -> kern_return_t {

@@ -16,7 +16,7 @@
 
 import Swift
 
-// #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+// #if os(anyAppleOS)
 // internal import Darwin
 // #elseif os(Windows)
 // internal import ucrt
@@ -372,7 +372,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     case Linux
     case Windows
 
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if os(anyAppleOS)
     static public let `default` = SymbolicationPlatform.Darwin
     #elseif os(Linux)
     static public let `default` = SymbolicationPlatform.Linux

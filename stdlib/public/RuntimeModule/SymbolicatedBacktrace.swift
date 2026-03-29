@@ -17,11 +17,11 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(anyAppleOS)
 internal import BacktracingImpl.OS.Darwin
 #endif
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(anyAppleOS)
 internal import Darwin
 #elseif os(Windows)
 internal import ucrt
@@ -202,7 +202,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     /// For instance, the `start` function from `dyld` on macOS is a system
     /// function, and we don't need to display it under normal circumstances.
     public var isSystemFunction: Bool {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      #if os(anyAppleOS)
       if rawName == "start", imageName == "dyld" {
         return true
       }
@@ -318,7 +318,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     self.frames = frames
   }
 
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(anyAppleOS)
   private enum macOSSymbolicationError: Error {
     case invalidUUID
   }
@@ -497,7 +497,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     switch symbolicationPlatform {
     case .Darwin:
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      #if os(anyAppleOS)
       withSymbolicator(images: theImages,
                       useSymbolCache: options.contains(.useSymbolCache)) {
         symbolicator in
