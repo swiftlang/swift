@@ -1561,7 +1561,7 @@ void diagnoseMissingImports(SourceFile &sf);
 // protocol should be used, thus enabling Borrowing iteration for a given
 // sequence type.
 bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync,
-                                SourceLoc loc, const DeclContext *dc);
+                                SourceLoc loc, DeclContext *dc);
 
 } // end namespace swift
 

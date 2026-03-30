@@ -3499,6 +3499,11 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     return ManagedValue();
   };
   
+  // See through opaque value placeholders, e.g. the for-each sequence.
+  if (auto *OV = dyn_cast<OpaqueValueExpr>(expr)) {
+    if (auto *underlying = OpaqueExprs.lookup(OV))
+      expr = underlying;
+  }
   if (auto le = dyn_cast<LoadExpr>(expr)) {
     expr = le->getSubExpr();
   }

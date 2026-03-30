@@ -3430,7 +3430,7 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 
 bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
                                        bool isAsync, SourceLoc loc,
-                                       const DeclContext *dc) {
+                                       DeclContext *dc) {
   if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
     return false;
   }
@@ -3445,7 +3445,16 @@ bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
     return false;
   }
 
-  // Always prefer conformance to Sequence over BorrowingSequence when
+  // Always try to use BorrowingSequence for sequences that conform to
+  // CxxBorrowingSequence when it is available.
+  if (auto cxxBorrowingSequence =
+          ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence)) {
+    if (auto conf = lookupConformance(seqTy, cxxBorrowingSequence)) {
+      return !conf.getAvailabilityConstraint(dc, loc);
+    }
+  }
+
+  // Else, always prefer conformance to Sequence over BorrowingSequence when
   // both are available.
   if (lookupConformance(seqTy, ctx.getProtocol(KnownProtocolKind::Sequence))) {
     return false;
