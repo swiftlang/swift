@@ -49,6 +49,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RequirementMatch.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
@@ -5039,6 +5040,25 @@ static bool isolationsMatch(
   return false;
 }
 
+/// Whether a witness declaration could be marked 'nonisolated'.
+static bool couldApplyNonisolated(WitnessIsolationError const &witnessError) {
+  if (hasExplicitGlobalActorAttr(witnessError.witness) ||
+      witnessError.witness->getLoc().isInvalid())
+    return false;
+  if (auto *var = dyn_cast<VarDecl>(witnessError.witness)) {
+    if (var->hasStorage()) {
+      // Mutable VarDecl with storage, for an immutable requirement, can be
+      // converted to 'let nonisolated'.
+      return !var->isLet() && isa<VarDecl>(witnessError.requirement) &&
+             !cast<VarDecl>(witnessError.requirement)
+                  ->isSettable(/*useDC=*/nullptr);
+    }
+    // Computed VarDecl can be converted if no property wrapper is present.
+    return !var->hasAttachedPropertyWrapper();
+  }
+  return isa<AbstractFunctionDecl, SubscriptDecl>(witnessError.witness);
+}
+
 static void diagnoseConformanceIsolationErrors(
     const NormalProtocolConformance *conformance
 ) {
@@ -5100,10 +5120,7 @@ static void diagnoseConformanceIsolationErrors(
       }
 
       // If this is an entity where `nonisolated` would make sense, suggest it.
-      if ((isa<AbstractFunctionDecl>(witnessError.witness) ||
-           isa<SubscriptDecl>(witnessError.witness)) &&
-          !hasExplicitGlobalActorAttr(witnessError.witness) &&
-          witnessError.witness->getLoc().isValid()) {
+      if (couldApplyNonisolated(witnessError)) {
         potentialNonisolated.push_back(witnessError.witness);
       }
 
@@ -5181,18 +5198,6 @@ static void diagnoseConformanceIsolationErrors(
                                              "@" + globalActorTypeStr.str());
     }
 
-    // If marking witnesses as 'nonisolated' could work, suggest that.
-    if (!potentialNonisolated.empty() && !hasIsolatedConformances) {
-      auto diag = ctx.Diags.diagnose(
-          conformance->getLoc(),
-          diag::note_make_witnesses_nonisolated);
-      for (auto witness: potentialNonisolated) {
-        diag.fixItInsert(
-            witness->getAttributeInsertionLoc(/*forModifier=*/true),
-            "nonisolated ");
-      }
-    }
-
     // If the conformance could be @preconcurrency, suggest it.
     if (!conformance->isIsolated() && !conformance->isPreconcurrency() &&
         !hasIsolatedConformances) {
@@ -5222,6 +5227,29 @@ static void diagnoseConformanceIsolationErrors(
 
         if (!witnessError.isMissingDistributed)
           witnessError.diagnose(conformance);
+      }
+    }
+
+    // If marking a witness as 'nonisolated' could work, suggest that.
+    if (!hasIsolatedConformances) {
+      for (auto witness : potentialNonisolated) {
+        auto var = dyn_cast<VarDecl>(witness);
+        // Not a variable, or a computed property.
+        if (!var || !var->hasStorage()) {
+          ctx.Diags
+              .diagnose(witness, diag::note_make_witness_nonisolated, witness)
+              .fixItInsert(
+                  witness->getAttributeInsertionLoc(/*forModifier=*/true),
+                  "nonisolated ");
+          continue;
+        }
+        // Mutable variables (since we didn't add let witnesses), which can be
+        // converted to 'nonisolated let'.
+        auto loc = getFixItLocForVarToLet(var);
+        if (loc.isValid()) {
+          ctx.Diags.diagnose(var, diag::note_make_witness_immutable, var)
+              .fixItReplace(loc, "nonisolated let");
+        }
       }
     }
   }

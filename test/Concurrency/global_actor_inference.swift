@@ -128,6 +128,7 @@ class Object: Interface {
   // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
 
   var baz: Int = 42 // expected-note{{main actor-isolated property 'baz' cannot satisfy nonisolated requirement}}
+  // expected-note@-1{{change property 'baz' to a 'nonisolated let' constant}}{{3-6=nonisolated let}}
 }
 
 

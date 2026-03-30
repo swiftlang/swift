@@ -1546,12 +1546,12 @@ protocol SGA_Proto {
 // try to override a MA method with inferred isolation from a protocol requirement
 // expected-warning@+1{{conformance of 'SGA_MA' to protocol 'SGA_Proto' involves isolation mismatches and can cause data races}}
 class SGA_MA: MA, SGA_Proto {
-  // expected-note@-1{{mark all declarations used in the conformance 'nonisolated'}}
-  // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
-  
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+
   // expected-error@+2 {{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
   // expected-note@+1 {{main actor-isolated instance method 'method()' cannot satisfy global actor 'SomeGlobalActor'-isolated requirement}}
   override func method() { onions_sga() }
+  // expected-note@-1{{mark instance method 'method()' 'nonisolated'}}{{3-3=nonisolated }}
 }
 
 class None_MA: MA {
