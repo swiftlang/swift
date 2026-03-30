@@ -826,8 +826,10 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
       if (!sourceFile)
         continue;
 
-      mainDependencies.addModuleImports(*sourceFile, alreadyAddedModules,
-                                        &ScanASTContext.SourceMgr);
+      mainDependencies.addModuleImports(
+          *sourceFile, alreadyAddedModules, &ScanASTContext.SourceMgr,
+          ScanCompilerInvocation.getCASOptions()
+              .RemoveInternalDeclsOnMinimization);
     }
 
     // Pass all the successful canImport checks from the ASTContext as part of
