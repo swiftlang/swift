@@ -201,17 +201,12 @@ public struct ObservationTracking: Sendable {
       state.withCriticalRegion { $0.changed }
   }
 
-  static func deactivateAccessList(_ ptr: UnsafeMutablePointer<_AccessList?>) -> ObservationRegistrar.Dirty? {
-    var found: ObservationRegistrar.Dirty? = nil
+  static func deactivateAccessList(_ ptr: UnsafeMutablePointer<_AccessList?>) {
     if let entries = ptr.pointee?.entries.values {
       for entry in entries {
-        let dirty = entry.context.clearDirty(ptr)
-        if found == nil {
-          found = dirty
-        }
+        entry.context.clearTracking(ptr)
       }
     }
-    return found
   }
 
   @available(SwiftStdlib 6.4, *)
@@ -381,7 +376,6 @@ extension ObservationTracking.Options: Sendable { }
 struct AccessListResult<T: ~Copyable>: ~Copyable {
   var result: T
   var accessList: ObservationTracking._AccessList?
-  var dirty: ObservationRegistrar.Dirty?
 }
 
 @available(SwiftStdlib 5.9, *)
@@ -389,7 +383,6 @@ fileprivate func generateAccessList<T: ~Copyable, Failure: Error>(
   _ apply: () throws(Failure) -> T
 ) throws(Failure) -> AccessListResult<T> {
   var accessList: ObservationTracking._AccessList?
-  var dirty: ObservationRegistrar.Dirty? = nil
   let result = try withUnsafeMutablePointer(to: &accessList) { (ptr: UnsafeMutablePointer<ObservationTracking._AccessList?>) throws(Failure) -> T in
     let previous = _ThreadLocal.value
     _ThreadLocal.value = UnsafeMutableRawPointer(ptr)
@@ -405,10 +398,10 @@ fileprivate func generateAccessList<T: ~Copyable, Failure: Error>(
       _ThreadLocal.value = previous
     }
     let result = try apply()
-    dirty = ObservationTracking.deactivateAccessList(ptr)
+    ObservationTracking.deactivateAccessList(ptr)
     return result
   }
-  return AccessListResult(result: result, accessList: accessList, dirty: dirty)
+  return AccessListResult(result: result, accessList: accessList)
 }
 
 @available(SwiftStdlib 6.4, *)
@@ -450,16 +443,6 @@ public func withObservationTracking<Result: ~Copyable, Failure: Error>(
   }
   let tracking = ObservationTracking(accessListResult.accessList)
   ObservationTracking._installTracking(options: options, tracking, willSet: willSet, didSet: didSet, deinit: `deinit`)
-  switch accessListResult.dirty {
-  case .willSet(let keyPath):
-    willSet?(ObservationTracking(accessListResult.accessList, changed: keyPath))
-  case .didSet(let keyPath):
-    didSet?(ObservationTracking(accessListResult.accessList, changed: keyPath))
-  case .deinit:
-    `deinit`?()
-  default:
-    break
-  }
   return accessListResult.result
 }
 

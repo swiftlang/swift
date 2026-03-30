@@ -529,7 +529,7 @@ extension __StringStorage {
     @inline(__always) get {
       _internalInvariant(hasBreadcrumbs)
       return Int(Builtin.atomicload_acquire_Word(
-        unsafe UnsafeMutableRawPointer(_realCapacityEnd)._rawValue))
+        UnsafeMutableRawPointer(_realCapacityEnd)._rawValue))
     }
   }
   
