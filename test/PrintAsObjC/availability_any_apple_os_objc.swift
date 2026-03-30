@@ -7,19 +7,19 @@
 import Foundation
 
 // CHECK-LABEL: SWIFT_CLASS("{{.*}}AvailableOnAnyAppleOS26{{.*}}")
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=26)
+// CHECK-SAME: SWIFT_AVAILABILITY(anyappleos,introduced=26)
 // CHECK: @end
 
 // CHECK-LABEL: SWIFT_CLASS("{{.*}}PropertyClass{{.*}}")
 // CHECK: @property{{.*}}propertyWithAvailability
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=26)
+// CHECK-SAME: SWIFT_AVAILABILITY(anyappleos,introduced=26)
 // CHECK: @end
 
 // CHECK-LABEL: SWIFT_CLASS("{{.*}}SomeClass{{.*}}")
 // CHECK: - (void)methodWithAnyAppleOSAvailability
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=26)
+// CHECK-SAME: SWIFT_AVAILABILITY(anyappleos,introduced=26)
 // CHECK: - (void)methodWithMinorVersion
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=26.5)
+// CHECK-SAME: SWIFT_AVAILABILITY(anyappleos,introduced=26.5)
 // CHECK: @end
 
 @objc
