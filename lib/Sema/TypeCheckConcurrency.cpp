@@ -7448,10 +7448,10 @@ bool swift::checkSendableConformance(
   if (classDecl && classDecl->getParentSourceFile()) {
     bool isInherited = isa<InheritedProtocolConformance>(conformance);
 
-    // An non-final class cannot conform to `Sendable`.
+    // A non-final class cannot conform to `Sendable`.
     if (!classDecl->isSemanticallyFinal()) {
       classDecl->diagnose(diag::concurrent_value_nonfinal_class,classDecl->getName())
-          .fixItInsert(classDecl->getStartLoc(), "final")
+          .fixItInsert(classDecl->getStartLoc(), "final ")
           .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
 
       if (behavior == DiagnosticBehavior::Unspecified)
