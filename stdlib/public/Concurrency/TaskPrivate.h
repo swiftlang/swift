@@ -593,6 +593,14 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     : Flags(flags), Record(record) {}
 #endif
 
+  ActiveTaskStatus withFlags(uintptr_t flags) const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, flags, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, flags);
+#endif
+  }
+
 public:
 #ifdef __GLIBCXX__
   /// We really don't want to provide this constructor, but in old
@@ -609,6 +617,28 @@ public:
       : Flags(uintptr_t(priority)), Record(nullptr) {}
 #endif
 
+  // Getters / setters for flags (in flag order)
+
+  // Priority
+  JobPriority getStoredPriority() const {
+    return JobPriority(Flags & PriorityMask);
+  }
+  /// Creates a new active task status for a task with the specified priority
+  /// and masks away any existing priority related flags on the task status. All
+  /// other flags about the task are unmodified. This is only safe to use when
+  /// we know that the task we're modifying is not running.
+  ActiveTaskStatus withNewPriority(JobPriority priority) const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    assert(ExecutionLock == DLOCK_OWNER_NULL);
+#endif
+    return withFlags((Flags & ~PriorityMask) | uintptr_t(priority));
+  }
+  ActiveTaskStatus withEscalatedPriority(JobPriority priority) const {
+    assert(priority > getStoredPriority());
+    return withFlags((Flags & ~PriorityMask) | IsEscalated | uintptr_t(priority));
+  }
+
+  // IsCancelled
   /// Is the task currently cancelled?
   /// This does take into account cancellation shields, i.e. while a shield is active this function will always return 'false'.
   bool isCancelled(bool ignoreShield = false) const {
@@ -616,68 +646,42 @@ public:
   }
   bool isCancelledIgnoringShield() const { return Flags & IsCancelled; }
   ActiveTaskStatus withCancelled() const {
+    return withFlags(Flags | IsCancelled);
+  }
+
+  // IsStatusRecordLocked
+  /// Does some thread hold the status record lock?
+  bool isStatusRecordLocked() const { return Flags & IsStatusRecordLocked; }
+  ActiveTaskStatus withStatusRecordLocked() const {
+    assert(!isStatusRecordLocked());
+    return withFlags(Flags | IsStatusRecordLocked);
+  }
+  ActiveTaskStatus withoutStatusRecordLocked() const {
+    assert(isStatusRecordLocked());
+    return withFlags(Flags & ~IsStatusRecordLocked);
+  }
+
+  // IsEscalated
+  bool isStoredPriorityEscalated() const {
+    return Flags & IsEscalated;
+  }
+  ActiveTaskStatus withoutStoredPriorityEscalation() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags | IsCancelled, ExecutionLock);
+    return ActiveTaskStatus(Record, Flags & ~IsEscalated, ExecutionLock);
 #else
-    return ActiveTaskStatus(Record, Flags | IsCancelled);
+    return ActiveTaskStatus(Record, Flags & ~IsEscalated);
 #endif
   }
 
-  bool hasCancellationShield() const { return Flags & HasActiveTaskCancellationShield; }
-  ActiveTaskStatus withCancellationShield() const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags | HasActiveTaskCancellationShield, ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, Flags | HasActiveTaskCancellationShield);
-#endif
-  }
-  ActiveTaskStatus withoutCancellationShield() const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags & ~HasActiveTaskCancellationShield, ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, Flags & ~HasActiveTaskCancellationShield);
-#endif
-  }
-
-  bool isIntrusivelyLinked() const { return Flags & IsIntrusivelyLinked; }
-  ActiveTaskStatus withIntrusivelyLinked() const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags | IsIntrusivelyLinked, ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, Flags | IsIntrusivelyLinked);
-#endif
-  }
-  ActiveTaskStatus withoutIntrusivelyLinked() const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags & ~IsIntrusivelyLinked, ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, Flags & ~IsIntrusivelyLinked);
-#endif
-  }
-
+  // IsRunning
   /// Is the task currently running? Also known as whether it is drain locked.
   bool isRunning() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-  return dispatch_lock_is_locked(ExecutionLock);
+    return dispatch_lock_is_locked(ExecutionLock);
 #else
     return Flags & IsRunning;
 #endif
   }
-
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-  static size_t executionLockOffset() {
-    return offsetof(ActiveTaskStatus, ExecutionLock);
-  }
-#endif
-
-  uint32_t currentExecutionLockOwner() const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-  return dispatch_lock_owner(ExecutionLock);
-#else
-  return 0;
-#endif
-  }
-
   ActiveTaskStatus withRunning(bool isRunning) const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   if (isRunning) {
@@ -692,106 +696,86 @@ public:
 #endif
   }
 
+  // IsIntrusivelyLinked
+  bool isIntrusivelyLinked() const { return Flags & IsIntrusivelyLinked; }
+  ActiveTaskStatus withIntrusivelyLinked() const {
+    return withFlags(Flags | IsIntrusivelyLinked);
+  }
+  ActiveTaskStatus withoutIntrusivelyLinked() const {
+    return withFlags(Flags & ~IsIntrusivelyLinked);
+  }
+  static bool atomicRemoveIntrusivelyLinked(char *storage) {
+    // To do an atomic AND, we have to use the underlying storage and
+    // cast it. This cast could be done in a simpler way since Flags
+    // should always be at the start and should always be a uint32_t.
+    // But to be more resilient, I get the offsets and types correctly
+    auto *flags = reinterpret_cast<std::atomic<decltype(ActiveTaskStatus::Flags)>*>(storage + offsetof(ActiveTaskStatus, Flags));
+    // Release memory ordering so that other threads can not decide to reuse this
+    // Task's intrusive linkage before all of our earlier uses have completed
+    auto oldFlags = flags->fetch_and(~(IsIntrusivelyLinked & HasRetainForInstrusiveLinkage), std::memory_order_release);
+
+    // Tell the caller if it needs to do a release on the Task
+    return (oldFlags & HasRetainForInstrusiveLinkage) != 0;
+  }
+
+  // IsComplete
   bool isComplete() const {
     return Flags & IsComplete;
   }
-
   ActiveTaskStatus withComplete() const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags | IsComplete, ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, Flags | IsComplete);
-#endif
+    return withFlags(Flags | IsComplete);
   }
 
-  /// Does some thread hold the status record lock?
-  bool isStatusRecordLocked() const { return Flags & IsStatusRecordLocked; }
-  ActiveTaskStatus withStatusRecordLocked() const {
-    assert(!isStatusRecordLocked());
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags | IsStatusRecordLocked,
-                            ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, Flags | IsStatusRecordLocked);
-#endif
-  }
-  ActiveTaskStatus withoutStatusRecordLocked() const {
-    assert(isStatusRecordLocked());
-
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags & ~IsStatusRecordLocked,
-                            ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, Flags & ~IsStatusRecordLocked);
-#endif
-  }
-
+  // HasTaskDependency
   /// Is there a dependencyRecord in the linked list of status records?
   bool hasTaskDependency() const { return Flags & HasTaskDependency; }
   ActiveTaskStatus withTaskDependency() const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags | HasTaskDependency, ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, Flags | HasTaskDependency);
-#endif
+    return withFlags(Flags | HasTaskDependency);
   }
   ActiveTaskStatus withoutTaskDependency() const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags & ~HasTaskDependency, ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, Flags & ~HasTaskDependency);
-#endif
+    return withFlags(Flags & ~HasTaskDependency);
   }
 
+  // HasTaskExecutorPreference
   /// Is there a task preference record in the linked list of status records?
   bool hasTaskExecutorPreference() const {
     return Flags & HasTaskExecutorPreference;
   }
   ActiveTaskStatus withTaskExecutorPreference() const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags | HasTaskExecutorPreference, ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, Flags | HasTaskExecutorPreference);
-#endif
+    return withFlags(Flags | HasTaskExecutorPreference);
   }
   ActiveTaskStatus withoutTaskExecutorPreference() const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags & ~HasTaskExecutorPreference, ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, Flags & ~HasTaskExecutorPreference);
-#endif
+    return withFlags(Flags & ~HasTaskExecutorPreference);
   }
 
-  JobPriority getStoredPriority() const {
-    return JobPriority(Flags & PriorityMask);
+  // HasActiveTaskCancellationShield
+  bool hasCancellationShield() const { return Flags & HasActiveTaskCancellationShield; }
+  ActiveTaskStatus withCancellationShield() const {
+    return withFlags(Flags | HasActiveTaskCancellationShield);
   }
-  bool isStoredPriorityEscalated() const {
-    return Flags & IsEscalated;
-  }
-
-  /// Creates a new active task status for a task with the specified priority
-  /// and masks away any existing priority related flags on the task status. All
-  /// other flags about the task are unmodified. This is only safe to use when
-  /// we know that the task we're modifying is not running.
-  ActiveTaskStatus withNewPriority(JobPriority priority) const {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    assert(ExecutionLock == DLOCK_OWNER_NULL);
-#endif
-    return ActiveTaskStatus(Record,
-                            (Flags & ~PriorityMask) | uintptr_t(priority));
+  ActiveTaskStatus withoutCancellationShield() const {
+    return withFlags(Flags & ~HasActiveTaskCancellationShield);
   }
 
-  ActiveTaskStatus withEscalatedPriority(JobPriority priority) const {
-    assert(priority > getStoredPriority());
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record,
-                            (Flags & ~PriorityMask)
-                               | IsEscalated | uintptr_t(priority), ExecutionLock);
-#else
-    return ActiveTaskStatus(Record, (Flags & ~PriorityMask) | IsEscalated | uintptr_t(priority));
-#endif
+  // HasActiveStealers
+  bool hasActiveStealers() const { return Flags & HasActiveStealers; }
+  ActiveTaskStatus withActiveStealers() const {
+    return withFlags(Flags | HasActiveStealers);
+  }
+  ActiveTaskStatus withoutActiveStealers() const {
+    return withFlags(Flags & ~HasActiveStealers);
   }
 
+  // HasRetainForInstrusiveLinkage
+  bool hasRetainForInstrusiveLinkage() const { return Flags & HasRetainForInstrusiveLinkage; }
+  ActiveTaskStatus withRetainForInstrusiveLinkage() const {
+    return withFlags(Flags | HasRetainForInstrusiveLinkage);
+  }
+  ActiveTaskStatus withoutRetainForInstrusiveLinkage() const {
+    return withFlags(Flags & ~HasRetainForInstrusiveLinkage);
+  }
+
+  // StealerExclusion
   uint8_t getStealerExclusionValue() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     return (Flags & StealerExclusionMask) >> StealerExclusionShift;
@@ -799,24 +783,41 @@ public:
     return 0;
 #endif
   }
-
-  ActiveTaskStatus withStealerExclusionValue(uint8_t value) const {
+  ActiveTaskStatus withNextStealerExclusionValue() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    auto currentStealerExclusionValue = getStealerExclusionValue();
+    auto newStealerExclusionValue = currentStealerExclusionValue;
+    if (__builtin_add_overflow(currentStealerExclusionValue, 1,
+                               &newStealerExclusionValue) ||
+        newStealerExclusionValue > StealerExclusionMax) {
+      assert(false && "Somehow overflowed stealer exclusion value");
+    }
+    SWIFT_TASK_DEBUG_LOG("Updating exclusion value from %d to %d",
+                         currentStealerExclusionValue, newStealerExclusionValue);
+
     auto NewFlags = Flags & ~StealerExclusionMask;
-    NewFlags |= (value << StealerExclusionShift);
+    NewFlags |= (newStealerExclusionValue << StealerExclusionShift);
     return ActiveTaskStatus(Record, NewFlags, ExecutionLock);
 #else
     return *this;
 #endif
   }
 
-  ActiveTaskStatus withoutStoredPriorityEscalation() const {
+  // Getters for ExecutionLock
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags & ~IsEscalated, ExecutionLock);
+  static size_t executionLockOffset() {
+    return offsetof(ActiveTaskStatus, ExecutionLock);
+  }
+#endif
+  uint32_t currentExecutionLockOwner() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  return dispatch_lock_owner(ExecutionLock);
 #else
-    return ActiveTaskStatus(Record, Flags & ~IsEscalated);
+  return 0;
 #endif
   }
+
+  // Getters / Setters for Record
 
   /// Return the innermost cancellation record.  Code running
   /// asynchronously with this task should not access this record
@@ -861,18 +862,12 @@ public:
                                             enqueued, wasRunning);
   }
 
-  static bool atomicRemoveIntrusivelyLinked(char *storage) {
-    // To do an atomic AND, we have to use the underlying storage and
-    // cast it. This cast could be done in a simpler way since Flags
-    // should always be at the start and should always be a uint32_t.
-    // But to be more resilient, I get the offsets and types correctly
-    auto *flags = reinterpret_cast<std::atomic<decltype(ActiveTaskStatus::Flags)>*>(storage + offsetof(ActiveTaskStatus, Flags));
-    // Release memory ordering so that other threads can not decide to reuse this
-    // Task's intrusive linkage before all of our earlier uses have completed
-    auto oldFlags = flags->fetch_and(~(IsIntrusivelyLinked & HasRetainForInstrusiveLinkage), std::memory_order_release);
-
-    // Tell the caller if it needs to do a release on the Task
-    return oldFlags & HasRetainForInstrusiveLinkage != 0;
+  bool operator!=(const ActiveTaskStatus &other) const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return Record != other.Record || Flags != other.Flags || ExecutionLock != other.ExecutionLock;
+#else
+    return Record != other.Record || Flags != other.Flags;
+#endif
   }
 };
 
@@ -1149,7 +1144,7 @@ void AsyncTask::taskRemoveEnqueued() {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     // This balances with the retain in swift_task_enqueueSelfOrStealer which happens
     // when adding the first stealer after a direct enqueue. See the comment under
-    swift_release(task);
+    swift_release(this);
 #endif
   }
 }
@@ -1202,7 +1197,7 @@ struct ThreadPriorityManager {
 };
 #endif
 
-uint32_t AsyncTask::taskFlagAsRunningWithoutDependency(AsyncTask::InvokeFlags invokeFlags) {
+inline uint32_t AsyncTask::taskFlagAsRunningWithoutDependency(AsyncTask::InvokeFlags invokeFlags) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   auto threadPriorityManager = ThreadPriorityManager(*this);
 #endif
@@ -1314,7 +1309,7 @@ inline std::pair<bool, uint32_t> AsyncTask::flagAsRunningFromEnqueued(uint8_t al
   // Stealers are only enabled with priority escalation
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   if (oldStatus.getStealerExclusionValue() != allowedExclusionValue) {
-    if (!(invokeFlags & AsyncTask::InvokeFlags::InvokedFromStealer)) taskRemoveEnqueued(this);
+    if (!(invokeFlags & AsyncTask::InvokeFlags::InvokedFromStealer)) taskRemoveEnqueued();
     return {false, 0};
   }
 #else
@@ -1359,17 +1354,7 @@ inline std::pair<bool, uint32_t> AsyncTask::flagAsRunningFromEnqueued(uint8_t al
     newStatus = newStatus.withoutTaskDependency();
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     if (oldStatus.hasActiveStealers()) {
-      auto currentStealerExclusionValue = oldStatus.getStealerExclusionValue();
-      auto newStealerExclusionValue = currentStealerExclusionValue;
-      if (__builtin_add_overflow(currentStealerExclusionValue, 1,
-                                 &newStealerExclusionValue) ||
-          newStealerExclusionValue > StealerExclusionMax) {
-        assert(false && "Somehow overflowed stealer exclusion value");
-      }
-      SWIFT_TASK_DEBUG_LOG("Updating exclusion value from %d to %d",
-                           currentStealerExclusionValue, newStealerExclusionValue);
-
-      newStatus = newStatus.withStealerExclusionValue(newStealerExclusionValue);
+      newStatus = newStatus.withNextStealerExclusionValue();
     }
     newStatus.withoutActiveStealers();
 #endif
@@ -1531,7 +1516,7 @@ swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
       newStatus = newStatus.withIntrusivelyLinked();
       needsStealer = false;
     } else {
-      newStatus = newStatus.withActiveStealer();
+      newStatus = newStatus.withActiveStealers();
       needsStealer = true;
       newStatus = newStatus.withRetainForInstrusiveLinkage();
       if (!oldStatus.hasRetainForInstrusiveLinkage()) {
@@ -1672,6 +1657,7 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
   #if !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
         newStatus = newStatus.withIntrusivelyLinked();
   #endif
+        return true;
       });
 
       if (oldStatus.isRunning()) {

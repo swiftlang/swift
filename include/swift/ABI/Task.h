@@ -491,7 +491,7 @@ private:
   void flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusRecord);
   void destroyTaskDependency(TaskDependencyStatusRecord *dependencyRecord);
   uint32_t taskFlagAsRunningWithoutDependency(InvokeFlags invokeFlags);
-  void AsyncTask::taskRemoveEnqueued();
+  void taskRemoveEnqueued();
 
 public:
   /// Flag that the task is to be enqueued on the provided executor and actually

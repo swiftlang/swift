@@ -222,7 +222,7 @@ SWIFT_ALWAYS_INLINE
 static inline
 void taskInvokeWithExclusionValue(AsyncTask *task,
                                   SerialExecutorRef serialExecutor,
-                                  TaskExecutorRef taskExecutor
+                                  TaskExecutorRef taskExecutor,
                                   uint8_t allowedStealerExclusionValue,
                                   AsyncTask::InvokeFlags invokeFlags = AsyncTask::InvokeFlags::None) {
   // Update the task status to say that it's running on the current
@@ -260,7 +260,13 @@ void swift::runJobInEstablishedExecutorContext(Job *job,
 #endif
 
   if (auto task = dyn_cast<AsyncTask>(job)) {
-    taskInvokeWithExclusionValue(task, serialExecutor, taskExecutor, task->_private().LocalStealerExclusionValue);
+    taskInvokeWithExclusionValue(
+      task,
+      serialExecutor,
+      taskExecutor,
+      task->_private().LocalStealerExclusionValue,
+      AsyncTask::InvokeFlags::None
+    );
   } else {
     // There's no extra bookkeeping to do for simple jobs besides swapping in
     // the voucher.
@@ -281,7 +287,15 @@ AsyncTaskStealer::process(Job *_job) {
   auto *stealer = cast<AsyncTaskStealer>(_job);
   SWIFT_TASK_DEBUG_LOG("Running stealer %p for Task %p", _job, stealer->Task);
 
-  taskInvokeWithExclusionValue(stealer->Task, stealer->ExclusionValue, AsyncTask::InvokeFlags::InvokedFromStealer);
+  auto *trackingInfo = ExecutorTrackingInfo::current();
+
+  taskInvokeWithExclusionValue(
+    stealer->Task,
+    trackingInfo->getActiveExecutor(),
+    trackingInfo->getTaskExecutor(),
+    stealer->ExclusionValue,
+    AsyncTask::InvokeFlags::InvokedFromStealer
+  );
 
   swift_release(stealer->Task);
 

@@ -48,11 +48,11 @@ ActiveTaskStatus::getStatusRecordParent(TaskStatusRecord *ptr) {
 /// from the ActiveTaskStatus so that callers may make additional modifications
 /// to ActiveTaskStatus flags. `statusUpdate` can be called multiple times in a
 /// RMW loop and so much be idempotent.
-void withStatusRecordLock(
+void swift::withStatusRecordLock(
     AsyncTask *task, ActiveTaskStatus status,
     llvm::function_ref<void(ActiveTaskStatus)> fn,
     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)>
-        statusUpdate = nullptr) {
+        statusUpdate) {
   // We need to acquire the lock AND set the is-locked bit in the status so that
   // other threads attempting lockless operations can atomically check whether
   // another thread holds the lock. Various operations can be done with a
@@ -141,7 +141,7 @@ void withStatusRecordLock(
 /// A convenience version of the above for contexts that haven't already
 /// done the load.
 template <class Fn>
-static void swift::withStatusRecordLock(
+static void withStatusRecordLock(
     AsyncTask *task, Fn &&fn,
     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)>
         statusUpdate = nullptr) {
@@ -384,7 +384,7 @@ bool swift::removeStatusRecordIf(AsyncTask *task, TaskStatusRecord *record,
             oldStatus, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
+      newStatus.traceStatusChanged(task, oldStatus, false);
       didRemove = true;
       break;
     }
@@ -559,7 +559,7 @@ TaskExecutorRef AsyncTask::getPreferredTaskExecutor(bool assumeHasRecord) {
   }
 
   TaskExecutorRef preference = TaskExecutorRef::undefined();
-  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
+  ::withStatusRecordLock(this, [&](ActiveTaskStatus status) {
     for (auto record : status.records()) {
       if (record->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
         auto executorPreferenceRecord =
@@ -866,7 +866,7 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
   // though, just that it's not concurrently running.
   auto parent = child->childFragment()->getParent();
 
-  withStatusRecordLock(parent, [&](ActiveTaskStatus unused) {
+  ::withStatusRecordLock(parent, [&](ActiveTaskStatus unused) {
     group->removeChildTask(child);
   });
 }
@@ -897,7 +897,7 @@ void swift::_swift_taskGroup_cancel_unlocked(TaskGroup *group,
   if (!group->getTaskRecord()->getFirstChild())
     return;
 
-  withStatusRecordLock(owningTask, [&group](ActiveTaskStatus status) {
+  ::withStatusRecordLock(owningTask, [&group](ActiveTaskStatus status) {
     _swift_taskGroup_cancel(group);
   });
 }
