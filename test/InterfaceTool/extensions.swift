@@ -31,6 +31,26 @@ public extension MyType {
   static let defaultName: String = "MyType"
   static var mutableDefault: Int = 0
 }
+
+/// private extension — members default to private and should be kept.
+private extension MyType {
+  func privateExtMethod() {
+    print("private ext")
+  }
+
+  var privateExtComputed: Int {
+    return 42
+  }
+
+  static let privateExtConst: String = "private"
+}
+
+/// internal extension — members default to internal and should be removed.
+internal extension MyType {
+  func internalExtMethod() {
+    print("internal ext")
+  }
+}
 //--- expected.swift
 public struct MyType {
 }
@@ -48,4 +68,14 @@ extension MyType: CustomStringConvertible {
 public extension MyType {
   static let defaultName: String = "MyType"
   static var mutableDefault: Int = 0
+}
+
+private extension MyType {
+  func privateExtMethod()
+
+  var privateExtComputed: Int {
+      get
+  }
+
+  static let privateExtConst: String = "private"
 }

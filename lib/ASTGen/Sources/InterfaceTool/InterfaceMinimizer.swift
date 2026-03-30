@@ -306,14 +306,9 @@ class InterfaceMinimizer: SyntaxRewriter {
   }
 
   override func visit(_ node: ExtensionDeclSyntax) -> DeclSyntax {
-    let level = accessLevel(of: node.modifiers)
-    let isPublic: Bool
-    switch level {
-    case .public, .open, .package:
-      isPublic = true
-    default:
-      isPublic = false
-    }
+    let isPublic = shouldKeepDecl(
+      modifiers: node.modifiers, attributes: node.attributes
+    )
 
     contextStack.append(.extensionDecl(isPublic: isPublic))
     defer { contextStack.removeLast() }
