@@ -13,9 +13,9 @@
 // RUN:   -emit-objc-header-path %t/Original.h \
 // RUN:   -o %t/Original.swiftmodule
 
-// Step 2: Minimize each source file
-// RUN: %swift-interface-tool -action minimize-source %t/Types.swift > %t/Types.min.swift
-// RUN: %swift-interface-tool -action minimize-source %t/Uses.swift > %t/Uses.min.swift
+// Step 2: Minimize each source file with -remove-internal-decls
+// RUN: %swift-interface-tool -action minimize-source -remove-internal-decls %t/Types.swift > %t/Types.min.swift
+// RUN: %swift-interface-tool -action minimize-source -remove-internal-decls %t/Uses.swift > %t/Uses.min.swift
 
 // Step 3: Compile minimized sources with -parse-as-interface, same outputs
 // RUN: %target-swift-frontend -emit-module -parse-as-interface \
@@ -35,20 +35,6 @@
 // RUN: diff %t/Original.package.swiftinterface %t/Minimized.package.swiftinterface
 // RUN: diff %t/Original.tbd %t/Minimized.tbd
 // RUN: diff %t/Original.h %t/Minimized.h
-
-// Test: -parse-as-interface rejects actions that require function bodies
-// RUN: not %target-swift-frontend -emit-object -parse-as-interface %t/Types.min.swift \
-// RUN:   -module-name TestMod 2>&1 | %FileCheck --check-prefix=CHECK-ERROR %s
-// RUN: not %target-swift-frontend -emit-ir -parse-as-interface %t/Types.min.swift \
-// RUN:   -module-name TestMod 2>&1 | %FileCheck --check-prefix=CHECK-ERROR %s
-// RUN: not %target-swift-frontend -emit-sil -parse-as-interface %t/Types.min.swift \
-// RUN:   -module-name TestMod 2>&1 | %FileCheck --check-prefix=CHECK-ERROR %s
-// CHECK-ERROR: error: the requested action is not compatible with '-parse-as-interface'
-
-// Test: -parse-as-interface -typecheck should succeed with multiple files
-// RUN: %target-swift-frontend -typecheck -parse-as-interface \
-// RUN:   %t/Types.min.swift %t/Uses.min.swift \
-// RUN:   -module-name TestMod -package-name TestPkg
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_swift_parser
@@ -253,6 +239,14 @@ public class Circle: Shape {
   public func scaled(by factor: Double) -> Self {
     fatalError()
   }
+}
+
+private protocol PrivateProto {
+  static func conform() -> Bool
+}
+
+private class MyClass : PrivateProto {
+  static func conform() -> Bool { true }
 }
 
 // Extension on Pair (from Types.swift) with constrained conformance

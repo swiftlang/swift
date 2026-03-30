@@ -854,6 +854,10 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   configureInheritedDesignatedInitAttributes(classDecl, ctor,
                                              superclassCtor, ctx);
 
+  // In SourceInterface mode, synthesize only the declaration (no body).
+  if (classDecl->getDeclContext()->isInSwiftSourceInterface())
+    return ctor;
+
   if (kind == DesignatedInitKind::Stub) {
     // Make this a stub implementation.
     ctor->setBodySynthesizer(synthesizeStubBody);
