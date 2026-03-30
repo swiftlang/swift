@@ -32,7 +32,7 @@ if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
 endif()
 
 target_link_libraries(libSwiftScan PRIVATE
-    swiftScanImpl)
+    "$<LINK_LIBRARY:WHOLE_ARCHIVE,swiftScanImpl>")
 
 set_target_properties(libSwiftScan
     PROPERTIES
