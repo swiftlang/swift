@@ -452,9 +452,32 @@ public func withObservationTracking<Result: ~Copyable, Failure: Error>(
   ObservationTracking._installTracking(options: options, tracking, willSet: willSet, didSet: didSet, deinit: `deinit`)
   switch accessListResult.dirty {
   case .willSet(let keyPath):
-    willSet?(ObservationTracking(accessListResult.accessList, changed: keyPath))
+    if let entries = accessListResult.accessList?.entries {
+      var foundDirty = false
+      for (_, entry) in entries {
+        if entry.properties.contains(keyPath) {
+          foundDirty = true
+          break
+        }
+      }
+      if foundDirty {
+        willSet?(ObservationTracking(accessListResult.accessList, changed: keyPath))
+      }
+    }
+    
   case .didSet(let keyPath):
-    didSet?(ObservationTracking(accessListResult.accessList, changed: keyPath))
+    if let entries = accessListResult.accessList?.entries {
+      var foundDirty = false
+      for (_, entry) in entries {
+        if entry.properties.contains(keyPath) {
+          foundDirty = true
+          break
+        }
+      }
+      if foundDirty {
+        didSet?(ObservationTracking(accessListResult.accessList, changed: keyPath))
+      }
+    }
   case .deinit:
     `deinit`?()
   default:
