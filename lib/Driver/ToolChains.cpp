@@ -844,6 +844,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_ModuleSemanticInfo:
   case file_types::TY_CachedDiagnostics:
   case file_types::TY_SymbolGraphFile:
+  case file_types::TY_TimeTrace:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -1127,6 +1128,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ModuleSemanticInfo:
     case file_types::TY_CachedDiagnostics:
     case file_types::TY_SymbolGraphFile:
+    case file_types::TY_TimeTrace:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");

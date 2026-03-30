@@ -83,6 +83,7 @@
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
 #include "llvm/Target/TargetMachine.h"
@@ -916,7 +917,10 @@ bool swift::compileAndWriteLLVM(
       return true;
     }
 
-    EmitPasses.run(*module);
+    {
+      llvm::TimeTraceScope TimeScope("ObjectFileEmission");
+      EmitPasses.run(*module);
+    }
     break;
   }
   }
@@ -1645,6 +1649,15 @@ struct LLVMCodeGenThreads {
 
     /// Run llvm codegen.
     void run() {
+      // Worker threads (threadIndex > 0) need their own time trace profiler
+      // instance. The main thread (threadIndex == 0) already has one.
+      // Note: timeTraceProfilerEnabled() is thread-local, so we check the
+      // flag captured on the main thread in the LLVMCodeGenThreads constructor.
+      bool initTimeTrace = threadIndex != 0 && parent.timeTraceEnabled;
+      if (initTimeTrace)
+        llvm::timeTraceProfilerInitialize(
+            /*TimeTraceGranularity=*/0, "swift-frontend-worker");
+
       auto *diagMutex = parent.diagMutex;
       while (IRGenModule *IGM = parent.irgen->fetchFromQueue()) {
         LLVM_DEBUG(diagMutex->lock();
@@ -1657,23 +1670,31 @@ struct LLVMCodeGenThreads {
                     IGM->Context.SourceMgr.getFileSystem(),
                     IGM->OutputFilename, IGM->Context.getOutputBackend(),
                     IGM->Context.Stats);
-        if (IGM->Context.Diags.hadAnyError())
+        if (IGM->Context.Diags.hadAnyError()) {
+          if (initTimeTrace)
+            llvm::timeTraceProfilerFinishThread();
           return;
+        }
       }
       LLVM_DEBUG(diagMutex->lock();
                  dbgs() << "thread " << threadIndex << ": done\n";
                  diagMutex->unlock(););
+
+      if (initTimeTrace)
+        llvm::timeTraceProfilerFinishThread();
       return;
     }
   };
 
   IRGenerator *irgen;
   llvm::sys::Mutex *diagMutex;
+  bool timeTraceEnabled;
   std::vector<Thread> threads;
 
   LLVMCodeGenThreads(IRGenerator *irgen, llvm::sys::Mutex *diagMutex,
                      unsigned numThreads)
-      : irgen(irgen), diagMutex(diagMutex) {
+      : irgen(irgen), diagMutex(diagMutex),
+        timeTraceEnabled(llvm::timeTraceProfilerEnabled()) {
     threads.reserve(numThreads);
     for (unsigned idx = 0; idx < numThreads; ++idx) {
       // the 0-th thread is executed by the main thread.
@@ -1825,6 +1846,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   }
 
   {
+    llvm::TimeTraceScope TimeScope("IRGen");
     FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
 
     // Emit the module contents.

@@ -167,6 +167,9 @@ OUTPUT(YAMLOptRecordPath, TY_YAMLOptRecord)
 /// The output path for bitstream optimization record file.
 OUTPUT(BitstreamOptRecordPath, TY_BitstreamOptRecord)
 
+/// The output path for time trace profiling data.
+OUTPUT(TimeTracePath, TY_TimeTrace)
+
 /// The output path to which we should output SIL as extra compilation output.
 OUTPUT(SILOutputPath, TY_SIL)
 

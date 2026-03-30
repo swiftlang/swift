@@ -96,6 +96,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
@@ -880,8 +881,12 @@ bool swift::performCompileStepsPostSema(
 
     SILOptions SILOpts = getSILOptions(PSPs, auxPSPs);
     IRGenOptions irgenOpts = Invocation.getIRGenOptions();
-    auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts,
-                                 &irgenOpts);
+    std::unique_ptr<SILModule> SM;
+    {
+      llvm::TimeTraceScope TimeScope("SILGeneration");
+      SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts,
+                              &irgenOpts);
+    }
     return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
                                          ReturnValue, observer,
                                          CommandLineArgs, auxPSPs);
@@ -899,8 +904,12 @@ bool swift::performCompileStepsPostSema(
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
       SILOptions SILOpts = getSILOptions(PSPs, emptyAuxPSPs);
     IRGenOptions irgenOpts = Invocation.getIRGenOptions();
-      auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
-                                   SILOpts, &irgenOpts);
+      std::unique_ptr<SILModule> SM;
+      {
+        llvm::TimeTraceScope TimeScope("SILGeneration");
+        SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
+                                SILOpts, &irgenOpts);
+      }
       result |= performCompileStepsPostSILGen(Instance, std::move(SM),
                                               PrimaryFile, PSPs, ReturnValue,
                                               observer, CommandLineArgs);
@@ -918,7 +927,11 @@ bool swift::performCompileStepsPostSema(
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         SILOptions SILOpts = getSILOptions(PSPs, emptyAuxPSPs);
-        auto SM = performASTLowering(*SASTF, Instance.getSILTypes(), SILOpts);
+        std::unique_ptr<SILModule> SM;
+        {
+          llvm::TimeTraceScope TimeScope("SILGeneration");
+          SM = performASTLowering(*SASTF, Instance.getSILTypes(), SILOpts);
+        }
         result |= performCompileStepsPostSILGen(Instance, std::move(SM), mod,
                                                 PSPs, ReturnValue, observer,
                                                 CommandLineArgs);
@@ -1173,7 +1186,10 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
 
   // Contains the hadError checks internally, we still want to output the
   // Objective-C header when there's errors and currently allowing them
-  emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
+  {
+    llvm::TimeTraceScope TimeScope("EmitObjCHeader");
+    emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
+  }
 
   // Verify reference dependencies of the current compilation job. Note this
   // must be run *before* verifying diagnostics so that the former can be tested
@@ -1213,17 +1229,27 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   }
 
   if (shouldEmitIndexData(Invocation)) {
+    llvm::TimeTraceScope TimeScope("EmitIndexData");
     emitIndexData(Instance);
   }
 
   // Emit Swiftdeps for every file in the batch.
-  emitSwiftdepsForAllPrimaryInputsIfNeeded(Instance);
+  {
+    llvm::TimeTraceScope TimeScope("EmitSwiftDeps");
+    emitSwiftdepsForAllPrimaryInputsIfNeeded(Instance);
+  }
 
   // Emit Make-style dependencies.
-  emitMakeDependenciesIfNeeded(Instance);
+  {
+    llvm::TimeTraceScope TimeScope("EmitMakeDeps");
+    emitMakeDependenciesIfNeeded(Instance);
+  }
 
   // Emit extracted constant values for every file in the batch
-  emitConstValuesForAllPrimaryInputsIfNeeded(Instance);
+  {
+    llvm::TimeTraceScope TimeScope("EmitConstValues");
+    emitConstValuesForAllPrimaryInputsIfNeeded(Instance);
+  }
 
   // Make sure we emitted an error if we encountered an invalid conformance.
   // This is important since `ASTContext::hadError` accounts for delayed
@@ -1303,7 +1329,10 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
   assert(!FrontendOptions::shouldActionOnlyParse(opts.RequestedAction) &&
          "Action may only parse, but has requested semantic analysis!");
 
-  Instance.performSema();
+  {
+    llvm::TimeTraceScope TimeScope("SemanticAnalysis");
+    Instance.performSema();
+  }
   if (observer)
     observer->performedSemanticAnalysis(Instance);
 
@@ -1336,6 +1365,7 @@ static bool performScanDependencies(CompilerInstance &Instance) {
 }
 
 static bool performParseOnly(ModuleDecl &MainModule) {
+  llvm::TimeTraceScope TimeScope("Parse");
   // A -parse invocation only cares about the side effects of parsing, so
   // force the parsing of all the source files.
   for (auto *file : MainModule.getFiles()) {
@@ -2201,8 +2231,11 @@ static bool performCompileStepsPostSILGen(
   SM->setSerializeSILAction(SerializeSILModuleAction);
 
   // Perform optimizations and mandatory/diagnostic passes.
-  if (Instance.performSILProcessing(SM.get()))
-    return true;
+  {
+    llvm::TimeTraceScope TimeScope("SILOptimization");
+    if (Instance.performSILProcessing(SM.get()))
+      return true;
+  }
 
   if (observer)
     observer->performedSILProcessing(*SM);
@@ -2257,7 +2290,10 @@ static bool performCompileStepsPostSILGen(
   if (Context.hadError())
     return !opts.AllowModuleWithCompilerErrors;
 
-  runSILLoweringPasses(*SM);
+  {
+    llvm::TimeTraceScope TimeScope("SILLowering");
+    runSILLoweringPasses(*SM);
+  }
 
   // If we are asked to emit lowered SIL, dump it now and return.
   if (Action == FrontendOptions::ActionType::EmitLoweredSIL)
@@ -2326,12 +2362,16 @@ static bool performCompileStepsPostSILGen(
       Invocation.getCASOptions().EnableCaching && IRGenOpts.UseCASBackend
           ? &Instance.getCASOutputBackend()
           : nullptr;
-  auto IRModule = generateIR(
-      IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
-      Instance.getSharedCASInstance(), casBackend, OutputFilename, MSF,
-      HashGlobal, ParallelOutputFilenames, ParallelIROutputFilenames,
-      IRGenOpts.DebugModuleSelfKey ? Instance.getCompilerBaseKey()
-                                   : std::nullopt);
+  GeneratedModule IRModule = GeneratedModule::null();
+  {
+    llvm::TimeTraceScope TimeScope("IRGeneration");
+    IRModule = generateIR(
+        IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
+        Instance.getSharedCASInstance(), casBackend, OutputFilename, MSF,
+        HashGlobal, ParallelOutputFilenames, ParallelIROutputFilenames,
+        IRGenOpts.DebugModuleSelfKey ? Instance.getCompilerBaseKey()
+                                     : std::nullopt);
+  }
 
   // Write extra LLVM IR output if requested
   if (IRModule && !PSPs.SupplementaryOutputs.LLVMIROutputPath.empty()) {
@@ -2364,8 +2404,11 @@ static bool performCompileStepsPostSILGen(
       return true;
   }
 
-  return generateCode(Instance, OutputFilename, IRModule.getModule(),
-                      HashGlobal);
+  {
+    llvm::TimeTraceScope TimeScope("LLVMBackend");
+    return generateCode(Instance, OutputFilename, IRModule.getModule(),
+                        HashGlobal);
+  }
 }
 
 static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
@@ -2666,6 +2709,14 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     observer->configuredCompiler(*Instance);
   }
 
+  // Initialize the time profiler if requested.
+  const auto &TimeTracePath = Invocation.getFrontendOptions().TimeTracePath;
+  if (!TimeTracePath.empty()) {
+    llvm::timeTraceProfilerInitialize(
+        Invocation.getFrontendOptions().TimeTraceGranularity,
+        "swift-frontend");
+  }
+
   if (Invocation.getFrontendOptions().GenReproducer) {
     int ReturnCode = generateReproducer(*Instance, Args) ? 1 : 0;
     DH.endMessage(ReturnCode);
@@ -2701,7 +2752,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   int ReturnValue = 0;
-  bool HadError = performCompile(*Instance, ReturnValue, observer, Args);
+  bool HadError;
+  {
+    llvm::TimeTraceScope TimeScope("ExecuteCompiler");
+    HadError = performCompile(*Instance, ReturnValue, observer, Args);
+  }
 
   if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();
@@ -2755,6 +2810,16 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   auto r = finishDiagProcessing(HadError ? 1 : ReturnValue, verifierEnabled);
   if (auto *StatsReporter = Instance->getStatsReporter())
     StatsReporter->noteCurrentProcessExitStatus(r);
+
+  // Write time trace output if enabled.
+  if (llvm::timeTraceProfilerEnabled()) {
+    std::error_code EC;
+    llvm::raw_fd_ostream OS(TimeTracePath, EC,
+                            llvm::sys::fs::OF_TextWithCRLF);
+    if (!EC)
+      llvm::timeTraceProfilerWrite(OS);
+    llvm::timeTraceProfilerCleanup();
+  }
 
   DH.endMessage(r);
   return r;

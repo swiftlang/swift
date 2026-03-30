@@ -196,6 +196,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     Args.hasArg(OPT_downgrade_typecheck_interface_error);
   computePrintStatsOptions();
   computeDebugTimeOptions();
+  computeTimeTraceOptions();
   computeTBDOptions();
 
   Opts.CompilerDebuggingOpts.DumpAvailabilityScopes |=
@@ -326,6 +327,22 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (HaveNewInputsAndOutputs &&
       computeMainAndSupplementaryOutputFilenames())
     return true;
+
+  // If time trace path wasn't set from command-line args, check if it was
+  // provided via the supplementary output file map (used by the driver in
+  // multi-file compilation).
+  if (Opts.TimeTracePath.empty()) {
+    Opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+        [&](const InputFile &input) -> bool {
+          const auto &sop =
+              input.getPrimarySpecificPaths().SupplementaryOutputs;
+          if (!sop.TimeTracePath.empty()) {
+            Opts.TimeTracePath = sop.TimeTracePath;
+            return true; // stop iterating
+          }
+          return false;
+        });
+  }
 
   if (checkUnusedSupplementaryOutputPaths())
     return true;
@@ -519,6 +536,30 @@ void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
     if (Args.getLastArg(OPT_profile_stats_entities)) {
       Opts.ProfileEntities = true;
     }
+  }
+}
+
+void ArgsToFrontendOptionsConverter::computeTimeTraceOptions() {
+  using namespace options;
+  if (const Arg *A = Args.getLastArg(OPT_ftime_trace_path)) {
+    Opts.TimeTracePath = A->getValue();
+  } else if (Args.hasArg(OPT_ftime_trace)) {
+    // Derive from primary output (-o), or from input file if no -o.
+    std::string Base = Opts.InputsAndOutputs.getSingleOutputFilename();
+    if (Base.empty())
+      Base = Opts.InputsAndOutputs.getFilenameOfFirstInput();
+    SmallString<128> Path(Base);
+    llvm::sys::path::replace_extension(Path, "time-trace.json");
+    Opts.TimeTracePath = Path.str().str();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_ftime_trace_granularity)) {
+    unsigned Val;
+    if (StringRef(A->getValue()).getAsInteger(10, Val))
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    else
+      Opts.TimeTraceGranularity = Val;
   }
 }
 

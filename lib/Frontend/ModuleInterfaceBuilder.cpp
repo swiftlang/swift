@@ -38,6 +38,7 @@
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/LockFileManager.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/TimeProfiler.h"
 
 using namespace swift;
 using FileDependency = SerializationOptions::FileDependency;
@@ -260,7 +261,10 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
     Instance.emitEndOfPipelineDebuggingOutput();
   };
 
-  Instance.performSema();
+  {
+    llvm::TimeTraceScope TimeScope("SemanticAnalysis");
+    Instance.performSema();
+  }
   if (Instance.getASTContext().hadError()) {
     LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
     return std::make_error_code(std::errc::not_supported);
@@ -273,7 +277,11 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   auto Mod = Instance.getMainModule();
   Mod->setIsBuiltFromInterface(true);
   auto &TC = Instance.getSILTypes();
-  auto SILMod = performASTLowering(Mod, TC, SILOpts);
+  std::unique_ptr<SILModule> SILMod;
+  {
+    llvm::TimeTraceScope TimeScope("SILGeneration");
+    SILMod = performASTLowering(Mod, TC, SILOpts);
+  }
   if (!SILMod) {
     LLVM_DEBUG(llvm::dbgs() << "SILGen did not produce a module\n");
     return std::make_error_code(std::errc::not_supported);
@@ -320,9 +328,12 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   });
 
   LLVM_DEBUG(llvm::dbgs() << "Running SIL processing passes\n");
-  if (Instance.performSILProcessing(SILMod.get())) {
-    LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
-    return std::make_error_code(std::errc::not_supported);
+  {
+    llvm::TimeTraceScope TimeScope("SILOptimization");
+    if (Instance.performSILProcessing(SILMod.get())) {
+      LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
+      return std::make_error_code(std::errc::not_supported);
+    }
   }
   if (Instance.getDiags().hadAnyError()) {
     return std::make_error_code(std::errc::not_supported);
