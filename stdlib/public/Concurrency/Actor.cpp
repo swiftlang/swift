@@ -246,17 +246,6 @@ void taskInvokeWithExclusionValue(AsyncTask *task,
     assert(ActiveTask::get() == nullptr &&
            "active task wasn't cleared before suspending?");
     if (oldTask) ActiveTask::set(oldTask);
-  } else {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    // This balances with the retain in swift_task_enqueueSelfOrStealer which happens
-    // when adding the first stealer after a direct enqueue. That is, when that
-    // function causes flagAsRunningFromEnqueued to return false for the direct
-    // enqueue, it does a retain in case that direct enqueue lives for a long
-    // time. This is where we release that retain as it is no longer needed.
-    if (!(invokeFlags & AsyncTask::InvokeFlags::InvokedFromStealer)) {
-      swift_release(task);
-    }
-#endif
   }
 }
 
@@ -2839,7 +2828,16 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
   JobPriority newPriority) {
   SWIFT_TASK_DEBUG_LOG("Escalating executor %p to %#x",
                        (void*)executor.getIdentity(), newPriority);
-  if (executor.isGeneric() && !task->hasTaskExecutorPreferenceRecord()) {
+
+  if (executor.isDefaultActor()) {
+    return swift_actor_escalate(asImpl(executor.getDefaultActor()), task, newPriority);
+  }
+
+  // TODO: Temporarily disable for testing the check for global
+  // executors only. All dispatch custom executors and every custom
+  // executor implementation I've seen so far would support (or at
+  // least not break) with adding stealers with the current semantics.
+  //if (executor.isGeneric() && !task->hasTaskExecutorPreferenceRecord()) {
     SWIFT_TASK_DEBUG_LOG("Enqueuing stealer for %p on %p",
                          (void*)task, (void*)executor.getIdentity());
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -2854,11 +2852,7 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
     }
 #endif
     return;
-  }
-
-  if (executor.isDefaultActor()) {
-    return swift_actor_escalate(asImpl(executor.getDefaultActor()), task, newPriority);
-  }
+  //}
 
   // TODO (rokhinip): This is either the main actor or an actor with a custom
   // executor. We need to let the executor know that the job has been escalated.

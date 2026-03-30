@@ -48,7 +48,7 @@ ActiveTaskStatus::getStatusRecordParent(TaskStatusRecord *ptr) {
 /// from the ActiveTaskStatus so that callers may make additional modifications
 /// to ActiveTaskStatus flags. `statusUpdate` can be called multiple times in a
 /// RMW loop and so much be idempotent.
-static void withStatusRecordLock(
+void withStatusRecordLock(
     AsyncTask *task, ActiveTaskStatus status,
     llvm::function_ref<void(ActiveTaskStatus)> fn,
     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)>
@@ -141,7 +141,7 @@ static void withStatusRecordLock(
 /// A convenience version of the above for contexts that haven't already
 /// done the load.
 template <class Fn>
-static void withStatusRecordLock(
+static void swift::withStatusRecordLock(
     AsyncTask *task, Fn &&fn,
     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)>
         statusUpdate = nullptr) {
@@ -500,7 +500,7 @@ void swift::removeStatusRecordFromSelf(TaskStatusRecord *record,
 
 SWIFT_CC(swift)
 void swift::updateStatusRecord(AsyncTask *task, TaskStatusRecord *record,
-     llvm::function_ref<void()>updateRecord,
+     llvm::function_ref<void(ActiveTaskStatus)>updateRecord,
      ActiveTaskStatus& status,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
 
@@ -516,7 +516,7 @@ void swift::updateStatusRecord(AsyncTask *task, TaskStatusRecord *record,
     }
     assert(foundRecord);
 #endif
-    updateRecord();
+    updateRecord(lockedStatus);
   }, fn);
 }
 
