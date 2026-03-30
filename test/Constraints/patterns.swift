@@ -871,3 +871,15 @@ do {
     guard let _: P = c3.first != nil ? c3.first! : d else { return }  // FIXME: Should also be an error
   }
 }
+
+func testMissingPatternDiagnosticsInExpressionContext() {
+  enum Kind {
+    case test(_: Int, _: String, _: Int, x: String)
+  }
+
+  func test(k: Kind) {
+    if case .test() = k {} // expected-error {{missing patterns #1, #2, #3, #4 in enum associated value match}} {{19-19=<#Int#>, <#String#>, <#Int#>, <#String#>}}
+    if case let .test(_, answer, _) = k {} // expected-error {{missing pattern #4 in enum associated value match}} {{35-35=, <#String#>}}
+    if case let .test(_, answer) = k {} // expected-error {{missing patterns #3, #4 in enum associated value match}} {{32-32=, <#Int#>, <#String#>}}
+  }
+}

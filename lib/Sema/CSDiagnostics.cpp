@@ -5264,11 +5264,54 @@ bool MissingArgumentsFailure::diagnoseAsError() {
     return true;
   }
 
+  auto formatNewArgumentsForDiagnostic =
+      [&](SmallVectorImpl<char> &diagnosticScratch) -> StringRef {
+    llvm::raw_svector_ostream arguments(diagnosticScratch);
+
+    interleave(
+        SynthesizedArgs,
+        [&](const SynthesizedArg &e) {
+          const auto paramIdx = e.paramIdx;
+          const auto &arg = e.param;
+
+          if (arg.hasLabel()) {
+            arguments << "'" << arg.getLabel().str() << "'";
+          } else {
+            arguments << "#" << (paramIdx + 1);
+          }
+        },
+        [&] { arguments << ", "; });
+
+    return arguments.str();
+  };
+
+  auto formFixIt = [&](SmallVectorImpl<char> &fixItScratch, bool needsParens,
+                       bool forNonEmpty = false) -> StringRef {
+    llvm::raw_svector_ostream fixIt(fixItScratch);
+
+    if (needsParens)
+      fixIt << "(";
+
+    if (forNonEmpty)
+      fixIt << ", ";
+
+    interleave(
+        SynthesizedArgs,
+        [&](const SynthesizedArg &arg) { forFixIt(fixIt, arg.param); },
+        [&] { fixIt << ", "; });
+
+    if (needsParens)
+      fixIt << ")";
+
+    return fixIt.str();
+  };
+
   if (!(locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
         locator->isLastElement<LocatorPathElt::ContextualType>() ||
         locator->isLastElement<LocatorPathElt::ApplyArgument>() ||
         locator->isLastElement<LocatorPathElt::ClosureResult>() ||
-        locator->isLastElement<LocatorPathElt::ClosureBody>()))
+        locator->isLastElement<LocatorPathElt::ClosureBody>() ||
+        locator->isLastElement<LocatorPathElt::PatternMatch>()))
     return false;
 
   // If this is a misplaced `missing argument` situation, it would be
@@ -5313,6 +5356,30 @@ bool MissingArgumentsFailure::diagnoseAsError() {
     return true;
   }
 
+  // `case let .test(_, ...) = <enum>`
+  if (auto patternElt =
+          locator->getLastElementAs<LocatorPathElt::PatternMatch>()) {
+    SmallString<32> argumentsScratch;
+    SmallString<32> fixItScratch;
+    auto diag =
+        emitDiagnostic(diag::missing_patterns_in_enum_associated_value_match,
+                       formatNewArgumentsForDiagnostic(argumentsScratch),
+                       SynthesizedArgs.size() > 1);
+
+    auto *pattern = patternElt->getPattern();
+    if (auto *eltPattern = dyn_cast<EnumElementPattern>(pattern)) {
+      if (auto *tuplePattern =
+              dyn_cast_or_null<TuplePattern>(eltPattern->getSubPattern())) {
+        diag.fixItInsert(
+            tuplePattern->getRParenLoc(),
+            formFixIt(fixItScratch, /*needsParens=*/false,
+                      /*forNonEmpty=*/tuplePattern->getNumElements() > 0));
+      }
+    }
+
+    return true;
+  }
+
   if (diagnoseMissingResultBuilderElement())
     return true;
 
@@ -5327,52 +5394,25 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // a diagnostic which lists all of them and a fix-it
   // to add arguments at appropriate positions.
 
-  SmallString<32> diagnostic;
-  llvm::raw_svector_ostream arguments(diagnostic);
+  {
+    SmallString<32> argumentsScratch;
+    SmallString<32> fixItScratch;
+    auto paramContext = getParameterContextForDiag(getRawAnchor());
+    auto diag =
+        emitDiagnostic(diag::missing_arguments_in_call,
+                       formatNewArgumentsForDiagnostic(argumentsScratch),
+                       static_cast<unsigned>(paramContext));
 
-  interleave(
-      SynthesizedArgs,
-      [&](const SynthesizedArg &e) {
-        const auto paramIdx = e.paramIdx;
-        const auto &arg = e.param;
+    auto callInfo = getCallInfo(anchor);
+    auto *args = callInfo ? callInfo->second : nullptr;
 
-        if (arg.hasLabel()) {
-          arguments << "'" << arg.getLabel().str() << "'";
-        } else {
-          arguments << "#" << (paramIdx + 1);
-        }
-      },
-      [&] { arguments << ", "; });
-
-  auto paramContext = getParameterContextForDiag(getRawAnchor());
-  auto diag = emitDiagnostic(
-      diag::missing_arguments_in_call, arguments.str(),
-      static_cast<unsigned>(paramContext));
-
-  auto callInfo = getCallInfo(anchor);
-  auto *args = callInfo ? callInfo->second : nullptr;
-
-  // TODO(diagnostics): We should be able to suggest this fix-it
-  // unconditionally.
-  SmallString<32> scratch;
-  llvm::raw_svector_ostream fixIt(scratch);
-  auto appendMissingArgsToFix = [&]() {
-    interleave(
-        SynthesizedArgs,
-        [&](const SynthesizedArg &arg) {
-          forFixIt(fixIt, arg.param);
-        },
-        [&] { fixIt << ", "; });
-  };
-
-  if (args && args->empty() && !args->isImplicit()) {
-    appendMissingArgsToFix();
-    diag.fixItInsertAfter(args->getLParenLoc(), fixIt.str());
-  } else if (isExpr<MacroExpansionExpr>(getRawAnchor())) {
-    fixIt << "(";
-    appendMissingArgsToFix();
-    fixIt << ")";
-    diag.fixItInsertAfter(getRawAnchor().getEndLoc(), fixIt.str());
+    // TODO(diagnostics): We should be able to suggest this fix-it
+    // unconditionally.
+    if (args && args->empty()) {
+      diag.fixItInsertAfter(args->isImplicit() ? getRawAnchor().getEndLoc()
+                                               : args->getLParenLoc(),
+                            formFixIt(fixItScratch, args->isImplicit()));
+    }
   }
 
   if (auto selectedOverload = getCalleeOverloadChoiceIfAvailable(locator)) {

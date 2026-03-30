@@ -5553,6 +5553,9 @@ ERROR(tuple_pattern_length_mismatch,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))
 ERROR(tuple_pattern_label_mismatch,none,
       "tuple pattern element label %0 must be %1", (Identifier, Identifier))
+ERROR(missing_patterns_in_enum_associated_value_match,none,
+      "missing pattern%select{|s}1 %0 in enum associated value match",
+      (StringRef, bool))
 ERROR(enum_element_pattern_member_not_found,none,
       "enum case %0 not found in type %1", (DeclNameRef, Type))
 ERROR(optional_element_pattern_not_valid_type,none,
