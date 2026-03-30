@@ -30,7 +30,7 @@ class Klass {
 
 struct StructContainingKlass {
   // CHECK: // variable initialization expression of StructContainingKlass.k
-  // CHECK-NEXT: // Isolation: global_actor. type: MainActor
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor21StructContainingKlassV1kAA0E0Cvpfi : $@convention(thin) () -> @owned Klass {
 
   // CHECK: // StructContainingKlass.k.getter
@@ -50,7 +50,7 @@ struct StructContainingKlass {
 // TODO: Allow for nonisolated to be applied to structs.
 struct NonIsolatedStructContainingKlass {
   // CHECK: // variable initialization expression of NonIsolatedStructContainingKlass.k
-  // CHECK-NEXT: // Isolation: global_actor. type: MainActor
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor32NonIsolatedStructContainingKlassV1kAA0G0Cvpfi : $@convention(thin) () -> @owned Klass {
 
   // CHECK: // NonIsolatedStructContainingKlass.k.getter
@@ -102,14 +102,13 @@ nonisolated func nonisolatedAsync<T>(_ t: T) async {}
 // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor16customActorAsyncyyxYalF : $@convention(thin) @async <T> (@in_guaranteed T) -> () {
 @CustomActor func customActorAsync<T>(_ t: T) async {}
 
+@CustomActor func requiresCustomActor() -> Klass { fatalError() }
+
 
 @CustomActor
 struct CustomActorStruct {
-  // Variable expression is custom actor... but since we have a nonisolated
-  // init, we should be fine?
-  //
   // CHECK: // variable initialization expression of CustomActorStruct.k
-  // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor17CustomActorStructV1kAA5KlassCvpfi : $@convention(thin) () -> @owned Klass {
 
   // CHECK: // CustomActorStruct.k.getter
@@ -120,6 +119,19 @@ struct CustomActorStruct {
   // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
   // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor17CustomActorStructV1kAA5KlassCvs : $@convention(method) (@owned Klass, @inout CustomActorStruct) -> () {
   var k = Klass()
+
+  // CHECK: // variable initialization expression of CustomActorStruct.k2
+  // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
+  // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor17CustomActorStructV2k2AA5KlassCvpfi : $@convention(thin) () -> @owned Klass {
+
+  // CHECK: // CustomActorStruct.k2.getter
+  // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
+  // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor17CustomActorStructV2k2AA5KlassCvg : $@convention(method) (@guaranteed CustomActorStruct) -> @owned Klass {
+
+  // CHECK: // CustomActorStruct.k2.setter
+  // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
+  // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor17CustomActorStructV2k2AA5KlassCvs : $@convention(method) (@owned Klass, @inout CustomActorStruct) -> () {
+  var k2 = requiresCustomActor()
 }
 
 // CHECK: // unspecifiedFunctionTest()

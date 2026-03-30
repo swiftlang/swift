@@ -2040,10 +2040,7 @@ bb3:
 // CHECK-LABEL: begin running test {{.*}} on test_checked_cast_br: sil_regionanalysis_partitionoptranslation with: @instruction
 // CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
 // CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $AnyObject
-// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
-// CHECK-NEXT:     Rep Value: %2 = argument of bb1 : $NonSendableKlass
 // CHECK-NEXT: require %%0:   checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2
-// CHECK-NEXT: assign_direct %%1 = %%0:   checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2
 // CHECK-NEXT: end running test {{.*}} on test_checked_cast_br: sil_regionanalysis_partitionoptranslation with: @instruction
 sil [ossa] @test_checked_cast_br : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
@@ -2055,6 +2052,58 @@ bb1(%casted : @owned $NonSendableKlass):
   br bb3
 
 bb2(%original : @owned $AnyObject):
+  destroy_value %original
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_checked_cast_br_success_block: sil_regionanalysis_partitionoptranslation_block with: @block
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $AnyObject                 // user: %1
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %2 = argument of bb1 : $NonSendableKlass          // user: %3
+// CHECK-NEXT: assign_fresh %%1:   destroy_value %2 : $NonSendableKlass            // id: %3
+// CHECK-NEXT: merge %%1 with %%0:   checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2 // id: %1
+// CHECK-NEXT: end running test 1 of 1 on test_checked_cast_br_success_block: sil_regionanalysis_partitionoptranslation_block with: @block
+sil [ossa] @test_checked_cast_br_success_block : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2
+
+bb1(%casted : @owned $NonSendableKlass):
+  specify_test "sil_regionanalysis_partitionoptranslation_block @block"
+  destroy_value %casted
+  br bb3
+
+bb2(%original : @owned $AnyObject):
+  destroy_value %original
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_checked_cast_br_failure_block: sil_regionanalysis_partitionoptranslation_block with: @block
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $AnyObject                 // user: %1
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %5 = argument of bb2 : $AnyObject                 // user: %6
+// CHECK-NEXT: assign_fresh %%1:   destroy_value %5 : $AnyObject                   // id: %6
+// CHECK-NEXT: assign_direct %%1 = %%0:   checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2 // id: %1
+// CHECK-NEXT: end running test 1 of 1 on test_checked_cast_br_failure_block: sil_regionanalysis_partitionoptranslation_block with: @block
+sil [ossa] @test_checked_cast_br_failure_block : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2
+
+bb1(%casted : @owned $NonSendableKlass):
+  destroy_value %casted
+  br bb3
+
+bb2(%original : @owned $AnyObject):
+  specify_test "sil_regionanalysis_partitionoptranslation_block @block"
   destroy_value %original
   br bb3
 

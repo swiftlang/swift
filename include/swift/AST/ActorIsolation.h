@@ -208,22 +208,9 @@ public:
     return ActorIsolation(Erased);
   }
 
-  static std::optional<ActorIsolation> forSILString(StringRef string) {
-    auto kind =
-        llvm::StringSwitch<std::optional<ActorIsolation::Kind>>(string)
-            .Case("unspecified", ActorIsolation::Unspecified)
-            .Case("actor_instance", ActorIsolation::ActorInstance)
-            .Case("nonisolated", ActorIsolation::Nonisolated)
-            .Case("nonisolated_unsafe", ActorIsolation::NonisolatedUnsafe)
-            .Case("global_actor", ActorIsolation::GlobalActor)
-            .Case("global_actor_unsafe", ActorIsolation::GlobalActor)
-            .Case("caller_isolation_inheriting",
-                  ActorIsolation::CallerIsolationInheriting)
-            .Default(std::nullopt);
-    if (kind == std::nullopt)
-      return std::nullopt;
-    return ActorIsolation(*kind, true /*is sil parsed*/);
-  }
+  /// Defined in lib/SIL/IR/ActorIsolation.cpp
+  static std::optional<ActorIsolation> forSILString(SILModule &mod,
+                                                    StringRef string);
 
   Kind getKind() const { return (Kind)kind; }
 

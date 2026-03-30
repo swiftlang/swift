@@ -60,6 +60,10 @@ ID file_types::lookupTypeForExtension(StringRef Ext) {
 // Compute the file type from filename. This handles the lookup for extensions
 // with multiple dots, like `.private.swiftinterface` correctly.
 ID file_types::lookupTypeFromFilename(StringRef Filename) {
+  // stdin is treated as a Swift input
+  if (Filename == "-")
+    return TY_Swift;
+
   StringRef MaybeExt = Filename;
   // Search from leftmost `.`, return the first match or till all dots are
   // consumed.

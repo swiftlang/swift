@@ -952,16 +952,27 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (!SILIsolationInfo::isNonSendable(arg))
     return {};
 
-  // Handle a switch_enum from a global-actor-isolated type.
   if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
     if (auto *singleTerm = phiArg->getSingleTerminator()) {
+      // Handle a switch_enum from a global-actor-isolated type.
       if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
         auto enumDecl =
             swi->getOperand()->getType().getEnumOrBoundGenericEnum();
         return SILIsolationInfo::getGlobalActorIsolated(arg, enumDecl);
       }
+
+      // Handle a checked_cast_br argument that involves an isolated
+      // conformance. The conformance only changes for the first element.
+      if (auto *ccbi = dyn_cast<CheckedCastBranchInst>(singleTerm);
+          ccbi && ccbi->getSuccessBB() == phiArg->getParent()) {
+        if (auto isolation = SILIsolationInfo::getConformanceIsolation(ccbi)) {
+          return isolation;
+        }
+      }
     }
-    return SILIsolationInfo();
+
+    // Otherwise assume that we are disconnected. We will rely on merging.
+    return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
   }
 
   auto *fArg = cast<SILFunctionArgument>(arg);
@@ -1139,6 +1150,24 @@ SILIsolationInfo SILIsolationInfo::getFromConformances(
       if (sendableMetatype &&
           lookupConformance(conformance.getType(), sendableMetatype,
                             /*allowMissing=*/false).isInvalid()) {
+        if (auto functionIsolation =
+                value->getFunction()->getActorIsolation()) {
+          if (functionIsolation->isGlobalActor()) {
+            return SILIsolationInfo::getGlobalActorIsolated(
+                value, functionIsolation->getGlobalActor(),
+                conformance.getProtocol());
+          }
+          if (functionIsolation->isActorInstanceIsolated()) {
+            if (auto isolatedParam = cast_or_null<SILFunctionArgument>(
+                    value->getFunction()->maybeGetIsolatedArgument())) {
+              if (auto result = SILIsolationInfo::getActorInstanceIsolated(
+                      value, isolatedParam, conformance.getProtocol())) {
+                return result;
+              }
+            }
+          }
+        }
+
         return SILIsolationInfo::getTaskIsolated(value,
                                                  conformance.getProtocol());
       }
@@ -1182,11 +1211,30 @@ SILIsolationInfo SILIsolationInfo::getForCastConformances(
 
     // The cast can produce a conformance with the same isolation as this
     // function is dynamically executing. If that's known (i.e., because we're
-    // on a global actor), the value is isolated to that global actor.
-    // Otherwise, it's task-isolated.
-    if (functionIsolation && functionIsolation->isGlobalActor()) {
-      return SILIsolationInfo::getGlobalActorIsolated(
-          value, functionIsolation->getGlobalActor(), proto);
+    // on a global actor or in a an actor instance method), the value could be
+    // isolated to that actor. Otherwise, if we are nonisolated, it's
+    // task-isolated.
+    //
+    // DISCUSSION: We assume that if it were not possible to get a conformance
+    // that is isolated to the current context, then we would emit an error in
+    // the type checker. The fact that we were let through means that the
+    // runtime will return nil or produce a value that is isolated to the
+    // current isolation domain.
+    if (functionIsolation) {
+      if (functionIsolation->isGlobalActor()) {
+        return SILIsolationInfo::getGlobalActorIsolated(
+            value, functionIsolation->getGlobalActor(), proto);
+      }
+
+      if (functionIsolation->isActorInstanceIsolated()) {
+        if (auto isolatedParam = cast_or_null<SILFunctionArgument>(
+                value->getFunction()->maybeGetIsolatedArgument())) {
+          if (auto result = SILIsolationInfo::getActorInstanceIsolated(
+                  value, isolatedParam, proto)) {
+            return result;
+          }
+        }
+      }
     }
 
     // Consider the cast to be task-isolated, because the runtime could find
@@ -1240,7 +1288,7 @@ SILIsolationInfo SILIsolationInfo::getConformanceIsolation(SILInstruction *inst)
 
 void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
   if (isolatedConformance) {
-    os << "isolated-conformance-to(" << isolatedConformance->getName() << ")";
+    os << " isolated-conformance-to(" << isolatedConformance->getName() << ")";
   }
 
   auto opts = getOptions();
@@ -2029,5 +2077,24 @@ static FunctionTest IsolationMergeTest(
       }
       llvm::outs() << "\n";
     });
+
+// Arguments:
+// - SILValue: value to look up isolation for.
+// Dumps:
+// - The inferred isolation.
+static FunctionTest
+    GetConformanceIsolationInferrence("sil_isolation_info_get_conformance_isolation_inferrence",
+                            [](auto &function, auto &arguments, auto &test) {
+                              auto value = arguments.takeValue();
+
+                              SILIsolationInfo info =
+                                SILIsolationInfo::getConformanceIsolation(cast<SingleValueInstruction>(value));
+                              llvm::outs() << "Input Value: " << *value;
+                              llvm::outs() << "Isolation: ";
+                              info.printForOneLineLogging(&function,
+                                                          llvm::outs());
+                              llvm::outs() << "\n";
+                            });
+
 
 } // namespace swift::test
