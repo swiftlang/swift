@@ -1173,7 +1173,7 @@ internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owne
 /// which was called through its ObjC-exported completion-handler-based API.
 ///
 /// Uses Task.immediate for reduced scheduling overhead.
-/// Use of this bridging mode is opt-in via the `LangOptions::ObjcToSwiftAsyncBridgingMode` option.
+/// Use of this bridging mode is opt-in via `-enable-upcoming-feature ObjCAsyncBridgeImmediateTask`
 @available(SwiftStdlib 6.2, *)
 @_alwaysEmitIntoClient
 @usableFromInline

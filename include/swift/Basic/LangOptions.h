@@ -433,16 +433,6 @@ namespace swift {
     // Swift into ObjC. If false, will use unchecked continuations instead.
     bool UseCheckedAsyncObjCBridging = false;
 
-    /// Controls which Task variant is used when bridging from ObjC to async Swift functions.
-    enum class ObjcToSwiftAsyncBridgingMode : uint8_t {
-      /// Default, "old" behavior: use Task(operation:)
-      Task,
-      /// Available from Swift 6.4: use Task.immediate(operation:)
-      TaskImmediate,
-    };
-    ObjcToSwiftAsyncBridgingMode objcToSwiftAsyncBridgingMode =
-        ObjcToSwiftAsyncBridgingMode::Task;
-
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;

@@ -609,6 +609,7 @@ static bool usesFeatureReparenting(Decl *decl) {
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowInout)
 UNINTERESTING_FEATURE(BorrowingSequence)
+UNINTERESTING_FEATURE(ObjCAsyncBridgeImmediateTask)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

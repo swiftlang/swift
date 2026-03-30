@@ -321,6 +321,7 @@ MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, LanguageMode::future)
 MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, LanguageMode::future)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, LanguageMode::future)
 UPCOMING_FEATURE(ImmutableWeakCaptures, 481, LanguageMode::future)
+UPCOMING_FEATURE(ObjCAsyncBridgeImmediateTask, 0, LanguageMode::future)
 
 //===----------------------------------------------------------------------===//
 // MARK: - Optional features

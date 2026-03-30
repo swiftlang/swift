@@ -6,15 +6,17 @@
 // RUN: %target-codesign %t/objc_async_default
 // RUN: %target-run %t/objc_async_default | %FileCheck %s
 
-// Select 'task' mode':
-// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -parse-as-library -module-name main -Xfrontend -objc-call-swift-async-bridging=task -import-objc-header %S/Inputs/objc_async.h %s %t/objc_async_objc.o -o %t/objc_async_task
+// Select 'task' mode (same as default):
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -parse-as-library -module-name main -import-objc-header %S/Inputs/objc_async.h %s %t/objc_async_objc.o -o %t/objc_async_task
 // RUN: %target-codesign %t/objc_async_task
 // RUN: %target-run %t/objc_async_task | %FileCheck --check-prefix=CHECK-TASK %s
 
-// Select 'immediate' mode:
-// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -parse-as-library -module-name main -Xfrontend -objc-call-swift-async-bridging=immediate -import-objc-header %S/Inputs/objc_async.h %s %t/objc_async_objc.o -o %t/objc_async_task_immediate
+// Select 'immediate' mode via upcoming feature:
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -parse-as-library -module-name main -Xfrontend -enable-upcoming-feature -Xfrontend ObjCAsyncBridgeImmediateTask -import-objc-header %S/Inputs/objc_async.h %s %t/objc_async_objc.o -o %t/objc_async_task_immediate
 // RUN: %target-codesign %t/objc_async_task_immediate
 // RUN: %target-run %t/objc_async_task_immediate | %FileCheck --check-prefix=CHECK-IMMEDIATE %s
+
+// REQUIRES: swift_feature_ObjCAsyncBridgeImmediateTask
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
