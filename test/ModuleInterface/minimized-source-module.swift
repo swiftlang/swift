@@ -50,6 +50,13 @@
 // RUN:   %t/Types.min.swift %t/Uses.min.swift \
 // RUN:   -module-name TestMod -package-name TestPkg
 
+// Step 5: Minimize with -remove-internal-decls and verify it typechecks
+// RUN: %swift-interface-tool -action minimize-source -remove-internal-decls %t/Types.swift > %t/Types.rid.swift
+// RUN: %swift-interface-tool -action minimize-source -remove-internal-decls %t/Uses.swift > %t/Uses.rid.swift
+// RUN: %target-swift-frontend -typecheck -parse-as-interface \
+// RUN:   %t/Types.rid.swift %t/Uses.rid.swift \
+// RUN:   -module-name TestMod -package-name TestPkg
+
 // REQUIRES: objc_interop
 // REQUIRES: swift_swift_parser
 
@@ -177,6 +184,56 @@ public protocol Describable {
 // Extension with static let — initializer must survive minimization
 extension Point {
   public static let origin: Point = Point(x: 0, y: 0)
+}
+
+// --- Stored property default values ---
+
+// Struct with defaults, no explicit init — defaults stripped in -remove-internal-decls
+public struct DefaultValues {
+  public var timeout: Int = 30
+  public var name: String = "default"
+  public var optional: Int? = nil
+}
+
+// Struct with @inlinable init — defaults PRESERVED
+@frozen public struct InlinableInitStruct {
+  public var timeout: Int = 30
+  public var name: String = "default"
+
+  @inlinable
+  public init(timeout: Int = 30, name: String = "default") {
+    self.timeout = timeout
+    self.name = name
+  }
+}
+
+// Struct with non-inlinable explicit init — defaults stripped
+public struct ExplicitInitStruct {
+  public var count: Int = 0
+  public var label: String = "default"
+
+  public init(count: Int, label: String) {
+    self.count = count
+    self.label = label
+  }
+}
+
+// Struct with inferred-type property — default PRESERVED (no type annotation)
+public struct InferredTypeStruct {
+  public var count = 42
+  public init() {}
+}
+
+// Class with stored property defaults
+public class DefaultValueClass {
+  public var label: String = "untitled"
+  public var count: Int = 0
+}
+
+// Struct with let + default — default stripped
+public struct LetDefaultStruct {
+  public let name: String = "constant"
+  public init() {}
 }
 
 //--- Uses.swift

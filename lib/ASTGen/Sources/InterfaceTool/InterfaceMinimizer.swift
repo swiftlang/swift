@@ -53,7 +53,7 @@ extension SyntaxProtocol {
 /// the default visibility of members.
 private enum DeclContext {
   case topLevel
-  case publicType
+  case publicType(hasInlinableInit: Bool)
   case protocolDecl
   case extensionDecl(isPublic: Bool)
 
@@ -324,7 +324,8 @@ class InterfaceMinimizer: SyntaxRewriter {
     _ node: D,
     makeDeclSyntax: (D) -> DeclSyntax
   ) -> DeclSyntax {
-    contextStack.append(.publicType)
+    let hasInlinableInit = removeInternalDecls && typeHasInlinableInit(node)
+    contextStack.append(.publicType(hasInlinableInit: hasInlinableInit))
     defer { contextStack.removeLast() }
 
     let newMembers = filterMemberBlockItems(node.memberBlock.members)
@@ -371,8 +372,22 @@ class InterfaceMinimizer: SyntaxRewriter {
   override func visit(_ node: VariableDeclSyntax) -> DeclSyntax {
     let preserveBody = shouldPreserveBody(attributes: node.attributes)
 
+    // Check if we should strip stored property defaults in this context.
+    let shouldStripDefaults: Bool = {
+      guard removeInternalDecls else { return false }
+      if case .publicType(hasInlinableInit: false) = currentContext {
+        // Don't strip static/class properties.
+        return !node.modifiers.contains { modifier in
+          modifier.name.tokenKind == .keyword(.static) ||
+          modifier.name.tokenKind == .keyword(.class)
+        }
+      }
+      return false
+    }()
+
     var newBindings: [PatternBindingSyntax] = []
     var anyChanged = false
+    var needsHasInitialValueAttr = false
 
     for binding in node.bindings {
       var changed = false
@@ -386,6 +401,18 @@ class InterfaceMinimizer: SyntaxRewriter {
         }
       }
 
+      // Strip initializer if conditions are met:
+      // - Must have a type annotation (otherwise type is inferred from value)
+      // - Must not be a tuple pattern (can't safely attach @_hasInitialValue)
+      if shouldStripDefaults,
+         binding.initializer != nil,
+         binding.typeAnnotation != nil,
+         !binding.pattern.is(TuplePatternSyntax.self) {
+        newBinding = newBinding.with(\.initializer, nil)
+        needsHasInitialValueAttr = true
+        changed = true
+      }
+
       if changed {
         anyChanged = true
       }
@@ -393,7 +420,23 @@ class InterfaceMinimizer: SyntaxRewriter {
     }
 
     if anyChanged {
-      return DeclSyntax(node.with(\.bindings, PatternBindingListSyntax(newBindings)))
+      var result = node.with(\.bindings, PatternBindingListSyntax(newBindings))
+      if needsHasInitialValueAttr {
+        // Transfer leading trivia from the existing first token to the new
+        // attribute so indentation is preserved.
+        let leadingTrivia = result.leadingTrivia
+        result = result.with(\.leadingTrivia, [])
+        let newAttr: AttributeListSyntax.Element = .attribute(AttributeSyntax(
+          leadingTrivia: leadingTrivia,
+          atSign: .atSignToken(),
+          attributeName: IdentifierTypeSyntax(name: .identifier("_hasInitialValue")),
+          trailingTrivia: .space
+        ))
+        var attrs = Array(result.attributes)
+        attrs.insert(newAttr, at: 0)
+        result = result.with(\.attributes, AttributeListSyntax(attrs))
+      }
+      return DeclSyntax(result)
     }
     return DeclSyntax(node)
   }
@@ -455,5 +498,17 @@ class InterfaceMinimizer: SyntaxRewriter {
       current = parent.parent
     }
     return nil
+  }
+
+  // MARK: - Stored property default stripping helpers
+
+  /// Check whether a type declaration contains any initializer whose body would
+  /// be preserved (e.g. `@inlinable init`). When true, stored property defaults
+  /// must be kept because the inlinable init body may reference them.
+  private func typeHasInlinableInit<D: DeclGroupSyntax>(_ node: D) -> Bool {
+    node.memberBlock.members.contains { member in
+      guard let initDecl = member.decl.as(InitializerDeclSyntax.self) else { return false }
+      return shouldPreserveBody(attributes: initDecl.attributes)
+    }
   }
 }

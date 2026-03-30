@@ -95,9 +95,9 @@ public struct WithInitAllAccess {
 //--- expected.swift
 
 public struct StoredProps {
-  public var pubVar: Int = 1
-  private var privVar: Int = 2
-  package var pkgVar: Int = 5
+  @_hasInitialValue public var pubVar: Int
+  @_hasInitialValue private var privVar: Int
+  @_hasInitialValue package var pkgVar: Int
 
   public init()
 }
@@ -115,7 +115,7 @@ public struct ComputedProps {
 }
 
 public struct UsableFromInlineProps {
-  @usableFromInline internal var ufiVar: Int = 10
+  @_hasInitialValue @usableFromInline internal var ufiVar: Int
   @usableFromInline internal var ufiComputed: Int {
       get
   }
@@ -125,23 +125,23 @@ public struct UsableFromInlineProps {
 
 @_spi(Testing)
 public struct SPIStruct {
-  public var spiPubVar: Int = 1
-  private var spiPrivVar: Int = 2
+  @_hasInitialValue public var spiPubVar: Int
+  @_hasInitialValue private var spiPrivVar: Int
 
   public init()
 }
 
 open class OpenClass {
-  open var openVar: Int = 1
-  public var pubVar: Int = 2
-  private var privVar: Int = 3
+  @_hasInitialValue open var openVar: Int
+  @_hasInitialValue public var pubVar: Int
+  @_hasInitialValue private var privVar: Int
 
   public init()
 }
 
 public struct MixedAccessProps {
-  public private(set) var readOnly: Int = 0
-  public internal(set) var pubInternalSet: Int = 0
+  @_hasInitialValue public private(set) var readOnly: Int
+  @_hasInitialValue public internal(set) var pubInternalSet: Int
 
   public init()
 }
@@ -156,15 +156,15 @@ public struct InlinableProps {
 }
 
 public struct NoInitAllAccess {
-  public var pubVar: Int = 1
-  private var privVar: Int = 2
-  package var pkgVar: Int = 5
+  @_hasInitialValue public var pubVar: Int
+  @_hasInitialValue private var privVar: Int
+  @_hasInitialValue package var pkgVar: Int
 }
 
 public struct WithInitAllAccess {
-  public var pubVar: Int = 1
-  private var privVar: Int = 2
-  package var pkgVar: Int = 5
+  @_hasInitialValue public var pubVar: Int
+  @_hasInitialValue private var privVar: Int
+  @_hasInitialValue package var pkgVar: Int
 
   public init()
 }

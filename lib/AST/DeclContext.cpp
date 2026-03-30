@@ -424,6 +424,11 @@ bool DeclContext::isInSwiftinterface() const {
   return sf && sf->Kind == SourceFileKind::Interface;
 }
 
+bool DeclContext::isInSwiftSourceInterface() const {
+  auto sf = getParentSourceFile();
+  return sf && sf->Kind == SourceFileKind::SourceInterface;
+}
+
 DeclContext *DeclContext::getModuleScopeContext() const {
   // If the current context is PackageUnit, return the module
   // decl context pointing to the current context. This check

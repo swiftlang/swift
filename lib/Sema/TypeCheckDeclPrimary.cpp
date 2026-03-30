@@ -2662,11 +2662,11 @@ public:
           switch (SF->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
+          case SourceFileKind::SourceInterface:
             break;
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
-          case SourceFileKind::SourceInterface:
           case SourceFileKind::MacroExpansion:
             var->diagnose(diag::opaque_type_var_no_init);
             break;
@@ -2688,11 +2688,11 @@ public:
           switch (SF->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
+          case SourceFileKind::SourceInterface:
             return;
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
-          case SourceFileKind::SourceInterface:
           case SourceFileKind::MacroExpansion:
             break;
           }
@@ -2712,10 +2712,10 @@ public:
           case SourceFileKind::Main:
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
+          case SourceFileKind::SourceInterface:
             return;
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Library:
-          case SourceFileKind::SourceInterface:
           case SourceFileKind::MacroExpansion:
             break;
           }

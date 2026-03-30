@@ -182,6 +182,11 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
     return;
   }
 
+  // Don't set StoredProperty default when there's no actual initializer
+  // expression (e.g., @_hasInitialValue in SourceInterface files).
+  if (!isExplicitlyInitialized)
+    return;
+
   // If there's a backing storage property, the memberwise initializer
   // will be in terms of that.
   VarDecl *backingStorageVar = var->getPropertyWrapperBackingProperty();
@@ -1760,8 +1765,10 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
     // Add the constructor.
     decl->addMember(ctor);
 
-    // Lazily synthesize an empty body for the default constructor.
-    ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
+    // In SourceInterface mode, synthesize only the declaration (no body).
+    // The interface lexer mode accepts bodyless functions.
+    if (!decl->getDeclContext()->isInSwiftSourceInterface())
+      ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
     return ctor;
   }
 

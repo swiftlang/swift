@@ -170,15 +170,15 @@ public struct Outer {
 }
 
 public struct Config {
-  public var timeout: Int = 30
-  public var name: String = "default"
-  private var counter: Int = 0
+  @_hasInitialValue public var timeout: Int
+  @_hasInitialValue public var name: String
+  @_hasInitialValue private var counter: Int
 }
 
 public struct ConfigWithInit {
-  public var timeout: Int = 30
-  public var name: String = "default"
-  private var counter: Int = 0
+  @_hasInitialValue public var timeout: Int
+  @_hasInitialValue public var name: String
+  @_hasInitialValue private var counter: Int
   public static let maxTimeout: Int = 3600
   public static var instanceCount: Int = 0
 
@@ -186,34 +186,30 @@ public struct ConfigWithInit {
 }
 
 public class Widget {
-  public var label: String = "untitled"
-  private var id: Int = 0
+  @_hasInitialValue public var label: String
+  @_hasInitialValue private var id: Int
 
   public init(label: String)
 }
 
 public class DefaultWidget {
-  public var label: String = "untitled"
-  private var id: Int = 0
+  @_hasInitialValue public var label: String
+  @_hasInitialValue private var id: Int
 }
 
 public struct InferredType {
-  public var name: String = "hello"
+  @_hasInitialValue public var name: String
   public var count = 42
 
   public init(name: String)
 }
 
 public class LazyProps {
-  public lazy var typedLazy: Int = {
-      42
-  }()
+  @_hasInitialValue public lazy var typedLazy: Int
   public lazy var inferredLazy = {
       42
   }()
-  private lazy var privateLazy: String = {
-      "hello"
-  }()
+  @_hasInitialValue private lazy var privateLazy: String
 
   public init()
 }
