@@ -744,8 +744,7 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC,
     AvailabilityDomain Domain, const AvailabilityRange &RequiredAvailability,
     ASTContext &Context, InFlightDiagnostic &Err) {
-  // FIXME: [availability] Support fixing availability for non-platform domains
-  if (!Domain.isPlatform())
+  if (!Domain.isVersioned())
     return false;
 
   const AvailabilityScope *scope = nullptr;
@@ -768,17 +767,20 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     auto Platform = targetPlatform(Context.LangOpts);
     if (RunningVers.getMajor() != RequiredVers.getMajor())
       return false;
-    if ((Platform == PlatformKind::macOS ||
+    if (Domain.isPlatform() &&
+        (Platform == PlatformKind::macOS ||
          Platform == PlatformKind::macOSApplicationExtension) &&
         RunningVers.getMajor() == 10 &&
         !(RunningVers.getMinor().has_value() &&
           RequiredVers.getMinor().has_value() &&
           RunningVers.getMinor().value() ==
-          RequiredVers.getMinor().value()))
+              RequiredVers.getMinor().value()))
       return false;
 
     auto FixRange = scope->getAvailabilityConditionVersionSourceRange(
-        AvailabilityDomain::forPlatform(Platform), RunningVers);
+        Domain.isPlatform() ? AvailabilityDomain::forPlatform(Platform)
+                            : Domain,
+        RunningVers);
     if (!FixRange.isValid())
       return false;
     // Have found a nontrivial availability scope-introducer to narrow.

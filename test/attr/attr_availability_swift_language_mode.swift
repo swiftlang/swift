@@ -58,6 +58,18 @@ func testMemberAvailability() {
   TestStruct().doAnotherThing() // expected-error {{'doAnotherThing()' is unavailable}}
 }
 
+@available(swift 5.1)
+extension TestStruct {
+  func doTheSlightlyNewerThing() {} // expected-note {{'doTheSlightlyNewerThing()' was introduced in Swift 5.1}}
+}
+
+@available(swift 5.0)
+extension TestStruct {
+  func useDoTheSlightlyNewerThing() {
+    doTheSlightlyNewerThing() // expected-error {{'doTheSlightlyNewerThing()' is unavailable}} {{-3:18-21=5.1}}
+  }
+}
+
 @available(swift 400)
 @available(macOS 10.11, *)
 extension TestStruct {}
