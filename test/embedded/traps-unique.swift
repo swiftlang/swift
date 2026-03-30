@@ -14,20 +14,20 @@ public func foobar(i: Int) {
 
 // CHECK: define {{.*}}@"$e4main6foobar1iySi_tF"{{.*}} {
 // CHECK: entry:
-// CHECK:   switch i64 %0, label %3 [
-// CHECK:     i64 1, label %1
-// CHECK:     i64 2, label %2
+// CHECK:   switch i64 %0, label %1 [
+// CHECK:     i64 1, label %2
+// CHECK:     i64 2, label %3
 // CHECK:   ]
 // CHECK: 1:
-// CHECK:   tail call void asm sideeffect ""
-// CHECK:   tail call void @llvm.trap()
-// CHECK:   unreachable
+// CHECK:   ret void
 // CHECK: 2:
 // CHECK:   tail call void asm sideeffect ""
 // CHECK:   tail call void @llvm.trap()
 // CHECK:   unreachable
 // CHECK: 3:
-// CHECK:   ret void
+// CHECK:   tail call void asm sideeffect ""
+// CHECK:   tail call void @llvm.trap()
+// CHECK:   unreachable
 // CHECK: }
 
 // We should not see a call to _asssertionFailure in IR because that means such basic block can be merged with another

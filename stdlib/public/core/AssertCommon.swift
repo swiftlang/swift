@@ -121,7 +121,7 @@ internal func _assertionFailure(
       file: file, line: line)
   }
 #endif
-  Builtin.condfail_message(false._value, message.unsafeRawPointer)
+  Builtin.condfail_message(true._value, message.unsafeRawPointer)
   Builtin.int_trap()
 }
 
@@ -217,7 +217,7 @@ internal func _assertionFailure(
     _embeddedReportFatalError(prefix: prefix, message: message)
   }
 
-  Builtin.condfail_message(false._value, message.unsafeRawPointer)
+  Builtin.condfail_message(true._value, message.unsafeRawPointer)
   Builtin.int_trap()
 }
 #endif
