@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -swift-version 6 -parse-as-library)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -swift-version 6 -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -16,45 +16,38 @@ import Foundation
 @MainActor
 final class MyController {
   var value = 0
-
-  // Inherits @MainActor from the class — no explicit annotation
+  var doneContinuation: CheckedContinuation<Void, Never>?
 
   func applySnapshot() {
-    print("[swift] \(#fileID):\(#line) applySnapshot() — isMainThread: \(Thread.isMainThread)")
-    guard _isMainThread() else {
-      fatalError("BUG: Expected to be on main actor in applySnapshot()")
-    }
+    print("applySnapshot: isMainThread=\(_isMainThread())")
+    // CHECK: applySnapshot: isMainThread=true
 
     Task.immediate {
-      print("[swift] \(#fileID):\(#line) Task.immediate start — isMainThread: \(Thread.isMainThread)")
-      guard _isMainThread() else {
-        fatalError("BUG: Expected to be on main actor in applySnapshot/Task.immediate intro")
-      }
+      print("Task.immediate start: isMainThread=\(_isMainThread())")
+      // CHECK: Task.immediate start: isMainThread=true
 
-      print("[swift] \(#fileID):\(#line) before withCheckedContinuation — isMainThread: \(Thread.isMainThread)")
       await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-        print("[swift] \(#fileID):\(#line) inside continuation body — isMainThread: \(Thread.isMainThread)")
-        DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
-          print("[swift] \(#fileID):\(#line) resuming continuation from DispatchQueue.global() — isMainThread: \(Thread.isMainThread)")
+        // Resume from a background thread to force a thread hop
+        // Avoid Task to prevent Dispatch sneakily work stealing the new task using the main thread anyway.
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
           continuation.resume()
         }
       }
 
       // After resuming from await — must be back on @MainActor (main thread)
       // In the bug, this resumes on com.apple.root.user-initiated-qos.cooperative
-      print("[swift] \(#fileID):\(#line) after withCheckedContinuation — isMainThread: \(Thread.isMainThread)")
-      guard _isMainThread() else {
-        fatalError("BUG: Task.immediate lost @MainActor isolation after await! Resumed on wrong thread.")
-      }
+      print("after withCheckedContinuation: isMainThread=\(_isMainThread())")
+      // CHECK: after withCheckedContinuation: isMainThread=true
 
-      print("[swift] \(#fileID):\(#line) Task.immediate done — isMainThread: \(Thread.isMainThread)")
       self.value = 2
+      self.doneContinuation?.resume()
     }
   }
-}
 
-// Helper to check main thread without triggering
-// "unavailable from asynchronous contexts" errors
+  func waitUntilDone() async {
+    await withCheckedContinuation { self.doneContinuation = $0 }
+  }
+}
 
 nonisolated func _isMainThread() -> Bool {
   return Thread.isMainThread
@@ -62,18 +55,12 @@ nonisolated func _isMainThread() -> Bool {
 
 @main
 struct Main {
-  static func main() async throws {
-    print("[swift] \(#fileID):\(#line) main() start — isMainThread: \(Thread.isMainThread)")
-    MainActor.preconditionIsolated()
-
+  static func main() async {
     let c = MyController()
     c.applySnapshot()
+    await c.waitUntilDone()
 
-    print("[swift] \(#fileID):\(#line) waiting for Task.immediate to complete...")
-    try await Task.sleep(for: .milliseconds(2000))
-
-    let val = c.value  // just to keep alive
-    precondition(val == 2, "Expected value to be 2, was \(val)")
-    print("OK: Task.immediate preserved @MainActor isolation across await")
+    print("value=\(c.value)")
+    // CHECK: value=2
   }
 }

@@ -28,26 +28,25 @@ if #available(SwiftStdlib 6.0, *) {
 
 // CHECK-NEXT: foo - withTaskExecutorPreference
 
-// After each continuation resumes, hop_to_executor hops back to the caller's
-// expected executor (rdar://173371163). When the caller is nonisolated inside
-// withTaskExecutorPreference, the hop goes through the task executor.
-// CHECK: foo - withTaskExecutorPreference - withCheckedContinuation
-// CHECK-NEXT: [executor][task-executor] Enqueue (2)
+// After each continuation resumes, hop_to_executor targets the generic executor.
+// Since the task has a preferred task executor whose identity matches the current
+// serial executor, mustSwitchToRun elides the hop — no enqueue needed.
+// Similarly, the hop inside withTaskExecutorPreference (after the body returns
+// but before the defer clears the preference) is also elided. The eventual hop
+// back to the generic executor (after the preference is cleared) goes through
+// libdispatch, not our custom executor, so it produces no visible enqueue here.
+
+// CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedContinuation
 // CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedContinuation done
 
-// CHECK: foo - withTaskExecutorPreference - withUnsafeContinuation
-// CHECK-NEXT: [executor][task-executor] Enqueue (3)
+// CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeContinuation
 // CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeContinuation done
 
-// CHECK: foo - withTaskExecutorPreference - withCheckedThrowingContinuation
-// CHECK-NEXT: [executor][task-executor] Enqueue (4)
+// CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedThrowingContinuation
 // CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedThrowingContinuation done
 
-// CHECK: foo - withTaskExecutorPreference - withUnsafeThrowingContinuation
-// CHECK-NEXT: [executor][task-executor] Enqueue (5)
+// CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeThrowingContinuation
 // CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeThrowingContinuation done
-
-// CHECK-NEXT: [executor][task-executor] Enqueue (6)
 
 // CHECK-NEXT: foo - withTaskExecutorPreference done
 
@@ -55,6 +54,11 @@ if #available(SwiftStdlib 6.0, *) {
 // CHECK-NEXT: ---------------------------------------
 // CHECK-NEXT: [executor][actor-executor] Enqueue (1)
 // CHECK-NEXT: actor.foo
+
+// Coming back to the origin executor,
+// which is the same actor as we just executed the continuation body on,
+// is triggering task_switch's fast path and we don't need to enqueue the again.
+// I.e. The "hop back" with hop_to_executor exists, but is optimized at runtime.
 
 // CHECK: actor.foo - withCheckedContinuation
 // CHECK-NEXT: actor.foo - withCheckedContinuation done
