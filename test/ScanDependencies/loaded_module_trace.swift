@@ -1,7 +1,10 @@
 // REQUIRES: swift_feature_RegionBasedIsolation
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/cache)
 // RUN: split-file %s %t
+// RUN: ln -s %t/C_real.swiftinterface %t/C.swiftinterface
 
 // RUN: %target-build-swift -emit-module -module-name Module %S/../Driver/Inputs/loaded_module_trace_empty.swift \
 // RUN:   -o %t/Module.swiftmodule -module-cache-path %t/cache
@@ -30,6 +33,7 @@
 // CHECK-DAG: {"name":"SwiftOnoneSupport","path":"{{[^"]*\\[/\\]}}SwiftOnoneSupport.swiftmodule{{(\\[/\\][^"]+[.]swiftinterface)?}}","isImportedDirectly":true,"supportsLibraryEvolution":true,"strictMemorySafety":true}
 // CHECK-DAG: {"name":"Module","path":"{{[^"]*\\[/\\]}}Module.swiftmodule","isImportedDirectly":false,"supportsLibraryEvolution":false,"strictMemorySafety":false}
 // CHECK-DAG: {"name":"A","path":"{{[^"]*\\[/\\]}}A.swiftinterface","isImportedDirectly":true,"supportsLibraryEvolution":true,"strictMemorySafety":true}
+// CHECK-DAG: {"name":"C","path":"{{[^"]*\\[/\\]}}C_real.swiftinterface","isImportedDirectly":true,"supportsLibraryEvolution":true,"strictMemorySafety":false}
 // CHECK: ],
 // CHECK: "swiftmacros":[
 // CHECK-DAG: {"name":"Plugin","path":"{{[^"]*\\[/\\]}}{{libPlugin.dylib|libPlugin.so|Plugin.dll}}"}
@@ -55,7 +59,7 @@ public func funcA() { }
 // swift-module-flags: -module-name B
 public func funcB() { }
 
-//--- C.swiftinterface
+//--- C_real.swiftinterface
 // swift-interface-format-version: 1.0
 // swift-module-flags: -module-name C
 public func funcC() { }
