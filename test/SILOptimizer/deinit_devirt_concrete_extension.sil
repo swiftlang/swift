@@ -1,0 +1,75 @@
+// RUN: %target-sil-opt -module-name main -enable-sil-verify-all -deinit-devirtualizer %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+// ~Copyable type nested in a constrained extension where all generic
+// parameters are concrete. The deinit's SILFunctionType has no invocation
+// generic signature because SIL drops it when all parameters are fixed,
+// but getContextSubstitutionMap returns a non-empty map for the enclosing
+// generic context. The DeinitDevirtualizer must use an empty SubstitutionMap.
+
+enum Container<Element> {
+}
+
+extension Container where Element == UInt8 {
+  struct Storage : ~Copyable {
+    @_hasStorage var value: Int { get set }
+    deinit
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                         destroy_value path
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: sil [ossa] @test_destroy_value_concrete_extension : $@convention(thin) (@owned Container<UInt8>.Storage) -> () {
+// CHECK: bb0([[ARG:%.*]] : @owned $Container<UInt8>.Storage):
+// CHECK:   [[FUNC:%.*]] = function_ref @$s4main9ContainerOAAs5UInt8VRszlE7StorageVfD :
+// CHECK:   apply [[FUNC]]([[ARG]])
+// CHECK: } // end sil function 'test_destroy_value_concrete_extension'
+sil [ossa] @test_destroy_value_concrete_extension : $@convention(thin) (@owned Container<UInt8>.Storage) -> () {
+bb0(%0 : @owned $Container<UInt8>.Storage):
+  destroy_value %0 : $Container<UInt8>.Storage
+  %2 = tuple()
+  return %2 : $()
+}
+
+//===----------------------------------------------------------------------===//
+//                          destroy_addr path
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: sil [ossa] @test_destroy_addr_concrete_extension : $@convention(thin) (@in Container<UInt8>.Storage) -> () {
+// CHECK: bb0([[ARG:%.*]] : $*Container<UInt8>.Storage):
+// CHECK:   [[FUNC:%.*]] = function_ref @$s4main9ContainerOAAs5UInt8VRszlE7StorageVfD :
+// CHECK:   [[VALUE:%.*]] = load [take] [[ARG]]
+// CHECK:   apply [[FUNC]]([[VALUE]])
+// CHECK: } // end sil function 'test_destroy_addr_concrete_extension'
+sil [ossa] @test_destroy_addr_concrete_extension : $@convention(thin) (@in Container<UInt8>.Storage) -> () {
+bb0(%0 : $*Container<UInt8>.Storage):
+  destroy_addr %0 : $*Container<UInt8>.Storage
+  %2 = tuple()
+  return %2 : $()
+}
+
+//===----------------------------------------------------------------------===//
+//                              Destructors
+//===----------------------------------------------------------------------===//
+
+// Non-generic deinit: no invocation generic signature despite the
+// enclosing generic context (Container<Element>).
+sil hidden [ossa] @$s4main9ContainerOAAs5UInt8VRszlE7StorageVfD : $@convention(method) (@owned Container<UInt8>.Storage) -> () {
+bb0(%0 : @owned $Container<UInt8>.Storage):
+  %1 = drop_deinit %0 : $Container<UInt8>.Storage
+  end_lifetime %1 : $Container<UInt8>.Storage
+  %3 = tuple ()
+  return %3 : $()
+}
+
+sil_moveonlydeinit Storage {
+  @$s4main9ContainerOAAs5UInt8VRszlE7StorageVfD
+}
