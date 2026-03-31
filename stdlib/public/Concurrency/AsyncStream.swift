@@ -241,7 +241,10 @@ public struct AsyncStream<Element> {
     let storage: _Storage<Element, Never>?
     let produce: () async -> Element?
 
-    init(storage: _Storage<Element, Never>? = nil, produce: @escaping () async -> Element?) {
+    init(
+      storage: _Storage<Element, Never>? = nil,
+      produce: @escaping () async -> Element?
+    ) {
       self.storage = storage
       self.produce = produce
     }
@@ -301,7 +304,9 @@ public struct AsyncStream<Element> {
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
   ) {
-    let storage: _Storage<Element, Never> = .create(bufferingPolicy: limit.asStorageBufferingPolicy())
+    let storage: _Storage<Element, Never> = .create(
+      bufferingPolicy: limit.asStorageBufferingPolicy()
+    )
     context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }

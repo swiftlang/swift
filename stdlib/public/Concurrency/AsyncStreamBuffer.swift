@@ -84,61 +84,65 @@ func _unlock(_ ptr: UnsafeRawPointer)
 ///   method exits its critical section.
 ///
 @safe
-internal
-final class _Storage<Element, Failure: Error>: @unchecked Sendable {
+internal final class _Storage<Element, Failure: Error>: @unchecked Sendable {
   typealias Buffer = _Deque<Element>
   typealias Consumer = UnsafeContinuation<Result<Element?, Failure>, Never>
   typealias Consumers = _Deque<UnsafeContinuation<Result<Element?, Failure>, Never>>
   typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
 
   @unsafe
-  private
-  enum State {
+  private enum State {
     case idle(
-      buffer: Buffer)
+      buffer: Buffer
+    )
 
     case waiting(
-      consumers: Consumers)
+      consumers: Consumers
+    )
 
     case draining(
       buffer: Buffer,
-      failure: Failure? = nil)
+      failure: Failure? = nil
+    )
 
     case terminated(
-      failure: Failure? = nil)
+      failure: Failure? = nil
+    )
   }
 
   @unsafe
-  private
-  enum YieldAction {
+  private enum YieldAction {
     case resume(
       consumer: Consumer,
-      element: Element?)
+      element: Element?
+    )
 
     case none
   }
 
-  private
-  enum NextAction {
+  private enum NextAction {
     case resume(
-      element: Element?)
+      element: Element?
+    )
 
     case `throw`(
-      failure: Failure)
+      failure: Failure
+    )
 
     case suspend
   }
 
   @unsafe
-  private
-  enum TerminateAction {
+  private enum TerminateAction {
     case callHandlerAndResume(
       terminationHandler: TerminationHandler?,
       consumers: Consumers,
-      failure: Failure?)
+      failure: Failure?
+    )
 
     case callHandler(
-      terminationHandler: TerminationHandler?)
+      terminationHandler: TerminationHandler?
+    )
 
     case none
   }
@@ -188,7 +192,8 @@ extension _Storage {
           unsafe state = unsafe .idle(buffer: buffer)
           return unsafe (
             result: .enqueued(remaining: .max),
-            action: .none)
+            action: .none
+          )
 
         case let .bufferingOldest(limit):
           switch buffer.count < limit {
@@ -197,12 +202,14 @@ extension _Storage {
             unsafe state = unsafe .idle(buffer: buffer)
             return unsafe (
               result: .enqueued(remaining: limit - buffer.count),
-              action: .none)
+              action: .none
+            )
 
           case false:
             return unsafe (
               result: .dropped(value),
-              action: .none)
+              action: .none
+            )
           }
 
         case let .bufferingNewest(limit):
@@ -212,7 +219,8 @@ extension _Storage {
             unsafe state = unsafe .idle(buffer: buffer)
             return unsafe (
               result: .enqueued(remaining: limit - buffer.count),
-              action: .none)
+              action: .none
+            )
 
           case _ where buffer.count >= limit && limit > .zero:
             let droppedValue = buffer.removeFirst()
@@ -220,12 +228,14 @@ extension _Storage {
             unsafe state = unsafe .idle(buffer: buffer)
             return unsafe (
               result: .dropped(droppedValue),
-              action: .none)
+              action: .none
+            )
 
           default:
             return unsafe (
               result: .dropped(value),
-              action: .none)
+              action: .none
+            )
           }
         }
 
@@ -243,18 +253,21 @@ extension _Storage {
         case .unbounded:
           return unsafe (
             result: .enqueued(remaining: .max),
-            action: .resume(consumer: consumer, element: value))
+            action: .resume(consumer: consumer, element: value)
+          )
 
         case let .bufferingOldest(limit), let .bufferingNewest(limit):
           return unsafe (
             result: .enqueued(remaining: limit),
-            action: .resume(consumer: consumer, element: value))
+            action: .resume(consumer: consumer, element: value)
+          )
         }
 
       case .draining, .terminated:
         return unsafe (
           result: .terminated,
-          action: .none)
+          action: .none
+        )
       }
     }
 
@@ -268,8 +281,7 @@ extension _Storage {
     }
   }
 
-  private
-  func next(_ consumer: Consumer) {
+  private func next(_ consumer: Consumer) {
     let action: NextAction = unsafe withLock { state in
       switch unsafe state {
       case var .idle(buffer):
@@ -331,8 +343,7 @@ extension _Storage {
     }
   }
 
-  nonisolated(nonsending)
-  func next() async throws(Failure) -> Element? {
+  nonisolated(nonsending) func next() async throws(Failure) -> Element? {
     return try await withTaskCancellationHandler {
       return unsafe await withUnsafeContinuation { consumer in
         unsafe self.next(consumer)
@@ -364,14 +375,16 @@ extension _Storage {
           unsafe state = unsafe .draining(buffer: buffer, failure: failure)
         }
         return unsafe .callHandler(
-          terminationHandler: self.onTermination.take())
+          terminationHandler: self.onTermination.take()
+        )
 
       case let .waiting(consumers):
         unsafe state = .terminated()
         return unsafe .callHandlerAndResume(
           terminationHandler: self.onTermination.take(),
           consumers: consumers,
-          failure: failure)
+          failure: failure
+        )
 
       case .draining, .terminated:
         return unsafe .none
@@ -404,10 +417,8 @@ extension _Storage {
 }
 
 extension _Storage {
-  internal
-  struct Continuation {
-    internal
-    enum BufferingPolicy {
+  internal struct Continuation {
+    internal enum BufferingPolicy {
       case unbounded
 
       case bufferingOldest(Int)
@@ -415,8 +426,7 @@ extension _Storage {
       case bufferingNewest(Int)
     }
 
-    internal
-    enum YieldResult {
+    internal enum YieldResult {
       case enqueued(remaining: Int)
 
       case dropped(Element)
@@ -424,8 +434,7 @@ extension _Storage {
       case terminated
     }
 
-    internal
-    enum Termination {
+    internal enum Termination {
       case finished(Failure?)
 
       case cancelled
@@ -434,8 +443,8 @@ extension _Storage {
 }
 
 extension _Storage {
-  private
-  func withLock<Value>(
+  @safe
+  private func withLock<Value>(
     _ action: (inout State) -> Value
   ) -> Value {
     let ptr = unsafe UnsafeRawPointer(

@@ -68,8 +68,8 @@ extension AsyncStream.Continuation {
   @Sendable (Termination) -> Void
 
   func adaptToStreamTerminationHandler(
-    _ onTermination: StorageTerminationHandler?)
-  -> StreamTerminationHandler? {
+    _ onTermination: StorageTerminationHandler?
+  ) -> StreamTerminationHandler? {
     guard
       let onTermination
     else { return nil }
@@ -80,8 +80,8 @@ extension AsyncStream.Continuation {
   }
 
   func adaptToStorageTerminationHandler(
-    _ onTermination: StreamTerminationHandler?)
-  -> StorageTerminationHandler? {
+    _ onTermination: StreamTerminationHandler?
+  ) -> StorageTerminationHandler? {
     guard
       let onTermination
     else { return nil }
@@ -162,8 +162,8 @@ extension AsyncThrowingStream.Continuation {
   @Sendable (Termination) -> Void
 
   func adaptToStreamTerminationHandler(
-    _ onTermination: StorageTerminationHandler?)
-  -> StreamTerminationHandler? {
+    _ onTermination: StorageTerminationHandler?
+  ) -> StreamTerminationHandler? {
     guard
       let onTermination
     else { return nil }
@@ -174,8 +174,8 @@ extension AsyncThrowingStream.Continuation {
   }
 
   func adaptToStorageTerminationHandler(
-    _ onTermination: StreamTerminationHandler?)
-  -> StorageTerminationHandler? {
+    _ onTermination: StreamTerminationHandler?
+  ) -> StorageTerminationHandler? {
     guard
       let onTermination
     else { return nil }

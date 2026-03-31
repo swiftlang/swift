@@ -267,7 +267,10 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     let storage: _Storage<Element, Failure>?
     let produce: () async throws(Failure) -> Element?
 
-    init(storage: _Storage<Element, Failure>? = nil, produce: @escaping () async throws(Failure) -> Element?) {
+    init(
+      storage: _Storage<Element, Failure>? = nil,
+      produce: @escaping () async throws(Failure) -> Element?
+    ) {
       self.storage = storage
       self.produce = produce
     }
@@ -338,7 +341,9 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
   ) where Failure == Error {
-    let storage: _Storage<Element, Failure> = .create(bufferingPolicy: limit.asStorageBufferingPolicy())
+    let storage: _Storage<Element, Failure> = .create(
+      bufferingPolicy: limit.asStorageBufferingPolicy()
+    )
     context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }
