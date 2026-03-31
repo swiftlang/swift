@@ -189,7 +189,7 @@ extension _Storage {
         switch self.bufferingPolicy {
         case .unbounded:
           buffer.append(value)
-          unsafe state = unsafe .idle(buffer: buffer)
+          unsafe state = .idle(buffer: buffer)
           return unsafe (
             result: .enqueued(remaining: .max),
             action: .none
@@ -199,7 +199,7 @@ extension _Storage {
           switch buffer.count < limit {
           case true:
             buffer.append(value)
-            unsafe state = unsafe .idle(buffer: buffer)
+            unsafe state = .idle(buffer: buffer)
             return unsafe (
               result: .enqueued(remaining: limit - buffer.count),
               action: .none
@@ -216,7 +216,7 @@ extension _Storage {
           switch limit {
           case _ where buffer.count < limit && limit > .zero:
             buffer.append(value)
-            unsafe state = unsafe .idle(buffer: buffer)
+            unsafe state = .idle(buffer: buffer)
             return unsafe (
               result: .enqueued(remaining: limit - buffer.count),
               action: .none
@@ -225,7 +225,7 @@ extension _Storage {
           case _ where buffer.count >= limit && limit > .zero:
             let droppedValue = buffer.removeFirst()
             buffer.append(value)
-            unsafe state = unsafe .idle(buffer: buffer)
+            unsafe state = .idle(buffer: buffer)
             return unsafe (
               result: .dropped(droppedValue),
               action: .none
@@ -244,9 +244,9 @@ extension _Storage {
 
         switch unsafe consumers.isEmpty {
         case true:
-          unsafe state = unsafe .idle(buffer: [])
+          unsafe state = .idle(buffer: [])
         case false:
-          unsafe state = unsafe .waiting(consumers: consumers)
+          unsafe state = .waiting(consumers: consumers)
         }
 
         switch self.bufferingPolicy {
@@ -287,12 +287,12 @@ extension _Storage {
       case var .idle(buffer):
         switch buffer.isEmpty {
         case true:
-          unsafe state = unsafe .waiting(consumers: [consumer])
+          unsafe state = .waiting(consumers: [consumer])
           return .suspend
 
         case false:
           let element = buffer.removeFirst()
-          unsafe state = unsafe .idle(buffer: buffer)
+          unsafe state = .idle(buffer: buffer)
           return .resume(element: element)
         }
 
@@ -304,7 +304,7 @@ extension _Storage {
       case .draining(var buffer, let failure):
         switch buffer.isEmpty {
         case true:
-          unsafe state = unsafe .terminated()
+          unsafe state = .terminated()
           switch failure {
           case .none:
             return .resume(element: nil)
@@ -315,12 +315,12 @@ extension _Storage {
 
         case false:
           let element = buffer.removeFirst()
-          unsafe state = unsafe .draining(buffer: buffer, failure: failure)
+          unsafe state = .draining(buffer: buffer, failure: failure)
           return .resume(element: element)
         }
 
       case let .terminated(failure):
-        unsafe state = unsafe .terminated()
+        unsafe state = .terminated()
         switch failure {
         case .none:
           return .resume(element: nil)
@@ -369,10 +369,10 @@ extension _Storage {
       case let .idle(buffer):
         switch buffer.isEmpty {
         case true:
-          unsafe state = unsafe .terminated(failure: failure)
+          unsafe state = .terminated(failure: failure)
 
         case false:
-          unsafe state = unsafe .draining(buffer: buffer, failure: failure)
+          unsafe state = .draining(buffer: buffer, failure: failure)
         }
         return unsafe .callHandler(
           terminationHandler: self.onTermination.take()
