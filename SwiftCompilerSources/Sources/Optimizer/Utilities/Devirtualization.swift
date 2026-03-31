@@ -151,6 +151,9 @@ extension DestroyValueInst : DevirtualizableDestroy {
 
   fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
     let builder = Builder(before: self, context)
+    // For types nested in constrained extensions where all generic parameters
+    // are concrete (e.g. `extension E where T == UInt8`), the deinit has no
+    // invocation generic signature, so the substitution map must be empty.
     let subs = deinitializer.isGeneric
       ? context.getContextSubstitutionMap(for: type)
       : SubstitutionMap()
@@ -226,6 +229,9 @@ extension DestroyAddrInst : DevirtualizableDestroy {
 
   fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
     let builder = Builder(before: self, context)
+    // For types nested in constrained extensions where all generic parameters
+    // are concrete (e.g. `extension E where T == UInt8`), the deinit has no
+    // invocation generic signature, so the substitution map must be empty.
     let subs = deinitializer.isGeneric
       ? context.getContextSubstitutionMap(for: destroyedAddress.type)
       : SubstitutionMap()
