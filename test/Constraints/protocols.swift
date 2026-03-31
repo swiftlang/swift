@@ -525,3 +525,32 @@ do {
     takesFooables([v]) // expected-error {{cannot convert value of type 'String' to expected element type 'any Fooable'}}
   }
 }
+
+// FIXME: These should all produce correct diagnostics
+do {
+  protocol P {}
+
+  func f1() -> () -> any P {
+    let x: () -> Any = { return 0 }
+    return x
+    // expected-error@-1 {{cannot convert return expression of type '() -> Any' to return type '() -> any P'}}
+  }
+
+  func f2() -> (any P)? {
+    let x: Any? = nil
+    return x
+    // expected-error@-1 {{failed to produce diagnostic for expression}}
+  }
+
+  func f3() -> [any P] {
+    let x: [Any] = []
+    return x
+    // expected-error@-1 {{failed to produce diagnostic for expression}}
+  }
+
+  func f4() -> [Int: any P] {
+    let x: [Int: Any] = [:]
+    return x
+    // expected-error@-1 {{failed to produce diagnostic for expression}}
+  }
+}

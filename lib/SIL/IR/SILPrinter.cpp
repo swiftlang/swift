@@ -29,6 +29,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -104,6 +105,10 @@ llvm::cl::opt<bool> SILPrintFunctionIsolationInfo(
     "sil-print-function-isolation-info", llvm::cl::init(false),
     llvm::cl::desc("Print out isolation info on functions in a manner that SIL "
                    "understands [e.x.: not in comments]"));
+
+llvm::cl::opt<bool> SILPrintLoopHeaders(
+    "sil-print-loopheaders", llvm::cl::init(true),
+    llvm::cl::desc("Print a comment on basic blocks that are loop headers"));
 
 static std::string demangleSymbol(StringRef Name) {
   if (SILFullDemangle)
@@ -747,6 +752,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   LineComments lineComments;
   unsigned LastBufferID;
   llvm::DenseSet<const SILBasicBlock *> printedBlocks;
+  llvm::SmallPtrSet<SILBasicBlock *, 32> loopHeaders;
 
   // Printers for the underlying stream.
 #define SIMPLE_PRINTER(TYPE) \
@@ -907,6 +913,10 @@ public:
   //===--------------------------------------------------------------------===//
   // Big entrypoints.
   void print(const SILFunction *F) {
+    if (SILPrintLoopHeaders) {
+      findLoopHeaders(*const_cast<SILFunction *>(F), loopHeaders);
+    }
+
     // If we are asked to emit sorted SIL, print out our BBs in RPOT order.
     if (Ctx.sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
@@ -1039,6 +1049,11 @@ public:
       *this << "// " << debugName.value() << '\n';
     }
 
+    if (SILPrintLoopHeaders &&
+        loopHeaders.count(const_cast<SILBasicBlock *>(BB))) {
+      *this << "// Loop header\n";
+    }
+
     // Then print the name of our block, the arguments, and the block colon.
     *this << Ctx.getID(BB);
     printBlockArguments(BB);
@@ -1064,8 +1079,8 @@ public:
       for (auto Id : PredIDs)
         *this << ' ' << Id;
     }
-    *this << '\n';
 
+    *this << '\n';
     const auto &SM = BB->getModule().getASTContext().SourceMgr;
     std::optional<SILLocation> PrevLoc;
     for (const SILInstruction &I : *BB) {

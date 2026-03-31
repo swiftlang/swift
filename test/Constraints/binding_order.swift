@@ -7,14 +7,22 @@
 // we pick the wrong upper bound too early, certain expressions
 // will fail.
 
+protocol Command {
+  var name: String { get }
+  static var id: Int { get }
+}
+
+extension Command {
+  var name: String { return "" }
+  static var id: Int { return 0 }
+}
+
 // Originally from rdar://35088384:
 //
 // This used to crash in Xcode 9 GM, and fails with a diagnostic in more
 // recent swift-4.0-branch builds, because we incorrectly infer the type
 // of the array literal as [Any].
 do {
-  protocol Command {}
-
   struct Undo: Command {}
   struct Cut: Command {}
   struct Copy: Command {}
@@ -59,6 +67,20 @@ do {
 
   func perform4<S: Sequence>(_: S) where S.Element == Any.Type? {}
   perform4([Undo.self, Cut.self, Copy.self])
+
+  // expected-error@+1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  let _: [Int: any Command] = Dictionary(
+    uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
+
+  // expected-error@+1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  let _: [Int: (any Command)?] = Dictionary(
+    uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
+
+  let _: [Int: any Command.Type] = Dictionary(
+    uniqueKeysWithValues: [Undo.self, Cut.self, Copy.self, Paste.self].map { ($0.id, $0) })
+
+  let _: [Int: (any Command.Type)?] = Dictionary(
+    uniqueKeysWithValues: [Undo.self, Cut.self, Copy.self, Paste.self].map { ($0.id, $0) })
 }
 
 // rdar://problem/38159133
@@ -66,8 +88,6 @@ do {
 // Swift 4.1 Xcode 9.3b4 regression
 
 do {
-  protocol Command {}
-
   class Super {}
   class A: Super, Command {}
   class B: Super, Command {}
@@ -255,6 +275,65 @@ do {
     // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
 
     f2("\(elts.map { c in [c.string, c.integer, c.dictionary.map { C._optData($0) }] })")
+  }
+}
+
+do {
+  class Super {}
+  class First<T>: Super {}
+  class Second: Super {}
+
+  func f0() -> [(String, () -> Super)] {
+    return [
+      ("", { return First<Int>() }),
+      ("", { return First<Bool>() }),
+      ("", { return Second() })
+    ]
+  }
+
+
+  func f1() -> [(String, () -> Super)] {
+    let result = [
+      ("", { return First<Int>() }),
+      ("", { return First<Bool>() }),
+      ("", { return Second() })
+    ]
+    return result
+  }
+
+  func f2() -> [(String, () -> Super)] {
+    return [
+      ("", {
+        let result = First<Int>()
+        return result
+      }),
+      ("", {
+        let result = First<Bool>()
+        return result
+      }),
+      ("", {
+        let result = Second()
+        return result
+      })
+    ]
+  }
+
+  func f3() -> [(String, () -> Super)] {
+    let result = [
+      ("", {
+        let result = First<Int>()
+        return result
+      }),
+      ("", {
+        let result = First<Bool>()
+        return result
+      }),
+      ("", {
+        let result = Second()
+        return result
+      })
+    ]
+    return result
   }
 }
 
