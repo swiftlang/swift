@@ -627,6 +627,11 @@ def create_argument_parser():
            help='Pass additional CMake options to the Swift build. '
                 'Can be passed multiple times to add multiple options.',
            default=[])
+    option('--extra-lldb-cmake-options', append,
+           type=argparse.ShellSplitType(),
+           help='Pass additional CMake options to the LLDB build. '
+                'Can be passed multiple times to add multiple options.',
+           default=[])
 
     option('--dsymutil-jobs', store_int,
            default=defaults.DSYMUTIL_JOBS,

@@ -209,6 +209,7 @@ EXPECTED_DEFAULTS = {
     'enable_ubsan': False,
     'export_compile_commands': False,
     'extra_cmake_options': [],
+    'extra_lldb_cmake_options': [],
     'extra_llvm_cmake_options': [],
     'extra_swift_args': [],
     'extra_swift_cmake_options': [],
@@ -840,6 +841,7 @@ EXPECTED_OPTIONS = [
     StrOption('--swift-darwin-supported-archs'),
     SetTrueOption('--swift-freestanding-is-darwin'),
     AppendOption('--extra-swift-cmake-options'),
+    AppendOption('--extra-lldb-cmake-options'),
 
     StrOption('--stdlib-docs-hosting-base-path'),
 

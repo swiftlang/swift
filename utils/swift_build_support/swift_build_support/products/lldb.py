@@ -15,9 +15,19 @@ from . import libcxx
 from . import llvm
 from . import product
 from . import swift
+from .. import toolchain as toolchaintypes
 
 
 class LLDB(product.Product):
+
+    def __init__(self, args, toolchain, source_dir, build_dir):
+        product.Product.__init__(self, args, toolchain, source_dir,
+                                 build_dir)
+        if isinstance(self.toolchain, toolchaintypes.Darwin):
+            self.cmake_options.extend([('Python3_EXECUTABLE', self.toolchain.python3)])
+
+        self.cmake_options.extend_raw(self.args.extra_lldb_cmake_options)
+
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
