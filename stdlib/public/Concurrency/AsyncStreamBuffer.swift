@@ -162,13 +162,13 @@ internal final class _Storage<Element, Failure: Error>: @unchecked Sendable {
 
 extension _Storage {
   func getOnTermination() -> TerminationHandler? {
-    unsafe withLock { _ in
+    return withLock { _ in
       return self.onTermination
     }
   }
 
   func setOnTermination(_ newValue: TerminationHandler?) {
-    unsafe withLock { state in
+    withLock { state in
       switch unsafe state {
       case .idle, .waiting:
         self.onTermination = newValue
@@ -183,7 +183,7 @@ extension _Storage {
     let (
       result,
       action
-    ): (Continuation.YieldResult, YieldAction) = unsafe withLock { state in
+    ): (Continuation.YieldResult, YieldAction) = withLock { state in
       switch unsafe state {
       case var .idle(buffer):
         switch self.bufferingPolicy {
@@ -282,7 +282,7 @@ extension _Storage {
   }
 
   private func next(_ consumer: Consumer) {
-    let action: NextAction = unsafe withLock { state in
+    let action: NextAction = withLock { state in
       switch unsafe state {
       case var .idle(buffer):
         switch buffer.isEmpty {
@@ -364,7 +364,7 @@ extension _Storage {
       failure = nil
     }
 
-    let action: TerminateAction = unsafe withLock { state in
+    let action: TerminateAction = withLock { state in
       switch unsafe state {
       case let .idle(buffer):
         switch buffer.isEmpty {
