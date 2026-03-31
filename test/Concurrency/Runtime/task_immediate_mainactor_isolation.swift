@@ -4,6 +4,7 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // REQUIRES: libdispatch
+// REQUIRES: foundation
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: freestanding
 
