@@ -151,7 +151,9 @@ extension DestroyValueInst : DevirtualizableDestroy {
 
   fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
     let builder = Builder(before: self, context)
-    let subs = context.getContextSubstitutionMap(for: type)
+    let subs = deinitializer.isGeneric
+      ? context.getContextSubstitutionMap(for: type)
+      : SubstitutionMap()
     let deinitRef = builder.createFunctionRef(deinitializer)
     if deinitializer.argumentConventions[deinitializer.selfArgumentIndex!].isIndirect {
       let allocStack = builder.createAllocStack(type)
@@ -224,7 +226,9 @@ extension DestroyAddrInst : DevirtualizableDestroy {
 
   fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
     let builder = Builder(before: self, context)
-    let subs = context.getContextSubstitutionMap(for: destroyedAddress.type)
+    let subs = deinitializer.isGeneric
+      ? context.getContextSubstitutionMap(for: destroyedAddress.type)
+      : SubstitutionMap()
     let deinitRef = builder.createFunctionRef(deinitializer)
     if !deinitializer.argumentConventions[deinitializer.selfArgumentIndex!].isIndirect {
       let value = builder.createLoad(fromAddress: destroyedAddress, ownership: .take)
