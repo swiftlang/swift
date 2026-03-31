@@ -163,7 +163,7 @@ set(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES "" CACHE STRING
     "List of SDKs to use for target triples, in the form triple@sdkpath.
     Using this variable precludes setting directly the value for  SWIFT_SDK_embedded_ARCH_\$\{ARCH\}_PATH")
 
-set(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/llvm-ar";crsU
+set(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/llvm-ar;crsU"
     CACHE STRING
     "Archiver to use when building static archives for non Darwin platform targeting the macOS SDK.
     This is required when using Xcode 26.4 beta 1 and later.")
