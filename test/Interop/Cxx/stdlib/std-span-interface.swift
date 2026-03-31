@@ -7,10 +7,10 @@
 // RUN: %FileCheck %s --match-full-lines --check-prefixes=CHECK,CHECK-LEGACY < %t/interface-lifetimebound.swift
 
 // Make sure we trigger typechecking and SIL diagnostics
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s \
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S%{fs-sep}Inputs -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s \
 // RUN:   -verify-additional-prefix default- -Rclang-importer -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}std-span.h -verify-ignore-unrelated
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s \
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s \
 // RUN:   -verify-additional-prefix experimental- -Rclang-importer -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}std-span.h -verify-ignore-unrelated
 
 // REQUIRES: swift_feature_SafeInteropWrappers

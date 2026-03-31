@@ -31,4 +31,4 @@ public func callMemCmp2(_ p1: UnsafeMutableRawPointer, _ p2: UnsafeMutableRawPoi
 int memcmp(const void * _Nullable __sized_by(n) s1, const void * _Nullable __sized_by(n) s2, size_t n);
 // expected-remark@-1{{did not add safe interop wrapper}}
 // expected-nonwindows-note@-2{{module SwiftShims does not import the Swift module}}
-// expected-windows-note@-2{{module vcruntime does not import the Swift module}}
+// expected-windows-note@-3{{module vcruntime does not import the Swift module}}
