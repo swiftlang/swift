@@ -43,37 +43,21 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
-STATISTIC(StatsNumFunctionsProcessed, "# of functions processed");
-STATISTIC(StatsNumBasicBlocksProcessed, "# of basic blocks processed");
-STATISTIC(StatsNumMarkUninitProcessed,
-          "# of times a mark uninitialized inst checked");
-STATISTIC(StatsNumMemoryElements, "# of memory elements (total)");
-STATISTIC(StatsNumLivenessAtInstQueries,
-          "# of getLivenessAtInst queries issued");
-STATISTIC(StatsNumLivenessAtInstScans,
-          "# of instructions scanned during liveness queries");
-STATISTIC(StatsNumDataflowIterations, "# of dataflow iterations performed");
-STATISTIC(StatsNumCachePrecomputationInsts,
-          "# Insts processed for cache precomputation");
-STATISTIC(StatsNumLivenessCacheHits, "# Times liveness cache used");
-STATISTIC(StatsNumLivenessCacheHitSkipDataflow,
-          "# Times liveness cache allowed skipping dataflow");
-STATISTIC(StatsNumLivenessCacheMisses, "# Times liveness cache missed");
-
-llvm::cl::opt<bool> DICaching("di-caching", llvm::cl::init(true),
-                              llvm::cl::desc("pre-compute & cache DI info"));
-
 using namespace swift;
 using namespace ownership;
 
-STATISTIC(NumInstScansDuringLivenessQueries,
-          "# of instructions scanned while computing `getLivenessAtInst()`");
+STATISTIC(NumInstsScannedForLivenessQueries,
+          "# of instructions scanned to compute intra block liveness");
 
 llvm::cl::opt<bool> TriggerUnreachableOnFailure(
     "sil-di-assert-on-failure", llvm::cl::init(false),
     llvm::cl::desc("After emitting a DI error, assert instead of continuing. "
                    "Meant for debugging ONLY!"),
     llvm::cl::Hidden);
+
+//llvm::cl::opt<bool> DICaching("di-caching", llvm::cl::init(true),
+//                              llvm::cl::desc("pre-compute & cache DI info"));
+const bool DICaching = true;
 
 template<typename ...ArgTypes>
 static InFlightDiagnostic diagnose(SILModule &M, SILLocation loc,
@@ -719,7 +703,7 @@ void LifetimeChecker::populateLivenessCache(
 
   // Walk the block and cache info about local element stores.
   for (auto &TheInst : *BB) {
-    ++StatsNumCachePrecomputationInsts;
+    ++NumInstsScannedForLivenessQueries;
 
     // We saw everything we expected, so we're done.
     if (NumInterestingInstsSeen == NumInterestingInstsExpected)
@@ -3667,7 +3651,6 @@ void LifetimeChecker::
 computePredsLiveOut(SILBasicBlock *BB) {
   LLVM_DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID()
                           << "\n");
-  auto stats = BB->getFunction()->getASTContext().Stats;
 
   // Collect blocks for which we have to calculate the out-availability.
   // These are the paths from blocks with known out-availability to the BB.
@@ -3703,8 +3686,6 @@ computePredsLiveOut(SILBasicBlock *BB) {
 
       // Merge from the predecessor blocks.
       for (auto Pred : WorkBB->getPredecessorBlocks()) {
-        if (stats) ++stats->getFrontendCounters().DINumDataflowIterations;
-        ++StatsNumDataflowIterations;
         changed |= BBState.mergeFromPred(getBlockInfo(Pred));
       }
       LLVM_DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID()
@@ -3747,10 +3728,6 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
                                                    unsigned NumElts) {
   LLVM_DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts
                           << " at " << *Inst);
-  auto Stats = Inst->getFunction()->getASTContext().Stats;
-  if (Stats)
-    ++Stats->getFrontendCounters().DINumLivenessAtInstQueries;
-  ++StatsNumLivenessAtInstQueries;
 
   AvailabilitySet Result(TheMemory.getNumElements());
 
@@ -3781,7 +3758,6 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
     // First, check our cache to see if we've already computed which elements
     // are store to before this instruction.
     if (auto StoresBeforeInst = BBInfo.getStoredEltsBeforeInst(Inst)) {
-      ++StatsNumLivenessCacheHits;
       LLVM_DEBUG({
         llvm::dbgs() << "  cache hit; stored elts before inst: ";
         swift::dumpBits(*StoresBeforeInst);
@@ -3790,21 +3766,16 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
       // Unset the elements that were locally written to before this inst.
       NeededElements.reset(*StoresBeforeInst);
 
-      //
       if (InstBB == TheMemory.getUninitializedValue()->getParent() ||
           NeededElements.none()) {
-        ++StatsNumLivenessCacheHitSkipDataflow;
         IsResultLocallyDetermined = true;
       }
     } else {
-      ++StatsNumLivenessCacheMisses;
       LLVM_DEBUG(llvm::dbgs() << "  cache miss\n");
 
       // Otherwise, fall back to a local scan within the block.
       for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
-        if (Stats)
-          ++Stats->getFrontendCounters().DINumLivenessAtInstScans;
-        ++StatsNumLivenessAtInstScans;
+        ++NumInstsScannedForLivenessQueries;
 
         --BBI;
         SILInstruction *TheInst = &*BBI;
@@ -3983,10 +3954,6 @@ static void processMemoryObject(MarkUninitializedInst *I,
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);
 
-  if (auto *stats = MemInfo.getFunction().getASTContext().Stats)
-    stats->getFrontendCounters().DINumMemoryElements += MemInfo.getNumElements();
-  StatsNumMemoryElements += MemInfo.getNumElements();
-
   // Set up the datastructure used to collect the uses of the allocation.
   DIElementUseInfo UseInfo;
 
@@ -4002,9 +3969,6 @@ static void processMemoryObject(MarkUninitializedInst *I,
 static bool checkDefiniteInitialization(SILFunction &Fn) {
   FrontendStatsTracer StatsTracer(Fn.getModule().getASTContext().Stats,
                                   "definite-init", &Fn);
-  auto stats = Fn.getModule().getASTContext().Stats;
-  if (stats) ++stats->getFrontendCounters().DINumFunctionsProcessed;
-  ++StatsNumFunctionsProcessed;
 
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
                           <<  Fn.getName() << "\n");
@@ -4013,12 +3977,8 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
   BlockStates blockStates(&Fn);
 
   for (auto &BB : Fn) {
-    if (stats) ++stats->getFrontendCounters().DINumBasicBlocksProcessed;
-    ++StatsNumBasicBlocksProcessed;
     for (SILInstruction &inst : BB) {
       if (auto *MUI = dyn_cast<MarkUninitializedInst>(&inst)) {
-        if (stats) ++stats->getFrontendCounters().DINumMarkUninitProcessed;
-        ++StatsNumMarkUninitProcessed;
         processMemoryObject(MUI, blockStates);
         Changed = true;
         // mark_uninitialized needs to remain in SIL for mandatory passes which

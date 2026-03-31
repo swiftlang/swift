@@ -1,4 +1,4 @@
-// RUN: %scale-test --invert-result --begin 1 --end 10 --step 1 --select NumInstScansDuringLivenessQueries -Xfrontend=-emit-sil %s
+// RUN: %scale-test --invert-result --begin 1 --end 10 --step 1 --select NumInstsScannedForLivenessQueries -Xfrontend=-emit-sil %s
 // REQUIRES: asserts
 
 class C${N} {
