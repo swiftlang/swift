@@ -5,7 +5,10 @@
 
 // CHECK-DAG: "traceEvents"
 // CHECK-DAG: "ExecuteCompiler"
-// CHECK-DAG: "SemanticAnalysis"
+// CHECK-DAG: "perform-sema"
+// CHECK-DAG: "SILGen"
 // CHECK-DAG: "SILLowering"
+// CHECK-DAG: "IRGen"
+// CHECK-DAG: "LLVM pipeline"
 // CHECK-DAG: "ObjectFileEmission"
 // CHECK-DAG: "EmitObjCHeader"

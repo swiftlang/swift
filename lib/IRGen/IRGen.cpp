@@ -1846,7 +1846,6 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   }
 
   {
-    llvm::TimeTraceScope TimeScope("IRGen");
     FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
 
     // Emit the module contents.

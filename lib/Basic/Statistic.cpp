@@ -21,6 +21,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include <chrono>
 #include <limits>
@@ -320,7 +321,9 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            bool TraceEvents,
                                            bool ProfileEvents,
                                            bool ProfileEntities,
-                                           bool PrintZeroStats)
+                                           bool PrintZeroStats,
+                                           StringRef TimeTracePath,
+                                           unsigned TimeTraceGranularity)
   : UnifiedStatsReporter(ProgramName,
                          auxName(ModuleName,
                                  InputName,
@@ -330,7 +333,7 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                          Directory,
                          SM, CSM, FineGrainedTimers,
                          TraceEvents, ProfileEvents, ProfileEntities,
-                         PrintZeroStats)
+                         PrintZeroStats, TimeTracePath, TimeTraceGranularity)
 {
 }
 
@@ -343,28 +346,34 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            bool TraceEvents,
                                            bool ProfileEvents,
                                            bool ProfileEntities,
-                                           bool PrintZeroStats)
+                                           bool PrintZeroStats,
+                                           StringRef TimeTracePath,
+                                           unsigned TimeTraceGranularity)
   : currentProcessExitStatusSet(false),
     currentProcessExitStatus(EXIT_FAILURE),
-    StatsFilename(Directory),
-    TraceFilename(Directory),
-    ProfileDirname(Directory),
     StartedTime(llvm::TimeRecord::getCurrentTime()),
     MainThreadID(std::this_thread::get_id()),
-    Timer(std::make_unique<NamedRegionTimer>(AuxName,
-                                        "Building Target",
-                                        ProgramName, "Running Program")),
     SourceMgr(SM),
     ClangSourceMgr(CSM),
-    RecursiveTimers(std::make_unique<RecursionSafeTimers>()),
     FineGrainedTimers(FineGrainedTimers),
     IsFlushingTracesAndProfiles(false),
-    IsPrintingZeroStats(PrintZeroStats)
+    IsPrintingZeroStats(PrintZeroStats),
+    HasStatsOutputDir(!Directory.empty()),
+    TimeTracePath(TimeTracePath.str())
 {
-  path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
-  path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
-  path::append(ProfileDirname, makeProfileDirName(ProgramName, AuxName));
-  EnableStatistics(/*PrintOnExit=*/false);
+  if (HasStatsOutputDir) {
+    RecursiveTimers = std::make_unique<RecursionSafeTimers>();
+    StatsFilename = Directory;
+    TraceFilename = Directory;
+    ProfileDirname = Directory;
+    path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
+    path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
+    path::append(ProfileDirname, makeProfileDirName(ProgramName, AuxName));
+    Timer = std::make_unique<NamedRegionTimer>(AuxName,
+                                               "Building Target",
+                                               ProgramName, "Running Program");
+    EnableStatistics(/*PrintOnExit=*/false);
+  }
   if (TraceEvents || ProfileEvents || ProfileEntities)
     LastTracedFrontendCounters.emplace();
   if (TraceEvents)
@@ -373,6 +382,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     EventProfilers =std::make_unique<StatsProfilers>();
   if (ProfileEntities)
     EntityProfilers =std::make_unique<StatsProfilers>();
+  if (!this->TimeTracePath.empty())
+    llvm::timeTraceProfilerInitialize(TimeTraceGranularity, ProgramName);
 }
 
 void UnifiedStatsReporter::recordJobMaxRSS(long rss) {
@@ -497,6 +508,8 @@ FrontendStatsTracer::FrontendStatsTracer(
     SavedTime = llvm::TimeRecord::getCurrentTime();
     Reporter->saveAnyFrontendStatsEvents(*this, true);
   }
+  if (llvm::timeTraceProfilerEnabled())
+    TimeTraceEntry = llvm::timeTraceProfilerBegin(EventName, StringRef());
 }
 
 FrontendStatsTracer::FrontendStatsTracer() = default;
@@ -509,7 +522,9 @@ FrontendStatsTracer::operator=(FrontendStatsTracer&& other)
   EventName = other.EventName;
   Entity = other.Entity;
   Formatter = other.Formatter;
+  TimeTraceEntry = other.TimeTraceEntry;
   other.Reporter = nullptr;
+  other.TimeTraceEntry = nullptr;
   return *this;
 }
 
@@ -518,13 +533,17 @@ FrontendStatsTracer::FrontendStatsTracer(FrontendStatsTracer&& other)
     SavedTime(other.SavedTime),
     EventName(other.EventName),
     Entity(other.Entity),
-    Formatter(other.Formatter)
+    Formatter(other.Formatter),
+    TimeTraceEntry(other.TimeTraceEntry)
 {
   other.Reporter = nullptr;
+  other.TimeTraceEntry = nullptr;
 }
 
 FrontendStatsTracer::~FrontendStatsTracer()
 {
+  if (TimeTraceEntry)
+    llvm::timeTraceProfilerEnd(TimeTraceEntry);
   if (Reporter)
     Reporter->saveAnyFrontendStatsEvents(*this, false);
 }
@@ -590,11 +609,13 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
     return;
 
   // First make a note in the recursion-safe timers; these
-  // are active anytime UnifiedStatsReporter is active.
-  if (IsEntry) {
-    RecursiveTimers->beginTimer(T.EventName);
-  } else {
-    RecursiveTimers->endTimer(T.EventName);
+  // are active anytime stats output is requested.
+  if (RecursiveTimers) {
+    if (IsEntry) {
+      RecursiveTimers->beginTimer(T.EventName);
+    } else {
+      RecursiveTimers->endTimer(T.EventName);
+    }
   }
 
   // If we don't have a saved entry to form deltas against in the trace buffer
@@ -676,7 +697,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
     if (FrontendCounters) {
       auto &C = getFrontendCounters();
       ++C.NumProcessFailures;
-    } else {
+    } else if (HasStatsOutputDir) {
       auto &C = getDriverCounters();
       ++C.NumProcessFailures;
     }
@@ -712,35 +733,47 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
                                              ElapsedTime.getProcessTime());
   }
 
-  std::error_code EC;
-  raw_fd_ostream ostream(StatsFilename, EC, fs::OF_Append | fs::OF_Text);
-  if (EC) {
-    llvm::errs() << "Error opening -stats-output-dir file '"
-                 << StatsFilename << "' for writing\n";
-    return;
-  }
-
-  // We change behavior here depending on whether -DLLVM_ENABLE_STATS and/or
-  // assertions were on in this build; this is somewhat subtle, but turning on
-  // all stats for all of LLVM and clang is a bit more expensive and intrusive
-  // than we want to be in release builds.
-  //
-  //  - If enabled: we copy all of our "always-on" local stats into LLVM's
-  //    global statistics list, and ask LLVM to manage the printing of them.
-  //
-  //  - If disabled: we still have our "always-on" local stats to write, and
-  //    LLVM's global _timers_ were still enabled (they're runtime-enabled, not
-  //    compile-time) so we sequence printing our own stats and LLVM's timers
-  //    manually.
+  if (HasStatsOutputDir) {
+    std::error_code EC;
+    raw_fd_ostream ostream(StatsFilename, EC, fs::OF_Append | fs::OF_Text);
+    if (EC) {
+      llvm::errs() << "Error opening -stats-output-dir file '"
+                   << StatsFilename << "' for writing\n";
+    } else {
+      // We change behavior here depending on whether -DLLVM_ENABLE_STATS
+      // and/or assertions were on in this build; this is somewhat subtle, but
+      // turning on all stats for all of LLVM and clang is a bit more expensive
+      // and intrusive than we want to be in release builds.
+      //
+      //  - If enabled: we copy all of our "always-on" local stats into LLVM's
+      //    global statistics list, and ask LLVM to manage the printing of them.
+      //
+      //  - If disabled: we still have our "always-on" local stats to write,
+      //    and LLVM's global _timers_ were still enabled (they're
+      //    runtime-enabled, not compile-time) so we sequence printing our own
+      //    stats and LLVM's timers manually.
 
 #if !defined(NDEBUG) || LLVM_ENABLE_STATS
-  publishAlwaysOnStatsToLLVM();
-  PrintStatisticsJSON(ostream);
-  TimerGroup::clearAll();
+      publishAlwaysOnStatsToLLVM();
+      PrintStatisticsJSON(ostream);
+      TimerGroup::clearAll();
 #else
-  printAlwaysOnStatsAndTimers(ostream);
+      printAlwaysOnStatsAndTimers(ostream);
 #endif
+    }
+  }
+
   flushTracesAndProfiles();
+
+  // Write time trace output if enabled.
+  if (llvm::timeTraceProfilerEnabled()) {
+    std::error_code EC;
+    llvm::raw_fd_ostream OS(TimeTracePath, EC,
+                            llvm::sys::fs::OF_TextWithCRLF);
+    if (!EC)
+      llvm::timeTraceProfilerWrite(OS);
+    llvm::timeTraceProfilerCleanup();
+  }
 }
 
 void
