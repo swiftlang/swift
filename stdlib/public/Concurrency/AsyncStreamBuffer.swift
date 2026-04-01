@@ -147,16 +147,26 @@ internal final class _Storage<Element, Failure: Error>: @unchecked Sendable {
     case none
   }
 
+  private let lock: UnsafeMutableRawPointer
+  private let bufferingPolicy: Continuation.BufferingPolicy
+
   private var state: State
-  private var bufferingPolicy: Continuation.BufferingPolicy
   private var onTermination: TerminationHandler?
 
-  private init(_doNotCallMe: ()) {
-    fatalError("Storage must be initialized by create")
+  init(bufferingPolicy: Continuation.BufferingPolicy) {
+    self.bufferingPolicy = bufferingPolicy
+    unsafe self.state = .idle(buffer: [])
+
+    unsafe self.lock = unsafe UnsafeMutableRawPointer.allocate(
+      byteCount: _lockWordCount() * MemoryLayout<UnsafeRawPointer>.stride,
+      alignment: MemoryLayout<UnsafeRawPointer>.alignment
+    )
+    unsafe _lockInit(self.lock)
   }
 
   deinit {
     self.terminate(.cancelled)
+    unsafe self.lock.deallocate()
   }
 }
 
@@ -447,53 +457,11 @@ extension _Storage {
   private func withLock<Value>(
     _ action: (inout State) -> Value
   ) -> Value {
-    let ptr = unsafe UnsafeRawPointer(
-      Builtin.projectTailElems(self, UnsafeRawPointer.self)
-    )
+    unsafe _lock(self.lock)
 
-    unsafe _lock(ptr)
-
-    defer { unsafe _unlock(ptr) }
+    defer { unsafe _unlock(self.lock) }
 
     return unsafe action(&self.state)
-  }
-
-  static func create(
-    bufferingPolicy limit: Continuation.BufferingPolicy
-  ) -> _Storage {
-    let minimumCapacity = _lockWordCount()
-
-    let storage = unsafe Builtin.allocWithTailElems_1(
-      _Storage.self,
-      minimumCapacity._builtinWordValue,
-      UnsafeRawPointer.self
-    )
-
-    let bufferingPolicyPtr =
-    unsafe UnsafeMutablePointer<Continuation.BufferingPolicy>(
-      Builtin.addressof(&storage.bufferingPolicy)
-    )
-    unsafe bufferingPolicyPtr.initialize(to: limit)
-
-    let statePtr =
-    unsafe UnsafeMutablePointer<State>(
-      Builtin.addressof(&storage.state)
-    )
-    unsafe statePtr.initialize(to: .idle(buffer: []))
-
-    let terminationPtr =
-    unsafe UnsafeMutablePointer<TerminationHandler?>(
-      Builtin.addressof(&storage.onTermination)
-    )
-    unsafe terminationPtr.initialize(to: nil)
-
-    let ptr =
-    unsafe UnsafeRawPointer(
-      Builtin.projectTailElems(storage, UnsafeRawPointer.self)
-    )
-    unsafe _lockInit(ptr)
-
-    return storage
   }
 }
 

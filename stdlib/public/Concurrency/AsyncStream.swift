@@ -304,7 +304,7 @@ public struct AsyncStream<Element> {
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
   ) {
-    let storage: _Storage<Element, Never> = .create(
+    let storage: _Storage<Element, Never> = .init(
       bufferingPolicy: limit.asStorageBufferingPolicy()
     )
     context = _Context(storage: storage, produce: storage.next)
