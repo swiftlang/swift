@@ -19,16 +19,15 @@ public func foobar(i: Int) {
 // CHECK:     i64 2, label %2
 // CHECK:   ]
 // CHECK: 1:
-// CHECK:   tail call void asm sideeffect ""
-// CHECK:   tail call void @llvm.trap()
+// CHECK:   tail call void @llvm.trap() [[NOMERGE:#[0-9]+]]
 // CHECK:   unreachable
 // CHECK: 2:
-// CHECK:   tail call void asm sideeffect ""
-// CHECK:   tail call void @llvm.trap()
+// CHECK:   tail call void @llvm.trap() [[NOMERGE]]
 // CHECK:   unreachable
 // CHECK: 3:
 // CHECK:   ret void
 // CHECK: }
+// CHECK: attributes [[NOMERGE]] = {{{.*}}nomerge{{.*}}}
 
 // We should not see a call to _asssertionFailure in IR because that means such basic block can be merged with another
 // and break the expectations that each trap point is unique.

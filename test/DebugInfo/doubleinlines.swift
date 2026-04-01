@@ -11,14 +11,10 @@ func callCondFail(arg: Builtin.Int1, msg: Builtin.RawPointer) {
 }
 
 // CHECK: define hidden swiftcc void @"$s13DoubleInlines12callCondFail3arg3msgyBi1__BptF"{{.*}} !dbg ![[FUNC:.*]] {
-// CHECK: tail call void asm sideeffect "", "n"(i32 0) #{{[0-9]+}}, !dbg ![[SCOPEONE:.*]]
-// CHECK: tail call void @llvm.trap(), !dbg ![[LOCTRAP:.*]]
+// CHECK: tail call void @llvm.trap(){{.*}}, !dbg ![[SCOPEONE:.*]]
 
 // CHECK: ![[FUNCSCOPEOTHER:.*]] = distinct !DISubprogram(name: "condFail",{{.*}}
-// CHECK: ![[SCOPEONE]] = distinct !DILocation(line: 6, scope: ![[SCOPETWO:.*]], inlinedAt: ![[SCOPETHREE:.*]])
-// CHECK: ![[SCOPETHREE]] = !DILocation(line: 6, scope: ![[FUNCSCOPE:.*]])
-// CHECK: ![[FUNCSCOPE:[0-9]+]] = distinct !DILexicalBlock(scope: ![[FUNC]],
-// CHECK: ![[LOCTRAP]] = !DILocation(line: 6, scope: ![[SCOPETRAP:.*]], inlinedAt: ![[SCOPEONE]])
+// CHECK: ![[SCOPEONE]] = !DILocation(line: 6, scope: ![[SCOPETRAP:.*]], inlinedAt: ![[SCOPEINLINED:.*]])
 // CHECK: ![[SCOPETRAP]] = distinct !DISubprogram(name: "Swift runtime failure: unknown program error"
 
 import Builtin
