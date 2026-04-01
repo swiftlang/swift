@@ -23,7 +23,6 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Concurrency.h"
@@ -6126,20 +6125,11 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
               if (getIsolationFromAttributes(ext).has_value())
                 return {};
 
-              // Members declared in an extension are @MainActor isolated
-              // even if it's an extension of a nonisolated type. This helps
-              // to extend types from other modules, for example, to conform
-              // to new protocols declared in @MainActor isolated module without
-              // having to explicitly state `@MainActor`.
-              auto isolation =
-                  ActorIsolation::forGlobalActor(globalActor)
-                      .withPreconcurrency(
-                          !ctx.isLanguageModeAtLeast(LanguageMode::v6));
-              return {{{isolation, {}}, nullptr, {}}};
+              // Keep looking.
+            } else {
+              // The type is nonisolated, so its members are nonisolated.
+              return {};
             }
-
-            // The type is nonisolated, so its members are nonisolated.
-            return {};
           }
         }
 
@@ -6154,12 +6144,8 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
         nominalTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl();
       }
       if (nominalTypeDecl &&
-          sendableConformanceRequiresNonisolated(nominalTypeDecl)) {
-        InferredActorIsolation isolation{
-            ActorIsolation::forNonisolated(/*unsafe=*/false), /*source=*/{}};
-        return {
-            {isolation, /*overridenValue=*/nullptr, /*overridenIsolation=*/{}}};
-      }
+          sendableConformanceRequiresNonisolated(nominalTypeDecl))
+        return { };
 
       if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
           isa<AbstractStorageDecl>(value) ||
@@ -8839,18 +8825,8 @@ ActorIsolation swift::inferConformanceIsolation(
         return *attrIsolation;
 
       // If we're defaulting to main-actor isolation, use that.
-      if (getDefaultIsolationForContext(dc) == DefaultIsolation::MainActor) {
-        // Infer conformance as `@MainActor`-isolated only if neither type nor
-        // member, that serves as a witness, are isolated, otherwise in this
-        // mode either type or extension would have to be explicitly or
-        // implicitly nonisolated (i.e. via primary declaration conforming to
-        // a `Sendable` protocol) and that gives us a hint that conformance
-        // should be nonisolated as well.
-        if (nominalIsolation.isNonisolated() && !hasKnownIsolatedWitness)
-          return nominalIsolation;
-
+      if (getDefaultIsolationForContext(dc) == DefaultIsolation::MainActor)
         return ActorIsolation::forMainActor(ctx);
-      }
     }
 
     return ActorIsolation::forNonisolated(false);
