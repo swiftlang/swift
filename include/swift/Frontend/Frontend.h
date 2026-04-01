@@ -43,6 +43,7 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
@@ -95,6 +96,7 @@ class CompilerInvocation {
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
   MigratorOptions MigratorOpts;
@@ -246,8 +248,6 @@ public:
   void setMainExecutablePath(StringRef Path);
 
   void setRuntimeResourcePath(StringRef Path);
-
-  void setPlatformAvailabilityInheritanceMapPath(StringRef Path);
 
   /// Compute the default prebuilt module cache path for a given resource path
   /// and SDK version. This function is also used by LLDB.
@@ -506,6 +506,7 @@ class CompilerInstance {
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   std::shared_ptr<llvm::cas::ActionCache> ResultCache;
   std::optional<llvm::cas::ObjectRef> CompileJobBaseKey;
+  std::string CASIDForPCH;
 
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
@@ -603,6 +604,11 @@ public:
   }
   std::shared_ptr<llvm::cas::ObjectStore> getSharedCASInstance() const {
     return CAS;
+  }
+  void setSharedCASInstances(std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                             std::shared_ptr<llvm::cas::ActionCache> Cache) {
+    this->CAS = std::move(CAS);
+    this->ResultCache = std::move(Cache);
   }
   std::optional<llvm::cas::ObjectRef> getCompilerBaseKey() const {
     return CompileJobBaseKey;
@@ -725,7 +731,9 @@ public:
 
   /// The fast setup function for cache replay.
   bool setupForReplay(const CompilerInvocation &Invocation, std::string &Error,
-                      ArrayRef<const char *> Args = {});
+                      ArrayRef<const char *> Args,
+                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                      std::shared_ptr<llvm::cas::ActionCache> Cache);
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 

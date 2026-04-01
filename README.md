@@ -17,7 +17,9 @@ features like flow control, data structures, and functions, with high-level
 constructs like objects, protocols, closures, and generics. Swift embraces
 modules, eliminating the need for headers and the code duplication they entail.
 
-To learn more about the programming language, visit [swift.org](https://swift.org/documentation/).
+To learn more about using the language, visit [swift.org](https://swift.org/documentation/).
+To learn more about the compiler's internal design, see the
+[documentation index](/docs/README.md).
 
 - [Contributing to Swift](#contributing-to-swift)
 - [Getting Started](#getting-started)
@@ -131,11 +133,3 @@ be related to the Xcode version, try passing `--clean` to `build-script`.
 
 When a new version of Xcode is released, you can update your build without
 recompiling the entire project by passing `--reconfigure` to `build-script`.
-
-## Learning More
-
-Be sure to look at the [documentation index](/docs/README.md) for a bird's eye
-view of the available documentation. In particular, the documents titled
-[Debugging the Swift Compiler](docs/DebuggingTheCompiler.md) and
-[Continuous Integration for Swift](docs/ContinuousIntegration.md) are very
-helpful to understand before submitting your first PR.

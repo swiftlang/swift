@@ -11,6 +11,10 @@ macro HangingMacro() = #externalMacro(module: "MacroDefinition", type: "HangingM
 class Foo {
   init() {}
 
+  // expected-expansion@+5:32{{
+  //   expected-error@1{{unexpected token '}' in expanded member list}}
+  //   expected-error@2{{expected declaration}}
+  // }}
   // expected-note@+1 2{{in expansion of macro 'HangingMacro' on property 'result' here}}
   @HangingMacro var result: Int // This comment makes it hang.
 }

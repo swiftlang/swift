@@ -1,13 +1,22 @@
-// RUN: %target-sil-opt %s -pack-specialization | %FileCheck %s
+// RUN: %target-sil-opt %s -module-name A -pack-specialization | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 import Swift
 
-protocol P {}
+protocol P {
+  associatedtype A
+  func f() -> A
+}
 
-class C : P {}
+extension P {
+  func f() -> some Any
+}
+
+class C : P {
+  typealias A = @_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>
+}
 
 // INDIVIDUAL PARAMETER TRANSFORMATION TESTS:
 //
@@ -32,7 +41,9 @@ class C : P {}
 // CHECK-NEXT:    [[OUT_IDX:%[0-9]+]] = scalar_pack_index 0 of $Pack{Int}
 // CHECK-NEXT:    [[OUT_ADDR:%[0-9]+]] = alloc_stack $Int
 // CHECK:         copy_addr [[IN_PACK]] to [init] [[OUT_PACK]]
-// CHECK:         [[RESULT:%[0-9]+]] = load [trivial] [[OUT_ADDR]]
+// These two checks ensure a destructure_tuple is not emitted when the original result was ().
+// CHECK-NEXT:    [[ORIG_RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    [[RESULT:%[0-9]+]] = load [trivial] [[OUT_ADDR]]
 // CHECK-NEXT:    dealloc_stack [[OUT_ADDR]]
 // CHECK-NEXT:    dealloc_pack [[OUT_PACK]]
 // CHECK-NEXT:    dealloc_stack [[ADDR]]
@@ -699,7 +710,8 @@ bb0(%0 : $*Pack{Int}):
 // BAIL OUT CONDITION TESTS:
 //
 // Only perform pack specialization on functions that have indirect pack
-// parameters that contain no pack expansions.
+// parameters and/or results that contain no pack expansions or generic type
+// parameters.
 //
 // 2025-10-15: We currently only explode packs with address elements
 // (SILPackType::isElementAddress), because these are the most common (since
@@ -788,4 +800,198 @@ bb0(%0 : $*Pack{Int}):
   %1 = function_ref @indirect_pack : $@convention(thin) (@pack_guaranteed Pack{Int}) -> ()
   %2 = apply %1(%0) : $@convention(thin) (@pack_guaranteed Pack{Int}) -> ()
   return %2
+}
+
+
+sil [ossa] @indirect_result_pack : $@convention(thin) () -> @pack_out Pack{Int} {
+bb0(%0 : $*Pack{Int}):
+  %1 = tuple ()
+  return %1
+}
+
+sil [ossa] @direct_result_pack : $@convention(thin) () -> @pack_out @direct Pack{Int} {
+bb0(%0 : $*@direct Pack{Int}):
+  %1 = tuple ()
+  return %1
+}
+
+sil [ossa] @result_pack_expansion : $@convention(thin) <each A> () -> @pack_out Pack{repeat each A} {
+bb0(%0 : $*Pack{repeat each A}):
+  %1 = tuple ()
+  return %1
+}
+
+sil [ossa] @mixed_result_packs : $@convention(thin) <each A> () -> (@pack_out Pack{Int}, @pack_out @direct Pack{Int}, @pack_out Pack{repeat each A}) {
+bb0(%0 : $*Pack{Int}, %1 : $*@direct Pack{Int}, %2 : $*Pack{repeat each A}):
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @result_call_eligibility_tests : $@convention(thin) <each A> () -> (@pack_out Pack{Int}, @pack_out @direct Pack{Int}, @pack_out Pack{repeat each A}) {
+// CHECK: bb0(%0 : $*Pack{Int}, %1 : $*@direct Pack{Int}, %2 : $*Pack{repeat each A}):
+// CHECK: function_ref @$s20indirect_result_packTf8x_n : $@convention(thin) () -> Int
+// CHECK: function_ref @direct_result_pack : $@convention(thin) () -> @pack_out @direct Pack{Int}
+// CHECK: function_ref @result_pack_expansion : $@convention(thin) <each τ_0_0> () -> @pack_out Pack{repeat each τ_0_0}
+// CHECK: function_ref @$s18mixed_result_packsTf8xnn_n : $@convention(thin) <each τ_0_0> () -> (Int, @pack_out @direct Pack{Int}, @pack_out Pack{repeat each τ_0_0})
+// CHECK-LABEL: } // end sil function 'result_call_eligibility_tests'
+sil [ossa] @result_call_eligibility_tests : $@convention(thin) <each A> () -> (@pack_out Pack{Int}, @pack_out @direct Pack{Int}, @pack_out Pack{repeat each A}) {
+bb0(%1 : $*Pack{Int}, %2 : $*@direct Pack{Int}, %3 : $*Pack{repeat each A}):
+
+  %4 = function_ref @indirect_result_pack : $@convention(thin) () -> @pack_out Pack{Int}
+  %5 = apply %4(%1) : $@convention(thin) () -> @pack_out Pack{Int}
+
+  %8 = function_ref @direct_result_pack : $@convention(thin) () -> @pack_out @direct Pack{Int}
+  %9 = apply %8(%2) : $@convention(thin) () -> @pack_out @direct Pack{Int}
+
+  %10 = function_ref @result_pack_expansion : $@convention(thin) <each A> () -> @pack_out Pack{repeat each A}
+  %11 = apply %10<Pack{repeat each A}>(%3) : $@convention(thin) <each A> () -> @pack_out Pack{repeat each A}
+
+  %12 = function_ref @mixed_result_packs : $@convention(thin) <each A> () -> (@pack_out Pack{Int}, @pack_out @direct Pack{Int}, @pack_out Pack{repeat each A})
+  %13 = apply %12<Pack{repeat each A}>(%1, %2, %3) : $@convention(thin) <each A> () -> (@pack_out Pack{Int}, @pack_out @direct Pack{Int}, @pack_out Pack{repeat each A})
+
+  %99 = tuple ()
+  return %99
+}
+
+// @substituted TYPE TESTS:
+//
+// PackSubstitution must correctly identify the types of Pack arguments in the presence of @substituted types.
+
+// CHECK-LABEL: sil shared [ossa] @$s25substitute_parameter_typeTf8x_n : $@convention(thin) @substituted <τ_0_0> (Int32) -> () for <Int32> {
+// CHECK: bb0(%0 : $Int32):
+// CHECK-LABEL: } // end sil function '$s25substitute_parameter_typeTf8x_n'
+sil [ossa] @substitute_parameter_type : $@convention(thin) @substituted <T> (@pack_guaranteed Pack{T}) -> () for <Int32> {
+bb0(%0 : $*Pack{Int32}):
+  %99 = tuple ()
+  return %99
+}
+
+// CHECK-LABEL: sil [ossa] @call_substitute_parameter_type : $@convention(thin) (@pack_guaranteed Pack{Int32}) -> () {
+// CHECK-LABEL: } // end sil function 'call_substitute_parameter_type'
+sil [ossa] @call_substitute_parameter_type : $@convention(thin) (@pack_guaranteed Pack{Int32}) -> () {
+bb0(%0 : $*Pack{Int32}):
+  %1 = function_ref @substitute_parameter_type : $@convention(thin) @substituted <T> (@pack_guaranteed Pack{T}) -> () for <Int32>
+  %2 = apply %1(%0) : $@convention(thin) @substituted <T> (@pack_guaranteed Pack{T}) -> () for <Int32>
+  return %2
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s22substitute_result_typeTf8x_n : $@convention(thin) @substituted <τ_0_0> () -> Int32 for <Int32> {
+// CHECK: bb0:
+// CHECK-LABEL: } // end sil function '$s22substitute_result_typeTf8x_n'
+sil [ossa] @substitute_result_type : $@convention(thin) @substituted <T> () -> @pack_out Pack{T} for <Int32> {
+bb0(%0 : $*Pack{Int32}):
+  %99 = tuple ()
+  return %99
+}
+
+// CHECK-LABEL: sil [ossa] @call_substitute_result_type : $@convention(thin) () -> @pack_out Pack{Int32} {
+// CHECK-LABEL: } // end sil function 'call_substitute_result_type'
+sil [ossa] @call_substitute_result_type : $@convention(thin) () -> @pack_out Pack{Int32} {
+bb0(%0 : $*Pack{Int32}):
+  %1 = function_ref @substitute_result_type : $@convention(thin) @substituted <T> () -> @pack_out Pack{T} for <Int32>
+  %2 = apply %1(%0) : $@convention(thin) @substituted <T> () -> @pack_out Pack{T} for <Int32>
+  return %2
+}
+
+
+// GENERIC TYPE HANDLING TESTS:
+//
+// Handling of generic types in packs. Since T is still generic, it is not
+// loadable, so it cannot be passed directly. Also make sure generic types are
+// handled correctly, even if the top-level type a pack element isn't a type
+// parameter (e.g. in opaque result types and generic data structures).
+//
+// CHECK-LABEL: sil shared [ossa] @$s17copy_pack_genericTf8xx_n : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK:       bb0([[OUT_ADDR:%[0-9]+]] : $*T, [[IN_ADDR:%[0-9]+]] : $*T)
+// CHECK-NEXT:    [[IN_PACK:%[0-9]+]] = alloc_pack $Pack{T}
+// CHECK-NEXT:    [[IDX:%[0-9]+]] = scalar_pack_index 0 of $Pack{T}
+// CHECK-NEXT:    pack_element_set [[IN_ADDR]] into [[IDX]] of [[IN_PACK]]
+// CHECK-NEXT:    [[OUT_PACK:%[0-9]+]] = alloc_pack $Pack{T}
+// CHECK-NEXT:    [[OUT_IDX:%[0-9]+]] = scalar_pack_index 0 of $Pack{T}
+// CHECK-NEXT:    pack_element_set [[OUT_ADDR]] into [[OUT_IDX]] of [[OUT_PACK]]
+// CHECK:         [[RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    dealloc_pack [[OUT_PACK]]
+// CHECK-NEXT:    dealloc_pack [[IN_PACK]]
+// CHECK-NEXT:    return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'copy_pack_generic'
+sil [ossa] @copy_pack_generic : $@convention(thin) <T> (@pack_guaranteed Pack{T}) -> @pack_out Pack{T} {
+bb0(%0 : $*Pack{T}, %1 : $*Pack{T}):
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @call_copy_pack_generic : $@convention(thin) <T> (@pack_guaranteed Pack{T}) -> @pack_out Pack{T} {
+// CHECK:       bb0(%0 : $*Pack{T}, %1 : $*Pack{T})
+// CHECK:         [[OUT_P_PACK_ADDR:%[0-9]+]] = pack_element_get [[OUT_PACK_GET_IDX:%[0-9]+]] of %0 as $*T
+// CHECK:         [[IN_P_PACK_ADDR:%[0-9]+]] = pack_element_get [[PACK_GET_IDX:%[0-9]+]] of %1 as $*T
+// CHECK:         [[SPECIALIZED:%[0-9]+]] = function_ref @$s17copy_pack_genericTf8xx_n : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK-NEXT:    [[RESULT:%[0-9]+]] = apply [[SPECIALIZED]]<T>([[OUT_P_PACK_ADDR]], [[IN_P_PACK_ADDR]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK-NEXT:    return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'call_copy_pack_generic'
+sil [ossa] @call_copy_pack_generic : $@convention(thin) <T> (@pack_guaranteed Pack{T}) -> @pack_out Pack{T} {
+bb0(%0 : $*Pack{T}, %1 : $*Pack{T}):
+  %2 = function_ref @copy_pack_generic : $@convention(thin) <T> (@pack_guaranteed Pack{T}) -> @pack_out Pack{T}
+  %3 = apply %2<T>(%0, %1) : $@convention(thin) <T> (@pack_guaranteed Pack{T}) -> @pack_out Pack{T}
+  return %3
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s11pack_opaqueTf8x_n : $@convention(thin) (@inout @_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>) -> () {
+// CHECK: bb0(%0 : $*@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>):
+// CHECK-LABEL: } // end sil function '$s11pack_opaqueTf8x_n'
+sil [ossa] @pack_opaque : $@convention(thin) (@pack_inout Pack{@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>}) -> () {
+bb0(%0 : $*Pack{C.A}):
+  %1 = tuple ()
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @call_pack_opaque : $@convention(thin) (@pack_inout Pack{@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>}) -> () {
+// CHECK-LABEL: } // end sil function 'call_pack_opaque'
+sil [ossa] @call_pack_opaque : $@convention(thin) (@pack_inout Pack{@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>}) -> () {
+bb0(%0 : $*Pack{C.A}):
+  %1 = function_ref @pack_opaque : $@convention(thin) (@pack_inout Pack{@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>}) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@pack_inout Pack{@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>}) -> ()
+  return %2
+}
+
+
+// CHECK-LABEL: sil shared [ossa] @$s18pack_opaque_resultTf8x_n : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C> {
+// CHECK: bb0(%0 : $*@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>):
+// CHECK-LABEL: } // end sil function '$s18pack_opaque_resultTf8x_n'
+sil [ossa] @pack_opaque_result : $@convention(thin) () -> @pack_out Pack{@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>} {
+bb0(%0 : $*Pack{C.A}):
+  %1 = tuple ()
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @call_pack_opaque_result : $@convention(thin) () -> @pack_out Pack{@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>} {
+// CHECK-LABEL: } // end sil function 'call_pack_opaque_result'
+sil [ossa] @call_pack_opaque_result : $@convention(thin) () -> @pack_out Pack{@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>} {
+bb0(%0 : $*Pack{C.A}):
+  %1 = function_ref @pack_opaque_result : $@convention(thin) () -> @pack_out Pack{@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>}
+  %2 = apply %1(%0) : $@convention(thin) () -> @pack_out Pack{@_opaqueReturnTypeOf("$s1A1PPAAE1fQryF", 0) __<C>}
+  return %2
+}
+
+struct Box<T> {
+  var v: T
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s19pack_nested_genericTf8xx_n : $@convention(thin) <T> (@inout Box<T>) -> @out Box<T> {
+// CHECK: bb0(%0 : $*Box<T>, %1 : $*Box<T>):
+// CHECK-LABEL: } // end sil function '$s19pack_nested_genericTf8xx_n'
+sil [ossa] @pack_nested_generic : $@convention(thin) <T> (@pack_inout Pack{Box<T>}) -> @pack_out Pack{Box<T>} {
+bb0(%0 : $*Pack{Box<T>}, %1 : $*Pack{Box<T>}):
+%2 = tuple ()
+return %2
+}
+
+// CHECK-LABEL: sil [ossa] @call_pack_nested_generic : $@convention(thin) <T> (@pack_inout Pack{Box<T>}) -> @pack_out Pack{Box<T>} {
+// CHECK-LABEL: } // end sil function 'call_pack_nested_generic'
+sil [ossa] @call_pack_nested_generic : $@convention(thin) <T> (@pack_inout Pack{Box<T>}) -> @pack_out Pack{Box<T>} {
+bb0(%0 : $*Pack{Box<T>}, %1 : $*Pack{Box<T>}):
+  %2 = function_ref @pack_nested_generic : $@convention(thin) <T> (@pack_inout Pack{Box<T>}) -> @pack_out Pack{Box<T>}
+  %3 = apply %2<T>(%0, %1) : $@convention(thin) <T> (@pack_inout Pack{Box<T>}) -> @pack_out Pack{Box<T>}
+  %4 = tuple ()
+  return %4
+
 }

@@ -451,7 +451,9 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
       }
     }
 
-    // FIXME: We don't have the inverses from desugaring available here!
+    // FIXME: We should pass proto->getInverseRequirements() instead of
+    //        an empty vector, but this makes the requirement machine angry.
+    //        For now, we check them in `checkProtocolRefinementRequirements`.
     SmallVector<InverseRequirement, 2> missingInverses;
 
     // Diagnose redundant requirements and conflicting requirements.
@@ -671,8 +673,10 @@ AbstractGenericSignatureRequest::evaluate(
   }
 
   SmallVector<StructuralRequirement, 2> defaults;
-  InverseRequirement::expandDefaults(ctx, paramsAsTypes, defaults);
-  applyInverses(ctx, paramsAsTypes, inverses, requirements,
+  SmallVector<Type, 2> expandedGPs;
+  InverseRequirement::expandDefaults(ctx, paramsAsTypes, requirements, defaults,
+                                     expandedGPs);
+  applyInverses(ctx, expandedGPs, inverses, requirements,
                 defaults, errors);
   requirements.append(defaults);
 
@@ -865,23 +869,15 @@ InferredGenericSignatureRequest::evaluate(
   }
 
   SmallVector<StructuralRequirement, 2> defaults;
-  InverseRequirement::expandDefaults(ctx, paramTypes, defaults);
-  applyInverses(ctx, paramTypes, inverses, requirements,
+  SmallVector<Type, 2> expandedGPs;
+  InverseRequirement::expandDefaults(ctx, paramTypes, requirements, defaults, expandedGPs);
+  applyInverses(ctx, expandedGPs, inverses, requirements,
                 defaults, errors);
   
   // Any remaining implicit defaults in a conditional inverse requirement
   // extension must be made explicit.
   if (forExtension) {
     auto invertibleProtocol = forExtension->isAddingConformanceToInvertible();
-    // FIXME: to workaround a reverse condfail, always infer the requirements if
-    //  the extension is in a swiftinterface file. This is temporary and should
-    //  be removed soon. (rdar://130424971)
-    if (auto *sf = forExtension->getOutermostParentSourceFile()) {
-      if (sf->Kind == SourceFileKind::Interface
-          && !ctx.LangOpts.hasFeature(Feature::SE427NoInferenceOnExtension)) {
-        invertibleProtocol = std::nullopt;
-      }
-    }
     if (invertibleProtocol) {
       for (auto &def : defaults) {
         // Check whether a corresponding explicit requirement was provided.
@@ -1043,13 +1039,21 @@ InferredGenericSignatureRequest::evaluate(
           ctx.Diags
               .diagnose(loc, diag::requires_generic_params_made_equal,
                         genericParam, result->getSugaredType(reduced))
+<<<<<<< HEAD
               .warnUntilLanguageMode(6);
+=======
+              .warnUntilLanguageMode(LanguageMode::v6);
+>>>>>>> origin/main
         } else {
           ctx.Diags
               .diagnose(loc,
                         diag::requires_generic_param_made_equal_to_concrete,
                         genericParam)
+<<<<<<< HEAD
               .warnUntilLanguageMode(6);
+=======
+              .warnUntilLanguageMode(LanguageMode::v6);
+>>>>>>> origin/main
         }
       }
     }

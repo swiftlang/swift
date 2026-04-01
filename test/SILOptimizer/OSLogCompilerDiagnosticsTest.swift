@@ -78,15 +78,3 @@ extension OSLogInterpolation {
   }
 }
 
-func testUnreachableLogCallComplex(c: Color)  {
-  switch c {
-  case .red:
-    return
-  case .blue:
-    return
-  default: // expected-warning {{default will never be executed}}
-    _osLogTestHelper("Some call \(c)")
-      // expected-warning@-1 {{os log call will never be executed and may have undiagnosed errors}}
-      // expected-error@-2 {{globalStringTablePointer builtin must be used only on string literals}}
-  }
-}

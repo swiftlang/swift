@@ -15,32 +15,30 @@
 // RUN:   %S/../Macros/Inputs/syntax_macro_definitions.swift \
 // RUN:   -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
+// RUN: %target-swift-frontend-plain -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   %s -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -load-plugin-library %t/plugins/%target-library-name(MacroDefinition)
+// RUN:   %s -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas \
+// RUN:   -load-plugin-library %t/plugins/%target-library-name(MacroDefinition) \
+// RUN:   -load-plugin-library %t/plugins/%target-library-name(NonExisting)
 
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json MyApp casFSRootID > %t/fs.casid
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json MyApp casFSRootID > %t/fs.casid
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS
 
 // FS: MacroDefinition
 
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
-// RUN: %swift_frontend_plain @%t/SwiftShims.cmd
-
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json MyApp > %t/MyApp.cmd
-// RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
-
-// RUN: %target-swift-frontend \
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -verify -cache-compile-job -cas-path %t/cas \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules \
-// RUN:   -load-plugin-library %t/plugins/%target-library-name(MacroDefinition) \
+// RUN:   -swift-version 5 -module-name MyApp -O \
+// RUN:   -resolved-plugin-verification \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   %s @%t/MyApp.cmd
 
 @attached(extension, conformances: P, names: named(requirement))
 macro DelegatedConformance() = #externalMacro(module: "MacroDefinition", type: "DelegatedConformanceViaExtensionMacro")
+
+@attached(extension, conformances: P, names: named(requirement))
+macro NonExisting() = #externalMacro(module: "NonExisting", type: "DelegatedConformanceViaExtensionMacro") // expected-warning {{external macro implementation type 'NonExisting.DelegatedConformanceViaExtensionMacro' could not be found for macro 'NonExisting()'; plugin for module 'NonExisting' not found}}
 
 protocol P {
   static func requirement()

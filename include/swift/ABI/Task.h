@@ -429,7 +429,22 @@ public:
   ///
   /// Generally this should be done immediately after updating
   /// ActiveTask.
-  void flagAsRunning();
+  ///
+  /// When Dispatch is used for the default executor:
+  /// * If the return value is non-zero, it must be passed
+  ///   to swift_dispatch_thread_reset_override_self
+  ///   before returning to the executor.
+  /// * If the return value is zero, it may be ignored or passed to
+  ///   the aforementioned function (which will ignore values of zero).
+  /// The current implementation will always return zero
+  /// if you call flagAsRunning again before calling
+  /// swift_dispatch_thread_reset_override_self with the
+  /// initial value. This supports suspending and immediately
+  /// resuming a Task without returning up the callstack.
+  ///
+  /// For all other default executors, flagAsRunning
+  /// will return zero which may be ignored.
+  uint32_t flagAsRunning();
 
   /// Flag that this task is now suspended with information about what it is
   /// waiting on.
@@ -453,7 +468,10 @@ public:
 
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
-  bool isCancelled() const;
+  ///
+  /// \param ignoreShield if cancellation shield should be ignored. 
+  ///        Cancellation shields prevent the observation of the isCancelled flag while active.
+  bool isCancelled(bool ignoreShield) const;
 
   // ==== INITIAL TASK RECORDS =================================================
   // A task may have a number of "initial" records set, they MUST be set in the
@@ -516,6 +534,15 @@ public:
   /// Returns true if storage has still more bindings.
   bool localValuePop();
 
+  // ==== Cancellation Shields -------------------------------------------------
+
+  /// Install a cancellation shield in this task.
+  /// Returns true if the shield was installed, and false if there was already 
+  /// one active and this action didn't change anything.
+  bool cancellationShieldPush();
+
+  void cancellationShieldPop();
+
   // ==== Child Fragment -------------------------------------------------------
 
   /// A fragment of an async task structure that happens to be a child task.
@@ -525,7 +552,7 @@ public:
 
     // TODO: Document more how this is used from the `TaskGroupTaskStatusRecord`
 
-    /// The next task in the singly-linked list of child tasks.
+    /// The next task in the doubly-linked list of child tasks.
     /// The list must start in a `ChildTaskStatusRecord` registered
     /// with the parent task.
     ///
@@ -533,6 +560,11 @@ public:
     ///
     /// WARNING: Access can only be performed by the `Parent` of this task.
     AsyncTask *NextChild = nullptr;
+
+    /// The previous task in the doubly-linked list of child tasks.
+    ///
+    /// WARNING: Access can only be performed by the `Parent` of this task.
+    AsyncTask *PrevChild = nullptr;
 
   public:
     ChildFragment(AsyncTask *parent) : Parent(parent) {}
@@ -545,13 +577,21 @@ public:
       return NextChild;
     }
 
-    /// Set the `NextChild` to to the passed task.
+    AsyncTask *getPrevChild() const { return PrevChild; }
+
+    /// Set the `NextChild` to the passed task.
     ///
     /// WARNING: This must ONLY be invoked from the parent of both
     /// (this and the passed-in) tasks for thread-safety reasons.
     void setNextChild(AsyncTask *task) {
       NextChild = task;
     }
+
+    /// Set the `PrevChild` to the passed task.
+    ///
+    /// WARNING: This must ONLY be invoked from the parent of both
+    /// (this and the passed-in) tasks for thread-safety reasons.
+    void setPrevChild(AsyncTask *task) { PrevChild = task; }
   };
 
   bool hasChildFragment() const {

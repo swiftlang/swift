@@ -23,6 +23,7 @@
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilitySpec.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -89,7 +90,8 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///   - Move expressions must have a declref expr subvalue.
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
-                                         bool isExprStmt) {
+                                         bool isExprStmt,
+                                         bool inForEachPreamble) {
   class DiagnoseWalker : public BaseDiagnosticWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
@@ -735,12 +737,12 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!AlreadyDiagnosedMetatypes.insert(E).second)
         return;
 
-      DiagnosticBehavior behavior = DiagnosticBehavior::Error;
+      auto *ParentExpr = Parent.getAsExpr();
 
-      if (auto *ParentExpr = Parent.getAsExpr()) {
-        if (ParentExpr->isValidParentOfTypeExpr(E))
-          return;
+      if (ParentExpr && ParentExpr->isValidParentOfTypeExpr(E))
+        return;
 
+<<<<<<< HEAD
         // In Swift < 6 warn about
         // - plain type name passed as an argument to a subscript, dynamic
         //   subscript, or ObjC literal since it used to be accepted.
@@ -761,15 +763,32 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                 behavior = DiagnosticBehavior::Warning;
               }
             }
+=======
+      // In Swift < 6 warn about
+      // - plain type name passed as an argument to a subscript, dynamic
+      //   subscript, or ObjC literal since it used to be accepted.
+      // - member type expressions rooted on non-identifier types, e.g.
+      //   '[X].Y' since they used to be accepted without the '.self'.
+      bool downgradeToWarningUntil6 = false;
+      if (!Ctx.isLanguageModeAtLeast(LanguageMode::v6)) {
+        if (ParentExpr && (isa<SubscriptExpr>(ParentExpr) ||
+                           isa<DynamicSubscriptExpr>(ParentExpr) ||
+                           isa<ObjectLiteralExpr>(ParentExpr))) {
+          auto *argList = ParentExpr->getArgs();
+          assert(argList);
+          downgradeToWarningUntil6 = argList->isUnlabeledUnary();
+        } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
+          if (auto *QualIdentTR =
+                  dyn_cast_or_null<QualifiedIdentTypeRepr>(TE->getTypeRepr())) {
+            downgradeToWarningUntil6 =
+                !isa<UnqualifiedIdentTypeRepr>(QualIdentTR->getRoot());
+>>>>>>> origin/main
           }
         }
       }
 
-      // Is this a protocol metatype?
-      Ctx.Diags
-          .diagnose(E->getStartLoc(), diag::value_of_metatype_type,
-                    behavior == DiagnosticBehavior::Warning)
-          .limitBehavior(behavior);
+      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type)
+          .warnUntilLanguageModeIf(downgradeToWarningUntil6, LanguageMode::v6);
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
@@ -1506,11 +1525,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
   // Diagnose uses of collection literals with defaulted types at the top
   // level.
-  if (auto collection =
-          dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
-    if (collection->isTypeDefaulted()) {
-      Walker.checkTypeDefaultedCollectionExpr(
-          const_cast<CollectionExpr *>(collection));
+  if (!inForEachPreamble) {
+    if (auto collection =
+            dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
+      if (collection->isTypeDefaulted()) {
+        Walker.checkTypeDefaultedCollectionExpr(
+            const_cast<CollectionExpr *>(collection));
+      }
     }
   }
 }
@@ -1897,7 +1918,11 @@ public:
 
     // Prior to Swift 6, use the old validation logic.
     auto &ctx = inClosure->getASTContext();
+<<<<<<< HEAD
     if (!ctx.isLanguageModeAtLeast(6))
+=======
+    if (!ctx.isLanguageModeAtLeast(LanguageMode::v6))
+>>>>>>> origin/main
       return selfDeclAllowsImplicitSelf510(DRE, ty, inClosure);
 
     return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
@@ -2282,7 +2307,11 @@ public:
 
   bool shouldRecordClosure(const AbstractClosureExpr *E) {
     // Record all closures in Swift 6 mode.
+<<<<<<< HEAD
     if (Ctx.isLanguageModeAtLeast(6))
+=======
+    if (Ctx.isLanguageModeAtLeast(LanguageMode::v6))
+>>>>>>> origin/main
       return true;
 
     // Only record closures requiring self qualification prior to Swift 6
@@ -2295,16 +2324,21 @@ public:
       SourceLoc loc, Expr *base, AbstractClosureExpr *closure,
       Diag<ArgTypes...> ID,
       typename detail::PassArgument<ArgTypes>::type... Args) {
-    std::optional<unsigned> warnUntilVersion;
+    std::optional<LanguageMode> languageModeForError;
     // Prior to Swift 6, we may need to downgrade to a warning for compatibility
     // with the 5.10 diagnostic behavior.
+<<<<<<< HEAD
     if (!Ctx.isLanguageModeAtLeast(6) &&
+=======
+    if (!Ctx.isLanguageModeAtLeast(LanguageMode::v6) &&
+>>>>>>> origin/main
         invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
-      warnUntilVersion.emplace(6);
+      languageModeForError.emplace(LanguageMode::v6);
     }
     // Prior to the next language mode, downgrade to a warning if we're in a
     // macro to preserve compatibility with the Swift 6 diagnostic behavior
     // where we previously skipped diagnosing.
+<<<<<<< HEAD
     auto futureVersion = version::Version::getFutureMajorLanguageVersion();
     if (!Ctx.isLanguageModeAtLeast(futureVersion) && isInMacro())
       warnUntilVersion.emplace(futureVersion);
@@ -2312,6 +2346,14 @@ public:
     auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
     if (warnUntilVersion)
       diag.warnUntilLanguageMode(*warnUntilVersion);
+=======
+    if (!Ctx.isLanguageModeAtLeast(LanguageMode::future) && isInMacro())
+      languageModeForError.emplace(LanguageMode::future);
+
+    auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
+    if (languageModeForError)
+      diag.warnUntilLanguageMode(*languageModeForError);
+>>>>>>> origin/main
 
     return diag;
   }
@@ -2370,7 +2412,12 @@ public:
 
     if (memberLoc.isValid()) {
       const AbstractClosureExpr *parentDisallowingImplicitSelf = nullptr;
+<<<<<<< HEAD
       if (Ctx.isLanguageModeAtLeast(6) && selfDRE && selfDRE->getDecl()) {
+=======
+      if (Ctx.isLanguageModeAtLeast(LanguageMode::v6) && selfDRE &&
+          selfDRE->getDecl()) {
+>>>>>>> origin/main
         parentDisallowingImplicitSelf = parentClosureDisallowingImplicitSelf(
             selfDRE->getDecl(), selfDRE->getType(), ACE);
       }
@@ -2559,8 +2606,9 @@ public:
     // insert 'self,'. If it wasn't a valid entry, then we will at least not
     // be introducing any new errors/warnings...
     const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
-    const auto nextAfterBracket = Lexer::getTokenAtLocation(
-        Ctx.SourceMgr, locAfterBracket, CommentRetentionMode::None);
+    const auto nextAfterBracket =
+        Lexer::getTokenAtLocation(Ctx.SourceMgr, locAfterBracket,
+                                  CommentRetentionMode::AttachToNextToken);
     if (nextAfterBracket.getLoc() != brackets.End)
       diag.fixItInsertAfter(brackets.Start, "self, ");
     else
@@ -2581,8 +2629,8 @@ public:
     // opening brace of the closure, we may need to pad the fix-it
     // with a space.
     const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
-    const auto next = Lexer::getTokenAtLocation(Ctx.SourceMgr, nextLoc,
-                                                CommentRetentionMode::None);
+    const auto next = Lexer::getTokenAtLocation(
+        Ctx.SourceMgr, nextLoc, CommentRetentionMode::AttachToNextToken);
     std::string trailing = next.getLoc() == nextLoc ? " " : "";
 
     diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
@@ -2646,6 +2694,220 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
   }
   
   const_cast<Expr *>(E)->walk(DiagnoseWalker(ctx, ACE));
+}
+
+// MARK: -
+
+/// Diagnose cases where weak/unowned capture list items rebind a value with
+/// strong reference ownership that is itself implicitly captured (i.e. not
+/// itself a capture list item) in an ancestor escaping closure. The purpose
+/// is to surface cases where the change in ownership may be accidental or
+/// otherwise subvert programmer intent.
+static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
+                                                const DeclContext *DC) {
+  if (!E || isa<ErrorExpr>(E) || !E->getType())
+    return;
+
+  class ImplicitWeakToStrongCaptureWalker : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+
+  public:
+    ImplicitWeakToStrongCaptureWalker(ASTContext &ctx) : Ctx(ctx) {}
+
+    /// Stack for tracking the current (escaping) closure expression.
+    llvm::SmallSetVector<AbstractClosureExpr *, 8> EscapingClosureStack;
+
+    /// Strong capture item Decls from escaping closures.
+    llvm::SmallSetVector<ValueDecl *, 8> EscapingStrongCaptureDecls;
+
+    static ReferenceOwnership getDeclOwnership(const Decl *D) {
+      if (auto attr = D->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+        return attr->get();
+      }
+      // Default to strong if unspecified
+      return ReferenceOwnership::Strong;
+    }
+
+    static bool isLessThanStrongOwnership(const ReferenceOwnership ownership) {
+      return isLessStrongThan(ownership, ReferenceOwnership::Strong);
+    }
+
+    static bool isEscapingClosure(const AbstractClosureExpr *ACE) {
+      return !ACE->getType()->isNoEscape();
+    }
+
+    // We're looking for captures like [weak a], [unowned b] here,
+    // where the bound Decl has strong ownership. We'll also keep
+    // track of capture list items formed for escaping closures.
+    void recordOrDiagnoseDeclIfNeeded(Decl *D) {
+
+      // We only care about pattern bindings
+      if (!isa<PatternBindingDecl>(D))
+        return;
+
+      auto PBD = cast<PatternBindingDecl>(D);
+
+      // We only handle (explicit) single variable bindings currently
+      auto VD = PBD->getSingleVar();
+      if (!VD || PBD->isImplicit())
+        return;
+
+      // If this Decl isn't part of a capture list, ignore it
+      if (!VD->isCaptureList())
+        return;
+
+      // We're only concerned with escaping closures
+      auto ACE = VD->getParentCaptureList()->getClosureBody();
+      if (!ACE || !isEscapingClosure(ACE))
+        return;
+
+      // If the capture item Decl has strong ownership, remember it for later
+      if (getDeclOwnership(VD) == ReferenceOwnership::Strong) {
+        EscapingStrongCaptureDecls.insert(VD);
+        return;
+      }
+
+      // If there's no ancestor escaping closure, no need to do anything
+      // further since we won't diagnose in such cases.
+      if (EscapingClosureStack.empty())
+        return;
+
+      // Get the initialization expression
+      auto itemInit = PBD->getInit(0);
+      if (!itemInit)
+        return;
+
+      VarDecl *referentVarDecl =
+          dyn_cast_or_null<VarDecl>(itemInit->getReferencedDecl().getDecl());
+
+      // If we didn't find a referenced Decl for some reason, or it doesn't
+      // have strong ownership, there's nothing to diagnose.
+      if (!referentVarDecl ||
+          isLessThanStrongOwnership(getDeclOwnership(referentVarDecl)))
+        return;
+
+      // As a policy choice, don't diagnose if the capture is explicitly
+      // assigned within the capture list item. E.g. we will treat things like
+      //
+      // { [weak self = self] in }
+      //
+      // as an indication that the programmer is aware of any consequences of
+      // the ownership change.
+      if (PBD->getEqualLoc(0).isValid())
+        return;
+
+      diagnoseCaptureIfNeeded(VD, referentVarDecl);
+    }
+
+    /// Diagnose the capture list binding `itemDecl` that refers to
+    /// `itemReferent` if appropriate.
+    ///
+    /// \param itemDecl The capture list item decl that may need to be
+    /// diagnosed. This must have less than strong `ReferenceOwnership`.
+    /// \param itemReferent The referent to which the capture list
+    /// item refers.
+    void diagnoseCaptureIfNeeded(VarDecl *itemDecl, VarDecl *itemReferent) {
+      // If an escaping closure contains the 'weakified' referent, as an
+      // explicit strong capture list item then we don't need to diagnose
+      // anything. We rely on the AST walk visiting ancestor DCs before
+      // their children here. i.e. we don't want to diagnose cases like:
+      //
+      //  outer { [self] in
+      //    inner { [weak self] in ... }
+      //  }
+      if (EscapingStrongCaptureDecls.contains(itemReferent))
+        return;
+
+      // Walk up the DC hierarchy to see if we find an escaping closure that
+      // sits between the capture item and its re-bound Decl. We look for the
+      // outermost such closure for reporting purposes.
+      DeclContext *currentDC = itemDecl->getDeclContext();
+      DeclContext *itemReferentDC = itemReferent->getDeclContext();
+      std::optional<ClosureExpr *> outermostCapturingClosure;
+
+      ASSERT(!EscapingClosureStack.empty()); // should have bailed earlier
+      while (currentDC && currentDC != itemReferentDC) {
+        SWIFT_DEFER { currentDC = currentDC->getParent(); };
+
+        if (isa<ClosureExpr>(currentDC)) {
+          ClosureExpr *CE = cast<ClosureExpr>(currentDC);
+          if (EscapingClosureStack.contains(CE))
+            outermostCapturingClosure = CE;
+        }
+      }
+
+      // No outer capturing closure found, so don't diagnose
+      if (!outermostCapturingClosure)
+        return;
+
+      const auto itemDeclOwnership = getDeclOwnership(itemDecl);
+      ASSERT(isLessThanStrongOwnership(itemDeclOwnership));
+
+      // We found something to diagnose.
+      Ctx.Diags.diagnose(itemDecl->getLoc(),
+                         diag::implicit_weak_to_strong_capture,
+                         itemDeclOwnership, itemDecl);
+
+      const auto initialCaptureLoc =
+          outermostCapturingClosure.value()->getLoc();
+
+      // Point to the implicit capture location
+      Ctx.Diags.diagnose(initialCaptureLoc,
+                         diag::implicit_weak_to_strong_capture_loc,
+                         itemReferent);
+
+      // Suggest adding a capture list item there
+      // FIXME: this should have a fixit
+      Ctx.Diags.diagnose(
+          initialCaptureLoc,
+          diag::implicit_weak_to_strong_capture_add_capture_list_item,
+          itemReferent);
+
+      // Suggest a fixit to silence the diagnostic by adding an assignment in
+      // the capture list item. i.e. turning:
+      //  `{ [weak xyz] in ...}`
+      //  into
+      //  `{ [weak xyz = xyz] in ... }`
+      Ctx.Diags
+          .diagnose(itemDecl->getLoc(),
+                    diag::implicit_weak_to_strong_capture_assign_to_silence)
+          .fixItInsertAfter(itemDecl->getLoc(),
+                            (" = " + itemDecl->getNameStr()).str());
+    }
+
+    // MARK: ASTWalker
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return Action::SkipNode(E);
+
+      if (auto CE = dyn_cast<ClosureExpr>(E))
+        if (isEscapingClosure(CE)) {
+          EscapingClosureStack.insert(CE);
+        }
+
+      return Action::Continue(E);
+    }
+
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+      if (auto CE = dyn_cast<ClosureExpr>(E))
+        if (isEscapingClosure(CE)) {
+          ASSERT(!EscapingClosureStack.empty());
+          EscapingClosureStack.pop_back();
+        }
+
+      return Action::Continue(E);
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      // Check for capture list entries to record info about them
+      recordOrDiagnoseDeclIfNeeded(D);
+      return Action::Continue();
+    }
+  };
+
+  ImplicitWeakToStrongCaptureWalker Walker(DC->getASTContext());
+  const_cast<Expr *>(E)->walk(Walker);
 }
 
 bool TypeChecker::getDefaultGenericArgumentsString(
@@ -4684,7 +4946,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
   } else if (auto SS = dyn_cast<SwitchStmt>(S)) {
     checkStmtConditionTrailingClosure(ctx, SS->getSubjectExpr());
   } else if (auto FES = dyn_cast<ForEachStmt>(S)) {
-    checkStmtConditionTrailingClosure(ctx, FES->getParsedSequence());
+    checkStmtConditionTrailingClosure(ctx, FES->getSequence());
     checkStmtConditionTrailingClosure(ctx, FES->getWhere());
   } else if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
     for (auto CS : DCS->getCatches())
@@ -4962,9 +5224,9 @@ public:
           case AccessorKind::Address:
           case AccessorKind::MutableAddress:
           case AccessorKind::Read:
-          case AccessorKind::Read2:
+          case AccessorKind::YieldingBorrow:
           case AccessorKind::Modify:
-          case AccessorKind::Modify2:
+          case AccessorKind::YieldingMutate:
           case AccessorKind::Init:
           case AccessorKind::Borrow:
           case AccessorKind::Mutate:
@@ -5484,7 +5746,11 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       // Do not warn on coercions from implicitly unwrapped optionals
       // for Swift versions less than 5.
+<<<<<<< HEAD
       if (!Ctx.isLanguageModeAtLeast(5) &&
+=======
+      if (!Ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
+>>>>>>> origin/main
           hasImplicitlyUnwrappedResult(subExpr))
         return;
 
@@ -6312,14 +6578,32 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
     DiagnoseWalker(const DeclContext *dc) : dc(dc) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (auto declRef = E->getReferencedDecl())
-        checkDecl(declRef.getDecl(), E->getLoc());
+      if (auto declRef = E->getReferencedDecl()) {
+        bool downgradeToWarning = false;
+        auto *decl = declRef.getDecl();
+
+        // If this is an implicit reference to `make{Async}Iterator`
+        // or `next` methods, let's produce a warning instead of an
+        // error to maintain source compatibility since it wasn't
+        // diagnosed before in closure contexts.
+        if (E->isImplicit() && decl->isInstanceMember()) {
+          auto &ctx = decl->getASTContext();
+          auto name = decl->getBaseName();
+
+          downgradeToWarning =
+              !ctx.isLanguageModeAtLeast(LanguageMode::future) &&
+              isInClosureContext() &&
+              (name == ctx.Id_makeIterator ||
+               name == ctx.Id_makeAsyncIterator || name == ctx.Id_next);
+        }
+
+        checkDecl(decl, E->getLoc(), downgradeToWarning);
+      }
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         for (const auto &component : KPE->getComponents()) {
           if (component.hasDeclRef())
-            checkDecl(component.getDeclRef().getDecl(), component.getLoc(),
-                      /*downgradeToWarning=*/true);
+            checkDecl(component.getDeclRef().getDecl(), component.getLoc());
         }
       }
 
@@ -6338,6 +6622,16 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
             downgradeToWarning ? DiagnosticBehavior::Warning
                                : DiagnosticBehavior::Unspecified);
     }
+
+    bool isInClosureContext() const {
+      auto *DC = dc;
+      do {
+        if (isa<ClosureExpr>(DC))
+          return true;
+      } while ((DC = DC->getParent()));
+
+      return false;
+    }
   };
 
   auto &ctx = DC->getASTContext();
@@ -6349,81 +6643,12 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
-static bool isReturningFRT(const clang::NamedDecl *ND,
-                           clang::QualType &outReturnType, ASTContext &Ctx) {
-  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
-    outReturnType = FD->getReturnType();
-  else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))
-    outReturnType = MD->getReturnType();
-  else
-    return false;
-
-  clang::QualType pointeeType = outReturnType;
-  if (outReturnType->isPointerType() || outReturnType->isReferenceType())
-    pointeeType = outReturnType->getPointeeType();
-
-  const auto *recordDecl = pointeeType->getAsRecordDecl();
-  if (!recordDecl)
-    return false;
-
-  return !importer::hasImmortalAttrs(recordDecl) &&
-         evaluateOrDefault(Ctx.evaluator,
-                           CxxRecordSemantics({recordDecl, Ctx, nullptr}),
-                           {}) == CxxRecordSemanticsKind::Reference;
-}
-
-static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
-                                                 clang::QualType retType,
-                                                 ASTContext &Ctx) {
-
-  auto attrInfo = importer::ReturnOwnershipInfo(ND);
-  if (attrInfo.hasRetainAttr())
-    return false;
-
-  if (importer::matchSwiftAttrOnRecordPtr<bool>(
-          retType, {{"returned_as_unretained_by_default", true}}))
-    return false;
-
-  if (isa<clang::ObjCMethodDecl>(ND))
-    // All ObjCMethods can be annotated with ownership attrs
-    return true;
-
-  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
-    if (isa<clang::CXXDeductionGuideDecl>(FD))
-      // Deduction guides don't need ownership attrs because they aren't
-      // functions.
-      return false;
-
-    if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
-      if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(methodDecl))
-        // Ownership attrs are not yet supported for ctors and dtors if FRTs
-        return false;
-
-      if (methodDecl->isOverloadedOperator())
-        // Ownership attrs are not yet supported for overloaded operators
-        return false;
-
-      if (!methodDecl->isUserProvided())
-        // Implicitly defined methods don't need ownership attrs since users
-        // can't annotate them.
-        return false;
-    }
-
-    return true;
-  }
-
-  // Decls that aren't functions or ObjCMethods don't need ownership attrs.
-  return false;
-}
-
-// Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
-// types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
 static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
   class DiagnoseWalker : public BaseDiagnosticWalker {
-    ASTContext &Ctx;
+    ClangModuleLoader *ClangLoader;
 
   public:
-    explicit DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) {}
+    explicit DiagnoseWalker(ClangModuleLoader *CML) : ClangLoader(CML) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E)
@@ -6437,40 +6662,17 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
       if (!func)
         return Action::Continue(E);
 
-      auto *clangDecl = func->getClangDecl();
-      if (!clangDecl)
-        return Action::Continue(E);
-
-      auto *ND = dyn_cast<clang::NamedDecl>(clangDecl);
-      if (!ND)
-        return Action::Continue(E);
-
-      clang::QualType retType;
-      if (!isReturningFRT(ND, retType, Ctx))
-        return Action::Continue(E);
-
-      if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
-        SourceLoc diagnosticLoc = func->getLoc();
-        if (diagnosticLoc.isInvalid() && func->getClangDecl()) {
-          // FIXME: Remove the diagnosticLoc once the source locations of the
-          // objc method declarations are imported correctly.
-          diagnosticLoc = Ctx.getClangModuleLoader()->importSourceLocation(
-              ND->getLocation());
-        }
-
-        Ctx.Diags.diagnose(CE->getLoc(),
-                           diag::warn_unannotated_cxx_func_returning_frt, func);
-
-        Ctx.Diags.diagnose(diagnosticLoc,
-                           diag::note_unannotated_cxx_func_returning_frt, func);
-      }
+      if (isa_and_nonnull<clang::NamedDecl>(func->getClangDecl()))
+        ClangLoader->checkCalledClangFunction(func, CE->getLoc());
 
       return Action::Continue(E);
     }
   };
 
-  DiagnoseWalker walker(DC->getASTContext());
-  const_cast<Expr *>(E)->walk(walker);
+  if (auto *Loader = DC->getASTContext().getClangModuleLoader()) {
+    DiagnoseWalker walker(Loader);
+    const_cast<Expr *>(E)->walk(walker);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -6481,17 +6683,23 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
 void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
                                             bool isExprStmt,
-                                            bool isConstInitExpr) {
+                                            bool isConstInitExpr,
+                                            bool inForEachPreamble) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
-  diagSyntacticUseRestrictions(E, DC, isExprStmt);
+  diagSyntacticUseRestrictions(E, DC, isExprStmt, inForEachPreamble);
   diagRecursivePropertyAccess(E, DC);
   diagnoseImplicitSelfUseInClosure(E, DC);
+  diagnoseImplicitWeakToStrongCapture(E, DC);
   diagnoseUnintendedOptionalBehavior(E, DC);
   maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
   diagnoseExplicitUseOfLazyVariableStorage(E, DC);
   diagnoseComparisonWithNaN(E, DC);
+<<<<<<< HEAD
   if (!ctx.isLanguageModeAtLeast(5))
+=======
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5))
+>>>>>>> origin/main
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
     diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
@@ -6828,21 +7036,6 @@ std::optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   }
 
   return std::nullopt;
-}
-
-bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
-                                                  ForEachStmt *forEach) {
-  auto &ctx = dc->getASTContext();
-  if (auto thrownError = TypeChecker::canThrow(ctx, forEach)) {
-    if (forEach->getTryLoc().isInvalid()) {
-      ctx.Diags
-          .diagnose(forEach->getAwaitLoc(), diag::throwing_call_unhandled, "call")
-          .fixItInsert(forEach->getAwaitLoc(), "try");
-      return true;
-    }
-  }
-
-  return false;
 }
 
 void DeferredDiag::emit(swift::ASTContext &ctx) {

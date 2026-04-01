@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Demangling/Demangler.h"
 #include "DemanglerAssert.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -294,6 +293,20 @@ static bool isProtocolNode(Demangle::NodePointer Node) {
   case Demangle::Node::Kind::Protocol:
   case Demangle::Node::Kind::ProtocolSymbolicReference:
   case Demangle::Node::Kind::ObjectiveCProtocolSymbolicReference:
+    return true;
+  default:
+    return false;
+  }
+  assert(0 && "unknown node kind");
+}
+
+static bool isGenericParamType(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isGenericParamType(Node->getChild(0));
+  case Demangle::Node::Kind::DependentGenericParamType:
     return true;
   default:
     return false;
@@ -1508,6 +1521,14 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinFixedArray);
       Ty->addChild(size, *this);
       Ty->addChild(element, *this);
+      break;
+    }
+    case 'W': {
+      NodePointer referent = popNode(Node::Kind::Type);
+      if (!referent)
+        return nullptr;
+      Ty = createNode(Node::Kind::BuiltinBorrow);
+      Ty->addChild(referent, *this);
       break;
     }
     case 'O':
@@ -2905,6 +2926,16 @@ NodePointer Demangler::popProtocolConformance() {
   return Conf;
 }
 
+NodePointer Demangler::popAssociatedConformanceWitnessAccessorSubject() {
+  if (auto type = popNode(Node::Kind::Type)) {
+    if (isGenericParamType(type))
+      return type;
+
+    pushNode(type);
+  }
+  return popAssocTypePath();
+}
+
 NodePointer Demangler::demangleThunkOrSpecialization() {
   switch (char c = nextChar()) {
     // Thunks that are from a thunk inst. We take the TT namespace.
@@ -3080,19 +3111,19 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
 
     case 'n': {
       NodePointer requirementTy = popProtocol();
-      NodePointer conformingType = popAssocTypePath();
+      NodePointer subject = popAssociatedConformanceWitnessAccessorSubject();
       NodePointer protoTy = popNode(Node::Kind::Type);
       return createWithChildren(Node::Kind::AssociatedConformanceDescriptor,
-                                protoTy, conformingType, requirementTy);
+                                protoTy, subject, requirementTy);
     }
 
     case 'N': {
       NodePointer requirementTy = popProtocol();
-      auto assocTypePath = popAssocTypePath();
+      NodePointer subject = popAssociatedConformanceWitnessAccessorSubject();
       NodePointer protoTy = popNode(Node::Kind::Type);
       return createWithChildren(
                             Node::Kind::DefaultAssociatedConformanceAccessor,
-                            protoTy, assocTypePath, requirementTy);
+                            protoTy, subject, requirementTy);
     }
 
     case 'b': {
@@ -4123,9 +4154,9 @@ NodePointer Demangler::demangleAccessor(NodePointer ChildNode) {
     case 'w': Kind = Node::Kind::WillSet; break;
     case 'W': Kind = Node::Kind::DidSet; break;
     case 'r': Kind = Node::Kind::ReadAccessor; break;
-    case 'y': Kind = Node::Kind::Read2Accessor; break;
+    case 'y': Kind = Node::Kind::YieldingBorrowAccessor; break;
     case 'M': Kind = Node::Kind::ModifyAccessor; break;
-    case 'x': Kind = Node::Kind::Modify2Accessor; break;
+    case 'x': Kind = Node::Kind::YieldingMutateAccessor; break;
     case 'i': Kind = Node::Kind::InitAccessor; break;
     case 'b':
       Kind = Node::Kind::BorrowAccessor;
@@ -4393,6 +4424,20 @@ NodePointer Demangler::demangleGenericRequirement() {
     case 'I': 
       ConstraintKind = Inverse;
       TypeKind = Substitution;
+      inverseKind = demangleIndexAsNode();
+      if (!inverseKind)
+        return nullptr;
+      break;
+    case 'j':
+      ConstraintKind = Inverse;
+      TypeKind = Assoc;
+      inverseKind = demangleIndexAsNode();
+      if (!inverseKind)
+        return nullptr;
+      break;
+    case 'J':
+      ConstraintKind = Inverse;
+      TypeKind = CompoundAssoc;
       inverseKind = demangleIndexAsNode();
       if (!inverseKind)
         return nullptr;

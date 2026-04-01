@@ -6,4 +6,5 @@ add_swift_unittest(SwiftIDETests
 target_link_libraries(SwiftIDETests
   PRIVATE
   swiftIDE
+  swiftClangImporter
 )

@@ -690,6 +690,12 @@ public:
 
   bool diagnoseAsNote() override;
 
+  /// If the type of a key path literal is read-only due to setter
+  /// availability constraints but the context requires a writable
+  /// key path, let's produce a tailed availability diagnostic that
+  /// points to the offending setter.
+  bool diagnoseKeyPathLiteralMutabilityMismatch() const;
+
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
 
@@ -948,7 +954,11 @@ public:
 #ifndef NDEBUG
     auto fnType1 = fromType->castTo<FunctionType>();
     auto fnType2 = toType->castTo<FunctionType>();
-    assert(fnType1->isThrowing() != fnType2->isThrowing());
+    // FIXME: `AnyFunctionType::isThrowing` is going to produce `true` for
+    // function that's with `throws(Never)`, we need to address that in
+    // `TypeSimplifier`.
+    assert(fnType1->getEffectiveThrownErrorType() &&
+           !fnType2->getEffectiveThrownErrorType());
 #endif
   }
 
@@ -1513,6 +1523,7 @@ private:
   /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
   bool diagnoseClosure(const ClosureExpr *closure);
+  bool diagnoseClosure(const ClosureExpr *closure, FunctionType *expectedType);
 
   /// Diagnose a single missing argument to a buildBlock call.
   bool diagnoseMissingResultBuilderElement() const;

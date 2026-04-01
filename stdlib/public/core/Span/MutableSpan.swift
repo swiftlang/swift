@@ -89,6 +89,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @unsafe
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(borrow start)
   public init(
     _unsafeStart start: UnsafeMutablePointer<Element>,
@@ -192,6 +193,7 @@ extension Span where Element: ~Copyable {
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
+  @_transparent
   public var span: Span<Element> {
     @lifetime(borrow self)
     borrowing get {
@@ -240,6 +242,7 @@ extension MutableSpan where Element: ~Copyable {
   public var count: Int { _assumeNonNegative(_count) }
 
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { _count == 0 }
 
   public typealias Index = Int
@@ -258,6 +261,10 @@ extension MutableSpan where Element: BitwiseCopyable {
   ///
   /// - Returns: a RawSpan over the memory represented by this span
   @_alwaysEmitIntoClient
+<<<<<<< HEAD
+=======
+  @_transparent
+>>>>>>> origin/main
   @unsafe
   public var bytes: RawSpan {
     @lifetime(borrow self)
@@ -274,6 +281,10 @@ extension MutableSpan where Element: BitwiseCopyable {
   ///
   /// - Returns: a MutableRawSpan over the memory represented by this span
   @_alwaysEmitIntoClient
+<<<<<<< HEAD
+=======
+  @_transparent
+>>>>>>> origin/main
   @unsafe
   public var mutableBytes: MutableRawSpan {
     @lifetime(&self)
@@ -301,10 +312,12 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
+    @_transparent
     unsafeAddress {
       _checkIndex(position)
       return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
+    @_transparent
     @lifetime(self: copy self)
     unsafeMutableAddress {
       _checkIndex(position)
@@ -323,9 +336,11 @@ extension MutableSpan where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
+    @_transparent
     unsafeAddress {
       unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
+    @_transparent
     @lifetime(self: copy self)
     unsafeMutableAddress {
       unsafe _unsafeAddressOfElement(unchecked: position)
@@ -373,6 +388,7 @@ extension MutableSpan where Element: ~Copyable {
 
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -381,6 +397,7 @@ extension MutableSpan where Element: ~Copyable {
 
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(self: copy self)
   public mutating func withUnsafeMutableBufferPointer<
     E: Error, Result: ~Copyable
@@ -403,6 +420,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -411,6 +429,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(self: copy self)
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeMutableRawBufferPointer) throws(E) -> Result
@@ -851,3 +870,15 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 }
+
+#if !SPAN_COMPATIBILITY_STUB
+@available(SwiftStdlib 6.4, *)
+extension MutableSpan: BorrowingSequence where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  @inlinable
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> SpanIterator<Element> {
+    SpanIterator(self.span)
+  }
+}
+#endif

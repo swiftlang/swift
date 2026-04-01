@@ -4399,19 +4399,18 @@ static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
   }
 
   // Otherwise, we need to coerce through memory.
-  Address temporary;
-  Size tempSize;
-  std::tie(temporary, tempSize) =
-      allocateForCoercion(IGF, argTI.getStorageType(), coercedTy, "coerced-arg");
-  IGF.Builder.CreateLifetimeStart(temporary, tempSize);
+  StackAddress temporary =
+    allocateForCoercion(IGF, argTI.getStorageType(), coercedTy, "coerced-arg");
 
   // Store to a temporary.
   Address tempOfArgTy =
-      IGF.Builder.CreateElementBitCast(temporary, argTI.getStorageType());
+      IGF.Builder.CreateElementBitCast(temporary.getAddress(),
+                                       argTI.getStorageType());
   argTI.initializeFromParams(IGF, in, tempOfArgTy, argType, isOutlined);
 
   // Bitcast the temporary to the expected type.
-  Address coercedAddr = IGF.Builder.CreateElementBitCast(temporary, coercedTy);
+  Address coercedAddr =
+    IGF.Builder.CreateElementBitCast(temporary.getAddress(), coercedTy);
 
   if (IsDirectFlattened && isa<llvm::StructType>(coercedTy)) {
     // Project out individual elements if necessary.
@@ -4427,7 +4426,7 @@ static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
     out.add(IGF.Builder.CreateLoad(coercedAddr));
   }
 
-  IGF.Builder.CreateLifetimeEnd(temporary, tempSize);
+  IGF.emitDeallocateStaticAlloca(temporary);
 }
 
 namespace {
@@ -4928,15 +4927,12 @@ static void emitDirectForeignParameter(IRGenFunction &IGF, Explosion &in,
 
   // Otherwise, we need to traffic through memory.
   // Create a temporary.
-  Address temporary; Size tempSize;
-  std::tie(temporary, tempSize) = allocateForCoercion(IGF,
-                                          coercionTy,
-                                          paramTI.getStorageType(),
-                                          "");
-  IGF.Builder.CreateLifetimeStart(temporary, tempSize);
+  StackAddress temporary =
+    allocateForCoercion(IGF, coercionTy, paramTI.getStorageType(), "");
 
   // Write the input parameters into the temporary:
-  Address coercedAddr = IGF.Builder.CreateElementBitCast(temporary, coercionTy);
+  Address coercedAddr =
+    IGF.Builder.CreateElementBitCast(temporary.getAddress(), coercionTy);
 
   // Break down a struct expansion if necessary.
   if (IsDirectFlattened && isa<llvm::StructType>(coercionTy)) {
@@ -4954,13 +4950,14 @@ static void emitDirectForeignParameter(IRGenFunction &IGF, Explosion &in,
   }
 
   // Pull out the elements.
-  temporary =
-      IGF.Builder.CreateElementBitCast(temporary, paramTI.getStorageType());
-  paramTI.loadAsTake(IGF, temporary, out);
+  auto paramAddress =
+      IGF.Builder.CreateElementBitCast(temporary.getAddress(),
+                                       paramTI.getStorageType());
+  paramTI.loadAsTake(IGF, paramAddress, out);
 
   // Deallocate the temporary.
   // `deallocateStack` emits the lifetime.end marker for us.
-  paramTI.deallocateStack(IGF, StackAddress(temporary), paramType);
+  IGF.emitDeallocateStaticAlloca(temporary);
 }
 
 void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
@@ -5306,7 +5303,7 @@ StackAddress irgen::emitAllocCoroStaticFrame(IRGenFunction &IGF,
 }
 void irgen::emitDeallocCoroStaticFrame(IRGenFunction &IGF, StackAddress frame) {
   IGF.Builder.CreateLifetimeEnd(frame.getAddress(), Size(-1) /*dynamic size*/);
-  IGF.emitDeallocateDynamicAlloca(frame, /*allowTaskAlloc*/ true,
+  IGF.emitDeallocateDynamicAlloca(frame,
                                   /*useTaskDeallocThrough*/ true,
                                   /*forCalleeCoroutineFrame*/ true);
 }
@@ -5709,11 +5706,10 @@ void IRGenFunction::emitEpilogue() {
     CurFn->insert(CurFn->end(), bb);
 }
 
-std::pair<Address, Size>
-irgen::allocateForCoercion(IRGenFunction &IGF,
-                           llvm::Type *fromTy,
-                           llvm::Type *toTy,
-                           const llvm::Twine &basename) {
+StackAddress irgen::allocateForCoercion(IRGenFunction &IGF,
+                                        llvm::Type *fromTy,
+                                        llvm::Type *toTy,
+                                        const llvm::Twine &basename) {
   auto &DL = IGF.IGM.DataLayout;
   
   auto fromSize = DL.getTypeSizeInBits(fromTy);
@@ -5725,11 +5721,12 @@ irgen::allocateForCoercion(IRGenFunction &IGF,
   llvm::Align alignment =
       std::max(DL.getABITypeAlign(fromTy), DL.getABITypeAlign(toTy));
 
-  auto buffer = IGF.createAlloca(bufferTy, Alignment(alignment.value()),
-                                 basename + ".coerced");
-  
   Size size(std::max(fromSize, toSize));
-  return {buffer, size};
+  auto buffer = IGF.emitStaticAlloca(bufferTy, size,
+                                     Alignment(alignment.value()),
+                                     basename + ".coerced");
+
+  return buffer;
 }
 
 llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
@@ -5755,15 +5752,14 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   }
 
   // Otherwise we need to store, bitcast, and load.
-  Address address; Size size;
-  std::tie(address, size) = allocateForCoercion(*this, fromTy, toTy,
-                                                value->getName() + ".coercion");
-  Builder.CreateLifetimeStart(address, size);
+  StackAddress temporary = allocateForCoercion(*this, fromTy, toTy,
+                                               value->getName() + ".coercion");
+  auto address = temporary.getAddress();
   auto orig = Builder.CreateElementBitCast(address, fromTy);
   Builder.CreateStore(value, orig);
   auto coerced = Builder.CreateElementBitCast(address, toTy);
   auto loaded = Builder.CreateLoad(coerced);
-  Builder.CreateLifetimeEnd(address, size);
+  emitDeallocateStaticAlloca(temporary);
   return loaded;
 }
 
@@ -5961,20 +5957,19 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
                                          : overlappedCoercionTy;
 
   // Allocate a temporary for the coercion.
-  Address temporary;
-  Size tempSize;
-  std::tie(temporary, tempSize) = allocateForCoercion(
+  auto temporary = allocateForCoercion(
       IGF, largerCoercion, loadableTI.getStorageType(), "temp-coercion");
 
   // Make sure we have sufficiently large alignment.
-  adjustAllocaAlignment(DataLayout, temporary, coercionTy);
-  adjustAllocaAlignment(DataLayout, temporary, overlappedCoercionTy);
+  adjustAllocaAlignment(DataLayout, temporary.getAddress(), coercionTy);
+  adjustAllocaAlignment(DataLayout, temporary.getAddress(),
+                        overlappedCoercionTy);
 
   auto &Builder = IGF.Builder;
-  Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Store the expanded type elements.
-  auto coercionAddr = Builder.CreateElementBitCast(temporary, coercionTy);
+  auto coercionAddr =
+    Builder.CreateElementBitCast(temporary.getAddress(), coercionTy);
   unsigned expandedMapIdx = 0;
 
   auto eltsArray = native.claimAll();
@@ -5999,16 +5994,18 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
   storeToFn(coercionTy, coercionAddr);
   if (!overlappedCoercionTy->isEmptyTy()) {
     auto overlappedCoercionAddr =
-        Builder.CreateElementBitCast(temporary, overlappedCoercionTy);
+        Builder.CreateElementBitCast(temporary.getAddress(),
+                                     overlappedCoercionTy);
     storeToFn(overlappedCoercionTy, overlappedCoercionAddr);
   }
 
   // Reload according to the types schema.
   Address storageAddr =
-      Builder.CreateElementBitCast(temporary, loadableTI.getStorageType());
+      Builder.CreateElementBitCast(temporary.getAddress(),
+                                   loadableTI.getStorageType());
   loadableTI.loadAsTake(IGF, storageAddr, nonNativeExplosion);
 
-  Builder.CreateLifetimeEnd(temporary, tempSize);
+  IGF.emitDeallocateStaticAlloca(temporary);
 
   return nonNativeExplosion;
 }
@@ -6174,25 +6171,24 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
   }
 
   // Allocate a temporary for the coercion.
-  Address temporary;
-  Size tempSize;
-  std::tie(temporary, tempSize) = allocateForCoercion(
+  StackAddress temporary = allocateForCoercion(
       IGF, largerCoercion, loadableTI.getStorageType(), "temp-coercion");
 
   // Make sure we have sufficiently large alignment.
-  adjustAllocaAlignment(DataLayout, temporary, coercionTy);
-  adjustAllocaAlignment(DataLayout, temporary, overlappedCoercionTy);
+  adjustAllocaAlignment(DataLayout, temporary.getAddress(), coercionTy);
+  adjustAllocaAlignment(DataLayout, temporary.getAddress(), overlappedCoercionTy);
 
   auto &Builder = IGF.Builder;
-  Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Initialize the memory of the temporary.
   Address storageAddr =
-      Builder.CreateElementBitCast(temporary, loadableTI.getStorageType());
+      Builder.CreateElementBitCast(temporary.getAddress(),
+                                   loadableTI.getStorageType());
   loadableTI.initialize(IGF, fromNonNative, storageAddr, isOutlined);
 
   // Load the expanded type elements from memory.
-  auto coercionAddr = Builder.CreateElementBitCast(temporary, coercionTy);
+  auto coercionAddr =
+    Builder.CreateElementBitCast(temporary.getAddress(), coercionTy);
 
   unsigned expandedMapIdx = 0;
   SmallVector<llvm::Value *, 8> expandedElts(expandedTys.size(), nullptr);
@@ -6216,11 +6212,12 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
   loadFromFn(coercionTy, coercionAddr);
   if (!overlappedCoercionTy->isEmptyTy()) {
     auto overlappedCoercionAddr =
-        Builder.CreateElementBitCast(temporary, overlappedCoercionTy);
+        Builder.CreateElementBitCast(temporary.getAddress(),
+                                     overlappedCoercionTy);
     loadFromFn(overlappedCoercionTy, overlappedCoercionAddr);
   }
 
-  Builder.CreateLifetimeEnd(temporary, tempSize);
+  IGF.emitDeallocateStaticAlloca(temporary);
 
   // Add the values to the explosion.
   for (auto *val : expandedElts)

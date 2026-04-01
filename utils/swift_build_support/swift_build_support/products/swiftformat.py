@@ -103,19 +103,6 @@ class SwiftFormat(product.Product):
 
     def build(self, host_target):
         self.run_build_script_helper('build', host_target)
-        if self.args.sourcekitlsp_lint:
-            self.lint_sourcekitlsp()
-
-    def lint_sourcekitlsp(self):
-        linting_cmd = [
-            os.path.join(self.build_dir, self.configuration(), 'swift-format'),
-            'lint',
-            '--parallel',
-            '--strict',
-            '--recursive',
-            os.path.join(os.path.dirname(self.source_dir), 'sourcekit-lsp'),
-        ]
-        shell.call(linting_cmd)
 
     def should_test(self, host_target):
         return self.args.test_swiftformat
@@ -128,11 +115,25 @@ class SwiftFormat(product.Product):
 
     def install(self, host_target):
         install_destdir = self.host_install_destdir(host_target)
+        install_prefix = install_destdir + self.args.install_prefix
         self.run_build_script_helper(
             'install',
             host_target,
-            additional_params=['--prefix', install_destdir + self.args.install_prefix]
+            additional_params=['--prefix', install_prefix]
         )
+        if self.args.sourcekitlsp_lint:
+            self.lint_sourcekitlsp(install_prefix)
+
+    def lint_sourcekitlsp(self, install_prefix):
+        linting_cmd = [
+            os.path.join(install_prefix, 'bin', 'swift-format'),
+            'lint',
+            '--parallel',
+            '--strict',
+            '--recursive',
+            os.path.join(os.path.dirname(self.source_dir), 'sourcekit-lsp'),
+        ]
+        shell.call(linting_cmd)
 
     @classmethod
     def get_dependencies(cls):

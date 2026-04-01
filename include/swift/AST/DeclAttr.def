@@ -608,7 +608,10 @@ SIMPLE_DECL_ATTR(reasync, AtReasync,
   ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnreachableInABIAttr,
   110)
 
-// Unused '111'
+SIMPLE_DECL_ATTR(_owned, Owned,
+  OnVar | OnSubscript,
+  NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  111)
 
 CONTEXTUAL_DECL_ATTR(nonisolated, Nonisolated,
   OnFunc | OnConstructor | OnDestructor | OnVar | OnSubscript | OnProtocol | OnExtension | OnClass | OnStruct | OnEnum,
@@ -874,7 +877,10 @@ DECL_ATTR(abi, ABI,
   LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   165)
 
-// Unused '166': Used to be `@execution(caller | concurrent)` replaced with `@concurrent` and `nonisolated(nonsending)`
+SIMPLE_DECL_ATTR(reparentable, Reparentable,
+  OnProtocol,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UserInaccessible | ForbiddenInABIAttr,
+  166)
 
 SIMPLE_DECL_ATTR(const, ConstVal,
   OnParam | OnVar | OnFunc,
@@ -905,12 +911,18 @@ DECL_ATTR(specialized, Specialized,
   AllowMultipleAttributes | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   172)
 
+
 SIMPLE_DECL_ATTR(_unsafeSelfDependentResult, UnsafeSelfDependentResult,
   OnAccessor,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
   173)
 
-LAST_DECL_ATTR(UnsafeSelfDependentResult)
+DECL_ATTR(warn, Warn,
+  OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar | OnNominalType | OnExtension | OnEnumElement | OnAccessor | OnImport | OnTypeAlias | OnAssociatedType | OnMacro,
+  AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  174)
+
+LAST_DECL_ATTR(Warn)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

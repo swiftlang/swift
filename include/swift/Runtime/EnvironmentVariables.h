@@ -70,6 +70,10 @@ SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverr
 // library can call.
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableTaskSlabAllocator();
 
+// Wrapper around SWIFT_CONCURRENCY_TRACING_SUBSYSTEM that the Concurrency
+// library can call.
+SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyTracingSubsystem();
+
 } // end namespace environment
 } // end namespace runtime
 } // end namespace swift

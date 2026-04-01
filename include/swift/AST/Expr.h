@@ -30,6 +30,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/ThrownErrorDestination.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/AccessControls.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -193,16 +194,16 @@ protected:
     LiteralCapacity : 32
   );
 
-  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+3+1+1,
+  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+4+1+1,
     Semantics : 2, // an AccessSemantics
-    FunctionRefInfo : 3,
+    FunctionRefInfo : 4,
     IsImplicitlyAsync : 1,
     IsImplicitlyThrows : 1
   );
 
-  SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+3,
+  SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+4,
     DeclRefKind : 2,
-    FunctionRefInfo : 3
+    FunctionRefInfo : 4
   );
 
   SWIFT_INLINE_BITFIELD(MemberRefExpr, LookupExpr, 2,
@@ -225,8 +226,8 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 3,
-    FunctionRefInfo : 3
+  SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 4,
+    FunctionRefInfo : 4
   );
 
   SWIFT_INLINE_BITFIELD_FULL(SubscriptExpr, LookupExpr, 2,
@@ -235,12 +236,12 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicSubscriptExpr, DynamicLookupExpr);
 
-  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 3,
-    FunctionRefInfo : 3
+  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 4,
+    FunctionRefInfo : 4
   );
 
-  SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 3,
-    FunctionRefInfo : 3
+  SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 4,
+    FunctionRefInfo : 4
   );
 
   SWIFT_INLINE_BITFIELD(BooleanLiteralExpr, LiteralExpr, 1,
@@ -4137,6 +4138,8 @@ public:
   ///
   /// Closures with untyped throws will produce "any Error", functions that
   /// cannot throw or are specified to throw "Never" will return std::nullopt.
+  SWIFT_UNAVAILABLE_IN_SILGEN_MSG(
+      "use 'TypeConverter::getClosureTypeInfo' instead")
   std::optional<Type> getEffectiveThrownType() const;
 
   /// \brief Return whether this closure is async when fully applied.
@@ -5764,14 +5767,13 @@ class EditorPlaceholderExpr : public Expr {
   SourceLoc Loc;
   TypeRepr *PlaceholderTy;
   TypeRepr *ExpansionTyR;
-  Expr *SemanticExpr;
 
 public:
   EditorPlaceholderExpr(Identifier Placeholder, SourceLoc Loc,
                         TypeRepr *PlaceholderTy, TypeRepr *ExpansionTyR)
       : Expr(ExprKind::EditorPlaceholder, /*Implicit=*/false),
         Placeholder(Placeholder), Loc(Loc), PlaceholderTy(PlaceholderTy),
-        ExpansionTyR(ExpansionTyR), SemanticExpr(nullptr) {}
+        ExpansionTyR(ExpansionTyR) {}
 
   Identifier getPlaceholder() const { return Placeholder; }
   SourceRange getSourceRange() const { return Loc; }
@@ -5783,9 +5785,6 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::EditorPlaceholder;
   }
-
-  Expr *getSemanticExpr() const { return SemanticExpr; }
-  void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
 };
 
 /// A LazyInitializerExpr is used to embed an existing typechecked
@@ -5930,6 +5929,8 @@ class KeyPathExpr : public Expr {
   /// Determines whether a key path starts with '.' which denotes necessity for
   /// a contextual root type.
   bool HasLeadingDot = false;
+
+  friend class ObjCKeyPathStringRequest;
 
 public:
   /// A single stored component, which will be one of:
@@ -6396,6 +6397,7 @@ public:
   /// Retrieve the string literal expression, which will be \c NULL prior to
   /// type checking and a string literal after type checking for an
   /// @objc key path.
+  /// FIXME: Ideally this would lazily evaluate ObjCKeyPathStringRequest.
   Expr *getObjCStringLiteralExpr() const {
     return ObjCStringLiteralExpr;
   }

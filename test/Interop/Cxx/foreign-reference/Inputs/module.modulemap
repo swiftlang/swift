@@ -1,5 +1,5 @@
-module Constructor {
-  header "constructor.h"
+module FRTConstructors {
+  header "frt-constructors.h"
   requires cplusplus
 }
 
@@ -23,8 +23,13 @@ module Nullable {
   requires cplusplus
 }
 
-module Inheritance {
-  header "inheritance.h"
+module InheritanceLayout {
+  header "inheritance-layout.h"
+  requires cplusplus
+}
+
+module InheritFRT {
+  header "inherit-frt.hpp"
   requires cplusplus
 }
 
@@ -43,8 +48,8 @@ module ReferenceCountedObjCProperty {
   export *
 }
 
-module LifetimeOperationMethods {
-  header "lifetime-operation-methods.h"
+module RefCountingMethods {
+  header "refcounting-methods.h"
   requires cplusplus
 }
 
@@ -95,5 +100,15 @@ module LoggingFrts {
 
 module FRTReferenceReturns {
   header "frt-reference-returns.h"
+  requires cplusplus
+}
+
+module RefCountedSmartPtrs {
+  header "refcounted-smartptrs.h"
+  requires cplusplus
+}
+
+module RefKit {
+  header "refkit.hpp"
   requires cplusplus
 }

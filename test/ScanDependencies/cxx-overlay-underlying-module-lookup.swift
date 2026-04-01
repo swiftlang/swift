@@ -9,6 +9,7 @@ import CxxStdlib
 
 /// --------Main module
 // CHECK-LABEL: "modulePath": "deps.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: "sourceFiles": [
 // CHECK-NEXT: cxx-overlay-underlying-module-lookup.swift
 // CHECK-NEXT: ],
@@ -23,6 +24,7 @@ import CxxStdlib
 
 /// ----------
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}CxxStdlib-{{.*}}.swiftmodule"
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: "sourceFiles": []
 // CHECK-NEXT: "directDependencies": [
 // CHECK-DAG:     "swift": "Cxx"

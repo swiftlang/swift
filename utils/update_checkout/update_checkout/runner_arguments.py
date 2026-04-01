@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .cli_arguments import CliArguments
@@ -7,14 +8,14 @@ from .cli_arguments import CliArguments
 @dataclass
 class RunnerArguments:
     repo_name: str
-    scheme_name: str
     output_prefix: str
+    source_root: Path
     verbose: bool
 
 
 @dataclass
 class UpdateArguments(RunnerArguments):
-    source_root: str
+    scheme_name: str
     config: Dict[str, Any]
     scheme_map: Any
     tag: Optional[str]
@@ -23,10 +24,13 @@ class UpdateArguments(RunnerArguments):
     clean: bool
     stash: bool
     cross_repos_pr: Dict[str, str]
+    skip_history: bool
+    partial_clone: bool
 
 
 @dataclass
 class AdditionalSwiftSourcesArguments(RunnerArguments):
+    scheme_name: str
     args: CliArguments
     repo_info: str
     repo_branch: str

@@ -17,7 +17,6 @@
 
 #include "CFTypeInfo.h"
 #include "ClangClassTemplateNamePrinter.h"
-#include "ClangDiagnosticConsumer.h"
 #include "ImportEnumInfo.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
@@ -38,14 +37,15 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/Mangle.h"
+#include "clang/AST/Type.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/OperatorKinds.h"
 #include "clang/Lex/Preprocessor.h"
-#include "clang/Parse/Parser.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <memory>
@@ -58,10 +58,6 @@ STATISTIC(ImportNameNumCacheMisses, "# of times the import name cache was missed
 
 using namespace swift;
 using namespace importer;
-
-// Commonly-used Clang classes.
-using clang::CompilerInstance;
-using clang::CompilerInvocation;
 
 Identifier importer::getOperatorName(ASTContext &ctx,
                                      clang::OverloadedOperatorKind op) {
@@ -292,12 +288,8 @@ static bool isSwiftReservedName(StringRef name) {
 /// name.
 static bool shouldLowercaseValueName(StringRef name) {
   // If we see any lowercase characters, we can lowercase.
-  for (auto c : name) {
-    if (clang::isLowercase(c)) return true;
-  }
-
   // Otherwise, lowercasing will either be a no-op or we have ALL_CAPS.
-  return false;
+  return llvm::any_of(name, clang::isLowercase);
 }
 
 /// Will recursively print out the fully qualified context for the given name.
@@ -421,7 +413,7 @@ namespace {
                             SmallVectorImpl<std::pair<const DeclType *,
                                                       ImportedName>>
                               &overriddenNames) {
-    typedef std::pair<const DeclType *, ImportedName> OverriddenName;
+    using OverriddenName = std::pair<const DeclType *, ImportedName>;
     llvm::SmallPtrSet<DeclName, 4> known;
     (void)known.insert(DeclName());
     overriddenNames.erase(
@@ -782,14 +774,13 @@ getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
   if (auto customNameAttr = findSwiftNameAttr(method, version)) {
     if (customNameAttr->name.starts_with("init("))
       return FactoryAsInitKind::AsInitializer;
-    else
-      return FactoryAsInitKind::AsClassMethod;
+    return FactoryAsInitKind::AsClassMethod;
   }
 
   return FactoryAsInitKind::Infer;
 }
 
-std::optional<CtorInitializerKind>
+static std::optional<CtorInitializerKind>
 determineCtorInitializerKind(const clang::ObjCMethodDecl *method) {
   const clang::ObjCInterfaceDecl *interface = method->getClassInterface();
 
@@ -854,11 +845,7 @@ static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
     return false;
   }
 
-  if (determineFactoryInitializerKind(method))
-    return true;
-
-  // Not imported as an initializer.
-  return false;
+  return static_cast<bool>(determineFactoryInitializerKind(method));
 }
 
 /// Attempt to omit needless words from the given function name.
@@ -1059,7 +1046,7 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
   if (clangSema.LookupName(lookupResult, /*scope=*/clangSema.TUScope,
                            /*AllowBuiltinCreation=*/false,
                            /*ForceNoCPlusPlus=*/!clangSema.TUScope)) {
-    if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
+    if (llvm::any_of(lookupResult, conflicts))
       return true;
   }
 
@@ -1069,7 +1056,7 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
           .isCPlusPlus()) {
     lookupResult.clear(clang::Sema::LookupTagName);
     if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
-      if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
+      if (llvm::any_of(lookupResult, conflicts))
         return true;
     }
   }
@@ -1196,13 +1183,12 @@ NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
       // If there was a conflict on the first argument, and this was
       // the first argument and we're not stripping error suffixes, just
       // give up completely on error import.
-      if (index == 0 && suffixToStrip.empty()) {
+      if (index == 0 && suffixToStrip.empty())
         return std::nullopt;
-
-        // If there was a conflict stripping an error suffix, adjust the
-        // name but don't change the base name.  This avoids creating a
-        // spurious _: () argument.
-      } else if (index == 0 && !suffixToStrip.empty()) {
+      // If there was a conflict stripping an error suffix, adjust the
+      // name but don't change the base name.  This avoids creating a
+      // spurious _: () argument.
+      if (index == 0 && !suffixToStrip.empty()) {
         suffixToStrip = {};
         baseName = origBaseName;
 
@@ -1491,21 +1477,21 @@ static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
 static void
 addDefaultArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
                                    SmallVectorImpl<StringRef> &argumentNames) {
-  for (size_t i = 0; i < funcDecl->param_size(); ++i) {
-    if (funcDecl->getParamDecl(i)->getType()->isRValueReferenceType())
+  for (auto *param : funcDecl->parameters()) {
+    if (param->getType()->isRValueReferenceType())
       argumentNames.push_back("consuming");
     else
-      argumentNames.push_back(StringRef());
+      argumentNames.emplace_back();
   }
   if (funcDecl->isVariadic())
-    argumentNames.push_back(StringRef());
+    argumentNames.emplace_back();
 }
 
 static StringRef renameUnsafeMethod(ASTContext &ctx,
                                     const clang::NamedDecl *decl,
                                     StringRef name) {
   if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl}), {})) {
+      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl, ctx}), {})) {
     return ctx.getIdentifier(("__" + name + "Unsafe").str()).str();
   }
 
@@ -1796,7 +1782,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   if (auto field = dyn_cast<clang::FieldDecl>(D)) {
     static_assert((clang::Decl::lastField - clang::Decl::firstField) == 2,
                   "update logic for new FieldDecl subclasses");
-    if (isa<clang::ObjCIvarDecl>(D) || isa<clang::ObjCAtDefsFieldDecl>(D))
+    if (isa<clang::ObjCIvarDecl, clang::ObjCAtDefsFieldDecl>(D))
       // These are not ordinary fields and are not imported into Swift.
       return result;
 
@@ -1954,6 +1940,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     if (!functionDecl)
       return ImportedName();
+
+    // We do not import && qualified operators yet.
+    if (const auto *method = dyn_cast<clang::CXXMethodDecl>(functionDecl)) {
+      if (method->getRefQualifier() == clang::RefQualifierKind::RQ_RValue)
+        return ImportedName();
+    }
 
     switch (op) {
     case clang::OverloadedOperatorKind::OO_Plus:
@@ -2130,7 +2122,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     for (unsigned index = 0; index != numArgs; ++index) {
       if (index == 0) {
-        argumentNames.push_back(StringRef());
+        argumentNames.emplace_back();
       } else {
         StringRef argName = selector.getNameForSlot(index);
         argumentNames.push_back(argName);
@@ -2298,28 +2290,48 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   SmallString<16> newName;
   // Check if we need to rename the C++ method to disambiguate it.
   if (auto method = dyn_cast<clang::CXXMethodDecl>(D)) {
+    bool shouldAddMutable = false;
+    bool shouldAddConsuming = false;
     if (!method->isConst() && !method->isOverloadedOperator() && !method->isStatic()) {
       // See if any other methods within the same struct have the same name, but
       // differ in constness.
       auto otherDecls = dc->lookup(method->getDeclName());
-      bool shouldRename = false;
       for (auto otherDecl : otherDecls) {
         if (otherDecl == D)
           continue;
         if (auto otherMethod = dyn_cast<clang::CXXMethodDecl>(otherDecl)) {
           // TODO: what if the other method is also non-const?
           if (otherMethod->isConst()) {
-            shouldRename = true;
+            shouldAddMutable = true;
             break;
           }
         }
       }
-
-      if (shouldRename) {
-        newName = baseName;
-        newName += "Mutating";
-        baseName = newName;
+    }
+    if (method->getRefQualifier() == clang::RefQualifierKind::RQ_RValue &&
+        !method->isOverloadedOperator()) {
+      // See if any other methods within the same struct have the same name, but
+      // differ in ref qualifier.
+      auto otherDecls = dc->lookup(method->getDeclName());
+      for (auto otherDecl : otherDecls) {
+        if (otherDecl == D)
+          continue;
+        if (auto otherMethod = dyn_cast<clang::CXXMethodDecl>(otherDecl)) {
+          if (otherMethod->getRefQualifier() ==
+              clang::RefQualifierKind::RQ_LValue) {
+            shouldAddConsuming = true;
+            break;
+          }
+        }
       }
+    }
+    if (shouldAddMutable || shouldAddConsuming) {
+      newName = baseName;
+      if (shouldAddMutable)
+        newName += "Mutating";
+      if (shouldAddConsuming)
+        newName += "Consuming";
+      baseName = newName;
     }
     if (method->isImplicit() &&
         baseName.starts_with("__synthesizedVirtualCall_")) {
@@ -2485,15 +2497,10 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
     return true;
 
   // Consult the list of macros to suppress.
-  auto suppressMacro = llvm::StringSwitch<bool>(name)
+  return llvm::StringSwitch<bool>(name)
 #define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
 #include "MacroTable.def"
                            .Default(false);
-
-  if (suppressMacro)
-    return true;
-
-  return false;
 }
 
 bool ClangImporter::shouldIgnoreMacro(StringRef Name,

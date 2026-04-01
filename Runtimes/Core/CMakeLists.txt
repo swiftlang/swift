@@ -50,6 +50,13 @@ project(SwiftCore
   LANGUAGES C CXX Swift
   VERSION ${SWIFT_RUNTIME_VERSION})
 
+if(CMAKE_VERSION VERSION_LESS 3.31)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Generic" AND CMAKE_SYSTEM_PROCESSOR MATCHES wasm32)
+    set(CMAKE_SYSTEM_NAME WASI)
+    set(WASI 1)
+  endif()
+endif()
+
 # The Swift standard library is not intended for use as a sub-library as part of
 # another project. It is tightly coupled with the compiler version.
 if(NOT PROJECT_IS_TOP_LEVEL)
@@ -156,7 +163,10 @@ add_compile_definitions(
   $<$<BOOL:${SwiftCore_HAS_DARWIN_LIBMALLOC}>:-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC> # Anything that includes include/swift/Runtime/Config.h
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_THREADING_${SwiftCore_THREADING_PACKAGE}>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER=$<BOOL:${SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER}>>
-  $<$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS>)
+  $<$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS>
+  $<$<AND:$<PLATFORM_ID:WASI>,$<COMPILE_LANGUAGE:C,CXX>>:-D_WASI_EMULATED_MMAN>
+  $<$<AND:$<PLATFORM_ID:WASI>,$<COMPILE_LANGUAGE:C,CXX>>:-D_WASI_EMULATED_PROCESS_CLOCKS>
+  $<$<AND:$<PLATFORM_ID:WASI>,$<COMPILE_LANGUAGE:C,CXX>>:-D_WASI_EMULATED_SIGNAL>)
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
@@ -182,6 +192,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:-disable-autolinking-runtime-compatibility-dynamic-replacements>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-strict-memory-safety>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Werror StrictMemorySafety>"
   "$<$<AND:$<BOOL:${SwiftCore_OPTIMIZATION_REMARKS}>,$<COMPILE_LANGUAGE:Swift>>:-save-optimization-record=${SwiftCore_OPTIMIZATION_REMARKS}>"
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
@@ -195,6 +206,8 @@ add_compile_options(
   "$<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+find_package(SwiftSwiftDirectRuntime)
 
 include(ExperimentalFeatures)
 

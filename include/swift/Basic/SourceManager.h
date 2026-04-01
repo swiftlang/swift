@@ -207,8 +207,8 @@ private:
 
 public:
   SourceManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
-                    llvm::vfs::getRealFileSystem())
-    : FileSystem(FS) {}
+                    llvm::vfs::createPhysicalFileSystem())
+      : FileSystem(FS) {}
   ~SourceManager();
 
   llvm::SourceMgr &getLLVMSourceMgr() {
@@ -380,6 +380,9 @@ public:
 
   /// Record the source file as having the given buffer ID.
   void recordSourceFile(unsigned bufferID, SourceFile *sourceFile);
+
+  /// Remove the source file for the given buffer ID from records.
+  void deleteSourceFile(unsigned bufferID);
 
   /// Retrieve the source files for the given buffer ID.
   llvm::TinyPtrVector<SourceFile *>

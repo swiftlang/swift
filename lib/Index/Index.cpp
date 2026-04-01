@@ -75,9 +75,9 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return true;
   }
 
@@ -96,10 +96,10 @@ bool index::printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
   return false;
 }
 
-static bool isMemberwiseInit(swift::ValueDecl *D) {
+static std::optional<MemberwiseInitKind> isMemberwiseInit(swift::ValueDecl *D) {
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
     return AFD->isMemberwiseInitializer();
-  return false;
+  return std::nullopt;
 }
 
 static SourceLoc getLocForExtension(ExtensionDecl *D) {
@@ -722,7 +722,11 @@ private:
       return;
 
     auto *DeclRef = dyn_cast<DeclRefExpr>(cast<ApplyExpr>(E)->getFn());
-    if (!DeclRef || !isMemberwiseInit(DeclRef->getDecl()))
+    if (!DeclRef)
+      return;
+
+    auto initKind = isMemberwiseInit(DeclRef->getDecl());
+    if (!initKind)
       return;
 
     auto *MemberwiseInit = DeclRef->getDecl();
@@ -752,7 +756,8 @@ private:
       return;
 
     unsigned CurLabel = 0;
-    for (auto Prop : TypeContext->getMemberwiseInitProperties()) {
+    auto InitProps = TypeContext->getMemberwiseInitProperties(initKind.value());
+    for (auto Prop : InitProps) {
       if (CurLabel == Args.size())
         break;
 
@@ -1214,6 +1219,8 @@ private:
 
     return false;
   }
+
+  bool shouldWalkIntoForEachDesugaredStmt() override { return true; }
 
   /// Reports all implicit member value decl conformances that \p D introduces
   /// as implicit overrides at the source location of \p D, and returns the

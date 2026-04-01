@@ -31,15 +31,27 @@ __attribute__((swift_attr("release:immortal"))) ImmortalRef {
 using VectorOfImmortalRefPtr = std::vector<ImmortalRef *>;
 
 struct NonCopyable {
-  NonCopyable() = default;
+  NonCopyable(int n) : number(n) {}
   NonCopyable(const NonCopyable &other) = delete;
   NonCopyable(NonCopyable &&other) = default;
   ~NonCopyable() {}
+  int number;
 };
 
 using VectorOfNonCopyable = std::vector<NonCopyable>;
 using VectorOfPointer = std::vector<NonCopyable *>;
 
+<<<<<<< HEAD
+=======
+VectorOfNonCopyable makeVectorOfNonCopyable() {
+  VectorOfNonCopyable vec;
+  vec.emplace_back(1);
+  vec.emplace_back(2);
+  vec.emplace_back(3);
+  return vec;
+}
+
+>>>>>>> origin/main
 struct HasVector {
   std::vector<NonCopyable> field;
 };

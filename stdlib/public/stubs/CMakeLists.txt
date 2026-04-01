@@ -51,4 +51,5 @@ if("${SWIFT_PRIMARY_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
                  "-fobjc-arc")
 endif()
 
+add_subdirectory(Exclusivity)
 add_subdirectory(Unicode)

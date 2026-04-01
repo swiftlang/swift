@@ -1027,6 +1027,51 @@ TuplePackExpansionInitialization::getElementAddress(SILGenFunction &SGF,
   return SGF.B.createTuplePackElementAddr(loc, packIndex, TupleAddr, eltAddrTy);
 }
 
+void
+SILGenFunction::emitPackForEach(SILLocation loc,
+                                ManagedValue inputPackMV,
+                                CanPackType inputFormalPackType,
+                                unsigned inputComponentIndex,
+                                GenericEnvironment *openedEnv,
+                                SILType inputEltTy,
+               llvm::function_ref<void(SILValue indexWithinComponent,
+                                       SILValue packExpansionIndex,
+                                       ManagedValue inputElt)> emitBody) {
+  // Deactivate the cleanup on the pack expansion component, but
+  // remember how to clone it for the elements later.
+  CleanupCloner inputCloner(*this, inputPackMV);
+  bool inputHasCleanup = inputPackMV.hasCleanup();
+  auto inputPackAddr = inputPackMV.forward(*this);
+
+  emitDynamicPackLoop(loc, inputFormalPackType, inputComponentIndex, openedEnv,
+      []() -> SILBasicBlock * { return nullptr; },
+      [&](SILValue indexWithinComponent,
+          SILValue packExpansionIndex,
+          SILValue inputPackIndex) {
+    // Enter a partial cleanup for the remaining elements of the input
+    // expansion component.
+    CleanupHandle remainingInputEltsCleanup = CleanupHandle::invalid();
+    if (inputHasCleanup) {
+      remainingInputEltsCleanup =
+        enterPartialDestroyRemainingPackCleanup(
+          inputPackAddr, inputFormalPackType, inputComponentIndex,
+          indexWithinComponent);
+    }
+
+    // Retrieve the input value from the pack and manage it.
+    auto inputEltAddr =
+      B.createPackElementGet(loc, inputPackIndex, inputPackAddr, inputEltTy);
+    ManagedValue inputElt = inputCloner.clone(inputEltAddr);
+
+    // Emit the body.
+    emitBody(indexWithinComponent, packExpansionIndex, inputElt);
+
+    // Deactivate the partial cleanup.
+    if (remainingInputEltsCleanup.isValid())
+      Cleanups.forwardCleanup(remainingInputEltsCleanup);
+  });
+}
+
 ManagedValue
 SILGenFunction::emitPackTransform(SILLocation loc,
                                   ManagedValue inputPackMV,
@@ -1046,11 +1091,7 @@ SILGenFunction::emitPackTransform(SILLocation loc,
   assert((isSimpleProjection || canForwardOutput) &&
          "we cannot support complex transformations that yield borrows");
 
-  CleanupCloner inputCloner(*this, inputPackMV);
-  bool inputHasCleanup = inputPackMV.hasCleanup();
-  auto inputPackAddr = inputPackMV.forward(*this);
-
-  auto inputPackTy = inputPackAddr->getType().castTo<SILPackType>();
+  auto inputPackTy = inputPackMV.getType().castTo<SILPackType>();
   assert(inputPackTy->getNumElements() ==
            inputFormalPackType->getNumElements());
   auto inputComponentTy = inputPackTy->getSILElementType(inputComponentIndex);
@@ -1080,22 +1121,12 @@ SILGenFunction::emitPackTransform(SILLocation loc,
     outputTupleAddr = emitTemporaryAllocation(loc, outputTupleTy);
   }
 
-  emitDynamicPackLoop(loc, inputFormalPackType, inputComponentIndex, openedEnv,
-      []() -> SILBasicBlock * { return nullptr; },
-      [&](SILValue indexWithinComponent,
-          SILValue packExpansionIndex,
-          SILValue inputPackIndex) {
-    // Enter a cleanup for the remaining elements of the input
-    // expansion component.
-    CleanupHandle remainingInputEltsCleanup = CleanupHandle::invalid();
-    if (inputHasCleanup) {
-      remainingInputEltsCleanup =
-        enterPartialDestroyRemainingPackCleanup(
-          inputPackAddr, inputFormalPackType, inputComponentIndex,
-          indexWithinComponent);
-    }
-
-    // Enter a cleanup for the previous elements of the output
+  emitPackForEach(loc, inputPackMV, inputFormalPackType, inputComponentIndex,
+                  openedEnv, inputEltTy,
+                  [&](SILValue indexWithinComponent,
+                      SILValue packExpansionIndex,
+                      ManagedValue inputElt) {
+    // Enter a partial cleanup for the previous elements of the output
     // expansion component.
     CleanupHandle previousOutputEltsCleanup = CleanupHandle::invalid();
     if (outputNeedsCleanup) {
@@ -1116,16 +1147,11 @@ SILGenFunction::emitPackTransform(SILLocation loc,
       outputEltInit = useBufferAsTemporary(outputEltAddr, outputEltTL);
     }
 
-    // Retrieve the input value from the pack and manage it.
-    auto inputEltAddr =
-      B.createPackElementGet(loc, inputPackIndex, inputPackAddr, inputEltTy);
-    ManagedValue inputElt = inputCloner.clone(inputEltAddr);
-
     // Apply the transform.
     ManagedValue outputElt =
       emitBody(inputElt, outputEltTy,
                canForwardOutput ? SGFContext(outputEltInit.get())
-                               : SGFContext::AllowGuaranteedPlusZero);
+                                : SGFContext::AllowGuaranteedPlusZero);
     assert(canForwardOutput == (outputElt.isInContext() ||
                                outputElt.isPlusOneOrTrivial(*this)) &&
            "transformation produced a value of the wrong ownership");
@@ -1156,9 +1182,7 @@ SILGenFunction::emitPackTransform(SILLocation loc,
     }
     B.createPackElementSet(loc, outputEltAddr, outputPackIndex, outputPackAddr);
 
-    // Deactivate the partial cleanups.
-    if (remainingInputEltsCleanup.isValid())
-      Cleanups.forwardCleanup(remainingInputEltsCleanup);
+    // Deactivate the partial cleanup.
     if (previousOutputEltsCleanup.isValid())
       Cleanups.forwardCleanup(previousOutputEltsCleanup);
   });

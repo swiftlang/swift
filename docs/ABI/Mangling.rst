@@ -113,9 +113,17 @@ The following symbolic reference kinds are currently implemented:
     objective-c-protocol-relative-reference  ::=  '\x0C'  .{4} // Reference points directly to a objective-c protcol reference
    #endif
 
-A mangled name may also include ``\xFF`` bytes, which are only used for
-alignment padding. They do not affect what the mangled name references and can
-be skipped over and ignored.
+Mangled names that contain relative symbolic references may include ``\xFF``
+bytes for alignment padding purposes. These bytes do not affect what the mangled
+name references and can be skipped over and ignored.
+
+DISCUSSION: A relative symbolic reference encodes a symbol by adding the offset
+integer value contained within the relative symbolic reference to the address in
+memory of the first byte of the relative symbolic reference. The addition of
+padding bytes is used to manipulate the location of that first byte so that the
+address of is already aligned in the same manner as the symbol that is
+ultimately referenced. Thus only an offset must be added to that address instead
+of also needing to consider alignment differences.
 
 Globals
 ~~~~~~~
@@ -271,7 +279,9 @@ types where the metadata itself has unknown layout.)
   global ::= assoc-type-name 'Tl'        // associated type descriptor
   global ::= assoc-type-name 'TM'        // default associated type witness accessor (HISTORICAL)
   global ::= type assoc-type-list protocol 'Tn' // associated conformance descriptor
+  global ::= type type protocol 'Tn'            // associated conformance descriptor (with generic type parameter as subject)
   global ::= type assoc-type-list protocol 'TN' // default associated conformance witness accessor
+  global ::= type type protocol 'TN'            // default associated conformance witness accessor (with generic type parameter as subject)
   global ::= type protocol 'Tb'          // base conformance descriptor
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk
@@ -400,9 +410,9 @@ Entities
   ACCESSOR ::= 'l' ADDRESSOR-KIND            // non-mutable addressor
   ACCESSOR ::= 'p'                           // pseudo accessor referring to the storage itself
   ACCESSOR ::= 'x'                           // modify
-  ACCESSOR ::= 'y'                           // read
+  ACCESSOR ::= 'y'                           // 'yielding borrow' (formerly `read`)
   ACCESSOR ::= 'b'                           // borrow
-  ACCESSOR ::= 'z'                           // mutate
+  ACCESSOR ::= 'z'                           // `yielding modify' (formerly `mutate`)
 
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner), not used anymore

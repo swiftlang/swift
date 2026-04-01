@@ -36,9 +36,36 @@ public protocol Executor: AnyObject, Sendable {
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
+<<<<<<< HEAD
 }
 
 @_spi(ExperimentalScheduling)
+=======
+  #if os(WASI) || !$Embedded
+  /// `true` if this is the main executor.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
+  @available(StdlibDeploymentTarget 6.3, *)
+  var isMainExecutor: Bool { get }
+  #endif // os(WASI) || !$Embedded
+
+  #if !$Embedded
+  /// Return this executable as a SchedulingExecutor, or nil if that is
+  /// unsupported.
+  ///
+  /// Executors that implement SchedulingExecutor should provide their
+  /// own copy of this method, which will allow the compiler to avoid a
+  /// potentially expensive runtime cast.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
+  @available(StdlibDeploymentTarget 6.3, *)
+  var asSchedulingExecutor: (any SchedulingExecutor)? { get }
+  #endif
+}
+
+>>>>>>> origin/main
 @available(StdlibDeploymentTarget 6.3, *)
 public protocol SchedulingExecutor: Executor {
 
@@ -123,8 +150,16 @@ extension Executor {
   /// Executors that implement SchedulingExecutor should provide their
   /// own copy of this method, which will allow the compiler to avoid a
   /// potentially expensive runtime cast.
+<<<<<<< HEAD
   @available(StdlibDeploymentTarget 6.3, *)
   internal var asSchedulingExecutor: (any SchedulingExecutor)? {
+=======
+  #if !os(Windows)
+  @_weakLinked
+  #endif
+  @available(StdlibDeploymentTarget 6.3, *)
+  public var asSchedulingExecutor: (any SchedulingExecutor)? {
+>>>>>>> origin/main
     return self as? SchedulingExecutor
   }
   #endif
@@ -148,6 +183,7 @@ extension Executor {
   #if os(WASI) || !$Embedded
   // This defaults to `false` so that existing third-party Executor
   // implementations will work as expected.
+<<<<<<< HEAD
   @available(StdlibDeploymentTarget 6.3, *)
   internal var isMainExecutor: Bool {
     #if os(WASI) || !$Embedded
@@ -156,12 +192,22 @@ extension Executor {
     return false
     #endif
   }
+=======
+  #if !os(Windows)
+  @_weakLinked
+  #endif
+  @available(StdlibDeploymentTarget 6.3, *)
+  public var isMainExecutor: Bool { false }
+>>>>>>> origin/main
   #endif // os(WASI) || !$Embedded
 
 }
 
 // Delay support
+<<<<<<< HEAD
 @_spi(ExperimentalScheduling)
+=======
+>>>>>>> origin/main
 @available(StdlibDeploymentTarget 6.3, *)
 extension SchedulingExecutor {
 
@@ -487,14 +533,17 @@ extension Executor {
   // Delegation goes like this:
   // Unowned Job -> Executor Job -> Job -> ---||---
 
+  @inlinable
   public func enqueue(_ job: UnownedJob) {
     self.enqueue(ExecutorJob(job))
   }
 
+  @inlinable
   public func enqueue(_ job: consuming ExecutorJob) {
     self.enqueue(Job(job))
   }
 
+  @inlinable
   public func enqueue(_ job: consuming Job) {
     self.enqueue(UnownedJob(job))
   }
@@ -812,8 +861,8 @@ public struct UnownedSerialExecutor: Sendable {
     // any SerialExecutor needs a raw witness table pointer, so mask off the low
     // bits, knowing the witness table pointer is aligned to the pointer size.
     let rawExecutorData = unsafe unsafeBitCast(executor, to: (UInt, UInt).self)
-    let mask = ~(UInt(MemoryLayout<UnsafeRawPointer>.alignment) - 1)
-    let alignedExecutor = unsafe (rawExecutorData.0, rawExecutorData.1 & mask)
+    let mask = unsafe ~(UInt(MemoryLayout<UnsafeRawPointer>.alignment) - 1)
+    let alignedExecutor = (rawExecutorData.0, rawExecutorData.1 & mask)
     return unsafe unsafeBitCast(alignedExecutor, to: (any SerialExecutor)?.self)
   }
 }

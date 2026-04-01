@@ -1,12 +1,10 @@
-// RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature AnyAppleOSAvailability -target %target-cpu-apple-macos26 -verify-additional-prefix apple- -verify-additional-prefix macos-
-// RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature AnyAppleOSAvailability -target %target-cpu-apple-ios26 -verify-additional-prefix apple- -verify-additional-prefix ios-
-// RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature AnyAppleOSAvailability -target %target-cpu-apple-watchos26 -verify-additional-prefix apple- -verify-additional-prefix watchos-
-// RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature AnyAppleOSAvailability -target %target-cpu-apple-tvos26 -verify-additional-prefix apple- -verify-additional-prefix tvos-
-// RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature AnyAppleOSAvailability -target %target-cpu-apple-visionos26 -verify-additional-prefix apple- -verify-additional-prefix visionos-
-// RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature AnyAppleOSAvailability -target x86_64-unknown-linux-gnu
-// RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature AnyAppleOSAvailability -target x86_64-unknown-windows-msvc
-
-// REQUIRES: swift_feature_AnyAppleOSAvailability
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target %target-cpu-apple-macos26 -verify-additional-prefix apple- -verify-additional-prefix macos-
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target %target-cpu-apple-ios26 -verify-additional-prefix apple- -verify-additional-prefix ios-
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target %target-cpu-apple-watchos26 -verify-additional-prefix apple- -verify-additional-prefix watchos-
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target %target-cpu-apple-tvos26 -verify-additional-prefix apple- -verify-additional-prefix tvos-
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target %target-cpu-apple-visionos26 -verify-additional-prefix apple- -verify-additional-prefix visionos-
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target x86_64-unknown-linux-gnu
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target x86_64-unknown-windows-msvc
 
 @available(anyAppleOS 26.1, *)
 func availableInAnyAppleOS26_1() { }
@@ -31,8 +29,25 @@ func availableInMacOS26_1AndAnyAppleOS26() { }
 @available(macOS 26.1, iOS 26.1, watchOS 26.1, tvOS 26.1, visionOS 26.1, *)
 func availableInEveryAppleOS26_1() { }
 
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(watchOS, unavailable)
+@available(tvOS, unavailable)
+@available(visionOS, unavailable)
+func unavailableInEveryAppleOS() {
+  availableInAnyAppleOS26_1()
+  availableInMacOS26_1AndAnyAppleOS26()
+  availableInEveryAppleOS26_1()
+  unavailableInAnyAppleOS()
+}
+
 @available(anyAppleOS, unavailable)
-func unavailableInAnyAppleOS() { } // expected-apple-note {{'unavailableInAnyAppleOS()' has been explicitly marked unavailable here}}
+func unavailableInAnyAppleOS() { // expected-apple-note {{'unavailableInAnyAppleOS()' has been explicitly marked unavailable here}}
+  availableInAnyAppleOS26_1()
+  availableInMacOS26_1AndAnyAppleOS26()
+  availableInEveryAppleOS26_1()
+  unavailableInEveryAppleOS()
+}
 
 // FIXME: [availability] Ensure the fix-it suggests @available(anyAppleOS ...) rdar://163819878
 func availableAtDeploymentTarget() {

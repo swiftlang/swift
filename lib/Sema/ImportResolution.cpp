@@ -929,8 +929,8 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                              diag::implementation_only_deprecated);
         inFlight.fixItReplace(import.implementationOnlyRange, "internal");
       }
-    } else if ( // Non-resilient client
-        !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
+    } else if (!ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
+               !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
             targetName.str(), importerName.str())) {
       ctx.Diags.diagnose(import.importLoc,
                          diag::implementation_only_requires_library_evolution,

@@ -224,10 +224,10 @@ public struct Builder {
     return createIntegerLiteral(integerValue, type: boolType)
   }
 
-  public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false,
+  public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false, isNested: Bool = false,
                              tailAllocatedTypes: TypeArray, tailAllocatedCounts: [Value]) -> AllocRefInst {
     return tailAllocatedCounts.withBridgedValues { countsRef in
-      let dr = bridged.createAllocRef(type.bridged, isObjC, canAllocOnStack, isBare, tailAllocatedTypes.bridged, countsRef)
+      let dr = bridged.createAllocRef(type.bridged, isObjC, canAllocOnStack, isBare, isNested, tailAllocatedTypes.bridged, countsRef)
       return notifyNew(dr.getAs(AllocRefInst.self))
     }
   }
@@ -460,8 +460,8 @@ public struct Builder {
   }
 
   @discardableResult
-  public func createDestroyValue(operand: Value) -> DestroyValueInst {
-    return notifyNew(bridged.createDestroyValue(operand.bridged).getAs(DestroyValueInst.self))
+  public func createDestroyValue(operand: Value, isDeadEnd: Bool = false) -> DestroyValueInst {
+    return notifyNew(bridged.createDestroyValue(operand.bridged, isDeadEnd).getAs(DestroyValueInst.self))
   }
 
   @discardableResult
@@ -472,6 +472,11 @@ public struct Builder {
   @discardableResult
   public func createEndLifetime(of value: Value) -> EndLifetimeInst {
     return notifyNew(bridged.createEndLifetime(value.bridged).getAs(EndLifetimeInst.self))
+  }
+
+  @discardableResult
+  public func createExtendLifetime(of value: Value) -> ExtendLifetimeInst {
+    return notifyNew(bridged.createExtendLifetime(value.bridged).getAs(ExtendLifetimeInst.self))
   }
 
   @discardableResult
@@ -573,6 +578,17 @@ public struct Builder {
     return notifyNew(enumInst.getAs(EnumInst.self))
   }
 
+  public static let optionalNoneCaseIndex = 0
+  public static let optionalSomeCaseIndex = 1
+
+  public func createOptionalNone(type: Type) -> EnumInst {
+    return createEnum(caseIndex: Self.optionalNoneCaseIndex, payload: nil, enumType: type)
+  }
+
+  public func createOptionalSome(operand: Value, type: Type) -> EnumInst {
+    return createEnum(caseIndex: Self.optionalSomeCaseIndex, payload: operand, enumType: type)
+  }
+
   public func createThinToThickFunction(thinFunction: Value, resultType: Type) -> ThinToThickFunctionInst {
     let tttf = bridged.createThinToThickFunction(thinFunction.bridged, resultType.bridged)
     return notifyNew(tttf.getAs(ThinToThickFunctionInst.self))
@@ -584,10 +600,13 @@ public struct Builder {
     capturedArguments: [Value], 
     calleeConvention: ArgumentConvention, 
     hasUnknownResultIsolation: Bool, 
-    isOnStack: Bool
+    isOnStack: Bool,
+    /// If true this `partial_apply [on_stack]` must follow proper stack allocation nesting rules.
+    isNested: Bool
   ) -> PartialApplyInst {
     return capturedArguments.withBridgedValues { capturedArgsRef in
-      let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged, substitutionMap.bridged, hasUnknownResultIsolation, isOnStack)
+      let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged,
+                                           substitutionMap.bridged, hasUnknownResultIsolation, isOnStack, isNested)
       return notifyNew(pai.getAs(PartialApplyInst.self))
     }
   }
@@ -831,14 +850,41 @@ public struct Builder {
     let convertFunction = bridged.createConvertEscapeToNoEscape(originalFunction.bridged, resultType.bridged, isLifetimeGuaranteed)
     return notifyNew(convertFunction.getAs(ConvertEscapeToNoEscapeInst.self))
   }
-}
 
+  public func createMakeBorrow(referent: Value) -> MakeBorrowInst {
+    let makeBorrow = bridged.createMakeBorrow(referent.bridged)
+    return notifyNew(makeBorrow.getAs(MakeBorrowInst.self))
+  }
+
+  public func createMakeAddrBorrow(referent: Value) -> MakeAddrBorrowInst {
+    let makeAddrBorrow = bridged.createMakeAddrBorrow(referent.bridged)
+    return notifyNew(makeAddrBorrow.getAs(MakeAddrBorrowInst.self))
+  }
+
+  @discardableResult
+  public func createFixLifetime(operand: Value) -> FixLifetimeInst {
+    let fixLifetime = bridged.createFixLifetime(operand.bridged)
+    return notifyNew(fixLifetime.getAs(FixLifetimeInst.self))
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //                                  Utilities
 //===----------------------------------------------------------------------===//
 
 extension Builder {
+  public func emitLoadBorrow(fromAddress: Value) -> LoadInstruction {
+    if !fromAddress.parentFunction.hasOwnership {
+      return createLoad(fromAddress: fromAddress, ownership: .unqualified)
+    }
+
+    if fromAddress.type.isTrivial(in: fromAddress.parentFunction) {
+      return createLoad(fromAddress: fromAddress, ownership: .trivial)
+    }
+
+    return createLoadBorrow(fromAddress: fromAddress)
+  }
+
   public func emitDestroy(of value: Value) {
     if value.type.isTrivial(in: value.parentFunction) {
       return

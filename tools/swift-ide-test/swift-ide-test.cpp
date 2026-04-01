@@ -839,6 +839,11 @@ static llvm::cl::opt<std::string>
                       llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
+    DisableSafeInterop("disable-safe-interop-wrappers",
+                       llvm::cl::desc("Disable safe interop wrappers."),
+                       llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
     CxxInteropGettersSettersAsProperties("cxx-interop-getters-setters-as-properties",
         llvm::cl::desc("Imports getters and setters as computed properties."),
         llvm::cl::cat(Category), llvm::cl::init(false));
@@ -1169,7 +1174,7 @@ static bool performWithCompletionLikeOperationParams(
 
   CompletionLikeOperationParams Params{Invocation,
                                        /*Args=*/{},
-                                       llvm::vfs::getRealFileSystem(),
+                                       llvm::vfs::createPhysicalFileSystem(),
                                        CompletionBuffer.get(),
                                        Offset,
                                        CodeCompletionDiagnostics ? &PrintDiags
@@ -1709,7 +1714,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
   }
 
   CompilerInvocation Invocation(InitInvok);
-  auto FileSystem = llvm::vfs::getRealFileSystem();
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem =
+      llvm::vfs::createPhysicalFileSystem();
 
   IDEInspectionInstance IDEInspectionInst(std::make_shared<PluginRegistry>());
 
@@ -3140,7 +3146,7 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
     }
     {
       GroupNamesPrinter Printer(llvm::outs());
-      llvm::SmallVector<Decl*, 256> Results;
+      llvm::SmallVector<Decl*> Results;
       swift::getTopLevelDeclsForDisplay(M, Results);
       for (auto R : Results) {
         Printer.addDecl(R);
@@ -3626,13 +3632,13 @@ public:
       case AccessorKind::Read:
         OS << "<read accessor for ";
         break;
-      case AccessorKind::Read2:
+      case AccessorKind::YieldingBorrow:
         OS << "<read2 accessor for ";
         break;
       case AccessorKind::Modify:
         OS << "<modify accessor for ";
         break;
-      case AccessorKind::Modify2:
+      case AccessorKind::YieldingMutate:
         OS << "<modify2 accessor for ";
         break;
       case AccessorKind::Init:
@@ -4579,6 +4585,9 @@ int main(int argc, char *argv[]) {
 
   InitInvok.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
 
+  if (options::DisableSafeInterop)
+    InitInvok.getLangOptions().DisableSafeInteropWrappers = true;
+
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 
@@ -4626,22 +4635,8 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableObjCInterop =
         llvm::Triple(options::Triple).isOSDarwin();
   }
-  if (options::EnableCxxInterop) {
+  if (options::EnableCxxInterop || !options::CxxInteropVersion.empty()) {
     InitInvok.getLangOptions().EnableCXXInterop = true;
-  }
-  if (!options::CxxInteropVersion.empty()) {
-    InitInvok.getLangOptions().EnableCXXInterop = true;
-    if (options::CxxInteropVersion == "upcoming-swift")
-      InitInvok.getLangOptions().cxxInteropCompatVersion =
-          version::Version({version::getUpcomingCxxInteropCompatVersion()});
-    else if (options::CxxInteropVersion == "swift-6")
-      InitInvok.getLangOptions().cxxInteropCompatVersion =
-          version::Version({6});
-    else if (options::CxxInteropVersion == "swift-5.9")
-      InitInvok.getLangOptions().cxxInteropCompatVersion =
-          version::Version({5, 9});
-    else
-      llvm::errs() << "invalid CxxInteropVersion\n";
   }
   if (options::CxxInteropGettersSettersAsProperties) {
     InitInvok.getLangOptions().CxxInteropGettersSettersAsProperties = true;

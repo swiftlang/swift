@@ -109,6 +109,7 @@ UNINTERESTING_FEATURE(ImplicitSome)
 UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
 UNINTERESTING_FEATURE(GenerateBindingsForThrowingFunctionsInCXX)
+UNINTERESTING_FEATURE(DeprecateCompatMemberwiseInit)
 UNINTERESTING_FEATURE(ReferenceBindings)
 UNINTERESTING_FEATURE(BuiltinModule)
 UNINTERESTING_FEATURE(RegionBasedIsolation)
@@ -121,6 +122,7 @@ UNINTERESTING_FEATURE(RawLayout)
 UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
+UNINTERESTING_FEATURE(SuppressedAssociatedTypesWithDefaults)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
@@ -128,6 +130,12 @@ UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
 UNINTERESTING_FEATURE(EmbeddedExistentials)
+UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
+UNINTERESTING_FEATURE(TypedAllocation)
+
+static bool usesFeatureUnderscoreOwned(Decl *D) {
+  return D->getAttrs().hasAttribute<OwnedAttr>();
+}
 
 // TODO: Return true for inlinable function bodies with module selectors in them
 UNINTERESTING_FEATURE(ModuleSelector)
@@ -141,12 +149,25 @@ static bool usesFeatureInlineArrayTypeSugar(Decl *D) {
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
 UNINTERESTING_FEATURE(ManualOwnership)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
-UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(SendingArgsAndResults)
 UNINTERESTING_FEATURE(CheckImplementationOnly)
 UNINTERESTING_FEATURE(CheckImplementationOnlyStrict)
+UNINTERESTING_FEATURE(EnforceSPIOperatorGroup)
 
+<<<<<<< HEAD
+=======
+static bool usesFeatureCAttribute(Decl *decl) {
+  for (auto attr : decl->getAttrs()) {
+    if (auto cdeclAttr = dyn_cast<CDeclAttr>(attr))
+      if (!cdeclAttr->Underscored)
+        return true;
+  }
+
+  return false;
+}
+
+>>>>>>> origin/main
 static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
   auto hasLifetimeAttr = [&](Decl *decl) {
     if (!decl->getAttrs().hasAttribute<LifetimeAttr>()) {
@@ -214,6 +235,59 @@ static bool usesFeatureLifetimes(Decl *decl) {
     return !varDecl->getTypeInContext()->isEscapable();
   }
   return false;
+<<<<<<< HEAD
+=======
+}
+
+static bool hasLifetimeDependencies(Type type) {
+  if (auto *aft = type->getAs<AnyFunctionType>()) {
+    return aft->hasExplicitLifetimeDependencies();
+  }
+  return false;
+}
+
+/// Search for any types within decl with lifetime dependencies. Ignore
+/// lifetimes on AbstractFunctionDecl decls, since those are supported by the
+/// Lifetimes feature, not ClosureLifetimes.
+static bool findClosureLifetimes(Decl *decl) {
+  // Search for any Decl that uses a type with lifetime dependencies, possibly
+  // restricting this to explicit dependencies.
+  class ClosureLifetimesWalker : public ASTWalker {
+
+  public:
+    bool useFound = false;
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+        // Check the parameters and result, but not the AFD itself, since
+        // lifetimes on AFDs are supported by the Lifetimes feature.
+        Type resultType =
+            afd->getInterfaceType()->getAs<AnyFunctionType>()->getResult();
+        useFound = resultType.findIf(hasLifetimeDependencies);
+        return Action::StopIf(useFound);
+      }
+
+      // Check for lifetime dependence info on param and type decls.
+      if (isa<ParamDecl>(D) || isa<TypeDecl>(D)) {
+        useFound = usesTypeMatching(D, hasLifetimeDependencies);
+        return Action::StopIf(useFound);
+      }
+
+      // Any other Decl kinds are irrelevant.
+      return Action::SkipChildren();
+    }
+  };
+
+  ClosureLifetimesWalker walker;
+  decl->walk(walker);
+  return walker.useFound;
+}
+
+static bool usesFeatureClosureLifetimes(Decl *decl) {
+  // This will find function types with lifetimes & closures with lifetimes,
+  // since it walks the AST rooted at decl, checking types.
+  return findClosureLifetimes(decl);
+>>>>>>> origin/main
 }
 
 static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
@@ -306,7 +380,6 @@ UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
 UNINTERESTING_FEATURE(Sensitive)
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
-UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
 UNINTERESTING_FEATURE(TrailingComma)
 UNINTERESTING_FEATURE(RawIdentifiers)
 UNINTERESTING_FEATURE(InferIsolatedConformances)
@@ -334,13 +407,13 @@ static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureSourceWarningControl(Decl *decl) {
+  return decl->getAttrs().hasAttribute<WarnAttr>();
+}
+
 static bool usesFeatureCompileTimeValues(Decl *decl) {
   return decl->getAttrs().hasAttribute<ConstValAttr>() ||
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
-}
-
-static bool usesFeatureCompileTimeValuesPreview(Decl *decl) {
-  return false;
 }
 
 static bool usesFeatureClosureBodyMacro(Decl *decl) {
@@ -351,11 +424,25 @@ static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
   return false;
 }
 
+<<<<<<< HEAD
+=======
+static bool usesFeatureBuiltinTaskCancellationShield(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinAddTaskLocalValue(Decl *decl) {
+  return false;
+}
+
+UNINTERESTING_FEATURE(CompileTimeValuesPreview)
+UNINTERESTING_FEATURE(LiteralExpressions)
+>>>>>>> origin/main
 UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(LibraryEvolution)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
+UNINTERESTING_FEATURE(ImportCxxMembersLazily)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -380,6 +467,7 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 UNINTERESTING_FEATURE(CustomAvailability)
+UNINTERESTING_FEATURE(BuiltinMarkDependence)
 
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.
@@ -460,8 +548,28 @@ UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)
 UNINTERESTING_FEATURE(AddressOfProperty2)
 UNINTERESTING_FEATURE(ImmutableWeakCaptures)
-// Ignore borrow and mutate accessors until it is used in the standard library.
-UNINTERESTING_FEATURE(BorrowAndMutateAccessors)
+UNINTERESTING_FEATURE(BorrowingForLoop)
+
+static bool usesFeatureBorrowAndMutateAccessors(Decl *decl) {
+  auto accessorDeclUsesFeatureBorrowAndMutateAccessors =
+      [](AccessorDecl *accessor) {
+        return requiresFeatureBorrowAndMutateAccessors(
+            accessor->getAccessorKind());
+      };
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(),
+                        accessorDeclUsesFeatureBorrowAndMutateAccessors);
+  }
+  case DeclKind::Accessor: {
+    auto *accessor = cast<AccessorDecl>(decl);
+    return accessorDeclUsesFeatureBorrowAndMutateAccessors(accessor);
+  }
+  default:
+    return false;
+  }
+}
 
 static bool usesFeatureInlineAlways(Decl *decl) {
   if (auto *inlineAttr = decl->getAttrs().getAttribute<InlineAttr>()) {
@@ -492,7 +600,24 @@ static bool usesFeatureTildeSendable(Decl *decl) {
       });
 }
 
-UNINTERESTING_FEATURE(AnyAppleOSAvailability)
+static bool usesFeatureReparenting(Decl *decl) {
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (proto->getAttrs().hasAttribute<ReparentableAttr>())
+      return true;
+  }
+
+  InheritedTypes inherited(decl);
+  for (auto const &entry : inherited.getEntries()) {
+    if (entry.isReparented())
+      return true;
+  }
+
+  return false;
+}
+
+UNINTERESTING_FEATURE(StrictAccessControl)
+UNINTERESTING_FEATURE(BorrowInout)
+UNINTERESTING_FEATURE(BorrowingSequence)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

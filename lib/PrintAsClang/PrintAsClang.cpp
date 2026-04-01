@@ -131,7 +131,6 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
       [&] {
         out << "#include <cstdint>\n"
                "#include <cstddef>\n"
-               "#include <cstdbool>\n"
                "#include <cstring>\n";
         out << "#include <stdlib.h>\n";
         out << "#include <new>\n";
@@ -319,9 +318,7 @@ static void collectClangModuleHeaderIncludes(
     }
 
     if (!containingSearchDirPath.empty()) {
-      llvm::SmallString<128> prefixToRemove =
-          llvm::formatv("{0}/", containingSearchDirPath);
-      llvm::sys::path::replace_path_prefix(textualInclude, prefixToRemove, "");
+      llvm::sys::path::replace_path_prefix(textualInclude, containingSearchDirPath, "");
     } else {
       // If we cannot find find the module map on the search path,
       // fallback to including the header using the provided path relative
@@ -358,7 +355,7 @@ static void collectClangModuleHeaderIncludes(
          dir != end && !errorCode; dir.increment(errorCode)) {
 
       if (llvm::StringSwitch<bool>(llvm::sys::path::extension(dir->path()))
-              .Cases(".h", ".H", ".hh", ".hpp", true)
+              .Cases({".h", ".H", ".hh", ".hpp"}, true)
               .Default(false)) {
 
         // Compute path to the header relative to the root of the module
@@ -453,7 +450,18 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
 
     for (auto searchDir = clangHeaderSearchInfo.search_dir_begin();
          searchDir != clangHeaderSearchInfo.search_dir_end(); ++searchDir) {
-      includeDirs.insert(normalizePath(searchDir->getName()));
+      // Header map lookup is not supported for now, so don't add the hmap
+      // paths to the search list.
+      if (searchDir->isHeaderMap())
+          continue;
+
+      // Ensure search directories end in / so that we don't prefix match
+      // against a folder that starts with the same substring.
+      auto path = normalizePath(searchDir->getName());
+      if (!path.ends_with("/"))
+          path.append("/");
+
+      includeDirs.insert(path);
     }
 
     const clang::Module *foundationModule = clangHeaderSearchInfo.lookupModule(
@@ -566,6 +574,8 @@ static void writePostImportPrologue(raw_ostream &os, ModuleDecl &M) {
         "#endif\n"
         "#pragma clang diagnostic ignored \"-Wunknown-pragmas\"\n"
         "#pragma clang diagnostic ignored \"-Wnullability\"\n"
+        "#pragma clang diagnostic ignored "
+        "\"-Warc-bridge-casts-disallowed-in-nonarc\"\n"
         "#pragma clang diagnostic ignored "
         "\"-Wdollar-in-identifier-extension\"\n"
         "#pragma clang diagnostic ignored "

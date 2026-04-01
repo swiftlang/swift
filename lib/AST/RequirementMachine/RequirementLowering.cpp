@@ -862,7 +862,10 @@ void swift::rewriting::realizeInheritedRequirements(
 ///
 /// This request is invoked by RequirementSignatureRequest for each protocol
 /// in the connected component.
-ArrayRef<StructuralRequirement>
+///
+/// The returned array of StructuralRequirements have already had the
+/// InverseRequirements applied to them.
+std::pair<ArrayRef<StructuralRequirement>, ArrayRef<InverseRequirement>>
 StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *proto) const {
   ASSERT(!proto->hasLazyRequirementSignature());
@@ -921,15 +924,17 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     desugarRequirements(result, inverses, errors);
 
     SmallVector<StructuralRequirement, 2> defaults;
-    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
-    applyInverses(ctx, needsDefaultRequirements, inverses, result,
+    SmallVector<Type, 2> expandedGPs;
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result,
+                                       defaults, expandedGPs);
+    applyInverses(ctx, expandedGPs, inverses, result,
                   defaults, errors);
     result.append(defaults);
 
     diagnoseRequirementErrors(ctx, errors,
                               AllowConcreteTypePolicy::NestedAssocTypes);
 
-    return ctx.AllocateCopy(result);
+    return std::make_pair(ctx.AllocateCopy(result), ctx.AllocateCopy(inverses));
   }
 
   // Add requirements for each associated type.
@@ -990,21 +995,27 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   desugarRequirements(result, inverses, errors);
 
   SmallVector<StructuralRequirement, 2> defaults;
+  SmallVector<Type, 2> expandedGPs;
   // We do not expand defaults for invertible protocols themselves.
   // HACK: We don't expand for Sendable either. This shouldn't be needed after
   // Swift 6.0
-  if (!proto->getInvertibleProtocolKind()
-      && !proto->isSpecificProtocol(KnownProtocolKind::Sendable))
-    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
+  if (!proto->getInvertibleProtocolKind() &&
+      !proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result,
+                                       defaults, expandedGPs);
+  } else {
+    // populate with valid subjects for inverses, despite skipping expansion.
+    expandedGPs.assign(needsDefaultRequirements);
+  }
 
-  applyInverses(ctx, needsDefaultRequirements, inverses, result,
+  applyInverses(ctx, expandedGPs, inverses, result,
                 defaults, errors);
   result.append(defaults);
 
   diagnoseRequirementErrors(ctx, errors,
                             AllowConcreteTypePolicy::NestedAssocTypes);
 
-  return ctx.AllocateCopy(result);
+  return std::make_pair(ctx.AllocateCopy(result), ctx.AllocateCopy(inverses));
 }
 
 /// This request primarily emits diagnostics about typealiases and associated
@@ -1090,8 +1101,17 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     if (auto trailing = proto->getTrailingWhereClause())
       return { ", ", trailing->getRequirements().back().getSourceRange().End };
 
+    auto const &inheritedTys = proto->getInherited();
+
     // Inheritance clause.
-    return { " where ", proto->getInherited().getEndLoc() };
+    if (!inheritedTys.empty())
+      return { " where ", inheritedTys.getEndLoc() };
+
+    // Otherwise, there's no nice way to find the end of the protocol's name or
+    // the opening '{', so just give a close approximation.
+    SourceLoc Loc = proto->getNameLoc();
+    Loc = Loc.getAdvancedLocOrInvalid(proto->getName().str().size());
+    return { " where ",  Loc};
   };
 
   // Retrieve the set of requirements that a given associated type declaration
@@ -1230,6 +1250,12 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
           //
           // FIXME: Protocol extensions with noncopyable generics can!
           if (ext->getTrailingWhereClause()) continue;
+
+          // Also ignore extensions defining a reparenting, this request will
+          // infer a same-type requirement upon the entire protocol, whereas
+          // reparented extensions only want the same-type requirement within
+          // the extension's generic environment.
+          if (ext->isForReparenting()) continue;
         }
 
         // We found something.
@@ -1317,4 +1343,27 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
   }
 
   return ctx.AllocateCopy(result);
+}
+
+ArrayRef<InverseRequirement>
+ProtocolInversesRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *proto) const {
+  auto &ctx = proto->getASTContext();
+
+  // If we have a serialized requirement signature, deserialize it and
+  // query it for the inverses.
+  if (proto->hasLazyRequirementSignature()) {
+    SmallVector<Requirement, 2> _ignored;
+    SmallVector<InverseRequirement, 2> result;
+    auto reqSig = proto->getRequirementSignature();
+    reqSig.getRequirementsWithInverses(proto, _ignored, result);
+    return ctx.AllocateCopy(result);
+  }
+
+  // Otherwise, we must avoid building a RequirementSignature, as this query
+  // needs to be safe to ask while building the protocol's RequirementSignature.
+  //
+  // So, use a StructuralRequirementsRequest to get the inverses.
+  return evaluateOrDefault(ctx.evaluator,
+     StructuralRequirementsRequest{proto}, {}).second;
 }

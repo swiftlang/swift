@@ -1,25 +1,22 @@
-# Explicit Sendable annotations on public type declarations
+# Explicit `Sendable` annotations on public type declarations (ExplicitSendable)
 
-If a public type doesn't have an explicit Sendable or non-Sendable annotation it is sometimes hard to discern whether that is intentional or not, especially if a type could be Sendable.
+Adds a warning for any public types without a `Sendable` annotation.
 
 ## Overview
 
-The Swift compiler would emit a warning if a public type has none of the following:
-
+When enabled, the compiler will emit a warning if a public type has none of the following:
   - A conformance to `Sendable` protocol;
   - An unavailable conformance to `Sendable` protocol;
   - `~Sendable` conformance to suppress the inference.
 
-Let's consider a simple public type without any Senable annotations:
-
+For example, given a simple public type:
 ```
 public struct S {
     let x: Int
 }
 ```
 
-When compiling with `-Wwarning ExplicitSendable` the following warning is going to be produced by the Swift compiler:
-
+As it has no `Sendable` annotations, this diagnostic group will add the following warning:
 ```
 1 | public struct S {
   |               |- warning: public struct 'S' does not specify whether it is 'Sendable' or not [#ExplicitSendable]

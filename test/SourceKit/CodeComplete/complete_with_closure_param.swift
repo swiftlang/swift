@@ -16,5 +16,5 @@ C().
 
 // CHECK:      key.kind: source.lang.swift.decl.function.method.instance,
 // CHECK-NEXT: key.name: "foo2(:)",
-// CHECK-NEXT: key.description: "foo2(x: (Int) -> Int)",
-// CHECK: key.sourcetext: "foo2(<#T##x: (Int) -> Int##(Int) -> Int#>)"
+// CHECK-NEXT: key.description: "foo2(x: MyFnTy)",
+// CHECK: key.sourcetext: "foo2(<#T##x: MyFnTy##MyFnTy##(Int) -> Int#>)"

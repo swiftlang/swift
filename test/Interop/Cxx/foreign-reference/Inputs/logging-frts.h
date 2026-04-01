@@ -5,6 +5,7 @@
 
 class SharedFRT {
 public:
+  SWIFT_RETURNS_RETAINED
   SharedFRT() : _refCount(1) { logMsg("Ctor"); }
 
 protected:
@@ -28,6 +29,16 @@ public:
     logMsg("retain");
   }
 
+<<<<<<< HEAD
+=======
+  void nonFriendReleaseFRT() {
+    --_refCount;
+    logMsg("release");
+    if (_refCount == 0)
+      delete this;
+  }
+
+>>>>>>> origin/main
   friend void releaseSharedFRT(SharedFRT *_Nonnull);
 } SWIFT_SHARED_REFERENCE(.retainSharedFRT, releaseSharedFRT);
 
@@ -91,4 +102,18 @@ struct FirstBase {
   virtual ~FirstBase() {}
 };
 
+<<<<<<< HEAD
 struct DerivedFRT : FirstBase, SharedFRT {};
+=======
+// Inferred case.
+struct DerivedFRT : FirstBase, SharedFRT {
+  SWIFT_RETURNS_RETAINED
+  DerivedFRT() = default;
+};
+
+// Explicitly annotated case.
+struct DerivedFRT2 : FirstBase, SharedFRT {
+  SWIFT_RETURNS_RETAINED
+  DerivedFRT2() = default;
+} SWIFT_SHARED_REFERENCE(.retainSharedFRT, .nonFriendReleaseFRT);
+>>>>>>> origin/main

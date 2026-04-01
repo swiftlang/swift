@@ -455,12 +455,26 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
   return false;
 }
 
-// Addressable parameters cannot be dropped because the address may
-// escape. They also can't be promoted to direct convention, so there
-// is no danger in preserving them.
 static bool canConvertArg(CanSILFunctionType substType, unsigned paramIdx,
                           SILFunction *caller) {
+  // The `self` parameter of a borrow accessor with an indirect return
+  // cannot be promoted, since the returned address might point into the
+  // parameter.
+  //
+  // TODO: It may be possible to promote `self` and the result if and only
+  // if both the parameter and result do or do not get promoted in unison.
+  if (substType->getNumResults() == 1
+      && substType->getSingleResult().getConvention()
+           == ResultConvention::GuaranteedAddress
+      && substType->getSelfParameterIndex() == paramIdx) {
+    return false;
+  }
+  
+  // Addressable parameters cannot be dropped because the address may
+  // escape. They also can't be promoted to direct convention, so there
+  // is no danger in preserving them.
   return !substType->isAddressable(paramIdx, caller);
+
 }
 
 // If there is no read from an indirect argument, this argument has to be
@@ -2413,7 +2427,8 @@ bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
   SILType substitutedType =
       funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
 
-  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), cm->getMember(), m);
+  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), cm->getMember(),
+                           /*convertIndirectToDirect=*/ true, m);
   reInfo.createSubstitutedAndSpecializedTypes();
   CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
   SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);
@@ -2465,7 +2480,8 @@ bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
   SILType substitutedType =
       funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
 
-  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), wm->getMember(), m);
+  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), wm->getMember(),
+                           /*convertIndirectToDirect=*/ false, m);
   reInfo.createSubstitutedAndSpecializedTypes();
   CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
   SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);
@@ -2649,7 +2665,7 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     auto *newPAI = builder.createPartialApply(
         loc, callee, subs, arguments,
         pai->getCalleeConvention(), pai->getResultIsolation(),
-        pai->isOnStack());
+        pai->isOnStack(), pai->isStackAllocationNested());
     pai->replaceAllUsesWith(newPAI);
     return newPAI;
   }
@@ -3511,7 +3527,7 @@ void swift::trySpecializeApplyOfGeneric(
     SingleValueInstruction *newPAI = Builder.createPartialApply(
       PAI->getLoc(), FRI, Subs, Arguments,
       PAI->getCalleeConvention(), PAI->getResultIsolation(),
-      PAI->isOnStack());
+      PAI->isOnStack(), PAI->isStackAllocationNested());
     PAI->replaceAllUsesWith(newPAI);
     DeadApplies.insert(PAI);
     return;

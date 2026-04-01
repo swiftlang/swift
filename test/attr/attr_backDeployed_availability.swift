@@ -19,9 +19,25 @@ extension TopLevelStruct {
 @backDeployed(before: macOS 12) // Ok, introduced availability is earlier than macOS 12
 public func availableBeforeBackDeployment() {}
 
+@available(anyAppleOS 26, *)
+@backDeployed(before: anyAppleOS 26.4) // Ok, introduced availability is earlier on all Apple platforms
+public func availableAnyAppleOS26BackDeployedBeforeAnyAppleOS26_4() {}
+
+@available(anyAppleOS 26, *)
+@backDeployed(before: macOS 26.4) // Ok, introduced availability is earlier on all Apple platforms
+public func availableAnyAppleOS26BackDeployedBeforeMacOS26_4() {}
+
 @available(macOS 12, *) // expected-note {{'availableSameVersionAsBackDeployment()' was introduced in macOS 12}}
 @backDeployed(before: macOS 12) // expected-error {{'@backDeployed' has no effect because 'availableSameVersionAsBackDeployment()' is not available before macOS 12}}
 public func availableSameVersionAsBackDeployment() {}
+
+@available(anyAppleOS 26, *) // expected-note {{'availableSameAnyAppleOSVersionAsMacOSBackDeployment()' was introduced in macOS 26}}
+@backDeployed(before: macOS 26) // expected-error {{'@backDeployed' has no effect because 'availableSameAnyAppleOSVersionAsMacOSBackDeployment()' is not available before macOS 26}}
+public func availableSameAnyAppleOSVersionAsMacOSBackDeployment() {}
+
+@available(macOS 26, *) // expected-note {{'availableSameAnyAppleVersionAsBackDeploymentAnyAppleOS()' was introduced in macOS 26}}
+@backDeployed(before: anyAppleOS 26) // expected-error {{'@backDeployed' has no effect because 'availableSameAnyAppleVersionAsBackDeploymentAnyAppleOS()' is not available before macOS 26}}
+public func availableSameAnyAppleVersionAsBackDeploymentAnyAppleOS() {}
 
 @available(macOS 12.1, *) // expected-note {{'availableAfterBackDeployment()' was introduced in macOS 12.1}}
 @backDeployed(before: macOS 12) // expected-error {{'@backDeployed' has no effect because 'availableAfterBackDeployment()' is not available before macOS 12}}

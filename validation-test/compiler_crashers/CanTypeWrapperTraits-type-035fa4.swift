@@ -1,4 +1,4 @@
-// {"kind":"emit-silgen","original":"caeb568b","signature":"swift::CanTypeWrapperTraits<swift::SILFunctionType>::type swift::SILType::castTo<swift::SILFunctionType>() const","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast"}
+// {"kind":"emit-silgen","original":"caeb568b","signature":"swift::CanTypeWrapperTraits<swift::SILFunctionType>::type swift::SILType::castTo<swift::SILFunctionType>() const","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast","signatureNext":"RValueEmitter::visitAbstractClosureExpr"}
 // RUN: not --crash %target-swift-frontend -emit-silgen %s
 func a<b, each c>(d
   : repeat Optional<each c>, body

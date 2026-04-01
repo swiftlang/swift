@@ -19,7 +19,7 @@ public struct Holder<Value> {
         self.value = value
     }
 
-    // CHECK-NEXT: public init<T>(_ value: T) where Value == Swift.AnyHashable, T : Swift.Hashable{{$}}
+    // CHECK-NEXT: public init<T>(_ value: T) where Value == Swift::AnyHashable, T : Swift::Hashable{{$}}
     public init<T : Hashable>(_ value: T) where Value == AnyHashable {
         self.value = value
     }
@@ -33,7 +33,7 @@ public struct Holder<Value> {
             self.fn = fn
         }
 
-        // CHECK-NEXT: func transform(_ holder: main.Holder<Value>) -> Result{{$}}
+        // CHECK-NEXT: func transform(_ holder: main::Holder<Value>) -> Result{{$}}
         public func transform(_ holder: Holder<Value>) -> Result {
             return fn(holder.value)
         }
@@ -44,9 +44,9 @@ public struct Holder<Value> {
 // CHECK-NEXT: }
 }
 
-// CHECK-NEXT: extension main.Holder.Transform where Value == Swift.Int {
+// CHECK-NEXT: extension main::Holder.main::Transform where Value == Swift::Int {
 extension Holder.Transform where Value == Int {
-    // CHECK-NEXT: public func negate(_ holder: main.Holder<Value>) -> Result{{$}}
+    // CHECK-NEXT: public func negate(_ holder: main::Holder<Value>) -> Result{{$}}
     public func negate(_ holder: Holder<Value>) -> Result {
         return transform(Holder(value: -holder.value))
     }

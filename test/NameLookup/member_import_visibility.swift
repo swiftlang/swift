@@ -47,11 +47,11 @@ func testExtensionMembers(x: X, y: Y<Z>) {
   func takesKeyPath<T, U>(_ t: T, _ keyPath: KeyPath<T, U>) -> () { }
 
   takesKeyPath(x, \.propXinA)
-  takesKeyPath(x, \.propXinB) // expected-member-visibility-warning{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  takesKeyPath(x, \.propXinB) // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
   takesKeyPath(x, \.propXinC)
 
   takesKeyPath(x, \.propXinA.description)
-  takesKeyPath(x, \.propXinB.description) // expected-member-visibility-warning{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  takesKeyPath(x, \.propXinB.description) // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
   takesKeyPath(x, \.propXinC.description)
 }
 
@@ -85,7 +85,7 @@ extension X {
     _ = (NestedInA, NestedInB, NestedInC).self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
     _ = GenericType<NestedInB>.self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
     _ = NestedInC.self
-    _ = AmbiguousNestedType.self
+    _ = AmbiguousNestedType.self // expected-ambiguity-error{{ambiguous use of 'AmbiguousNestedType'}}
   }
 
   var hasNestedInAType: NestedInA { fatalError() }

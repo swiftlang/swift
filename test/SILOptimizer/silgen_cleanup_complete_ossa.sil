@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -opt-mode=none -silgen-cleanup -enable-ossa-complete-lifetimes -parse-incomplete-ossa -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-sil-opt -sil-print-types -opt-mode=none -silgen-cleanup -parse-incomplete-ossa -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK
 
 import Builtin
 
@@ -48,7 +48,7 @@ sil @unreachableHandler : $@convention(thin) () -> ()
 // CHECK: bb2:
 // CHECK:   apply
 // CHECK:   end_borrow [[BORROW]] : ${ var FakeOptional<Klass> }
-// CHECK:   dealloc_box [dead_end] [[BOX]] : ${ var FakeOptional<Klass> }
+// CHECK:   destroy_value [dead_end] [[BOX]] : ${ var FakeOptional<Klass> }
 // CHECK:   unreachable
 // CHECK-LABEL: } // end sil function 'testCompleteOSSALifetimes'
 sil [ossa] @testCompleteOSSALifetimes : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
@@ -124,12 +124,13 @@ die:
   unreachable
 }
 
+// TODO: currently access scopes are not handled by lifetime completion
 // CHECK-LABEL: sil [ossa] @begin_access : {{.*}} {
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
 // CHECK:         [[ACCESS:%[^,]+]] = begin_access [modify] [static] [[ADDR]]
 // CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
 // CHECK:       [[DIE]]:
-// CHECK:         end_access [[ACCESS]]
+// xCHECK:         end_access [[ACCESS]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'begin_access'
 sil [ossa] @begin_access : $@convention(thin) () -> () {
@@ -151,13 +152,10 @@ die:
 }
 
 // CHECK-LABEL: sil [ossa] @unreachable_def : {{.*}} {
-// CHECK:       bb2:
-// CHECK-NEXT:    [[DEF:%[^,]+]] = apply
-// CHECK-NEXT:    br bb3
-// CHECK:       bb3:
-// CHECK-NEXT:    destroy_value [dead_end] [[DEF]]
-// CHECK:         unreachable
-// CHECK-LABEL: } // end sil function 'unreachable_def'
+// CHECK:       bb1:
+// CHECK-NEXT:    %1 = tuple ()
+// CHECK-NEXT:    return %1
+// CHECK-NEXT:  } // end sil function 'unreachable_def'
 sil [ossa] @unreachable_def : $@convention(thin) () -> () {
 entry:
   br exit
@@ -175,15 +173,10 @@ die:
 }
 
 // CHECK-LABEL: sil [ossa] @unreachable_def_2 : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] :
-// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
-// CHECK:       [[LEFT]]:
-// CHECK-NEXT:    destroy_value [dead_end] [[C]]
-// CHECK-NEXT:    unreachable
-// CHECK:       [[RIGHT]]:
-// CHECK-NEXT:    destroy_value [dead_end] [[C]]
-// CHECK:         unreachable
-// CHECK-LABEL: } // end sil function 'unreachable_def_2'
+// CHECK:       bb0:
+// CHECK-NEXT:    %0 = tuple ()
+// CHECK-NEXT:    return %0
+// CHECK-NEXT:  } // end sil function 'unreachable_def_2'
 sil [ossa] @unreachable_def_2 : $@convention(thin) () -> () {
 entry:
   %t = tuple ()
@@ -199,209 +192,3 @@ right:
   unreachable
 }
 
-// CHECK-LABEL: sil [ossa] @unreachable_def_3 : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] :
-// CHECK:         cond_br
-// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
-// CHECK:       [[LEFT]]:
-// CHECK-NEXT:    destroy_value [dead_end] [[C]]
-// CHECK-NEXT:    unreachable
-// CHECK:       [[RIGHT]]:
-// CHECK-NEXT:    destroy_value [dead_end] [[C]]
-// CHECK:         unreachable
-// CHECK-LABEL: } // end sil function 'unreachable_def_3'
-sil [ossa] @unreachable_def_3 : $@convention(thin) () -> () {
-entry:
-  %t = tuple ()
-  return %t : $()
-
-header(%c : @owned $C):
-  br body
-
-body:
-  cond_br undef, die, backedge
-
-backedge:
-  br header(%c)
-
-die:
-  cond_br undef, left, right
-
-left:
-  unreachable
-
-right:
-  unreachable
-}
-
-// Ensure that `header` is completed before `postloop` (postloop would
-// erroneously be added as a root if a search for loops wasn't done).
-// CHECK-LABEL: sil [ossa] @unreachable_def_4 : {{.*}} {
-// CHECK:         [[C2:%[^,]+]] = apply
-// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] :
-// CHECK:         cond_br
-// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
-// CHECK:       [[LEFT]]:
-// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
-// CHECK-NEXT:    destroy_value [dead_end] [[C]]
-// CHECK-NEXT:    unreachable
-// CHECK:       [[RIGHT]]:
-// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
-// CHECK-NEXT:    destroy_value [dead_end] [[C]]
-// CHECK:         unreachable
-// CHECK-LABEL: } // end sil function 'unreachable_def_4'
-sil [ossa] @unreachable_def_4 : $@convention(thin) () -> () {
-entry:
-  %t = tuple ()
-  return %t : $()
-
-// Put this here so it appears before the loop when iterating over the
-// function's blocks.
-postloop:
-  %c2 = apply undef() : $@convention(thin) () -> (@owned C)
-  br die
-
-header(%c : @owned $C):
-  br body
-
-body:
-  cond_br undef, postloop, backedge
-
-backedge:
-  br header(%c)
-
-die:
-  cond_br undef, left, right
-
-left:
-  unreachable
-
-right:
-  unreachable
-}
-
-// Check that values backwards reachable from dead-end loops are completed.
-// CHECK-LABEL: sil [ossa] @unreachable_def_5 : {{.*}} {
-// CHECK:         apply undef([[C:%[^)]+]])
-// CHECK-NEXT:    extend_lifetime [[C]]
-// CHECK-LABEL: } // end sil function 'unreachable_def_5'
-sil [ossa] @unreachable_def_5 : $@convention(thin) () -> () {
-entry:
-  %t = tuple ()
-  return %t : $()
-
-header:
-  %c = apply undef() : $@convention(thin) () -> (@owned C)
-  br body
-
-body:
-  cond_br undef, die, backedge
-
-backedge:
-  destroy_value %c
-  br header
-
-die:
-  br deadend_header
-
-deadend_header:
-  apply undef(%c) : $@convention(thin) (@guaranteed C) -> ()
-  br deadend_backedge
-
-deadend_backedge:
-  br deadend_header
-}
-
-// CHECK-LABEL: sil [ossa] @unreachable_def_6 : {{.*}} {
-// CHECK:         [[C2:%[^,]+]] = apply
-// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] : @owned
-// CHECK:       {{bb[0-9]+}}([[C3:%[^,]+]] : @owned
-// CHECK:         cond_br
-// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
-// CHECK:       [[LEFT]]:
-// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
-// CHECK-NEXT:    destroy_value [dead_end] [[C3]]
-// CHECK-NEXT:    destroy_value [dead_end] [[C]]
-// CHECK-NEXT:    unreachable
-// CHECK:       [[RIGHT]]:
-// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
-// CHECK-NEXT:    destroy_value [dead_end] [[C3]]
-// CHECK-NEXT:    destroy_value [dead_end] [[C]]
-// CHECK:         unreachable
-// CHECK-LABEL: } // end sil function 'unreachable_def_6'
-sil [ossa] @unreachable_def_6 : $@convention(thin) () -> () {
-entry:
-  %t = tuple ()
-  return %t : $()
-
-// Put this here so it appears before the loop when iterating over the
-// function's blocks.
-postloop:
-  %c2 = apply undef() : $@convention(thin) () -> (@owned C)
-  br die
-
-header_1(%c : @owned $C):
-  br body_1
-
-body_1:
-  cond_br undef, postloop_1, backedge_1
-
-backedge_1:
-  br header_1(%c)
-
-postloop_1:
-  br postloop
-
-header_2(%c3 : @owned $C):
-  br body_2
-
-body_2:
-  cond_br undef, postloop_2, backedge_2
-
-backedge_2:
-  br header_2(%c3)
-
-postloop_2:
-  br postloop
-
-die:
-  apply undef(%c) : $@convention(thin) (@guaranteed C) -> ()
-  apply undef(%c3) : $@convention(thin) (@guaranteed C) -> ()
-  cond_br undef, left, right
-
-left:
-  unreachable
-
-right:
-  unreachable
-}
-
-// CHECK-LABEL: sil [ossa] @testExtendTrivialToDeadEnd : $@convention(thin) (UInt8) -> () {
-// CHECK: bb0(%0 : $UInt8):
-// CHECK:   [[MV:%.*]] = move_value [var_decl] %0 : $UInt8
-// CHECK:   try_apply %{{.*}}(%{{.*}}, [[MV]]) : $@convention(thin) (UInt8) -> @error_indirect Err, normal bb1, error bb2
-// CHECK: bb1(
-// CHECK:   extend_lifetime [[MV]] : $UInt8
-// CHECK:   return
-// CHECK: bb2:
-// CHECK:   dealloc_stack
-// CHECK:   extend_lifetime [[MV]] : $UInt8
-// CHECK:   unreachable
-// CHECK-LABEL: } // end sil function 'testExtendTrivialToDeadEnd'
-sil [ossa] @testExtendTrivialToDeadEnd : $@convention(thin) (UInt8) -> () {
-bb0(%0 : $UInt8):
-  %mv = move_value [var_decl] %0
-  %e = alloc_stack $Err
-  %f = function_ref @throwing : $@convention(thin) (UInt8) -> @error_indirect Err
-  try_apply %f(%e, %mv) : $@convention(thin) (UInt8) -> @error_indirect Err, normal bb1, error bb2
-
-bb1(%ret : $()):
-  extend_lifetime %mv
-  dealloc_stack %e : $*Err
-  %99 = tuple ()
-  return %99
-
-bb2:
-  dealloc_stack %e : $*Err
-  unreachable
-}

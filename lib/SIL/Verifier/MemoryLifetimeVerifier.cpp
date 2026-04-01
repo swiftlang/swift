@@ -232,13 +232,8 @@ bool MemoryLifetimeVerifier::isTrivialEnumSuccessor(SILBasicBlock *block,
   } else if (auto *switchEnumAddr = dyn_cast<SwitchEnumAddrInst>(term)) {
     elem = switchEnumAddr->getUniqueCaseForDestination(succ);
     enumTy = switchEnumAddr->getOperand()->getType();
-  } else if (auto *switchValue = dyn_cast<SwitchValueInst>(term)) {
-    auto destCase = switchValue->getUniqueCaseForDestination(succ);
-    assert(destCase.has_value());
-    auto caseValue =
-        cast<IntegerLiteralInst>(switchValue->getCase(*destCase).first);
-    auto testValue = dyn_cast<IntegerLiteralInst>(switchValue->getOperand());
-    return testValue ? testValue->getValue() != caseValue->getValue() : true;
+  } else if (isa<SwitchValueInst>(term)) {
+    return true;
   } else {
     return false;
   }
@@ -335,7 +330,11 @@ bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
     return false;
   }
 
+  if (!addr)
+    return false;
+
   for (SILFunction *callee : callees) {
+<<<<<<< HEAD
     if (addr) {
       if (callee->argumentMayRead(argOp, addr))
         return true;
@@ -345,6 +344,14 @@ bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
       // may read from an unknown sub-field.
       if (!callee->hasArgumentEffects())
         return true;
+=======
+    // If the callee has no side-effects computed, yet, ignore it.
+    // This can happen if a store to an unused inout has been eliminated at a call site
+    // and afterwards the callee is specialized and therefore doesn't have the required
+    // side-effects computed, yet.
+    if (callee->hasArgumentEffects() && callee->argumentMayRead(argOp, addr)) {
+      return true;
+>>>>>>> origin/main
     }
   }
   return false;
@@ -719,6 +726,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
             break;
           case StoreOwnershipQualifier::Assign:
             requireBitsSet(bits | ~nonTrivialLocations, SI->getDest(), &I);
+            locations.setBits(bits, SI->getDest());
             break;
           case StoreOwnershipQualifier::Trivial:
             locations.setBits(bits, SI->getDest());
@@ -947,7 +955,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
   switch (argumentConvention) {
     case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
-      requireBitsSetForArgument(bits, &argumentOp);
+      requireBitsSet(bits, argumentOp.get(), applyInst);
       locations.clearBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_Out:
@@ -956,6 +964,8 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       locations.setBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
+      requireBitsSet(bits, argumentOp.get(), applyInst);
+      break;
     case SILArgumentConvention::Indirect_Inout:
       requireBitsSetForArgument(bits, &argumentOp);
       break;

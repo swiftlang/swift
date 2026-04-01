@@ -1,3 +1,3 @@
-# Dynamic Exclusivity (Experimental Diagnostics)
+# Dynamic exclusivity (DynamicExclusivity)
 
-TODO explain
+Experimental

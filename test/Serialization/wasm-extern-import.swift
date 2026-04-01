@@ -17,6 +17,7 @@
 
 //--- Lib.swift
 @_extern(wasm, module: "mod", name: "foo") public func foo()
+<<<<<<< HEAD
 
 //--- Client.swift
 import Lib
@@ -24,3 +25,22 @@ public func callFoo() { foo() }
 
 // CHECK: declare swiftcc void @"$s3Lib3fooyyF"() #[[ATTR:[0-9]+]]
 // CHECK: attributes #[[ATTR]] = {{.*}}"wasm-import-module"="mod"{{.*}}"wasm-import-name"="foo"
+=======
+@_extern(wasm, module: "modOnly", name: "") public func modOnly()
+@_extern(wasm, module: "", name: "nameOnly") public func nameOnly()
+
+//--- Client.swift
+import Lib
+public func use() {
+    foo()
+    modOnly()
+    nameOnly()
+}
+
+// CHECK: declare swiftcc void @"$s3Lib3fooyyF"() #[[ATTR:[0-9]+]]
+// CHECK: declare swiftcc void @"$s3Lib7modOnlyyyF"() #[[ATTR_MOD_ONLY:[0-9]+]]
+// CHECK: declare swiftcc void @"$s3Lib8nameOnlyyyF"() #[[ATTR_NAME_ONLY:[0-9]+]]
+// CHECK: attributes #[[ATTR]] = {{.*}}"wasm-import-module"="mod"{{.*}}"wasm-import-name"="foo"
+// CHECK: attributes #[[ATTR_MOD_ONLY]] = {{.*}}"wasm-import-module"="modOnly"{{.*}}
+// CHECK: attributes #[[ATTR_NAME_ONLY]] = {{.*}}"wasm-import-name"="nameOnly"{{.*}}
+>>>>>>> origin/main

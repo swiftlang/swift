@@ -30,9 +30,11 @@
 
 using namespace swift;
 
-bool swift::performanceHintDiagnosticsEnabled(ASTContext &ctx) {
-  return !ctx.Diags.isIgnoredDiagnosticGroupTree(DiagGroupID::PerformanceHints) &&
-         (ctx.TypeCheckerOpts.SkipFunctionBodies == FunctionBodySkipping::None);
+bool swift::performanceHintDiagnosticsEnabled(ASTContext &ctx, SourceFile *sf) {
+  return ctx.TypeCheckerOpts.SkipFunctionBodies == FunctionBodySkipping::None &&
+         (ctx.Diags.isDiagnosticGroupEnabled(sf, DiagGroupID::PerformanceHints) ||
+          ctx.Diags.isDiagnosticGroupEnabled(sf, DiagGroupID::ReturnTypeImplicitCopy) ||
+          ctx.Diags.isDiagnosticGroupEnabled(sf, DiagGroupID::ExistentialType));
 }
 
 namespace {
@@ -157,4 +159,12 @@ evaluator::SideEffect EmitPerformanceHints::evaluate(Evaluator &evaluator,
                                                      SourceFile *SF) const {
   PerformanceHintDiagnosticWalker::check(SF);
   return {};
+}
+
+void swift::diagnoseUntypedThrows(
+    const DeclContext *dc, SourceLoc throwsLoc) {
+  dc->getASTContext().Diags.diagnose(
+      throwsLoc, diag::perf_hint_untyped_throws);
+  dc->getASTContext().Diags.diagnose(throwsLoc, diag::perf_hint_add_thrown_error_type)
+    .fixItInsertAfter(throwsLoc, "(<#any Error#>)");
 }

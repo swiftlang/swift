@@ -248,8 +248,8 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
                                    IndexingConsumer &IdxConsumer,
                                    ArrayRef<const char *> OrigArgs) {
   std::string Error;
-  auto InputBuf =
-      ASTMgr->getMemoryBuffer(InputFile, llvm::vfs::getRealFileSystem(), Error);
+  auto InputBuf = ASTMgr->getMemoryBuffer(
+      InputFile, llvm::vfs::createPhysicalFileSystem(), Error);
   if (!InputBuf) {
     IdxConsumer.failed(Error);
     return;
@@ -413,5 +413,5 @@ void SwiftLangSupport::indexToStore(
   getASTManager()->processASTAsync(Invok, ASTConsumer,
                                    /*OncePerASTToken=*/nullptr,
                                    CancellationToken,
-                                   llvm::vfs::getRealFileSystem());
+                                   llvm::vfs::createPhysicalFileSystem());
 }

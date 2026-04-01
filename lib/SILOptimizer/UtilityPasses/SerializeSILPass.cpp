@@ -65,6 +65,12 @@ void MapOpaqueArchetypes::replace() {
   // Insert the new entry block at the beginning.
   fn.moveBlockBefore(clonedEntryBlock, fn.begin());
   removeUnreachableBlocks(fn);
+  // We know that this pass does not create infinite loops even if it
+  // deletes basic blocks.
+  fn.setNeedBreakInfiniteLoops(false);
+  // De-serializing `unreachable` instructions does not create incomplete
+  // lifetimes. We assume that the serialized SIL has no incomplete lifetimes.
+  fn.setNeedCompleteLifetimes(false);
 }
 
 static bool opaqueArchetypeWouldChange(TypeExpansionContext context,
@@ -338,6 +344,12 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::IgnoredUseInst:
   case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
   case SILInstructionKind::UncheckedOwnershipInst:
+  case SILInstructionKind::MakeBorrowInst:
+  case SILInstructionKind::DereferenceBorrowInst:
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::InitBorrowAddrInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst:
     // Handle by operand and result check.
     break;
 

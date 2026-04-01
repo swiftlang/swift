@@ -71,7 +71,6 @@ public struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
     self.wasInserted = BasicBlockSet(context)
     self.inExclusiveRange = BasicBlockSet(context)
     self.worklist = BasicBlockWorklist(context)
-    worklist.pushIfNotVisited(begin)
   }
 
   /// Insert a potential end block.

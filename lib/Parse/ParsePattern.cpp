@@ -180,7 +180,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     // Per SE-0155, enum elements may not have empty parameter lists.
     if (paramContext == ParameterContextKind::EnumElement) {
       decltype(diag::enum_element_empty_arglist) diagnostic;
+<<<<<<< HEAD
       if (Context.isLanguageModeAtLeast(5)) {
+=======
+      if (Context.isLanguageModeAtLeast(LanguageMode::v5)) {
+>>>>>>> origin/main
         diagnostic = diag::enum_element_empty_arglist;
       } else {
         diagnostic = diag::enum_element_empty_arglist_swift4;
@@ -249,7 +253,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         if (Tok.isContextualKeyword("isolated")) {
           diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
                    Tok.getText())
+<<<<<<< HEAD
               .warnUntilLanguageMode(6);
+=======
+              .warnUntilLanguageMode(LanguageMode::v6);
+>>>>>>> origin/main
           // did we already find an 'isolated' type modifier?
           if (param.IsolatedLoc.isValid()) {
             diagnose(Tok, diag::parameter_specifier_repeated)
@@ -266,7 +274,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         if (Tok.isContextualKeyword("_const")) {
           diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
                    Tok.getText())
+<<<<<<< HEAD
               .warnUntilLanguageMode(6);
+=======
+              .warnUntilLanguageMode(LanguageMode::v6);
+>>>>>>> origin/main
           param.CompileConstLoc = consumeToken();
           continue;
         }
@@ -275,7 +287,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             Tok.isContextualKeyword("sending")) {
           diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
                    Tok.getText())
+<<<<<<< HEAD
               .warnUntilLanguageMode(6);
+=======
+              .warnUntilLanguageMode(LanguageMode::v6);
+>>>>>>> origin/main
           if (param.SendingLoc.isValid()) {
             diagnose(Tok, diag::parameter_specifier_repeated)
                 .fixItRemove(Tok.getLoc());
@@ -459,7 +475,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                     .fixItInsert(typeStartLoc, "_: ");
             } else {
               diagnose(typeStartLoc, diag::parameter_unnamed)
+<<<<<<< HEAD
                   .warnUntilLanguageMode(6)
+=======
+                  .warnUntilLanguageMode(LanguageMode::v6)
+>>>>>>> origin/main
                   .fixItInsert(typeStartLoc, "_: ");
             }
           }

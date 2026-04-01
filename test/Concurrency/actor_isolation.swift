@@ -191,7 +191,7 @@ extension MyActor {
     set { }
   }
 
-  // expected-warning@+1{{'nonisolated(unsafe)' has no effect on instance method 'nonisolatedUnsafe(otherActor:)', consider using 'nonisolated'}}{{3-14=nonisolated}}
+  // expected-warning@+1{{'nonisolated(unsafe)' has no effect on instance method 'nonisolatedUnsafe(otherActor:)', consider using 'nonisolated'}}{{3-22=nonisolated}}
   nonisolated(unsafe) func nonisolatedUnsafe(otherActor: MyActor) -> Int { }
 
   nonisolated func actorIndependentFunc(otherActor: MyActor) -> Int {
@@ -275,7 +275,7 @@ extension MyActor {
     // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
     acceptInout(&otherActor.mutable)  // expected-error{{actor-isolated property 'mutable' can not be used 'inout' on a nonisolated actor instance}}
     // expected-error@+3{{actor-isolated property 'mutable' can not be mutated on a nonisolated actor instance}}
-    // expected-warning@+2{{no 'async' operations occur within 'await' expression}}
+    // expected-warning@+2{{no 'async' operations occur within 'await' expression}}{{5-11=}}
     // expected-note@+1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
     await otherActor.mutable = 0
 
@@ -616,7 +616,7 @@ func testGlobalRestrictions(actor: MyActor) async {
 
   // stored and computed properties can be accessed. Only immutable stored properties can be accessed without 'await'
   _ = actor.immutable
-  _ = await actor.immutable // expected-warning {{no 'async' operations occur within 'await' expression}}
+  _ = await actor.immutable // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
   _ = actor.mutable  // expected-error{{actor-isolated property 'mutable' cannot be accessed from outside of the actor}}{{7-7=await }}
   _ = await actor.mutable
   _ = actor.text[0] // expected-error{{actor-isolated property 'text' cannot be accessed from outside of the actor}}{{7-7=await }}
@@ -863,7 +863,6 @@ actor SomeActorWithInits {
   // expected-note@+1 4 {{mutation of this property is only permitted within the actor}}
   var mutableState: Int = 17
   var otherMutableState: Int
-  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
   let nonSendable: SomeClass
 
   // Sema should not complain about referencing non-Sendable members
@@ -935,7 +934,7 @@ actor SomeActorWithInits {
   @MainActor init(i5 x: SomeClass) {
     self.mutableState = 42
     self.otherMutableState = 17
-    self.nonSendable = x // expected-warning {{actor-isolated property 'nonSendable' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.nonSendable = x
 
     self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
     self.nonisolated()
@@ -975,7 +974,7 @@ actor SomeActorWithInits {
     _ = mutableState  // will be caught by flow-isolation
   }
 
-  deinit {
+  deinit { // expected-note 3 {{add 'isolated' to run isolated to 'SomeActorWithInits', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
     let _ = self.nonSendable // OK only through typechecking, not SIL.
 
     defer {
@@ -1013,7 +1012,7 @@ class SomeClassWithInits {
     self.isolated()
   }
 
-  deinit {
+  deinit { // expected-note 2{{add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
     print(mutableState) // Okay, we're actor-isolated
     print(SomeClassWithInits.shared) // expected-error{{main actor-isolated static property 'shared' can not be referenced from a nonisolated context}}
     beets_ma() //expected-error{{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
@@ -1205,7 +1204,7 @@ extension MyActor {
     }
 
     acceptAsyncSendableClosureInheriting {
-      _ = await synchronous() // expected-warning{{no 'async' operations occur within 'await' expression}}
+      _ = await synchronous() // expected-warning{{no 'async' operations occur within 'await' expression}}{{11-17=}}
       counter += 1 // okay
     }
 
@@ -1435,7 +1434,7 @@ actor SelfParamIsolationNonMethod {
     acceptAsyncSendableClosure { self.f() }
   }
 
-  deinit {
+  deinit { // expected-note {{add 'isolated' to run isolated to 'SelfParamIsolationNonMethod', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
     // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{44-44=await }}
     acceptAsyncSendableClosureInheriting { self.f() }
 
@@ -1471,15 +1470,65 @@ final class MainActorInit: Sendable {
   func f() {}
 }
 
+final class Exponentiator: Sendable {
+  @MainActor
+  var numbers: [Int]
+
+  init(_ numbers: [Int]) {
+    self.numbers = numbers
+  }
+
+  @MainActor
+  lazy var squared: [Int] = {
+    numbers.map { $0 * $0 }
+  }()
+
+  // expected-warning@+2 {{stored property 'cubed' of 'Sendable'-conforming class 'Exponentiator' is mutable; this is an error in the Swift 6 language mode}}
+  // expected-warning@+1 {{main actor-isolated default value in a nonisolated context}}
+  lazy var cubed: [Int] = {
+    zip(squared, numbers).map { $0 * $1 }
+  }()
+}
+
+final class NumberHolder: Sendable {
+  // expected-warning@+1 {{stored property 'numbers' of 'Sendable'-conforming class 'NumberHolder' is mutable; this is an error in the Swift 6 language mode}}
+  lazy var numbers = [1, 2, 3]
+}
+
 actor DunkTracker {
   private var lebron: Int?
   private var curry: Int? // expected-note {{property declared here}}
 
-  deinit {
+  deinit { // expected-note {{add 'isolated' to run isolated to 'DunkTracker', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
     // expected-warning@+1 {{actor-isolated property 'curry' can not be referenced from a nonisolated autoclosure; this is an error in the Swift 6 language mode}}
     if lebron != nil || curry != nil {
-      
+
     }
+  }
+}
+
+// Verify that 'mark deinitializer as isolated' is not suggested when
+// 'isolated' would not resolve the diagnostic.
+actor DeinitKeyPath {
+  var x: Int = 0
+
+  deinit {
+    let _ = \DeinitKeyPath.x // expected-error {{cannot form key path to actor-isolated property 'x'}}
+  }
+}
+
+struct MutatingAsyncStruct {
+  var x: Int = 0
+  mutating func doWork() async { x += 1 }
+}
+
+actor DeinitMutatingAsync {
+  var s: MutatingAsyncStruct = MutatingAsyncStruct()
+
+  deinit {
+    s.doWork() // expected-error {{cannot call mutating async function 'doWork()' on actor-isolated property 's'}}
+    // expected-note@-1 {{'s' can be concurrently accessed during mutation, risking data races}}
+    // expected-error@-2 {{'async' call in a function that does not support concurrency}}
   }
 }
 
@@ -1497,12 +1546,12 @@ protocol SGA_Proto {
 // try to override a MA method with inferred isolation from a protocol requirement
 // expected-warning@+1{{conformance of 'SGA_MA' to protocol 'SGA_Proto' involves isolation mismatches and can cause data races}}
 class SGA_MA: MA, SGA_Proto {
-  // expected-note@-1{{mark all declarations used in the conformance 'nonisolated'}}
-  // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
-  
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+
   // expected-error@+2 {{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
   // expected-note@+1 {{main actor-isolated instance method 'method()' cannot satisfy global actor 'SomeGlobalActor'-isolated requirement}}
   override func method() { onions_sga() }
+  // expected-note@-1{{mark instance method 'method()' 'nonisolated'}}{{3-3=nonisolated }}
 }
 
 class None_MA: MA {
@@ -1616,13 +1665,12 @@ actor ActorWithNonSendableLet: NonisolatedProtocol {
 }
 
 actor ProtectNonSendable {
-  // expected-note@+1 2 {{property declared here}}
+  // expected-note@+1 {{property declared here}}
   let ns = NonSendable()
 
   init() {}
 
   @MainActor init(fromMain: Void) {
-    // expected-warning@+1 {{actor-isolated property 'ns' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
     _ = self.ns
   }
 }
@@ -1717,8 +1765,7 @@ struct ReferenceSelfDotMethods {
   nonisolated
   private func testCurry() -> (Self) -> (@MainActor () -> Void) {
     let functionRef = Self.mainActorAffinedFunction
-    // warning goes away with InferSendableFromCaptures, see actor_isolation_swift6.swift
-    return functionRef // expected-warning {{converting non-Sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
+    return functionRef // Ok
   }
 
   @MainActor
@@ -1737,7 +1784,7 @@ struct ReferenceSelfDotMethods {
 }
 
 actor UserDefinedActorSelfDotMethod {
-  func actorAffinedFunc() {} // expected-note {{calls to instance method 'actorAffinedFunc()' from outside of its actor context are implicitly asynchronous}}
+  func actorAffinedFunc() {}
 
   // Unfortunately we can't express the desired isolation of this returned closure statically to
   // be able to call it on the desired actor. This may be possible with the acceptance of
@@ -1745,7 +1792,7 @@ actor UserDefinedActorSelfDotMethod {
   // in the type system to express this sort of curry.
   nonisolated
   private func testCurry() -> (UserDefinedActorSelfDotMethod) -> (@isolated(any) () -> Void) {
-    let functionRef = Self.actorAffinedFunc // expected-error {{call to actor-isolated instance method 'actorAffinedFunc()' in a synchronous nonisolated context}}
+    let functionRef = Self.actorAffinedFunc
     // error message changes with InferSendabaleFromCaptures - see actor_isolation_swift6.swift
     return functionRef // expected-error {{cannot convert return expression of type '(isolated Self) -> () -> ()' to return type '(UserDefinedActorSelfDotMethod) -> @isolated(any) () -> Void'}}
   }
@@ -1776,3 +1823,76 @@ class InvalidInheritedGlobalActorIsolation {
     }
   }
 }
+
+actor PartialApplyTest {
+  func compute(_: Int) {}
+  func expensiveCompute() async {}
+
+  func test() {
+    _ = Self.compute // Ok
+    _ = Self.compute(_:) // Ok
+
+    _ = Self.expensiveCompute // Ok
+    _ = self.expensiveCompute // Ok (this is okay because method is async)
+  }
+
+  nonisolated static func test(a: PartialApplyTest) {
+    _ = PartialApplyTest.compute // Ok
+    _ = PartialApplyTest.compute(_:) // Ok
+
+    _ = a.compute // expected-error {{actor-isolated instance method 'compute' can not be partially applied}}
+    _ = a.compute(_:) // expected-error {{actor-isolated instance method 'compute' can not be partially applied}}
+
+    _ = Self.expensiveCompute // Ok
+    _ = a.expensiveCompute // Ok (this is okay because method is async)
+  }
+}
+
+func testPartialApplyWithIsolatedParameters() {
+  func isolatedFn(v: Int, _: isolated PartialApplyTest) {
+  }
+
+  let fn = isolatedFn(v:_:) // expected-note {{calls to let 'fn' from outside of its actor context are implicitly asynchronous}}
+  let _: (Int, isolated PartialApplyTest) -> Void = fn // Ok
+
+  func apply(a: PartialApplyTest) {
+    fn(42, a) //expected-error {{call to actor-isolated let 'fn' in a synchronous nonisolated context}}
+  }
+}
+
+actor SharedDefaultTest {
+  static let shared = SharedDefaultTest()
+
+  var value = 42
+
+  func test(_: Int = SharedDefaultTest.shared.value) {} // expected-error {{cannot use default value from different instance of 'SharedDefaultTest'}}
+  // expected-note@-1 {{default value must be isolated to 'self'}}
+}
+
+actor AnotherActorsDefaultTest {
+  var anotherValue = SharedDefaultTest.shared.value // expected-warning {{default value for property 'anotherValue' must be 'AnotherActorsDefaultTest'-isolated; this is an error in the Swift 6 language mode}}
+  // expected-note@-1:7 {{expected default value to have same isolation as property 'anotherValue' (got 'SharedDefaultTest' and 'AnotherActorsDefaultTest')}}
+
+  func test(_: Int = SharedDefaultTest.shared.value) {} // expected-error {{default value for parameter must be 'AnotherActorsDefaultTest'-isolated}}
+  // expected-note@-1:13 {{expected default value to have same isolation as parameter (got 'SharedDefaultTest' and 'AnotherActorsDefaultTest')}}
+}
+
+class IsolatedParamTest {
+  func test(_: Int = SharedDefaultTest.shared.value, owner: isolated SharedDefaultTest) {}
+  // expected-error@-1:13 {{cannot use default value from different instance of 'SharedDefaultTest'}}
+  // expected-note@-2:47 {{default value must be isolated to 'owner'}}
+  // expected-note@-3:54 {{'owner' specified here}}
+}
+
+class DifferentActorIsolatedParamTest {
+  func test(_: Int = SharedDefaultTest.shared.value, owner: isolated AnotherActorsDefaultTest) {}
+  // expected-error@-1:13 {{default value for parameter must be 'AnotherActorsDefaultTest'-isolated}}
+  // expected-note@-2:13 {{expected default value to have same isolation as parameter (got 'SharedDefaultTest' and 'AnotherActorsDefaultTest')}}
+}
+
+class GlobalDefaultIsolationTest {
+  @SomeGlobalActor
+  func test(_: Int = SharedDefaultTest.shared.value) {}
+  // expected-error@-1 {{actor-isolated default value in a global actor 'SomeGlobalActor'-isolated context}}
+}
+

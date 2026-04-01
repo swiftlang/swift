@@ -38,13 +38,25 @@ class SwiftToClangInteropContext;
 /// Tracks which C++ declarations have been emitted in a lexical
 /// C++ scope.
 struct CxxDeclEmissionScope {
+  /// Records information about an emitted C++ function overload.
+  struct EmittedFunctionOverload {
+    const AbstractFunctionDecl *funcDecl;
+    /// The C++ parameter types as they appear in the C++ inline thunk
+    /// signature, used to detect genuinely ambiguous overloads.
+    llvm::SmallVector<std::string, 4> cxxParamTypes;
+  };
+
   /// Additional Swift declarations that are unrepresentable in C++.
-  std::vector<const ValueDecl *> additionalUnrepresentableDeclarations;
+  /// The string holds a reason why the declaration is unrepresentable;
+  /// empty string means the reason should be acqured from
+  /// 'getDeclRepresentation'.
+  llvm::DenseMap<const ValueDecl *, std::string>
+      additionalUnrepresentableDeclarations;
   /// Records the C++ declaration names already emitted in this lexical scope.
   llvm::StringSet<> emittedDeclarationNames;
   /// Records the names of the function overloads already emitted in this
   /// lexical scope.
-  llvm::StringMap<llvm::SmallVector<const AbstractFunctionDecl *, 2>>
+  llvm::StringMap<llvm::SmallVector<EmittedFunctionOverload, 2>>
       emittedFunctionOverloads;
   llvm::StringMap<const AccessorDecl *> emittedAccessorMethodNames;
 };

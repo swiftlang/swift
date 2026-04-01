@@ -27,4 +27,4 @@ func indirectUse() {
 }
 
 public func functionWithFilePathDefaultArgument(file: String = #filePath) {}
-// SWIFTINTERFACE: public func functionWithFilePathDefaultArgument(file: Swift.String = #filePath)
+// SWIFTINTERFACE: public func functionWithFilePathDefaultArgument(file: Swift::String = #filePath)

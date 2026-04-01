@@ -70,6 +70,9 @@ struct swiftscan_dependency_info_s {
 
   /// Specific details of a particular kind of module.
   swiftscan_module_details_t details;
+
+  /// The library level of this module.
+  swiftscan_library_level_t library_level;
 };
 
 struct swiftscan_link_library_info_s {
@@ -204,9 +207,6 @@ typedef struct {
 
   /// Options to the compile command required to build this clang modulemap
   swiftscan_string_set_t *command_line;
-
-  /// The CASID for CASFileSystemRoot
-  swiftscan_string_ref_t cas_fs_root_id;
 
   /// The CASID for CASFileSystemRoot
   swiftscan_string_ref_t clang_include_tree;

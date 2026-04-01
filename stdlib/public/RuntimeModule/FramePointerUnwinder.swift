@@ -17,7 +17,11 @@
 import Swift
 
 @_spi(Unwinders)
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, IteratorProtocol {
   public typealias Context = C
   public typealias MemoryReader = M
@@ -89,25 +93,28 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   private mutating func isAsyncPC(_ pc: Address) -> Bool {
     // On Linux, we need to examine the PC to see if this is an async frame
     #if os(Linux)
-    let address = MemoryReader.Address(pc)
+    guard let address = Backtrace.Address(pc) else {
+      return false
+    }
 
     if let images = images,
-       let imageNdx = images.indexOfImage(at: Backtrace.Address(address)) {
-      let base = MemoryReader.Address(images[imageNdx].baseAddress)!
-      let relativeAddress = address - base
+       let imageNdx = images.indexOfImage(at: address) {
+      let base = images[imageNdx].baseAddress
+      let relativeAddress: ImageSource.Address
       let cache = ElfImageCache.threadLocal
 
       if let hit = cache.lookup(path: images[imageNdx].path) {
         switch hit {
           case let .elf32Image(image):
-            if let theSymbol = image.lookupSymbol(
-                 address: Elf32Image.Traits.Address(relativeAddress)
-               ) {
+            relativeAddress = ImageSource.Address(address - base)
+              + image.imageBase
+            if let theSymbol = image.lookupSymbol(address: relativeAddress) {
               return isAsyncSymbol(theSymbol.name)
             }
           case let .elf64Image(image):
-            if let theSymbol = image.lookupSymbol(
-                 address: Elf64Image.Traits.Address(relativeAddress)) {
+            relativeAddress = ImageSource.Address(address - base)
+              + image.imageBase
+            if let theSymbol = image.lookupSymbol(address: relativeAddress) {
               return isAsyncSymbol(theSymbol.name)
             }
         }
@@ -126,7 +133,7 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
   private func isAsyncFrame(_ storedFp: Address) -> Bool {
-    #if (os(macOS) || os(iOS) || os(watchOS)) && (arch(arm64) || arch(arm64_32) || arch(x86_64))
+    #if os(anyAppleOS) && (arch(arm64) || arch(arm64_32) || arch(x86_64))
     // On Darwin, we borrow a bit of the frame pointer to indicate async
     // stack frames
     return (storedFp & (1 << 60)) != 0

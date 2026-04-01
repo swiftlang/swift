@@ -88,6 +88,8 @@ namespace swift {
   class DerivativeAttr;
   class DifferentiableAttr;
   class ExtensionDecl;
+  struct ExplicitSwiftModuleMap;
+  struct ExplicitClangModuleMap;
   struct ExternalSourceLocs;
   class ForeignRepresentationInfo;
   class FuncDecl;
@@ -720,11 +722,17 @@ public:
   /// Get Sequence.makeIterator().
   FuncDecl *getSequenceMakeIterator() const;
 
+  /// Get BorrowingSequence.makeBorrowingIterator().
+  FuncDecl *getBorrowingSequenceMakeBorrowingIterator() const;
+
   /// Get AsyncSequence.makeAsyncIterator().
   FuncDecl *getAsyncSequenceMakeAsyncIterator() const;
 
   /// Get IteratorProtocol.next().
   FuncDecl *getIteratorNext() const;
+
+  /// Get BorrowingIteratorProtocol.nextSpan(maximumCount:).
+  FuncDecl *getBorrowingIteratorNextSpan() const;
 
   /// Get AsyncIteratorProtocol.next().
   FuncDecl *getAsyncIteratorNext() const;
@@ -752,6 +760,12 @@ public:
   /// If this is true, the method getAllocateUninitializedArray
   /// promises to return non-null.
   bool hasArrayLiteralIntrinsics() const;
+
+  /// Retrieve the declaration of Swift.CGFloat.init(_: Double).
+  ConcreteDeclRef getCGFloatInitDecl() const;
+
+  /// Retrieve the declaration of Swift.Double.init(_: CGFloat).
+  ConcreteDeclRef getDoubleInitDecl() const;
 
   /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
   ConcreteDeclRef getBoolBuiltinInitDecl() const;
@@ -917,6 +931,8 @@ public:
   // runtime version.
 #define FEATURE(N, V)                                                          \
   inline AvailabilityRange get##N##Availability() const {                      \
+    if (LangOpts.hasFeature(Feature::Embedded))                                \
+      return AvailabilityRange::alwaysAvailable();                             \
     return getSwiftAvailability V;                                             \
   }                                                                            \
   inline AvailabilityRange get##N##RuntimeAvailability() const {               \
@@ -1029,12 +1045,6 @@ public:
   /// Availability macros parsed from the command line arguments.
   const AvailabilityMacroMap &getAvailabilityMacroMap() const;
 
-  /// Test support utility for loading a platform remap file
-  /// in case an SDK is not specified to the compilation.
-  const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
-  getAuxiliaryDarwinPlatformRemapInfo(
-      clang::DarwinSDKInfo::OSEnvPair Kind) const;
-
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//
@@ -1074,8 +1084,14 @@ public:
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
   void addSearchPath(StringRef searchPath, bool isFramework, bool isSystem);
 
-  /// Adds the path to the explicitly built module \c name.
-  void addExplicitModulePath(StringRef name, std::string path);
+  ExplicitSwiftModuleMap *getExplicitSwiftModuleMap();
+  ExplicitClangModuleMap *getExplicitClangModuleMap();
+
+  /// Look up the library level for a module from the explicit module map.
+  /// \param isClang Whether to look in the Clang module map (true) or the
+  ///                Swift module map (false).
+  std::optional<LibraryLevel>
+  getExplicitModuleLibraryLevel(StringRef moduleName, bool isClang);
 
   /// Adds a module loader to this AST context.
   ///
@@ -1550,13 +1566,20 @@ public:
       const ValueDecl *base, const ValueDecl *derived,
       const OverrideGenericSignatureReqCheck direction);
 
-  /// Whether our effective Swift version is at least 'major'.
+  /// Returns a boolean value indicating whether the language mode is at least
+  /// `mode`.
   ///
-  /// This is usually the check you want; for example, when introducing
+  /// This is very likely the check you want; for example, when introducing
   /// a new language feature which is only visible in Swift 5, you would
+<<<<<<< HEAD
   /// check for isLanguageModeAtLeast(5).
   bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
     return LangOpts.isLanguageModeAtLeast(major, minor);
+=======
+  /// check for `isLanguageModeAtLeast(LanguageMode::v5)`.
+  bool isLanguageModeAtLeast(LanguageMode mode) const {
+    return LangOpts.isLanguageModeAtLeast(mode);
+>>>>>>> origin/main
   }
 
   /// Check whether it's important to respect access control restrictions

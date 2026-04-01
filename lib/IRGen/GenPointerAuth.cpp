@@ -478,6 +478,7 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
   llvm_unreachable("bad kind");
 }
 
+<<<<<<< HEAD
 static void hashStringForFunctionType(IRGenModule &IGM, CanSILFunctionType type,
                                       raw_ostream &Out,
                                       GenericEnvironment *genericEnv);
@@ -573,32 +574,17 @@ static void hashStringForFunctionType(IRGenModule &IGM, CanSILFunctionType type,
   }
 }
 
+=======
+>>>>>>> origin/main
 static llvm::ConstantInt *getTypeDiscriminator(IRGenModule &IGM,
                                                CanSILFunctionType type) {
-  // The hash we need to do here ignores:
-  //   - thickness, so that we can promote thin-to-thick without rehashing;
-  //   - error results, so that we can promote nonthrowing-to-throwing
-  //     without rehashing;
-  //   - isolation, so that global actor annotations can change in the SDK
-  //     without breaking compatibility and so that we can erase it to
-  //     nonisolated without rehashing;
-  //   - types of indirect arguments/retvals, so they can be substituted freely;
-  //   - types of class arguments/retvals
-  //   - types of metatype arguments/retvals
-  // See isABICompatibleWith and areABICompatibleParamsOrReturns in
-  // SILFunctionType.cpp.
-
-  SmallString<32> Buffer;
-  llvm::raw_svector_ostream Out(Buffer);
-  auto genericSig = type->getInvocationGenericSignature();
-  hashStringForFunctionType(
-      IGM, type, Out,
-      genericSig.getCanonicalSignature().getGenericEnvironment());
-  return getDiscriminatorForString(IGM, Out.str());
+  return llvm::ConstantInt::get(
+      IGM.Int64Ty, type->getPointerAuthDiscriminator(&IGM.getSILModule()));
 }
 
 static llvm::ConstantInt *
 getCoroutineYieldTypesDiscriminator(IRGenModule &IGM, CanSILFunctionType type) {
+<<<<<<< HEAD
   SmallString<32> buffer;
   llvm::raw_svector_ostream out(buffer);
   auto genericSig = type->getInvocationGenericSignature();
@@ -635,6 +621,10 @@ getCoroutineYieldTypesDiscriminator(IRGenModule &IGM, CanSILFunctionType type) {
   }
 
   return getDiscriminatorForString(IGM, out.str());
+=======
+  return llvm::ConstantInt::get(
+      IGM.Int64Ty, type->getCoroutineYieldTypesDiscriminator(IGM.getSILModule()));
+>>>>>>> origin/main
 }
 
 llvm::ConstantInt *
@@ -683,7 +673,7 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
   case Kind::CoroutineYieldTypes: {
     auto fnType = Storage.get<CanSILFunctionType>(StoredKind);
 
-    llvm::ConstantInt *&cache = IGM.getPointerAuthCaches().Types[fnType];
+    llvm::ConstantInt *&cache = IGM.getPointerAuthCaches().YieldTypes[fnType];
     if (cache)
       return cache;
 

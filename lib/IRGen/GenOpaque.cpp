@@ -553,13 +553,141 @@ irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
   return call;
 }
 
+StackAddress
+IRGenFunction::emitStackAllocation(llvm::Value *size, Alignment align,
+                                   StackAllocationIsNested_t isNested,
+                                   const llvm::Twine &name) {
+  // Allocate constant-sized allocations directly in the LLVM frame.
+  // We limit this to 16 words unless we're emitting in the entry block.
+  if (auto constantSize = dyn_cast<llvm::ConstantInt>(size)) {
+    bool isInEntryBlock = (Builder.GetInsertBlock() == &*CurFn->begin());
+    if (isInEntryBlock ||
+        constantSize->getValue().ule(16 * IGM.getPointerSize().getValue())) {
+      return emitStaticByteArrayAlloca(constantSize, align, name);
+    }
+  }
+
+  // If this code is properly-nested, use a dynamic allocation path.
+  if (isNested) {
+    return emitDynamicAlloca(IGM.Int8Ty, size, align, AllowsTaskAlloc,
+                             /*mallocTypeId=*/nullptr, name);
+  }
+
+  // Otherwise, use the non-nested dynamic allocation method (generally
+  // malloc).
+  return emitNonNestedStackAllocation(size, align, name);
+}
+
+void IRGenFunction::emitStackDeallocation(StackAddress address) {
+  switch (address.getKind()) {
+  case StackAddress::StaticAlloca:
+    emitDeallocateStaticAlloca(address);
+    return;
+
+  case StackAddress::DynamicAlloca:
+  case StackAddress::TaskAlloc:
+  case StackAddress::CoroAlloc:
+    emitDeallocateDynamicAlloca(address);
+    return;
+
+  case StackAddress::NonNested:
+    emitNonNestedStackDeallocation(address);
+    return;
+  }
+  llvm_unreachable("bad stack address kind");
+}
+
+StackAddress
+IRGenFunction::emitStaticAlloca(llvm::Type *ty, Size size,
+                                Alignment align, const llvm::Twine &name) {
+  auto addr = createAlloca(ty, align, name);
+
+  // LLVM IR requires the size to be an i64.
+  auto sizeForLifetime = llvm::ConstantInt::get(IGM.Int64Ty, size.getValue());
+  Builder.CreateLifetimeStart(addr, sizeForLifetime);
+
+  return StackAddress(addr, StackAddress::StaticAlloca, sizeForLifetime);
+}
+
+StackAddress
+IRGenFunction::emitStaticByteArrayAlloca(llvm::ConstantInt *size,
+                                         Alignment align,
+                                         const llvm::Twine &name) {
+  auto addr = createAlloca(IGM.Int8Ty, size, align, name);
+
+  // The lifetime intrinsics require an i64 on all targets.
+  auto sizeForLifetime = size;
+  if (size->getType() != IGM.Int64Ty) {
+    sizeForLifetime = llvm::ConstantInt::get(IGM.Int64Ty, size->getZExtValue());
+  }
+
+  Builder.CreateLifetimeStart(addr, sizeForLifetime);
+
+  return StackAddress(addr, StackAddress::StaticAlloca, sizeForLifetime);
+}
+
+void
+IRGenFunction::emitDeallocateStaticAlloca(StackAddress address) {
+  assert(address.isValid());
+  assert(address.getKind() == StackAddress::StaticAlloca);
+
+  auto csize = address.getExtraInfo();
+  assert(csize || isa<llvm::UndefValue>(address.getAddressPointer()));
+  if (!csize) return;
+
+  Builder.CreateLifetimeEnd(address.getAddress(),
+                            cast<llvm::ConstantInt>(csize));
+}
+
+StackAddress IRGenFunction::emitDynamicStackAllocation(
+    SILType T, StackAllocationIsNested_t isNested, const llvm::Twine &name) {
+  if (isNested) {
+    return emitDynamicAlloca(T, name);
+  }
+
+  // TODO: Alignment should be platform specific.
+  auto *size = emitLoadOfSize(*this, T);
+  auto align = Alignment(MaximumAlignment);
+  return emitNonNestedStackAllocation(size, align, name);
+}
+
+void IRGenFunction::emitDynamicStackDeallocation(StackAddress address) {
+  assert(address.getKind() != StackAddress::StaticAlloca);
+  if (address.getKind() != StackAddress::NonNested) {
+    return emitDeallocateDynamicAlloca(address);
+  }
+
+  return emitNonNestedStackDeallocation(address);
+}
+
+StackAddress IRGenFunction::emitNonNestedStackAllocation(
+    llvm::Value *size, Alignment align, const llvm::Twine &name) {
+  // First malloc the memory.
+  auto mallocFn = IGM.getMallocFunctionPointer();
+  auto *call = Builder.CreateCall(mallocFn, {size});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.C_CC);
+
+  auto address = Address(call, IGM.Int8Ty, align);
+  return StackAddress(address, StackAddress::NonNested, call);
+}
+
+void IRGenFunction::emitNonNestedStackDeallocation(StackAddress address) {
+  assert(address.getKind() == StackAddress::NonNested);
+  auto *call = Builder.CreateCall(IGM.getFreeFunctionPointer(),
+                                  {address.getExtraInfo()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.C_CC);
+}
+
 /// Emit a dynamic alloca call to allocate enough memory to hold an object of
 /// type 'T' and an optional llvm.stackrestore point if 'isInEntryBlock' is
 /// false.
 StackAddress IRGenFunction::emitDynamicAlloca(SILType T,
                                               const llvm::Twine &name) {
   llvm::Value *size = emitLoadOfSize(*this, T);
-  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), AllowsTaskAlloc,
+  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(MaximumAlignment),
+                           AllowsTaskAlloc,
                            /*mallocTypeId=*/nullptr, name);
 }
 
@@ -581,12 +709,12 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     // The task allocator wants size increments in the multiple of
     // MaximumAlignment.
     byteCount = alignUpToMaximumAlignment(IGM.SizeTy, byteCount);
-    auto address = emitTaskAlloc(byteCount, align);
-    auto stackAddress = StackAddress{address, address.getAddress()};
-    stackAddress = stackAddress.withAddress(
-        Builder.CreateElementBitCast(stackAddress.getAddress(), eltTy));
-    return stackAddress;
-    // In coroutines, call llvm.coro.alloca.alloc.
+    auto allocation = emitTaskAlloc(byteCount, align);
+    auto address = Builder.CreateElementBitCast(allocation, eltTy);
+    return StackAddress(address, StackAddress::TaskAlloc,
+                        allocation.getAddress());
+
+  // In coroutines, call llvm.coro.alloca.alloc.
   } else if (isCoroutine()) {
     // NOTE: llvm does not support dynamic allocas in coroutines.
 
@@ -615,11 +743,9 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     auto ptr = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_get,
                                            {allocToken});
 
-    auto stackAddress =
-        StackAddress{Address(ptr, IGM.Int8Ty, align), allocToken};
-    stackAddress = stackAddress.withAddress(
-        Builder.CreateElementBitCast(stackAddress.getAddress(), eltTy));
-    return stackAddress;
+    auto address =
+      Builder.CreateElementBitCast(Address(ptr, IGM.Int8Ty, align), eltTy);
+    return StackAddress(address, StackAddress::CoroAlloc, allocToken);
   }
 
   // Otherwise, use a dynamic alloca.
@@ -634,7 +760,10 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
         {IGM.DataLayout.getAllocaPtrType(IGM.getLLVMContext())}, {}, "spsave");
   }
 
-  // Emit the dynamic alloca.
+  // Emit the dynamic alloca. We delete CreateAlloca on our IRBuilder
+  // subclass because we don't want code to naively create dynamic allocas,
+  // but in this case we really do want to use it, so we have to look
+  // around that.
   auto *alloca = Builder.IRBuilderBase::CreateAlloca(eltTy, arraySize, name);
   alloca->setAlignment(llvm::MaybeAlign(align.getValue()).valueOrOne());
 
@@ -642,17 +771,25 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
          getActiveDominancePoint().isUniversal() &&
              "Must be in entry block if we insert dynamic alloca's without "
              "stackrestores");
-  return {Address(alloca, eltTy, align), stackRestorePoint};
+  auto addr = Address(alloca, eltTy, align);
+  return StackAddress(addr, StackAddress::DynamicAlloca, stackRestorePoint);
 }
 
 /// Deallocate dynamic alloca's memory if requested by restoring the stack
 /// location before the dynamic alloca's call.
 void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
-                                                bool allowTaskDealloc,
                                                 bool useTaskDeallocThrough,
                                                 bool forCalleeCoroutineFrame) {
+  assert(address.getKind() == StackAddress::DynamicAlloca ||
+         address.getKind() == StackAddress::TaskAlloc ||
+         address.getKind() == StackAddress::CoroAlloc);
+
+  if (!address.getAddress().isValid())
+    return;
+
   // Async function use taskDealloc.
-  if (allowTaskDealloc && isAsync() && address.getAddress().isValid()) {
+  if (address.getKind() == StackAddress::TaskAlloc) {
+    assert(isAsync());
     if (useTaskDeallocThrough) {
       emitTaskDeallocThrough(
           Address(address.getExtraInfo(), IGM.Int8Ty, address.getAlignment()));
@@ -662,12 +799,13 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
         Address(address.getExtraInfo(), IGM.Int8Ty, address.getAlignment()));
     return;
   }
+
   // In coroutines, unconditionally call llvm.coro.alloca.free.
   // Except if the address is invalid, this happens when this is a StackAddress
   // for a partial_apply [stack] that did not need a context object on the
   // stack.
-  else if (isCoroutine() && address.getAddress().isValid()) {
-    // NOTE: llvm does not support dynamic allocas in coroutines.
+  if (address.getKind() == StackAddress::CoroAlloc) {
+    assert(isCoroutine());
 
     auto allocToken = address.getExtraInfo();
     if (!allocToken) {
@@ -684,7 +822,9 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
                                 allocToken);
     return;
   }
-  // Otherwise, call llvm.stackrestore if an address was saved.
+
+  // Otherwise, call llvm.stackrestore if we performed a stacksave.
+  assert(address.getKind() == StackAddress::DynamicAlloca);
   auto savedSP = address.getExtraInfo();
   if (savedSP == nullptr)
     return;
@@ -1016,6 +1156,29 @@ llvm::Value *irgen::emitLoadOfIsBitwiseTakable(IRGenFunction &IGF, SILType T) {
   auto masked = IGF.Builder.CreateAnd(flags, mask);
   return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getInt32(0),
                                   flags->getName() + ".isBitwiseTakable");
+}
+
+/// Load the 'isBitwiseBorrowable' valueWitness from the given table as an i1.
+llvm::Value *irgen::emitLoadOfIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) {
+  auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
+
+  // Bitwise-takable implies bitwise-borrowable, and the not-bitwise-borrowable
+  // bit may be left indeterminate if the type is already not-bitwise-takable. 
+  // So the type is bitwise-borrowable only when both bits are zero.
+  auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsNonBitwiseBorrowable
+                               | ValueWitnessFlags::IsNonBitwiseTakable);
+  auto masked = IGF.Builder.CreateAnd(flags, mask);
+  return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getInt32(0),
+                                  flags->getName() + ".isBitwiseBorrowable");
+}
+
+/// Load the 'isAddressableForDependencies' valueWitness from the given table as an i1.
+llvm::Value *irgen::emitLoadOfIsAddressableForDependencies(IRGenFunction &IGF, SILType T) {
+  auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
+  auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsAddressableForDependencies);
+  auto masked = IGF.Builder.CreateAnd(flags, mask);
+  return IGF.Builder.CreateICmpNE(masked, IGF.IGM.getInt32(0),
+                                  flags->getName() + ".isAddressableForDependencies");
 }
 
 /// Load the 'isInline' valueWitness from the given table as an i1.

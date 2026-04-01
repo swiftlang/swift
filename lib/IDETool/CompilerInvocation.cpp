@@ -87,8 +87,10 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
   assert(FileSystem);
 
   llvm::SmallString<128> PrimaryFile;
-  if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
-    PrimaryFile = UnresolvedPrimaryFile;
+  if (!UnresolvedPrimaryFile.empty()) {
+    if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
+      PrimaryFile = UnresolvedPrimaryFile;
+  }
 
   unsigned primaryCount = 0;
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
@@ -267,7 +269,8 @@ bool ide::initCompilerInvocation(
 bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
                                          CompilerInvocation &Invok,
                                          std::string &Error) {
-  const auto VFS = llvm::vfs::getRealFileSystem();
+  const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+      llvm::vfs::createPhysicalFileSystem();
 
   clang::TextDiagnosticBuffer DiagBuf;
   clang::DiagnosticOptions DiagOpts;

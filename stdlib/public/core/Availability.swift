@@ -75,7 +75,7 @@ public func _stdlib_isOSVersionAtLeast_AEIC(
   _ minor: Builtin.Word,
   _ patch: Builtin.Word
 ) -> Builtin.Int1 {
-#if (os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) || os(Android)) && SWIFT_RUNTIME_OS_VERSIONING
+#if (os(anyAppleOS) || os(Android)) && SWIFT_RUNTIME_OS_VERSIONING
   if Int(major) == 9999 {
     return true._value
   }
@@ -258,8 +258,10 @@ extension _SwiftStdlibVersion {
   public static var v6_2_0: Self { Self(_value: 0x060200) }
   @_alwaysEmitIntoClient
   public static var v6_3_0: Self { Self(_value: 0x060300) }
+  @_alwaysEmitIntoClient
+  public static var v6_4_0: Self { Self(_value: 0x060400) }
 
-  private static var _current: Self { .v6_3_0 }
+  private static var _current: Self { .v6_4_0 }
 
 #if hasFeature(Macros)
   @available(SwiftStdlib 5.7, *)

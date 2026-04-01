@@ -2288,6 +2288,7 @@ sil [ossa] @testUnreachable1NoDestroy : $@convention(thin) <T> () -> () {
 bb0:
     %instance = apply undef<T>() : $@convention(thin) <τ> () -> @out τ
     apply undef<T>(%instance) : $@convention(thin) <τ> (@in_guaranteed τ) -> ()
+    destroy_value [dead_end] %instance
     unreachable
 }
 
@@ -2934,6 +2935,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @test_store_borrow_1_copy_addr : {{.*}} {
+// CHECK:         alloc_stack
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack
 // CHECK:         apply undef<T>([[ADDR]])
 // CHECK:         [[COPY:%[^,]+]] = alloc_stack

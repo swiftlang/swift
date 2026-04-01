@@ -23,6 +23,7 @@
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/ExportKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
@@ -42,6 +43,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/WarningGroupBehavior.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -3678,6 +3680,38 @@ public:
   }
 };
 
+class WarnAttr : public DeclAttribute {
+public:
+  WarnAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior,
+           std::optional<StringRef> Reason, SourceLoc AtLoc, SourceRange Range,
+           bool Implicit)
+      : DeclAttribute(DeclAttrKind::Warn, AtLoc, Range, Implicit),
+        DiagnosticBehavior(Behavior), DiagnosticGroupID(DiagnosticGroupID),
+        Reason(Reason) {}
+
+  WarnAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior, bool Implicit)
+      : WarnAttr(DiagnosticGroupID, Behavior, std::nullopt, SourceLoc(),
+                 SourceRange(), Implicit) {}
+
+  WarningGroupBehavior DiagnosticBehavior;
+  DiagGroupID DiagnosticGroupID;
+  const std::optional<StringRef> Reason;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Warn;
+  }
+
+  WarnAttr *clone(ASTContext &ctx) const {
+    return new (ctx) WarnAttr(DiagnosticGroupID, DiagnosticBehavior, Reason,
+                              AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const WarnAttr *other,
+                    Decl *attachedTo) const {
+    return Reason == other->Reason;
+  }
+};
+
 
 /// The kind of unary operator, if any.
 enum class UnaryOperatorKind : uint8_t { None, Prefix, Postfix };
@@ -4240,6 +4274,17 @@ public:
 
   SWIFT_DEBUG_DUMPER(dump());
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;
+
+  /// Returns true if multiple instances of an attribute kind
+  /// can appear on a type.
+  static constexpr bool allowMultipleAttributes(TypeAttrKind TK) {
+    switch (TK) {
+    case swift::TypeAttrKind::Lifetime:
+      return true;
+    default:
+      return false;
+    }
+  }
 };
 
 class AtTypeAttrBase : public TypeAttribute {
@@ -4345,6 +4390,19 @@ public:
   SourceLoc getDifferentiabilityLoc() const {
     return DifferentiabilityLoc;
   }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+class LifetimeTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Lifetime> {
+  LifetimeEntry *entry;
+
+public:
+  LifetimeTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                   LifetimeEntry *entry)
+      : SimpleTypeAttr(atLoc, kwLoc, parens), entry(entry) {}
+
+  LifetimeEntry *getLifetimeEntry() const { return entry; }
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };

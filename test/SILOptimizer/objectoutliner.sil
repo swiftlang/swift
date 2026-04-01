@@ -22,6 +22,7 @@ sil_global [let] @g1 : $Int32 = {
 }
 
 sil_global [let] @gobj : $Obj
+sil_global [let] @gobj2 : $Obj
 sil_global @gobj_var : $Obj
 
 // CHECK-LABEL: sil_global private [let] @outline_global_simpleTv_ : $Obj = {
@@ -508,6 +509,24 @@ sil [global_init_once_fn] @init_gobj : $@convention(c) (Builtin.RawPointer) -> (
 bb0(%0 : $Builtin.RawPointer):
   alloc_global @gobj
   %2 = global_addr @gobj : $*Obj
+  %3 = integer_literal $Builtin.Int64, 27
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = alloc_ref $Obj
+  %8 = end_init_let_ref %5 : $Obj
+  %9 = ref_element_addr %8 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  store %8 to %2 : $*Obj
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil public_external [global_init_once_fn] @dont_outline_in_external_func :
+// CHECK-NOT:     global_value
+// CHECK:       } // end sil function 'dont_outline_in_external_func'
+sil public_external [global_init_once_fn] @dont_outline_in_external_func : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @gobj2
+  %2 = global_addr @gobj2 : $*Obj
   %3 = integer_literal $Builtin.Int64, 27
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = alloc_ref $Obj

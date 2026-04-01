@@ -372,7 +372,7 @@ struct ValueOwnershipKind {
         return OwnershipKind::Owned;
       case OwnershipKind::Guaranteed:
       case OwnershipKind::Unowned:
-        ABORT("Cannot initialize a nonCopyable type with a guaranteed value");
+        return *this;
       }
     }
     return *this;
@@ -1237,6 +1237,11 @@ private:
   template <unsigned N> friend class FixedOperandList;
   friend class TrailingOperandsList;
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Operand &op) {
+  op.print(OS);
+  return OS;
+}
 
 /// A class which adapts an array of Operands into an array of Values.
 ///

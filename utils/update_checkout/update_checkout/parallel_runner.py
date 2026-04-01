@@ -1,5 +1,5 @@
 import sys
-from multiprocessing import cpu_count
+import os
 import time
 from typing import Callable, List, Any, Optional, Tuple, Union
 from threading import Lock, Thread, Event
@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 import shutil
 
 from .git_command import GitException
-
 from .runner_arguments import (
     RunnerArguments,
     AdditionalSwiftSourcesArguments,
@@ -84,14 +83,14 @@ class ParallelRunner:
     ):
         def run_safely(*args, **kwargs):
             try:
-                fn(*args, **kwargs)
+                return fn(*args, **kwargs)
             except GitException as e:
                 return e
 
         if n_threads == 0:
             # Limit the number of threads as the performance regresses if the
             # number is too high.
-            n_threads = min(cpu_count() * 2, 16)
+            n_threads = min(os.cpu_count() * 2, 16)
         self._n_threads = n_threads
         self._monitor_polling_period = 0.1
         self._terminal_width = shutil.get_terminal_size().columns
@@ -158,6 +157,9 @@ class ParallelRunner:
         for r in results:
             if r is None:
                 continue
+            if isinstance(r, tuple) and len(r) == 3:
+                if r[1] == 0:
+                    continue
             if fail_count == 0:
                 print(f"======{operation} FAILURES======")
             fail_count += 1

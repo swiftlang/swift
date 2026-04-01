@@ -90,6 +90,14 @@ enum class ExtraStringFlavor : uint8_t {
   WasmImportModule,
   /// wasm import field/name for @_extern(wasm)
   WasmImportName,
+<<<<<<< HEAD
+=======
+};
+
+enum class IsNestedEncoding : uint8_t {
+  IsNotNested,
+  IsNested,
+>>>>>>> origin/main
 };
 
 /// The record types within the "sil-index" block.
@@ -546,7 +554,7 @@ namespace sil_block {
 
   // SIL instructions with one type. (alloc_stack)
   using SILOneTypeLayout = BCRecordLayout<SIL_ONE_TYPE, SILInstOpCodeField,
-                                          BCFixed<4>, // Optional attributes
+                                          BCFixed<5>, // Optional attributes
                                           TypeIDField, SILTypeCategoryField>;
 
   // SIL instructions with one typed valueref. (dealloc_stack, return)

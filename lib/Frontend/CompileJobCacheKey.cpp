@@ -152,10 +152,10 @@ llvm::Error swift::printCompileJobCacheKey(llvm::cas::ObjectStore &CAS,
   if (Err)
     return Err;
 
-  llvm::outs() << "Cache Key " << CAS.getID(Key).toString() << "\n";
-  llvm::outs() << "Swift Compiler Invocation Info:\n";
-  llvm::outs() << BaseStr;
-  llvm::outs() << "Input index: " << InputIndex << "\n";
+  OS << "Cache Key " << CAS.getID(Key).toString() << "\n";
+  OS << "Swift Compiler Invocation Info:\n";
+  OS << BaseStr;
+  OS << "Input index: " << InputIndex << "\n";
 
   return llvm::Error::success();
 }

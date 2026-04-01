@@ -1825,11 +1825,6 @@ namespace {
       return cast<LoadableTypeInfo>(*ElementsWithPayload[0].ti);
     }
 
-    llvm::Value *emitPayloadMetadataForLayout(IRGenFunction &IGF,
-                                     SILType T) const {
-      return IGF.emitTypeMetadataRefForLayout(getPayloadType(IGF.IGM, T));
-    }
-
     /// More efficient value semantics implementations for certain enum layouts.
     enum CopyDestroyStrategy {
       /// No special behavior.
@@ -2676,8 +2671,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRetain(
-              IGF, e, /*needsNullCheck*/ true);
+          getPayloadTypeInfo().strongCustomRetain(IGF, e,
+                                                  /*needsNullCheck*/ true);
           return;
         }
 
@@ -2713,8 +2708,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRelease(
-              IGF, e, /*needsNullCheck*/ true);
+          getPayloadTypeInfo().strongCustomRelease(IGF, e,
+                                                   /*needsNullCheck*/ true);
           return;
         }
 

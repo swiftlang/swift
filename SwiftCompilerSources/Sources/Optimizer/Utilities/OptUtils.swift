@@ -260,7 +260,12 @@ extension ApplySite {
                                                 capturedArguments: newArguments,
                                                 calleeConvention: partialAp.calleeConvention,
                                                 hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
+<<<<<<< HEAD
                                                 isOnStack: partialAp.isOnStack)
+=======
+                                                isOnStack: partialAp.isOnStack,
+                                                isNested:  partialAp.isNested)
+>>>>>>> origin/main
       partialAp.replace(with: newApply, context)
 
     case let tryApply as TryApplyInst:
@@ -441,6 +446,14 @@ extension Instruction {
       // An extend_lifetime can only be removed if the operand is also removed.
       // If its operand is trivial, it will be removed by MandatorySimplification.
       return false
+    case let dsi as DestructureStructInst:
+      // A dead `destructure_struct` with an owned argument can appear for a non-copyable or
+      // non-escapable struct which has only trivial elements. The instruction is not trivially
+      // dead because it ends the lifetime of its operand.
+      if dsi.struct.ownership == .owned {
+        return false
+      }
+      return true
     default:
       break
     }
@@ -1042,6 +1055,23 @@ func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalTy
   }
 }
 
+func isCastSupportedInEmbeddedSwift(from sourceType: Type,
+                                    to destType: Type ) -> Bool {
+  if !sourceType.isExistential {
+    return false
+  }
+  if destType.hasArchetype {
+    return false
+  }
+
+  if !destType.isStruct && !destType.isClass && !destType.isEnum &&
+      !destType.isTuple && !destType.isLoweredFunction {
+    return false
+  }
+
+  return true
+}
+
 extension CheckedCastAddrBranchInst {
   var dynamicCastResult: Bool? {
     switch classifyDynamicCastBridged(bridged) {
@@ -1050,6 +1080,18 @@ extension CheckedCastAddrBranchInst {
       case .willFail:    return false
       default: fatalError("unknown result from classifyDynamicCastBridged")
     }
+  }
+
+  var supportedInEmbeddedSwift: Bool {
+    return isCastSupportedInEmbeddedSwift(from: source.type,
+                                          to: destination.type)
+  }
+}
+
+extension UnconditionalCheckedCastAddrInst {
+  var supportedInEmbeddedSwift: Bool {
+    return isCastSupportedInEmbeddedSwift(from: source.type,
+                                          to: destination.type)
   }
 }
 
@@ -1141,9 +1183,6 @@ extension Type {
   /// False if expanding a type is invalid. For example, expanding a
   /// struct-with-deinit drops the deinit.
   func shouldExpand(_ context: some Context) -> Bool {
-    if !context.options.useAggressiveReg2MemForCodeSize {
-      return true
-    }
     return context.bridgedPassContext.shouldExpand(self.bridged)
   }
 }
@@ -1210,6 +1249,10 @@ func cloneFunction(from originalFunction: Function, toEmpty targetFunction: Func
   var cloner = Cloner(cloneToEmptyFunction: targetFunction, context)
   defer { cloner.deinitialize() }
   cloner.cloneFunctionBody(from: originalFunction)
+
+  // Cloning a whole function may clone some `unreachable` instructions but doesn't
+  // introduce any incomplete lifetimes in the cloned function.
+  context.setNeedCompleteLifetimes(to: false)
 }
 
 func cloneAndSpecializeFunction(from originalFunction: Function,
@@ -1221,6 +1264,10 @@ func cloneAndSpecializeFunction(from originalFunction: Function,
                                       substitutions: substitutions, context)
   defer { cloner.deinitialize() }
   cloner.cloneFunctionBody()
+
+  // Cloning a whole function may clone some `unreachable` instructions but doesn't
+  // introduce any incomplete lifetimes in the cloned function.
+  context.setNeedCompleteLifetimes(to: false)
 }
 
 let destroyBarrierTest = FunctionTest("destroy_barrier") { function, arguments, context in

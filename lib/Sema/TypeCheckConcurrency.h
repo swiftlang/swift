@@ -231,6 +231,8 @@ struct ActorReferenceResult {
   const ActorIsolation isolation;
 
 private:
+  struct Builder;
+
   static ActorReferenceResult
   forSameConcurrencyDomain(ActorIsolation isolation,
                            Options options = std::nullopt);
@@ -557,7 +559,11 @@ bool diagnoseIfAnyNonSendableTypes(
 
         if (!diagnosed) {
           ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
+<<<<<<< HEAD
               .limitBehaviorUntilLanguageMode(behavior, 6)
+=======
+              .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6)
+>>>>>>> origin/main
               .limitBehaviorIf(preconcurrency);
           diagnosed = true;
         }

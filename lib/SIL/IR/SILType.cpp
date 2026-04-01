@@ -779,6 +779,9 @@ bool SILFunctionType::isAddressable(unsigned paramIdx, SILModule &module,
                                     Lowering::TypeConverter &typeConverter,
                                     TypeExpansionContext expansion) {
   SILParameterInfo paramInfo = getParameters()[paramIdx];
+  if (paramIdx == getSelfParameterIndex() && hasGuaranteedAddressResult()) {
+    return getSelfParameter().isFormalIndirect();
+  }
   for (auto &depInfo : getLifetimeDependencies()) {
     auto *addressableIndices = depInfo.getAddressableIndices();
     if (addressableIndices && addressableIndices->contains(paramIdx)) {
@@ -1147,10 +1150,8 @@ bool SILType::isEscapable(const SILFunction &function) const {
   // TODO: Support ~Escapable in parameter packs.
   //
   // Treat all other SIL-specific types as Escapable.
-  if (isa<SILBlockStorageType,
-          SILBoxType,
-          SILPackType,
-          SILTokenType>(ty)) {
+  if (isa<SILBlockStorageType>(ty) || isa<SILBoxType>(ty) ||
+      isa<SILPackType>(ty) || isa<SILTokenType>(ty)) {
     return true;
   }
   return ty->isEscapable();
@@ -1185,10 +1186,8 @@ bool SILType::isMoveOnly(bool orWrapped) const {
     return false;
 
   // Treat all other SIL-specific types as Copyable.
-  if (isa<SILBlockStorageType,
-          SILBoxType,
-          SILPackType,
-          SILTokenType>(ty)) {
+  if (isa<SILBlockStorageType>(ty) || isa<SILBoxType>(ty) ||
+      isa<SILPackType>(ty) || isa<SILTokenType>(ty)) {
     return false;
   }
 
@@ -1259,6 +1258,12 @@ bool SILType::isAddressableForDeps(const SILFunction &function) const {
   auto contextType =
     hasTypeParameter() ? function.mapTypeIntoEnvironment(*this) : *this;
   auto properties = function.getTypeProperties(contextType);
+  return properties.isAddressableForDependencies();
+}
+
+bool SILType::isAddressableForDeps(SILModule &M,
+                                   TypeExpansionContext context) const {
+  auto properties = M.Types.getTypeProperties(*this, context);
   return properties.isAddressableForDependencies();
 }
 

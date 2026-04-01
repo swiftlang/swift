@@ -216,7 +216,9 @@ public:
 
   ReabstractionInfo(CanSILFunctionType substitutedType,
                     SILDeclRef methodDecl,
+                    bool convertIndirectToDirect,
                     SILModule &M) :
+    ConvertIndirectToDirect(convertIndirectToDirect),
     SubstitutedType(substitutedType),
     methodDecl(methodDecl),
     M(&M), isWholeModule(M.isWholeModule()) {}

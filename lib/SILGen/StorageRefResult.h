@@ -1,7 +1,11 @@
 #ifndef SWIFT_SILGEN_STORAGEREFRESULT_H
 #define SWIFT_SILGEN_STORAGEREFRESULT_H
 
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Builtins.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/SIL/SILModule.h"
 
 namespace swift {
 /// Container to hold the result of a search for the storage reference
@@ -42,7 +46,8 @@ public:
     return StorageRefResult(storageRef, newRoot);
   }
 
-  static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
+  static inline StorageRefResult
+  findStorageReferenceExprForBorrow(SILModule &M, Expr *e) {
     e = e->getSemanticsProvidingExpr();
 
     // These are basically defined as the cases implemented by SILGenLValue.
@@ -65,36 +70,57 @@ public:
       // sub-expression is a storage reference, but don't return the
       // sub-expression.
     } else if (auto tue = dyn_cast<TupleElementExpr>(e)) {
-      if (auto result = findStorageReferenceExprForBorrow(tue->getBase()))
+      if (auto result = findStorageReferenceExprForBorrow(M, tue->getBase()))
         return result.withTransitiveRoot(tue);
 
     } else if (auto fve = dyn_cast<ForceValueExpr>(e)) {
-      if (auto result = findStorageReferenceExprForBorrow(fve->getSubExpr()))
+      if (auto result = findStorageReferenceExprForBorrow(M, fve->getSubExpr()))
         return result.withTransitiveRoot(fve);
 
     } else if (auto boe = dyn_cast<BindOptionalExpr>(e)) {
-      if (auto result = findStorageReferenceExprForBorrow(boe->getSubExpr()))
+      if (auto result = findStorageReferenceExprForBorrow(M, boe->getSubExpr()))
         return result.withTransitiveRoot(boe);
 
     } else if (auto oe = dyn_cast<OpenExistentialExpr>(e)) {
-      if (findStorageReferenceExprForBorrow(oe->getExistentialValue()))
-        if (auto result = findStorageReferenceExprForBorrow(oe->getSubExpr()))
+      if (findStorageReferenceExprForBorrow(M, oe->getExistentialValue()))
+        if (auto result = findStorageReferenceExprForBorrow(M, oe->getSubExpr()))
           return result.withTransitiveRoot(oe);
 
     } else if (auto bie = dyn_cast<DotSyntaxBaseIgnoredExpr>(e)) {
-      if (auto result = findStorageReferenceExprForBorrow(bie->getRHS()))
+      if (auto result = findStorageReferenceExprForBorrow(M, bie->getRHS()))
         return result.withTransitiveRoot(bie);
 
     } else if (auto te = dyn_cast<AnyTryExpr>(e)) {
-      if (auto result = findStorageReferenceExprForBorrow(te->getSubExpr()))
+      if (auto result = findStorageReferenceExprForBorrow(M, te->getSubExpr()))
         return result.withTransitiveRoot(te);
 
     } else if (auto ioe = dyn_cast<InOutExpr>(e)) {
-      if (auto result = findStorageReferenceExprForBorrow(ioe->getSubExpr()))
+      if (auto result = findStorageReferenceExprForBorrow(M, ioe->getSubExpr()))
         return result.withTransitiveRoot(ioe);
     } else if (auto le = dyn_cast<LoadExpr>(e)) {
-      if (auto result = findStorageReferenceExprForBorrow(le->getSubExpr()))
+      if (auto result = findStorageReferenceExprForBorrow(M, le->getSubExpr()))
         return result.withTransitiveRoot(le);
+    } else if (auto ae = dyn_cast<ApplyExpr>(e)) {
+      // Some builtins can produce borrows as a special case.
+      auto declRef = ae->getFn()->getReferencedDecl();
+      if (!declRef) {
+        return StorageRefResult();
+      }
+      if (!declRef.getDecl()->getModuleContext()->isBuiltinModule()) {
+        return StorageRefResult();
+      }
+
+      auto &builtinInfo
+        = M.getBuiltinInfo(declRef.getDecl()->getBaseIdentifier());
+
+      if (builtinInfo.ID != BuiltinValueKind::DereferenceBorrow) {
+        return StorageRefResult();
+      }
+
+      if (auto result = findStorageReferenceExprForBorrow(M,
+                                                  ae->getArgs()->getExpr(0))) {
+        return result.withTransitiveRoot(e);
+      }
     }
 
     return StorageRefResult();

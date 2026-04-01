@@ -96,6 +96,14 @@ FUNCTION(AllocObject, Swift, swift_allocObject, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::Allocating),
          UNKNOWN_MEMEFFECTS)
 
+// RefCounted *swift_allocObjectTyped(Metadata *type, size_t size, size_t alignMask, uint64_t typeId);
+FUNCTION(AllocObjectTyped, Swift, swift_allocObjectTyped, C_CC, AlwaysAvailable,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int64Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Allocating),
+         UNKNOWN_MEMEFFECTS)
+
 // HeapObject *swift_initStackObject(HeapMetadata const *metadata,
 //                                   HeapObject *object);
 FUNCTION(InitStackObject, Swift, swift_initStackObject, C_CC, AlwaysAvailable,
@@ -230,6 +238,14 @@ FUNCTION(NativeStrongRetainDirect, Swift, swift_retainDirect, SwiftDirectRR_CC, 
 
 // void swift_release(void *ptr);
 FUNCTION(NativeStrongReleaseDirect, Swift, swift_releaseDirect, SwiftDirectRR_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_releaseBox(void *ptr);
+FUNCTION(ReleaseBox, Swift, swift_releaseBox, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
@@ -2327,7 +2343,7 @@ FUNCTION(TaskAlloc,
          ARGS(SizeTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         MEMEFFECTS(InaccessibleMemOnly))
 
 // void swift_task_dealloc(void *ptr);
 FUNCTION(TaskDealloc,
@@ -2337,7 +2353,7 @@ FUNCTION(TaskDealloc,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         MEMEFFECTS(InaccessibleMemOnly))
 
 // void swift_task_dealloc_through(void *ptr);
 FUNCTION(TaskDeallocThrough,
@@ -2347,7 +2363,7 @@ FUNCTION(TaskDeallocThrough,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         MEMEFFECTS(InaccessibleMemOnly))
 
 // void swift_task_cancel(AsyncTask *task);
 FUNCTION(TaskCancel,
@@ -2357,7 +2373,7 @@ FUNCTION(TaskCancel,
          ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         MEMEFFECTS(InaccessibleMemOnly))
 
 // AsyncTaskAndContext swift_task_create(
 //     size_t taskCreateFlags,
@@ -2570,7 +2586,7 @@ FUNCTION(AsyncLetBegin,
          ),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         UNKNOWN_MEMEFFECTS)
 
 /// void swift_asyncLet_finish(
 ///     AsyncLet *alet,
@@ -2592,7 +2608,7 @@ FUNCTION(AsyncLetFinish,
          ),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         UNKNOWN_MEMEFFECTS)
 
 /// void swift_task_run_inline(
 ///     OpaqueValue *result,
@@ -2725,6 +2741,36 @@ FUNCTION(TaskLocalValuePop,
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
+
+// void swift_task_cancellationShieldPush();
+FUNCTION(TaskCancellationShieldPush,
+         _Concurrency, swift_task_cancellationShieldPush, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(Int1Ty),
+         ARGS(),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_task_cancellationShieldPop();
+FUNCTION(TaskCancellationShieldPop,
+         _Concurrency, swift_task_cancellationShieldPop, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(),
+         ARGS(),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// bool swift_task_hasActiveCancellationShield(AsyncTask *task);
+FUNCTION(TaskHasActiveCancellationShield,
+         _Concurrency, swift_task_hasActiveCancellationShield, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(Int1Ty),
+         ARGS(SwiftTaskPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         MEMEFFECTS(ReadOnly))
 
 // AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContextWithType(const Metadata *);
 FUNCTION(AutoDiffCreateLinearMapContextWithType,
@@ -3075,6 +3121,39 @@ FUNCTION(MemsetS, c, memset_s, C_CC, AlwaysAvailable,
          RETURNS(Int32Ty),
          ARGS(PtrTy, SizeTy, Int32Ty, SizeTy),
          ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
+// MetadataResponse swift_getBorrowTypeMetadata(MetadataRequest request,
+//                                              Metadata *referent);
+FUNCTION(GetBorrowTypeMetadata,
+         Swift, swift_getBorrowTypeMetadata,
+         SwiftCC, AlwaysAvailable,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, WillReturn),
+         EFFECT(RuntimeEffect::MetaData),
+         MEMEFFECTS(ReadOnly))
+
+// void swift_initBorrow(const Metadata *referent, OpaqueValue *destBorrow,
+//                       OpaqueValue *srcReferent);
+FUNCTION(InitBorrow,
+         Swift, swift_initBorrow,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, OpaquePtrTy, OpaquePtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
+// const OpaqueValue *swift_dereferenceBorrow(Metadata *referent,
+//                                            const OpaqueValue *borrow);
+FUNCTION(DereferenceBorrow,
+         Swift, swift_dereferenceBorrow,
+         C_CC, AlwaysAvailable,
+         RETURNS(OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy, OpaquePtrTy),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(RuntimeEffect::NoEffect),
          UNKNOWN_MEMEFFECTS)
 

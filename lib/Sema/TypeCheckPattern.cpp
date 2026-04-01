@@ -310,6 +310,8 @@ public:
   ALWAYS_RESOLVED_PATTERN(Bool)
 #undef ALWAYS_RESOLVED_PATTERN
 
+  Pattern *visitOpaquePattern(OpaquePattern *P) { return P; }
+
   Pattern *visitBindingPattern(BindingPattern *P) {
     // Keep track of the fact that we're inside of a var/let pattern.  This
     // affects how unqualified identifiers are processed.
@@ -447,16 +449,14 @@ public:
     }
 
     const auto options = TypeResolutionOptions(std::nullopt) |
-                         TypeResolutionFlags::SilenceErrors;
+                         TypeResolutionFlags::SilenceDiagnostics;
 
     // See if the repr resolves to a type.
     const auto ty = TypeResolution::resolveContextualType(
         repr, DC, options,
-        [](auto unboundTy) {
-          // FIXME: Don't let unbound generic types escape type resolution.
-          // For now, just return the unbound generic type.
-          return unboundTy;
-        },
+        // FIXME: Don't let unbound generic types escape type resolution.
+        // For now, just return the unbound generic type.
+        TypeResolution::defaultUnboundTypeOpener,
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get,
@@ -566,16 +566,14 @@ public:
       auto *qualIdentTR = cast<QualifiedIdentTypeRepr>(repr);
 
       const auto options = TypeResolutionOptions(std::nullopt) |
-                           TypeResolutionFlags::SilenceErrors;
+                           TypeResolutionFlags::SilenceDiagnostics;
 
       // See first if the entire repr resolves to a type.
       const Type enumTy = TypeResolution::resolveContextualType(
           qualIdentTR->getBase(), DC, options,
-          [](auto unboundTy) {
-            // FIXME: Don't let unbound generic types escape type
-            // resolution. For now, just return the unbound generic type.
-            return unboundTy;
-          },
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          TypeResolution::defaultUnboundTypeOpener,
           // FIXME: Don't let placeholder types escape type resolution.
           // For now, just return the placeholder type.
           PlaceholderType::get,
@@ -644,7 +642,8 @@ Pattern *ResolvePatternRequest::evaluate(Evaluator &evaluator, Pattern *P,
     // If they wrote a "x?" pattern, they probably meant "if let x".
     // Check for this and recover nicely if they wrote that.
     if (auto *OSP = dyn_cast<OptionalSomePattern>(Body)) {
-      if (!OSP->getSubPattern()->isRefutablePattern()) {
+      if (!OSP->getSubPattern()->isRefutablePattern(
+              /*allowIsPatternCoercion*/ false)) {
         Context.Diags.diagnose(OSP->getStartLoc(),
                                diag::iflet_implicitly_unwraps)
           .highlight(OSP->getSourceRange())
@@ -656,7 +655,7 @@ Pattern *ResolvePatternRequest::evaluate(Evaluator &evaluator, Pattern *P,
     // If the pattern bound is some other refutable pattern, then they
     // probably meant:
     //   if case let <pattern> =
-    if (Body->isRefutablePattern()) {
+    if (Body->isRefutablePattern(/*allowIsPatternCoercion*/ false)) {
       Context.Diags.diagnose(P->getLoc(), diag::iflet_pattern_matching)
         .fixItInsert(P->getLoc(), "case ");
       return P;
@@ -837,6 +836,10 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
 
     return subType;
   }
+
+  case PatternKind::Opaque:
+    // Opaque patterns already have an assigned type.
+    return cast<OpaquePattern>(P)->getSubPattern()->getType();
 
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
@@ -1078,9 +1081,15 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
       ctx.Diags
           .diagnose(NLE->getLoc(), diag::value_type_comparison_with_nil_illegal,
                     patternTy)
+<<<<<<< HEAD
           .warnUntilLanguageMode(6);
 
       if (ctx.isLanguageModeAtLeast(6))
+=======
+          .warnUntilLanguageMode(LanguageMode::v6);
+
+      if (ctx.isLanguageModeAtLeast(LanguageMode::v6))
+>>>>>>> origin/main
         return nullptr;
     }
   }
@@ -1150,6 +1159,14 @@ Pattern *TypeChecker::coercePatternToType(
     PP->setType(sub->getType());
     return P;
   }
+
+  case PatternKind::Opaque: {
+    auto *OP = cast<OpaquePattern>(P);
+    OP->setType(OP->getSubPattern()->getType());
+    ASSERT(OP->getType()->isEqual(type) && "Opaque pattern changed type?");
+    return OP;
+  }
+
   case PatternKind::Binding: {
     auto VP = cast<BindingPattern>(P);
 

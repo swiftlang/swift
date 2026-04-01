@@ -413,6 +413,19 @@ public:
       Flags |= CapturedValue::IsNoEscape;
 
     addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
+
+    // Check is the local function captures and isolated parameter, and if so
+    // propagate it up.
+    if (auto *F = dyn_cast<FuncDecl>(D)) {
+      auto isolation = getActorIsolation(F);
+
+      if (isolation.isActorInstanceIsolated() &&
+          isolation.isActorInstanceForCapture()) {
+        addCapture(CapturedValue(isolation.getActorInstance(), Flags,
+                                 DRE->getStartLoc()));
+      }
+    }
+
     return Action::SkipNode(DRE);
   }
 
@@ -742,7 +755,7 @@ public:
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *forEachStmt = dyn_cast<ForEachStmt>(S)) {
       if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(forEachStmt->getParsedSequence())) {
+              dyn_cast<PackExpansionExpr>(forEachStmt->getSequence())) {
         if (auto *env = expansion->getGenericEnvironment()) {
           // Remember this generic environment, so that it remains on the
           // visited stack until the end of the for .. in loop.
@@ -758,7 +771,7 @@ public:
   PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
     if (auto *forEachStmt = dyn_cast<ForEachStmt>(S)) {
       if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(forEachStmt->getParsedSequence())) {
+              dyn_cast<PackExpansionExpr>(forEachStmt->getSequence())) {
         if (auto *env = expansion->getGenericEnvironment()) {
           assert(VisitingForEachEnv.back() == env);
           (void) env;
@@ -798,7 +811,7 @@ static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
   // bodies, where it is both unnecessary and likely to lead to bad diagnostics.
   // We already suppress the executor check in defer bodies.
   if (auto FD = dyn_cast<FuncDecl>(AFD))
-    if (FD->isDeferBody())
+    if (FD->isDeferBody() && !FD->isAsync())
       return false;
 
   return true;

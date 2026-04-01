@@ -549,8 +549,6 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                            Type builderType);
 
-bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
-
 void collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced);
 
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
@@ -727,12 +725,6 @@ void filterSolutionsForCodeCompletion(
 bool typeCheckForCodeCompletion(
     constraints::SyntacticElementTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
-
-/// Check the key-path expression.
-///
-/// Returns the type of the last component of the key-path.
-std::optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
-                                         bool requireResultType = false);
 
 /// Type check whether the given type declaration includes members of
 /// unsupported recursive value types.
@@ -927,6 +919,11 @@ void checkConformancesInContext(IterableDeclContext *idc);
 /// Check that the type of the given property conforms to NSCopying.
 ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 
+/// Simplify generic argument expressions which are type sugar productions that
+/// got parsed as expressions due to the parser not knowing which identifiers
+/// are type names.
+TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
+
 /// \name Name lookup
 ///
 /// Routines that perform name lookup.
@@ -1103,6 +1100,11 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 std::optional<Diagnostic>
 diagnosticIfDeclCannotBeUnavailable(const Decl *D, SemanticAvailableAttr attr);
 
+/// Emit a warning on the first use of a compatibility memberwise initializer
+/// overload in a SourceFile.
+void diagnoseCompatMemberwiseInitIfNeeded(const ConstructorDecl *init,
+                                          SourceLoc loc);
+
 /// Checks whether the required range of versions of the compilation's target
 /// platform are available at the given `SourceRange`. If not, `Diagnose` is
 /// invoked.
@@ -1150,14 +1152,9 @@ void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkCallerSideDefaultArgumentEffects(DeclContext *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 
 /// Whether the given expression can throw, and if so, the thrown type.
 std::optional<Type> canThrow(ASTContext &ctx, Expr *expr);
-
-/// Whether the given for..each statement can throw, and if so, the thrown
-/// error type.
-std::optional<Type> canThrow(ASTContext &ctx, ForEachStmt *forEach);
 
 /// Determine the error type that is thrown out of the body of the given
 /// do-catch statement.
@@ -1559,6 +1556,12 @@ bool maybeDiagnoseMissingImportForMember(
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
+
+// Guide ForEachStmt type-checking by indicating whether the BorrowingSequence
+// protocol should be used, thus enabling Borrowing iteration for a given
+// sequence type.
+bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync,
+                                SourceLoc loc, DeclContext *dc);
 
 } // end namespace swift
 

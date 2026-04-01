@@ -36,6 +36,7 @@
 #include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
+#include "llvm/CASUtil/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -60,9 +61,10 @@ llvm::IntrusiveRefCntPtr<SwiftCASOutputBackend> createSwiftCachingOutputBackend(
     llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
     llvm::cas::ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
-    const FrontendOptions &Opts, FrontendOptions::ActionType Action) {
+    const FrontendOptions &Opts, FrontendOptions::ActionType Action,
+    bool WriteOutputHashXAttr) {
   return makeIntrusiveRefCnt<SwiftCASOutputBackend>(
-      CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action);
+      CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action, WriteOutputHashXAttr);
 }
 
 Error cas::CachedResultLoader::replay(CallbackTy Callback) {
@@ -143,11 +145,25 @@ struct CacheInputEntry {
 };
 } // namespace
 
+// Get the output config type from the output file type.
+static llvm::vfs::OutputConfig getOutputConfig(file_types::ID Type) {
+  llvm::vfs::OutputConfig Config;
+  switch(Type) {
+    case file_types::ID::TY_ModuleTrace:
+      // ModuleTrace always appends.
+      return Config.setAtomicWrite().setAppend();
+    default:
+      // By default, only write to the output file when different. This matches
+      // the behavior in `swift::withOutputPath()`.
+      return Config.setAtomicWrite().setOnlyIfDifferent();
+  }
+}
+
 static bool replayCachedCompilerOutputsImpl(
     ArrayRef<CacheInputEntry> Inputs, ObjectStore &CAS, DiagnosticEngine &Diag,
     const FrontendOptions &Opts, CachingDiagnosticsProcessor &CDP,
     DiagnosticHelper *DiagHelper, OutputBackend &Backend, bool CacheRemarks,
-    bool UseCASBackend) {
+    bool UseCASBackend, bool WriteOutputHashXAttr) {
   bool CanReplayAllOutput = true;
   struct OutputEntry {
     std::string Path;
@@ -289,7 +305,7 @@ static bool replayCachedCompilerOutputsImpl(
 
   // Replay the result only when everything is resolved.
   for (auto &Output : OutputProxies) {
-    auto File = Backend.createFile(Output.Path);
+    auto File = Backend.createFile(Output.Path, getOutputConfig(Output.Kind));
     if (!File) {
       Diag.diagnose(SourceLoc(), diag::error_opening_output, Output.Path,
                     toString(File.takeError()));
@@ -317,6 +333,12 @@ static bool replayCachedCompilerOutputsImpl(
                     toString(std::move(E)));
       continue;
     }
+    if (WriteOutputHashXAttr && Output.Kind == file_types::ID::TY_Object) {
+      if (auto E = llvm::cas::writeCASHashXAttr(
+              CAS.getID(Output.Proxy.getRef()), Output.Path))
+        Diag.diagnose(SourceLoc(), diag::error_cas, "writing output hash xattr",
+                      toString(std::move(E)));
+    }
     if (CacheRemarks)
       Diag.diagnose(SourceLoc(), diag::replay_output, Output.Path,
                     Output.Key.toString());
@@ -330,7 +352,8 @@ static bool replayCachedCompilerOutputsImpl(
 bool replayCachedCompilerOutputs(
     ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
     DiagnosticEngine &Diag, const FrontendOptions &Opts,
-    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend) {
+    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend,
+    bool WriteOutputHashXAttr) {
   // Compute all the inputs need replay.
   llvm::SmallVector<CacheInputEntry> Inputs;
   auto AllInputs = Opts.InputsAndOutputs.getAllInputs();
@@ -385,18 +408,20 @@ bool replayCachedCompilerOutputs(
   llvm::vfs::OnDiskOutputBackend Backend;
   return replayCachedCompilerOutputsImpl(Inputs, CAS, Diag, Opts, CDP,
                                          /*DiagHelper=*/nullptr, Backend,
-                                         CacheRemarks, UseCASBackend);
+                                         CacheRemarks, UseCASBackend,
+                                         WriteOutputHashXAttr);
 }
 
 bool replayCachedCompilerOutputsForInput(
     ObjectStore &CAS, ObjectRef OutputRef, const InputFile &Input,
     unsigned InputIndex, DiagnosticEngine &Diag, DiagnosticHelper &DiagHelper,
     OutputBackend &OutBackend, const FrontendOptions &Opts,
-    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend) {
+    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend,
+    bool WriteOutputHashXAttr) {
   llvm::SmallVector<CacheInputEntry> Inputs = {{Input, InputIndex, OutputRef}};
   return replayCachedCompilerOutputsImpl(Inputs, CAS, Diag, Opts, CDP,
                                          &DiagHelper, OutBackend, CacheRemarks,
-                                         UseCASBackend);
+                                         UseCASBackend, WriteOutputHashXAttr);
 }
 
 std::unique_ptr<llvm::MemoryBuffer>
@@ -442,6 +467,45 @@ loadCachedCompileResultFromCacheKey(ObjectStore &CAS, ActionCache &Cache,
     return failure("loading cached results", std::move(Err));
 
   return Buffer;
+}
+
+llvm::Expected<std::optional<llvm::cas::ObjectProxy>>
+loadCachedCompileResultProxy(llvm::cas::ObjectStore &CAS,
+                             llvm::cas::ActionCache &Cache,
+                             llvm::StringRef CacheKey, file_types::ID Kind) {
+
+  auto ID = CAS.parseID(CacheKey);
+  if (!ID)
+    return ID.takeError();
+
+  auto Ref = CAS.getReference(*ID);
+  if (!Ref)
+    return std::nullopt;
+
+  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref);
+  if (!OutputRef)
+    return OutputRef.takeError();
+
+  if (!*OutputRef)
+    return std::nullopt;
+
+  CachedResultLoader Loader(CAS, **OutputRef);
+  std::optional<llvm::cas::ObjectProxy> Result;
+  if (auto Err =
+          Loader.replay([&](file_types::ID Type, ObjectRef Ref) -> Error {
+            if (Kind != Type)
+              return Error::success();
+
+            auto Proxy = CAS.getProxy(Ref);
+            if (!Proxy)
+              return Proxy.takeError();
+
+            Result = std::move(*Proxy);
+            return Error::success();
+          }))
+    return std::move(Err);
+
+  return Result;
 }
 
 static llvm::Error createCASObjectNotFoundError(const llvm::cas::CASID &ID) {

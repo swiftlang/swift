@@ -1,0 +1,51 @@
+// test uses symlinks
+// UNSUPPORTED: OS=windows-msvc
+
+RUN: %empty-directory(%t)
+
+RUN: %swift-scan-test -action=create_casfs -cas-path %t/cas %S/Inputs/create-casfs > %t/cas.id
+RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/cas.id | %FileCheck %s
+
+CHECK: syml
+CHECK-SAME: broken_symlink -> missing
+CHECK: file
+CHECK-SAME: directory/file
+CHECK: syml
+CHECK-SAME: file -> directory/file
+CHECK: file
+CHECK-SAME: oneline
+CHECK: file
+CHECK-SAME: oneline-nonewline
+CHECK: syml
+CHECK-SAME: self -> .
+CHECK: syml
+CHECK-SAME: sym_dir -> directory
+
+// Symlink is recorded without following it.
+RUN: %swift-scan-test -action=create_casfs -cas-path %t/cas %S/Inputs/create-casfs/sym_dir > %t/cas2.id
+RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/cas2.id | %FileCheck %s -check-prefix=SYMLINKONLY
+
+SYMLINKONLY-NOT: directory
+SYMLINKONLY: syml
+SYMLINKONLY-SAME: sym_dir -> directory
+SYMLINKONLY-NOT: directory
+
+// Directory recorded without recursing.
+RUN: %swift-scan-test -action=create_casfs -cas-path %t/cas %S/Inputs/create-casfs/directory -non-recursive > %t/cas3.id
+RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/cas3.id | %FileCheck %s -check-prefix=NONRECURSE
+
+NONRECURSE-NOT: file
+NONRECURSE: tree
+NONRECURSE-SAME: directory/
+NONRECURSE-NOT: file
+
+// Merge roots and files.
+RUN: %swift-scan-test -action=create_casfs -cas-path %t/cas @%t/cas2.id @%t/cas3.id %S/Inputs/create-casfs/oneline > %t/merge.id
+RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/merge.id | %FileCheck %s -check-prefix=MERGE
+
+MERGE: tree
+MERGE-SAME: directory/
+MERGE: file
+MERGE-SAME: oneline
+MERGE: syml
+MERGE-SAME: sym_dir -> directory

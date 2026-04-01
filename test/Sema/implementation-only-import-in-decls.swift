@@ -30,8 +30,8 @@ public struct TestGenericParamsWithOuter<T> {
 }
 
 public enum TestCase {
-  case x(BadStruct) // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  case y(Int, BadStruct) // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  case x(BadStruct) // expected-error {{cannot use struct 'BadStruct' in an associated value of a public or '@usableFromInline' enum; 'BADLibrary' has been imported as implementation-only}}
+  case y(Int, BadStruct) // expected-error {{cannot use struct 'BadStruct' in an associated value of a public or '@usableFromInline' enum; 'BADLibrary' has been imported as implementation-only}}
 }
 
 public func testGenericParams<T: BadProto>(_: T) {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}

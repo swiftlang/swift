@@ -23,6 +23,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
@@ -39,6 +40,7 @@
 #include "clang/AST/GlobalDecl.h"
 #include "clang/AST/Mangle.h"
 #include "clang/AST/RecordLayout.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Sema/Sema.h"
@@ -276,6 +278,22 @@ namespace {
       if (fields.size() != 1)
         return false;
       return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
+    }
+
+    void strongCustomRetain(IRGenFunction &IGF, Explosion &e,
+                            bool needsNullCheck) const override {
+      ReferenceCounting dummy;
+      ASSERT(isSingleRetainablePointer(ResilienceExpansion::Maximal, &dummy));
+      auto fields = asImpl().getFields();
+      fields[0].getTypeInfo().strongCustomRetain(IGF, e, needsNullCheck);
+    }
+
+    void strongCustomRelease(IRGenFunction &IGF, Explosion &e,
+                             bool needsNullCheck) const override {
+      ReferenceCounting dummy;
+      ASSERT(isSingleRetainablePointer(ResilienceExpansion::Maximal, &dummy));
+      auto fields = asImpl().getFields();
+      fields[0].getTypeInfo().strongCustomRelease(IGF, e, needsNullCheck);
     }
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
@@ -553,7 +571,14 @@ namespace {
       const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
+<<<<<<< HEAD
       return importer::findCopyConstructor(cxxRecordDecl);
+=======
+      if (auto *cctor = importer::findCopyConstructor(cxxRecordDecl);
+          cctor && cctor->getAccess() == clang::AS_public)
+        return cctor;
+      return nullptr;
+>>>>>>> origin/main
     }
 
     const clang::CXXConstructorDecl *findMoveConstructor() const {
@@ -562,7 +587,7 @@ namespace {
         return nullptr;
       for (auto ctor : cxxRecordDecl->ctors()) {
         if (ctor->isMoveConstructor() &&
-            // FIXME: Support default arguments (rdar://142414553)
+            // FIXME: Support default arguments (https://github.com/swiftlang/swift/issues/86260)
             ctor->getNumParams() == 1 &&
             ctor->getAccess() == clang::AS_public && !ctor->isDeleted() &&
             !ctor->isIneligibleOrNotSelected())
@@ -622,6 +647,7 @@ namespace {
       auto &ctx = IGF.IGM.Context;
       auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
+<<<<<<< HEAD
       if (copyConstructor->isDefaulted() &&
           copyConstructor->getAccess() == clang::AS_public &&
           !copyConstructor->isDeleted() &&
@@ -642,8 +668,31 @@ namespace {
               const_cast<clang::CXXConstructorDecl *>(copyConstructor));
       }
 
+=======
+>>>>>>> origin/main
       auto &diagEngine = importer->getClangSema().getDiagnostics();
       clang::DiagnosticErrorTrap trap(diagEngine);
+
+      if (copyConstructor->isDefaulted() &&
+          copyConstructor->getAccess() == clang::AS_public &&
+          !copyConstructor->isDeleted() &&
+          !copyConstructor->isIneligibleOrNotSelected() &&
+          // Note: we use "doesThisDeclarationHaveABody" here because
+          // that's what "DefineImplicitCopyConstructor" checks.
+          !copyConstructor->doesThisDeclarationHaveABody()) {
+        assert(!copyConstructor->getParent()->isAnonymousStructOrUnion() &&
+               "Cannot do codegen of special member functions of anonymous "
+               "structs/unions");
+        if (copyConstructor->isCopyConstructor())
+          importer->getClangSema().DefineImplicitCopyConstructor(
+              clang::SourceLocation(),
+              const_cast<clang::CXXConstructorDecl *>(copyConstructor));
+        else
+          importer->getClangSema().DefineImplicitMoveConstructor(
+              clang::SourceLocation(),
+              const_cast<clang::CXXConstructorDecl *>(copyConstructor));
+      }
+
       auto clangFnAddr =
           IGF.IGM.getAddrOfClangGlobalDecl(globalDecl, NotForDefinition);
 

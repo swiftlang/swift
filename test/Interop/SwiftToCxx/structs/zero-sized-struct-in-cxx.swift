@@ -45,8 +45,8 @@ public func g(x: ZeroSizedStruct) {
 
 // CHECK: class ZeroSizedStruct2 { } SWIFT_UNAVAILABLE_MSG("'ZeroSizedStruct2' is a zero sized value type, it cannot be exposed to C++ yet");
 
-// CHECK: // Unavailable in C++: Swift global function 'f()'.
+// CHECK: // Unavailable in C++: Swift global function 'f()'. Return type 'ZeroSizedStruct' is not representable in C++.
 
-// CHECK: // Unavailable in C++: Swift global function 'g(x:)'.
+// CHECK: // Unavailable in C++: Swift global function 'g(x:)'. Parameter 'x' of type 'ZeroSizedStruct' is not representable in C++.
 
 // CHECK: } // namespace Structs

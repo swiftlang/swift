@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend \
-// RUN:   -emit-pch %S/Inputs/InlineBridgingHeader.h -o %t.pch 
+// RUN:   -emit-pch %S/Inputs/InlineBridgingHeader.h -o %t.pch -g
 // RUN: %target-swift-frontend \
 // RUN:   -import-objc-header %t.pch -emit-ir -g %s -o - | %FileCheck %s
 

@@ -20,6 +20,8 @@ add_swift_unittest(SwiftASTTests
 target_link_libraries(SwiftASTTests
    PRIVATE
    swiftAST
+   swiftClangImporter
+   swiftSIL
    # FIXME: Circular dependencies.
    swiftParse
    swiftSema

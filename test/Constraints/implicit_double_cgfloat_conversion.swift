@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift %clang-importer-sdk
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -swift-version 5 -verify %s | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-swift-emit-silgen -swift-version 5 -verify %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -46,10 +46,9 @@ func test_various_situations_converting_to_cgfloat() {
 
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC : $@convention(method) (CGFloat, @thin Double.Type) -> Double
   // CHECK: function_ref @$sSd1poiyS2d_SdtFZ : $@convention(method) (Double, Double, @thin Double.Type) -> Double
-  // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC : $@convention(method) (CGFloat, @thin Double.Type) -> Double
-  // CHECK: function_ref @$sSd1soiyS2d_SdtFZ : $@convention(method) (Double, Double, @thin Double.Type) -> Double
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
-  test_to_cgfloat(d + cgf - cgf) // Double is always preferred over CGFloat, so three conversion here.
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatV1soiyA2C_ACtFZ : $@convention(method) (CGFloat, CGFloat, @thin CGFloat.Type) -> CGFloat
+  test_to_cgfloat(d + cgf - cgf) // FIXME: We convert 'cgf' to Double, and then 'd + cgf' back to CGFloat here.
 
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
   // CHECK: function_ref @$s34implicit_double_cgfloat_conversion013test_returns_B0ySd12CoreGraphics7CGFloatVF : $@convention(thin) (CGFloat) -> Double
@@ -139,19 +138,31 @@ func test_narrowing_is_delayed(x: Double, y: CGFloat) {
   // CHECK: function_ref @$sSd1doiyS2d_SdtFZ
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC
   let _: CGFloat = x / y // CGFloat.init(x / Double.init(y))
+
+  // FIXME: The original intent here was to produce:
+  //
+  //    CGFloat.init(x / Double(y) + 1 as Double)
+  //
+  // But we actually get this with the real SDK:
+  //
+  //    CGFloat(x / Double(y)) + CGFloat(1 as Int)
+  //
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
   // CHECK: function_ref @$sSd1doiyS2d_SdtFZ
-  // CHECK: function_ref @$sSd22_builtinIntegerLiteralSdBI_tcfC
-  // CHECK: function_ref @$sSd1poiyS2d_SdtFZ
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC
-  let _: CGFloat = x / y + 1 // CGFloat.init(x / Double(y) + 1 as Double)
+  // CHECK: function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatV14integerLiteralACSi_tcfC
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatV1poiyA2C_ACtFZ
+  let _: CGFloat = x / y + 1
+
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
   // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcf
   let _: CGFloat = overloaded(x, y) // Prefers `overloaded(Double, Double) -> Double`
+
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
   // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
-  // CHECK: @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcf
   let _: CGFloat = overloaded(x, overloaded(x, y)) // Prefers `overloaded(Double, Double) -> Double` in both occurrences.
 
@@ -160,28 +171,30 @@ func test_narrowing_is_delayed(x: Double, y: CGFloat) {
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
   // CHECK: function_ref @$sSd1doiyS2d_SdtFZ
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF0E0L_yyAGF
   test(x / y)
+
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
   // CHECK: function_ref @$sSd1doiyS2d_SdtFZ
-  // CHECK: function_ref @$sSd22_builtinIntegerLiteralSdBI_tcfC
-  // CHECK: function_ref @$sSd1poiyS2d_SdtFZ
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC
+  // CHECK: function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatV14integerLiteralACSi_tcfC
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatV1poiyA2C_ACtFZ
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF0E0L_yyAGF
   test(x / y + 1)
+
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
   // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcf
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF0E0L_yyAGF
   test(overloaded(x, y))
+
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
   // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
   // CHECK: @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcf
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF0E0L_yyAGF
   test(overloaded(x, overloaded(x, y)))
-}
-
-extension CGFloat {
-  static func /(_: CGFloat, _: CGFloat) -> CGFloat { fatalError() }
-
-  static prefix func -(_: Self) -> Self { fatalError() }
 }
 
 // Make sure that solution with no Double/CGFloat conversions is preferred
@@ -193,7 +206,13 @@ func test_no_ambiguity_with_unary_operators(width: CGFloat, height: CGFloat) {
     init(x: Int,     y: Int,     width: Int,     height: Int) {}
   }
 
-  // CHECK: function_ref @$s12CoreGraphics7CGFloatV34implicit_double_cgfloat_conversionE1doiyA2C_ACtFZ
+  // CHECK: function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatV14integerLiteralACSi_tcfC
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatV1doiyA2C_ACtFZ
+  // CHECK: witness_method $CGFloat, #SignedNumeric."-" : <Self where Self : SignedNumeric> (Self.Type) -> (Self) -> Self
+  // CHECK: function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatV14integerLiteralACSi_tcfC
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatV1doiyA2C_ACtFZ
   // CHECK: function_ref @$s34implicit_double_cgfloat_conversion38test_no_ambiguity_with_unary_operators5width6heighty12CoreGraphics7CGFloatV_AGtF1RL_V1x1yAcdiG_A3GtcfC
   _ = R(x: width / 4, y: -height / 2, width: width, height: height)
 }
@@ -221,10 +240,6 @@ func test_multi_argument_conversion_with_optional(d: Double, cgf: CGFloat) {
   func test(_: Double, _: CGFloat?) {}
 
   test(cgf, d) // Ok (CGFloat -> Double and Double? -> CGFloat?)
-}
-
-extension CGFloat: @retroactive Hashable {
-  public func hash(into hasher: inout Hasher) { fatalError() }
 }
 
 func test_collection_literals_as_call_arguments() {
@@ -371,7 +386,7 @@ do {
 func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
   // Make sure that @autoclosure thunk calls CGFloat./ and not Double./
   // CHECK-LABEL: sil private [transparent] [ossa] @$s34implicit_double_cgfloat_conversion05test_C45_operator_is_attempted_with_literal_arguments1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_
-  // CHECK: [[CGFLOAT_DIV_OP:%.*]] = function_ref @$s12CoreGraphics7CGFloatV34implicit_double_cgfloat_conversionE1doiyA2C_ACtFZ : $@convention(method) (CGFloat, CGFloat, @thin CGFloat.Type) -> CGFloat
+  // CHECK: [[CGFLOAT_DIV_OP:%.*]] = function_ref @$s12CoreGraphics7CGFloatV1doiyA2C_ACtFZ : $@convention(method) (CGFloat, CGFloat, @thin CGFloat.Type) -> CGFloat
   // CHECK-NEXT: {{.*}} = apply [[CGFLOAT_DIV_OP]]({{.*}}, %2) : $@convention(method) (CGFloat, CGFloat, @thin CGFloat.Type) -> CGFloat
   let ratio = v ?? (2.0 / 16.0)
   let _: CGFloat = ratio // Ok
@@ -379,6 +394,13 @@ func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
 
 // Make sure that optimizer doesn't favor CGFloat -> Double conversion
 // in presence of CGFloat initializer, otherwise it could lead to ambiguities.
+//
+// FIXME: This regressed with the real CGFloat.init overload set from the
+// SDK, but this test file previously used the mock SDK which masked the
+// regression.
+//
+// See implicit_double_cgfloat_conversion_hacks.swift -- the test case passes
+// with -enable-solver-performance-hacks.
 func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
   func test(_: CGFloat) -> CGFloat { 0 }
   func test(_: Double) -> Double { 0 }
@@ -387,9 +409,6 @@ func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
 
   let arr = [test(CGFloat(v))]
   hasCGFloatElement(arr) // Ok
-
-  var total = 0.0 // This is Double by default
-  total += test(CGFloat(v)) + CGFloat(v) // Ok
 }
 
 // rdar://99352676

@@ -86,7 +86,7 @@ public func makeQueryResult() -> QueryResult<UInt32> { .init(glyphIDs: []) }
 
 // CHECK: class Struct1 { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'Struct1' can not yet be represented in C++");
 
-// CHECK: // Unavailable in C++: Swift global function 'unsupportedFunc(_:)'.
+// CHECK: // Unavailable in C++: Swift global function 'unsupportedFunc(_:)'.{{.*}}can not yet be represented in C++.
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts

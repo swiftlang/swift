@@ -25,7 +25,11 @@ func stringFrom(sequence: some Sequence<UTF8.CodeUnit>) -> String? {
   }
 }
 
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 extension Backtrace: Codable {
 
   enum CodingKeys: CodingKey {

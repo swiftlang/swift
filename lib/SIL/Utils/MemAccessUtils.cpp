@@ -22,6 +22,7 @@
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILGenUtils.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/Test.h"
 #include "llvm/Support/Debug.h"
@@ -2317,6 +2318,9 @@ bool swift::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::InjectEnumAddrInst:
     return true;
 
+  case SILInstructionKind::InitBorrowAddrInst:
+    return cast<InitBorrowAddrInst>(memInst)->getDest() == address;
+
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::ApplyInst: {
@@ -2483,6 +2487,12 @@ void swift::checkSwitchEnumBlockArg(SILPhiArgument *arg) {
     arg->dump();
     llvm_unreachable("unexpected box source.");
   }
+}
+
+bool swift::isPossibleUnsafeAccessInvalidStorage(SILValue address,
+                                                 SILFunction *F) {
+  auto storage = AccessStorage::compute(address);
+  return storage && !isPossibleFormalAccessStorage(storage, F);
 }
 
 bool swift::isPossibleFormalAccessStorage(const AccessStorage &storage,
@@ -2775,6 +2785,18 @@ void swift::visitAccessedAddress(SILInstruction *I,
     visitor(&I->getAllOperands()[MarkUnresolvedMoveAddrInst::Src]);
     visitor(&I->getAllOperands()[MarkUnresolvedMoveAddrInst::Dest]);
     return;
+
+  case SILInstructionKind::InitBorrowAddrInst:
+    visitor(&I->getAllOperands()[InitBorrowAddrInst::Referent]);
+    visitor(&I->getAllOperands()[InitBorrowAddrInst::Dest]);
+    return;
+
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst:
+    visitor(&I->getAllOperands()[0]);
+    return;
+    
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst:

@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/ConformingMethodList.h"
-#include "ExprContextAnalysis.h"
 #include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ConformanceLookup.h"

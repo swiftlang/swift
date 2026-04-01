@@ -126,6 +126,9 @@ bb0(%0 : @guaranteed $Array<Float>, %1 : @guaranteed $Array<Float>):
   cond_br %44, bb1, bb2
 
 bb1:
+  end_borrow %b
+  destroy_value [dead_end] %19
+  destroy_value [dead_end] %121
   unreachable
 
 bb2:
@@ -138,6 +141,9 @@ bb2:
   cond_br %62, bb4, bb3
 
 bb3:
+  end_borrow %b
+  destroy_value [dead_end] %19
+  destroy_value [dead_end] %121
   unreachable
 
 bb4:
@@ -153,9 +159,15 @@ bb4:
   cond_br %83, bb6, bb7
 
 bb5:
+  end_borrow %b
+  destroy_value [dead_end] %19
+  destroy_value [dead_end] %121
   unreachable
 
 bb6:
+  end_borrow %b
+  destroy_value [dead_end] %19
+  destroy_value [dead_end] %121
   unreachable
 
 bb7:

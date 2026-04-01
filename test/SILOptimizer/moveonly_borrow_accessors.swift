@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil  -enable-experimental-feature BorrowAndMutateAccessors %s
+// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil  %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 public struct NC : ~Copyable {}
 
@@ -50,12 +49,6 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
       return self[0]
     }
   }
-
-  var literal: Int {
-    borrow {
-      return 0
-    }
-  }
 }
 
 public struct SimpleNCWrapper: ~Copyable {
@@ -99,12 +92,6 @@ public struct NCWrapper: ~Copyable {
   var nested_subscript: NC {
     borrow {
       return self[0]
-    }
-  }
-
-  var literal: Int {
-    borrow {
-      return 0
     }
   }
 }

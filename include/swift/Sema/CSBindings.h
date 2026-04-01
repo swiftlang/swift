@@ -24,6 +24,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMExtras.h"
+#include "swift/Sema/CSTrail.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "llvm/ADT/APInt.h"
@@ -56,7 +57,10 @@ enum class AllowedBindingKind : uint8_t {
   /// Supertypes of the specified type.
   Supertypes,
   /// Subtypes of the specified type.
-  Subtypes
+  Subtypes,
+  /// Special hack for `extension P where Self == S { ... }` members
+  /// and keypaths.
+  Fallback,
 };
 
 /// The kind of literal binding found.
@@ -84,14 +88,21 @@ struct PotentialBinding {
   /// because they are synthetic, they have a locator instead.
   PointerUnion<Constraint *, ConstraintLocator *> BindingSource;
 
+  /// When the binding is transferred through a subtype chain, this
+  /// marks a type variable for which it was originally inferred.
+  TypeVariableType *Originator;
+
   PotentialBinding(Type type, AllowedBindingKind kind,
-                   PointerUnion<Constraint *, ConstraintLocator *> source)
-      : BindingType(type), Kind(kind), BindingSource(source) {}
+                   PointerUnion<Constraint *, ConstraintLocator *> source,
+                   TypeVariableType *originator)
+      : BindingType(type), Kind(kind), BindingSource(source),
+        Originator(originator) {
+  }
 
   PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
       : PotentialBinding(
-            type, kind,
-            PointerUnion<Constraint *, ConstraintLocator *>(source)) {}
+            type, kind, PointerUnion<Constraint *, ConstraintLocator *>(source),
+            /*originator=*/nullptr) {}
 
   bool isDefaultableBinding() const {
     if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
@@ -124,12 +135,21 @@ struct PotentialBinding {
   Constraint *getSource() const { return cast<Constraint *>(BindingSource); }
 
   PotentialBinding withType(Type type) const {
-    return {type, Kind, BindingSource};
+    return {type, Kind, BindingSource, Originator};
   }
 
   PotentialBinding withSameSource(Type type, AllowedBindingKind kind) const {
-    return {type, kind, BindingSource};
+    ASSERT(kind != AllowedBindingKind::Fallback);
+    return {type, kind, BindingSource, Originator};
   }
+
+  PotentialBinding asTransitiveFrom(TypeVariableType *originator) const {
+    ASSERT(Kind != AllowedBindingKind::Fallback);
+    ASSERT(originator);
+    return {BindingType, Kind, BindingSource, originator};
+  }
+
+  bool isTransitive() const { return bool(Originator); }
 
   /// Determine whether this binding could be a viable candidate
   /// to be "joined" with some other binding. It has to be at least
@@ -140,16 +160,26 @@ struct PotentialBinding {
                                   ConstraintLocator *locator) {
     return {PlaceholderType::get(typeVar->getASTContext(), typeVar),
             AllowedBindingKind::Exact,
-            /*source=*/locator};
+            /*source=*/locator, /*originator=*/nullptr};
   }
 
   static PotentialBinding forPlaceholder(Type placeholderTy) {
     return {placeholderTy, AllowedBindingKind::Exact,
-            PointerUnion<Constraint *, ConstraintLocator *>()};
+            PointerUnion<Constraint *, ConstraintLocator *>(),
+            /*originator=*/nullptr};
+  }
+
+  void print(llvm::raw_ostream &out, const PrintOptions &PO) const;
+
+  bool operator==(const PotentialBinding &other) const {
+    return (Kind == other.Kind &&
+            BindingType->isEqual(other.BindingType));
   }
 };
 
 struct LiteralRequirement {
+  /// The literal protocol.
+  ProtocolDecl *Protocol;
   /// The source of the literal requirement.
   Constraint *Source;
   /// The default type associated with this literal (if any).
@@ -162,16 +192,22 @@ struct LiteralRequirement {
   /// this points to the source of the binding.
   mutable Constraint *CoveredBy = nullptr;
 
-  LiteralRequirement(Constraint *source, Type defaultTy, bool isDirect)
-      : Source(source), DefaultType(defaultTy), IsDirectRequirement(isDirect) {}
+  LiteralRequirement(ProtocolDecl *protocol, Constraint *source,
+                     Type defaultTy, bool isDirect)
+      : Protocol(protocol), Source(source), DefaultType(defaultTy),
+        IsDirectRequirement(isDirect) {}
 
   Constraint *getSource() const { return Source; }
 
-  ProtocolDecl *getProtocol() const { return Source->getProtocol(); }
+  ProtocolDecl *getProtocol() const { return Protocol; }
 
   bool isCovered() const { return bool(CoveredBy); }
 
   bool isDirectRequirement() const { return IsDirectRequirement; }
+
+  void setDirectRequirement(bool isDirectRequirement) {
+    IsDirectRequirement = isDirectRequirement;
+  }
 
   bool hasDefaultType() const { return bool(DefaultType); }
 
@@ -214,6 +250,17 @@ private:
 };
 
 struct PotentialBindings {
+  /// The constraint system this type variable and its bindings belong to.
+  ConstraintSystem &CS;
+
+  /// This must be incremented whenever any of the below state changes.
+  unsigned GenerationNumber = 0;
+
+  /// The type variable this bindings are associated with. Note that his
+  /// property could change when associated with a constraint graph node
+  /// that is being re-used. Calling \c reset sets it to `nullptr`.
+  TypeVariableType *TypeVar;
+
   /// The set of all constraints that have been added via infer().
   llvm::SmallSetVector<Constraint *, 2> Constraints;
 
@@ -222,6 +269,11 @@ struct PotentialBindings {
 
   /// The set of constraints which delay attempting this type variable.
   llvm::TinyPtrVector<Constraint *> DelayedBy;
+
+  /// The set of LValueObject constraints having this type variable on the
+  /// left-hand side. If this is non-empty, we know that the type variable
+  /// must be bound to an lvalue.
+  llvm::TinyPtrVector<Constraint *> LValueOf;
 
   /// The set of type variables adjacent to the current one.
   ///
@@ -239,11 +291,30 @@ struct PotentialBindings {
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
 
+  /// The set of protocol conformance requirements imposed on this type variable.
+  llvm::SmallVector<Constraint *, 4> Protocols;
+
+  /// The set of unique literal protocol requirements placed on this
+  /// type variable.
+  llvm::SmallVector<LiteralRequirement, 2> Literals;
+
+  /// The set of fallback constraints imposed on this type variable.
+  llvm::SmallVector<Constraint *, 2> Defaults;
+
   ASTNode AssociatedCodeCompletionToken = ASTNode();
+
+#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+  void record##PropertyName(Constraint *constraint);
+#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+  void record##RelationName(TypeVariableType *typeVar, Constraint *originator);
+#include "swift/Sema/CSTrail.def"
+
+  PotentialBindings(ConstraintSystem &cs, TypeVariableType *typeVar)
+      : CS(cs), TypeVar(typeVar) {}
 
   /// Add a potential binding to the list of bindings,
   /// coalescing supertype bounds when we are able to compute the meet.
-  void addPotentialBinding(TypeVariableType *typeVar, PotentialBinding binding);
+  void addPotentialBinding(PotentialBinding binding);
 
   bool isSubtypeOf(TypeVariableType *typeVar) const {
     return llvm::any_of(
@@ -254,35 +325,29 @@ struct PotentialBindings {
         });
   }
 
-private:
+  ArrayRef<Constraint *> getConformanceRequirements() const {
+    return Protocols;
+  }
+
+  void inferFromLiteral(Constraint *literal);
+
   /// Attempt to infer a new binding and other useful information
   /// (i.e. whether bindings should be delayed) from the given
   /// relational constraint.
-  std::optional<PotentialBinding> inferFromRelational(
-      ConstraintSystem &CS,
-      TypeVariableType *TypeVar,
-      Constraint *constraint);
+  std::optional<PotentialBinding> inferFromRelational(Constraint *constraint);
 
-public:
-  void infer(ConstraintSystem &CS,
-             TypeVariableType *TypeVar,
-             Constraint *constraint);
+  void infer(Constraint *constraint);
 
   /// Retract all bindings and other information related to a given
   /// constraint from this binding set.
   ///
   /// This would happen when constraint is simplified or solver backtracks
   /// (either from overload choice or (some) type variable binding).
-  void retract(ConstraintSystem &CS,
-               TypeVariableType *TypeVar,
-               Constraint *constraint);
+  void retract(Constraint *constraint);
 
   void reset();
 
-  void dump(ConstraintSystem &CS,
-            TypeVariableType *TypeVar,
-            llvm::raw_ostream &out,
-            unsigned indent) const;
+  void dump(llvm::raw_ostream &out, unsigned indent) const;
 };
 
 
@@ -313,15 +378,11 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
-    auto lhsTy = LHS.BindingType.getPointer();
-    auto rhsTy = RHS.BindingType.getPointer();
-
-    // Fast path: pointer equality.
-    if (DenseMapInfo<swift::TypeBase *>::isEqual(lhsTy, rhsTy))
-      return true;
-
     // If either side is empty or tombstone, let's use pointer equality.
     {
+      auto lhsTy = LHS.BindingType.getPointer();
+      auto rhsTy = RHS.BindingType.getPointer();
+
       auto emptyTy = llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey();
       auto tombstoneTy =
           llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey();
@@ -333,8 +394,7 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
         return lhsTy == rhsTy;
     }
 
-    // Otherwise let's drop the sugar and check.
-    return LHS.BindingType->isEqual(RHS.BindingType);
+    return LHS == RHS;
   }
 
 private:
@@ -348,6 +408,16 @@ private:
 namespace swift {
 namespace constraints {
 namespace inference {
+
+enum class KnownLValueKind: uint8_t {
+  /// Insufficient information to determine yet.
+  Unknown,
+  /// Definitely not an lvalue.
+  RValue,
+  /// Definitely an lvalue.
+  LValue
+};
+
 class BindingSet {
   using BindingScore =
       std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
@@ -360,11 +430,32 @@ class BindingSet {
 
   llvm::SmallPtrSet<TypeVariableType *, 4> AdjacentVars;
 
-public:
-  swift::SmallSetVector<PotentialBinding, 4> Bindings;
+  /// Generation number of PotentialBindings at the time this BindingSet
+  /// was constructed.
+  unsigned GenerationNumber = 0;
 
-  /// The set of protocol conformance requirements placed on this type variable.
-  llvm::SmallVector<Constraint *, 4> Protocols;
+  /// Flag indicating if we were in salvage when we constructed this
+  /// BindingSet.
+  bool Salvage : 1;
+
+  /// Set to true if the transitive inference process modified the binding set
+  /// after it was constructed.
+  bool IsDirty : 1;
+
+  /// Computed early by computeLValueState().
+  unsigned LValueState : 2;
+
+  /// Set when adding a binding that contradicts an existing binding
+  /// or a conformance constraint on the type variable. See addBinding()
+  /// and reduceBinding().
+  bool IsConflicting : 1;
+
+  void setLValueState(KnownLValueKind kind) {
+    LValueState = unsigned(kind);
+  }
+
+public:
+  swift::SmallVector<PotentialBinding, 4> Bindings;
 
   /// The set of unique literal protocol requirements placed on this
   /// type variable or inferred transitively through subtype chains.
@@ -372,9 +463,11 @@ public:
   /// Note that ordering is important when it comes to bindings, we'd
   /// like to add any "direct" default types first to attempt them
   /// before transitive ones.
-  llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
+  llvm::SmallVector<LiteralRequirement, 2> Literals;
 
-  llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
+  llvm::SmallVector<Constraint *, 2> Defaults;
+
+  llvm::SmallDenseSet<ProtocolDecl *, 4> Protocols;
 
   /// The set of transitive protocol requirements inferred through
   /// subtype/conversion/equivalence relations with other type variables.
@@ -383,7 +476,9 @@ public:
   BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
              const PotentialBindings &info);
 
-  ConstraintSystem &getConstraintSystem() const { return CS; }
+  BindingSet(BindingSet &&other) = default;
+
+  BindingSet(const BindingSet &other) = delete;
 
   TypeVariableType *getTypeVariable() const { return TypeVar; }
 
@@ -395,6 +490,33 @@ public:
   /// that represents a generic parameter.
   bool forGenericParameter() const;
 
+  /// Whether the binding set has changed after construction, in which
+  /// case we must recompute it on the next call to determineBestBindings().
+  bool isDirty() const {
+    return IsDirty;
+  }
+
+  /// Return the generation number of the corresponding potential bindings
+  /// at the time this binding set was constructed.
+  unsigned getGenerationNumber() const {
+    return GenerationNumber;
+  }
+
+  /// Check if this binding set is known to be up to date.
+  bool isUpToDate() const;
+
+  KnownLValueKind getLValueState() const {
+    return KnownLValueKind(LValueState);
+  }
+
+  /// Whether we deduced that the adjacent constraints on this type
+  /// variable are contradictory.
+  bool isConflicting() const {
+    return IsConflicting;
+  }
+
+  /// Whether this type variable is subject to a ExpressibleByNilLiteral
+  /// requirement. These require special handling.
   bool canBeNil() const;
 
   /// If this type variable doesn't have any viable bindings, or
@@ -451,7 +573,7 @@ public:
     // Literal requirements always result in a subtype/supertype
     // relationship to a concrete type.
     if (llvm::any_of(Literals, [](const auto &literal) {
-          return literal.second.viableAsBinding();
+          return literal.viableAsBinding();
         }))
       return false;
 
@@ -459,18 +581,6 @@ public:
       return binding.BindingType->isExistentialType() &&
              binding.Kind == AllowedBindingKind::Subtypes;
     });
-  }
-
-  /// Check if this binding is viable for inclusion in the set.
-  ///
-  /// \param binding The binding to validate.
-  /// \param isTransitive Indicates whether this binding has been
-  /// acquired through transitive inference and requires extra
-  /// checking.
-  bool isViable(PotentialBinding &binding, bool isTransitive);
-
-  explicit operator bool() const {
-    return hasViableBindings() || isDirectHole();
   }
 
   /// Determine whether this set has any "viable" (or non-hole) bindings.
@@ -486,8 +596,10 @@ public:
            !Defaults.empty();
   }
 
-  ArrayRef<Constraint *> getConformanceRequirements() const {
-    return Protocols;
+  /// Determine whether this set can be chosen as the next binding set
+  /// to attempt.
+  bool isViable() const {
+    return hasViableBindings() || isDirectHole();
   }
 
   unsigned getNumViableLiteralBindings() const;
@@ -497,8 +609,8 @@ public:
       return 1;
 
     auto numDefaultable = llvm::count_if(
-        Defaults, [](const std::pair<CanType, Constraint *> &entry) {
-          return entry.second->getKind() == ConstraintKind::Defaultable;
+        Defaults, [](Constraint *constraint) {
+          return constraint->getKind() == ConstraintKind::Defaultable;
         });
 
     // Short-circuit unviable checks if there are no defaultable bindings.
@@ -510,14 +622,22 @@ public:
     auto unviable =
         llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
           auto type = binding.BindingType->getCanonicalType();
-          auto def = Defaults.find(type);
-          return def != Defaults.end()
-                     ? def->second->getKind() == ConstraintKind::Defaultable
-                     : false;
+          for (auto *constraint : Defaults) {
+            if (constraint->getSecondType()->isEqual(type)) {
+              return constraint->getKind() == ConstraintKind::Defaultable;
+            }
+          }
+          return false;
         });
 
     assert(numDefaultable >= unviable);
     return numDefaultable - unviable;
+  }
+
+  unsigned getNumExactBindings() const {
+    return llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
+      return binding.Kind == AllowedBindingKind::Exact;
+    });
   }
 
   ASTNode getAssociatedCodeCompletionToken() const {
@@ -544,6 +664,8 @@ public:
   /// Check if this binding is favored over a conjunction.
   bool favoredOverConjunction(Constraint *conjunction) const;
 
+  void inferTransitiveKeyPathBindings();
+
   /// Detect `subtype` relationship between two type variables and
   /// attempt to infer supertype bindings transitively e.g.
   ///
@@ -553,23 +675,43 @@ public:
   ///
   /// \param inferredBindings The set of all bindings inferred for type
   /// variables in the workset.
-  void inferTransitiveBindings();
+  void inferTransitiveSupertypeBindings();
+
+  void inferTransitiveUnresolvedMemberRefBindings();
 
   /// Detect subtype, conversion or equivalence relationship
   /// between two type variables and attempt to propagate protocol
   /// requirements down the subtype or equivalence chain.
   void inferTransitiveProtocolRequirements();
 
-  /// Finalize binding computation for this type variable by
-  /// inferring bindings from context e.g. transitive bindings.
+  /// Try to coalesce integer and floating point literal protocols
+  /// if they appear together because the only possible default type that
+  /// could satisfy both requirements is `Double`.
+  void coalesceIntegerAndFloatLiteralRequirements();
+
+  /// Check whether the given binding set covers any of the literal protocols
+  /// associated with this type variable. The idea is that if a type variable
+  /// has a binding like Int and also it has a conformance requirement to
+  /// ExpressibleByIntegerLitral, we can avoid attempting the default type of
+  /// that literal literal if we already attempted Int.
+  void determineLiteralCoverage();
+
+  /// Finalize binding computation for key path type variables.
   ///
   /// \returns true if finalization successful (which makes binding set viable),
   /// and false otherwise.
-  bool finalize(bool transitive);
+  bool finalizeKeyPathBindings();
+
+  /// Handle diagnostics of unresolved member chains.
+  void finalizeUnresolvedMemberChainResult();
 
   static BindingScore formBindingScore(const BindingSet &b);
 
-  bool operator==(const BindingSet &other);
+  bool operator==(const BindingSet &other) const;
+
+  bool operator!=(const BindingSet &other) const {
+    return !(*this == other);
+  }
 
   /// Compare two sets of bindings, where \c this < other indicates that
   /// \c this is a better set of bindings that \c other.
@@ -577,22 +719,34 @@ public:
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
 
+  void resetTransitiveProtocols() {
+    TransitiveProtocols.reset();
+  }
+
 private:
+  void computeLValueState();
+
+  void markDirty() {
+    IsDirty = true;
+  }
+
+  void markConflicting() {
+    IsConflicting = true;
+  }
+
   /// Add a new binding to the set.
   ///
   /// \param binding The binding to add.
-  /// \param isTransitive Indicates whether this binding has been
-  /// acquired through transitive inference and requires validity
-  /// checking.
-  void addBinding(PotentialBinding binding, bool isTransitive);
+  void addBinding(PotentialBinding binding);
 
-  void addLiteralRequirement(Constraint *literal);
+  /// Rewrite certain bindings into a simpler form based on this type variable's
+  /// adjacent conformance constraints.
+  void reduceBinding(PotentialBinding &binding);
+
+  std::optional<bool> subsumeBinding(PotentialBinding &binding,
+                                     const PotentialBinding &existing);
 
   void addDefault(Constraint *constraint);
-
-  /// Check whether the given binding set covers any of the
-  /// literal protocols associated with this type variable.
-  void determineLiteralCoverage();
 
   StringRef getLiteralBindingKind(LiteralBindingKind K) const {
 #define ENTRY(Kind, String)                                                    \
@@ -607,6 +761,13 @@ private:
 #undef ENTRY
   }
 };
+
+/// Check whether the given type can be used as a binding for the given
+/// type variable.
+///
+/// \returns true if the binding is okay.
+bool checkTypeOfBinding(TypeVariableType *typeVar, Type type);
+
 } // namespace inference
 } // namespace constraints
 } // namespace swift

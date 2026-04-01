@@ -500,6 +500,39 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
       SwiftNativeObjCRuntimeBaseAttr(name, atLoc, range, /*Implicit=*/false);
 }
 
+BridgedWarnAttr
+BridgedWarnAttr_createParsed(BridgedASTContext cContext,
+                             SourceLoc atLoc,
+                             SourceRange range,
+                             Identifier diagGroupName,
+                             WarningGroupBehavior behavior,
+                             BridgedStringRef reason) {
+  ASTContext &context = cContext.unbridged();
+  auto diagGroupID = getDiagGroupIDByName(diagGroupName.str());
+  
+  WarningGroupBehavior attrBehavior;
+  switch (behavior) {
+    case None:
+    case AsWarning:
+      attrBehavior = WarningGroupBehavior::AsWarning;
+      break;
+    case AsError:
+      attrBehavior = WarningGroupBehavior::AsError;
+      break;
+    case Ignored:
+      attrBehavior = WarningGroupBehavior::Ignored;
+      break;
+  }
+  
+  std::optional<StringRef> reasonText = std::nullopt;
+  if (!reason.getIsEmpty())
+    reasonText = context.AllocateCopy(reason.unbridged());
+
+  return new (context) WarnAttr(*diagGroupID, attrBehavior,
+                                reasonText, atLoc, range,
+                                /*Implicit=*/false);
+}
+
 static NonSendableKind unbridged(BridgedNonSendableKind kind) {
   switch (kind) {
   case BridgedNonSendableKindSpecific:

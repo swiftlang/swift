@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -verify -solver-scope-threshold=100
+// RUN: %target-swift-frontend %s -typecheck -verify -solver-scope-threshold=100
 // REQUIRES: objc_interop
 
 // https://github.com/swiftlang/swift/issues/52629

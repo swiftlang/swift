@@ -100,7 +100,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/Errors.cpp")
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/DemanglingErrorHandling.cpp")
   set(swiftDemanglingCRSources
     "${SWIFT_SOURCE_DIR}/lib/Demangling/CrashReporter.cpp")
 
@@ -152,6 +152,10 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
       "Enable build of the embedded Swift standard library and runtime for cross-compiling targets"
       FALSE)
 
+option(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM
+       "Whether to build the Embedded Swift standard library using the hooks in swift/EmbeddedPlatform.h"
+       FALSE)
+
 set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
     "List of extra target triples to build the embedded Swift standard library for")
 
@@ -159,7 +163,11 @@ set(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES "" CACHE STRING
     "List of SDKs to use for target triples, in the form triple@sdkpath.
     Using this variable precludes setting directly the value for  SWIFT_SDK_embedded_ARCH_\$\{ARCH\}_PATH")
 
+<<<<<<< HEAD
 set(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/llvm-ar";crsU
+=======
+set(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/llvm-ar;crsU"
+>>>>>>> origin/main
     CACHE STRING
     "Archiver to use when building static archives for non Darwin platform targeting the macOS SDK.
     This is required when using Xcode 26.4 beta 1 and later.")
@@ -172,6 +180,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_HOST_VARIANT STREQUAL "macosx")
   endif()
 endif()
 
+<<<<<<< HEAD
+=======
+option(SWIFT_EMBEDDED_STDLIB_BUILD_EXTRA_TARGET_TRIPLES_ONLY
+       "Whether to skip building the Embedded Swift triples hardcoded in the build system"
+       FALSE)
+
+>>>>>>> origin/main
 if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "wasi") AND
@@ -281,6 +296,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND NOT SWIFT_WASI_SYSROOT_PATH)
   endif()
 endif()
 
+if(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES 
+   AND SWIFT_EMBEDDED_STDLIB_BUILD_EXTRA_TARGET_TRIPLES_ONLY)
+  set(EMBEDDED_STDLIB_TARGET_TRIPLES "")
+endif()
+
 foreach(triple ${SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES})
   if(triple STREQUAL "")
     continue()
@@ -341,6 +361,7 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+  add_subdirectory(EmbeddedPlatform)
 
   if(SWIFT_BUILD_CLANG_OVERLAYS OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
     add_subdirectory(ClangOverlays)

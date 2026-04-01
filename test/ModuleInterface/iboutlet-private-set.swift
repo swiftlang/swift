@@ -11,7 +11,7 @@
 @objc public class MyType {}
 
 open class Bar {
-	// CHECK: @objc @IBOutlet weak public var foo: Foo.MyType! {
+	// CHECK: @objc @IBOutlet weak public var foo: Foo::MyType! {
 	// CHECK-NEXT: get
 	// CHECK-NEXT: }
 	@IBOutlet public private(set) weak var foo: MyType!

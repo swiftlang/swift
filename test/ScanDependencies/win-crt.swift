@@ -7,5 +7,6 @@
 import CRT
 
 // CHECK:        "modulePath": "{{.*}}\\ucrt-{{.*}}.pcm",
+// CHECK-NEXT:   "libraryLevel":
 // CHECK-NEXT:   "sourceFiles": [
 // CHECK-NEXT:      "{{.*}}\\ucrt\\module.modulemap"

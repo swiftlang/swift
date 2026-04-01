@@ -71,21 +71,21 @@ actor MyGenericGlobalActor<T> {
 
 // AVAILABILITY1: Begin completions
 // AVAILABILITY1-NEXT: Keyword/None:                       *[#Platform#]; name=*{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       Swift[#Platform#]; name=Swift{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       anyAppleOS[#Platform#]; name=anyAppleOS{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       macOS[#Platform#]; name=macOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       iOS[#Platform#]; name=iOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       tvOS[#Platform#]; name=tvOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       watchOS[#Platform#]; name=watchOS{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       macCatalyst[#Platform#]; name=macCatalyst
 // AVAILABILITY1-NEXT: Keyword/None:                       visionOS[#Platform#]; name=visionOS{{$}}
-// AVAILABILITY1-NEXT: Keyword/None:                       macOS[#Platform#]; name=macOS{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       DriverKit[#Platform#]; name=DriverKit{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       macOSApplicationExtension[#Platform#]; name=macOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       iOSApplicationExtension[#Platform#]; name=iOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       tvOSApplicationExtension[#Platform#]; name=tvOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       watchOSApplicationExtension[#Platform#]; name=watchOSApplicationExtension{{$}}
-// AVAILABILITY1-NEXT: Keyword/None:                       visionOSApplicationExtension[#Platform#]; name=visionOSApplicationExtension{{$}}
-// AVAILABILITY1-NEXT: Keyword/None:                       macOSApplicationExtension[#Platform#]; name=macOSApplicationExtension{{$}}
-// AVAILABILITY1-NEXT: Keyword/None:                       macCatalyst[#Platform#]; name=macCatalyst
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalystApplicationExtension[#Platform#]; name=macCatalystApplicationExtension
-// AVAILABILITY1-NEXT: Keyword/None:                       DriverKit[#Platform#]; name=DriverKit{{$}}
-// AVAILABILITY1-NEXT: Keyword/None:                       Swift[#Platform#]; name=Swift{{$}}
-// AVAILABILITY1-NEXT: Keyword/None:                       anyAppleOS[#Platform#]; name=anyAppleOS{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       visionOSApplicationExtension[#Platform#]; name=visionOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       FreeBSD[#Platform#]; name=FreeBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       OpenBSD[#Platform#]; name=OpenBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       Windows[#Platform#]; name=Windows{{$}}
@@ -126,6 +126,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
 // KEYWORD2-NEXT:             Keyword/None:                       abi[#Func Attribute#]; name=abi{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
+// KEYWORD2-NEXT:             Keyword/None:                       warn[#Func Attribute#]; name=warn
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -201,6 +202,7 @@ actor MyGenericGlobalActor<T> {
 // ON_GLOBALVAR-DAG: Keyword/None:                       preconcurrency[#Var Attribute#]; name=preconcurrency
 // ON_GLOBALVAR-DAG: Keyword/None:                       backDeployed[#Var Attribute#]; name=backDeployed
 // ON_GLOBALVAR-DAG: Keyword/None:                       concurrent[#Var Attribute#]; name=concurrent
+// ON_GLOBALVAR-DAG: Keyword/None:                       warn[#Var Attribute#]; name=warn
 // ON_GLOBALVAR-NOT: Keyword
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -241,6 +243,7 @@ struct _S {
 // ON_PROPERTY-DAG: Keyword/None:                       preconcurrency[#Var Attribute#]; name=preconcurrency
 // ON_PROPERTY-DAG: Keyword/None:                       backDeployed[#Var Attribute#]; name=backDeployed
 // ON_PROPERTY-DAG: Keyword/None:                       concurrent[#Var Attribute#]; name=concurrent
+// ON_PROPERTY-DAG: Keyword/None:                       warn[#Var Attribute#]; name=warn
 // ON_PROPERTY-NOT: Keyword
 // ON_PROPERTY-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -277,6 +280,7 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
 // ON_METHOD-DAG: Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
 // ON_METHOD-DAG: Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
+// ON_METHOD-DAG: Keyword/None:                       warn[#Func Attribute#]; name=warn  
 // ON_METHOD-NOT: Keyword
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -353,6 +357,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
 // ON_MEMBER_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
 // ON_MEMBER_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
+// ON_MEMBER_LAST-DAG: Keyword/None:                       warn[#Declaration Attribute#]; name=warn
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -429,6 +434,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
 // KEYWORD_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
 // KEYWORD_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
+// KEYWORD_LAST-DAG: Keyword/None:                       warn[#Declaration Attribute#]; name=warn
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper

@@ -106,6 +106,9 @@ class ModuleFileSharedCore {
   /// Name to use in public facing diagnostics and documentation.
   StringRef PublicModuleName;
 
+  /// Section name to use for OSLog strings.
+  StringRef OSLogStringSectionName;
+
   /// The version of the Swift compiler used to produce swiftinterface
   /// this module is based on. This is the most precise version possible
   /// - a compiler tag or version if this is a development compiler.
@@ -123,7 +126,6 @@ public:
   public:
     const StringRef RawPath;
     const StringRef RawSPIs;
-    const StringRef BinaryModulePath;
 
   private:
     using ImportFilterKind = ModuleDecl::ImportFilterKind;
@@ -138,9 +140,9 @@ public:
       return static_cast<ImportFilterKind>(1 << RawImportControl);
     }
 
-    Dependency(StringRef path, StringRef spiGroups, StringRef binaryModulePath,
-               bool isHeader, ImportFilterKind importControl, bool isScoped)
-        : RawPath(path), RawSPIs(spiGroups), BinaryModulePath(binaryModulePath),
+    Dependency(StringRef path, StringRef spiGroups, bool isHeader,
+               ImportFilterKind importControl, bool isScoped)
+        : RawPath(path), RawSPIs(spiGroups),
           RawImportControl(rawControlFromKind(importControl)),
           IsHeader(isHeader), IsScoped(isScoped) {
       assert(llvm::popcount(static_cast<unsigned>(importControl)) == 1 &&
@@ -149,15 +151,14 @@ public:
     }
 
   public:
-    Dependency(StringRef path, StringRef spiGroups, StringRef binaryModulePath,
+    Dependency(StringRef path, StringRef spiGroups,
                ImportFilterKind importControl, bool isScoped)
-        : Dependency(path, spiGroups, binaryModulePath, false, importControl,
-                     isScoped) {}
+        : Dependency(path, spiGroups, false, importControl, isScoped) {}
 
     static Dependency forHeader(StringRef headerPath, bool exported) {
       auto importControl =
           exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
-      return Dependency(headerPath, {}, {}, true, importControl, false);
+      return Dependency(headerPath, {}, true, importControl, false);
     }
 
     bool isExported() const {
@@ -421,8 +422,10 @@ private:
     /// Whether this module used deferred code generation.
     unsigned DeferredCodeGen : 1;
 
-    // Explicitly pad out to the next word boundary.
-    unsigned : 1;
+    /// Whether this module used deferred code generation.
+    unsigned AggressiveCMOEnabled : 1;
+
+    // Explicitly pad out to the next word boundary if neccessary.
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -694,6 +697,8 @@ public:
   bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
 
   bool deferredCodeGen() const { return Bits.DeferredCodeGen; }
+
+  bool isAggressiveCMOEnabled() const { return Bits.AggressiveCMOEnabled; }
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///

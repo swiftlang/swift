@@ -19,11 +19,12 @@ public func initializeSwiftModules() {
   registerAST()
   registerSIL()
   registerSwiftAnalyses()
+  registerOptimizerUtilities()
   registerSwiftPasses()
   registerOptimizerTests()
 }
 
-private func registerPass(
+func registerPass(
       _ pass: ModulePass,
       _ runFn: @escaping (@convention(c) (BridgedContext) -> ())) {
   pass.name._withBridgedStringRef { nameStr in
@@ -95,6 +96,7 @@ private func registerSwiftPasses() {
   registerPass(cleanupDebugStepsPass, { cleanupDebugStepsPass.run($0) })
   registerPass(namedReturnValueOptimization, { namedReturnValueOptimization.run($0) })
   registerPass(stripObjectHeadersPass, { stripObjectHeadersPass.run($0) })
+  registerPass(deadAccessScopeElimination, { deadAccessScopeElimination.run($0) })
   registerPass(deadStoreElimination, { deadStoreElimination.run($0) })
   registerPass(redundantLoadElimination, { redundantLoadElimination.run($0) })
   registerPass(mandatoryRedundantLoadElimination, { mandatoryRedundantLoadElimination.run($0) })
@@ -116,6 +118,10 @@ private func registerSwiftPasses() {
   registerForSILCombine(BeginBorrowInst.self,      { run(BeginBorrowInst.self, $0) })
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })
   registerForSILCombine(BuiltinInst.self,          { run(BuiltinInst.self, $0) })
+<<<<<<< HEAD
+=======
+  registerForSILCombine(CondFailInst.self,         { run(CondFailInst.self, $0) })
+>>>>>>> origin/main
   registerForSILCombine(ExplicitCopyAddrInst.self, { run(ExplicitCopyAddrInst.self, $0) })
   registerForSILCombine(ExplicitCopyValueInst.self,{ run(ExplicitCopyValueInst.self, $0) })
   registerForSILCombine(FixLifetimeInst.self,      { run(FixLifetimeInst.self, $0) })
@@ -132,10 +138,12 @@ private func registerSwiftPasses() {
   registerForSILCombine(DestroyValueInst.self,     { run(DestroyValueInst.self, $0) })
   registerForSILCombine(DestructureStructInst.self, { run(DestructureStructInst.self, $0) })
   registerForSILCombine(DestructureTupleInst.self, { run(DestructureTupleInst.self, $0) })
+  registerForSILCombine(StructExtractInst.self,    { run(StructExtractInst.self, $0) })
   registerForSILCombine(TypeValueInst.self, { run(TypeValueInst.self, $0) })
   registerForSILCombine(ClassifyBridgeObjectInst.self, { run(ClassifyBridgeObjectInst.self, $0) })
   registerForSILCombine(MarkDependenceInst.self,    { run(MarkDependenceInst.self, $0) })
   registerForSILCombine(MarkDependenceAddrInst.self, { run(MarkDependenceAddrInst.self, $0) })
+  registerForSILCombine(MoveValueInst.self,         { run(MoveValueInst.self, $0) })
   registerForSILCombine(PointerToAddressInst.self,  { run(PointerToAddressInst.self, $0) })
   registerForSILCombine(UncheckedEnumDataInst.self, { run(UncheckedEnumDataInst.self, $0) })
   registerForSILCombine(WitnessMethodInst.self,     { run(WitnessMethodInst.self, $0) })
@@ -145,22 +153,19 @@ private func registerSwiftPasses() {
   registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
   registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
   registerForSILCombine(EndCOWMutationAddrInst.self, { run(EndCOWMutationAddrInst.self, $0) })
-
-  // Test passes
-  registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })
-  registerPass(functionUsesDumper, { functionUsesDumper.run($0) })
-  registerPass(silPrinterPass, { silPrinterPass.run($0) })
-  registerPass(escapeInfoDumper, { escapeInfoDumper.run($0) })
-  registerPass(addressEscapeInfoDumper, { addressEscapeInfoDumper.run($0) })
-  registerPass(accessDumper, { accessDumper.run($0) })
-  registerPass(deadEndBlockDumper, { deadEndBlockDumper.run($0) })
-  registerPass(memBehaviorDumper, { memBehaviorDumper.run($0) })
-  registerPass(rangeDumper, { rangeDumper.run($0) })
-  registerPass(testInstructionIteration, { testInstructionIteration.run($0) })
-  registerPass(updateBorrowedFromPass, { updateBorrowedFromPass.run($0) })
+  registerForSILCombine(InitBorrowAddrInst.self,    { run(InitBorrowAddrInst.self, $0) })
+  registerForSILCombine(CheckedCastBranchInst.self, { run(CheckedCastBranchInst.self, $0) })
+  registerForSILCombine(DereferenceBorrowInst.self, { run(DereferenceBorrowInst.self, $0) })
+  registerForSILCombine(DereferenceAddrBorrowInst.self, { run(DereferenceAddrBorrowInst.self, $0) })
+  registerForSILCombine(DifferentiableFunctionInst.self, { run(DifferentiableFunctionInst.self, $0) })
 }
 
 private func registerSwiftAnalyses() {
   AliasAnalysis.register()
   CalleeAnalysis.register()
+}
+
+private func registerOptimizerUtilities() {
+  registerControlFlowUtils()
+  registerLifetimeCompletion()
 }

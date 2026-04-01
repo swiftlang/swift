@@ -137,6 +137,13 @@ namespace {
         CS->setDeclContext(ParentDC);
       if (auto *FS = dyn_cast<FallthroughStmt>(S))
         FS->setDeclContext(ParentDC);
+      if (auto *FES = dyn_cast<ForEachStmt>(S)) {
+        FES->setDeclContext(ParentDC);
+        // Make sure the desugared `while` statement is computed such that
+        // we contextualize it, and to ensure it's present for other subsequent
+        // type-checker walks.
+        FES->getDesugaredStmt();
+      }
 
       return Action::Continue(S);
     }
@@ -912,8 +919,8 @@ typeCheckPatternBindingStmtConditionElement(StmtConditionElement &elt,
   bool hadError = TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
   elt.setPattern(pattern);
   elt.setInitializer(init);
-  
-  isFalsable |= pattern->isRefutablePattern();
+
+  isFalsable |= pattern->isRefutablePattern(/*allowIsPatternCoercion*/ true);
   return hadError;
 }
 
@@ -953,7 +960,7 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
   // If none of the statement's conditions can be false, diagnose.
   // FIXME: Also diagnose if none of the statements conditions can be true.
   // FIXME: Offer a fix-it to remove the unreachable code.
-  if (!hadAnyFalsable && !hadError) {
+  if (!stmt->isImplicit() && !hadAnyFalsable && !hadError) {
     auto &diags = dc->getASTContext().Diags;
     Diag<> msg = diag::invalid_diagnostic;
     switch (stmt->getKind()) {
@@ -1091,12 +1098,14 @@ public:
     auto &eval = getASTContext().evaluator;
     auto *S =
         evaluateOrDefault(eval, PreCheckReturnStmtRequest{RS, DC}, nullptr);
+    if (!S)
+      return nullptr;
 
-    // We do a cast here as it may have been turned into a FailStmt. We should
-    // return that without doing anything else.
-    RS = dyn_cast_or_null<ReturnStmt>(S);
+    // We do a cast here as we may now have a different stmt (e.g a FailStmt, or
+    // a BraceStmt for error cases). If so, recurse into the visitor.
+    RS = dyn_cast<ReturnStmt>(S);
     if (!RS)
-      return S;
+      return visit(S);
 
     auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
     assert(TheFunc && "Should have bailed from pre-check if this is None");
@@ -1114,19 +1123,18 @@ public:
 
     auto *accessor = TheFunc->getAccessorDecl();
     auto *exprToCheck = RS->getResult();
-    InOutExpr *inout = nullptr;
 
     if (accessor && accessor->isMutateAccessor()) {
+      auto *unsafeExpr = dyn_cast<UnsafeExpr>(exprToCheck);
       // Check that the returned expression is a &.
-      if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
+      if (isa<InOutExpr>(exprToCheck) ||
+          (unsafeExpr && isa<InOutExpr>(unsafeExpr->getSubExpr()))) {
         ResultTy = InOutType::get(ResultTy);
       } else {
         getASTContext()
             .Diags
             .diagnose(exprToCheck->getLoc(), diag::missing_address_of_return)
             .highlight(exprToCheck->getSourceRange());
-        inout = new (getASTContext()) InOutExpr(
-            exprToCheck->getStartLoc(), exprToCheck, Type(), /*implicit*/ true);
       }
     }
     using namespace constraints;
@@ -1518,6 +1526,8 @@ public:
     return S;
   }
 
+  Stmt *visitOpaqueStmt(OpaqueStmt *S) { return S; }
+
   Stmt *visitBreakStmt(BreakStmt *S) {
     // Force the target to be computed in case it produces diagnostics.
     (void)S->getTarget();
@@ -1785,16 +1795,31 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
   auto &ctx = DC->getASTContext();
   auto fn = AnyFunctionRef::fromDeclContext(DC);
 
+  auto errorResult = [&]() -> Stmt * {
+    // We don't need any recovery if there's no result, just bail.
+    if (!RS->hasResult())
+      return nullptr;
+
+    // If we have a result, make sure it's preserved, insert an implicit brace
+    // with a wrapping error expression. This ensures we can still do semantic
+    // functionality, and avoids downstream crashes where we expect the
+    // expression to have been type-checked.
+    auto *result = RS->getResult();
+    RS->setResult(nullptr);
+    auto *err = new (ctx) ErrorExpr(result->getSourceRange(), Type(), result);
+    return BraceStmt::createImplicit(ctx, {err});
+  };
+
   // Not valid outside of a function.
   if (!fn) {
     ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_invalid_outside_func);
-    return nullptr;
+    return errorResult();
   }
 
   // If the return is in a defer, then it isn't valid either.
   if (isDefer(DC)) {
     ctx.Diags.diagnose(RS->getReturnLoc(), diag::jump_out_of_defer, "return");
-    return nullptr;
+    return errorResult();
   }
 
   // The rest of the checks only concern return statements with results.
@@ -1815,8 +1840,7 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
     if (!nilExpr) {
       ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_init_non_nil)
           .highlight(E->getSourceRange());
-      RS->setResult(nullptr);
-      return RS;
+      return errorResult();
     }
 
     // "return nil" is only permitted in a failable initializer.
@@ -1826,8 +1850,7 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
       ctx.Diags
           .diagnose(ctor->getLoc(), diag::make_init_failable, ctor)
           .fixItInsertAfter(ctor->getLoc(), "?");
-      RS->setResult(nullptr);
-      return RS;
+      return errorResult();
     }
 
     // Replace the "return nil" with a new 'fail' statement.
@@ -3084,17 +3107,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   return hadError ? errorBody() : body;
 }
 
-bool TypeChecker::typeCheckTapBody(TapExpr *expr, DeclContext *DC) {
-  // We intentionally use typeCheckStmt instead of typeCheckBody here
-  // because we want to contextualize TapExprs with the body they're in.
-  BraceStmt *body = expr->getBody();
-  bool HadError = StmtChecker(DC).typeCheckStmt(body);
-  if (body) {
-    expr->setBody(body);
-  }
-  return HadError;
-}
-
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   BraceStmt *Body = TLCD->getBody();
   StmtChecker(TLCD).typeCheckBody(Body);
@@ -3414,4 +3426,537 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 
   // Fall back to AsyncIteratorProtocol.next().
   return ctx.getAsyncIteratorNext();
+}
+
+bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
+                                       bool isAsync, SourceLoc loc,
+                                       DeclContext *dc) {
+  if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
+    return false;
+  }
+
+  if (isAsync || seqTy->isExistentialType()) {
+    return false;
+  }
+
+  auto *borrowingSeqProto =
+      ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
+  if (!borrowingSeqProto) {
+    return false;
+  }
+
+  // Always try to use BorrowingSequence for sequences that conform to
+  // CxxBorrowingSequence when it is available.
+  if (auto cxxBorrowingSequence =
+          ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence)) {
+    if (auto conf = lookupConformance(seqTy, cxxBorrowingSequence)) {
+      return !conf.getAvailabilityConstraint(dc, loc);
+    }
+  }
+
+  // Else, always prefer conformance to Sequence over BorrowingSequence when
+  // both are available.
+  if (lookupConformance(seqTy, ctx.getProtocol(KnownProtocolKind::Sequence))) {
+    return false;
+  }
+
+  // Fall back to Sequence if no conformance to BorrowingSequence is found.
+  // This ensures that we maintain Sequence as the minimal required
+  // conformance.
+  auto seqConformanceRef = lookupConformance(seqTy, borrowingSeqProto);
+  if (seqConformanceRef.isInvalid()) {
+    return false;
+  }
+
+  return true;
+}
+
+namespace {
+class DesugarForEachStmt {
+  ForEachStmt *stmt;
+  DeclContext *dc;
+  ASTContext &ctx;
+  bool isAsync;
+  bool isBorrowing = false;
+  VarDecl *makeIteratorVar = nullptr;
+  ProtocolDecl *sequenceProto = nullptr;
+  ProtocolConformanceRef seqConformanceRef;
+  WhileStmt *innerLoop = nullptr;
+
+public:
+  DesugarForEachStmt(ForEachStmt *stmt)
+      : stmt(stmt), dc(stmt->getDeclContext()),
+        ctx(stmt->getDeclContext()->getASTContext()),
+        isAsync(stmt->getAwaitLoc().isValid()) {}
+
+  BraceStmt *operator()() {
+    auto *sequence = stmt->getSequence();
+    auto seqType = sequence->getType();
+
+    if (isa<PackExpansionExpr>(sequence))
+      return nullptr;
+
+    if (!seqType || (stmt->getWhere() && !stmt->getWhere()->getType()))
+      return nullptr;
+
+    if (seqType->hasError() || stmt->getPattern()->getType()->hasError() ||
+        (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
+      return nullptr;
+
+    isBorrowing = shouldUseBorrowingSequence(ctx, seqType, isAsync,
+                                             sequence->getStartLoc(), dc);
+
+    sequenceProto =
+        isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
+                : (isBorrowing
+                       ? ctx.getProtocol(KnownProtocolKind::BorrowingSequence)
+                       : ctx.getProtocol(KnownProtocolKind::Sequence));
+    seqConformanceRef = lookupConformance(seqType, sequenceProto);
+    ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
+
+    if (auto constraint = seqConformanceRef.getAvailabilityConstraint(
+            dc, stmt->getForLoc())) {
+      emitDiagnosticsForUnavailableConformance(seqType, constraint.value());
+      return nullptr;
+    }
+
+    buildMakeIteratorVar();
+
+    SmallVector<ASTNode, 2> stmts;
+    stmts.push_back(buildMakeIterator());
+    stmts.push_back(buildWhileStmt());
+
+    auto *braceStmt = BraceStmt::createImplicit(ctx, stmt->getStartLoc(), stmts,
+                                                stmt->getEndLoc());
+
+    bool HadError = StmtChecker(dc).typeCheckStmt(braceStmt);
+    if (HadError)
+      return nullptr;
+
+    return braceStmt;
+  }
+
+private:
+  void
+  emitDiagnosticsForUnavailableConformance(Type seqType,
+                                           AvailabilityConstraint constraint) {
+    auto loc = stmt->getForLoc();
+    auto protoDecl = seqConformanceRef.getProtocol();
+
+    auto domainAndRange = constraint.getDomainAndRange(ctx);
+    ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
+                       seqType, protoDecl,
+                       domainAndRange.getDomain().getNameForAttributePrinting(),
+                       domainAndRange.getRange().getVersionString());
+    fixAvailability(loc, dc, domainAndRange.getDomain(),
+                    domainAndRange.getRange(), ctx);
+  }
+
+  void buildMakeIteratorVar() {
+    std::string name;
+    {
+      if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
+        name = "$" + np->getBoundName().str().str();
+      name += "$generator";
+    }
+
+    makeIteratorVar = new (ctx) VarDecl(
+        /*isStatic=*/false, VarDecl::Introducer::Var,
+        stmt->getSequence()->getStartLoc(), ctx.getIdentifier(name), dc);
+    makeIteratorVar->setImplicit();
+
+    // Async iterators are not `Sendable`; they're only meant to be used from
+    // the isolation domain that creates them. But the `next()` method runs on
+    // the generic executor, so calling it from an actor-isolated context passes
+    // non-`Sendable` state across the isolation boundary. `next()` should
+    // inherit the isolation of the caller, but for now, use the opt out.
+    if (isAsync) {
+      auto *nonisolated =
+          NonisolatedAttr::createImplicit(ctx, NonIsolatedModifier::Unsafe);
+      makeIteratorVar->addAttribute(nonisolated);
+    }
+  }
+
+  Expr *buildNextSpanCall(DeclRefExpr *makeIteratorVarRef) {
+    // For borrowing: call nextSpan(maximumCount: Int.max)
+    auto *nextSpanFn = ctx.getBorrowingIteratorNextSpan();
+    auto associatedType =
+        sequenceProto->getAssociatedType(ctx.Id_BorrowingIterator);
+    auto typeWitness = seqConformanceRef.getTypeWitness(associatedType);
+    auto iteratorConformanceRef = lookupConformance(
+        typeWitness, cast<ProtocolDecl>(nextSpanFn->getDeclContext()));
+    auto nextSpanWitness =
+        iteratorConformanceRef.getWitnessByName(nextSpanFn->getName());
+    auto *nextSpanRef = new (ctx)
+        MemberRefExpr(makeIteratorVarRef, stmt->getForLoc(), nextSpanWitness,
+                      DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
+
+    // Build Int.max as an unresolved member reference
+    auto *intRef = TypeExpr::createImplicit(ctx.getIntType(), ctx);
+    auto *maxRef = UnresolvedDotExpr::createImplicit(ctx, intRef, ctx.Id_max);
+
+    // Create argument: maximumCount: Int.max
+    auto *args =
+        ArgumentList::forImplicitSingle(ctx, ctx.Id_maximumCount, maxRef);
+
+    return CallExpr::createImplicit(ctx, nextSpanRef, args);
+  }
+
+  Expr *buildNextCall() {
+    // The result type of `.makeIterator()` is used to form a call to
+    // `.next()/.nextSpan()`.
+    // `next()` is called on each iteration of the loop.
+    // `nextSpan()` returns a span. For more details, see
+    // https://github.com/airspeedswift/swift-evolution/blob/61c3640ea04c4fc3b74de2a1f43cad61647c8786/proposals/NNNN-borrowing-sequence.md?plain=1#L114.
+    // FIXME: update above link
+    auto *makeIteratorVarRef =
+        new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
+                              /*Implicit=*/true);
+
+    if (isBorrowing) {
+      return buildNextSpanCall(makeIteratorVarRef);
+    }
+
+    // Regular (non-borrowing): call next()
+    FuncDecl *nextFn = TypeChecker::getForEachIteratorNextFunction(
+        dc, stmt->getForLoc(), isAsync);
+    TinyPtrVector<Identifier> labels;
+    if (nextFn && nextFn->getParameters()->size() == 1)
+      labels.push_back(ctx.Id_isolation);
+
+    ConcreteDeclRef nextWitness;
+    if (stmt->getSequence()->getType()->isExistentialType()) {
+      nextWitness = ConcreteDeclRef(nextFn);
+    } else if (nextFn) {
+      auto iteratorId = isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator;
+      auto associatedType = sequenceProto->getAssociatedType(iteratorId);
+      auto typeWitness = seqConformanceRef.getTypeWitness(associatedType);
+      auto iteratorConformanceRef = lookupConformance(
+          typeWitness, cast<ProtocolDecl>(nextFn->getDeclContext()));
+      nextWitness = iteratorConformanceRef.getWitnessByName(nextFn->getName());
+    }
+
+    auto *nextRef = new (ctx)
+        MemberRefExpr(makeIteratorVarRef, stmt->getForLoc(), nextWitness,
+                      DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
+
+    ArgumentList *nextArgs;
+    if (nextFn && nextFn->getParameters()->size() == 1) {
+      auto isolationArg =
+          new (ctx) CurrentContextIsolationExpr(stmt->getForLoc(), Type());
+      nextArgs = ArgumentList::createImplicit(
+          ctx, {Argument(SourceLoc(), ctx.Id_isolation, isolationArg)});
+    } else {
+      nextArgs = ArgumentList::createImplicit(ctx, {});
+    }
+
+    Expr *nextCall = CallExpr::createImplicit(ctx, nextRef, nextArgs);
+
+    // Wrap the 'next' call in 'unsafe', if the loop is async (in which case
+    // the iterator variable is nonisolated(unsafe).
+    if (isAsync &&
+        ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
+      SourceLoc loc = stmt->getUnsafeLoc();
+      if (loc.isInvalid())
+        loc = stmt->getForLoc();
+      nextCall = UnsafeExpr::createImplicit(ctx, loc, nextCall);
+    }
+
+    return nextCall;
+  }
+
+  PatternBindingDecl *buildMakeIterator() {
+    auto *sequence = stmt->getSequence();
+    auto seqType = sequence->getType();
+    auto *opaqueSeqExpr =
+        new (ctx) OpaqueValueExpr(sequence->getSourceRange(), seqType);
+    stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
+
+    // First, let's form a call from sequence to `.makeIterator()` and save
+    // that in a special variable which is going to be used by SILGen.
+    FuncDecl *makeIterator =
+        isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                : (isBorrowing ? ctx.getBorrowingSequenceMakeBorrowingIterator()
+                               : ctx.getSequenceMakeIterator());
+
+    ConcreteDeclRef witness;
+    if (seqType->isExistentialType())
+      witness = ConcreteDeclRef(makeIterator);
+    else {
+      witness = seqConformanceRef.getWitnessByName(makeIterator->getName());
+    }
+
+    auto *makeIteratorRef = new (ctx)
+        MemberRefExpr(opaqueSeqExpr, stmt->getForLoc(), witness,
+                      DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
+
+    Expr *makeIteratorCall =
+        CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
+
+    Pattern *pattern = NamedPattern::createImplicit(ctx, makeIteratorVar);
+    auto *PB = PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, pattern, makeIteratorCall, dc);
+    return PB;
+  }
+
+  StmtCondition buildWhileCond(VarDecl *nextCallVar, Expr *nextCall) {
+    Pattern *nextCallVarPattern =
+        NamedPattern::createImplicit(ctx, nextCallVar);
+
+    // For the borrowing logic, nextCallVarPattern returns a Span so
+    // the actual condition is the isEmpty check done below.
+    // For non-borrowing, we need to wrap the result of the nextCall
+    // in an optional some pattern to check whether it contains a value.
+    if (!isBorrowing) {
+      nextCallVarPattern =
+          OptionalSomePattern::createImplicit(ctx, nextCallVarPattern);
+    }
+
+    auto PBI = ConditionalPatternBindingInfo::create(
+        ctx, SourceLoc(), nextCallVarPattern, nextCall);
+
+    auto conditionElement = StmtConditionElement(PBI);
+    SmallVector<StmtConditionElement, 2> cond;
+    cond.push_back(conditionElement);
+
+    // For borrowing iterators, add !span.isEmpty condition.
+    // To signal that there are no more elements, `nextSpan()` will return
+    // an empty span.
+    if (isBorrowing) {
+      auto *spanRef =
+          new (ctx) DeclRefExpr(nextCallVar, DeclNameLoc(), /*implicit=*/true);
+      auto *isEmptyRef =
+          UnresolvedDotExpr::createImplicit(ctx, spanRef, ctx.Id_isEmpty);
+
+      // Create !span.isEmpty as a prefix unary operator call
+      auto notOpId = ctx.getIdentifier("!");
+      auto *notOpRef = new (ctx) UnresolvedDeclRefExpr(
+          DeclNameRef(notOpId), DeclRefKind::PrefixOperator,
+          DeclNameLoc(stmt->getForLoc()));
+      auto *notOp = PrefixUnaryExpr::create(ctx, notOpRef, isEmptyRef);
+      notOp->setImplicit();
+
+      cond.push_back(StmtConditionElement(notOp));
+    }
+
+    return ctx.AllocateCopy(cond);
+  }
+
+  VarDecl *buildCountVar() {
+    auto *countVar = new (ctx) VarDecl(
+        /*isStatic=*/false, VarDecl::Introducer::Let, stmt->getForLoc(),
+        ctx.getIdentifier("$count"), dc);
+    countVar->setImplicit();
+    return countVar;
+  }
+
+  StmtCondition buildInnerWhileCond(VarDecl *countVar, VarDecl *indexVar,
+                                    Pattern *opaquePattern, Expr *element) {
+    auto *indexRef =
+        new (ctx) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit=*/true);
+    auto *countVarRef =
+        new (ctx) DeclRefExpr(countVar, DeclNameLoc(), /*implicit=*/true);
+
+    auto *lessThanOp = new (ctx) UnresolvedDeclRefExpr(
+        DeclNameRef(ctx.getIdentifier("<")), DeclRefKind::BinaryOperator,
+        DeclNameLoc(stmt->getForLoc()));
+    auto *condition = BinaryExpr::create(ctx, indexRef, lessThanOp, countVarRef,
+                                         /*implicit=*/true);
+
+    auto conditionElement = StmtConditionElement(condition);
+    SmallVector<StmtConditionElement> innerWhileCond;
+    innerWhileCond.push_back(conditionElement);
+
+    auto PBI = ConditionalPatternBindingInfo::create(ctx, SourceLoc(),
+                                                     opaquePattern, element);
+    auto elementDecl = StmtConditionElement(PBI);
+    innerWhileCond.push_back(elementDecl);
+
+    return ctx.AllocateCopy(innerWhileCond);
+  }
+
+  AssignExpr *buildIndexIncrAssignment(VarDecl *indexVar) {
+    // Add $i = $i + 1 at the end of the body
+    auto *indexRefForIncr =
+        new (ctx) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit=*/true);
+    auto *indexRefRHS =
+        new (ctx) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit=*/true);
+    auto *oneLiteral =
+        IntegerLiteralExpr::createFromUnsigned(ctx, 1, stmt->getForLoc());
+
+    auto *plusOp = new (ctx)
+        UnresolvedDeclRefExpr(DeclNameRef(ctx.getIdentifier("+")),
+                              DeclRefKind::BinaryOperator, DeclNameLoc());
+    auto *addExpr = BinaryExpr::create(ctx, indexRefRHS, plusOp, oneLiteral,
+                                       /*implicit=*/true);
+
+    return new (ctx)
+        AssignExpr(indexRefForIncr, SourceLoc(), addExpr, /*implicit=*/true);
+  }
+
+  SmallVector<ASTNode> buildWhileBody(VarDecl *nextCallVar) {
+    SmallVector<ASTNode> bodyElements;
+
+    auto elementPattern = stmt->getPattern();
+    if (isBorrowing && elementPattern->getType()->isNoncopyable()) {
+      // We need to borrow the element to be able to use it in the loop.
+      if (auto *forVarDecl = elementPattern->getSingleVar()) {
+        forVarDecl->setIntroducer(VarDecl::Introducer::Borrowing);
+      } else if (auto *anyPattern = dyn_cast<AnyPattern>(
+                     elementPattern->getSemanticsProvidingPattern(
+                         /*lookThroughOpaque*/ true))) {
+        // This branch will no longer be needed once `_` is always borrowing.
+        anyPattern->setIsBorrowing();
+      }
+    }
+
+    auto *opaquePattern = new (ctx) OpaquePattern(elementPattern);
+    auto *nextCallVarRef = new (ctx) DeclRefExpr(
+        nextCallVar, DeclNameLoc(stmt->getForLoc()), /*Implicit=*/true);
+
+    // Either an unwrapped value returned by next, or an element of the span
+    // returned by nextSpan when dealing with BorrowingIterators.
+    Expr *element = nextCallVarRef;
+
+    Pattern *indexPattern = nullptr;
+
+    if (isBorrowing) {
+      // Bind original pattern to span[i] in inner loop.
+      auto *indexVar = new (ctx) VarDecl(
+          /*isStatic=*/false, VarDecl::Introducer::Var, stmt->getForLoc(),
+          ctx.getIdentifier("$i"), dc);
+      indexVar->setImplicit();
+      indexPattern = NamedPattern::createImplicit(ctx, indexVar);
+      auto *indexRef =
+          new (ctx) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit=*/true);
+
+      // Create span[i] subscript
+      auto *indexArgs =
+          ArgumentList::forImplicitSingle(ctx, Identifier(), indexRef);
+      element = SubscriptExpr::create(ctx, nextCallVarRef, indexArgs,
+                                      ConcreteDeclRef(), /*implicit=*/true);
+    }
+
+    auto isRefutable =
+        elementPattern->isRefutablePattern(/*allowIsPatternCoercion*/ false);
+    if (!isRefutable && !isBorrowing) {
+      auto PBD = PatternBindingDecl::createImplicit(
+          ctx, StaticSpellingKind::None, opaquePattern, element, dc);
+      bodyElements.push_back(PBD);
+    }
+
+    /* For a non-borrowing ForEachStmt,
+     * for ... in ... where cond { body }
+     * becomes:
+     * while ... { if cond then body }
+     */
+    auto *whereClause = stmt->getWhere();
+
+    OpaqueStmt *opaqueForBody = new (ctx) OpaqueStmt();
+    stmt->setOpaqueBodyStmt(opaqueForBody);
+
+    if (whereClause || (isRefutable && !isBorrowing)) {
+      SmallVector<StmtConditionElement, 1> internalConditions;
+
+      if (isRefutable && !isBorrowing) {
+        auto PBI = ConditionalPatternBindingInfo::create(
+            ctx, SourceLoc(), opaquePattern, element);
+        auto conditionElement = StmtConditionElement(PBI);
+        internalConditions.push_back(conditionElement);
+      }
+
+      if (whereClause) {
+        auto *opaqueWhere = new (ctx) OpaqueValueExpr(
+            whereClause->getSourceRange(), whereClause->getType());
+        stmt->setOpaqueWhereExpr(opaqueWhere);
+        internalConditions.push_back(opaqueWhere);
+      }
+
+      bodyElements.push_back(new (ctx) IfStmt(
+          LabeledStmtInfo(), SourceLoc(), ctx.AllocateCopy(internalConditions),
+          BraceStmt::createImplicit(ctx, {opaqueForBody}), SourceLoc(), nullptr,
+          /*implicit*/ true));
+    } else {
+      bodyElements.push_back(opaqueForBody);
+    }
+
+    if (isBorrowing) {
+      // Create integer literal 0 for initial value of $i
+      auto *zeroLiteral =
+          IntegerLiteralExpr::createFromUnsigned(ctx, 0, stmt->getForLoc());
+      auto *indexInitPB = PatternBindingDecl::createImplicit(
+          ctx, StaticSpellingKind::None, indexPattern, zeroLiteral, dc);
+
+      // $count = $span.count
+      auto *countVar = buildCountVar();
+      auto *countPattern = NamedPattern::createImplicit(ctx, countVar);
+
+      auto *countRef =
+          UnresolvedDotExpr::createImplicit(ctx, nextCallVarRef, ctx.Id_count);
+      auto *countPB = PatternBindingDecl::createImplicit(
+          ctx, StaticSpellingKind::None, countPattern, countRef, dc);
+
+      auto *indexVar = indexPattern->getSingleVar();
+      ASSERT(indexVar != nullptr);
+
+      // Add $i = $i + 1 at the beginning of the body
+      bodyElements.insert(bodyElements.begin(),
+                          buildIndexIncrAssignment(indexVar));
+
+      auto *innerWhileBody =
+          BraceStmt::create(ctx, stmt->getBody()->getLBraceLoc(), bodyElements,
+                            stmt->getBody()->getRBraceLoc(),
+                            /*implicit=*/true);
+
+      innerLoop = new (ctx) WhileStmt(
+          LabeledStmtInfo(), stmt->getForLoc(),
+          /* $i < $count, case let $element = span[i]  */
+          buildInnerWhileCond(countVar, indexVar, opaquePattern, element),
+          innerWhileBody, /*implicit=*/true);
+
+      return {indexInitPB, countPB, innerLoop};
+    }
+
+    return bodyElements;
+  }
+
+  WhileStmt *buildWhileStmt() {
+    Expr *nextCall = buildNextCall();
+    auto varName = isBorrowing ? "$span" : "$element";
+    auto nextCallVar = new (ctx)
+        VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let,
+                nextCall->getStartLoc(), ctx.getIdentifier(varName), dc);
+    nextCallVar->setImplicit();
+
+    auto *whileBody = BraceStmt::create(
+        ctx, stmt->getBody()->getLBraceLoc(), buildWhileBody(nextCallVar),
+        stmt->getBody()->getRBraceLoc(), /*implicit*/ true);
+
+    auto *whileStmt = new (ctx)
+        WhileStmt(LabeledStmtInfo(), stmt->getForLoc(),
+                  buildWhileCond(nextCallVar, nextCall), whileBody, true);
+
+    // Set the statement as a target for any Break or Continue statements in the
+    // ForEach.
+    stmt->setBreakTarget(whileStmt);
+
+    if (isBorrowing) {
+      ASSERT(innerLoop);
+      innerLoop->setParentForEach(stmt);
+      stmt->setContinueTarget(innerLoop);
+    } else {
+      stmt->setContinueTarget(whileStmt);
+    }
+
+    whileStmt->setParentForEach(stmt);
+
+    return whileStmt;
+  }
+};
+} // namespace
+
+BraceStmt *DesugarForEachStmtRequest::evaluate(Evaluator &evaluator,
+                                               ForEachStmt *stmt) const {
+  DesugarForEachStmt desugarForEachStmt(stmt);
+  return desugarForEachStmt();
 }

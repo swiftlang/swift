@@ -219,6 +219,8 @@ public:
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
 
+    EmitPolyglotAST, ///< Emit polyglot AST as JSON
+
     ScanDependencies, ///< Scan dependencies of Swift source files
     PrintVersion,     ///< Print version information.
     PrintArguments,   ///< Print supported arguments of this compiler
@@ -399,6 +401,9 @@ public:
   /// The path at which to either serialize or deserialize the dependency scanner cache.
   std::string SerializedDependencyScannerCachePath;
 
+  /// Emit dependency scanning related remarks.
+  bool EmitDependencyScannerRemarks = false;
+
   /// Emit remarks indicating use of the serialized module dependency scanning cache.
   bool EmitDependencyScannerCacheRemarks = false;
 
@@ -541,12 +546,12 @@ public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Dependency Scanning hash.
   llvm::hash_code getModuleScanningHashComponents() const {
-    return hash_combine(ModuleName,
-                        ModuleABIName,
-                        ModuleLinkName,
-                        ImplicitObjCHeaderPath,
-                        PrebuiltModuleCachePath,
-                        UserModuleVersion);
+    return hash_combine(
+        ModuleName, ModuleABIName, ModuleLinkName, ImplicitObjCHeaderPath,
+        PrebuiltModuleCachePath,
+        llvm::hash_combine_range(ImplicitImportModuleNames.begin(),
+                                 ImplicitImportModuleNames.end()),
+        UserModuleVersion);
   }
 
   StringRef determineFallbackModuleName() const;

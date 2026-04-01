@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -test-runner %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -test-runner %s | %FileCheck %s
 
 import Builtin
 
@@ -23,17 +23,19 @@ sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 sil [ossa] @test_simplify_args1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   specify_test "simplify_cfg_simplify_block_args"
-  %1 = begin_borrow %0 : $Klass
-  br bb1(%1 : $Klass)
+  %2 = begin_borrow %0
+  br bb1(%2)
 
-bb1(%3 : @guaranteed $Klass):
-  br bb2(%3 : $Klass)
+bb1(%4 : @reborrow $Klass):
+  %5 = borrowed %4 from (%0)
+  br bb2(%5)
 
-bb2(%5 : @guaranteed $Klass):
-  end_borrow %5 : $Klass
-  destroy_value %0 : $Klass
-  %t = tuple ()
-  return %t : $()
+bb2(%7 : @reborrow $Klass):
+  %8 = borrowed %7 from (%0)
+  end_borrow %8
+  destroy_value %0
+  %11 = tuple ()
+  return %11
 }
 
 // CHECK-LABEL: sil [ossa] @test_simplify_args2 :
@@ -45,19 +47,20 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   cond_br undef, bb1, bb2
 
 bb1:
-  %2 = begin_borrow %0 : $Klass
-  br bb3(%2 : $Klass)
+  %4 = begin_borrow %0
+  br bb3(%4)
 
 bb2:
-  %3 = begin_borrow %1 : $Klass
-  br bb3(%3 : $Klass)
+  %6 = begin_borrow %1
+  br bb3(%6)
 
-bb3(%4 : @guaranteed $Klass):
-  end_borrow %4 : $Klass
-  destroy_value %0 : $Klass
-  destroy_value %1 : $Klass
-  %t = tuple ()
-  return %t : $()
+bb3(%8 : @reborrow $Klass):
+  %9 = borrowed %8 from (%1, %0)
+  end_borrow %9
+  destroy_value %0
+  destroy_value %1
+  %13 = tuple ()
+  return %13
 }
 
 // CHECK-LABEL: sil [ossa] @test_simplify_args3 :
@@ -110,21 +113,22 @@ bb3(%4 : @owned $Klass):
 sil [ossa] @test_simplify_args5 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   specify_test "simplify_cfg_simplify_block_args"
-  %2 = begin_borrow %0 : $Klass
+  %3 = begin_borrow %0
   cond_br undef, bb1, bb2
 
 bb1:
-  br bb3(%2 : $Klass)
+  br bb3(%3)
 
 bb2:
-  br bb3(%2 : $Klass)
+  br bb3(%3)
 
-bb3(%4 : @guaranteed $Klass):
-  end_borrow %4 : $Klass
-  destroy_value %0 : $Klass
-  destroy_value %1 : $Klass
-  %t = tuple ()
-  return %t : $()
+bb3(%7 : @reborrow $Klass):
+  %8 = borrowed %7 from (%0)
+  end_borrow %8
+  destroy_value %0
+  destroy_value %1
+  %12 = tuple ()
+  return %12
 }
 
 // CHECK-LABEL: sil [ossa] @test_simplify_args6 :
@@ -181,18 +185,19 @@ bb4:
 sil [ossa] @test_simplify_args8 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   specify_test "simplify_cfg_simplify_argument @block[1] 0"
-  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
-  br bb1(%1 : $FakeOptional<Klass>)
+  %2 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0
+  br bb1(%2)
 
-bb1(%3 : @guaranteed $FakeOptional<Klass>):
-  %4 = unchecked_enum_data %3 : $FakeOptional<Klass>, #FakeOptional.some!enumelt
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  %c = apply %f(%4) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb3
+bb1(%4 : @guaranteed $FakeOptional<Klass>):
+  %5 = borrowed %4 from (%0)
+  %6 = unchecked_enum_data %5, #FakeOptional.some!enumelt
+  %7 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb2
 
-bb3:
-  %7 = tuple ()
-  return %7 : $()
+bb2:
+  %10 = tuple ()
+  return %10
 }
 
 // CHECK-LABEL: sil [ossa] @test_simplify_args9 : 
@@ -271,23 +276,24 @@ bb3:
 sil [ossa] @test_simplify_enum_arg_guaranteed1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   specify_test "simplify_cfg_simplify_argument @block[1] 0"
-  %b = begin_borrow %0 : $Klass
-  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
-  %c = copy_value %1 : $FakeOptional<Klass>
-  br bb1(%1 : $FakeOptional<Klass>)
+  %2 = begin_borrow %0
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %2
+  %4 = copy_value %3
+  br bb1(%3)
 
-bb1(%3 : @guaranteed $FakeOptional<Klass>):
-  %4 = unchecked_enum_data %3 : $FakeOptional<Klass>, #FakeOptional.some!enumelt
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+bb1(%6 : @guaranteed $FakeOptional<Klass>):
+  %7 = borrowed %6 from (%2)
+  %8 = unchecked_enum_data %7, #FakeOptional.some!enumelt
+  %9 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %10 = apply %9(%8) : $@convention(thin) (@guaranteed Klass) -> ()
   br bb2
 
 bb2:
-  destroy_value %c : $FakeOptional<Klass>
-  end_borrow %b : $Klass
-  destroy_value %0 : $Klass
-  %t = tuple ()
-  return %t : $()
+  destroy_value %4
+  end_borrow %2
+  destroy_value %0
+  %15 = tuple ()
+  return %15
 }
 
 // CHECK-LABEL: sil [ossa] @test_simplify_enum_arg_guaranteed2 : 
@@ -296,22 +302,23 @@ bb2:
 sil [ossa] @test_simplify_enum_arg_guaranteed2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   specify_test "simplify_cfg_simplify_argument @block[1] 0"
-  %b = begin_borrow %0 : $Klass
-  %1 = struct $NonTrivialStruct(%b : $Klass) 
-  %c = copy_value %1 : $NonTrivialStruct
-  br bb1(%1 : $NonTrivialStruct)
+  %2 = begin_borrow %0
+  %3 = struct $NonTrivialStruct (%2)
+  %4 = copy_value %3
+  br bb1(%3)
 
-bb1(%3 : @guaranteed $NonTrivialStruct):
-  %4 = struct_extract %3 : $NonTrivialStruct, #NonTrivialStruct.val
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+bb1(%6 : @guaranteed $NonTrivialStruct):
+  %7 = borrowed %6 from (%2)
+  %8 = struct_extract %7, #NonTrivialStruct.val
+  %9 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %10 = apply %9(%8) : $@convention(thin) (@guaranteed Klass) -> ()
   br bb2
 
 bb2:
-  destroy_value %c : $NonTrivialStruct
-  end_borrow %b : $Klass
-  destroy_value %0 : $Klass
-  %t = tuple ()
-  return %t : $()
+  destroy_value %4
+  end_borrow %2
+  destroy_value %0
+  %15 = tuple ()
+  return %15
 }
 

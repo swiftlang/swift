@@ -226,6 +226,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       // Common Swift runtime libs
       "-lswiftSwiftOnoneSupport",
       "-lswiftCore",
+      "-lswiftObservation",
       "-lswift_Concurrency",
       "-lswift_StringProcessing",
       "-lswiftRegexBuilder",

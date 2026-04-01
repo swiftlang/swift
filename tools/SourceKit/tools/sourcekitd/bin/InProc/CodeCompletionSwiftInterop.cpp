@@ -108,7 +108,7 @@ public:
 
   FileSystemRef createFileSystem() {
     auto *overlayFS =
-        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem());
+        new llvm::vfs::OverlayFileSystem(llvm::vfs::createPhysicalFileSystem());
     overlayFS->pushOverlay(new SharedStringInMemoryFS(modifiedFiles));
     return overlayFS;
   }

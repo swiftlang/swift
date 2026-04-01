@@ -396,6 +396,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { _count == 0 }
 
   /// The representation for a position in `Span`.
@@ -511,6 +512,10 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Returns: a RawSpan over the memory represented by this span
   @_alwaysEmitIntoClient
+<<<<<<< HEAD
+=======
+  @_transparent
+>>>>>>> origin/main
   @unsafe
   public var bytes: RawSpan {
     @lifetime(copy self)
@@ -698,6 +703,7 @@ extension Span where Element: ~Copyable  {
   ///   parameter is valid only for the duration of its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -732,6 +738,7 @@ extension Span where Element: BitwiseCopyable {
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -749,6 +756,15 @@ extension Span where Element: ~Copyable {
   /// refer to the same region in memory.
   @_alwaysEmitIntoClient
   public func isIdentical(to other: Self) -> Bool {
+    unsafe (self._pointer == other._pointer) && (self._count == other._count)
+  }
+
+  /// Returns a Boolean value indicating whether two instances refer to the same
+  /// memory region.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
     unsafe (self._pointer == other._pointer) && (self._count == other._count)
   }
 
@@ -913,3 +929,15 @@ extension Span where Element: ~Copyable {
     extracting(droppingFirst: k)
   }
 }
+
+#if !SPAN_COMPATIBILITY_STUB
+@available(SwiftStdlib 6.4, *)
+extension Span: BorrowingSequence where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  @inlinable
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> SpanIterator<Element> {
+    SpanIterator(self)
+  }
+}
+#endif

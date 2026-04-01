@@ -86,12 +86,12 @@ ExportContext::ExportContext(DeclContext *DC,
                              AvailabilityContext availability,
                              FragileFunctionKind kind,
                              llvm::SmallVectorImpl<UnsafeUse> *unsafeUses,
-                             bool spi, bool exported,
+                             bool spi, ExportedLevel exported,
                              bool implicit)
     : DC(DC), Availability(availability), FragileKind(kind),
       UnsafeUses(unsafeUses) {
   SPI = spi;
-  Exported = exported;
+  Exported = unsigned(exported);
   Implicit = implicit;
   Reason = unsigned(ExportabilityReason::General);
 }
@@ -178,7 +178,7 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
     computeExportContextBits(Ctx, D, &spi, &implicit);
   });
 
-  bool exported = ::isExported(D);
+  ExportedLevel exported = ::isExported(D);
 
   return ExportContext(DC, availabilityContext, fragileKind, nullptr,
                        spi, exported, implicit);
@@ -194,7 +194,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   forEachOuterDecl(
       DC, [&](Decl *D) { computeExportContextBits(Ctx, D, &spi, &implicit); });
 
-  bool exported = false;
+  ExportedLevel exported = ExportedLevel::None;
 
   return ExportContext(DC, availabilityContext, fragileKind, nullptr,
                        spi, exported, implicit);
@@ -205,8 +205,9 @@ ExportContext ExportContext::forConformance(DeclContext *DC,
   assert(isa<ExtensionDecl>(DC) || isa<NominalTypeDecl>(DC));
   auto where = forDeclSignature(DC->getInnermostDeclarationDeclContext());
 
-  where.Exported &= proto->getFormalAccessScope(
-      DC, /*usableFromInlineAsPublic*/true).isPublic();
+  if (!proto->getFormalAccessScope(
+        DC, /*usableFromInlineAsPublic*/true).isPublic())
+    where.Exported = unsigned(ExportedLevel::None);
 
   return where;
 }
@@ -219,7 +220,7 @@ ExportContext ExportContext::withReason(ExportabilityReason reason) const {
 
 ExportContext ExportContext::withExported(bool exported) const {
   auto copy = *this;
-  copy.Exported = isExported() && exported;
+  copy.Exported = exported ? Exported : unsigned(ExportedLevel::None);
   return copy;
 }
 
@@ -235,18 +236,64 @@ bool ExportContext::mustOnlyReferenceExportedDecls() const {
   return Exported || FragileKind.kind != FragileFunctionKind::None;
 }
 
-bool ExportContext::canReferenceOrigin(DisallowedOriginKind originKind) const {
+DiagnosticBehavior
+ExportContext::behaviorForReferenceToOrigin(DisallowedOriginKind originKind)
+const {
   if (originKind == DisallowedOriginKind::None)
-    return true;
+    return DiagnosticBehavior::Ignore;
 
-  // Non public imports aren't hidden dependencies in embedded  mode,
-  // don't enforce them on implicitly always emit into client code.
-  if (originKind == DisallowedOriginKind::NonPublicImport &&
-      getFragileFunctionKind().kind ==
-        FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
-    return true;
+  // Exportability checks for non-library-evolution mode have less restrictions
+  // than the library-evolution ones. Implicitly always emit into client code
+  // in embedded mode and implicitly exported layouts in non-library-evolution
+  // mode can reference SPIs and non-public dependencies.
+  if (getFragileFunctionKind().kind ==
+        FragileFunctionKind::EmbeddedAlwaysEmitIntoClient ||
+      getExportedLevel() == ExportedLevel::ImplicitlyExported) {
+    switch (originKind) {
+    case DisallowedOriginKind::None:
+    case DisallowedOriginKind::NonPublicImport:
+    case DisallowedOriginKind::SPIOnly:
+    case DisallowedOriginKind::SPIImported:
+    case DisallowedOriginKind::SPILocal:
+      return DiagnosticBehavior::Ignore;
+    case DisallowedOriginKind::MissingImport:
+    case DisallowedOriginKind::InternalBridgingHeaderImport:
+    case DisallowedOriginKind::ImplementationOnly:
+    case DisallowedOriginKind::FragileCxxAPI:
+    case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
+      break;
+    }
+  }
 
-  return false;
+  // Allow references to hidden dependencies from `@c/objc @implementation`
+  // decl signatures.
+  if (getDeclContext()->isInObjCImplementationContext()) {
+    switch (originKind) {
+    case DisallowedOriginKind::None:
+    case DisallowedOriginKind::NonPublicImport:
+    case DisallowedOriginKind::InternalBridgingHeaderImport:
+    case DisallowedOriginKind::ImplementationOnly:
+    case DisallowedOriginKind::SPIOnly:
+      return DiagnosticBehavior::Ignore;
+    case DisallowedOriginKind::SPIImported:
+    case DisallowedOriginKind::SPILocal:
+    case DisallowedOriginKind::MissingImport:
+    case DisallowedOriginKind::FragileCxxAPI:
+    case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
+      break;
+    }
+  }
+
+  // Exportability checking for non-library-evolution was introduced late,
+  // downgrade errors to warnings by default.
+  auto &ctx = DC->getASTContext();
+  if (getExportedLevel() == ExportedLevel::ImplicitlyExported &&
+      originKind != DisallowedOriginKind::ImplementationOnlyMemoryLayout &&
+      !ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
+      !ctx.isLanguageModeAtLeast(LanguageMode::future))
+    return DiagnosticBehavior::Warning;
+
+  return DiagnosticBehavior::Error;
 }
 
 std::optional<ExportabilityReason>
@@ -824,9 +871,7 @@ static void fixAvailabilityByAddingVersionCheck(
       .fixItReplace(RangeToWrap, IfText);
 }
 
-/// Emit suggested Fix-Its for a reference with to an unavailable symbol
-/// requiting the given OS version range.
-static void fixAvailability(SourceRange ReferenceRange,
+void swift::fixAvailability(SourceRange ReferenceRange,
                             const DeclContext *ReferenceDC,
                             AvailabilityDomain Domain,
                             const AvailabilityRange &RequiredAvailability,
@@ -1069,8 +1114,13 @@ static bool diagnosePotentialUnavailability(
       // Don't downgrade
     } else if (behaviorLimit >= DiagnosticBehavior::Warning) {
       err.limitBehavior(behaviorLimit);
+<<<<<<< HEAD
     } else {
       err.warnUntilLanguageMode(6);
+=======
+    } else if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
+      err.warnUntilLanguageMode(LanguageMode::v6);
+>>>>>>> origin/main
     }
 
     // Direct a fixit to the error if an existing guard is nearly-correct
@@ -1769,7 +1819,12 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
                 shouldHideDomainNameForConstraintDiagnostic(constraint),
                 domainAndRange.getDomain(), EncodedMessage.Message)
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
+<<<<<<< HEAD
       .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6, 6);
+=======
+      .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6,
+                               LanguageMode::v6);
+>>>>>>> origin/main
 
   switch (constraint.getReason()) {
   case AvailabilityConstraint::Reason::UnavailableUnconditionally:
@@ -2161,7 +2216,8 @@ bool diagnoseExplicitUnavailability(
   // obsolete decls still map to valid ObjC runtime names, so behave correctly
   // at runtime, even though their use would produce an error outside of a
   // #keyPath expression.
-  auto limit = Flags.contains(DeclAvailabilityFlag::ForObjCKeyPath)
+  auto limit = (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+                Flags.contains(DeclAvailabilityFlag::ForObjCKeyPath))
                   ? DiagnosticBehavior::Warning
                   : DiagnosticBehavior::Unspecified;
 
@@ -2950,10 +3006,19 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
                                    attr->getMessage());
     if (D->preconcurrency()) {
       diag.limitBehavior(DiagnosticBehavior::Warning);
+<<<<<<< HEAD
     } else if (shouldWarnUntilFutureVersion()) {
       diag.warnUntilFutureLanguageMode();
     } else {
       diag.warnUntilLanguageMode(6);
+=======
+    } else if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
+      if (shouldWarnUntilFutureVersion()) {
+        diag.warnUntilLanguageMode(LanguageMode::future);
+      } else {
+        diag.warnUntilLanguageMode(LanguageMode::v6);
+      }
+>>>>>>> origin/main
     }
 
     if (!attr->getRename().empty()) {
@@ -2974,10 +3039,19 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     SourceLoc diagLoc = call ? call->getLoc() : R.Start;
     auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl, D,
                                    attr->Message);
+<<<<<<< HEAD
     if (shouldWarnUntilFutureVersion()) {
       diag.warnUntilFutureLanguageMode();
     } else {
       diag.warnUntilLanguageMode(6);
+=======
+    if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
+      if (shouldWarnUntilFutureVersion()) {
+        diag.warnUntilLanguageMode(LanguageMode::future);
+      } else {
+        diag.warnUntilLanguageMode(LanguageMode::v6);
+      }
+>>>>>>> origin/main
     }
   }
   D->diagnose(diag::decl_declared_here, D);
@@ -3038,6 +3112,15 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   // Diagnose for deprecation
   if (!isAccessorWithDeprecatedStorage)
     diagnoseIfDeprecated(R, Where, D, call);
+
+  // A reference to a compatibility memberwise initializer should be diagnosed
+  // as if it were deprecated if DeprecateCompatMemberwiseInit is enabled.
+  if (ctx.LangOpts.hasFeature(Feature::DeprecateCompatMemberwiseInit)) {
+    if (auto *init = dyn_cast<ConstructorDecl>(D)) {
+      if (init->isMemberwiseInitializer() == MemberwiseInitKind::Compatibility)
+        TypeChecker::diagnoseCompatMemberwiseInitIfNeeded(init, R.Start);
+    }
+  }
 
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
         && isa<ProtocolDecl>(D))

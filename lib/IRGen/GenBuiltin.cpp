@@ -1114,7 +1114,11 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     out.add(DebugAssert);
     return;
   }
-  
+
+  case BuiltinValueKind::InfiniteLoopTrueCondition:
+    out.add(IGF.Builder.getTrue());
+    return;
+
   case BuiltinValueKind::DestroyArray: {
     // The input type is (T.Type, Builtin.RawPointer, Builtin.Word).
     /* metatype (which may be thin) */
@@ -1578,15 +1582,28 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     out.add(emitBuiltinTaskAddHandler(IGF, Builtin.ID, func, context));
     return;
   }
+  case BuiltinValueKind::RemoveTaskLocalValue:
   case BuiltinValueKind::TaskLocalValuePop:
+    // removeTaskLocalValue technically takes an argument, but we ignore
+    // it because it's really just an abstract token.
     return emitBuiltinTaskLocalValuePop(IGF);
+  case BuiltinValueKind::AddTaskLocalValue:
   case BuiltinValueKind::TaskLocalValuePush: {
     auto *key = args.claimNext();
     auto *value = args.claimNext();
     // Grab T from the builtin.
     auto *valueMetatype = IGF.emitTypeMetadataRef(argTypes[1].getASTType());
-    return emitBuiltinTaskLocalValuePush(IGF, key, value, valueMetatype);
+    emitBuiltinTaskLocalValuePush(IGF, key, value, valueMetatype);
+
+    // The output value is not used for anything, so we don't actually set
+    // anything.
+    return;
   }
+  case BuiltinValueKind::TaskCancellationShieldPush:
+    out.add(emitBuiltinTaskCancellationShieldPush(IGF));
+    return;
+  case BuiltinValueKind::TaskCancellationShieldPop:
+    return emitBuiltinTaskCancellationShieldPop(IGF);
 
   // Builtins without IRGen implementations.
   case BuiltinValueKind::None:
@@ -1605,8 +1622,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::ExtractFunctionIsolation:
   case BuiltinValueKind::DistributedActorAsAnyActor:
   case BuiltinValueKind::TypeJoin:
-  case BuiltinValueKind::TypeJoinInout:
-  case BuiltinValueKind::TypeJoinMeta:
   case BuiltinValueKind::TriggerFallbackDiagnostic:
     llvm_unreachable("IRGen unimplemented for this builtin!");
   }

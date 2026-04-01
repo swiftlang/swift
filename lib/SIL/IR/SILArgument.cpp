@@ -87,8 +87,6 @@ SILParameterInfo SILFunctionArgument::getKnownParameterInfo() const {
   return getFunction()->getConventions().getParamInfoForSILArg(getIndex());
 }
 
-/// WARNING: Do not use this from SILGen!
-/// Use methods such as `isSILIndirect` or query the ParameterInfo instead.
 SILArgumentConvention
 SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
   assert(index < getNumSILArguments());

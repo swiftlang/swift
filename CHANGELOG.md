@@ -5,6 +5,196 @@
 
 ## Swift (next)
 
+* [SE-0493][]: `defer` statements now support `async` calls. The isolation of the body of the `defer` statement is always the same as the isolation of its enclosing scope.
+  
+  ```
+  func example() async {
+    let resource = getResource()
+    defer { await resource.cleanup() }
+    try resource.doSomething()
+  }
+  ```
+
+* [SE-0518][]:
+  Introduced `~Sendable` conformance syntax to explicitly suppress a conformance to `Sendable`,
+  which prevents automatic `Sendable` inference on types, and provides an alternative way
+  to mark types as non-`Sendable` without inheritance impact.
+
+  ```swift
+  // The `Base` type has been audited and determined to be non-`Sendable`, sub-classes
+  // can introduce non-`Sendable` mutable state or protect their state / make everything
+  // constant and thus may be marked as `Sendable`.
+  public class Base: ~Sendable {
+    // ...
+  }
+  ```
+
+* The checking for illegal forward references to local variables is now consistent regardless of
+  whether the reference appears in a closure. Previously the type-checker could incorrectly permit
+  forward references within a closure that it would reject outside of the closure, however this
+  is not something that can be supported in general in the type-checker. In most cases this should
+  have no impact since such invalid references would have already been rejected by later diagnostic
+  passes in the compiler. However there are a couple of cases that were previously legal that are
+  now illegal.
+
+  These include:
+
+  - `lazy` local variables with initializers that forward reference a local variable in a closure,
+    or local variables with attached macros that relocate the initializer into an accessor, e.g:
+
+    ```swift
+    func foo() {
+      lazy var x = { y } // error: use of local variable 'y' before its declaration
+      let y = 0
+    }
+    ```
+
+    ```swift
+    func foo() {
+      @LazyLikeMacro var x = { y } // error: use of local variable 'y' before its declaration
+      let y = 0
+    }
+    ```
+
+  - Forward references to local computed variables from a closure, e.g:
+
+    ```swift
+    func foo() {
+      var x = { y } // error: use of local variable 'y' before its declaration
+      var y: Int { 0 }
+    }
+    ```
+
+  Both cases were already invalid if there was no closure involved. These are now consistently
+  rejected.
+
+  This then allows for consistent shadowing behavior inside and outside of closures, allowing the
+  following previously illegal case to become legal:
+
+  ```swift
+  struct S {
+    var x: Int
+    func foo() {
+      // Already legal, both refer to `self.x`
+      let y = x
+      let x = x
+
+      let z = x // Refers to the local var.
+    }
+    func bar() {
+      // Both previously illegal, now both refer to `self.x`.
+      let y = { x }()
+      let x: Int = { x }()
+
+      let z = x // Still refers to the local var.
+    }
+  }
+  ```
+
+* To simplify writing cross-platform code for Apple platforms while adopting
+  new APIs, availability on macOS, iOS, tvOS, watchOS, and visionOS can now be
+  specified implicitly using `anyAppleOS` for operating system versions starting
+  with `26.0`:
+
+  ```swift
+  @available(anyAppleOS 26.0, *)
+  func functionAvailableOnVersion26() {
+    // ...
+  }
+
+  if #available(anyAppleOS 26.0, *) {
+    // Executes on macOS 26, iOS 26, watchOS 26, tvOS 26, and visionOS 26.
+    functionAvailableOnVersion26()
+  }
+  ```
+
+  If availability for a specific platform is specified simultaneously with
+  `anyAppleOS`, availability for the specific platform takes precedence when
+  building for that platform:
+
+  ```swift
+  if #available(anyAppleOS 26.0, macOS 26.4, *) {
+    // Executes on macOS 26.4 and version 26 of all other Apple OSes.
+  }
+  ```
+
+* [SE-0504][]:
+  Introduced Task Cancellation Shields which temporarily prevent the observation of task
+  cancellation in a given scope. This functionality is intended for use with cleanup actions which
+  may otherwise not have run to completion (since their implementation may have been checking for
+  cancellation and returning early). It may also be used within `defer` blocks to conveniently
+  express such guaranteed-to-run-to-completion cleanups.
+
+  ```swift
+  Task.isCancelled // true
+  withTaskCancellationShield {
+    Task.isCancelled // false
+    cleanup() 
+  }
+  ```
+
+* The raw span accessor properties of `Span` and `MutableSpan` (`bytes` and
+  `mutableBytes`) as well as the two generic `append()` methods of
+  `OutputRawSpan` are newly marked with `@unsafe`. These changes are corrections
+  for omissions in the SE-0458, SE-0467 and SE-0485 proposals or their
+  implementations.
+
+  These `@unsafe` annotations are required because of a permissible compiler
+  optimization involving values of types that contain padding. When the compiler
+  stores such a value to addressable memory, it is free to skip any padding
+  bytes. This can potentially leave those bytes uninitialized. This optimization
+  is safe when the memory is only ever read as the same type as the value
+  stored. However, when reinterpreting the memory as raw bytes, the potentially
+  uninitialized bytes violate the prerequisite that `RawSpan` and
+  `MutableRawSpan` represent fully initialized memory. In the case of
+  `OutputRawSpan`, they violate the postcondition that the memory it has written
+  is fully initialized.
+
+  It is safe to use `bytes` when the `Element` type of `Span` or `MutableSpan`
+  has neither internal nor trailing padding bytes, as every byte is then known
+  to be initialized. The same constraint applies to the type parameter of
+  `OutputSpan.append(_:as:)`.
+
+  To safely use `MutableSpan`'s `mutableBytes`, an additional safety constraint
+  applies when the memory is to later be used again as `Element`. In that case,
+  the non-padding bytes of `Element` must allow every bit pattern to be
+  permissible in a valid value of `Element`.
+
+## Swift 6.3
+
+* [SE-0491][]:
+  You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
+  module selector is written before the name it qualifies and consists of the module name and two colons (`::`):
+  
+  ```swift
+  // This type conforms to the `View` protocol from `SwiftUI`, even if other
+  // modules have also declared a type named `View`:
+  struct MyView: SwiftUI::View { ... }
+  ```
+  
+  A module selector can also be applied to the name of a member; this is helpful if extensions in other modules have
+  added an ambiguous overload:
+  
+  ```swift
+  // Calls the `data(using:)` method added by `Foundation`, even if other
+  // modules have added identical overloads of `data(using:)`.
+  let data = "a little bit of text".Foundation::data(using: .utf8)
+  ```
+  
+  When a module selector is used, Swift skips past any enclosing scopes and starts its search at the top level of the
+  module; this means that certain declarations, such as local variables and generic parameter types, cannot be found
+  with a module selector. Constraints in `where` clauses also cannot use a module selector to refer to an associated
+  type.
+  
+  Module selectors are primarily intended to be used when working around unavoidable conflicts, such as when two
+  modules you don't control both use the same name. API designs which force clients to use a module selector are not
+  recommended; it is usually better to rename a declaration instead. (19481048)
+
+* If you maintain a module built with Library Evolution, you can now configure Swift to use module selectors to improve
+  the robustness of its module interface file. This is especially helpful if your module declares a type with the same
+  name as the module itself. To opt in to this behavior, add the `-enable-module-selectors-in-module-interface` flag to
+  the `OTHER_SWIFT_FLAGS` build setting.
+
 * Concurrency-related APIs like `Task` and string-processing-related APIs like `Regex` can now be qualified by the name
   `Swift`, just like other standard library APIs:
   
@@ -45,7 +235,7 @@
   }
   ```
 
-* [SE-0471][]:
+* [SE-0371][]:
   Actor and global actor annotated types may now declare a synchronous `isolated deinit`, which allows such deinitializer
   to access actor isolated state while deinitializing the actor. This enables actor deinitializers to safely access
   and shut down or close resources during an actors deinitialization, without explicitly resorting to unstructured 
@@ -3881,7 +4071,7 @@ concurrency checking.
 
 * The C `long double` type is now imported as `Float80` on i386 and x86_64
   macOS and Linux. The tgmath functions in the Darwin and glibc modules now
-  support `Float80` as well as `Float` and `Double`. Several tgmath
+  support `Float80` as well as `Float` and `Double`. Several tgmath
   functions have been made generic over `[Binary]FloatingPoint` so that they
   will automatically be available for any conforming type.
 
@@ -10888,6 +11078,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0365]: <https://github.com/apple/swift-evolution/blob/main/proposals/0365-implicit-self-weak-capture.md>
 [SE-0366]: <https://github.com/apple/swift-evolution/blob/main/proposals/0366-move-function.md>
 [SE-0370]: <https://github.com/apple/swift-evolution/blob/main/proposals/0370-pointer-family-initialization-improvements.md>
+[SE-0371]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0376]: <https://github.com/apple/swift-evolution/blob/main/proposals/0376-function-back-deployment.md>
 [SE-0377]: <https://github.com/apple/swift-evolution/blob/main/proposals/0377-parameter-ownership-modifiers.md>
 [SE-0380]: <https://github.com/apple/swift-evolution/blob/main/proposals/0380-if-switch-expressions.md>
@@ -10923,8 +11114,11 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0462]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0462-task-priority-escalation-apis.md
 [SE-0469]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0469-task-names.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
-[SE-0471]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
+[SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
+[SE-0493]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0493-defer-async.md
+[SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
+[SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

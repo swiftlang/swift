@@ -44,6 +44,7 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -cxx-interoperability-mode=default
     -Xfrontend -module-interface-preserve-types-as-written
+    -Xfrontend -disable-module-selectors-in-module-interface
 
     # This flag is unnecessary when building with newer compilers that allow
     # using C++ symbols in resilient overlays (see f4204568).

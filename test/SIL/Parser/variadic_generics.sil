@@ -89,6 +89,20 @@ bb0(%tuple : $*(String, repeat each T, Int), %i : $Builtin.Word):
   return %ret : $()
 }
 
+// pack_pack_index where the component start index equals the number of
+// elements in the pack type, representing an empty trailing slice [N, N).
+// CHECK-LABEL: sil @test_pack_pack_index_end :
+// CHECK: [[INNER_INDEX:%.*]] = dynamic_pack_index {{%.*}} of $Pack{}
+// CHECK: [[INDEX:%.*]] = pack_pack_index 2, [[INNER_INDEX]] of $Pack{Int, String}
+sil @test_pack_pack_index_end : $() -> () {
+bb0:
+  %intIndex = integer_literal $Builtin.Word, 0
+  %innerIndex = dynamic_pack_index %intIndex of $Pack{}
+  %index = pack_pack_index 2, %innerIndex of $Pack{Int, String}
+  %ret = tuple ()
+  return %ret : $()
+}
+
 // CHECK-LABEBL: sil @test7
 // CHECK:   [[LEN:%.*]] = pack_length $Pack{(), (), ()}
 // CHECK:   return [[LEN]] : $Builtin.Word

@@ -115,6 +115,7 @@ extension AddressUseVisitor {
          is MarkUninitializedInst, is DropDeinitInst,
          is CopyableToMoveOnlyWrapperAddrInst,
          is MoveOnlyWrapperToCopyableAddrInst,
+         is DereferenceBorrowAddrInst,
          is MarkUnresolvedNonCopyableValueInst:
       let svi = operand.instruction as! SingleValueInstruction
       return projectedAddressUse(of: operand, into: svi)
@@ -139,7 +140,12 @@ extension AddressUseVisitor {
       let svi = operand.instruction as! SingleValueInstruction
       return loadedAddressUse(of: operand, intoValue: svi)
 
-    case is YieldInst:
+    case is YieldInst,
+    // Return should only occur in a borrow or inout accessor, in which case the
+    // returned address should be structurally used as if it were a projected
+    // use in the caller, even though there is no code here in the callee to
+    // formally end the access.
+         is ReturnInst:
       return yieldedAddressUse(of: operand)
 
     case let sdai as SourceDestAddrInstruction

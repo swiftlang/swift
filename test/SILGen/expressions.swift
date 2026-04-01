@@ -596,11 +596,12 @@ func loadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct) -> NonTrivialStru
 // CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$s{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>
 // CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
 // CHECK-NEXT: end_borrow [[BORROW]]
-// CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2([[UNWRAPPED_X:%[0-9]+]] : @owned $NonTrivialStruct):
+// CHECK-NEXT: ignored_use [[UNWRAPPED_X]]
+// CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: destroy_value [[UNWRAPPED_X]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[METATYPE]]
@@ -622,11 +623,12 @@ func loadIgnoredLValueThroughForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTri
 // CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$s{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>
 // CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
 // CHECK-NEXT: end_borrow [[BORROW]]
-// CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb3
 // CHECK: bb3:
 // CHECK: unreachable
 // CHECK: bb4([[UNWRAPPED_X:%[0-9]+]] : @owned $NonTrivialStruct):
+// CHECK-NEXT: ignored_use [[UNWRAPPED_X]]
+// CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: destroy_value [[UNWRAPPED_X]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[METATYPE]]
@@ -647,7 +649,8 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 // CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @swift_getAtKeyPath :
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT: apply [[PROJECT_FN]]<NonTrivialStruct, Int>([[RESULT]], [[S_TEMP]], [[KP]])
-// CHECK-NEXT: load [trivial] [[RESULT]]
+// CHECK-NEXT: [[RESULT_LOAD:%.*]] = load [trivial] [[RESULT]]
+// CHECK-NEXT: ignored_use [[RESULT_LOAD]]
 // CHECK-NEXT: end_access [[S_READ]]
 // CHECK-NEXT: dealloc_stack [[RESULT]]
 // CHECK-NEXT: destroy_addr [[S_TEMP]]
@@ -698,3 +701,27 @@ func test21886435() {
   () = ()
 }
 
+class IgnoredUseComputedGetterWithDiscardedResult {
+   struct S {
+       var x: String
+   }
+
+   var s: S {
+       get { S(x: "") }
+       set {}
+   }
+
+   // CHECK-LABEL: sil hidden [ossa] @$s11expressions43IgnoredUseComputedGetterWithDiscardedResultC1fyyACF : $@convention(method) (@guaranteed IgnoredUseComputedGetterWithDiscardedResult, @guaranteed IgnoredUseComputedGetterWithDiscardedResult) -> () {
+   // CHECK: bb0([[ARG:%.*]] : @guaranteed $IgnoredUseComputedGetterWithDiscardedResult,
+   // CHECK:   [[METHOD:%.*]] = class_method [[ARG]]
+   // CHECK:   [[RESULT:%.*]] = apply [[METHOD]]([[ARG]])
+   // CHECK:   [[BORROW:%.*]] = begin_borrow [[RESULT]]
+   // CHECK:   [[EXTRACT:%.*]] = struct_extract [[BORROW]]
+   // CHECK:   ignored_use [[EXTRACT]]
+   // CHECK:   end_borrow [[BORROW]]
+   // CHECK:   destroy_value [[RESULT]]
+   // CHECK: } // end sil function '$s11expressions43IgnoredUseComputedGetterWithDiscardedResultC1fyyACF'
+   func f(_ o: IgnoredUseComputedGetterWithDiscardedResult) {
+     _ = o.s.x
+   }
+}

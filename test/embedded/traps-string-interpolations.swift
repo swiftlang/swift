@@ -28,8 +28,7 @@ public func test5(i: Int) {
 
 // CHECK:      define {{.*}}@"$e4main5test11iySi_tF"
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   tail call void asm sideeffect ""
-// CHECK-NEXT:   tail call void @llvm.trap()
+// CHECK-NEXT:   tail call void @llvm.trap() [[NOMERGE:#[0-9]+]]
 // CHECK-NEXT:   unreachable
 // CHECK-NEXT: }
 
@@ -42,13 +41,12 @@ public func test5(i: Int) {
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   %.not = icmp eq i64 %0, 42
 // CHECK-NEXT:   br i1 %.not, label %1, label %2
-// CHECK-EMPTY: 
+// CHECK-EMPTY:
 // CHECK-NEXT: 1:
 // CHECK-NEXT:   ret void
-// CHECK-EMPTY: 
+// CHECK-EMPTY:
 // CHECK-NEXT: 2:
-// CHECK-NEXT:   tail call void asm sideeffect ""
-// CHECK-NEXT:   tail call void @llvm.trap()
+// CHECK-NEXT:   tail call void @llvm.trap() [[NOMERGE]]
 // CHECK-NEXT:   unreachable
 // CHECK-NEXT: }
 
@@ -59,7 +57,7 @@ public func test5(i: Int) {
 
 // CHECK:      define {{.*}}@"$e4main5test51iySi_tF"
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   tail call void asm sideeffect ""
-// CHECK-NEXT:   tail call void @llvm.trap()
+// CHECK-NEXT:   tail call void @llvm.trap() [[NOMERGE]]
 // CHECK-NEXT:   unreachable
 // CHECK-NEXT: }
+// CHECK: attributes [[NOMERGE]] = {{{.*}}nomerge{{.*}}}

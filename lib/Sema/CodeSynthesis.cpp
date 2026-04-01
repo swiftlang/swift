@@ -285,9 +285,11 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
 ///
 /// \returns The newly-created constructor, which has already been type-checked
 /// (but has not been added to the containing struct or class).
-static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
-                                                  ImplicitConstructorKind ICK,
-                                                  ASTContext &ctx) {
+static ConstructorDecl *
+createImplicitConstructor(NominalTypeDecl *decl, ImplicitConstructorKind ICK,
+                          std::optional<MemberwiseInitKind> memberwiseKind,
+                          ASTContext &ctx) {
+  ASSERT(ICK != ImplicitConstructorKind::Memberwise || memberwiseKind);
   assert(!decl->hasClangNode());
 
   SourceLoc Loc = decl->getLoc();
@@ -299,7 +301,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
-    for (auto var : decl->getMemberwiseInitProperties()) {
+    for (auto var : decl->getMemberwiseInitProperties(memberwiseKind.value())) {
       accessLevel = std::min(accessLevel, var->getFormalAccess());
       params.push_back(createMemberwiseInitParameter(decl, Loc, var));
     }
@@ -405,7 +407,11 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                             ICK == ImplicitConstructorKind::Memberwise,
                             decl->getDeclaredType(), existingIsolation,
                             isolation)
+<<<<<<< HEAD
                   .warnUntilLanguageMode(6);
+=======
+                  .warnUntilLanguageMode(LanguageMode::v6);
+>>>>>>> origin/main
               if (previousVar) {
                 previousVar->diagnose(diag::property_requires_actor,
                                       previousVar, existingIsolation);
@@ -432,7 +438,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   }
 
   if (ICK == ImplicitConstructorKind::Memberwise) {
-    ctor->setIsMemberwiseInitializer();
+    ctor->setIsMemberwiseInitializer(memberwiseKind.value());
 
     if (!ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues)) {
       addNonIsolatedToSynthesized(decl, ctor);
@@ -950,7 +956,11 @@ static void diagnoseMissingRequiredInitializer(
       .diagnose(insertionLoc, diag::required_initializer_missing,
                 superInitializer->getName(),
                 superInitializer->getDeclContext()->getDeclaredInterfaceType())
+<<<<<<< HEAD
       .warnUntilLanguageModeIf(downgradeToWarning, 6)
+=======
+      .warnUntilLanguageModeIf(downgradeToWarning, LanguageMode::v6)
+>>>>>>> origin/main
       .fixItInsert(insertionLoc, initializerText);
 
   ctx.Diags.diagnose(findNonImplicitRequiredInit(superInitializer),
@@ -975,20 +985,25 @@ static void diagnoseMissingRequiredInitializer(
 /// at least once.
 static bool enumerateCurrentPropertiesAndAuxiliaryVars(
     NominalTypeDecl *typeDecl, llvm::function_ref<bool(VarDecl *)> callback) {
+  bool hadErrors = false;
+
+  std::function<void(Decl *)> visitMember;
+  visitMember = [&](Decl *member) {
+    if (hadErrors)
+      return;
+
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      if (!callback(var)) {
+        hadErrors = true;
+        return;
+      }
+    }
+    member->visitAuxiliaryDecls(visitMember);
+  };
+
   for (auto *member :
        typeDecl->getImplementationContext()->getCurrentMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member)) {
-      if (!callback(var))
-        return true;
-    }
-
-    bool hadErrors = false;
-    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      if (auto *auxVar = dyn_cast<VarDecl>(auxDecl)) {
-        hadErrors |= !callback(auxVar);
-      }
-    });
-
+    visitMember(member);
     if (hadErrors)
       return true;
   }
@@ -1368,7 +1383,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
   // Force the memberwise and default initializers if the type has them.
   // FIXME: We need to be more lazy about synthesizing constructors.
-  (void)decl->getMemberwiseInitializer();
+  (void)decl->getMemberwiseInitializer(MemberwiseInitKind::Regular);
+  (void)decl->getMemberwiseInitializer(MemberwiseInitKind::Compatibility);
   (void)decl->getDefaultInitializer();
 }
 
@@ -1458,9 +1474,8 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   return std::make_tuple<>();
 }
 
-bool
-HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
-                                   StructDecl *decl) const {
+bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
+                                        MemberwiseInitKind initKind) const {
   if (!shouldAttemptInitializerSynthesis(decl))
     return false;
 
@@ -1468,6 +1483,27 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   // synthesize a memberwise init.
   if (hasUserDefinedDesignatedInit(evaluator, decl))
     return false;
+
+  auto &ctx = decl->getASTContext();
+  if (initKind == MemberwiseInitKind::Compatibility) {
+    // In the next language mode we should stop creating the compatibility
+    // initializer if 'DeprecateCompatMemberwiseInit' is enabled.
+    if (ctx.LangOpts.hasFeature(Feature::DeprecateCompatMemberwiseInit) &&
+        ctx.isLanguageModeAtLeast(LanguageMode::future)) {
+      return false;
+    }
+
+    // If there are no extra properties present for the compatibility
+    // initializer we don't need to synthesize it. The compatibility initializer
+    // is guaranteed to be a superset of the regular initializer so we can just
+    // compare sizes.
+    using Kind = MemberwiseInitKind;
+    auto regularProps = decl->getMemberwiseInitProperties(Kind::Regular);
+    auto compatProps = decl->getMemberwiseInitProperties(Kind::Compatibility);
+    ASSERT(regularProps.size() <= compatProps.size() && "Must be superset");
+    if (regularProps.size() == compatProps.size())
+      return false;
+  }
 
   std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
   decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
@@ -1482,7 +1518,7 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
         if (var->getOriginalWrappedProperty())
           return true;
 
-        if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+        if (!var->isMemberwiseInitialized(initKind, /*preferDeclared=*/true))
           return true;
 
         // Check whether use of init accessors results in access to
@@ -1526,16 +1562,14 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
     return !initializedProperties.empty();
 
   {
-    auto &diags = decl->getASTContext().Diags;
-
-    diags.diagnose(
+    ctx.Diags.diagnose(
         decl, diag::cannot_synthesize_memberwise_due_to_property_init_order);
 
     for (const auto &invalid : invalidOrderings) {
       auto *accessor = invalid.first->getAccessor(AccessorKind::Init);
-      diags.diagnose(accessor->getLoc(),
-                     diag::out_of_order_access_in_init_accessor,
-                     invalid.first->getName(), invalid.second);
+      ctx.Diags.diagnose(accessor->getLoc(),
+                         diag::out_of_order_access_in_init_accessor,
+                         invalid.first->getName(), invalid.second);
     }
   }
 
@@ -1544,11 +1578,20 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
 
 ConstructorDecl *
 SynthesizeMemberwiseInitRequest::evaluate(Evaluator &evaluator,
-                                          NominalTypeDecl *decl) const {
+                                          NominalTypeDecl *decl,
+                                          MemberwiseInitKind initKind) const {
+  ASSERT(decl->hasMemberwiseInitializer(initKind));
+
   // Create the implicit memberwise constructor.
   auto &ctx = decl->getASTContext();
-  auto ctor =
-      createImplicitConstructor(decl, ImplicitConstructorKind::Memberwise, ctx);
+  auto ctor = createImplicitConstructor(
+      decl, ImplicitConstructorKind::Memberwise, initKind, ctx);
+
+  // The diagnostic for the compatibility memberwise initializer assumes it's
+  // fileprivate at most, make sure that's true.
+  ASSERT(initKind != MemberwiseInitKind::Compatibility ||
+         ctor->getFormalAccess() <= AccessLevel::FilePrivate);
+
   decl->addMember(ctor);
   return ctor;
 }
@@ -1556,6 +1599,12 @@ SynthesizeMemberwiseInitRequest::evaluate(Evaluator &evaluator,
 ConstructorDecl *
 ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                                 NominalTypeDecl *decl) const {
+  // For now, use the compatibility memberwise initializer that includes all
+  // private properties.
+  // FIXME: Can we switch to the regular?
+  auto &ctx = decl->getASTContext();
+  auto initKind = MemberwiseInitKind::Compatibility;
+
   // Compute the access level for the memberwise initializer. The minimum of:
   // - Public, by default. This enables public nominal types to have public
   //   memberwise initializers.
@@ -1565,19 +1614,42 @@ ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   //     memberwise initializer causes a redeclaration error.
   // - The minimum access level of memberwise-initialized properties in the
   //   nominal type declaration.
+  // FIXME: This doesn't correctly handle init accessors.
   auto accessLevel = AccessLevel::Public;
   for (auto *member : decl->getMembers()) {
     auto *var = dyn_cast<VarDecl>(member);
-    if (!var || !var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+    if (!var)
       continue;
+    if (!var->isMemberwiseInitialized(initKind, /*preferDeclared=*/true))
+      continue;
+
     accessLevel = std::min(accessLevel, var->getFormalAccess());
   }
-  auto &ctx = decl->getASTContext();
 
   // If a memberwise initializer exists, set its access level and return it.
-  if (auto *initDecl = decl->getMemberwiseInitializer()) {
-    initDecl->overwriteAccess(accessLevel);
-    return initDecl;
+  // First try the compatibility initializer, then the regular if it contains
+  // all the necessary properties.
+  {
+    auto *initDecl = [&]() -> ConstructorDecl * {
+      using Kind = MemberwiseInitKind;
+
+      // Always use the compat init if present.
+      if (auto *init = decl->getMemberwiseInitializer(Kind::Compatibility))
+        return init;
+
+      // If there is no compatibility init, check to see if the regular init
+      // has all the necessary properties.
+      auto regularProps = decl->getMemberwiseInitProperties(Kind::Regular);
+      auto compatProps = decl->getMemberwiseInitProperties(Kind::Compatibility);
+      if (regularProps.size() != compatProps.size())
+        return nullptr;
+
+      return decl->getMemberwiseInitializer(Kind::Regular);
+    }();
+    if (initDecl) {
+      initDecl->overwriteAccess(accessLevel);
+      return initDecl;
+    }
   }
 
   auto isEffectiveMemberwiseInitializer = [&](ConstructorDecl *initDecl) {
@@ -1628,7 +1700,7 @@ ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   // return it.
   if (!memberwiseInitDecl) {
     memberwiseInitDecl = createImplicitConstructor(
-        decl, ImplicitConstructorKind::Memberwise, ctx);
+        decl, ImplicitConstructorKind::Memberwise, initKind, ctx);
     memberwiseInitDecl->overwriteAccess(accessLevel);
     decl->addMember(memberwiseInitDecl);
   }
@@ -1691,7 +1763,8 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
   auto ctorKind = decl->isDistributedActor() ?
       ImplicitConstructorKind::DefaultDistributedActor :
       ImplicitConstructorKind::Default;
-  if (auto ctor = createImplicitConstructor(decl, ctorKind, ctx)) {
+  if (auto ctor = createImplicitConstructor(
+          decl, ctorKind, /*memberwiseKind*/ std::nullopt, ctx)) {
     // Add the constructor.
     decl->addMember(ctor);
 

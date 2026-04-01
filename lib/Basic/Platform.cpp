@@ -184,6 +184,8 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
       return DarwinPlatformKind::VisionOSSimulator;
     return DarwinPlatformKind::VisionOS;
   }
+  if (triple.isAppleFirmware())
+    return DarwinPlatformKind::Firmware;
 
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -208,6 +210,8 @@ static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
     return "xros";
   case DarwinPlatformKind::VisionOSSimulator:
     return "xrsimulator";
+  case DarwinPlatformKind::Firmware:
+    return "firmware";
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -246,6 +250,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
   case llvm::Triple::XROS:
+  case llvm::Triple::Firmware:
     return getPlatformNameForDarwin(getDarwinPlatformKind(triple));
   case llvm::Triple::Linux:
     if (triple.isAndroid())
@@ -367,18 +372,18 @@ getArchForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleArchName = triple.getArchName();
 
   return llvm::StringSwitch<StringRef>(tripleArchName)
-              .Cases("arm64", "aarch64", "arm64")
-              .Cases("arm64_32", "aarch64_32", "arm64_32")
-              .Cases("x86_64", "amd64", "x86_64")
-              .Cases("i386", "i486", "i586", "i686", "i786", "i886", "i986",
-                     "i386")
-              .Cases("unknown", "", "unknown")
-  // These values are also supported, but are handled by the default case below:
-  //          .Case ("armv7s", "armv7s")
-  //          .Case ("armv7k", "armv7k")
-  //          .Case ("armv7", "armv7")
-  //          .Case ("arm64e", "arm64e")
-              .Default(tripleArchName);
+      .Cases({"arm64", "aarch64"}, "arm64")
+      .Cases({"arm64_32", "aarch64_32"}, "arm64_32")
+      .Cases({"x86_64", "amd64"}, "x86_64")
+      .Cases({"i386", "i486", "i586", "i686", "i786", "i886", "i986"}, "i386")
+      .Cases({"unknown", ""}, "unknown")
+      // These values are also supported, but are handled by the default case
+      // below:
+      //          .Case ("armv7s", "armv7s")
+      //          .Case ("armv7k", "armv7k")
+      //          .Case ("armv7", "armv7")
+      //          .Case ("arm64e", "arm64e")
+      .Default(tripleArchName);
 }
 
 static StringRef
@@ -405,20 +410,21 @@ getOSForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleOSNameNoVersion = tripleOSName.take_until(llvm::isDigit);
 
   return llvm::StringSwitch<StringRef>(tripleOSNameNoVersion)
-              .Cases("macos", "macosx", "darwin", "macos")
-              .Cases("unknown", "", "unknown")
-  // These values are also supported, but are handled by the default case below:
-  //          .Case ("ios", "ios")
-  //          .Case ("tvos", "tvos")
-  //          .Case ("watchos", "watchos")
-              .Default(tripleOSNameNoVersion);
+      .Cases({"macos", "macosx", "darwin"}, "macos")
+      .Cases({"unknown", ""}, "unknown")
+      // These values are also supported, but are handled by the default case
+      // below:
+      //          .Case ("ios", "ios")
+      //          .Case ("tvos", "tvos")
+      //          .Case ("watchos", "watchos")
+      .Default(tripleOSNameNoVersion);
 }
 
 static std::optional<StringRef>
 getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleEnvironment = triple.getEnvironmentName();
   return llvm::StringSwitch<std::optional<StringRef>>(tripleEnvironment)
-      .Cases("unknown", "", std::nullopt)
+      .Cases({"unknown", ""}, std::nullopt)
       // These values are also supported, but are handled by the default case
       // below:
       //          .Case ("simulator", StringRef("simulator"))
@@ -457,13 +463,8 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
                         triple.getOSName(), environment);
   }
 
-  if (triple.isOSFreeBSD()) {
+  if (triple.isOSFreeBSD() || triple.isOSOpenBSD()) {
     return swift::getUnversionedTriple(triple);
-  }
-
-  if (triple.isOSOpenBSD()) {
-    StringRef arch = swift::getMajorArchitectureName(triple);
-    return llvm::Triple(arch, triple.getVendorName(), triple.getOSName());
   }
 
   // Other platforms get no normalization.

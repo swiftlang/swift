@@ -277,10 +277,13 @@ bool AvailabilityContext::isUnavailable() const {
   return false;
 }
 
-bool AvailabilityContext::containsUnavailableDomain(
+bool AvailabilityContext::isUnavailableForDomain(
     AvailabilityDomain domain) const {
   for (auto domainInfo : storage->getDomainInfos()) {
     if (domainInfo.isUnavailable()) {
+      if (domainInfo.getDomain().isUniversal())
+        return true;
+
       if (domainInfo.getDomain().contains(domain))
         return true;
     }

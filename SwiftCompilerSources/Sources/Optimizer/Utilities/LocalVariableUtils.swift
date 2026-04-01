@@ -320,6 +320,9 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
       case .indirectOut:
         self.isLiveIn = false
         self.isLiveOut = true
+      case .directGuaranteed: // Box captured by closure
+        self.isLiveIn = true
+        self.isLiveOut = true
       default:
         return nil
       }

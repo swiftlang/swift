@@ -735,6 +735,7 @@ bb2:
 
 bb3:
   end_borrow %3
+  destroy_value [dead_end] %2
   unreachable
 
 bb4:

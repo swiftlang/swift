@@ -26,6 +26,7 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "LiteralExpressionFolding.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -314,7 +315,11 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
   if (D->getFormalAccess() == AccessLevel::Open) {
     auto &context = D->getASTContext();
     auto diagID = diag::implicitly_final_cannot_be_open;
+<<<<<<< HEAD
     if (!context.isLanguageModeAtLeast(5))
+=======
+    if (!context.isLanguageModeAtLeast(LanguageMode::v5))
+>>>>>>> origin/main
       diagID = diag::implicitly_final_cannot_be_open_swift4;
     auto inFlightDiag = context.Diags.diagnose(D, diagID,
                                     static_cast<unsigned>(reason.value()));
@@ -336,7 +341,7 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   case AccessorKind::Get: {
     auto readImpl = storage->getReadImpl();
     if (!isObjC &&
-        (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+        (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
          readImpl == ReadImplKind::Address))
       return false;
     return storage->isDynamic();
@@ -347,7 +352,7 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   case AccessorKind::Set: {
     auto writeImpl = storage->getWriteImpl();
     if (!isObjC && (writeImpl == WriteImplKind::Modify ||
-                    writeImpl == WriteImplKind::Modify2 ||
+                    writeImpl == WriteImplKind::YieldingMutate ||
                     writeImpl == WriteImplKind::MutableAddress ||
                     writeImpl == WriteImplKind::StoredWithObservers))
       return false;
@@ -357,8 +362,8 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
     if (!isObjC && storage->getReadImpl() == ReadImplKind::Read)
       return storage->isDynamic();
     return false;
-  case AccessorKind::Read2:
-    if (!isObjC && storage->getReadImpl() == ReadImplKind::Read2)
+  case AccessorKind::YieldingBorrow:
+    if (!isObjC && storage->getReadImpl() == ReadImplKind::YieldingBorrow)
       return storage->isDynamic();
     return false;
   case AccessorKind::Modify: {
@@ -366,8 +371,8 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
       return storage->isDynamic();
     return false;
   }
-  case AccessorKind::Modify2: {
-    if (!isObjC && storage->getWriteImpl() == WriteImplKind::Modify2)
+  case AccessorKind::YieldingMutate: {
+    if (!isObjC && storage->getWriteImpl() == WriteImplKind::YieldingMutate)
       return storage->isDynamic();
     return false;
   }
@@ -413,7 +418,11 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
                         "actors")
               .fixItRemove(convenAttr->getLocation())
               .warnInSwiftInterface(dc)
+<<<<<<< HEAD
               .warnUntilLanguageMode(6);
+=======
+              .warnUntilLanguageMode(LanguageMode::v6);
+>>>>>>> origin/main
 
         } else { // not an actor
           // Forbid convenience inits on Foreign CF types, as Swift does not yet
@@ -641,7 +650,11 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       // be delegating because, well, we don't know the layout.
       // A dynamic replacement is permitted to be non-delegating.
       if (NTD->isResilient() ||
+<<<<<<< HEAD
           (ctx.isLanguageModeAtLeast(5) &&
+=======
+          (ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
+>>>>>>> origin/main
            !decl->getAttrs().getAttribute<DynamicReplacementAttr>())) {
         if (decl->getParentModule() != NTD->getParentModule())
           Kind = BodyInitKind::Delegating;
@@ -843,7 +856,11 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           if (VD->getFormalAccess() == AccessLevel::Open) {
             auto &context = decl->getASTContext();
             auto diagID = diag::implicitly_final_cannot_be_open;
+<<<<<<< HEAD
             if (!context.isLanguageModeAtLeast(5))
+=======
+            if (!context.isLanguageModeAtLeast(LanguageMode::v5))
+>>>>>>> origin/main
               diagID = diag::implicitly_final_cannot_be_open_swift4;
             auto inFlightDiag =
               context.Diags.diagnose(decl, diagID,
@@ -877,6 +894,8 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
           case AccessorKind::Read:
           case AccessorKind::Modify:
+          case AccessorKind::YieldingBorrow:
+          case AccessorKind::YieldingMutate:
           case AccessorKind::Get:
           case AccessorKind::DistributedGet:
           case AccessorKind::Set:
@@ -1200,8 +1219,7 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
 }
 
 evaluator::SideEffect
-EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
-                               TypeResolutionStage stage) const {
+EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
   Type rawTy = ED->getRawType();
   if (!rawTy) {
     return std::make_tuple<>();
@@ -1231,7 +1249,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   llvm::SmallDenseMap<RawValueKey, RawValueSource, 8> uniqueRawValues;
 
   // Make the raw member accesses explicit.
-  auto uncheckedRawValueOf = [](EnumElementDecl *EED) -> LiteralExpr * {
+  auto uncheckedRawValueOf = [](EnumElementDecl *EED) -> Expr * {
     return EED->RawValueExpr;
   };
 
@@ -1264,28 +1282,35 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       }
       elt->setRawValueExpr(nextValue);
     }
-    prevValue = uncheckedRawValueOf(elt);
-    assert(prevValue && "continued without setting raw value of enum case");
 
-    switch (stage) {
-    case TypeResolutionStage::Structural:
-      // We're only interested in computing the complete set of raw values,
-      // so we can skip type checking.
-      continue;
-    default:
-      // Continue on to type check the raw value.
-      break;
+    auto value = uncheckedRawValueOf(elt);
+    {
+      if (TypeChecker::typeCheckExpression(
+              value, ED,
+              /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
+        checkEnumElementActorIsolation(elt, value);
+        TypeChecker::checkEnumElementEffects(elt, value);
+        if (auto *seqExpr = dyn_cast<SequenceExpr>(value))
+          value = TypeChecker::foldSequence(seqExpr, ED);
+        elt->setRawValueExpr(value);
+      }
     }
 
-    
-    {
-      Expr *exprToCheck = prevValue;
-      if (TypeChecker::typeCheckExpression(
-              exprToCheck, ED,
-              /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
-        checkEnumElementActorIsolation(elt, exprToCheck);
-        TypeChecker::checkEnumElementEffects(elt, exprToCheck);
-      }
+    bool literalExprEnabled =
+        ED->getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
+    // We must constant-fold the expression here to reduce it to
+    // a LiteralExpr so that:
+    // 1. We validate the expression *is* foldable down to a constant
+    // 2. We can use it to compute the next automatic raw value expression.
+    prevValue = literalExprEnabled
+                    ? dyn_cast<LiteralExpr>(
+                          foldLiteralExpression(value, &ED->getASTContext()))
+                    : dyn_cast<LiteralExpr>(value);
+    if (!prevValue) {
+      if (literalExprEnabled && value)
+        ED->getASTContext().Diags.diagnose(
+            value->getLoc(), diag::nonliteral_int_expr_enum_case_raw_value);
+      continue;
     }
 
     // If we didn't find a valid initializer (maybe the initial value was
@@ -1294,7 +1319,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       elt->setInvalid();
       continue;
     }
-
 
     // If the raw values of the enum case are fixed, then we trust our callers
     // to have set things up correctly.  This comes up with imported enums
@@ -1602,16 +1626,7 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
     auto loc = IOD->getPrecedenceGroupLoc();
     auto groups = TypeChecker::lookupPrecedenceGroup(dc, name, loc);
 
-    if (groups.hasResults() ||
-        !ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes)
-      return groups.getSingleOrDiagnose(loc);
-
-    // We didn't find the named precedence group and designated types are
-    // enabled, so we will assume that it was actually a designated type. Warn
-    // and fall through as though `PrecedenceGroupName` had never been set.
-    ctx.Diags.diagnose(IOD->getColonLoc(),
-                       diag::operator_decl_remove_designated_types)
-        .fixItRemove({IOD->getColonLoc(), loc});
+    return groups.getSingleOrDiagnose(loc);
   }
 
   auto groups = TypeChecker::lookupPrecedenceGroup(
@@ -1649,7 +1664,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Borrow:
       break;
 
@@ -1657,7 +1672,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::MutableAddress:
     case AccessorKind::Set:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
     case AccessorKind::Mutate:
       if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
         return SelfAccessKind::Mutating;
@@ -2070,9 +2085,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // Coroutine accessors don't mention the value type directly.
     // If we add yield types to the function type, we'll need to update this.
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
       return TupleType::getEmpty(ctx);
     }
   }
@@ -2508,6 +2523,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     auto sig = AFD->getGenericSignature();
     bool hasSelf = AFD->hasImplicitSelfDecl();
+    bool isInstanceMethod = AFD->isInstanceMethod();
 
     AnyFunctionType::ExtInfoBuilder infoBuilder;
 
@@ -2549,6 +2565,16 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       SmallVector<AnyFunctionType::Param, 4> argTy;
       AFD->getParameters()->getParams(argTy);
 
+      // If we don't have the concurrency library, reject the use of 'async'.
+      ASTContext &ctx = AFD->getASTContext();
+      if (AFD->hasAsync() &&
+          AFD->getLoc(/*SerializedOK=*/false).isValid() &&
+          !ctx.getLoadedModule(ctx.Id_Concurrency) &&
+          !ctx.SILOpts.ParseStdlib) {
+        ctx.Diags.diagnose(
+            AFD->getAsyncLoc(), diag::no_concurrency_module, "async");
+      }
+
       maybeAddParameterIsolation(infoBuilder, argTy);
       infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
       infoBuilder = infoBuilder.withSendable(AFD->isSendable());
@@ -2561,8 +2587,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
           infoBuilder = infoBuilder.withSendingResult();
       }
 
-      // Lifetime dependencies only apply to the outer function type.
-      if (!hasSelf && lifetimeDependenceInfo.has_value()) {
+      // Lifetime dependencies only apply to the outer function type for
+      // instance methods.
+      if (lifetimeDependenceInfo.has_value() && !isInstanceMethod) {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
@@ -2582,7 +2609,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto selfParam = computeSelfParam(AFD);
       AnyFunctionType::ExtInfoBuilder selfInfoBuilder;
       maybeAddParameterIsolation(selfInfoBuilder, {selfParam});
-      if (lifetimeDependenceInfo.has_value()) {
+      if (lifetimeDependenceInfo.has_value() && isInstanceMethod) {
         selfInfoBuilder =
             selfInfoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
@@ -2732,13 +2759,13 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
       // or lazy type-checking, regular type-checking should go through the
       // StmtChecker and assign types before querying this, otherwise we could
       // end up double-type-checking.
-      //
-      // FIXME: We ought to be able to enable the following assert once we've
-      // fixed cases where we currently allow forward references to variables to
-      // kick interface type requests
-      // (https://github.com/swiftlang/swift/pull/85141).
-      // ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
-      //        Context.TypeCheckerOpts.EnableLazyTypecheck);
+      // FIXME: The check for 'IsForSourceKit' is a hack to workaround cases
+      // where we're doing cursor info in an invalid extension, we ought to
+      // still be type-checking decls in invalid extensions.
+      ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
+             Context.LangOpts.IsForSourceKit ||
+             Context.TypeCheckerOpts.EnableLazyTypecheck &&
+             "Querying VarDecl's type before type-checking parent stmt");
 
       // Try type checking parent control statement.
       if (auto condStmt = dyn_cast<LabeledConditionalStmt>(parentStmt)) {

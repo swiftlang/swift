@@ -330,7 +330,8 @@ static void printImports(raw_ostream &out,
 
   for (auto import : allImports) {
     auto importedModule = import.importedModule;
-    if (importedModule->isOnoneSupportModule()) {
+    if (importedModule->isOnoneSupportModule() ||
+        importedModule->isClangHeaderImportModule()) {
       continue;
     }
 
@@ -452,19 +453,24 @@ class InheritedProtocolCollector {
       return cache.value();
 
     cache.emplace();
+    llvm::SmallVector<SemanticAvailableAttr, 8> pendingAttrs;
     while (D) {
       for (auto nextAttr : D->getSemanticAvailableAttrs()) {
         // FIXME: This is just approximating the effects of nested availability
         // attributes for the same platform; formally they'd need to be merged.
-        // FIXME: [availability] This should compare availability domains.
-        bool alreadyHasMoreSpecificAttrForThisPlatform = llvm::any_of(
+        bool alreadyHasActiveAttrForDomain = llvm::any_of(
             *cache, [nextAttr](SemanticAvailableAttr existingAttr) {
-              return existingAttr.getPlatform() == nextAttr.getPlatform();
+              if (nextAttr.getParsedAttr()->getKind() !=
+                  existingAttr.getParsedAttr()->getKind())
+                return false;
+              return existingAttr.getDomain().contains(nextAttr.getDomain());
             });
-        if (alreadyHasMoreSpecificAttrForThisPlatform)
+        if (alreadyHasActiveAttrForDomain)
           continue;
-        cache->push_back(nextAttr);
+        pendingAttrs.push_back(nextAttr);
       }
+      cache->append(pendingAttrs);
+      pendingAttrs.clear();
       D = D->getDeclContext()->getAsDecl();
     }
 
@@ -695,7 +701,7 @@ public:
     if (!printOptions.shouldPrint(nominal))
       return;
 
-    /// is this nominal specifically an 'actor' or 'distributed actor'?
+    // Is this nominal specifically an 'actor' or 'distributed actor'?
     bool anyActorClass = false;
     if (auto klass = dyn_cast<ClassDecl>(nominal)) {
       anyActorClass = klass->isAnyActor();
@@ -892,7 +898,9 @@ bool swift::emitSwiftInterface(raw_ostream &out,
                               DisableModuleSelectorsInModuleInterface))
     useModuleSelectors = false;
 
-  bool useExportedModuleNames = Opts.printPublicInterface();
+  auto useExportedModuleNames = Opts.printPublicInterface()
+    ? PrintOptions::ExportedModuleNameUsage::Always
+    : PrintOptions::ExportedModuleNameUsage::IfLoaded;
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
       M, useModuleSelectors, Opts.PreserveTypesAsWritten,
       Opts.PrintFullConvention,

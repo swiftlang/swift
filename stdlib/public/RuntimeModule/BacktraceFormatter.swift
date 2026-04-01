@@ -17,7 +17,7 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(anyAppleOS)
 internal import Darwin
 internal import BacktracingImpl.OS.Darwin
 #elseif os(Windows)
@@ -30,7 +30,11 @@ internal import Musl
 
 /// A backtrace formatting theme.
 @_spi(Formatting)
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 public protocol BacktraceFormattingTheme {
   func frameIndex(_ s: String) -> String
   func programCounter(_ s: String) -> String
@@ -49,7 +53,11 @@ public protocol BacktraceFormattingTheme {
   func imagePath(_ s: String) -> String
 }
 
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 extension BacktraceFormattingTheme {
   public func frameIndex(_ s: String) -> String { return s }
   public func programCounter(_ s: String) -> String { return s }
@@ -72,7 +80,11 @@ extension BacktraceFormattingTheme {
 ///
 /// This is used by chaining modifiers, e.g. .theme(.color).showSourceCode().
 @_spi(Formatting)
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 public struct BacktraceFormattingOptions {
   var _theme: BacktraceFormattingTheme = BacktraceFormatter.Themes.plain
   var _showSourceCode: Bool = false
@@ -106,9 +118,10 @@ public struct BacktraceFormattingOptions {
 
   /// Theme to use for formatting.
   ///
-  /// @param theme  A `BacktraceFormattingTheme` structure.
+  /// - Parameters:
+  ///   - theme: A ``BacktraceFormattingTheme`` structure.
   ///
-  /// @returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public static func theme(_ theme: BacktraceFormattingTheme) -> BacktraceFormattingOptions {
     return BacktraceFormattingOptions().theme(theme)
   }
@@ -120,12 +133,13 @@ public struct BacktraceFormattingOptions {
 
   /// Enable or disable the display of source code in the backtrace.
   ///
-  /// @param enabled       Whether or not to enable source code.
+  /// - Parameters:
+  ///   - enabled: Whether or not to enable source code.
   ///
-  /// @param contextLines  The number of lines of context either side of the
+  ///   - contextLines: The number of lines of context either side of the
   ///                      line associated with the backtrace frame.
   ///
-  /// @returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public static func showSourceCode(_ enabled: Bool = true, contextLines: Int = 2) -> BacktraceFormattingOptions {
     return BacktraceFormattingOptions().showSourceCode(enabled,
                                                        contextLines: contextLines)
@@ -139,10 +153,11 @@ public struct BacktraceFormattingOptions {
 
   /// Enable or disable the display of raw addresses.
   ///
-  /// @param enabled  If false, we will only display a raw address in the
+  /// - Parameters:
+  ///   - enabled: If false, we will only display a raw address in the
   ///                 backtrace if we haven't been able to symbolicate.
   ///
-  /// @returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public static func showAddresses(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     return BacktraceFormattingOptions().showAddresses(enabled)
   }
@@ -154,9 +169,10 @@ public struct BacktraceFormattingOptions {
 
   /// Enable or disable the display of the image list.
   ///
-  /// @param enabled  Says whether or not to output the image list.
+  /// - Parameters: 
+  ///   - enabled: Says whether or not to output the image list.
   ///
-  /// @returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public enum ImagesToShow {
     case none
     case mentioned
@@ -173,13 +189,22 @@ public struct BacktraceFormattingOptions {
 
   /// Enable or disable the display of image names in the frame list.
   ///
-  /// @param enabled  If true, we will display the name of the image for
+  /// - Parameters:
+  ///   - enabled: If true, we will display the name of the image for
   ///                 each frame.
   ///
-  /// @returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public static func showImageNames(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     return BacktraceFormattingOptions().showImageNames(enabled)
   }
+
+  /// Enable or disable the display of image names in the frame list.
+  ///
+  /// - Parameters:
+  ///   - enabled: If true, we will display the name of the image for
+  ///                 each frame.
+  ///
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public func showImageNames(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     var newOptions = self
     newOptions._showImageNames = enabled
@@ -188,12 +213,20 @@ public struct BacktraceFormattingOptions {
 
   /// Enable or disable the display of frame attributes in the frame list.
   ///
-  /// @param enabled  If true, we will display the frame attributes.
+  /// - Parameters
+  ///   - enabled: If true, we will display the frame attributes.
   ///
-  /// @returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public static func showFrameAttributes(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     return BacktraceFormattingOptions().showFrameAttributes(enabled)
   }
+
+  /// Enable or disable the display of frame attributes in the frame list.
+  ///
+  /// - Parameters
+  ///   - enabled: If true, we will display the frame attributes.
+  ///
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public func showFrameAttributes(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     var newOptions = self
     newOptions._showFrameAttributes = enabled
@@ -202,12 +235,20 @@ public struct BacktraceFormattingOptions {
 
   /// Set whether or not to show Swift runtime failure frames.
   ///
-  /// @param enabled  If true, we will skip Swift runtime failure frames.
+  /// - Parameters:
+  ///   - enabled: If true, we will skip Swift runtime failure frames.
   ///
-  /// @returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public static func skipRuntimeFailures(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     return BacktraceFormattingOptions().skipRuntimeFailures(enabled)
   }
+
+  /// Set whether or not to show Swift runtime failure frames.
+  ///
+  /// - Parameters:
+  ///   - enabled: If true, we will skip Swift runtime failure frames.
+  ///
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public func skipRuntimeFailures(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     var newOptions = self
     newOptions._skipRuntimeFailures = enabled
@@ -216,12 +257,20 @@ public struct BacktraceFormattingOptions {
 
   /// Set whether or not to show Swift thunk function frames.
   ///
-  /// @param enabled  If true, we will skip Swift thunk function frames.
+  /// - Parameters:
+  ///   - enabled: If true, we will skip Swift thunk function frames.
   ///
-  /// @returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public static func skipThunkFunctions(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     return BacktraceFormattingOptions().skipThunkFunctions(enabled)
   }
+
+  /// Set whether or not to show Swift thunk function frames.
+  ///
+  /// - Parameters:
+  ///   - enabled: If true, we will skip Swift thunk function frames.
+  ///
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public func skipThunkFunctions(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     var newOptions = self
     newOptions._skipThunkFunctions = enabled
@@ -233,12 +282,23 @@ public struct BacktraceFormattingOptions {
   /// For instance, on macOS, this will cause us to skip the "start" frame
   /// at the very top of the stack.
   ///
-  /// @param enabled  If true, we will skip system frames.
+  /// - Parameters:
+  ///   - enabled: If true, we will skip system frames.
   ///
-  /// @returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public static func skipSystemFrames(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     return BacktraceFormattingOptions().skipSystemFrames(enabled)
   }
+
+  /// Set whether or not to show system frames.
+  ///
+  /// For instance, on macOS, this will cause us to skip the "start" frame
+  /// at the very top of the stack.
+  ///
+  /// - Parameters:
+  ///   - enabled: If true, we will skip system frames.
+  ///
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public func skipSystemFrames(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     var newOptions = self
     newOptions._skipSystemFrames = enabled
@@ -249,12 +309,22 @@ public struct BacktraceFormattingOptions {
   ///
   /// This is intended to avoid leaking PII into crash logs.
   ///
-  /// @param enabled  If true, paths will be sanitized.
+  /// - Parameters:
+  ///   - enabled:  If true, paths will be sanitized.
   ///
-  /// @returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new `BacktraceFormattingOptions` structure.
   public static func sanitizePaths(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     return BacktraceFormattingOptions().sanitizePaths(enabled)
   }
+
+  /// Enable or disable path sanitization.
+  ///
+  /// This is intended to avoid leaking PII into crash logs.
+  ///
+  /// - Parameters:
+  ///   - enabled:  If true, paths will be sanitized.
+  ///
+  /// - Returns: A new `BacktraceFormattingOptions` structure.
   public func sanitizePaths(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     var newOptions = self
     newOptions._sanitizePaths = enabled
@@ -263,9 +333,10 @@ public struct BacktraceFormattingOptions {
 
   /// Set whether we show mangled or demangled names.
   ///
-  /// @param enabled  If true, we show demangled names if we have them.
+  /// - Parameters:
+  ///   - enabled: If true, we show demangled names if we have them.
   ///
-  /// @returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public static func demangle(_ enabled: Bool = true) -> BacktraceFormattingOptions {
     return BacktraceFormattingOptions().demangle(enabled)
   }
@@ -277,13 +348,22 @@ public struct BacktraceFormattingOptions {
 
   /// Set the output width.
   ///
-  /// @param width  The output width in characters.  This is only used to
+  /// - Parameters:
+  ///   - width: The output width in characters.  This is only used to
   ///               highlight information, and defaults to 80.
   ///
-  /// returns A new `BacktraceFormattingOptions` structure.
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public static func width(_ width: Int) -> BacktraceFormattingOptions {
     return BacktraceFormattingOptions().width(width)
   }
+
+  /// Set the output width.
+  ///
+  /// - Parameters:
+  ///   - width: The output width in characters.  This is only used to
+  ///               highlight information, and defaults to 80.
+  ///
+  /// - Returns: A new ``BacktraceFormattingOptions`` structure.
   public func width(_ width: Int) -> BacktraceFormattingOptions {
     var newOptions = self
     newOptions._width = width
@@ -363,7 +443,11 @@ private func measure<S: StringProtocol>(_ s: S) -> Int {
 }
 
 /// Pad the given string to the given width using spaces.
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 private func pad(_ s: String, to width: Int,
                  aligned alignment: BacktraceFormatter.Alignment = .left)
   -> String {
@@ -392,10 +476,11 @@ private func pad(_ s: String, to width: Int,
 
 /// Untabify the given string, assuming tabs of the specified size.
 ///
-/// @param s         The string to untabify.
-/// @param tabWidth  The tab width to assume (default 8).
+/// - Parameters:
+///   - s: The string to untabify.
+///   - tabWidth: The tab width to assume (default 8).
 ///
-/// @returns A string with all the tabs replaced with appropriate numbers
+/// - Returns: A string with all the tabs replaced with appropriate numbers
 ///          of spaces.
 private func untabify(_ s: String, tabWidth: Int = 8) -> String {
   var result: String = ""
@@ -417,9 +502,10 @@ private func untabify(_ s: String, tabWidth: Int = 8) -> String {
 /// The point of this function is to try to remove anything that might
 /// contain PII before it ends up in a log file somewhere.
 ///
-/// @param path  The path to sanitize.
+/// - Parameters:
+///   - path: The path to sanitize.
 ///
-/// @returns A string containing the sanitized path.
+/// - Returns: A string containing the sanitized path.
 @_spi(Formatting)
 public func sanitizePath(_ path: String) -> String {
   #if os(macOS)
@@ -434,9 +520,10 @@ public func sanitizePath(_ path: String) -> String {
 
 /// Trim whitespace from the right hand end of a string.
 ///
-/// @param s  The string to trim.
+/// - Parameters:
+///   - s: The string to trim.
 ///
-/// @returns A string with the whitespace trimmed.
+/// - Returns: A string with the whitespace trimmed.
 private func rtrim<S: StringProtocol>(_ s: S) -> S.SubSequence {
   if let lastNonWhitespace = s.lastIndex(where: { !$0.isWhitespace }) {
     return s.prefix(through: lastNonWhitespace)
@@ -446,7 +533,11 @@ private func rtrim<S: StringProtocol>(_ s: S) -> S.SubSequence {
 
 /// Responsible for formatting backtraces.
 @_spi(Formatting)
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 public struct BacktraceFormatter {
 
   /// The formatting options to apply when formatting data.
@@ -477,10 +568,11 @@ public struct BacktraceFormatter {
 
   /// Output a table with each column nicely aligned.
   ///
-  /// @param rows  An array of table rows, each of which holds an array
+  /// - Parameters:
+  ///   - rows  An array of table rows, each of which holds an array
   ///              of table columns.
   ///
-  /// @result A `String` containing the formatted table.
+  /// - Returns: A `String` containing the formatted table.
   public static func formatTable(_ rows: [TableRow],
                                   alignments: [Alignment] = []) -> String {
     // Work out how many columns we have
@@ -532,10 +624,11 @@ public struct BacktraceFormatter {
 
   /// Format an individual frame into a list of columns.
   ///
-  /// @param frame         The frame to format.
-  /// @param index         The frame index, if required.
+  /// - Parameters:
+  ///   - frame: The frame to format.
+  ///   - index: The frame index, if required.
   ///
-  /// @result An array of strings, one per column.
+  /// - Returns: An array of strings, one per column.
   public func formatColumns(frame: Backtrace.Frame,
                             index: Int? = nil) -> [String] {
     let pc: String
@@ -569,11 +662,11 @@ public struct BacktraceFormatter {
   }
 
   /// Format a frame into a list of rows.
+  /// - Parameters:
+  ///   - frame: The frame to format.
+  ///   - index: The frame index, if required.
   ///
-  /// @param frame         The frame to format.
-  /// @param index         The frame index, if required.
-  ///
-  /// @result An array of table rows.
+  /// - Returns: An array of table rows.
   public func formatRows(frame: Backtrace.Frame,
                          index: Int? = nil) -> [TableRow] {
     return [.columns(formatColumns(frame: frame,
@@ -582,10 +675,11 @@ public struct BacktraceFormatter {
 
   /// Format just one frame.
   ///
-  /// @param frame         The frame to format.
-  /// @param index         The frame index, if required.
+  /// - Parameters:
+  /// - frame: The frame to format.
+  /// - index: The frame index, if required.
   ///
-  /// @result A `String` containing the formatted data.
+  /// - Returns: A `String` containing the formatted data.
   public func format(frame: Backtrace.Frame,
                      index: Int? = nil) -> String {
     let rows = formatRows(frame: frame,
@@ -595,9 +689,10 @@ public struct BacktraceFormatter {
 
   /// Format the frame list from a backtrace.
   ///
-  /// @param frames        The frames to format.
+  /// - Parameters:
+  ///   - frames: The frames to format (lazy loaded Sequence).
   ///
-  /// @result A `String` containing the formatted data.
+  /// - Returns: A `String` containing the formatted data.
   public func format(frames: some Sequence<Backtrace.Frame>) -> String {
     var rows: [TableRow] = []
 
@@ -617,9 +712,10 @@ public struct BacktraceFormatter {
 
   /// Format a `Backtrace`
   ///
-  /// @param backtrace  The `Backtrace` object to format.
+  /// - Parameters:
+  ///   - backtrace: The `Backtrace` object to format.
   ///
-  /// @result A `String` containing the formatted data.
+  /// - Returns: A `String` containing the formatted data.
   public func format(backtrace: Backtrace) -> String {
     return format(frames: backtrace.frames)
   }
@@ -631,9 +727,17 @@ public struct BacktraceFormatter {
   /// with the point at which the program crashed highlighted.
   private func formattedSourceLines(from sourceLocation: SymbolicatedBacktrace.SourceLocation,
                                     indent theIndent: Int = 2) -> String? {
+    #if os(Windows)
+    var fp: UnsafeMutablePointer<FILE>? = nil
+    let err = fopen_s(&fp, sourceLocation.path, "rt")
+    if err != 0 {
+      return nil
+    }
+    #else
     guard let fp = fopen(sourceLocation.path, "rt") else {
       return nil
     }
+    #endif
     defer {
       fclose(fp)
     }
@@ -734,9 +838,10 @@ public struct BacktraceFormatter {
 
   /// Format an individual frame into a list of columns.
   ///
-  /// @params frame  The frame to format.
+  /// - Parameters:
+  ///   - frame: The frame to format.
   ///
-  /// @result An array of strings, one per column.
+  /// - Returns: An array of strings, one per column.
   public func formatColumns(frame: SymbolicatedBacktrace.Frame,
                             index: Int? = nil) -> [String] {
     let pc: String
@@ -848,10 +953,11 @@ public struct BacktraceFormatter {
 
   /// Format a frame into a list of rows.
   ///
-  /// @param frame         The frame to format.
-  /// @param index         The frame index, if required.
+  /// - Parameters:
+  ///   - frame: The frame to format.
+  ///   - index: The frame index, if required.
   ///
-  /// @result An array of table rows.
+  /// - Returns: An array of table rows.
   public func formatRows(frame: SymbolicatedBacktrace.Frame,
                          index: Int? = nil,
                          showSource: Bool = true) -> [TableRow] {
@@ -874,10 +980,11 @@ public struct BacktraceFormatter {
 
   /// Format just one frame.
   ///
-  /// @param frame         The frame to format.
-  /// @param index         The frame index, if required.
+  /// - Parameters:
+  ///   - frame: The frame to format.
+  ///   - index: The frame index, if required.
   ///
-  /// @result A `String` containing the formatted data.
+  /// - Returns: A `String` containing the formatted data.
   public func format(frame: SymbolicatedBacktrace.Frame,
                      index: Int? = nil,
                      showSource: Bool = true) -> String {
@@ -893,10 +1000,11 @@ public struct BacktraceFormatter {
   }
 
   /// Format the frame list from a symbolicated backtrace.
+  /// 
+  /// - Parameters:
+  ///   - frames: The frames to format (lazy loaded Sequence).
   ///
-  /// @param frames        The frames to format.
-  ///
-  /// @result A `String` containing the formatted data.
+  /// - Returns: A `String` containing the formatted data.
   public func format(
     frames: some Sequence<SymbolicatedBacktrace.Frame>
   ) -> String {
@@ -931,11 +1039,12 @@ public struct BacktraceFormatter {
     return BacktraceFormatter.formatTable(rows, alignments: [.right])
   }
 
-  /// Format a `SymbolicatedBacktrace`
+  /// Format a ``SymbolicatedBacktrace``
   ///
-  /// @param backtrace  The `SymbolicatedBacktrace` object to format.
+  /// - Parameters:
+  ///   - backtrace: The ``SymbolicatedBacktrace`` object to format.
   ///
-  /// @result A `String` containing the formatted data.
+  /// - Returns: A `String` containing the formatted data.
   public func format(backtrace: SymbolicatedBacktrace) -> String {
     var result = format(frames: backtrace.frames)
 
@@ -969,11 +1078,12 @@ public struct BacktraceFormatter {
     return result
   }
 
-  /// Format a `Backtrace.Image` into a list of columns.
+  /// Format a ``Backtrace/Image`` into a list of columns.
   ///
-  /// @param image         The `Image` object to format.
-  ///
-  /// @result An array of strings, one per column.
+  /// - Parameters:
+  ///   - image: The `Image` object to format.
+  /// 
+  /// - Returns: An array of strings, one per column.
   public func formatColumns(image: Backtrace.Image) -> [String] {
     let addressRange = "\(image.baseAddress)–\(image.endOfText)"
     let buildID: String
@@ -1001,11 +1111,12 @@ public struct BacktraceFormatter {
     ]
   }
 
-  /// Format an array of `Backtrace.Image`s.
+  /// Format an array of ``Backtrace/Image``s.
   ///
-  /// @param images        The array of `Image` objects to format.
+  /// - Parameters:
+  ///   - images: The array of ``Image`` objects to format.
   ///
-  /// @result A string containing the formatted data.
+  /// - Returns: A string containing the formatted data.
   public func format(images: some Sequence<Backtrace.Image>) -> String {
     let rows = images.map{
       TableRow.columns(

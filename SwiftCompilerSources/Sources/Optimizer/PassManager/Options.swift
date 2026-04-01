@@ -45,7 +45,7 @@ struct Options {
   }
 
   var enableEmbeddedSwiftExistentials: Bool {
-    hasFeature(.EmbeddedExistentials)
+    hasFeature(.Embedded) && hasFeature(.EmbeddedExistentials)
   }
 
   var enableMergeableTraps: Bool {
@@ -54,6 +54,10 @@ struct Options {
 
   func hasFeature(_ feature: BridgedFeature) -> Bool {
     _bridged.hasFeature(feature)
+  }
+
+  func shouldRemoveCondFail(withMessage message: StringRef, inFunction: StringRef) -> Bool {
+    _bridged.shouldRemoveCondFail(message._bridged, inFunction._bridged)
   }
 
   // The values for the assert_configuration call are:

@@ -22,7 +22,11 @@ struct ImageSymbol {
   var offset: Int
 }
 
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 protocol Image {
   typealias UUID = [UInt8]
   typealias Address = ImageSource.Address
@@ -68,7 +72,11 @@ protocol Image {
   func lookupSymbol(address: Address) -> ImageSymbol?
 }
 
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 extension Image {
   public func swapIfRequired<T: FixedWidthInteger>(_ x: T) -> T {
     if shouldByteSwap {

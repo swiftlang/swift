@@ -76,8 +76,8 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   auto requiresLLD = [&]{
     if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
       return llvm::StringSwitch<bool>(A->getValue())
-        .Cases("lld", "lld.exe", "lld-link", "lld-link.exe", true)
-        .Default(false);
+          .Cases({"lld", "lld.exe", "lld-link", "lld-link.exe"}, true)
+          .Default(false);
     }
     // Force to use lld for LTO on Windows because we don't support link LTO or
     // something else except for lld LTO at this time.

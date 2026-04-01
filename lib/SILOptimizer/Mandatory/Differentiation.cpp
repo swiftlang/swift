@@ -1030,6 +1030,10 @@ static SILFunction *createEmptyVJP(ADContext &context,
       original->isRuntimeAccessible());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
 
+  if (original->getInlineStrategy() == AlwaysInline ||
+      original->getInlineStrategy() == HeuristicAlwaysInline)
+    vjp->setInlineStrategy(HeuristicAlwaysInline);
+
   LLVM_DEBUG(llvm::dbgs() << "VJP type: " << vjp->getLoweredFunctionType()
                           << "\n");
   return vjp;
@@ -1074,6 +1078,10 @@ static SILFunction *createEmptyJVP(ADContext &context,
       original->isRuntimeAccessible());
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
 
+  if (original->getInlineStrategy() == AlwaysInline ||
+      original->getInlineStrategy() == HeuristicAlwaysInline)
+    jvp->setInlineStrategy(HeuristicAlwaysInline);
+
   LLVM_DEBUG(llvm::dbgs() << "JVP type: " << jvp->getLoweredFunctionType()
                           << "\n");
   return jvp;
@@ -1109,6 +1117,10 @@ static void emitFatalError(ADContext &context, SILFunction *f,
   auto *fatalErrorFnRef = builder.createFunctionRef(loc, fatalErrorFn);
   builder.createApply(loc, fatalErrorFnRef, SubstitutionMap(), {});
   builder.createUnreachable(loc);
+
+  // Replacing the whole function with an `fatalError` call and an `unreachable`
+  // does not create incomplete lifetimes.
+  f->setNeedCompleteLifetimes(false);
 }
 
 /// Returns true on error.

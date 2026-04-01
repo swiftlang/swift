@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %t/objc-implement.swift -typecheck -parse-as-library -emit-module-interface-path %t/ObjcImplement.swiftinterface -enable-library-evolution -module-name ObjcImplement -import-underlying-module -swift-version 5 -emit-api-descriptor-path %t/api.json
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %t/objc-implement.swift -typecheck -parse-as-library -emit-module-interface-path %t/ObjcImplement.swiftinterface -enable-library-evolution -module-name ObjcImplement -import-underlying-module -swift-version 5 -emit-api-descriptor-path %t/api.json -library-level api
 // RUN: %validate-json %t/api.json | %FileCheck %s
 
 //--- objc-implement.swift

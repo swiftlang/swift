@@ -965,6 +965,8 @@ public:
   /// True if a value of this type can have its address taken by a
   /// lifetime-dependent value.
   bool isAddressableForDeps(const SILFunction &function) const;
+  bool isAddressableForDeps(SILModule &module,
+                            TypeExpansionContext context) const;
 
   /// True if destroying a value of this type might invoke a custom deinitialer
   /// with side effects. This includes any recursive deinitializers that may be

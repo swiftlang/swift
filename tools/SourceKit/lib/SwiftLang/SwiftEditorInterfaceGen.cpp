@@ -850,7 +850,7 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(
   const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
   getASTManager()->processASTAsync(Invocation, AstConsumer, Once,
                                    CancellationToken,
-                                   llvm::vfs::getRealFileSystem());
+                                   llvm::vfs::createPhysicalFileSystem());
 }
 
 void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,

@@ -2,10 +2,12 @@
 add_swift_host_library(swiftSema STATIC
   AssociatedTypeInference.cpp
   NonisolatedNonsendingByDefaultMigration.cpp
+  BindingProducer.cpp
   BuilderTransform.cpp
   Comment.cpp
   CSApply.cpp
   CSBindings.cpp
+  CSDisjunction.cpp
   CSSyntacticElement.cpp
   CSGen.cpp
   CSRanking.cpp
@@ -39,7 +41,8 @@ add_swift_host_library(swiftSema STATIC
   DerivedConformance/DerivedConformanceRawRepresentable.cpp
   ImportResolution.cpp
   InstrumenterSupport.cpp
-  LegalConstExprVerifier.cpp
+  LegalLiteralExprVerifier.cpp
+  LiteralExpressionFolding.cpp
   LookupVisibleDecls.cpp
   MiscDiagnostics.cpp
   OpenedExistentials.cpp
@@ -50,6 +53,7 @@ add_swift_host_library(swiftSema STATIC
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
   SyntacticElementTarget.cpp
+  Subtyping.cpp
   TypeOfReference.cpp
   TypeCheckAccess.cpp
   TypeCheckAccessNotes.cpp
@@ -86,6 +90,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckType.cpp
   TypeCheckUnsafe.cpp
   TypeChecker.cpp
+  TypeVariableType.cpp
   IDETypeCheckingRequests.cpp)
 if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")

@@ -20,6 +20,7 @@
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -386,19 +387,23 @@ static void autoApplyFixes(SourceManager &SM, unsigned BufferID,
 bool DiagnosticVerifier::verifyUnknown(
     std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const {
   bool HadError = false;
-  for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
-    if (CapturedDiagnostics[i].Loc.isValid())
+  auto CapturedDiagIter = CapturedDiagnostics.begin();
+  while (CapturedDiagIter != CapturedDiagnostics.end()) {
+    if (CapturedDiagIter->Loc.isValid()) {
+      ++CapturedDiagIter;
       continue;
+    }
 
     HadError = true;
     std::string Message =
         ("unexpected " +
-         getDiagKindString(CapturedDiagnostics[i].Classification) +
-         " produced: " + CapturedDiagnostics[i].Message)
+         getDiagKindString(CapturedDiagIter->Classification) +
+         " produced: " + CapturedDiagIter->Message)
             .str();
 
     auto diag = SM.GetMessage({}, llvm::SourceMgr::DK_Error, Message, {}, {});
     printDiagnostic(diag);
+    CapturedDiagIter = CapturedDiagnostics.erase(CapturedDiagIter);
   }
 
   if (HadError) {
@@ -414,23 +419,35 @@ bool DiagnosticVerifier::verifyUnknown(
 bool DiagnosticVerifier::verifyUnrelated(
     std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const {
   bool HadError = false;
-  for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
-    SourceLoc Loc = CapturedDiagnostics[i].Loc;
-    if (!Loc.isValid())
+  auto CapturedDiagIter = CapturedDiagnostics.begin();
+  while (CapturedDiagIter != CapturedDiagnostics.end()) {
+    SourceLoc Loc = CapturedDiagIter->Loc;
+    if (!Loc.isValid()) {
+      ++CapturedDiagIter;
       // checked by verifyUnknown
       continue;
+    }
 
     HadError = true;
     std::string Message =
         ("unexpected " +
-         getDiagKindString(CapturedDiagnostics[i].Classification) +
-         " produced: " + CapturedDiagnostics[i].Message)
+         getDiagKindString(CapturedDiagIter->Classification) +
+         " produced: " + CapturedDiagIter->Message)
             .str();
 
     auto diag = SM.GetMessage(Loc, llvm::SourceMgr::DK_Error, Message, {}, {});
     printDiagnostic(diag);
 
-    auto FileName = SM.getIdentifierForBuffer(SM.findBufferContainingLoc(Loc));
+    unsigned TopmostBufferID = SM.findBufferContainingLoc(Loc);
+    while (const GeneratedSourceInfo *GSI =
+               SM.getGeneratedSourceInfo(TopmostBufferID)) {
+      SourceLoc ParentLoc = GSI->originalSourceRange.getStart();
+      if (ParentLoc.isInvalid())
+        break;
+      TopmostBufferID = SM.findBufferContainingLoc(ParentLoc);
+      Loc = ParentLoc;
+    }
+    auto FileName = SM.getIdentifierForBuffer(TopmostBufferID);
     auto noteDiag =
         SM.GetMessage(Loc, llvm::SourceMgr::DK_Note,
                       ("file '" + FileName +
@@ -441,6 +458,7 @@ bool DiagnosticVerifier::verifyUnrelated(
                        "ignore diagnostics in this file"),
                       {}, {});
     printDiagnostic(noteDiag);
+    CapturedDiagIter = CapturedDiagnostics.erase(CapturedDiagIter);
   }
 
   return HadError;
@@ -476,7 +494,14 @@ void DiagnosticVerifier::printDiagnostic(const llvm::SMDiagnostic &Diag) const {
   ColoredStream coloredStream{stream};
   raw_ostream &out = UseColor ? coloredStream : stream;
   llvm::SourceMgr &Underlying = SM.getLLVMSourceMgr();
-  Underlying.PrintMessage(out, Diag);
+  if (Diag.getFilename().empty()) {
+    llvm::SMDiagnostic SubstDiag(
+        *Diag.getSourceMgr(), Diag.getLoc(), "<empty-filename>",
+        Diag.getLineNo(), Diag.getColumnNo(), Diag.getKind(), Diag.getMessage(),
+        Diag.getLineContents(), Diag.getRanges(), Diag.getFixIts());
+    Underlying.PrintMessage(out, SubstDiag);
+  } else
+    Underlying.PrintMessage(out, Diag);
 
   SourceLoc Loc = SourceLoc::getFromPointer(Diag.getLoc().getPointer());
   if (Loc.isInvalid())
@@ -664,8 +689,31 @@ static void validatePrefixList(ArrayRef<std::string> prefixes) {
   }
 }
 
-static bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx) {
+bool DiagnosticVerifier::parseTargetBufferName(StringRef &MatchStart,
+                                               StringRef &Out,
+                                               size_t &TextStartIdx) {
   StringRef Offs = MatchStart.slice(0, TextStartIdx);
+
+  if (Offs.starts_with("@'")) {
+    // Windows paths may start with something like T:\, so they need to be quoted
+    // to prevent the colon from seeming like the end of the path.
+    Offs = Offs.substr(2);
+    size_t QuoteEndIndex = Offs.find("'");
+    if (QuoteEndIndex == StringRef::npos) {
+      addError(
+          MatchStart.data(),
+          "no closing \"'\" found to match opening \"'\" for file path here");
+      return false;
+    }
+    if (!Offs.substr(QuoteEndIndex + 1).starts_with(":")) {
+      addError(MatchStart.data(), "expected ':' after buffer name");
+      return false;
+    }
+    Out = Offs.slice(0, QuoteEndIndex);
+    MatchStart = MatchStart.substr(QuoteEndIndex + 3);
+    TextStartIdx -= (QuoteEndIndex + 3);
+    return true;
+  }
 
   size_t LineIndex = Offs.find(':');
   if (LineIndex == 0 || LineIndex == StringRef::npos)
@@ -720,7 +768,7 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
   bool AbsoluteLine = false;
 
   if (TextStartIdx > 0 && MatchStart[0] == '@') {
-    if (MatchStart[1] != '+' && MatchStart[1] != '-' && MatchStart[1] != ':' && (MatchStart[1] < '0' || MatchStart[1] > '9')) {
+    if (MatchStart[1] != '#' && MatchStart[1] != '+' && MatchStart[1] != '-' && MatchStart[1] != ':' && (MatchStart[1] < '0' || MatchStart[1] > '9')) {
       StringRef TargetBufferName;
       if (!parseTargetBufferName(MatchStart, TargetBufferName, TextStartIdx)) {
         addError(MatchStart.data(), "expected '+'/'-' for line offset, ':' "
@@ -739,10 +787,42 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
         return 0;
       }
     }
+
+    // Location marker reference: @#markerName or @#markerName:col
     StringRef Offs;
-    if (MatchStart[1] == '+')
+    if (MatchStart[0] == '@' && MatchStart[1] == '#') {
+      size_t NameStart = 2;
+      size_t NameEnd = NameStart;
+      while (NameEnd < TextStartIdx &&
+             (isalnum(MatchStart[NameEnd]) ||
+              MatchStart[NameEnd] == '_' || MatchStart[NameEnd] == '-'))
+        ++NameEnd;
+
+      if (NameEnd == NameStart) {
+        addError(MatchStart.data() + 1,
+                 "expected marker name after '#'");
+        return 0;
+      }
+
+      StringRef MarkerName = MatchStart.slice(NameStart, NameEnd);
+      auto It = LocationMarkers.find(MarkerName);
+      if (It == LocationMarkers.end()) {
+        addError(MatchStart.data() + 1,
+                 "use of undefined location marker '#" + MarkerName + "'");
+        return 0;
+      }
+
+      LineOffset = It->second.Line;
+      AbsoluteLine = true;
+      if (It->second.BufferID != BufferID)
+        Expected.TargetBufferID = It->second.BufferID;
+
+      // Extract the remainder after the marker name (e.g. ":col" or empty)
+      // and let the shared column-parsing code below handle it.
+      Offs = MatchStart.slice(NameEnd, TextStartIdx).rtrim();
+    } else if (MatchStart[1] == '+') {
       Offs = MatchStart.slice(2, TextStartIdx).rtrim();
-    else {
+    } else {
       Offs = MatchStart.slice(1, TextStartIdx).rtrim();
       if (Offs[0] >= '0' && Offs[0] <= '9')
         AbsoluteLine = true;
@@ -760,8 +840,8 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
     }
 
     size_t ColonIndex = Offs.find(':');
-    // Check whether a line offset was provided
-    if (ColonIndex != 0) {
+    // Check whether a line offset was provided (not applicable for markers).
+    if (!LineOffset && ColonIndex != 0) {
       StringRef LineOffs = Offs.slice(0, ColonIndex);
       if (LineOffs.getAsInteger(10, LineOffset)) {
         addError(MatchStart.data(), "expected line offset before '{{'");
@@ -828,6 +908,10 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
             NestedExpected.ExpectedEnd - NestedMatchStart.data();
         assert(NestedMatchEnd > 0);
         PrevMatchEnd = NestedMatch + NestedMatchEnd;
+      } else {
+        // Skip line if this an expected diagnostic with a prefix this invocation ignores,
+        // otherwise its }} will close the expansion.
+        PrevMatchEnd = MatchStart.find("\n", PrevMatchEnd);
       }
 
       size_t NextEnd = MatchStart.find("}}", PrevMatchEnd);
@@ -1302,6 +1386,98 @@ void DiagnosticVerifier::addError(const char *Loc, const Twine &message,
   Errors.push_back(diag);
 }
 
+/// Scan the buffer for location marker definitions of the form "// #name".
+/// A marker definition is a comment whose only content is "#name", e.g.:
+///   code // #marker1
+///   // #marker2
+/// The marker name consists of alphanumeric characters, hyphens, or
+/// underscores. Nothing else may appear in the comment after the marker name
+/// (except trailing whitespace). This prevents false positives from comments
+/// like "// #available(...)" or stack traces containing "// #10 0x...".
+void DiagnosticVerifier::scanForMarkers(unsigned BufferID) {
+  StringRef InputFile = SM.getEntireTextForBuffer(BufferID);
+  const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
+
+  for (size_t Pos = InputFile.find("//"); Pos != StringRef::npos;
+       Pos = InputFile.find("//", Pos + 2)) {
+    size_t Cur = Pos + 2;
+    while (Cur < InputFile.size() && (InputFile[Cur] == ' ' ||
+                                       InputFile[Cur] == '\t'))
+      ++Cur;
+
+    if (Cur >= InputFile.size() || InputFile[Cur] != '#')
+      continue;
+
+    size_t HashPos = Cur;
+    size_t NameStart = HashPos + 1;
+    size_t NameEnd = NameStart;
+    while (NameEnd < InputFile.size() &&
+           (isalnum(InputFile[NameEnd]) || InputFile[NameEnd] == '_' ||
+            InputFile[NameEnd] == '-'))
+      ++NameEnd;
+
+    if (NameEnd == NameStart)
+      continue;
+
+    // Only trailing whitespace is allowed after the marker name until EOL.
+    size_t Rest = NameEnd;
+    while (Rest < InputFile.size() && (InputFile[Rest] == ' ' ||
+                                        InputFile[Rest] == '\t'))
+      ++Rest;
+    if (Rest < InputFile.size() && InputFile[Rest] != '\n' &&
+        InputFile[Rest] != '\r' && InputFile[Rest] != '\0')
+      continue;
+
+    StringRef MarkerName = InputFile.slice(NameStart, NameEnd);
+    unsigned Line =
+        SM.getLineAndColumnInBuffer(
+              BufferStartLoc.getAdvancedLoc(HashPos), BufferID)
+            .first;
+
+    auto Result =
+        LocationMarkers.try_emplace(MarkerName, MarkerLocation{BufferID, Line});
+    if (!Result.second) {
+      addError(InputFile.data() + HashPos,
+               "location marker '#" + MarkerName + "' already defined");
+    }
+  }
+}
+
+bool DiagnosticVerifier::hasMarkerAtLine(unsigned BufferID,
+                                         unsigned Line) const {
+  for (const auto &Entry : LocationMarkers) {
+    if (Entry.second.BufferID == BufferID && Entry.second.Line == Line)
+      return true;
+  }
+  return false;
+}
+
+bool DiagnosticVerifier::verifyDeferredMarkerDiagnostics() {
+  Errors.clear();
+  bool HadError = false;
+  auto CapturedDiagIter = CapturedDiagnostics.begin();
+  while (CapturedDiagIter != CapturedDiagnostics.end()) {
+    if (!CapturedDiagIter->SourceBufferID ||
+        !hasMarkerAtLine(*CapturedDiagIter->SourceBufferID,
+                         CapturedDiagIter->Line)) {
+      ++CapturedDiagIter;
+      continue;
+    }
+    HadError = true;
+    std::string Message =
+        ("unexpected " +
+         getDiagKindString(CapturedDiagIter->Classification) +
+         " produced: " + CapturedDiagIter->Message)
+            .str();
+    addError(getRawLoc(CapturedDiagIter->Loc).getPointer(), Message);
+    CapturedDiagIter = CapturedDiagnostics.erase(CapturedDiagIter);
+  }
+  for (auto &Err : Errors)
+    printDiagnostic(Err);
+  Errors.clear();
+  return HadError;
+}
+
 /// After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
@@ -1402,12 +1578,19 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
       // Diagnostics attached to generated sources originating in this
       // buffer also count as part of this buffer for this purpose.
-      const GeneratedSourceInfo *GSI =
-          SM.getGeneratedSourceInfo(CapturedDiagIter->SourceBufferID.value());
-      if (!GSI || llvm::find(GSI->ancestors, BufferID) == GSI->ancestors.end()) {
+      unsigned scratch;
+      llvm::ArrayRef<unsigned> ancestors = SM.getAncestors(CapturedDiagIter->SourceBufferID.value(), scratch);
+      if (llvm::find(ancestors, BufferID) == ancestors.end()) {
         ++CapturedDiagIter;
         continue;
       }
+    }
+
+    // Defer reporting unexpected diagnostics on lines with location markers,
+    // because another file may have an expected-error@#marker for this line.
+    if (hasMarkerAtLine(BufferID, CapturedDiagIter->Line)) {
+      ++CapturedDiagIter;
+      continue;
     }
 
     HadUnexpectedDiag = true;
@@ -1520,7 +1703,7 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
   CapturedDiagnostics.emplace_back(message, loc.bufferID, Info.Kind,
                                    loc.sourceLoc, loc.line, loc.column, fixIts,
                                    llvm::sys::path::stem(
-                                      Info.CategoryDocumentationURL).str());
+                                      Info.getCategoryDocumentationURL()).str());
 }
 
 /// Once all diagnostics have been captured, perform verification.
@@ -1551,13 +1734,35 @@ bool DiagnosticVerifier::finishProcessing() {
 
   processExpansions(SM, Expansions, CapturedDiagnostics);
 
+  // Scan all buffers for location marker definitions before verifying, so
+  // that markers defined in one file can be referenced from another.
   ArrayRef<unsigned> BufferIDLists[2] = { BufferIDs, additionalBufferIDs };
+  for (ArrayRef<unsigned> BufferIDList : BufferIDLists)
+    for (auto &BufferID : BufferIDList)
+      scanForMarkers(BufferID);
+
+  // Emit any errors from marker scanning (e.g. duplicate marker definitions)
+  // before verifyFile() clears the Errors vector.
+  for (auto &Err : Errors)
+    printDiagnostic(Err);
+  if (!Errors.empty())
+    Result.HadError = true;
+  Errors.clear();
+
   for (ArrayRef<unsigned> BufferIDList : BufferIDLists)
     for (auto &BufferID : BufferIDList) {
       DiagnosticVerifier::Result FileResult = verifyFile(BufferID);
       Result.HadError |= FileResult.HadError;
       Result.HadUnexpectedDiag |= FileResult.HadUnexpectedDiag;
     }
+
+  // Now that all files have been verified, check for any remaining diagnostics
+  // on lines with markers that were deferred during per-file verification.
+  if (verifyDeferredMarkerDiagnostics()) {
+    Result.HadError = true;
+    Result.HadUnexpectedDiag = true;
+  }
+
   if (!IgnoreUnknown) {
     bool HadError = verifyUnknown(CapturedDiagnostics);
     Result.HadError |= HadError;

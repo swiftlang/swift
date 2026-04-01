@@ -1,9 +1,9 @@
-// RUN: %target-run-simple-swift(-Osize -swift-version 5 -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Osize -swift-version 5 -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo %target-embedded-posix-shim) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 
 @main
@@ -15,9 +15,9 @@ struct Main {
     print("static string: \("string" as StaticString)")
     // CHECK: static string: string
 
-    print("integers: \(42) \(-42) \(0xffffffff)")
+    print("integers: \(42) \(-42) \(UInt(0xffffffff))")
     // CHECK: integers: 42 -42 4294967295
-    
+
     print("booleans: \(true) \(false)")
     // CHECK: booleans: true false
   }

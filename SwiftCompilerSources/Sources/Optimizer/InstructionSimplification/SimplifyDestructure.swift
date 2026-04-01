@@ -50,19 +50,6 @@ private extension DestructureInstruction {
 
   func foldWithAggregateConstruction(_ context: SimplifyContext) {
 
-    if aggregate.type.isTrivial(in: parentFunction) {
-      // ```
-      //   (%1, %2) = destructure_tuple %t
-      // ```
-      // ->
-      // ```
-      //   %1 = tuple_extract %t, 0
-      //   %2 = tuple_extract %t, 1
-      // ```
-      replaceWithAggregateExtract(context)
-      return
-    }
-
     switch aggregate {
     case let constructInst as ConstructureInstruction:
       // Eliminate the redundant instruction pair
@@ -98,6 +85,21 @@ private extension DestructureInstruction {
 
     default:
       break
+    }
+
+    if !isDeleted,
+       aggregate.type.isTrivial(in: parentFunction) || aggregate.ownership == .guaranteed
+    {
+      // ```
+      //   (%1, %2) = destructure_tuple %t
+      // ```
+      // ->
+      // ```
+      //   %1 = tuple_extract %t, 0
+      //   %2 = tuple_extract %t, 1
+      // ```
+      replaceWithAggregateExtract(context)
+      return
     }
   }
 

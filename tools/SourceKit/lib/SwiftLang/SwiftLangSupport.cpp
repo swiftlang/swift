@@ -259,7 +259,8 @@ class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
       return nullptr;
 
     auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
-        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
+        new llvm::vfs::OverlayFileSystem(
+            llvm::vfs::createPhysicalFileSystem()));
     OverlayFS->pushOverlay(std::move(InMemoryFS));
     return OverlayFS;
   }
@@ -370,10 +371,10 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
     return IsRef ? KindRefAccessorMutableAddress
                  : KindDeclAccessorMutableAddress;
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return IsRef ? KindRefAccessorRead : KindDeclAccessorRead;
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return IsRef ? KindRefAccessorModify : KindDeclAccessorModify;
   case AccessorKind::Init:
     return IsRef ? KindRefAccessorInit : KindDeclAccessorInit;
@@ -1049,7 +1050,7 @@ SwiftLangSupport::getFileSystem(const std::optional<VFSOptions> &vfsOptions,
   }
 
   // Fallback to the real filesystem.
-  return llvm::vfs::getRealFileSystem();
+  return llvm::vfs::createPhysicalFileSystem();
 }
 
 void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
@@ -1135,6 +1136,52 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
                                           CancellationFlag};
   PerformOperation(
       CancellableResult<CompletionLikeOperationParams>::success(Params));
+}
+
+void SwiftLangSupport::getPolyglotAST(
+    StringRef PrimaryFilePath, ArrayRef<const char *> Args,
+    std::optional<VFSOptions> VfsOptions,
+    SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<std::string> &)> Receiver) {
+  std::string FileSystemError;
+  auto FileSystem = getFileSystem(VfsOptions, PrimaryFilePath, FileSystemError);
+  if (!FileSystem) {
+    Receiver(RequestResult<std::string>::fromError(FileSystemError));
+    return;
+  }
+
+  // Display diagnostics to stderr.
+  CompilerInstance CI;
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+
+  std::string Error;
+  CompilerInvocation Invocation;
+  if (getASTManager()->initCompilerInvocation(
+        Invocation, Args,
+        FrontendOptions::ActionType::Typecheck, CI.getDiags(),
+        {}, Error)) {
+    Receiver(RequestResult<std::string>::fromError(Error));
+    return;
+  }
+
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    Receiver(RequestResult<std::string>::fromError(InstanceSetupError));
+    return;
+  }
+
+  auto &Ctx = CI.getASTContext();
+  auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
+  Importer.importBridgingHeader(PrimaryFilePath,
+                                CI.getMainModule(),
+                                /*diagLoc=*/{},
+                                /*trackParsedSymbols=*/true);
+
+  std::string buffer;
+  llvm::raw_string_ostream OS(buffer);
+  Importer.printPolyglotAST(PrimaryFilePath, OS);
+  Receiver(RequestResult<std::string>::fromResult(buffer));
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

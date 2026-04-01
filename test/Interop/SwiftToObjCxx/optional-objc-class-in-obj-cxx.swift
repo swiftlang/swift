@@ -2,6 +2,7 @@
 
 // RUN: %target-swift-frontend %s -module-name UseCoreFoundation -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/UseCoreFoundation.h
 // RUN: %target-interop-build-clangxx -std=gnu++20 -fobjc-arc -c -x objective-c++-header %t/UseCoreFoundation.h -o %t/o.o
+// RUN: %target-interop-build-clangxx -Werror=arc-bridge-casts-disallowed-in-nonarc -std=gnu++20 -fno-objc-arc -c -x objective-c++-header %t/UseCoreFoundation.h -o %t/o.o
 
 // REQUIRES: objc_interop
 
@@ -13,4 +14,8 @@ public class TestFoundationType {
     public init(resourcesBundle bundle: Bundle? = nil) {
         _bundle = bundle
     }
+}
+
+public func getArray() -> [String] {
+    []
 }

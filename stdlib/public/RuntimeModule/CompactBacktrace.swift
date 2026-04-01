@@ -16,7 +16,11 @@
 
 import Swift
 
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 enum CompactBacktraceFormat {
   /// Tells us what size of machine words were used when generating the
   /// backtrace.
@@ -578,7 +582,7 @@ enum CompactBacktraceFormat {
             // Grab a rich frame and encode it
             guard let frame = iterator.next() else {
               state = .done
-              return nil
+              return Instruction.end.rawValue
             }
 
             if let lastFrame, lastFrame == frame {
@@ -618,7 +622,11 @@ enum CompactBacktraceFormat {
   }
 }
 
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 extension CompactBacktraceFormat.Instruction: Comparable {
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.rawValue < rhs.rawValue
@@ -628,7 +636,11 @@ extension CompactBacktraceFormat.Instruction: Comparable {
   }
 }
 
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 extension CompactBacktraceFormat.Instruction {
   func decoded() -> CompactBacktraceFormat.DecodedInstruction? {
     switch self {

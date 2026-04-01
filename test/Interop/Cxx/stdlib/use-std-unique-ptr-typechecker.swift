@@ -14,3 +14,9 @@ takeCopyable(vecUniquePtr)
 let uniqueIntVec = HasUniqueIntVector()
 takeCopyable(uniqueIntVec)
 // CHECK: error: global function 'takeCopyable' requires that 'HasUniqueIntVector' conform to 'Copyable'
+<<<<<<< HEAD
+=======
+
+let unorderedMap = HasUnorderedMap()
+_ = unorderedMap.field
+>>>>>>> origin/main

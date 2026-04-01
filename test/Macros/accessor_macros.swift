@@ -102,6 +102,7 @@ struct MyBrokenStruct {
     /*
     expected-expansion@-2:25{{
       expected-error@1:1{{variable already has a getter}}
+      expected-error@5:1{{variable already has a setter}}
     }}
     */
     // CHECK-DIAGS: variable already has a getter

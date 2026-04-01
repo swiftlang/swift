@@ -401,6 +401,10 @@ if(SWIFT_USE_SYMLINKS)
   set(SWIFT_COPY_OR_SYMLINK_DIR "create_symlink")
 endif()
 
+option(SWIFT_STDLIB_INSTALL_ONLY_CLANG_RESOURCE_HEADERS
+  "If enabled, install only Clang builtin headers and modulemaps under lib/swift[/swift_static]/clang instead of the entire resource directory."
+  OFF)
+
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
@@ -776,6 +780,10 @@ option(SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE
   "Build the stdlib with -strict-concurrency=complete"
   FALSE)
 
+option(SWIFT_STDLIB_ENABLE_SIL_OPAQUE_VALUES
+  "Build the stdlib with -enable-sil-opaque-values"
+  FALSE)
+
 option(SWIFT_ENABLE_SYNCHRONIZATION
   "Enable build of the Swift Synchronization module"
   FALSE)
@@ -798,6 +806,10 @@ option(SWIFT_ENABLE_GLOBAL_ISEL_ARM64
 
 option(SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   "Enable experimental SwiftParser validation by default"
+  FALSE)
+
+option(SWIFT_ENABLE_DIRECT_RETAIN_RELEASE
+  "Enable use of direct refcounting calls by default"
   FALSE)
 
 cmake_dependent_option(SWIFT_BUILD_SOURCEKIT
@@ -944,7 +956,7 @@ if(SWIFT_PATH_TO_CMARK_BUILD)
     OUTPUT_VARIABLE _CMARK_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   message(STATUS "CMark Version: ${_CMARK_VERSION}")
-elseif(SWIFT_INCLUDE_TOOLS)
+elseif(SWIFT_INCLUDE_TOOLS AND NOT "cmark" IN_LIST LLVM_EXTERNAL_PROJECTS)
   find_package(cmark-gfm CONFIG REQUIRED)
 endif()
 message(STATUS "")
@@ -1149,8 +1161,8 @@ swift_common_cxx_warnings()
 # Set sanitizer options for Swift compiler.
 swift_common_sanitizer_config()
 
-# Check if we're build with MSVC or Clang-cl, as these compilers have similar command line arguments.
-if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
+# Check if we're build with MSVC or clang-cl, as these compilers have similar command line arguments.
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC")
   set(SWIFT_COMPILER_IS_MSVC_LIKE TRUE)
 endif()
 
@@ -1459,6 +1471,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Volatile Support:                   ${SWIFT_ENABLE_VOLATILE}")
   message(STATUS "Pointer Bounds Support:             ${SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS}")
   message(STATUS "Runtime Support:                    ${SWIFT_ENABLE_RUNTIME_MODULE}")
+  message(STATUS "C++ Interop Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
@@ -1531,6 +1544,28 @@ if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(lib)
 endif()
 
+# NOTE(compnerd) we cannot use `LLVM_HAVE_LIBXML2` as the basis for this check
+# as we require RelaxNG support which is not guaranteed by the LLVM check.
+option(SWIFT_ENABLE_LIBXML2 "Use libxml2 to validate the comment schema via swift-ide-test" TRUE)
+set(SWIFT_HAVE_LIBXML2 FALSE)
+if(SWIFT_ENABLE_LIBXML2)
+  find_package(LibXml2)
+  if(LibXml2_FOUND)
+    # Check if libxml2 we found is usable; for example, we may have found a
+    # 32-bit library on a 64-bit system which would result in a link-time
+    # failure.
+    cmake_push_check_state()
+    list(APPEND CMAKE_REQUIRED_INCLUDES ${LIBXML2_INCLUDE_DIRS})
+    list(APPEND CMAKE_REQUIRED_LIBRARIES ${LIBXML2_LIBRARIES})
+    list(APPEND CMAKE_REQUIRED_DEFINITIONS ${LIBXML2_DEFINITIONS})
+    check_symbol_exists(xmlRelaxNGParse libxml/relaxng.h HAVE_LIBXML2_RELAXNG)
+    cmake_pop_check_state()
+    if(HAVE_LIBXML2_RELAXNG)
+      set(SWIFT_HAVE_LIBXML2 TRUE)
+    endif()
+  endif()
+endif()
+
 ###############
 # PLEASE READ #
 ###############
@@ -1549,6 +1584,10 @@ else()
   set(SWIFT_STDLIB_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/stdlib")
   # Some of the things below depend on the threading library
   add_subdirectory(stdlib/public/Threading)
+
+  if(SWIFT_BUILD_SWIFT_DIRECT_RUNTIME)
+    add_subdirectory(stdlib/public/SwiftDirectRuntime)
+  endif()
 
   if(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT)
     add_subdirectory(stdlib/toolchain)

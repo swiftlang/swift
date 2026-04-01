@@ -41,7 +41,7 @@ class Sema;
 class SwiftNewTypeAttr;
 class Type;
 class TypedefNameDecl;
-}
+} // namespace clang
 
 // TODO: pull more off of the ImportImpl
 
@@ -174,7 +174,7 @@ bool isUnavailableInSwift(const clang::Decl *decl, const PlatformAvailability *,
 /// applies to this parameter.
 OptionalTypeKind getParamOptionality(const clang::ParmVarDecl *param,
                                      bool knownNonNull);
-}
-}
+} // namespace importer
+} // namespace swift
 
 #endif

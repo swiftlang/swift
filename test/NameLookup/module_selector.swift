@@ -440,3 +440,11 @@ func dependentTypeLookup<T, U, V, W, X>(_: T, _: U, _: V, _: W, _: X) where
   X: Identifiable, X: ComparableIdentifiable, X.NonexistentModule::ID == Int
   // expected-error@-1 {{module selector is not allowed on generic member type; associated types with the same name are merged instead of shadowing one another}} {{49-68=}}
 {}
+
+// rdar://164647850 -- conforming to `Swift::Error` doesn't work when there's an `Error` type around
+
+enum Error {}
+enum E: Swift::Error { case err }
+
+func testErrorConformance() -> Result<Void, E> { .success(()) }
+// no-error@-1

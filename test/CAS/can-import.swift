@@ -30,7 +30,7 @@
 // CMD-NEXT: "0"
 // CMD-NEXT: "1000.0.0"
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
@@ -42,6 +42,7 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   %t/single.swift -o %t/deps2.json -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/include -F %t/frameworks
 
+<<<<<<< HEAD
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json clang:Simple > %t/CSimple.cmd
 // RUN: %swift_frontend_plain @%t/CSimple.cmd
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json Simple > %t/Simple.cmd
@@ -51,17 +52,28 @@
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map2.json > %t/map2.casid
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json Test > %t/Test.cmd
+=======
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps2.json -o %t/Test.cmd
+>>>>>>> origin/main
 // RUN: %FileCheck %s --check-prefix=SINGLE --input-file=%t/Test.cmd
 // SINGLE:      "-module-can-import-version"
 // SINGLE-NEXT: "Simple"
 // SINGLE-NEXT: "0"
 // SINGLE-NEXT: "1000.0.0"
 
+<<<<<<< HEAD
 // RUN: %target-swift-frontend \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map2.casid \
+=======
+// RUN: %target-swift-frontend-plain \
+// RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
+// RUN:   -swift-version 5 \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
+// RUN:   -module-name Test \
+>>>>>>> origin/main
 // RUN:   %t/single.swift @%t/Test.cmd
 
 //--- main.swift

@@ -89,7 +89,8 @@ unsigned getNumInOutArguments(FullApplySite applySite);
 ///
 /// \p callbacks.onDelete() is invoked to delete each instruction.
 void eliminateDeadInstruction(SILInstruction *inst,
-                              InstModCallbacks callbacks = InstModCallbacks());
+                              InstModCallbacks callbacks = InstModCallbacks(),
+                              bool assumeFixedLifetimes = true);
 
 /// For each of the given instructions, if they are dead delete them
 /// along with their dead operands. Note this utility must be phased out and
@@ -617,6 +618,8 @@ SILValue getInitOfTemporaryAllocStack(AllocStackInst *asi);
 
 bool isDestructorSideEffectFree(SILInstruction *mayRelease,
                                 DestructorAnalysis *DA);
+
+bool shouldRemoveCondFail(StringRef withMessage, StringRef functionName);
 
 } // end namespace swift
 

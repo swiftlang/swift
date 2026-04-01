@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -verify
+// RUN: %target-swift-frontend %s -typecheck -verify
 // REQUIRES: objc_interop
 
 import Foundation

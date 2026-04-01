@@ -1201,6 +1201,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     return Builder.createPartialApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
         PAI->getCalleeConvention(), PAI->getResultIsolation(), PAI->isOnStack(),
+        PAI->isStackAllocationNested(),
         GenericSpecializationInformation::create(ApplyInst, Builder));
   }
   case ApplySiteKind::ApplyInst:

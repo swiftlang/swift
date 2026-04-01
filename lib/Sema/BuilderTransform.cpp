@@ -363,7 +363,7 @@ protected:
     } else {
       Expr *buildBlockResult = buildBlockVarRef.get();
       // Otherwise, it's a top-level brace and we need to synthesize
-      // a call to `buildFialBlock` if supported.
+      // a call to `buildFinalBlock` if supported.
       if (builder.supports(ctx.Id_buildFinalResult, {Identifier()})) {
         buildBlockResult =
             builder.buildCall(resultLoc, ctx.Id_buildFinalResult,
@@ -730,12 +730,11 @@ protected:
     auto *newForEach = new (ctx)
         ForEachStmt(forEachStmt->getLabelInfo(), forEachStmt->getForLoc(),
                     forEachStmt->getTryLoc(), forEachStmt->getAwaitLoc(),
-                    forEachStmt->getUnsafeLoc(),
-                    forEachStmt->getPattern(), forEachStmt->getInLoc(),
-                    forEachStmt->getParsedSequence(),
+                    forEachStmt->getUnsafeLoc(), forEachStmt->getPattern(),
+                    forEachStmt->getInLoc(), forEachStmt->getSequence(),
                     forEachStmt->getWhereLoc(), forEachStmt->getWhere(),
                     cloneBraceWith(forEachStmt->getBody(), newBody),
-                    forEachStmt->isImplicit());
+                    forEachStmt->getDeclContext(), forEachStmt->isImplicit());
 
     // For a body of new `do` statement that holds updated `for-in` loop
     // and epilog that consists of a call to `buildArray` that forms the
@@ -771,6 +770,7 @@ protected:
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(PoundAssert)
   UNSUPPORTED_STMT(Case)
+  UNSUPPORTED_STMT(Opaque)
 
 #undef UNSUPPORTED_STMT
 

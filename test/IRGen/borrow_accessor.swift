@@ -1,6 +1,5 @@
-// RUN:%target-swift-frontend -emit-irgen %s -verify  -enable-experimental-feature BorrowAndMutateAccessors | %FileCheck %s
+// RUN:%target-swift-frontend -emit-irgen %s -verify  | %FileCheck %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 // REQUIRES: OS=macosx
 
 public class Klass {

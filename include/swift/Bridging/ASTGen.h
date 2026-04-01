@@ -30,8 +30,8 @@ void swift_ASTGen_addQueuedDiagnostic(
     BridgedStringRef text,
     swift::DiagnosticKind severity,
     swift::SourceLoc sourceLoc,
-    BridgedStringRef categoryName,
-    BridgedStringRef documentationPath,
+    const BridgedDiagnosticCategoryEntry *_Nullable categoryChain,
+    ptrdiff_t numCategoryChainEntries,
     const swift::CharSourceRange *_Nullable highlightRanges,
     ptrdiff_t numHighlightRanges,
     BridgedArrayRef /*BridgedFixIt*/ fixIts);
@@ -39,8 +39,8 @@ void swift_ASTGen_renderSingleDiagnostic(
     void *_Nonnull state,
     BridgedStringRef text,
     swift::DiagnosticKind severity,
-    BridgedStringRef categoryName,
-    BridgedStringRef documentationPath,
+    const BridgedDiagnosticCategoryEntry *_Nullable categoryChain,
+    ptrdiff_t numCategoryChainEntries,
     ssize_t colorize,
     BridgedStringRef *_Nonnull renderedString);
 void swift_ASTGen_renderQueuedDiagnostics(
@@ -116,6 +116,17 @@ intptr_t swift_ASTGen_configuredRegions(
     BridgedIfConfigClauseRangeInfo *_Nullable *_Nonnull);
 void swift_ASTGen_freeConfiguredRegions(
     BridgedIfConfigClauseRangeInfo *_Nullable regions, intptr_t numRegions);
+
+swift::WarningGroupBehavior swift_ASTGen_warningGroupBehaviorAtPosition(
+    void *_Nonnull sourceFile,
+    BridgedArrayRef globalRules,
+    BridgedStringRef diagnosticGroupNameStrRef,
+    swift::SourceLoc loc);
+
+bool swift_ASTGen_isWarningGroupEnabledInFile(
+    void *_Nonnull sourceFile,
+    BridgedArrayRef globalRules,
+    BridgedStringRef diagnosticGroupNameStrRef);
 
 intptr_t swift_ASTGen_activeInEmbeddedSwift(
     BridgedASTContext astContext,

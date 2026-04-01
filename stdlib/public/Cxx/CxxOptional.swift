@@ -15,6 +15,8 @@ public protocol CxxOptional<Wrapped>: ExpressibleByNilLiteral {
 
   init()
 
+  init(_ value: Wrapped)
+
   func __convertToBool() -> Bool
 
   var pointee: Wrapped { get }
@@ -37,6 +39,13 @@ extension CxxOptional {
     get {
       guard hasValue else { return nil }
       return pointee
+    }
+    set(newValue) {
+      if let newValueNonNull = newValue {
+        self = Self.init(newValueNonNull)
+      } else {
+        self = Self.init()
+      }
     }
   }
 }

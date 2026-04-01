@@ -16,6 +16,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -28,6 +29,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -87,6 +89,10 @@ SILPrintTypes("sil-print-types", llvm::cl::init(false),
                    llvm::cl::desc("always print type annotations for instruction operands in SIL output"));
 
 llvm::cl::opt<bool>
+SILPrintOwnership("sil-print-ownership", llvm::cl::init(false),
+                   llvm::cl::desc("print ownership of instruction results in SIL output"));
+
+llvm::cl::opt<bool>
 SILPrintNoUses("sil-print-no-uses", llvm::cl::init(false),
                    llvm::cl::desc("omit use comments in SIL output"));
 
@@ -99,6 +105,10 @@ llvm::cl::opt<bool> SILPrintFunctionIsolationInfo(
     "sil-print-function-isolation-info", llvm::cl::init(false),
     llvm::cl::desc("Print out isolation info on functions in a manner that SIL "
                    "understands [e.x.: not in comments]"));
+
+llvm::cl::opt<bool> SILPrintLoopHeaders(
+    "sil-print-loopheaders", llvm::cl::init(true),
+    llvm::cl::desc("Print a comment on basic blocks that are loop headers"));
 
 static std::string demangleSymbol(StringRef Name) {
   if (SILFullDemangle)
@@ -394,11 +404,11 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Init:
       OS << "!init";
       break;
-    case AccessorKind::Read2:
-      OS << "!read2";
+    case AccessorKind::YieldingBorrow:
+      OS << "!yielding_borrow";
       break;
-    case AccessorKind::Modify2:
-      OS << "!modify2";
+    case AccessorKind::YieldingMutate:
+      OS << "!yielding_mutate";
       break;
     case AccessorKind::Borrow:
       OS << "!borrow";
@@ -698,6 +708,35 @@ protected:
   }
 };
 
+static bool hasNonAddressResults(const SILInstruction *inst) {
+  for (SILValue result : inst->getResults()) {
+    if (result->getType().isObject())
+      return true;
+  }
+  return false;
+}
+
+/// Returns true if the ownership of a result of `inst` mismatches with its type.
+/// That can happen e.g. for non-trivial enums which are constructed with a trivial case:
+/// ```
+/// enum E {
+///   case A
+///   case B(AnyObject)
+/// }
+///
+///   %1 = enum $E, #E.A!enumelt  // type of %1 is non trivial, but ownership is "none"
+/// ```
+static bool hasUnusualResultOwnership(const SILInstruction *inst) {
+  for (SILValue result : inst->getResults()) {
+    if (result->getType().isObject() &&
+        result->getOwnershipKind() == OwnershipKind::None &&
+        !result->getType().isTrivial(*inst->getFunction())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 } // namespace
 
 namespace swift {
@@ -713,6 +752,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   LineComments lineComments;
   unsigned LastBufferID;
   llvm::DenseSet<const SILBasicBlock *> printedBlocks;
+  llvm::SmallPtrSet<SILBasicBlock *, 32> loopHeaders;
 
   // Printers for the underlying stream.
 #define SIMPLE_PRINTER(TYPE) \
@@ -731,10 +771,16 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SIMPLE_PRINTER(SILDeclRef)
   SIMPLE_PRINTER(APInt)
   SIMPLE_PRINTER(ValueOwnershipKind)
-  SIMPLE_PRINTER(UUID)
   SIMPLE_PRINTER(GenericSignature)
   SIMPLE_PRINTER(ActorIsolation)
 #undef SIMPLE_PRINTER
+
+  SILPrinter &operator<<(UUID value) {
+    llvm::SmallString<UUID::StringBufferSize> str;
+    ASTPrinter::getUUIDStringForPrinting(value, str);
+    PrintState.OS << str;
+    return *this;
+  }
 
   SILPrinter &operator<<(SILValuePrinterInfo i) {
     SILColor C(PrintState.OS, SC_Type);
@@ -867,6 +913,10 @@ public:
   //===--------------------------------------------------------------------===//
   // Big entrypoints.
   void print(const SILFunction *F) {
+    if (SILPrintLoopHeaders) {
+      findLoopHeaders(*const_cast<SILFunction *>(F), loopHeaders);
+    }
+
     // If we are asked to emit sorted SIL, print out our BBs in RPOT order.
     if (Ctx.sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
@@ -999,6 +1049,11 @@ public:
       *this << "// " << debugName.value() << '\n';
     }
 
+    if (SILPrintLoopHeaders &&
+        loopHeaders.count(const_cast<SILBasicBlock *>(BB))) {
+      *this << "// Loop header\n";
+    }
+
     // Then print the name of our block, the arguments, and the block colon.
     *this << Ctx.getID(BB);
     printBlockArguments(BB);
@@ -1024,8 +1079,8 @@ public:
       for (auto Id : PredIDs)
         *this << ' ' << Id;
     }
-    *this << '\n';
 
+    *this << '\n';
     const auto &SM = BB->getModule().getASTContext().SourceMgr;
     std::optional<SILLocation> PrevLoc;
     for (const SILInstruction &I : *BB) {
@@ -1101,6 +1156,28 @@ public:
     llvm::copy(inst->getResults(), std::back_inserter(values));
     printUserList(values, inst);
     printBranchTargets(inst);
+  }
+
+  void printOwnershipOfInstruction(const SILInstruction *inst) {
+
+    if (!inst->isStaticInitializerInst() &&
+        inst->getFunction()->hasOwnership() &&
+        hasNonAddressResults(inst) &&
+        (SILPrintOwnership || hasUnusualResultOwnership(inst)))
+    {
+      lineComments.delim();
+
+      *this << "ownership: ";
+      llvm::interleave(inst->getResults(),
+        [&](SILValue result) {
+          if (result->getType().isAddress()) {
+            *this << '-';
+          } else {
+            *this << result->getOwnershipKind();
+          }
+        },
+        [&] { *this << ", "; });
+    }
   }
 
   void printUserList(ArrayRef<SILValue> values, SILNodePointer node) {
@@ -1375,6 +1452,8 @@ public:
     // Print users, or id for valueless instructions.
     printUsersOfInstruction(I);
 
+    printOwnershipOfInstruction(I);
+
     // Print SIL location.
     if (Ctx.printVerbose()) {
       printSILLocation(I->getLoc(), I->getModule(), I->getDebugScope());
@@ -1579,7 +1658,17 @@ public:
       printDebugInfoExpression(Var->DIExpr);
   }
 
+  template <class T>
+  void printNonNested(T *inst) {
+    static_assert(&T::isStackAllocationNested !=
+                      &SILInstruction::isStackAllocationNested,
+                  "Type doesn't override isStackAllocationNested");
+    if (inst->isStackAllocationNested() == StackAllocationIsNotNested)
+      *this << "[non_nested] ";
+  }
+
   void visitAllocStackInst(AllocStackInst *AVI) {
+    printNonNested(AVI);
     if (AVI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
     if (AVI->isLexical())
@@ -1604,6 +1693,8 @@ public:
       *this << "[objc] ";
     if (ARI->canAllocOnStack())
       *this << "[stack] ";
+    if (!ARI->isStackAllocationNested())
+      *this << "[non_nested] ";
     auto Types = ARI->getTailAllocatedTypes();
     auto Counts = ARI->getTailAllocatedCounts();
     for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
@@ -1756,8 +1847,11 @@ public:
       *this << "[isolated_any] ";
       break;
     }
-    if (CI->isOnStack())
+    if (CI->isOnStack()) {
       *this << "[on_stack] ";
+      if (!CI->isStackAllocationNested())
+        *this << "[non_nested] ";
+    }
     visitApplyInstBase(CI);
   }
 
@@ -1871,6 +1965,30 @@ public:
     *this << '"' << llvm::toHex(SLI->getValue()) << '"';
   }
 
+  void visitMakeBorrowInst(MakeBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitMakeAddrBorrowInst(MakeAddrBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitInitBorrowAddrInst(InitBorrowAddrInst *I) {
+    *this << getIDAndType(I->getDest()) << " with " << getIDAndType(I->getReferent());
+  }
+
   void printLoadOwnershipQualifier(LoadOwnershipQualifier Qualifier) {
     switch (Qualifier) {
     case LoadOwnershipQualifier::Unqualified:
@@ -1966,6 +2084,23 @@ public:
       return;
 
     if (inst->getForwardingOwnershipKind() != op->getOwnershipKind()) {
+      *this << ", forwarding: @" << inst->getForwardingOwnershipKind();
+    }
+  }
+
+  template <typename Inst>
+  void printForwardingOwnershipKind(Inst *inst) {
+    if (inst->getNumRealOperands() == 0) {
+      return;
+    }
+    bool matching = false;
+    for (Operand *op : inst->getRealOperands()) {
+      if (inst->getForwardingOwnershipKind() == op->get()->getOwnershipKind()) {
+        matching = true;
+        break;
+      }
+    }
+    if (!matching) {
       *this << ", forwarding: @" << inst->getForwardingOwnershipKind();
     }
   }
@@ -2414,6 +2549,7 @@ public:
         SI->getElements(), [&](const SILValue &V) { *this << getIDAndType(V); },
         [&] { *this << ", "; });
     *this << ')';
+    printForwardingOwnershipKind(SI);
   }
 
   void visitObjectInst(ObjectInst *OI) {
@@ -2469,6 +2605,7 @@ public:
           [&] { *this << ", "; });
       *this << ')';
     }
+    printForwardingOwnershipKind(TI);
   }
 
   void visitTupleAddrConstructorInst(TupleAddrConstructorInst *TI) {
@@ -3520,18 +3657,18 @@ void SILFunction::dump(const char *FileName) const {
   print(os);
 }
 
-static StringRef getLinkageString(SILLinkage linkage) {
+StringRef swift::getLinkageString(SILLinkage linkage) {
   switch (linkage) {
-  case SILLinkage::Public: return "public ";
-  case SILLinkage::PublicNonABI: return "non_abi ";
-  case SILLinkage::Package: return "package ";
-  case SILLinkage::PackageNonABI: return "package_non_abi ";
-  case SILLinkage::Hidden: return "hidden ";
-  case SILLinkage::Shared: return "shared ";
-  case SILLinkage::Private: return "private ";
-  case SILLinkage::PublicExternal: return "public_external ";
-  case SILLinkage::PackageExternal: return "package_external ";
-  case SILLinkage::HiddenExternal: return "hidden_external ";
+  case SILLinkage::Public: return "public";
+  case SILLinkage::PublicNonABI: return "non_abi";
+  case SILLinkage::Package: return "package";
+  case SILLinkage::PackageNonABI: return "package_non_abi";
+  case SILLinkage::Hidden: return "hidden";
+  case SILLinkage::Shared: return "shared";
+  case SILLinkage::Private: return "private";
+  case SILLinkage::PublicExternal: return "public_external";
+  case SILLinkage::PackageExternal: return "package_external";
+  case SILLinkage::HiddenExternal: return "hidden_external";
   }
   llvm_unreachable("bad linkage");
 }
@@ -3542,7 +3679,7 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
       (!isDefinition && linkage == SILLinkage::DefaultForDeclaration))
     return;
 
-  OS << getLinkageString(linkage);
+  OS << getLinkageString(linkage) << ' ';
 }
 
 
@@ -3625,6 +3762,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[signature_optimized_thunk] ";
     break;
   case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
+  case IsDistributedThunk: OS << "[distributed_thunk] "; break;
   }
   if (isDynamicallyReplaceable()) {
     OS << "[dynamically_replacable] ";
@@ -3671,9 +3809,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[available " << availability.getVersionString() << "] ";
   }
 
-  // This is here only for testing purposes.
-  if (SILPrintFunctionIsolationInfo) {
-    if (auto isolation = getActorIsolation()) {
+  if (auto isolation = getActorIsolation()) {
+    if (isolation->isSILParsed() || SILPrintFunctionIsolationInfo) {
       OS << "[isolation \"";
       isolation->printForSIL(OS);
       OS << "\"] ";

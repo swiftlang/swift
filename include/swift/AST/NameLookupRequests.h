@@ -241,6 +241,30 @@ public:
   void cacheResult(ArrayRef<ValueDecl *> value) const;
 };
 
+/// Computes the set of protocols that are reparenting a given protocol.
+class ReparentingProtocolsRequest
+    : public SimpleRequest<
+          ReparentingProtocolsRequest,
+          ArrayRef<std::tuple<ProtocolDecl *, ExtensionDecl *, unsigned>>(
+              ProtocolDecl *),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  /// Indicates a reparenting by a protocol, defined at a specific extension,
+  /// with an index into the extension's InheritedTypes establishing it.
+  using Result = std::tuple<ProtocolDecl *, ExtensionDecl *, unsigned>;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Result> evaluate(Evaluator &, ProtocolDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Requests whether or not this class has designated initializers that are
 /// not public or @usableFromInline.
 class HasMissingDesignatedInitializersRequest :

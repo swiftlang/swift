@@ -1318,7 +1318,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       isBare = ar->isBare();
     Args.push_back((unsigned)ARI->isObjC() |
                    ((unsigned)ARI->canAllocOnStack() << 1) |
-                   ((unsigned)isBare << 2));
+                   ((unsigned)isBare << 2) |
+                   ((unsigned)ARI->isStackAllocationNested() << 3));
     ArrayRef<SILType> TailTypes = ARI->getTailAllocatedTypes();
     ArrayRef<Operand> AllOps = ARI->getAllOperands();
     unsigned NumTailAllocs = TailTypes.size();
@@ -1349,6 +1350,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     attr |= unsigned(ASI->isLexical()) << 1;
     attr |= unsigned(ASI->isFromVarDecl()) << 2;
     attr |= unsigned(ASI->usesMoveableValueDebugInfo()) << 3;
+    attr |= unsigned(ASI->isStackAllocationNested()) << 4;
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
     break;
   }
@@ -1502,6 +1504,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     for (auto Arg: PAI->getArguments()) {
       Args.push_back(addValueRef(Arg));
     }
+    unsigned flags = 0;
+    flags |= unsigned(PAI->isStackAllocationNested()
+                        ? IsNestedEncoding::IsNested
+                        : IsNestedEncoding::IsNotNested) << 0;
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
         SIL_PARTIAL_APPLY, 0,
@@ -1509,7 +1515,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addTypeRef(PAI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(PAI->getType().getRawASTType()),
         addValueRef(PAI->getCallee()),
-        unsigned(swift::ActorIsolation::Unspecified),
+        flags,
         unsigned(swift::ActorIsolation::Unspecified), Args);
     break;
   }
@@ -1793,7 +1799,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::ReturnInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::DestroyNotEscapedClosureInst:
-  case SILInstructionKind::ThrowInst: {
+  case SILInstructionKind::ThrowInst:
+  case SILInstructionKind::MakeBorrowInst:
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst: {
     unsigned Attr = 0;
     if (auto *LI = dyn_cast<LoadInst>(&SI))
       Attr = unsigned(LI->getOwnershipQualifier());
@@ -2485,7 +2496,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::ExplicitCopyAddrInst:
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
   case SILInstructionKind::StoreInst:
-  case SILInstructionKind::StoreBorrowInst: {
+  case SILInstructionKind::StoreBorrowInst:
+  case SILInstructionKind::InitBorrowAddrInst: {
     SILValue operand, value;
     unsigned Attr = 0;
     if (SI.getKind() == SILInstructionKind::StoreInst) {
@@ -2519,6 +2531,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *SBI = dyn_cast<StoreBorrowInst>(&SI)) {
       operand = SBI->getDest();
       value = SBI->getSrc();
+    } else if (auto *IBA = dyn_cast<InitBorrowAddrInst>(&SI)) {
+      operand = IBA->getDest();
+      value = IBA->getReferent();
     } else {
       llvm_unreachable("switch out of sync");
     }
@@ -3293,9 +3308,12 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
 }
 
 void SILSerializer::writeSILVTable(const SILVTable &vt) {
+  auto &astContext = vt.getClass()->getASTContext();
   // Do not emit vtables for non-public classes unless everything has to be
   // serialized.
   if (!Options.SerializeAllSIL &&
+      // In Embedded we should serialize everything.
+      !astContext.LangOpts.hasFeature(Feature::Embedded) &&
       vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Package)
     return;
 
@@ -3304,7 +3322,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 
   // Use the mangled name of the class as a key to distinguish between classes
   // which have the same name (but are in different contexts).
-  Mangle::ASTMangler mangler(vt.getClass()->getASTContext());
+  Mangle::ASTMangler mangler(astContext);
   std::string mangledClassName = mangler.mangleNominalType(vt.getClass());
   size_t nameLength = mangledClassName.size();
   char *stringStorage = (char *)StringTable.Allocate(nameLength, 1);
@@ -3339,12 +3357,6 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 }
 
 void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
-  // Do not emit deinit for non-public nominal types unless everything has to be
-  // serialized.
-  if (!Options.SerializeAllSIL && deinit.getNominalDecl()->getEffectiveAccess() <
-                                 swift::AccessLevel::Package)
-    return;
-
   SILFunction *impl = deinit.getImplementation();
   if (!Options.SerializeAllSIL &&
       // Package CMO for MoveOnlyDeinit is not supported so

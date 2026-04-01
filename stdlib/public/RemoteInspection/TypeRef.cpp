@@ -451,6 +451,12 @@ public:
     printRec(BA->getElementType());
     stream << ")";
   }
+
+  void visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    printHeader("builtin_borrow");
+    printRec(BA->getReferentType());
+    stream << ")";
+  }
 };
 
 struct TypeRefIsConcrete
@@ -597,6 +603,10 @@ struct TypeRefIsConcrete
 
   bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     return visit(BA->getElementType());
+  }
+
+  bool visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    return visit(BA->getReferentType());
   }
 };
 
@@ -1198,6 +1208,13 @@ public:
 
     return ba;
   }
+  Demangle::NodePointer visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    auto ba = Dem.createNode(Node::Kind::BuiltinBorrow);
+
+    ba->addChild(visit(BA->getReferentType()), Dem);
+
+    return ba;
+  }
 };
 
 Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
@@ -1451,6 +1468,10 @@ public:
   const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
                                             visit(BA->getElementType()));
+  }
+
+  const TypeRef *visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    return BuiltinBorrowTypeRef::create(Builder, visit(BA->getReferentType()));
   }
 };
 
@@ -1834,6 +1855,10 @@ public:
   const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
                                             visit(BA->getElementType()));
+  }
+
+  const TypeRef *visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    return BuiltinBorrowTypeRef::create(Builder, visit(BA->getReferentType()));
   }
 };
 

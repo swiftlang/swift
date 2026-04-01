@@ -91,7 +91,7 @@ internal func _fatalErrorFlags() -> UInt32 {
 #if !$Embedded
 @inline(never)
 #else
-@inline(__always)
+@inline(__always) @_transparent
 #endif
 @_semantics("programtermination_point")
 internal func _assertionFailure(
@@ -121,6 +121,7 @@ internal func _assertionFailure(
       file: file, line: line)
   }
 #endif
+  Builtin.condfail_message(false._value, message.unsafeRawPointer)
   Builtin.int_trap()
 }
 
@@ -216,6 +217,7 @@ internal func _assertionFailure(
     _embeddedReportFatalError(prefix: prefix, message: message)
   }
 
+  Builtin.condfail_message(false._value, message.unsafeRawPointer)
   Builtin.int_trap()
 }
 #endif
@@ -230,7 +232,7 @@ internal func _assertionFailure(
 #if !$Embedded
 @inline(never)
 #else
-@inline(__always)
+@inline(__always) @_transparent
 #endif
 @_semantics("programtermination_point")
 internal func _fatalErrorMessage(
@@ -292,9 +294,9 @@ func _unimplementedInitializer(className: StaticString,
 
 #if !$Embedded
 
-/// Used to evaluate editor placeholders.
-public // COMPILER_INTRINSIC
-func _undefined<T>(
+/// Previously used to evaluate editor placeholders.
+@usableFromInline // COMPILER_INTRINSIC
+internal func _undefined<T>(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
@@ -303,9 +305,9 @@ func _undefined<T>(
 
 #else
 
-/// Used to evaluate editor placeholders.
-public // COMPILER_INTRINSIC
-func _undefined<T>(
+/// Previously used to evaluate editor placeholders.
+@usableFromInline // COMPILER_INTRINSIC
+internal func _undefined<T>(
   _ message: @autoclosure () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
@@ -313,6 +315,38 @@ func _undefined<T>(
 }
 
 #endif
+
+/// Called when evaluating an editor placeholder in a playground.
+///
+/// We always export this into the client since it should never be used in an
+/// actual shipping binary and keeps it a pure compiler implementation detail.
+///
+/// This function should not be inlined in desktop Swift because it is cold and
+/// inlining just bloats code. In Embedded Swift, we force inlining as this
+/// function is typically just a trap (in release configurations).
+#if !$Embedded
+@inline(never)
+#else
+@inline(__always)
+#endif
+@_alwaysEmitIntoClient // COMPILER_INTRINSIC
+internal func _undefinedEditorPlaceholder(
+  _filenameStart: Builtin.RawPointer,
+  _filenameLength: Builtin.Word,
+  _filenameIsASCII: Builtin.Int1,
+  _line: Builtin.Word
+) -> Never {
+  _assertionFailure(
+    "Fatal error",
+    "attempt to evaluate editor placeholder",
+    file: StaticString(
+            _start: _filenameStart,
+            utf8CodeUnitCount: _filenameLength,
+            isASCII: _filenameIsASCII),
+    line: UInt(_line),
+    flags: 0
+  )
+}
 
 /// Called when falling off the end of a switch and the type can be represented
 /// as a raw value.

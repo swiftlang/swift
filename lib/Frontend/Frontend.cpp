@@ -285,7 +285,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       getLangOptions().SkipNonExportableDecls;
 
   serializationOpts.SkipImplementationOnlyDecls =
-      getLangOptions().hasFeature(Feature::CheckImplementationOnly);
+      getLangOptions().hasFeature(Feature::CheckImplementationOnlyStrict) &&
+      !::getenv("SWIFT_DISABLE_IMPLICIT_CHECK_IMPLEMENTATION_ONLY");
 
   serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
 
@@ -476,6 +477,7 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   if (!getInvocation().requiresCAS())
     return false;
 
+<<<<<<< HEAD
   const auto &Opts = getInvocation().getCASOptions();
   if (Opts.CASOpts.CASPath.empty() && Opts.CASOpts.PluginPath.empty()) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
@@ -489,6 +491,23 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     return true;
   }
   std::tie(CAS, ResultCache) = *MaybeDB;
+=======
+  if (!CAS) {
+    const auto &Opts = getInvocation().getCASOptions();
+    if (Opts.Config.CASPath.empty() && Opts.Config.PluginPath.empty()) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
+                           "no CAS options provided");
+      return true;
+    }
+    auto MaybeDB = Opts.Config.createDatabases();
+    if (!MaybeDB) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
+                           toString(MaybeDB.takeError()));
+      return true;
+    }
+    std::tie(CAS, ResultCache) = *MaybeDB;
+  }
+>>>>>>> origin/main
 
   // create baseline key.
   auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
@@ -516,7 +535,8 @@ void CompilerInstance::setupOutputBackend() {
     CASOutputBackend = createSwiftCachingOutputBackend(
         *CAS, *ResultCache, *CompileJobBaseKey, InAndOuts,
         Invocation.getFrontendOptions(),
-        Invocation.getFrontendOptions().RequestedAction);
+        Invocation.getFrontendOptions().RequestedAction,
+        Invocation.getCASOptions().WriteOutputHashXAttr);
 
     if (Invocation.getIRGenOptions().UseCASBackend) {
       auto OutputFiles = InAndOuts.copyOutputFilenames();
@@ -633,11 +653,14 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 
 bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
                                       std::string &Error,
-                                      ArrayRef<const char *> Args) {
+                                      ArrayRef<const char *> Args,
+                                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                                      std::shared_ptr<llvm::cas::ActionCache> Cache) {
   // This is the fast path for setup an instance for replay but cannot run
   // regular compilation.
   Invocation = Invoke;
 
+  setSharedCASInstances(CAS, Cache);
   if (setupCASIfNeeded(Args)) {
     Error = "Setting up CAS failed";
     return true;
@@ -676,16 +699,23 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     const auto &ClangOpts = getInvocation().getClangImporterOptions();
 
     if (!CASOpts.BridgingHeaderPCHCacheKey.empty()) {
-      if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
-              getObjectStore(), getActionCache(), Diagnostics,
-              CASOpts.BridgingHeaderPCHCacheKey, file_types::ID::TY_PCH,
-              ClangOpts.getPCHInputPath()))
-        MemFS->addFile(Invocation.getClangImporterOptions().getPCHInputPath(),
-                       0, std::move(loadedBuffer));
-      else
-        Diagnostics.diagnose(
-            SourceLoc(), diag::error_load_input_from_cas,
-            Invocation.getClangImporterOptions().getPCHInputPath());
+      auto Proxy = loadCachedCompileResultProxy(
+          getObjectStore(), getActionCache(), CASOpts.BridgingHeaderPCHCacheKey,
+          file_types::ID::TY_PCH);
+
+      if (!Proxy) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas, "loading pch file",
+                             llvm::toString(Proxy.takeError()));
+        return true;
+      }
+      if (!*Proxy) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
+                             ClangOpts.getPCHInputPath());
+        return true;
+      }
+      MemFS->addFile(ClangOpts.getPCHInputPath(), 0,
+                     (*Proxy)->getMemoryBuffer());
+      CASIDForPCH = (*Proxy)->getID().toString();
     }
     if (!CASOpts.InputFileKey.empty()) {
       if (Invocation.getFrontendOptions()
@@ -852,9 +882,10 @@ bool CompilerInstance::setUpModuleLoaders() {
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
-  std::unique_ptr<ClangImporter> clangImporter =
-    ClangImporter::create(*Context, Invocation.getPCHHash(),
-                          getDependencyTracker());
+  std::unique_ptr<ClangImporter> clangImporter = ClangImporter::create(
+      *Context, &Invocation.getIRGenOptions(), Invocation.getPCHHash(),
+      CASIDForPCH, getDependencyTracker(), /*ignoreFileMapping=*/false,
+      getSharedCASInstance(), getSharedCacheInstance());
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;
@@ -910,7 +941,8 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
         FEOpts.CacheReplayPrefixMap,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
-        FEOpts.shouldTrackSystemDependencies());
+        FEOpts.shouldTrackSystemDependencies(),
+        getSharedCASInstance(), getSharedCacheInstance());
   }
 
   return false;
@@ -972,10 +1004,10 @@ std::string CompilerInstance::getBridgingHeaderPath() const {
 }
 
 bool CompilerInstance::setUpInputs() {
-  // There is no input file when building PCM using Caching.
+  // There is no need to setup input when emit PCM. Let ClangImporter and the
+  // underlying clang CompilerInstance to handle inputs.
   if (Invocation.getFrontendOptions().RequestedAction ==
-          FrontendOptions::ActionType::EmitPCM &&
-      Invocation.getCASOptions().EnableCaching)
+      FrontendOptions::ActionType::EmitPCM)
     return false;
 
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
@@ -1520,7 +1552,11 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     }
     if (Invocation.getLangOptions().hasFeature(Feature::LibraryEvolution))
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
+<<<<<<< HEAD
     if (Invocation.getLangOptions().isLanguageModeAtLeast(6))
+=======
+    if (Invocation.getLangOptions().isLanguageModeAtLeast(LanguageMode::v6))
+>>>>>>> origin/main
       MainModule->setIsConcurrencyChecked(true);
     if (Invocation.getLangOptions().EnableCXXInterop &&
         Invocation.getLangOptions()
@@ -1537,6 +1573,9 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().hasFeature(Feature::Embedded) &&
         Invocation.getLangOptions().hasFeature(Feature::DeferredCodeGen))
       MainModule->setDeferredCodeGen(true);
+    if (Invocation.getSILOptions().CMOMode ==
+        CrossModuleOptimizationMode::Aggressive)
+      MainModule->setAggressiveCMOEnabled(true);
 
     configureAvailabilityDomains(getASTContext(),
                                  Invocation.getFrontendOptions(), MainModule);
@@ -1708,6 +1747,8 @@ void CompilerInstance::finishTypeChecking() {
     loadDerivativeConfigurations(SF);
     return false;
   });
+
+  handleOSLogStringSectionName(*getMainModule());
 }
 
 SourceFile::ParsingOptions

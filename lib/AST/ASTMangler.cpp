@@ -43,7 +43,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
@@ -54,11 +53,9 @@
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Basic/CharInfo.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
@@ -146,9 +143,9 @@ static StringRef getCodeForAccessorKind(AccessorKind kind) {
     return "au";
   case AccessorKind::Init:
     return "i";
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return "x";
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return "y";
   case AccessorKind::Borrow:
     return "b";
@@ -396,10 +393,9 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
 
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
-      sub = sub.transformRec([](Type t) -> std::optional<Type> {
-        if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
-          auto &ctx = openedExistential->getASTContext();
-          return ctx.TheSelfType;
+      sub = sub.transformRec([&](Type t) -> std::optional<Type> {
+        if (t->is<ExistentialArchetypeType>()) {
+          return Context.TheSelfType;
         }
         return std::nullopt;
       });
@@ -432,10 +428,9 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
 
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
-      sub = sub.transformRec([](Type t) -> std::optional<Type> {
-        if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
-          auto &ctx = openedExistential->getASTContext();
-          return ctx.TheSelfType;
+      sub = sub.transformRec([&](Type t) -> std::optional<Type> {
+        if (t->is<ExistentialArchetypeType>()) {
+          return Context.TheSelfType;
         }
         return std::nullopt;
       });
@@ -1400,13 +1395,21 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
   TypeBase *tybase = type.getPointer();
   switch (type->getKind()) {
     case TypeKind::TypeVariable:
-      llvm_unreachable("mangling type variable");
-
+    case TypeKind::Join:
+    case TypeKind::Meet:
     case TypeKind::ErrorUnion:
-      llvm_unreachable("Error unions should not persist to mangling");
-
     case TypeKind::Module:
-      llvm_unreachable("Cannot mangle module type yet");
+    case TypeKind::BuiltinUnboundGeneric:
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::PackArchetype:
+    case TypeKind::ElementArchetype:
+    case TypeKind::ExistentialArchetype:
+    case TypeKind::SILMoveOnlyWrapped:
+    case TypeKind::SILBlockStorage:
+      ABORT([&](llvm::raw_ostream &out) {
+        out << "Cannot mangle this kind of type:\n";
+        type->dump(out);
+      });
 
     case TypeKind::Error:
     case TypeKind::Placeholder:
@@ -1457,8 +1460,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendOperator("Bb");
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
-    case TypeKind::BuiltinUnboundGeneric:
-      ABORT("Don't know how to mangle a BuiltinUnboundGenericType");
     case TypeKind::Locatable: {
       auto loc = cast<LocatableType>(tybase);
       return appendType(loc->getSinglyDesugaredType(), sig, forDecl);
@@ -1470,6 +1471,11 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       appendType(bfa->getSize(), sig, forDecl);
       appendType(bfa->getElementType(), sig, forDecl);
       return appendOperator("BV");
+    }
+    case TypeKind::BuiltinBorrow: {
+      auto bfa = cast<BuiltinBorrowType>(tybase);
+      appendType(bfa->getReferentType(), sig, forDecl);
+      return appendOperator("BW");
     }
     
     case TypeKind::SILToken:
@@ -1765,15 +1771,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
                                     forDecl);
 
       // type ::= archetype
-    case TypeKind::PrimaryArchetype:
-    case TypeKind::PackArchetype:
-    case TypeKind::ElementArchetype:
-    case TypeKind::ExistentialArchetype:
-      ABORT([&](auto &out) {
-        out << "Cannot mangle free-standing archetype: ";
-        tybase->dump(out);
-      });
-
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
       auto opaqueDecl = opaqueType->getDecl();
@@ -1893,12 +1890,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       return;
     }
-
-    case TypeKind::SILMoveOnlyWrapped:
-      // If we hit this, we just mangle the underlying name and move on.
-      llvm_unreachable("should never be mangled?");
-    case TypeKind::SILBlockStorage:
-      llvm_unreachable("should never be mangled");
   }
   llvm_unreachable("bad type kind");
 }
@@ -2114,6 +2105,7 @@ static bool isRetroactiveConformance(const RootProtocolConformance *root) {
 
 template<typename Fn>
 static bool forEachConditionalConformance(const ProtocolConformance *conformance,
+                                          bool allowMarkerProtocols,
                                           Fn fn) {
   auto *rootConformance = conformance->getRootConformance();
 
@@ -2141,6 +2133,10 @@ static bool forEachConditionalConformance(const ProtocolConformance *conformance
       continue;
 
     ProtocolDecl *proto = req.getProtocolDecl();
+
+    if (!allowMarkerProtocols && proto->isMarkerProtocol())
+      continue;
+
     auto conformance = subMap.lookupConformance(
         req.getFirstType()->getCanonicalType(), proto);
     if (fn(req.getFirstType().subst(subMap), conformance))
@@ -2177,7 +2173,8 @@ static bool containsRetroactiveConformance(
 
   // If the conformance is conditional and any of the substitutions used to
   // satisfy the conditions are retroactive, it's retroactive.
-  return forEachConditionalConformance(conformance,
+  return forEachConditionalConformance(
+    conformance, /*allowMarkerProtocols=*/false,
     [&](Type substType, ProtocolConformanceRef substConf) -> bool {
       return containsRetroactiveConformance(substConf);
     });
@@ -2664,6 +2661,9 @@ namespace {
     VarDecl *visitAnyPattern(AnyPattern *P) {
       return nullptr;
     }
+    VarDecl *visitOpaquePattern(OpaquePattern *P) {
+      return visit(P->getSubPattern());
+    }
 
     // Refutable patterns shouldn't ever come up.
 #define REFUTABLE_PATTERN(ID, BASE)                                        \
@@ -2958,7 +2958,7 @@ static void reconcileInverses(
       if (baseSig && baseSig->requiresProtocol(inv.subject, inv.protocol))
         return true;
 
-      auto gp = inv.subject->castTo<GenericTypeParamType>();
+      auto gp = inv.subject->getRootGenericParam();
 
       // Remove inverses that were either already mangled for this entity,
       // or chosen not to be included in the output.
@@ -4036,7 +4036,7 @@ ASTMangler::dropProtocolsFromAssociatedTypes(Type type,
   if (!OptimizeProtocolNames || !sig)
     return type;
 
-  if (!type->hasDependentMember())
+  if (!type->hasTypeParameter())
     return type;
 
   return type.transformRec([&](TypeBase *t) -> std::optional<Type> {
@@ -4593,10 +4593,10 @@ void ASTMangler::appendAnyProtocolConformance(
                                            CanType conformingType,
                                            ProtocolConformanceRef conformance) {
   // If we have a conformance to a marker protocol but we aren't allowed to
-  // emit marker protocols, skip it.
-  if (!AllowMarkerProtocols &&
-      conformance.getProtocol()->isMarkerProtocol())
-    return;
+  // emit marker protocols, it's too late. The caller should have handled this,
+  // because otherwise they don't know if they should emit a list separator or
+  // not.
+  ASSERT(AllowMarkerProtocols || !conformance.getProtocol()->isMarkerProtocol());
 
   // While all invertible protocols are marker protocols, do not mangle them
   // as a dependent conformance. See `conformanceRequirementIndex` which skips
@@ -4657,7 +4657,7 @@ void ASTMangler::appendConcreteProtocolConformance(
 
   // Conditional conformance requirements.
   bool firstRequirement = true;
-  forEachConditionalConformance(conformance,
+  forEachConditionalConformance(conformance, AllowMarkerProtocols,
     [&](Type substType, ProtocolConformanceRef substConf) -> bool {
       if (substType->hasArchetype())
         substType = substType->mapTypeOutOfEnvironment();
@@ -4816,11 +4816,10 @@ void ASTMangler::appendDistributedThunk(
   // recipient, whichever 'protocol Type'-conforming type it will be.
   NominalTypeDecl *stubActorDecl = nullptr;
   if (auto P = referenceInProtocolContextOrRequirement()) {
-    auto &C = thunk->getASTContext();
     auto M = thunk->getModuleContext();
 
     SmallVector<ValueDecl *, 1> stubClassLookupResults;
-    C.lookupInModule(M, llvm::Twine("$", P->getNameStr()).str(), stubClassLookupResults);
+    Context.lookupInModule(M, llvm::Twine("$", P->getNameStr()).str(), stubClassLookupResults);
 
     assert(stubClassLookupResults.size() <= 1 && "Found multiple distributed stub types!");
     if (stubClassLookupResults.size() > 0) {
@@ -4917,9 +4916,8 @@ void ASTMangler::appendMacroExpansionContext(
       auto innermostNonlocalDC = outermostLocalDC->getParent();
       appendContext(innermostNonlocalDC, nullBase, StringRef());
       Identifier name = macroName;
-      ASTContext &ctx = origDC->getASTContext();
       unsigned discriminator = macroDiscriminator;
-      name = encodeLocalPrecheckedDiscriminator(ctx, name, discriminator);
+      name = encodeLocalPrecheckedDiscriminator(Context, name, discriminator);
       appendIdentifier(name.str());
     } else {
       return appendContext(origDC, nullBase, StringRef());
@@ -5115,10 +5113,9 @@ ASTMangler::appendMacroExpansion(const FreestandingMacroExpansion *expansion) {
 void ASTMangler::appendMacroExpansion(ClosureExpr *attachedTo,
                                       CustomAttr *attr,
                                       MacroDecl *macro) {
-  auto &ctx = attachedTo->getASTContext();
   auto discriminator =
-      ctx.getNextMacroDiscriminator(attachedTo,
-                                    macro->getBaseName());
+      Context.getNextMacroDiscriminator(attachedTo,
+                                        macro->getBaseName());
 
   appendMacroExpansionContext(
       attr->getLocation(),
@@ -5197,7 +5194,8 @@ const DeclContext *DeclOrEnclosingContext::getEnclosingContext() const {
 /// mangle entities within local contexts before they are fully type-checked,
 /// as is needed for macro expansions.
 static std::pair<DeclOrEnclosingContext, std::optional<unsigned>>
-getPrecheckedLocalContextDiscriminator(const Decl *decl, Identifier name) {
+getPrecheckedLocalContextDiscriminator(ASTContext &ctx, const Decl *decl,
+                                       Identifier name) {
   auto outermostLocal = getOutermostLocalContext(decl->getDeclContext());
   if (!outermostLocal) {
     return std::make_pair(
@@ -5215,7 +5213,6 @@ getPrecheckedLocalContextDiscriminator(const Decl *decl, Identifier name) {
 
   DeclContext *enclosingDC = const_cast<DeclContext *>(
       declOrEnclosingContext.getEnclosingContext());
-  ASTContext &ctx = enclosingDC->getASTContext();
   auto discriminator = ctx.getNextMacroDiscriminator(enclosingDC, name);
   return std::make_pair(declOrEnclosingContext, discriminator);
 }
@@ -5234,7 +5231,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   auto appendDeclWithName = [&](const Decl *decl, Identifier name) {
     // Mangle the context.
     auto precheckedMangleContext =
-        getPrecheckedLocalContextDiscriminator(decl, name);
+        getPrecheckedLocalContextDiscriminator(Context, decl, name);
     if (auto mangleDecl = dyn_cast_or_null<ValueDecl>(
             precheckedMangleContext.first.dyn_cast<const Decl *>())) {
       appendContextOf(mangleDecl, nullBase);
@@ -5250,7 +5247,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
     if (auto discriminator = precheckedMangleContext.second) {
       skipLocalDiscriminator = true;
       name = encodeLocalPrecheckedDiscriminator(
-          decl->getASTContext(), name, *discriminator);
+          Context, name, *discriminator);
     }
 
     if (auto valueDecl = dyn_cast<ValueDecl>(decl))
@@ -5290,7 +5287,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
           out << "Z";
       }
 
-      attachedToName = decl->getASTContext().getIdentifier(name);
+      attachedToName = Context.getIdentifier(name);
     }
 
     appendDeclWithName(storage, attachedToName);
@@ -5299,7 +5296,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
     auto name = valueDecl->getName().getBaseName();
     if (name.isSpecial()) {
       attachedToName =
-          decl->getASTContext().getIdentifier(name.userFacingName());
+          Context.getIdentifier(name.userFacingName());
     } else {
       attachedToName = name.getIdentifier();
     }
@@ -5315,7 +5312,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   if (auto *macroDecl = attr->getResolvedMacro()) {
     macroName = macroDecl->getName().getBaseName();
   } else {
-    macroName = decl->getASTContext().getIdentifier("__unknown_macro__");
+    macroName = Context.getIdentifier("__unknown_macro__");
   }
 
   // FIXME: attached macro discriminators should take attachedToName into
@@ -5364,6 +5361,7 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
   auto layout = base->getExistentialLayout();
   appendExistentialLayout(layout, sig, forDecl);
 
+<<<<<<< HEAD
   assert(!base->is<ProtocolType>() &&
          "plain protocol type constraint has no generalization structure");
 
@@ -5374,6 +5372,18 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
   assert(requirements.size() + inverses.size() > 0 &&
          "Unconstrained existential?");
 
+=======
+  ASSERT(!base->is<ProtocolType>() &&
+         "plain protocol type constraint has no generalization structure");
+
+  SmallVector<Requirement, 4> requirements;
+  SmallVector<InverseRequirement, NumInvertibleProtocols> inverses;
+  gatherExistentialRequirements(requirements, inverses, base);
+
+  ASSERT(requirements.size() + inverses.size() > 0 &&
+         "Unconstrained existential?");
+
+>>>>>>> origin/main
   // Sort the requirements to canonicalize their order.
   llvm::array_pod_sort(
       requirements.begin(), requirements.end(),

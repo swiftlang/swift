@@ -13,7 +13,7 @@
 // RUN: %FileCheck %s < %t/Bar.private.swiftinterface
 // RUN: %FileCheck %s < %t/Bar.package.swiftinterface
 
-// CHECK: -enable-library-evolution -package-name barpkg -swift-version 6 -module-name Bar
+// CHECK: -enable-library-evolution -package-name barpkg -language-mode 6 -module-name Bar
 
 /// Building modules from non-package interfaces with package-name (default mode) should succeed.
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Bar.swiftinterface -o %t/Bar.swiftmodule -module-name Bar

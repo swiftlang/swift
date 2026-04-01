@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify %t/main.swift -I %t -verify-additional-file %t/cmodule.h
+// RUN: %target-swift-frontend -typecheck -verify %t/main.swift -I %t -verify-additional-file %t/cmodule.h -plugin-path %swift-plugin-dir
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx

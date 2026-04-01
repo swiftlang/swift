@@ -59,6 +59,10 @@ _ = true ? x : 1.2 // expected-error {{result values in '? :' expression have mi
 _ = (x: true) ? true : false // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
 _ = (x: 1) ? true : false // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
 
+_ = undefined ? 0 : 1 // expected-error {{cannot find 'undefined' in scope}}
+_ = [undefined] ? 0 : 1 // expected-error {{cannot find 'undefined' in scope}}
+// expected-error@-1 {{cannot convert value of type '[Element]' to expected condition type 'Bool'}}
+
 func resultBool() -> Bool { true }
 _ = resultBool ? true : false // expected-error {{function 'resultBool' was used as a property; add () to call it}} {{15-15=()}}
 

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift %S/../../utils/gen-unicode-data/Data/16/
+// RUN: %target-run-simple-swift %S/../../utils/gen-unicode-data/Data/17/
 // REQUIRES: executable_test
 // REQUIRES: long_test
 // REQUIRES: optimized_stdlib

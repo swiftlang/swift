@@ -35,6 +35,7 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/OverloadChoice.h"
+#include "swift/Sema/Solution.h"
 #include "swift/Sema/SolutionResult.h"
 #include "swift/Sema/SyntacticElementTarget.h"
 #include "llvm/ADT/MapVector.h"
@@ -50,8 +51,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
 #include <functional>
-
-using namespace swift::constraints::inference;
 
 namespace swift {
 
@@ -69,6 +68,12 @@ class SyntacticElementTarget;
 struct DeclReferenceType;
 class PreparedOverload;
 struct PreparedOverloadBuilder;
+
+// Subtyping.h
+enum class ConversionBehavior : unsigned;
+
+// CSDisjunction.h
+class SolverDisjunction;
 
 } // end namespace constraints
 
@@ -94,10 +99,6 @@ Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool, bool);
 } // end namespace TypeChecker
 
 } // end namespace swift
-
-/// Allocate memory within the given constraint system.
-void *operator new(size_t bytes, swift::constraints::ConstraintSystem& cs,
-                   size_t alignment = 8);
 
 namespace swift {
 
@@ -194,15 +195,6 @@ public:
   DeclRefExpr *buildVarRef(VarDecl *var, SourceLoc loc);
 };
 
-/// Describes the algorithm to use for trailing closure matching.
-enum class TrailingClosureMatching {
-  /// Match a trailing closure to the first parameter that appears to work.
-  Forward,
-
-  /// Match a trailing closure to the last parameter.
-  Backward,
-};
-
 class ConstraintLocator;
 
 /// Describes a conversion restriction or a fix.
@@ -282,31 +274,6 @@ public:
 
 } // end namespace constraints
 
-/// Options that describe how a type variable can be used.
-enum TypeVariableOptions {
-  /// Whether the type variable can be bound to an lvalue type or not.
-  TVO_CanBindToLValue = 0x01,
-
-  /// Whether the type variable can be bound to an inout type or not.
-  TVO_CanBindToInOut = 0x02,
-
-  /// Whether the type variable can be bound to a non-escaping type or not.
-  TVO_CanBindToNoEscape = 0x04,
-
-  /// Whether the type variable can be bound to a hole or not.
-  TVO_CanBindToHole = 0x08,
-
-  /// Whether a more specific deduction for this type variable implies a
-  /// better solution to the constraint system.
-  TVO_PrefersSubtypeBinding = 0x10,
-
-  /// Whether the type variable can be bound to a pack type or not.
-  TVO_CanBindToPack = 0x20,
-
-  /// Whether the type variable can be bound only to a pack expansion type.
-  TVO_PackExpansion = 0x40,
-};
-
 enum class KeyPathMutability : uint8_t {
   ReadOnly,
   Writable,
@@ -314,384 +281,6 @@ enum class KeyPathMutability : uint8_t {
 };
 
 using KeyPathCapability = std::pair<KeyPathMutability, /*isSendable=*/bool>;
-
-/// The implementation object for a type variable used within the
-/// constraint-solving type checker.
-///
-/// The implementation object for a type variable contains information about
-/// the type variable, where it was generated, what protocols it must conform
-/// to, what specific types it might be and, eventually, the fixed type to
-/// which it is assigned.
-class TypeVariableType::Implementation {
-  /// The locator that describes where this type variable was generated.
-  constraints::ConstraintLocator *locator;
-
-  /// Either the parent of this type variable within an equivalence
-  /// class of type variables, or the fixed type to which this type variable
-  /// type is bound.
-  llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
-
-  /// The corresponding node in the constraint graph.
-  constraints::ConstraintGraphNode *GraphNode = nullptr;
-
-  /// Temporary state for ConstraintGraph::computeConnectedComponents(),
-  /// stored inline for performance.
-  llvm::PointerIntPair<TypeVariableType *, 1, unsigned> Component;
-
-  friend class constraints::SolverTrail;
-
-public:
-  /// Retrieve the type variable associated with this implementation.
-  TypeVariableType *getTypeVariable() const {
-    return reinterpret_cast<TypeVariableType *>(
-        const_cast<Implementation *>(this)) - 1;
-  }
-
-  explicit Implementation(constraints::ConstraintLocator *locator,
-                          unsigned options)
-    : locator(locator), ParentOrFixed(getTypeVariable()) {
-    getTypeVariable()->Bits.TypeVariableType.Options = options;
-  }
-
-  /// Retrieve the unique ID corresponding to this type variable.
-  unsigned getID() const { return getTypeVariable()->getID(); }
-
-  unsigned getRawOptions() const {
-    return getTypeVariable()->Bits.TypeVariableType.Options;
-  }
-
-  void setRawOptions(unsigned bits) {
-    getTypeVariable()->Bits.TypeVariableType.Options = bits;
-    assert(getTypeVariable()->Bits.TypeVariableType.Options == bits
-           && "Truncation");
-  }
-
-  /// Whether this type variable can bind to an LValueType.
-  bool canBindToLValue() const { return getRawOptions() & TVO_CanBindToLValue; }
-
-  /// Whether this type variable can bind to an InOutType.
-  bool canBindToInOut() const { return getRawOptions() & TVO_CanBindToInOut; }
-
-  /// Whether this type variable can bind to a noescape FunctionType.
-  bool canBindToNoEscape() const { return getRawOptions() & TVO_CanBindToNoEscape; }
-
-  /// Whether this type variable can bind to a PlaceholderType.
-  bool canBindToHole() const { return getRawOptions() & TVO_CanBindToHole; }
-
-  /// Whether this type variable can bind to a PackType.
-  bool canBindToPack() const { return getRawOptions() & TVO_CanBindToPack; }
-
-  /// Whether this type variable can bind only to PackExpansionType.
-  bool isPackExpansion() const { return getRawOptions() & TVO_PackExpansion; }
-
-  /// Whether this type variable prefers a subtype binding over a supertype
-  /// binding.
-  bool prefersSubtypeBinding() const {
-    return getRawOptions() & TVO_PrefersSubtypeBinding;
-  }
-
-  /// Retrieve the corresponding node in the constraint graph.
-  constraints::ConstraintGraphNode *getGraphNode() const { return GraphNode; }
-
-  /// Set the corresponding node in the constraint graph.
-  void setGraphNode(constraints::ConstraintGraphNode *newNode) { 
-    GraphNode = newNode; 
-  }
-  
-  /// Check whether this type variable either has a representative that
-  /// is not itself or has a fixed type binding.
-  bool hasRepresentativeOrFixed() const {
-    // If we have a fixed type, we're done.
-    if (!isa<TypeVariableType *>(ParentOrFixed))
-      return true;
-
-    // Check whether the representative is different from our own type
-    // variable.
-    return cast<TypeVariableType *>(ParentOrFixed) != getTypeVariable();
-  }
-
-  /// Low-level accessor; use getRepresentative() or getFixedType() instead.
-  llvm::PointerUnion<TypeVariableType *, TypeBase *>
-  getRepresentativeOrFixed() const {
-    return ParentOrFixed;
-  }
-
-  /// Record the current type-variable binding.
-  void recordBinding(constraints::SolverTrail &trail) {
-    trail.recordChange(constraints::SolverTrail::Change::UpdatedTypeVariable(
-        getTypeVariable(), ParentOrFixed, getRawOptions()));
-  }
-
-  /// Retrieve the locator describing where this type variable was
-  /// created.
-  constraints::ConstraintLocator *getLocator() const {
-    return locator;
-  }
-
-  /// Retrieve the generic parameter opened by this type variable.
-  GenericTypeParamType *getGenericParameter() const;
-
-  /// Returns the \c ExprKind of this type variable if it's the type of an
-  /// atomic literal expression, meaning the literal can't be composed of subexpressions.
-  /// Otherwise, returns \c None.
-  std::optional<ExprKind> getAtomicLiteralKind() const;
-
-  /// Determine whether this type variable represents a closure type.
-  bool isClosureType() const;
-
-  /// Determine whether this type variable represents a type of tap expression.
-  bool isTapType() const;
-
-  /// Determine whether this type variable represents one of the
-  /// parameter types associated with a closure.
-  bool isClosureParameterType() const;
-
-  /// Determine whether this type variable represents a closure result type.
-  bool isClosureResultType() const;
-
-  /// Determine whether this type variable represents
-  /// a type of a key path expression.
-  bool isKeyPathType() const;
-
-  /// Determine whether this type variable represents a root type of a key path
-  /// expression.
-  bool isKeyPathRoot() const;
-
-  /// Determine whether this type variable represents a value type of a key path
-  /// expression.
-  bool isKeyPathValue() const;
-
-  /// Determine whether this type variable represents an index parameter of
-  /// a special `subscript(keyPath:)` subscript.
-  bool isKeyPathSubscriptIndex() const;
-
-  /// Determine whether this type variable represents a subscript result type.
-  bool isSubscriptResultType() const;
-
-  /// Determine whether this type variable represents an opened
-  /// type parameter pack.
-  bool isParameterPack() const;
-
-  /// Determine whether this type variable represents a code completion
-  /// expression.
-  bool isCodeCompletionToken() const;
-
-  /// Determine whether this type variable represents an opened opaque type.
-  bool isOpaqueType() const;
-
-  /// Determine whether this type variable represents a type of a collection
-  /// literal (represented by `ArrayExpr` and `DictionaryExpr` in AST).
-  bool isCollectionLiteralType() const;
-
-  /// Determine whether this type variable represents a literal such
-  /// as an integer value, a floating-point value with and without a sign.
-  bool isNumberLiteralType() const;
-
-  /// Determine whether this type variable represents a result type of a
-  /// function call.
-  bool isFunctionResult() const;
-
-  /// Determine whether this type variable represents a type of the ternary
-  /// operator.
-  bool isTernary() const;
-
-  /// Retrieve the representative of the equivalence class to which this
-  /// type variable belongs.
-  ///
-  /// \param trail The record of changes made by retrieving the representative,
-  /// which can happen due to path compression. If null, path compression is
-  /// not performed.
-  TypeVariableType *
-  getRepresentative(constraints::SolverTrail *trail) {
-    // Find the representative type variable.
-    auto result = getTypeVariable();
-    Implementation *impl = this;
-    while (isa<TypeVariableType *>(impl->ParentOrFixed)) {
-      // Extract the representative.
-      auto nextTV = cast<TypeVariableType *>(impl->ParentOrFixed);
-      if (nextTV == result)
-        break;
-
-      result = nextTV;
-      impl = &nextTV->getImpl();
-    }
-
-    if (impl == this || !trail || trail->isUndoActive())
-      return result;
-
-    // Perform path compression.
-    impl = this;
-    while (isa<TypeVariableType *>(impl->ParentOrFixed)) {
-      // Extract the representative.
-      auto nextTV = cast<TypeVariableType *>(impl->ParentOrFixed);
-      if (nextTV == result)
-        break;
-
-      // Record the state change.
-      impl->recordBinding(*trail);
-
-      impl->ParentOrFixed = result;
-      impl = &nextTV->getImpl();
-    }
-
-    return result;
-  }
-
-  /// Merge the equivalence class of this type variable with the
-  /// equivalence class of another type variable.
-  ///
-  /// \param other The type variable to merge with.
-  ///
-  /// \param trail The record of state changes.
-  void mergeEquivalenceClasses(TypeVariableType *other,
-                               constraints::SolverTrail *trail) {
-    ASSERT(getID() < other->getImpl().getID());
-
-    auto otherRep = other->getImpl().getRepresentative(trail);
-    if (trail)
-      otherRep->getImpl().recordBinding(*trail);
-    otherRep->getImpl().ParentOrFixed = getTypeVariable();
-
-    if (canBindToLValue() && !otherRep->getImpl().canBindToLValue()) {
-      if (trail)
-        recordBinding(*trail);
-      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToLValue;
-    }
-
-    if (canBindToInOut() && !otherRep->getImpl().canBindToInOut()) {
-      if (trail)
-        recordBinding(*trail);
-      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToInOut;
-    }
-
-    if (canBindToNoEscape() && !otherRep->getImpl().canBindToNoEscape()) {
-      if (trail)
-        recordBinding(*trail);
-      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToNoEscape;
-    }
-
-    if (canBindToPack() && !otherRep->getImpl().canBindToPack()) {
-      if (trail)
-        recordBinding(*trail);
-      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToPack;
-    }
-  }
-
-  /// Retrieve the fixed type that corresponds to this type variable,
-  /// if there is one.
-  ///
-  /// \returns the fixed type associated with this type variable, or a null
-  /// type if there is no fixed type.
-  ///
-  /// \param trail The record of changes made by retrieving the representative,
-  /// which can happen due to path compression. If null, path compression is
-  /// not performed.
-  Type getFixedType(constraints::SolverTrail *trail) {
-    // Find the representative type variable.
-    auto rep = getRepresentative(trail);
-    Implementation &repImpl = rep->getImpl();
-
-    // Return the bound type if there is one, otherwise, null.
-    return repImpl.ParentOrFixed.dyn_cast<TypeBase *>();
-  }
-
-  /// Assign a fixed type to this equivalence class.
-  void assignFixedType(Type type,
-                       constraints::SolverTrail *trail) {
-    assert((!getFixedType(nullptr) ||
-            getFixedType(nullptr)->isEqual(type)) &&
-           "Already has a fixed type!");
-    auto rep = getRepresentative(trail);
-    if (trail)
-      rep->getImpl().recordBinding(*trail);
-    rep->getImpl().ParentOrFixed = type.getPointer();
-  }
-
-  void setCanBindToLValue(constraints::SolverTrail *trail,
-                          bool enabled) {
-    auto &impl = getRepresentative(trail)->getImpl();
-    if (trail)
-      impl.recordBinding(*trail);
-
-    if (enabled)
-      impl.getTypeVariable()->Bits.TypeVariableType.Options |=
-          TVO_CanBindToLValue;
-    else
-      impl.getTypeVariable()->Bits.TypeVariableType.Options &=
-          ~TVO_CanBindToLValue;
-  }
-
-  void setCanBindToNoEscape(constraints::SolverTrail *trail,
-                            bool enabled) {
-    auto &impl = getRepresentative(trail)->getImpl();
-    if (trail)
-      impl.recordBinding(*trail);
-
-    if (enabled)
-      impl.getTypeVariable()->Bits.TypeVariableType.Options |=
-          TVO_CanBindToNoEscape;
-    else
-      impl.getTypeVariable()->Bits.TypeVariableType.Options &=
-          ~TVO_CanBindToNoEscape;
-  }
-
-  void enableCanBindToHole(constraints::SolverTrail *trail) {
-    auto &impl = getRepresentative(trail)->getImpl();
-    if (trail)
-      impl.recordBinding(*trail);
-
-    impl.getTypeVariable()->Bits.TypeVariableType.Options |= TVO_CanBindToHole;
-  }
-
-  void setComponent(TypeVariableType *parent) {
-    Component.setPointerAndInt(parent, /*valid=*/false);
-  }
-
-  TypeVariableType *getComponent() const {
-    auto *rep = getTypeVariable();
-    while (rep != rep->getImpl().Component.getPointer())
-      rep = rep->getImpl().Component.getPointer();
-
-    // Path compression
-    if (rep != getTypeVariable()) {
-      const_cast<TypeVariableType::Implementation *>(this)
-          ->Component.setPointer(rep);
-    }
-
-    return rep;
-  }
-
-  bool isValidComponent() const {
-    ASSERT(Component.getPointer() == getTypeVariable());
-    return Component.getInt();
-  }
-
-  bool markValidComponent() {
-    if (Component.getInt())
-      return false;
-    ASSERT(Component.getPointer() == getTypeVariable());
-    Component.setInt(1);
-    return true;
-  }
-
-  /// Print the type variable to the given output stream.
-  void print(llvm::raw_ostream &OS);
-
-private:
-  StringRef getTypeVariableOptions(TypeVariableOptions TVO) const {
-  #define ENTRY(Kind, String) case TypeVariableOptions::Kind: return String
-    switch (TVO) {
-    ENTRY(TVO_CanBindToLValue, "lvalue");
-    ENTRY(TVO_CanBindToInOut, "inout");
-    ENTRY(TVO_CanBindToNoEscape, "noescape");
-    ENTRY(TVO_CanBindToHole, "hole");
-    ENTRY(TVO_PrefersSubtypeBinding, "");
-    ENTRY(TVO_CanBindToPack, "pack");
-    ENTRY(TVO_PackExpansion, "pack expansion");
-    }
-  #undef ENTRY
-  }
-};
 
 namespace constraints {
 
@@ -766,6 +355,7 @@ enum class SolutionCompareResult {
   Worse
 };
 
+<<<<<<< HEAD
 /// An overload that has been selected in a particular solution.
 ///
 /// A selected overload captures the specific overload choice (e.g., a
@@ -1237,6 +827,8 @@ struct CaseLabelItemInfo {
   Expr *guardExpr;
 };
 
+=======
+>>>>>>> origin/main
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
 /// target.
 struct SyntacticElementTargetKey {
@@ -1424,485 +1016,6 @@ struct SyntacticElementTargetKey {
   void dump(raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 };
 
-/// Describes the arguments to which a parameter binds.
-/// FIXME: This is an awful data structure. We want the equivalent of a
-/// TinyPtrVector for unsigned values.
-using ParamBinding = SmallVector<unsigned, 1>;
-
-/// The result of calling matchCallArguments().
-struct MatchCallArgumentResult {
-  /// The direction of trailing closure matching that was performed.
-  TrailingClosureMatching trailingClosureMatching;
-
-  /// The parameter bindings determined by the match.
-  SmallVector<ParamBinding, 4> parameterBindings;
-
-  /// When present, the forward and backward scans each produced a result,
-  /// and the parameter bindings are different. The primary result will be
-  /// forwarding, and this represents the backward binding.
-  std::optional<SmallVector<ParamBinding, 4>> backwardParameterBindings;
-
-  friend bool operator==(const MatchCallArgumentResult &lhs,
-                         const MatchCallArgumentResult &rhs) {
-    if (lhs.trailingClosureMatching != rhs.trailingClosureMatching)
-      return false;
-    if (lhs.parameterBindings != rhs.parameterBindings)
-      return false;
-    return lhs.backwardParameterBindings == rhs.backwardParameterBindings;
-  }
-
-  /// Generate a result that maps the provided number of arguments to the same
-  /// number of parameters via forward match.
-  static MatchCallArgumentResult forArity(unsigned argCount) {
-    SmallVector<ParamBinding, 4> Bindings;
-    for (unsigned i : range(argCount))
-      Bindings.push_back({i});
-    return {TrailingClosureMatching::Forward, Bindings, std::nullopt};
-  }
-};
-
-/// Describes a potential throw site in the constraint system.
-///
-/// For example, given `try f() + a[b] + x.y`, each of `f()`, `a[b]`, `x`, and
-/// `x.y` is a potential throw site.
-struct PotentialThrowSite {
-  enum Kind {
-    /// The application of a function or subscript.
-    Application,
-
-    /// An explicit 'throw'.
-    ExplicitThrow,
-
-    /// A non-exhaustive do...catch, which rethrows whatever is thrown from
-    /// inside it's `do` block.
-    NonExhaustiveDoCatch,
-
-    /// A property access that can throw an error.
-    PropertyAccess,
-  } kind;
-
-  /// The type that describes the potential throw site, such as the type of the
-  /// function being called or type being thrown.
-  Type type;
-
-  /// The locator that specifies where the throwing operation occurs.
-  ConstraintLocator *locator;
-};
-
-enum class ImpliedResultKind {
-  /// A regular implied result, this applies to e.g single expression bodies of
-  /// function decls, and implied 'then' statements outside of closures.
-  Regular,
-
-  /// An implied result for a closure, e.g a single expression body.
-  ForClosure
-};
-
-/// A complete solution to a constraint system.
-///
-/// A solution to a constraint system consists of type variable bindings to
-/// concrete types for every type variable that is used in the constraint
-/// system along with a set of mappings from each constraint locator
-/// involving an overload set to the selected overload.
-class Solution {
-  /// The constraint system this solution solves.
-  ConstraintSystem *constraintSystem;
-
-  /// The fixed score for this solution.
-  Score FixedScore;
-
-  /// The total memory used by this solution.
-  std::optional<size_t> TotalMemory;
-
-public:
-  /// Create a solution for the given constraint system.
-  Solution(ConstraintSystem &cs, const Score &score)
-    : constraintSystem(&cs), FixedScore(score) {}
-
-  // Solution is a non-copyable type for performance reasons.
-  Solution(const Solution &other) = delete;
-  Solution &operator=(const Solution &other) = delete;
-
-  Solution(Solution &&other) = default;
-  Solution &operator=(Solution &&other) = default;
-
-  size_t getTotalMemory() const;
-
-  /// Retrieve the constraint system that this solution solves.
-  ConstraintSystem &getConstraintSystem() const { return *constraintSystem; }
-
-  DeclContext *getDC() const;
-
-  /// The set of type bindings.
-  llvm::MapVector<TypeVariableType *, Type> typeBindings;
-  
-  /// The set of overload choices along with their types.
-  llvm::DenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
-
-  /// The set of constraint restrictions used to arrive at this restriction,
-  /// which informs constraint application.
-  llvm::DenseMap<std::pair<CanType, CanType>, ConversionRestrictionKind>
-    ConstraintRestrictions;
-
-  /// The list of fixes that need to be applied to the initial expression
-  /// to make the solution work.
-  std::vector<ConstraintFix *> Fixes;
-
-  /// The list of fixed requirements.
-  using FixedRequirement =
-      std::tuple<GenericTypeParamType *, unsigned, TypeBase *>;
-  std::vector<FixedRequirement> FixedRequirements;
-
-  /// Maps expressions for implied results (e.g implicit 'then' statements,
-  /// implicit 'return' statements in single expression body closures) to their
-  /// result kind.
-  llvm::DenseMap<Expr *, ImpliedResultKind> ImpliedResults;
-
-  /// For locators associated with call expressions, the trailing closure
-  /// matching rule and parameter bindings that were applied.
-  llvm::DenseMap<ConstraintLocator *, MatchCallArgumentResult>
-      argumentMatchingChoices;
-
-  /// The set of disjunction choices used to arrive at this solution,
-  /// which informs constraint application.
-  llvm::DenseMap<ConstraintLocator *, unsigned> DisjunctionChoices;
-
-  /// A map from applied disjunction constraints to the corresponding
-  /// argument function type.
-  llvm::DenseMap<ConstraintLocator *, FunctionType *> AppliedDisjunctions;
-
-  /// The set of opened types for a given locator.
-  llvm::DenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
-
-  /// The opened existential type for a given locator.
-  llvm::DenseMap<ConstraintLocator *, ExistentialArchetypeType *>
-    OpenedExistentialTypes;
-
-  llvm::DenseMap<PackExpansionType *, TypeVariableType *>
-      OpenedPackExpansionTypes;
-
-  /// The generic environment that can open pack elements for a given
-  /// pack expansion.
-  llvm::DenseMap<PackExpansionExpr *, GenericEnvironment *>
-      PackExpansionEnvironments;
-
-  /// The pack expansion expression for a given pack element.
-  llvm::DenseMap<PackElementExpr *, PackExpansionExpr *> PackElementExpansions;
-
-  /// The locators of \c Defaultable constraints whose defaults were used.
-  llvm::DenseSet<ConstraintLocator *> DefaultedConstraints;
-
-  /// The node -> type mappings introduced by this solution.
-  llvm::DenseMap<ASTNode, Type> nodeTypes;
-
-  /// The key path component types introduced by this solution.
-  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, Type>
-      keyPathComponentTypes;
-
-  /// The key path expression and its root type, value type, and decl context
-  /// introduced by this solution.
-  llvm::DenseMap<const KeyPathExpr *,
-                 std::tuple</*root=*/TypeVariableType *,
-                            /*value=*/TypeVariableType *, DeclContext *>>
-      KeyPaths;
-
-  /// Contextual types introduced by this solution.
-  std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
-
-  /// Maps AST nodes to their target.
-  llvm::DenseMap<SyntacticElementTargetKey, SyntacticElementTarget> targets;
-
-  /// Maps case label items to information tracked about them as they are
-  /// being solved.
-  llvm::DenseMap<const CaseLabelItem *, CaseLabelItemInfo> caseLabelItems;
-
-  /// Maps catch nodes to the set of potential throw sites that will be caught
-  /// at that location.
-
-  /// Keep track of all of the potential throw sites.
-  std::vector<std::pair<CatchNode, PotentialThrowSite>>
-      potentialThrowSites;
-
-  /// A map of expressions to the ExprPatterns that they are being solved as
-  /// a part of.
-  llvm::DenseMap<Expr *, ExprPattern *> exprPatterns;
-
-  /// The set of parameters that have been inferred to be 'isolated'.
-  llvm::DenseSet<ParamDecl *> isolatedParams;
-
-  /// The set of closures that have been inferred to be "isolated by
-  /// preconcurrency".
-  llvm::DenseSet<const ClosureExpr *> preconcurrencyClosures;
-
-  /// The set of functions that have been transformed by a result builder.
-  llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
-      resultBuilderTransformed;
-
-  /// A map from argument expressions to their applied property wrapper expressions.
-  llvm::DenseMap<ASTNode, SmallVector<AppliedPropertyWrapper, 2>> appliedPropertyWrappers;
-
-  ArrayRef<AppliedPropertyWrapper> getAppliedPropertyWrappers(ASTNode anchor) {
-    auto found = appliedPropertyWrappers.find(anchor);
-    if (found != appliedPropertyWrappers.end())
-      return found->second;
-    return ArrayRef<AppliedPropertyWrapper>();
-  }
-
-  /// A mapping from the constraint locators for references to various
-  /// names (e.g., member references, normal name references, possible
-  /// constructions) to the argument lists for the call to that locator.
-  llvm::DenseMap<ConstraintLocator *, ArgumentList *> argumentLists;
-
-  /// The set of implicitly generated `.callAsFunction` root expressions.
-  llvm::DenseMap<ConstraintLocator *, UnresolvedDotExpr *>
-      ImplicitCallAsFunctionRoots;
-
-  /// The set of conformances synthesized during solving (i.e. for
-  /// ad-hoc distributed `SerializationRequirement` conformances).
-  llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
-      SynthesizedConformances;
-
-  /// Record a new argument matching choice for given locator that maps a
-  /// single argument to a single parameter.
-  void recordSingleArgMatchingChoice(ConstraintLocator *locator);
-
-  /// Simplify the given type by substituting all occurrences of
-  /// type variables for their fixed types.
-  ///
-  /// \param wantInterfaceType If true, maps the resulting type out of context,
-  /// and replaces type variables for opened generic parameters with the
-  /// generic parameter types. Should only be used for diagnostic logic.
-  /// \param forCompletion If true, will produce archetypes instead of
-  /// ErrorTypes for generic parameter originators, which is what completion
-  /// currently expects for the code completion token.
-  Type simplifyType(Type type, bool wantInterfaceType = false,
-                    bool forCompletion = false) const;
-
-  // To aid code completion, we need to attempt to convert type placeholders
-  // back into underlying generic parameters if possible, since type
-  // of the code completion expression is used as "expected" (or contextual)
-  // type so it's helpful to know what requirements it has to filter
-  // the list of possible member candidates e.g.
-  //
-  // \code
-  // func test<T: P>(_: [T]) {}
-  //
-  // test(42.#^MEMBERS^#)
-  // \code
-  //
-  // It's impossible to resolve `T` in this case but code completion
-  // expression should still have a type of `[T]` instead of `[<<hole>>]`
-  // because it helps to produce correct contextual member list based on
-  // a conformance requirement associated with generic parameter `T`.
-  Type simplifyTypeForCodeCompletion(Type type) const;
-
-  /// Coerce the given expression to the given type.
-  ///
-  /// This operation cannot fail.
-  ///
-  /// \param expr The expression to coerce.
-  /// \param toType The type to coerce the expression to.
-  /// \param locator Locator used to describe the location of this expression.
-  ///
-  /// \returns the coerced expression, which will have type \c ToType.
-  Expr *coerceToType(Expr *expr, Type toType, ConstraintLocator *locator);
-
-  /// Compute the set of substitutions for a generic signature opened at the
-  /// given locator.
-  ///
-  /// \param decl The underlying declaration for which the substitutions are
-  /// computed.
-  ///
-  /// \param sig The generic signature.
-  ///
-  /// \param locator The locator that describes where the substitutions came
-  /// from.
-  SubstitutionMap computeSubstitutions(NullablePtr<ValueDecl> decl,
-                                       GenericSignature sig,
-                                       ConstraintLocator *locator) const;
-
-  /// Resolves the contextual substitutions for a reference to a declaration
-  /// at a given locator.
-  ConcreteDeclRef
-  resolveConcreteDeclRef(ValueDecl *decl, ConstraintLocator *locator) const;
-
-  /// Return the disjunction choice for the given constraint location.
-  unsigned getDisjunctionChoice(ConstraintLocator *locator) const {
-    assert(DisjunctionChoices.count(locator));
-    return DisjunctionChoices.find(locator)->second;
-  }
-
-  /// Whether the given expression is the implied result for either a ReturnStmt
-  /// or ThenStmt, and if so, the kind of implied result.
-  std::optional<ImpliedResultKind> isImpliedResult(const Expr *E) const {
-    auto result = ImpliedResults.find(E);
-    if (result == ImpliedResults.end())
-      return std::nullopt;
-
-    return result->second;
-  }
-
-  /// Retrieve the fixed score of this solution
-  const Score &getFixedScore() const { return FixedScore; }
-
-  /// Retrieve the fixed score of this solution
-  Score &getFixedScore() { return FixedScore; }
-
-  /// Check whether this solution has a fixed binding for the given type
-  /// variable.
-  bool hasFixedType(TypeVariableType *typeVar) const;
-
-  /// Retrieve the fixed type for the given type variable.
-  Type getFixedType(TypeVariableType *typeVar) const;
-
-  /// Try to resolve the given locator to a declaration within this
-  /// solution. Note that this only returns a decl for a direct reference such
-  /// as \c x.foo and will not return a decl for \c x.foo().
-  ConcreteDeclRef resolveLocatorToDecl(ConstraintLocator *locator) const;
-
-  /// Retrieve the overload choice associated with the given
-  /// locator.
-  SelectedOverload getOverloadChoice(ConstraintLocator *locator) const {
-    return getOverloadChoiceIfAvailable(locator).value();
-  }
-
-  /// Retrieve the overload choice for the callee associated with the given
-  /// locator.
-  SelectedOverload getCalleeOverloadChoice(ConstraintLocator *locator) const;
-
-  /// Retrieve the overload choice associated with the given
-  /// locator, if any.
-  std::optional<SelectedOverload>
-  getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
-    auto known = overloadChoices.find(locator);
-    if (known != overloadChoices.end())
-      return known->second;
-    return std::nullopt;
-  }
-
-  /// Retrieve the overload choice for the callee associated with the given
-  /// locator, if any.
-  std::optional<SelectedOverload>
-  getCalleeOverloadChoiceIfAvailable(ConstraintLocator *locator) const;
-
-  std::optional<SyntacticElementTarget>
-  getTargetFor(SyntacticElementTargetKey key) const;
-
-  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
-                                      bool lookThroughApply = true) const;
-
-  ConstraintLocator *
-  getConstraintLocator(ASTNode anchor,
-                       ArrayRef<LocatorPathElt> path = {}) const;
-
-  ConstraintLocator *getConstraintLocator(ConstraintLocator *baseLocator,
-                                          ArrayRef<LocatorPathElt> path) const;
-
-  void setExprTypes(Expr *expr) const;
-
-  bool hasType(ASTNode node) const;
-
-  /// Returns \c true if the \p ComponentIndex-th component in \p KP has a type
-  /// associated with it.
-  bool hasType(const KeyPathExpr *KP, unsigned ComponentIndex) const;
-
-  /// Retrieve the type of the given node, as recorded in this solution.
-  Type getType(ASTNode node) const;
-
-  /// Retrieve the type of the \p ComponentIndex-th component in \p KP.
-  Type getType(const KeyPathExpr *KP, unsigned ComponentIndex) const;
-
-  TypeVariableType *getKeyPathRootType(const KeyPathExpr *keyPath) const;
-
-  TypeVariableType *
-  getKeyPathRootTypeIfAvailable(const KeyPathExpr *keyPath) const;
-
-  /// Retrieve the type of the given node as recorded in this solution
-  /// and resolve all of the type variables in contains to form a fully
-  /// "resolved" concrete type.
-  Type getResolvedType(ASTNode node) const;
-
-  std::optional<ContextualTypeInfo>
-  getContextualTypeInfo(ASTNode anchor) const {
-    for (const auto &entry : contextualTypes) {
-      if (entry.first == anchor)
-        return entry.second;
-    }
-    return std::nullopt;
-  }
-
-  Type getContextualType(ASTNode anchor) const {
-    if (auto info = getContextualTypeInfo(anchor)) {
-      // The contextual information record could contain the purpose
-      // without a type i.e. when the context is an optional-some or
-      // an invalid pattern binding.
-      if (auto contextualTy = info->getType())
-          return simplifyType(contextualTy);
-    }
-    return Type();
-  }
-
-  ContextualTypePurpose getContextualTypePurpose(ASTNode anchor) const {
-    if (auto info = getContextualTypeInfo(anchor)) {
-      return info->purpose;
-    }
-    return CTP_Unused;
-  }
-
-  /// Retrieve the generic environment for the opened element of a given pack
-  /// expansion, or \c nullptr if no environment was recorded.
-  GenericEnvironment *
-  getPackExpansionEnvironment(PackExpansionExpr *expr) const;
-
-  /// For a given locator describing a function argument conversion, or a
-  /// constraint within an argument conversion, returns information about the
-  /// application of the argument to its parameter. If the locator is not
-  /// for an argument conversion, returns \c None.
-  std::optional<FunctionArgApplyInfo>
-  getFunctionArgApplyInfo(ConstraintLocator *) const;
-
-  /// Retrieve the builder transform that was applied to this function, if any.
-  const AppliedBuilderTransform *getAppliedBuilderTransform(
-     AnyFunctionRef fn) const {
-    auto known = resultBuilderTransformed.find(fn);
-    return known != resultBuilderTransformed.end()
-        ? &known->second
-        : nullptr;
-  }
-
-  /// Retrieve the solved ExprPattern that corresponds to provided
-  /// sub-expression.
-  NullablePtr<ExprPattern> getExprPatternFor(Expr *E) const {
-    auto result = exprPatterns.find(E);
-    if (result == exprPatterns.end())
-      return nullptr;
-
-    return result->second;
-  }
-
-  /// This method implements functionality of `Expr::isTypeReference`
-  /// with data provided by a given solution.
-  bool isTypeReference(Expr *E) const;
-
-  /// Call Expr::isIsStaticallyDerivedMetatype on the given
-  /// expression, using a custom accessor for the type on the
-  /// expression that reads the type from the Solution
-  /// expression type map.
-  bool isStaticallyDerivedMetatype(Expr *E) const;
-
-  /// Retrieve the argument list that is associated with a call at the given
-  /// locator.
-  ArgumentList *getArgumentList(ConstraintLocator *locator) const;
-
-  std::optional<ConversionRestrictionKind>
-  getConversionRestriction(CanType type1, CanType type2) const;
-
-  SWIFT_DEBUG_DUMP;
-
-  /// Dump this solution.
-  void dump(raw_ostream &OS, unsigned indent) const LLVM_ATTRIBUTE_USED;
-};
-
 /// Describes the differences between several solutions to the same
 /// constraint system.
 class SolutionDiff {
@@ -1967,9 +1080,6 @@ enum class ConstraintSystemFlags {
 
   /// Disable macro expansions.
   DisableMacroExpansions = 0x40,
-
-  /// Enable old type-checker performance hacks.
-  EnablePerformanceHacks = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -1995,10 +1105,6 @@ struct MemberLookupResult {
   /// This is a list of viable candidates that were matched.
   ///
   SmallVector<OverloadChoice, 4> ViableCandidates;
-  
-  /// If there is a favored candidate in the viable list, this indicates its
-  /// index.
-  unsigned FavoredChoice = ~0U;
 
   /// The number of optional unwraps that were applied implicitly in the
   /// lookup, for contexts where that is permitted.
@@ -2078,10 +1184,6 @@ struct MemberLookupResult {
   void addUnviable(OverloadChoice candidate, UnviableReason reason) {
     UnviableCandidates.push_back(candidate);
     UnviableReasons.push_back(reason);
-  }
-
-  std::optional<unsigned> getFavoredIndex() const {
-    return (FavoredChoice == ~0U) ? std::optional<unsigned>() : FavoredChoice;
   }
 };
 
@@ -2181,9 +1283,6 @@ public:
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
 
-  /// The total number of disjunctions created.
-  unsigned CountDisjunctions = 0;
-
 private:
   bool PreparingOverload = false;
 
@@ -2200,7 +1299,7 @@ private:
 
   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> ExprWeights;
 
-  /// Allocator used for all of the related constraint systems.
+  /// Allocator used for data that is local to this constraint system.
   llvm::BumpPtrAllocator Allocator;
 
   /// Arena used for memory management of constraint-checker-related
@@ -2380,6 +1479,10 @@ private:
   /// The constraint graph.
   ConstraintGraph CG;
 
+  /// Information about the remaining disjunctions we have yet to attempt
+  /// in this path.
+  llvm::DenseMap<Constraint *, SolverDisjunction> RemainingDisjunctions;
+
   /// A mapping from constraint locators to the set of opened types associated
   /// with that locator.
   llvm::SmallDenseMap<ConstraintLocator *, ArrayRef<OpenedType>, 4>
@@ -2457,11 +1560,11 @@ public:
   llvm::DenseMap<NominalTypeDecl *, DynamicCallableMethods>
       DynamicCallableCache;
 
-  /// A cache of implicitly generated dot-member expressions used as roots
+  /// A cache of implicitly generated dot-member expressions and argument lists
   /// for some `.callAsFunction` calls. The key here is "base" locator for
   /// the `.callAsFunction` member reference.
-  llvm::SmallDenseMap<ConstraintLocator *, UnresolvedDotExpr *, 2>
-      ImplicitCallAsFunctionRoots;
+  llvm::SmallDenseMap<ConstraintLocator *, ImplicitCallAsFunctionInfo, 2>
+      ImplicitCallAsFunctions;
 
   /// The set of conformances synthesized during solving (i.e. for
   /// ad-hoc distributed `SerializationRequirement` conformances).
@@ -2469,74 +1572,6 @@ public:
       SynthesizedConformances;
 
 private:
-  /// Describe the candidate expression for partial solving.
-  /// This class used by shrink & solve methods which apply
-  /// variation of directional path consistency algorithm in attempt
-  /// to reduce scopes of the overload sets (disjunctions) in the system.
-  class Candidate {
-    Expr *E;
-    DeclContext *DC;
-    llvm::BumpPtrAllocator &Allocator;
-
-    // Contextual Information.
-    Type CT;
-    ContextualTypePurpose CTP;
-
-  public:
-    Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
-              ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), DC(cs.DC), Allocator(cs.Allocator), CT(ct), CTP(ctp) {}
-
-    /// Return underlying expression.
-    Expr *getExpr() const { return E; }
-
-    /// Try to solve this candidate sub-expression
-    /// and re-write it's OSR domains afterwards.
-    ///
-    /// \param shrunkExprs The set of expressions which
-    /// domains have been successfully shrunk so far.
-    ///
-    /// \returns true on solver failure, false otherwise.
-    bool solve(llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs);
-
-    /// Apply solutions found by solver as reduced OSR sets for
-    /// for current and all of it's sub-expressions.
-    ///
-    /// \param solutions The solutions found by running solver on the
-    /// this candidate expression.
-    ///
-    /// \param shrunkExprs The set of expressions which
-    /// domains have been successfully shrunk so far.
-    void applySolutions(
-        llvm::SmallVectorImpl<Solution> &solutions,
-        llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) const;
-
-    /// Check if attempt at solving of the candidate makes sense given
-    /// the current conditions - number of shrunk domains which is related
-    /// to the given candidate over the total number of disjunctions present.
-    static bool
-    isTooComplexGiven(ConstraintSystem *const cs,
-                      llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) {
-      SmallVector<Constraint *, 8> disjunctions;
-      cs->collectDisjunctions(disjunctions);
-
-      unsigned unsolvedDisjunctions = disjunctions.size();
-      for (auto *disjunction : disjunctions) {
-        auto *locator = disjunction->getLocator();
-        if (!locator)
-          continue;
-
-        if (auto *OSR = getAsExpr<OverloadSetRefExpr>(locator->getAnchor())) {
-          if (shrunkExprs.count(OSR) > 0)
-            --unsolvedDisjunctions;
-        }
-      }
-
-      // The threshold used to be `TypeCheckerOpts.SolverShrinkUnsolvedThreshold`
-      return unsolvedDisjunctions >= 10;
-    }
-  };
-
   /// Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs,
@@ -2664,10 +1699,6 @@ private:
   };
 
 public:
-  /// Retrieve the first constraint that has failed along the solver's path, or
-  /// \c nullptr if no constraint has failed.
-  Constraint *getFailedConstraint() const { return failedConstraint; }
-
   /// Check whether constraint system is in valid state e.g.
   /// has left-over active/inactive constraints which should
   /// have been simplified.
@@ -3382,12 +2413,6 @@ public:
   ConstraintLocator *
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
 
-  /// Compute a constraint locator for an implicit value-to-value
-  /// conversion rooted at the given location.
-  ConstraintLocator *
-  getImplicitValueConversionLocator(ConstraintLocatorBuilder root,
-                                    ConversionRestrictionKind restriction);
-
   /// Lookup and return parent associated with given expression.
   Expr *getParentExpr(Expr *expr) {
     if (auto result = getExprDepthAndParent(expr))
@@ -3499,12 +2524,6 @@ public:
     return Options.contains(ConstraintSystemFlags::ForCodeCompletion);
   }
 
-  /// Check whether old type-checker performance hacks has been explicitly
-  /// enabled.
-  bool performanceHacksEnabled() const {
-    return Options.contains(ConstraintSystemFlags::EnablePerformanceHacks);
-  }
-
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix, unsigned impact = 1,
@@ -3524,8 +2543,15 @@ public:
   void recordMatchCallArgumentResult(ConstraintLocator *locator,
                                      MatchCallArgumentResult result);
 
-  void recordImplicitCallAsFunctionRoot(
-      ConstraintLocator *locator, UnresolvedDotExpr *root);
+  /// Record a new implicit `callAsFunction` call for a split argument list
+  /// e.g `T(...) {}` -> `T(...).callAsFunction {}`
+  ///
+  /// \param root The member access to \c callAsFunction
+  /// \param baseArgs The new arguments for the base \c T(...) call. The
+  /// arguments for the \c callAsFunction call are recorded on the \c root
+  void recordImplicitCallAsFunction(ConstraintLocator *locator,
+                                    UnresolvedDotExpr *root,
+                                    ArgumentList *baseArgs);
 
   /// Record root, value, and declContext of keypath expression for use across
   /// constraint system, and add a change to the trail.
@@ -3557,10 +2583,6 @@ public:
           return false;
         });
   }
-
-  /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
-  /// constraint system, return the decl that it references.
-  ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
 
   /// Try to salvage the constraint system by applying (speculative)
   /// fixes.
@@ -3600,80 +2622,8 @@ public:
   /// Add the appropriate constraint for a contextual conversion.
   void addContextualConversionConstraint(Expr *expr, Type conversionType,
                                          ContextualTypePurpose purpose,
-                                         ConstraintLocator *locator);
-
-  /// Convenience function to pass an \c ArrayRef to \c addJoinConstraint
-  Type addJoinConstraint(ConstraintLocator *locator,
-                         ArrayRef<std::pair<Type, ConstraintLocator *>> inputs,
-                         std::optional<Type> supertype = std::nullopt) {
-    return addJoinConstraint<decltype(inputs)::iterator>(
-        locator, inputs.begin(), inputs.end(), supertype, [](auto it) { return *it; });
-  }
-
-  /// Add a "join" constraint between a set of types, producing the common
-  /// supertype.
-  ///
-  /// Currently, a "join" is modeled by a set of conversion constraints to
-  /// a new type variable or a specified supertype. At some point, we may want
-  /// a new constraint kind to cover the join.
-  ///
-  /// \note This method will merge any input type variables for atomic literal
-  /// expressions of the same kind. It assumes that if same-kind literal type
-  /// variables are joined, there will be no differing constraints on those
-  /// type variables.
-  ///
-  /// \returns the joined type, which is generally a new type variable, unless there are
-  /// fewer than 2 input types or the \c supertype parameter is specified.
-  template <typename Iterator>
-  Type addJoinConstraint(
-      ConstraintLocator *locator, Iterator begin, Iterator end,
-      std::optional<Type> supertype,
-      std::function<std::pair<Type, ConstraintLocator *>(Iterator)> getType) {
-    if (begin == end)
-      return Type();
-
-    // No need to generate a new type variable if there's only one type to join
-    if ((begin + 1 == end) && !supertype.has_value())
-      return getType(begin).first;
-
-    // The type to capture the result of the join, which is either the specified supertype,
-    // or a new type variable.
-    Type resultTy = supertype.has_value() ? supertype.value() :
-                    createTypeVariable(locator, (TVO_PrefersSubtypeBinding | TVO_CanBindToNoEscape));
-
-    using RawExprKind = uint8_t;
-    llvm::SmallDenseMap<RawExprKind, TypeVariableType *> representativeForKind;
-
-    // Join the input types.
-    while (begin != end) {
-      Type type;
-      ConstraintLocator *locator;
-      std::tie(type, locator) = getType(begin++);
-
-      // We can merge the type variables of same-kind atomic literal expressions because they
-      // will all have the same set of constraints and therefore can never resolve to anything
-      // different.
-      if (auto *typeVar = type->getAs<TypeVariableType>()) {
-        if (auto literalKind = typeVar->getImpl().getAtomicLiteralKind()) {
-          auto *&originalRep = representativeForKind[RawExprKind(*literalKind)];
-          auto *currentRep = getRepresentative(typeVar);
-
-          if (originalRep) {
-            if (originalRep != currentRep)
-              mergeEquivalenceClasses(currentRep, originalRep, /*updateWorkList=*/false);
-            continue;
-          }
-
-          originalRep = currentRep;
-        }
-      }
-
-      // Introduce conversions from each input type to the supertype.
-      addConstraint(ConstraintKind::Conversion, type, resultTy, locator);
-    }
-
-    return resultTy;
-  }
+                                         ConstraintLocator *locator,
+                                         bool shouldOpenOpaqueType = true);
 
   /// Add a constraint to the constraint system with an associated fix.
   void addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
@@ -3763,26 +2713,6 @@ public:
                                    useDC, functionRefInfo,
                                    getConstraintLocator(locator)));
       }
-      break;
-    }
-  }
-
-  /// Add a value witness constraint to the constraint system.
-  void addValueWitnessConstraint(
-      Type baseTy, ValueDecl *requirement, Type memberTy, DeclContext *useDC,
-      FunctionRefInfo functionRefInfo, ConstraintLocatorBuilder locator) {
-    assert(baseTy);
-    assert(memberTy);
-    assert(requirement);
-    assert(useDC);
-    switch (simplifyValueWitnessConstraint(
-        ConstraintKind::ValueWitness, baseTy, requirement, memberTy, useDC,
-        functionRefInfo, TMF_GenerateConstraints, locator)) {
-    case SolutionKind::Unsolved:
-      llvm_unreachable("Unsolved result when generating constraints!");
-
-    case SolutionKind::Solved:
-    case SolutionKind::Error:
       break;
     }
   }
@@ -3951,9 +2881,7 @@ public:
 
   /// Retrieve the representative of the equivalence class containing
   /// this type variable.
-  TypeVariableType *getRepresentative(TypeVariableType *typeVar) const {
-    return typeVar->getImpl().getRepresentative(getTrail());
-  }
+  TypeVariableType *getRepresentative(TypeVariableType *typeVar) const;
 
   /// Find if the given type variable is representative for a type
   /// variable which last locator path element is of the specified kind.
@@ -4010,9 +2938,7 @@ public:
 
   /// Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
-  Type getFixedType(TypeVariableType *typeVar) const {
-    return typeVar->getImpl().getFixedType(getTrail());
-  }
+  Type getFixedType(TypeVariableType *typeVar) const;
 
   /// Retrieve the fixed type corresponding to a given type variable,
   /// recursively, until we hit something that isn't a type variable
@@ -4312,8 +3238,7 @@ public:
   void openGenericRequirement(DeclContext *outerDC,
                               GenericSignature signature,
                               unsigned index,
-                              const Requirement &requirement,
-                              bool skipProtocolSelfConstraint,
+                              Requirement requirement,
                               ConstraintLocatorBuilder locator,
                               llvm::function_ref<Type(Type)> subst,
                               PreparedOverloadBuilder *preparedOverload);
@@ -4333,6 +3258,36 @@ public:
   /// Check whether the given type conforms to the given protocol and if
   /// so return a valid conformance reference.
   ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *P);
+
+  /// We memoize the computation in the below.
+  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
+      ConformanceTransitiveForSupertypeCache;
+
+  /// Suppose we are given a type T with the given conversion behavior,
+  /// and a protocol P, with the following setup:
+  /// - T conv $T0
+  /// - $T0 conforms P
+  /// The question is, does this imply that T must conform to P? This
+  /// returns true if so, false otherwise.
+  ///
+  /// Also see Subtyping.h, checkTranstiveSupertypeConformance().
+  bool isConformanceTransitiveForSupertype(ConversionBehavior behavior,
+                                           ProtocolDecl *proto);
+
+  /// We memoize the computation in the below.
+  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
+      ConformanceTransitiveForSubtypeCache;
+
+  /// Suppose we are given a type T with the given conversion behavior,
+  /// and a protocol P, with the following setup:
+  /// - $T0 conv T
+  /// - $T0 conforms P
+  /// The question is, does this imply that T must conform to P? This
+  /// returns true if so, false otherwise.
+  ///
+  /// Also see Subtyping.h, checkTranstiveSubtypeConformance().
+  bool isConformanceTransitiveForSubtype(ConversionBehavior behavior,
+                                         ProtocolDecl *proto);
 
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
   /// the appropriate closure-type and opening extraction functions.
@@ -4505,14 +3460,12 @@ public:
   /// Retrieve the type that will be used when matching the given overload.
   Type getEffectiveOverloadType(ConstraintLocator *locator,
                                 const OverloadChoice &overload,
-                                bool allowMembers,
                                 DeclContext *useDC);
 
   /// Add a new overload set to the list of unresolved overload
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
-                      DeclContext *useDC, ConstraintLocator *locator,
-                      std::optional<unsigned> favoredIndex = std::nullopt);
+                      DeclContext *useDC, ConstraintLocator *locator);
 
   void addOverloadSet(ArrayRef<Constraint *> choices,
                       ConstraintLocator *locator);
@@ -4613,9 +3566,6 @@ public:
   ///
   /// \param locator The locator to use when generating constraints.
   ///
-  /// \param favoredIndex If there is a "favored" or preferred choice
-  /// this is its index in the set of choices.
-  ///
   /// \param requiresFix Determines whether choices require a fix to
   /// be included in the result. If the fix couldn't be provided by
   /// `getFix` for any given choice, such choice would be filtered out.
@@ -4627,7 +3577,6 @@ public:
       SmallVectorImpl<Constraint *> &constraints, Type type,
       ArrayRef<OverloadChoice> choices, DeclContext *useDC,
       ConstraintLocator *locator,
-      std::optional<unsigned> favoredIndex = std::nullopt,
       bool requiresFix = false,
       llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
           getFix = [](unsigned, const OverloadChoice &) { return nullptr; });
@@ -4716,6 +3665,13 @@ public:
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
 
+  /// Match the @Sendable bit between two functions.
+  TypeMatchResult matchFunctionSendability(FunctionType *func1,
+                                           FunctionType *func2,
+                                           ConstraintKind kind,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locator);
+
   /// Subroutine of \c matchTypes(), which matches up two function
   /// types.
   TypeMatchResult matchFunctionTypes(FunctionType *func1, FunctionType *func2,
@@ -4726,6 +3682,11 @@ public:
   bool matchFunctionIsolations(FunctionType *func1, FunctionType *func2,
                                ConstraintKind kind, TypeMatchOptions flags,
                                ConstraintLocatorBuilder locator);
+
+  /// Subroutine of \c matchTypes()
+  bool matchFunctionLifetimes(const LifetimeDependentInterface &func1,
+                              const LifetimeDependentInterface &func2,
+                              ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
@@ -4762,6 +3723,23 @@ public:
   TypeMatchResult matchFunctionResultTypes(Type expectedResult, Type fnResult,
                                            TypeMatchOptions flags,
                                            ConstraintLocatorBuilder locator);
+
+  enum ImpliedResultConversionKind : unsigned {
+    /// Usual subtyping rules apply.
+    None,
+    /// Accept Never subtype $T only.
+    FromNever,
+    /// Accept Never subtype $T, and $T subtype Void.
+    ToVoid
+  };
+
+  /// Determines if special subtyping rules for implied result contexts apply.
+  ///
+  /// We allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for
+  /// closure literals and expressions representing an implied result of
+  /// closures and if/switch expressions.
+  ImpliedResultConversionKind
+  getImpliedResultConversionKind(ConstraintLocator *locator);
 
 public: // FIXME: public due to statics in CSSimplify.cpp
   /// Attempt to match up types \c type1 and \c type2, which in effect
@@ -5026,11 +4004,17 @@ private:
       ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
 
-  /// Attempt to simplify the given value witness constraint.
-  SolutionKind simplifyValueWitnessConstraint(
-      ConstraintKind kind, Type baseType, ValueDecl *member, Type memberType,
-      DeclContext *useDC, FunctionRefInfo functionRefInfo,
-      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
+  /// Lookup a dependent member, returning a null Type and recording a fix on
+  /// failure.
+  Type lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
+                             bool openExistential,
+                             ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify the ForEachElement constraint.
+  SolutionKind
+  simplifyForEachElementConstraint(Type first, Type second,
+                                   TypeMatchOptions flags,
+                                   ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the optional object constraint.
   SolutionKind simplifyOptionalObjectConstraint(
@@ -5276,14 +4260,13 @@ public:
 
   /// Determine whether given type variable with its set of bindings is viable
   /// to be attempted on the next step of the solver.
-  std::optional<BindingSet> determineBestBindings(
-      llvm::function_ref<void(const BindingSet &)> onCandidate);
+  const inference::BindingSet *determineBestBindings();
 
   /// Get bindings for the given type variable based on current
   /// state of the constraint system.
   ///
   /// FIXME: Remove this.
-  BindingSet getBindingsFor(TypeVariableType *typeVar);
+  inference::BindingSet getBindingsFor(TypeVariableType *typeVar);
 
 private:
   /// Add a constraint to the constraint system.
@@ -5298,15 +4281,15 @@ private:
                                       Type second,
                                       ConstraintLocatorBuilder locator);
 
-  /// Collect the current inactive disjunction constraints.
-  void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
-
   /// Record a particular disjunction choice and add a change to the trail.
   void recordDisjunctionChoice(ConstraintLocator *locator, unsigned index);
 
   /// Record applied disjunction and add a change to the trail.
   void recordAppliedDisjunction(ConstraintLocator *locator,
                                 FunctionType *type);
+
+  /// Get the applicable function constraint for a disjunction, if there is one.
+  Constraint *getApplicableFnConstraint(Constraint *disjunction);
 
   /// Filter the set of disjunction terms, keeping only those where the
   /// predicate returns \c true.
@@ -5347,6 +4330,8 @@ public:
     TypeVariableType *tyvar,
     unsigned *numOptionalUnwraps = nullptr);
 
+  SolverDisjunction &getRemainingDisjunction(Constraint *disjunction);
+
 private:
   /// Solve the system of constraints after it has already been
   /// simplified.
@@ -5356,23 +4341,11 @@ private:
   /// \returns true if an error occurred, false otherwise.
   bool solveSimplified(SmallVectorImpl<Solution> &solutions);
 
-  /// Find reduced domains of disjunction constraints for given
-  /// expression, this is achieved to solving individual sub-expressions
-  /// and combining resolving types. Such algorithm is called directional
-  /// path consistency because it goes from children to parents for all
-  /// related sub-expressions taking union of their domains.
-  ///
-  /// \param expr The expression to find reductions for.
-  void shrink(Expr *expr);
-
   /// Pick a disjunction from the InactiveConstraints list.
   ///
   /// \returns The selected disjunction and a set of it's favored choices.
   std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
   selectDisjunction();
-
-  /// The old method that is only used when performance hacks are enabled.
-  Constraint *selectDisjunctionWithHacks();
 
   /// Pick a conjunction from the InactiveConstraints list.
   ///
@@ -5565,15 +4538,17 @@ public:
   bool applySolutionToBody(TapExpr *tapExpr,
                            SyntacticElementTargetRewriter &rewriter);
 
-  /// Reorder the disjunctive clauses for a given expression to
-  /// increase the likelihood that a favored constraint will be successfully
-  /// resolved before any others.
-  void optimizeConstraints(Expr *e);
-
   /// Set the current sub-expression (of a multi-statement closure, etc) for
   /// the purposes of diagnosing "reasonable time" errors.
   void startExpression(ASTNode node);
 
+<<<<<<< HEAD
+  /// Set the current sub-expression (of a multi-statement closure, etc) for
+  /// the purposes of diagnosing "reasonable time" errors.
+  void startExpression(ASTNode node);
+
+=======
+>>>>>>> origin/main
   /// The source range of the target being type checked.
   SourceRange getCurrentSourceRange() const {
     return CurrentRange;
@@ -5665,26 +4640,6 @@ public:
   void print(raw_ostream &out, Expr *) const;
 };
 
-/// A function object suitable for use as an \c OpenUnboundGenericTypeFn that
-/// "opens" the given unbound type by introducing fresh type variables for
-/// generic parameters and constructing a bound generic type from these
-/// type variables.
-class OpenUnboundGenericType {
-  ConstraintSystem &cs;
-  const ConstraintLocatorBuilder &locator;
-
-public:
-  explicit OpenUnboundGenericType(ConstraintSystem &cs,
-                                  const ConstraintLocatorBuilder &locator)
-      : cs(cs), locator(locator) {}
-
-  Type operator()(UnboundGenericType *unboundTy) const {
-    return cs.openUnboundGenericType(unboundTy->getDecl(),
-                                     unboundTy->getParent(), locator,
-                                     /*isTypeResolution=*/true);
-  }
-};
-
 /// A function object suitable for use as an \c OpenRequirementFn that "opens"
 /// the requirements for a given type's generic signature given a set of
 /// argument substitutions.
@@ -5700,67 +4655,6 @@ public:
       : cs(cs), locator(locator), preparedOverload(preparedOverload) {}
 
   void operator()(GenericTypeDecl *decl, TypeSubstitutionFn subst) const;
-};
-
-class HandlePlaceholderType {
-  ConstraintSystem &cs;
-  ConstraintLocator *locator;
-
-public:
-  explicit HandlePlaceholderType(ConstraintSystem &cs,
-                                 const ConstraintLocatorBuilder &locator)
-      : cs(cs) {
-    this->locator = cs.getConstraintLocator(locator);
-  }
-
-  Type operator()(ASTContext &ctx, PlaceholderTypeRepr *placeholderRepr) const {
-    return cs.createTypeVariable(
-        cs.getConstraintLocator(
-            locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
-        TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
-            TVO_CanBindToHole);
-  }
-};
-
-/// A function object that opens a given pack type by generating a
-/// \c PackElementOf constraint.
-class OpenPackElementType {
-  ConstraintSystem &cs;
-  ConstraintLocator *locator;
-  PackExpansionExpr *elementEnv;
-
-public:
-  explicit OpenPackElementType(ConstraintSystem &cs,
-                               const ConstraintLocatorBuilder &locator,
-                               PackExpansionExpr *elementEnv)
-      : cs(cs), elementEnv(elementEnv) {
-    this->locator = cs.getConstraintLocator(locator);
-  }
-
-  Type operator()(Type packType, PackElementTypeRepr *packRepr) const {
-    // Only assert we have an element environment when invoking the function
-    // object. In cases where pack elements are referenced outside of a
-    // pack expansion, type resolution will error before opening the pack
-    // element.
-    assert(elementEnv);
-
-    auto *elementType = cs.createTypeVariable(locator,
-                                              TVO_CanBindToHole |
-                                              TVO_CanBindToNoEscape);
-
-    // If we're opening a pack element from an explicit type repr,
-    // set the type repr types in the constraint system for generating
-    // ShapeOf constraints when visiting the PackExpansionExpr.
-    if (packRepr) {
-      cs.setType(packRepr->getPackType(), packType);
-      cs.setType(packRepr, elementType);
-    }
-
-    cs.addConstraint(ConstraintKind::PackElementOf, elementType,
-                     packType->getRValueType(),
-                     cs.getConstraintLocator(elementEnv));
-    return elementType;
-  }
 };
 
 /// Compute the shuffle required to map from a given tuple type to
@@ -6016,388 +4910,15 @@ Type getDynamicSelfReplacementType(Type baseObjTy, const ValueDecl *member,
 
 ValueDecl *getOverloadChoiceDecl(Constraint *choice);
 
-class DisjunctionChoice {
-  ConstraintSystem &CS;
-  unsigned Index;
-  Constraint *Choice;
-  bool ExplicitConversion;
-  bool IsBeginningOfPartition;
-
-public:
-  DisjunctionChoice(ConstraintSystem &cs, unsigned index, Constraint *choice,
-                    bool explicitConversion, bool isBeginningOfPartition)
-      : CS(cs), Index(index), Choice(choice),
-        ExplicitConversion(explicitConversion),
-        IsBeginningOfPartition(isBeginningOfPartition) {}
-
-  unsigned getIndex() const { return Index; }
-
-  bool attempt(ConstraintSystem &cs) const;
-
-  bool isDisabled() const {
-    if (!Choice->isDisabled())
-      return false;
-
-    // If solver is in a diagnostic mode, let's allow
-    // constraints that have fixes or have been disabled
-    // in attempt to produce a solution faster for
-    // well-formed expressions.
-    if (CS.shouldAttemptFixes()) {
-      return !(hasFix() || Choice->isDisabledInPerformanceMode());
-    }
-
-    return true;
-  }
-
-  bool hasFix() const {
-    return bool(Choice->getFix());
-  }
-
-  bool isUnavailable() const {
-    if (auto *decl = getOverloadChoiceDecl(Choice))
-      return CS.isDeclUnavailable(decl, Choice->getLocator());
-    return false;
-  }
-
-  bool isDisfavored() const {
-    if (auto *decl = getOverloadChoiceDecl(Choice))
-      return decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>();
-    return false;
-  }
-
-  bool isBeginningOfPartition() const { return IsBeginningOfPartition; }
-
-  // FIXME: All three of the accessors below are required to support
-  //        performance optimization hacks in constraint solver.
-
-  bool isGenericOperator() const;
-  bool isSymmetricOperator() const;
-  bool isUnaryOperator() const;
-
-  void print(llvm::raw_ostream &Out, SourceManager *SM,
-             unsigned indent = 0) const {
-    Out << "disjunction choice ";
-    Choice->print(Out, SM, indent);
-  }
-
-  operator Constraint *() { return Choice; }
-  operator Constraint *() const { return Choice; }
-
-private:
-  /// If associated disjunction is an explicit conversion,
-  /// let's try to propagate its type early to prune search space.
-  void propagateConversionInfo(ConstraintSystem &cs) const;
-
-  static ValueDecl *getOperatorDecl(Constraint *choice) {
-    auto *decl = getOverloadChoiceDecl(choice);
-    if (!decl)
-      return nullptr;
-
-    return decl->isOperator() ? decl : nullptr;
-  }
-};
-
-class ConjunctionElement {
-  Constraint *Element;
-
-public:
-  ConjunctionElement(Constraint *element) : Element(element) {}
-
-  bool attempt(ConstraintSystem &cs) const;
-
-  ConstraintLocator *getLocator() const { return Element->getLocator(); }
-
-  void print(llvm::raw_ostream &Out, SourceManager *SM, unsigned indent) const {
-    Out << "conjunction element ";
-    Element->print(Out, SM, indent);
-  }
-
-private:
-  /// Find type variables referenced by this conjunction element.
-  /// If this is a closure body element, it would look inside \c ASTNode.
-  void
-  findReferencedVariables(ConstraintSystem &cs,
-                          SmallPtrSetImpl<TypeVariableType *> &typeVars) const;
-};
-
-class TypeVariableBinding {
-  TypeVariableType *TypeVar;
-  PotentialBinding Binding;
-
-public:
-  TypeVariableBinding(TypeVariableType *typeVar, PotentialBinding &binding)
-      : TypeVar(typeVar), Binding(binding) {}
-
-  TypeVariableType *getTypeVariable() const { return TypeVar; }
-  Type getType() const { return Binding.BindingType; }
-
-  bool isDefaultable() const { return Binding.isDefaultableBinding(); }
-
-  bool hasDefaultedProtocol() const {
-    return Binding.hasDefaultedLiteralProtocol();
-  }
-
-  bool attempt(ConstraintSystem &cs) const;
-
-  /// Determine what fix (if any) needs to be introduced into a
-  /// constraint system as part of resolving type variable as a hole.
-  std::optional<std::pair<ConstraintFix *, unsigned>>
-  fixForHole(ConstraintSystem &cs) const;
-
-  void print(llvm::raw_ostream &Out, SourceManager *, unsigned indent) const {
-    PrintOptions PO = PrintOptions::forDebugging();
-    Out << "type variable binding " << TypeVar->getString(PO)
-        << " := " << Binding.BindingType->getString(PO);
-  }
-};
-
-template<typename Choice>
-class BindingProducer {
-  ConstraintLocator *Locator;
-
-protected:
-  ConstraintSystem &CS;
-
-public:
-  BindingProducer(ConstraintSystem &cs, ConstraintLocator *locator)
-      : Locator(locator), CS(cs) {}
-
-  virtual ~BindingProducer() {}
-  virtual std::optional<Choice> operator()() = 0;
-
-  ConstraintLocator *getLocator() const { return Locator; }
-
-  /// Check whether generator would have to compute next
-  /// batch of bindings because it freshly ran out of current one.
-  /// This is useful to be able to exhaustively attempt bindings
-  /// for type variables found at one level, before proceeding to
-  /// supertypes or literal defaults etc.
-  virtual bool needsToComputeNext() const = 0;
-
-  virtual bool isExhausted() const = 0;
-};
-
-class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
-  using BindingKind = AllowedBindingKind;
-  using Binding = PotentialBinding;
-
-  TypeVariableType *TypeVar;
-  llvm::SmallVector<Binding, 8> Bindings;
-  /// The set of defaults to attempt once producer
-  /// runs out of direct & transitive bindings.
-  llvm::SmallVector<Constraint *, 4> DelayedDefaults;
-
-  // The index pointing to the offset in the bindings
-  // generator is currently at, `numTries` represents
-  // the number of times bindings have been recomputed.
-  unsigned Index = 0, NumTries = 0;
-
-  llvm::SmallPtrSet<CanType, 4> ExploredTypes;
-  llvm::SmallPtrSet<TypeBase *, 4> BoundTypes;
-
-  /// Determines whether this type variable has a
-  /// `ExpressibleByNilLiteral` requirement which
-  /// means that bindings have to either conform
-  /// to that protocol or be wrapped in an optional.
-  bool CanBeNil;
-
-  bool IsExhausted = false;
-
-public:
-  using Element = TypeVariableBinding;
-
-  TypeVarBindingProducer(BindingSet &bindings);
-
-  /// Retrieve a set of bindings available in the current state.
-  ArrayRef<Binding> getCurrentBindings() const { return Bindings; }
-
-  std::optional<Element> operator()() override {
-    if (isExhausted())
-      return std::nullopt;
-
-    // Once we reach the end of the current bindings
-    // let's try to compute new ones, e.g. supertypes,
-    // literal defaults, if that fails, we are done.
-    if (needsToComputeNext() && !computeNext()) {
-      IsExhausted = true;
-      return std::nullopt;
-    }
-
-    auto &binding = Bindings[Index++];
-
-    // Record produced type as bound/explored early, otherwise
-    // it could be possible to re-discover it during `computeNext()`,
-    // which leads to duplicate bindings e.g. inferring fallback
-    // `Void` for a closure result type when `Void` was already
-    // inferred as a direct/transitive binding.
-    {
-      auto type = binding.BindingType;
-
-      BoundTypes.insert(type.getPointer());
-      ExploredTypes.insert(type->getCanonicalType());
-    }
-
-    return TypeVariableBinding(TypeVar, binding);
-  }
-
-  bool needsToComputeNext() const override {
-    return isExhausted() ? false : Index >= Bindings.size();
-  }
-
-  bool isExhausted() const override { return IsExhausted; }
-
-private:
-  /// Compute next batch of bindings if possible, this could
-  /// be supertypes extracted from one of the current bindings
-  /// or default literal types etc.
-  ///
-  /// \returns true if some new bindings were successfully computed,
-  /// false otherwise.
-  bool computeNext();
-
-  /// Check whether binding type is required to either conform to
-  /// `ExpressibleByNilLiteral` protocol or be wrapped into an optional type.
-  bool requiresOptionalAdjustment(const Binding &binding) const;
-
-  Binding getDefaultBinding(Constraint *constraint) const;
-};
-
-/// Iterator over disjunction choices, makes it
-/// easy to work with disjunction and encapsulates
-/// some other important information such as locator.
-class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
-  // The disjunction choices that this producer will iterate through.
-  ArrayRef<Constraint *> Choices;
-
-  // The ordering of disjunction choices. We index into Choices
-  // through this vector in order to visit the disjunction choices in
-  // the order we want to visit them.
-  SmallVector<unsigned, 8> Ordering;
-
-  // The index of the first element in a partition of the disjunction
-  // choices. The choices are split into partitions where we will
-  // visit all elements within a single partition before moving to the
-  // elements of the next partition. If we visit all choices within a
-  // single partition and have found a successful solution with one of
-  // the choices in that partition, we stop looking for other
-  // solutions.
-  SmallVector<unsigned, 4> PartitionBeginning;
-
-  // The index in the current partition of disjunction choices that we
-  // are iterating over.
-  unsigned PartitionIndex = 0;
-
-  bool IsExplicitConversion;
-
-  Constraint *Disjunction;
-
-  unsigned Index = 0;
-
-  bool needsGenericOperatorOrdering = true;
-
-public:
-  using Element = DisjunctionChoice;
-
-  DisjunctionChoiceProducer(ConstraintSystem &cs, Constraint *disjunction,
-                            llvm::TinyPtrVector<Constraint *> &favorites)
-      : BindingProducer(cs, disjunction->shouldRememberChoice()
-                                ? disjunction->getLocator()
-                                : nullptr),
-        Choices(disjunction->getNestedConstraints()),
-        IsExplicitConversion(disjunction->isExplicitConversion()),
-        Disjunction(disjunction) {
-    assert(disjunction->getKind() == ConstraintKind::Disjunction);
-    assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
-
-    // Mark constraints as favored. This information
-    // is going to be used by partitioner.
-    for (auto *choice : favorites)
-      cs.favorConstraint(choice);
-
-    // Order and partition the disjunction choices.
-    partitionDisjunction(Ordering, PartitionBeginning);
-  }
-
-  void setNeedsGenericOperatorOrdering(bool flag) {
-    needsGenericOperatorOrdering = flag;
-  }
-
-  std::optional<Element> operator()() override {
-    if (isExhausted())
-      return std::nullopt;
-
-    unsigned currIndex = Index;
-    bool isBeginningOfPartition = PartitionIndex < PartitionBeginning.size() &&
-                                  PartitionBeginning[PartitionIndex] == Index;
-    if (isBeginningOfPartition)
-      ++PartitionIndex;
-
-    ++Index;
-
-    auto choice = DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
-                                    IsExplicitConversion, isBeginningOfPartition);
-    // Partition the generic operators before producing the first generic
-    // operator disjunction choice.
-    if (needsGenericOperatorOrdering && choice.isGenericOperator()) {
-      unsigned nextPartitionIndex = (PartitionIndex < PartitionBeginning.size() ?
-                                     PartitionBeginning[PartitionIndex] : Ordering.size());
-      partitionGenericOperators(Ordering.begin() + currIndex,
-                                Ordering.begin() + nextPartitionIndex);
-      needsGenericOperatorOrdering = false;
-    }
-
-    return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
-                             IsExplicitConversion, isBeginningOfPartition);
-  }
-
-  bool needsToComputeNext() const override { return false; }
-
-  bool isExhausted() const override { return Index >= Choices.size(); }
-
-private:
-  // Partition the choices in the disjunction into groups that we will
-  // iterate over in an order appropriate to attempt to stop before we
-  // have to visit all of the options.
-  void
-  partitionDisjunction(SmallVectorImpl<unsigned> &Ordering,
-                       SmallVectorImpl<unsigned> &PartitionBeginning);
-
-  /// Partition the choices in the range \c first to \c last into groups and
-  /// order the groups in the best order to attempt based on the argument
-  /// function type that the operator is applied to.
-  void partitionGenericOperators(SmallVectorImpl<unsigned>::iterator first,
-                                 SmallVectorImpl<unsigned>::iterator last);
-};
-
-class ConjunctionElementProducer : public BindingProducer<ConjunctionElement> {
-  ArrayRef<Constraint *> Elements;
-
-  unsigned Index = 0;
-
-public:
-  using Element = ConjunctionElement;
-
-  ConjunctionElementProducer(ConstraintSystem &cs, Constraint *conjunction)
-      : BindingProducer(cs, conjunction->getLocator()),
-        Elements(conjunction->getNestedConstraints()) {
-    assert(conjunction->getKind() == ConstraintKind::Conjunction);
-  }
-
-  std::optional<Element> operator()() override {
-    if (Index >= Elements.size())
-      return std::nullopt;
-
-    return ConjunctionElement(Elements[Index++]);
-  }
-
-  bool needsToComputeNext() const override { return false; }
-
-  bool isExhausted() const override { return Index >= Elements.size(); }
-
-  void markExhausted() {
-    Index = Elements.size();
-  }
-};
+/// Determine whether this type is considered `Sendable` when captured
+/// i.e. a base type of a partially applied member reference.
+///
+/// The requirement here is more strict than regular `Sendable` conformance:
+///  - The type has to conform to `Sendable`;
+///  - All referenced type parameters have to conform to `SendableMetatype`.
+///
+/// This function requires the type to be fully resolved.
+bool isSendableCapture(Type type);
 
 /// Find any references to external type variables used in the body of a
 /// conjunction element (e.g closures, taps, if/switch expressions).
@@ -6515,23 +5036,6 @@ bool debugConstraintSolverForTarget(ASTContext &C,
                                     SyntacticElementTarget target);
 } // end namespace constraints
 
-template<typename ...Args>
-TypeVariableType *TypeVariableType::getNew(const ASTContext &C, unsigned ID,
-                                           Args &&...args) {
-  // Allocate memory
-  void *mem = C.Allocate(sizeof(TypeVariableType) + sizeof(Implementation),
-                         alignof(TypeVariableType),
-                         AllocationArena::ConstraintSolver);
-
-  // Construct the type variable.
-  auto *result = ::new (mem) TypeVariableType(C, ID);
-
-  // Construct the implementation object.
-  new (result+1) TypeVariableType::Implementation(std::forward<Args>(args)...);
-
-  return result;
-}
-
 /// If the expression has the effect of a forced downcast, find the
 /// underlying forced downcast expression.
 ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
@@ -6543,75 +5047,6 @@ ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 /// \param module represents the module in which the expr appears
 bool canAddExplicitConsume(constraints::Solution &sol,
                            ModuleDecl *module, Expr *expr);
-
-// Count the number of overload sets present
-// in the expression and all of the children.
-class OverloadSetCounter : public ASTWalker {
-  unsigned &NumOverloads;
-
-public:
-  OverloadSetCounter(unsigned &overloads)
-  : NumOverloads(overloads)
-  {}
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Arguments;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-    if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
-      // If we've found function application and it's
-      // function is an overload set, count it.
-      if (isa<OverloadSetRefExpr>(applyExpr->getFn()))
-        ++NumOverloads;
-    }
-
-    // Always recur into the children.
-    return Action::Continue(expr);
-  }
-};
-
-/// Matches array of function parameters to candidate inputs,
-/// which can be anything suitable (e.g., parameters, arguments).
-///
-/// It claims inputs sequentially and tries to pair between an input
-/// and the next appropriate parameter. The detailed matching behavior
-/// of each pair is specified by a custom function (i.e., pairMatcher).
-/// It considers variadic and defaulted arguments when forming proper
-/// input-parameter pairs; however, other information like label and
-/// type information is not directly used here. It can be implemented
-/// in the custom function when necessary.
-class InputMatcher {
-  size_t NumSkippedParameters;
-  const ParameterListInfo &ParamInfo;
-  const ArrayRef<AnyFunctionType::Param> Params;
-
-public:
-  enum Result {
-    /// The specified inputs are successfully matched.
-    IM_Succeeded,
-    /// There are input(s) left unclaimed while all parameters are matched.
-    IM_HasUnclaimedInput,
-    /// There are parateter(s) left unmatched while all inputs are claimed.
-    IM_HasUnmatchedParam,
-    /// Custom pair matcher function failure.
-    IM_CustomPairMatcherFailed,
-  };
-
-  InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-               const ParameterListInfo &paramInfo);
-
-  /// Matching a given array of inputs.
-  ///
-  /// \param numInputs The number of inputs.
-  /// \param pairMatcher Custom matching behavior of an input-parameter pair.
-  /// \return the matching result.
-  Result
-  match(int numInputs,
-        std::function<bool(unsigned inputIdx, unsigned paramIdx)> pairMatcher);
-
-  size_t getNumSkippedParameters() const { return NumSkippedParameters; }
-};
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.
@@ -6666,4 +5101,4 @@ struct DenseMapInfo<swift::constraints::SyntacticElementTargetKey> {
 };
 } // end namespace llvm
 
-#endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H
+#endif // SWIFT_SEMA_CONSTRAINT_SYSTEM_H

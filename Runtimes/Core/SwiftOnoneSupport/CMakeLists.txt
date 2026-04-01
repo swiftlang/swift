@@ -29,7 +29,8 @@ target_compile_definitions(swiftSwiftOnoneSupport PRIVATE
 target_link_libraries(swiftSwiftOnoneSupport
   PRIVATE
     swiftShims
-    swiftCore)
+    swiftCore
+    $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 install(TARGETS swiftSwiftOnoneSupport
     EXPORT SwiftCoreTargets

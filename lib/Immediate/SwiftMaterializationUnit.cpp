@@ -276,6 +276,7 @@ generateModule(const CompilerInstance &CI, std::unique_ptr<SILModule> SM) {
   // Run LLVM passes on the resulting module
   performLLVM(IRGenOpts, Context.Diags, /*diagMutex*/ nullptr,
               /*hash*/ nullptr, Module, GenModule.getTargetMachine(),
+              CI.getSourceMgr().getFileSystem(),
               CI.getPrimarySpecificPathsForAtMostOnePrimary().OutputFilename,
               CI.getOutputBackend(), Context.Stats);
 

@@ -420,7 +420,7 @@ public:
   /// Compute the distances. The function \p getApplyLength returns the length
   /// of a function call.
   template <typename Func>
-  void analyze(ColdBlockInfo &CBI, Func getApplyLength) {
+  void analyze(ColdBlockAnalysis *CBA, Func getApplyLength) {
     assert(!isValid());
     valid = true;
     unsigned numBlocks = F->size();
@@ -431,13 +431,13 @@ public:
       return;
 
     BlockInfoStorage.resize(numBlocks);
-    CBI.analyze(F);
+    ColdBlockInfo *CBI = CBA->get(F);
 
     // First step: compute the length of the blocks.
     unsigned BlockIdx = 0;
     for (SILBasicBlock &BB : *F) {
       int Length = 0;
-      if (CBI.isCold(&BB)) {
+      if (CBI->isCold(&BB)) {
         Length = ColdBlockLength;
       } else {
         for (SILInstruction &I : BB) {

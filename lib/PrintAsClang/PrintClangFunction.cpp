@@ -21,6 +21,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -66,8 +67,7 @@ KnownTypeKind isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
   }
 
   const TypeDecl *typeDecl;
-  auto *tPtr = t->isOptional() ? t->getOptionalObjectType()->getDesugaredType()
-                               : t->getDesugaredType();
+  auto *tPtr = t->lookThroughSingleOptionalType()->getDesugaredType();
   if (auto *bgt = dyn_cast<BoundGenericStructType>(tPtr)) {
     return (bgt->isUnsafePointer() || bgt->isUnsafeMutablePointer())
                ? KnownTypeKind::Known
@@ -81,9 +81,7 @@ KnownTypeKind isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
                                 : KnownTypeKind::Known;
   }
   if (auto *classType = dyn_cast<ClassType>(tPtr)) {
-    return (classType->getClassOrBoundGenericClass()->hasClangNode() &&
-            isa<clang::ObjCInterfaceDecl>(
-                classType->getClassOrBoundGenericClass()->getClangDecl()))
+    return (classType->getClassOrBoundGenericClass()->hasClangNode())
                ? KnownTypeKind::Known
                : KnownTypeKind::Unknown;
   }
@@ -158,7 +156,7 @@ private:
   }
 
 public:
-  void printTypeName(const ASTContext &Context, raw_ostream &os) const {
+  void printTypeName(ASTContext &Context, raw_ostream &os) const {
     ClangSyntaxPrinter(Context, os).printClangTypeReference(typeDecl);
   }
 
@@ -169,7 +167,7 @@ public:
                         bodyOfReturn);
   }
 
-  void printReturnScaffold(const ASTContext &Context, raw_ostream &os,
+  void printReturnScaffold(ASTContext &Context, raw_ostream &os,
                            llvm::function_ref<void(StringRef)> bodyOfReturn) {
     std::string fullQualifiedType;
     std::string typeName;
@@ -290,7 +288,12 @@ public:
   visitExistentialType(ExistentialType *ty,
                        std::optional<OptionalTypeKind> optionalKind,
                        bool isInOutParam) {
-    if (ty->isObjCExistentialType()) {
+    bool hasSwiftSuperClass = false;
+    if (auto superClass = ty->getExistentialLayout().getSuperclass()) {
+      auto *CD = superClass->getClassOrBoundGenericClass();
+      hasSwiftSuperClass = !CD->isObjC();
+    }
+    if (ty->isObjCExistentialType() && !hasSwiftSuperClass) {
       declPrinter.withOutputStream(os).print(ty, optionalKind);
       if (isInOutParam) {
         os << " __strong";
@@ -485,15 +488,23 @@ public:
 
     auto args = BGT->getGenericArgs();
     assert(args.size() == 1);
-    llvm::SaveAndRestore<FunctionSignatureTypeUse> typeUseNormal(
-        typeUseKind, FunctionSignatureTypeUse::TypeReference);
-    // FIXME: We can definitely support pointers to known Clang types.
-    if (isKnownCType(args.front(), typeMapping, BGT->getASTContext()) ==
-        KnownTypeKind::Unknown)
-      return ClangRepresentation(ClangRepresentation::unsupported);
-    auto partRepr = visitPart(args.front(), OTK_None, /*isInOutParam=*/false);
-    if (partRepr.isUnsupported())
-      return partRepr;
+    auto arg = args.front();
+    if (const auto *structDecl = arg->getStructOrBoundGenericStruct();
+        structDecl && structDecl->getClangDecl()) {
+      ClangTypeHandler handler(structDecl->getClangDecl());
+      if (!handler.isRepresentable())
+        return ClangRepresentation::unsupported;
+      handler.printTypeName(structDecl->getASTContext(), os);
+    } else {
+      llvm::SaveAndRestore<FunctionSignatureTypeUse> typeUseNormal(
+          typeUseKind, FunctionSignatureTypeUse::TypeReference);
+      if (isKnownCType(arg, typeMapping, BGT->getASTContext()) ==
+          KnownTypeKind::Unknown)
+        return ClangRepresentation(ClangRepresentation::unsupported);
+      auto partRepr = visitPart(arg, OTK_None, /*isInOutParam=*/false);
+      if (partRepr.isUnsupported())
+        return partRepr;
+    }
     if (isConst)
       os << " const";
     os << " *";
@@ -518,6 +529,10 @@ public:
   visitBoundGenericEnumType(BoundGenericEnumType *BGT,
                             std::optional<OptionalTypeKind> optionalKind,
                             bool isInOutParam) {
+    if (optionalKind == OTK_None) {
+      if (auto objTy = BGT->getOptionalObjectType())
+        return visitPart(objTy, OTK_Optional, isInOutParam);
+    }
     return visitValueType(BGT, BGT->getDecl(), optionalKind, isInOutParam,
                           BGT->getGenericArgs());
   }

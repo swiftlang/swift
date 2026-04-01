@@ -205,6 +205,19 @@ func testDoCatchErrorTypedInClosure(cond: Bool) {
   }
 }
 
+// issue-77718
+func testDoCatchErrorTypedInAsyncClosure<T, E: Error>(
+  work: @escaping @Sendable () async throws(E) -> T,
+) -> Task<Result<T, E>, Never> {
+  .init {
+    do {
+      return .success(try await work())
+    } catch {
+      return .failure(error)
+    }
+  }
+}
+
 struct ThrowingMembers {
   subscript(i: Int) -> Int {
     get throws(MyError) { i }

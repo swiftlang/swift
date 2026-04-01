@@ -62,7 +62,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
   /// `pointer` must point to a region of `byteCount` initialized bytes,
-  /// or may be `nil` if `count` is 0.
+  /// or may be `nil` if `byteCount` is 0.
   ///
   /// The region of `byteCount` bytes of memory starting at `pointer`
   /// must remain valid, initialized and immutable
@@ -121,7 +121,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeRawBufferPointer>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -142,7 +142,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: an `UnsafeMutableRawBufferPointer` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -163,7 +163,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeMutableRawBufferPointer>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -207,7 +207,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: an `UnsafeBufferPointer<T>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -228,7 +228,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeBufferPointer<T>>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -249,7 +249,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: an `UnsafeMutableBufferPointer<T>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -270,7 +270,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeMutableBufferPointer<T>>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -701,6 +701,15 @@ extension RawSpan {
     unsafe (self._pointer == other._pointer) && (self._count == other._count)
   }
 
+  /// Returns a Boolean value indicating whether two instances refer to the same
+  /// memory region.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    unsafe (self._pointer == other._pointer) && (self._count == other._count)
+  }
+
   /// Returns the offsets where the memory of `other` is located within
   /// the memory represented by `self`
   ///
@@ -858,3 +867,30 @@ extension RawSpan {
     extracting(droppingFirst: k)
   }
 }
+
+extension RawSpan {
+  @available(SwiftStdlib 6.4, *)
+  @_transparent
+  public var _span: Span<UInt8> {
+    @lifetime(copy self)
+    get {
+      let buf = unsafe UnsafeBufferPointer(
+        start: _pointer?.assumingMemoryBound(to: UInt8.self), 
+        count: _count)
+      let span = unsafe Span(_unsafeElements: buf)
+      return unsafe _overrideLifetime(span, copying: self)
+    }
+  }
+}
+
+#if !SPAN_COMPATIBILITY_STUB
+@available(SwiftStdlib 6.4, *)
+extension RawSpan: BorrowingSequence {
+  @available(SwiftStdlib 6.4, *)
+  @inlinable
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> SpanIterator<UInt8> {
+    SpanIterator(self._span)
+  }
+}
+#endif

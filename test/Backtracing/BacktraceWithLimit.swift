@@ -1,13 +1,19 @@
 // RUN: %empty-directory(%t)
+<<<<<<< HEAD
 // RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -Onone -o %t/BacktraceWithLimit
 // RUN: %target-codesign %t/BacktraceWithLimit
 // RUN: %target-run %t/BacktraceWithLimit | %FileCheck %s
+=======
+// RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -Onone -o %t/BacktraceWithLimit.exe
+// RUN: %target-codesign %t/BacktraceWithLimit.exe
+// RUN: %target-run %t/BacktraceWithLimit.exe | %FileCheck %s
+>>>>>>> origin/main
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 import Runtime
 

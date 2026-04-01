@@ -424,6 +424,7 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
 
   switch (target.getOS()) {
   case llvm::Triple::XROS:
+  case llvm::Triple::Firmware:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
@@ -1487,13 +1488,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.RuntimeVariant =
           llvm::StringSwitch<std::optional<OutputInfo::MSVCRuntime>>(
               A->getValue())
-              .Cases("MD", "MultiThreadedDLL", "shared-ucrt",
+              .Cases({"MD", "MultiThreadedDLL", "shared-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDLL)
-              .Cases("MDd", "MultiThreadedDebugDLL", "shared-debug-ucrt",
+              .Cases({"MDd", "MultiThreadedDebugDLL", "shared-debug-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDebugDLL)
-              .Cases("MT", "MultiThreaded", "static-ucrt",
+              .Cases({"MT", "MultiThreaded", "static-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreaded)
-              .Cases("MTd", "MultiThreadedDebug", "static-debug-ucrt",
+              .Cases({"MTd", "MultiThreadedDebug", "static-debug-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDebug)
               .Default(std::nullopt);
       if (!OI.RuntimeVariant)
@@ -1699,6 +1700,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftOverlayFile:
       case file_types::TY_JSONDependencies:
       case file_types::TY_JSONArguments:
+      case file_types::TY_JSONPolyglotAST:
       case file_types::TY_SwiftABIDescriptor:
       case file_types::TY_SwiftAPIDescriptor:
       case file_types::TY_ConstValues:

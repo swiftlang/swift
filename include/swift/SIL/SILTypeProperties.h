@@ -128,23 +128,33 @@ enum MayHaveCustomDeinit_t : bool {
   MayHaveCustomDeinit = true,
 };
 
+/// Is this a very large type whose expansion into SSA values is likely
+/// detrimential i.e should be kept indirect.
+enum IsVeryLargeType_t : bool {
+  IsNotVeryLargeType = false,
+  IsVeryLargeType = true
+};
+
 class SILTypeProperties {
   // These are chosen so that bitwise-or merges the flags properly.
   //
   // clang-format off
   enum : unsigned {
-    NonTrivialFlag                 = 1 << 0,
-    NonFixedABIFlag                = 1 << 1,
-    AddressOnlyFlag                = 1 << 2,
-    ResilientFlag                  = 1 << 3,
-    TypeExpansionSensitiveFlag     = 1 << 4,
-    InfiniteFlag                   = 1 << 5,
-    HasRawPointerFlag              = 1 << 6,
-    LexicalFlag                    = 1 << 7,
-    HasPackFlag                    = 1 << 8,
-    AddressableForDependenciesFlag = 1 << 9,
-    HasRawLayoutFlag               = 1 << 10,
-    CustomDeinitFlag               = 1 << 11,
+    NonTrivialFlag                           = 1 << 0,
+    NonFixedABIFlag                          = 1 << 1,
+    AddressOnlyFlag                          = 1 << 2,
+    ResilientFlag                            = 1 << 3,
+    TypeExpansionSensitiveFlag               = 1 << 4,
+    InfiniteFlag                             = 1 << 5,
+    HasRawPointerFlag                        = 1 << 6,
+    LexicalFlag                              = 1 << 7,
+    HasPackFlag                              = 1 << 8,
+    AddressableForDependenciesFlag           = 1 << 9,
+    HasRawLayoutFlag                         = 1 << 10,
+    CustomDeinitFlag                         = 1 << 11,
+    IsVeryLargeTypeFlag                      = 1 << 12,
+    DefinitelyAddressableForDependenciesFlag = 1 << 13,
+    DefinitelyHasRawLayoutFlag               = 1 << 14
   };
   // clang-format on
 
@@ -164,7 +174,10 @@ public:
       IsLexical_t isLexical = IsNotLexical, HasPack_t hasPack = HasNoPack,
       IsAddressableForDependencies_t isAFD = IsNotAddressableForDependencies,
       HasRawLayout_t hasRawLayout = DoesNotHaveRawLayout,
-      MayHaveCustomDeinit_t customDeinit = HasOnlyDefaultDeinit)
+      MayHaveCustomDeinit_t customDeinit = HasOnlyDefaultDeinit,
+      IsVeryLargeType_t largeType = IsNotVeryLargeType,
+      IsAddressableForDependencies_t definitelyIsAFD = IsNotAddressableForDependencies,
+      HasRawLayout_t definitelyHasRawLayout = DoesNotHaveRawLayout)
       : Flags((isTrivial ? 0U : NonTrivialFlag) |
               (isFixedABI ? 0U : NonFixedABIFlag) |
               (isAddressOnly ? AddressOnlyFlag : 0U) |
@@ -175,7 +188,10 @@ public:
               (hasPack ? HasPackFlag : 0U) |
               (isAFD ? AddressableForDependenciesFlag : 0U) |
               (hasRawLayout ? HasRawLayoutFlag : 0U) |
-              (customDeinit ? CustomDeinitFlag : 0U)) {}
+              (customDeinit ? CustomDeinitFlag : 0U) |
+              (largeType ? IsVeryLargeTypeFlag : 0U) |
+              (definitelyIsAFD ? AddressableForDependenciesFlag : 0U) |
+              (definitelyHasRawLayout ? HasRawLayoutFlag : 0U)) {}
 
   constexpr bool operator==(SILTypeProperties p) const {
     return Flags == p.Flags;
@@ -186,9 +202,9 @@ public:
   }
 
   static constexpr SILTypeProperties forTrivialOpaque() {
-    return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
-            IsNotTypeExpansionSensitive, HasRawPointer, IsNotLexical,
-            HasNoPack, IsAddressableForDependencies};
+    return {IsTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient,
+            IsNotTypeExpansionSensitive, HasRawPointer, IsLexical,
+            HasNoPack, IsAddressableForDependencies, HasRawLayout};
   }
 
   static constexpr SILTypeProperties forRawPointer() {
@@ -261,6 +277,25 @@ public:
   MayHaveCustomDeinit_t mayHaveCustomDeinit() const {
     return MayHaveCustomDeinit_t((Flags & CustomDeinitFlag) != 0);
   }
+  IsVeryLargeType_t isVeryLargeType() const {
+    return IsVeryLargeType_t((Flags & IsVeryLargeTypeFlag) != 0);
+  }
+
+  // This query is different from 'isAddressableForDependencies' because for
+  // opaque types it is assumed positively rather than negatively. Meaning 'T'
+  // will always return true for 'isAddressableForDependencies', but that may
+  // not actually be correct for the real type.
+  IsAddressableForDependencies_t definitelyIsAddressableForDependencies() const {
+    return IsAddressableForDependencies_t(
+                      (Flags & DefinitelyAddressableForDependenciesFlag) != 0);
+  }
+  // This query is different from 'isOrContainsRawLayout' because for opaque
+  // types it is assumed positively rather negatively. Meaning 'T' will always
+  // return true for 'isOrContainsRawLayout', but that may not actually be
+  // correct for the real type.
+  HasRawLayout_t definitelyIsOrContainsRawLayout() const {
+    return HasRawLayout_t((Flags & DefinitelyHasRawLayoutFlag) != 0);
+  }
 
   void setNonTrivial() { Flags |= NonTrivialFlag; }
   void setIsOrContainsRawPointer() { Flags |= HasRawPointerFlag; }
@@ -286,6 +321,15 @@ public:
   void setCustomDeinit(MayHaveCustomDeinit_t hasCustomDeinit) {
     Flags = (Flags & ~CustomDeinitFlag)
       | (hasCustomDeinit ? CustomDeinitFlag : 0);
+  }
+  void setVeryLargeType() { Flags |= IsVeryLargeTypeFlag; }
+  void setDefinitelyAddressableForDependencies() {
+    Flags |= AddressableForDependenciesFlag;
+    Flags |= DefinitelyAddressableForDependenciesFlag;
+  }
+  void setDefinitelyHasRawLayout() {
+    Flags |= HasRawLayoutFlag;
+    Flags |= DefinitelyHasRawLayoutFlag;
   }
 };
 

@@ -1361,7 +1361,9 @@ deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRec
 void IRGenerator::emitLazyDefinitions() {
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     // In embedded Swift, the compiler cannot emit any metadata, etc.
-    assert(LazyTypeMetadata.empty());
+    // Other than to support existentials.
+    assert(LazyTypeMetadata.empty() ||
+           SIL.getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials));
     assert(LazySpecializedTypeMetadataRecords.empty());
     assert(LazyTypeContextDescriptors.empty());
     assert(LazyOpaqueTypeDescriptors.empty());
@@ -1388,7 +1390,8 @@ void IRGenerator::emitLazyDefinitions() {
          !LazyCanonicalSpecializedMetadataAccessors.empty() ||
          !LazyMetadataAccessors.empty() ||
          !LazyClassMetadata.empty() ||
-         !LazySpecializedClassMetadata.empty()
+         !LazySpecializedClassMetadata.empty() ||
+         !LazySpecializedValueMetadata.empty()
          ) {
     // Emit any lazy type metadata we require.
     while (!LazyTypeMetadata.empty()) {
@@ -1514,6 +1517,12 @@ void IRGenerator::emitLazyDefinitions() {
       CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
       emitLazySpecializedClassMetadata(*IGM.get(), classType);
     }
+
+    while(!LazySpecializedValueMetadata.empty()) {
+      CanType valueType = LazySpecializedValueMetadata.pop_back_val();
+      CurrentIGMPtr IGM = getGenModule(valueType->getNominalOrBoundGenericNominal());
+      emitLazySpecializedValueMetadata(*IGM.get(), valueType);
+    }
   }
 
   FinishedEmittingLazyDefinitions = true;
@@ -1579,6 +1588,16 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   auto found = HasLazyMetadata.find(type);
   if (found != HasLazyMetadata.end())
     return found->second;
+  auto &langOpts = SIL.getASTContext().LangOpts;
+  auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
+    langOpts.hasFeature(Feature::EmbeddedExistentials);
+  if (isEmbeddedWithExistentials &&
+      (isa<StructDecl>(type) || isa<EnumDecl>(type))) {
+    bool isGeneric = cast<NominalTypeDecl>(type)->isGenericContext();
+    HasLazyMetadata[type] = !isGeneric;
+
+    return !isGeneric;
+  }
 
   auto canBeLazy = [&]() -> bool {
     auto *dc = type->getDeclContext();
@@ -1628,8 +1647,14 @@ void IRGenerator::noteUseOfClassMetadata(CanType classType) {
 }
 
 void IRGenerator::noteUseOfSpecializedClassMetadata(CanType classType) {
-  if (LazilyEmittedSpecializedClassMetadata.insert(classType.getPointer()).second) {
+  if (LazilyEmittedSpecializedMetadata.insert(classType.getPointer()).second) {
     LazySpecializedClassMetadata.push_back(classType);
+  }
+}
+
+void IRGenerator::noteUseOfSpecializedValueMetadata(CanType valueType) {
+  if (LazilyEmittedSpecializedMetadata.insert(valueType.getPointer()).second) {
+    LazySpecializedValueMetadata.push_back(valueType);
   }
 }
 
@@ -4027,38 +4052,41 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   auto var = createVariable(*this, link, definitionType,
                             entity.getAlignment(*this), DbgTy);
 
-  // @escaping () -> ()
-  // NOTE: we explicitly desugar the `Void` type for the return as the test
-  // suite makes assumptions that it can emit the value witness table without a
-  // standard library for the target. `Context.getVoidType()` will attempt to
-  // lookup the `Decl` before returning the canonical type. To workaround this
-  // dependency, we simply desugar the `Void` return type to `()`.
-  static CanType kAnyFunctionType =
-      FunctionType::get({}, Context.TheEmptyTupleType,
-                        ASTExtInfo{})->getCanonicalType();
+  auto isZeroParamFunctionType = [this](Type t) -> bool {
+    if (auto *funcTy = t->getAs<FunctionType>()) {
+      return (funcTy->getParams().size() == 0 &&
+              funcTy->getResult()->isEqual(Context.TheEmptyTupleType));
+    }
+
+    return false;
+  };
 
   // Adjust the linkage for the well-known VWTs that are strongly defined
   // in the runtime.
   //
-  // We special case the "AnyFunctionType" here as this type is referened
+  // We special case the "AnyFunctionType" here as this type is referenced
   // inside the standard library with the definition being in the runtime
   // preventing the normal detection from identifying that this is module
   // local.
   //
   // If we are statically linking the standard library, we need to internalise
   // the symbols.
-  if (getSwiftModule()->isStdlibModule() ||
-      (Context.getStdlibModule() &&
-       Context.getStdlibModule()->isStaticLibrary()))
-    if (entity.isTypeKind() &&
-        (IsWellKnownBuiltinOrStructralType(entity.getType()) ||
-         entity.getType() == kAnyFunctionType))
-      if (auto *GV = dyn_cast<llvm::GlobalValue>(var))
-        if (GV->hasDLLImportStorageClass())
-          ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
-                          llvm::GlobalValue::DefaultVisibility,
-                          llvm::GlobalValue::DefaultStorageClass})
-              .to(GV);
+  if (auto *GV = dyn_cast<llvm::GlobalValue>(var)) {
+    if (GV->hasDLLImportStorageClass()) {
+      if (getSwiftModule()->isStdlibModule() ||
+          (Context.getStdlibModule() &&
+           Context.getStdlibModule()->isStaticLibrary())) {
+        if (entity.isTypeKind() &&
+            (isWellKnownBuiltinOrStructuralType(entity.getType()) ||
+             isZeroParamFunctionType(entity.getType()))) {
+              ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
+                              llvm::GlobalValue::DefaultVisibility,
+                              llvm::GlobalValue::DefaultStorageClass})
+                  .to(GV);
+        }
+      }
+    }
+  }
 
   // Install the concrete definition if we have one.
   if (definition && definition.hasInit()) {
@@ -4870,7 +4898,8 @@ void IRGenModule::emitAccessibleFunctions() {
     llvm_unreachable("Don't know how to emit accessible functions for "
                      "the selected object format.");
   case llvm::Triple::MachO:
-    fnsSectionName = "__TEXT, __swift5_acfuncs, regular";
+    // no_dead_strip - accessible functions must never be stripped
+    fnsSectionName = "__TEXT, __swift5_acfuncs, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
@@ -5286,7 +5315,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
     return cast<llvm::GlobalValue>(addr);
   }
-
+  bool hasEmbeddedExistentials = isEmbeddedWithExistentials();
   auto entity =
       (isPrespecialized &&
        !irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
@@ -5302,6 +5331,9 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     entity = LinkEntity::forTypeMetadata(concreteType,
                                          TypeMetadataAddress::AddressPoint);
+    if (hasEmbeddedExistentials)
+      entity = LinkEntity::forTypeMetadata(concreteType,
+                                           TypeMetadataAddress::FullMetadata);
   }
 
   auto DbgTy = DebugTypeInfo::getGlobalMetadata(MetatypeType::get(concreteType),
@@ -5324,7 +5356,8 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
   markGlobalAsUsedBasedOnLinkage(*this, link, var);
   
-  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+  if (Context.LangOpts.hasFeature(Feature::Embedded) &&
+      !hasEmbeddedExistentials) {
     return var;
   }
 
@@ -5335,12 +5368,14 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   if (auto nominal = concreteType->getAnyNominal()) {
     // Keep type metadata around for all types (except @_objcImplementation,
     // since we're using ObjC metadata for that).
-    if (!isObjCImpl)
+    if (!isObjCImpl && !hasEmbeddedExistentials)
       addRuntimeResolvableType(nominal);
 
     // Don't define the alias for foreign type metadata, prespecialized
     // generic metadata, or @_objcImplementation classes, since they're not ABI.
-    if (requiresForeignTypeMetadata(nominal) || isPrespecialized || isObjCImpl)
+    if ((requiresForeignTypeMetadata(nominal) && !hasEmbeddedExistentials) ||
+        (isPrespecialized && !hasEmbeddedExistentials) ||
+        isObjCImpl)
       return var;
 
     // Native Swift class metadata has a destructor before the address point.
@@ -5353,6 +5388,10 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     }
   }
 
+  if (hasEmbeddedExistentials) {
+    adjustmentIndex = MetadataAdjustmentIndex::EmbeddedWithExistentials;
+  }
+
   llvm::Constant *indices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, adjustmentIndex)};
@@ -5361,6 +5400,20 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   addr = llvm::ConstantExpr::getBitCast(addr, TypeMetadataPtrTy);
 
   // For concrete metadata, declare the alias to its address point.
+
+  if (hasEmbeddedExistentials) {
+    auto isFromOtherModule = [] (NominalTypeDecl *d) -> bool {
+      auto module = d->getModuleContext();
+      auto &ctx = module->getASTContext();
+      return module != ctx.MainModule && ctx.MainModule;
+    };
+    auto nom = concreteType->getAnyNominal();
+    if (!nom || isFromOtherModule(nom)) {
+      // We don't actually use the defined type medata in the non-home module
+      // but rather reference the full metadata at an offset.
+      return nullptr;
+    }
+  }
   auto directEntity = LinkEntity::forTypeMetadata(
       concreteType, TypeMetadataAddress::AddressPoint);
   return defineAlias(directEntity, addr, TypeMetadataStructTy);
@@ -5394,7 +5447,11 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-  if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
+  auto hasEmbeddedExistentials = isEmbeddedWithExistentials();
+  if (hasEmbeddedExistentials) {
+    adjustmentIndex = 0;
+    defaultVarTy = EmbeddedExistentialsMetadataStructTy;
+  } else if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
     defaultVarTy = FullExistentialTypeMetadataStructTy;
     adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
   } else if (fullMetadata) {
@@ -5437,6 +5494,19 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
         }
       }
     }
+
+    if (hasEmbeddedExistentials) {
+      if ((isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) &&
+          nominal->isGenericContext()) {
+        IRGen.noteUseOfSpecializedValueMetadata(concreteType);
+      }
+    }
+  }
+
+  if (hasEmbeddedExistentials &&
+      (isa<TupleType>(concreteType) ||
+       isa<FunctionType>(concreteType))) {
+    IRGen.noteUseOfSpecializedValueMetadata(concreteType);
   }
 
   if (shouldPrespecializeGenericMetadata()) {
@@ -5477,6 +5547,30 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
                                  /*overrideDeclType=*/nullptr);
     typeOfValue = entity->getDefaultDeclarationType(*this);
+  } else if (hasEmbeddedExistentials) {
+    // We want to avoid generating any local uses of metadata address point
+    // definitions. Instead any local use should be to the offset full metadata
+    // symbol, that is "(gep <full metadata symbol> <offset>)".
+    auto fullMetadataEntity = LinkEntity::forTypeMetadata(
+      concreteType, TypeMetadataAddress::FullMetadata);
+    auto fullMetadata = getAddrOfLLVMVariable(fullMetadataEntity,
+                                              ConstantInit(), DbgTy, refKind,
+                                              /*overrideDeclType=*/nullptr);
+
+    if (auto *GV = dyn_cast<llvm::GlobalVariable>(fullMetadata.getValue()))
+      if (GV->isDeclaration())
+        GV->setComdat(nullptr);
+
+    llvm::Constant *indices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty,
+                             MetadataAdjustmentIndex::EmbeddedWithExistentials)
+    };
+    addr = ConstantReference(
+      llvm::ConstantExpr::getInBoundsGetElementPtr(defaultVarTy,
+                                                   fullMetadata.getValue(),
+                                                   indices),
+      fullMetadata.isIndirect());
   } else {
     addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
                                  /*overrideDeclType=*/defaultVarTy);
@@ -6060,7 +6154,7 @@ IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
     sectionName = ObjCMethodTypeSectionName;
     break;
   case CStringSectionType::OSLogString:
-    sectionName = OSLogStringSectionName;
+    sectionName = Context.LangOpts.OSLogStringSectionName;
     break;
   case CStringSectionType::NumTypes:
     llvm_unreachable("invalid type");

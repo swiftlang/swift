@@ -12,7 +12,6 @@
 
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
-#include "ExprContextAnalysis.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -3020,6 +3019,7 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
       case TypeAttrKind::Nonisolated:
       case TypeAttrKind::Unchecked:
       case TypeAttrKind::Unsafe:
+      case TypeAttrKind::Reparented:
         // These attributes are only available in inheritance clasuses.
         return;
       default:

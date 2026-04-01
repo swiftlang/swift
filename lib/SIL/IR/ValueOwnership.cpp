@@ -182,6 +182,10 @@ CONSTANT_OWNERSHIP_INST(None, TuplePackElementAddr)
 CONSTANT_OWNERSHIP_INST(None, Object)
 CONSTANT_OWNERSHIP_INST(None, Vector)
 CONSTANT_OWNERSHIP_INST(None, TypeValue)
+CONSTANT_OWNERSHIP_INST(None, MakeBorrow)
+CONSTANT_OWNERSHIP_INST(None, MakeAddrBorrow)
+CONSTANT_OWNERSHIP_INST(None, DereferenceAddrBorrow)
+CONSTANT_OWNERSHIP_INST(None, DereferenceBorrowAddr)
 
 #undef CONSTANT_OWNERSHIP_INST
 
@@ -235,9 +239,8 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MarkUninitialized)
 
 // In raw SIL, a MoveValue delimits the scope of trivial variables.
 CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MoveValue)
+CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, DereferenceBorrow)
 
-// result.
-//
 // If the operand is nontrivial and the result is trivial, then it is the
 // programmer's responsibility to use Builtin.fixLifetime.
 //
@@ -578,6 +581,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, IsSameMetatype)
 CONSTANT_OWNERSHIP_BUILTIN(None, Alignof)
 CONSTANT_OWNERSHIP_BUILTIN(None, AllocRaw)
 CONSTANT_OWNERSHIP_BUILTIN(None, AssertConf)
+CONSTANT_OWNERSHIP_BUILTIN(None, InfiniteLoopTrueCondition)
 CONSTANT_OWNERSHIP_BUILTIN(None, UToSCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, StackAlloc)
 CONSTANT_OWNERSHIP_BUILTIN(None, UnprotectedStackAlloc)
@@ -635,7 +639,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDefaultActor)
-CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDistributedRemoteActor)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, InitializeDistributedRemoteActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeNonDefaultDistributedActor)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContextWithType)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
@@ -670,6 +674,10 @@ CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddPriorityEscalationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemovePriorityEscalationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePush)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePop)
+CONSTANT_OWNERSHIP_BUILTIN(None, AddTaskLocalValue)
+CONSTANT_OWNERSHIP_BUILTIN(None, RemoveTaskLocalValue)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPush)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPop)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

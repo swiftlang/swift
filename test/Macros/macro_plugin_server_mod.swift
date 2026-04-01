@@ -24,6 +24,7 @@
 
 // RUN: %cmake-c-compiler \
 // RUN:   %c-flags -target %host_triple -isysroot %host_sdk \
+// RUN:   %shared-linker-flags \
 // RUN:   -shared -o %t/plugins/libCrashOnLoad.dylib \
 // RUN:   %t/CrashOnLoad.c
 

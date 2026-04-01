@@ -37,6 +37,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/IRGen/TBDGen.h"
@@ -127,6 +128,14 @@ static cl::opt<bool> AlignModuleToPageSize(
     "align-module-to-page-size", cl::Hidden,
     cl::desc("Align the text section of all LLVM modules to the page size"));
 
+static cl::opt<std::string> SaveIRGen(
+    "save-irgen", cl::Hidden,
+    cl::desc("Save LLVM-IR to a file before LLVM optimizations"));
+
+static cl::opt<std::string> SaveIR(
+    "save-ir", cl::Hidden,
+    cl::desc("Save LLVM-IR to a file after LLVM optimizations"));
+
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
            std::string>
 swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
@@ -189,6 +198,11 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
   }
 
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
+
+  // Add +mte target feature when memtag-stack sanitizer is enabled
+  if (Opts.Sanitizers & SanitizerKind::MemTagStack)
+    ClangOpts.Features.push_back("+mte");
+
   return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
 }
 
@@ -239,13 +253,13 @@ getProfileReader(const Twine &ProfileName, llvm::vfs::FileSystem &FS,
 }
 
 static std::optional<PGOOptions> buildIRUseOptions(const IRGenOptions &Opts,
+                                                   llvm::vfs::FileSystem &FS,
                                                    DiagnosticEngine &Diags) {
   if (Opts.UseIRProfile.empty())
     return std::nullopt;
 
-  auto FS = llvm::vfs::getRealFileSystem();
   std::unique_ptr<llvm::IndexedInstrProfReader> Reader =
-      getProfileReader(Opts.UseIRProfile.c_str(), *FS, Diags);
+      getProfileReader(Opts.UseIRProfile.c_str(), FS, Diags);
   if (!Reader)
     return std::nullopt;
 
@@ -273,6 +287,7 @@ static std::optional<PGOOptions> buildIRUseOptions(const IRGenOptions &Opts,
 
 static void populatePGOOptions(std::optional<PGOOptions> &Out,
                                const IRGenOptions &Opts,
+                               llvm::vfs::FileSystem &FS,
                                DiagnosticEngine &Diags) {
   if (!Opts.UseSampleProfile.empty()) {
     Out = PGOOptions(
@@ -315,7 +330,7 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
     return;
   }
 
-  if (auto IRUseOptions = buildIRUseOptions(Opts, Diags)) {
+  if (auto IRUseOptions = buildIRUseOptions(Opts, FS, Diags)) {
     Out = *IRUseOptions;
     return;
   }
@@ -347,14 +362,14 @@ void diagnoseSync(
   Diags.diagnose(Loc, ID, std::move(Args)...);
 }
 
-void swift::performLLVMOptimizations(const IRGenOptions &Opts,
-                                     DiagnosticEngine &Diags,
-                                     llvm::sys::Mutex *DiagMutex,
-                                     llvm::Module *Module,
-                                     llvm::TargetMachine *TargetMachine,
-                                     llvm::raw_pwrite_stream *out) {
+void swift::performLLVMOptimizations(
+    const IRGenOptions &Opts, DiagnosticEngine &Diags,
+    llvm::sys::Mutex *DiagMutex, llvm::Module *Module,
+    llvm::TargetMachine *TargetMachine,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
+    llvm::raw_pwrite_stream *out) {
   std::optional<PGOOptions> PGOOpt;
-  populatePGOOptions(PGOOpt, Opts, Diags);
+  populatePGOOptions(PGOOpt, Opts, *FS, Diags);
 
   PipelineTuningOptions PTO;
 
@@ -393,7 +408,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                               Opts.VerifyEach, PrintPassOpts);
   SI.registerCallbacks(PIC, &MAM);
 
-  PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC);
+  PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC, FS);
 
   // Attempt to load pass plugins and register their callbacks with PB.
   for (const auto &PluginFile : Opts.LLVMPassPlugins) {
@@ -599,6 +614,15 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
 
   MPM.run(*Module, MAM);
 
+  if (!SaveIR.empty()) {
+    std::error_code error;
+    llvm::raw_fd_ostream irFile(SaveIR, error);
+    if (irFile.has_error() || error)
+      ABORT("cannot open LLVM-IR output file");
+
+    Module->print(irFile, nullptr);
+  }
+
   if (AlignModuleToPageSize) {
     align(Module);
   }
@@ -739,12 +763,11 @@ namespace {
 
 /// Run the LLVM passes. In multi-threaded compilation this will be done for
 /// multiple LLVM modules in parallel.
-bool swift::performLLVM(const IRGenOptions &Opts,
-                        DiagnosticEngine &Diags,
+bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
                         llvm::sys::Mutex *DiagMutex,
-                        llvm::GlobalVariable *HashGlobal,
-                        llvm::Module *Module,
+                        llvm::GlobalVariable *HashGlobal, llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
+                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
                         StringRef OutputFilename,
                         llvm::vfs::OutputBackend &Backend,
                         UnifiedStatsReporter *Stats) {
@@ -805,12 +828,21 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     assert(Opts.OutputKind == IRGenOutputKind::Module && "no output specified");
   }
 
+  if (!SaveIRGen.empty()) {
+    std::error_code error;
+    llvm::raw_fd_ostream irgenFile(SaveIRGen, error);
+    if (irgenFile.has_error() || error)
+      ABORT("cannot open LLVM-IR output file");
+
+    Module->print(irgenFile, nullptr);
+  }
+
   auto &Ctxt = Module->getContext();
   std::unique_ptr<llvm::DiagnosticHandler> OldDiagnosticHandler =
           Ctxt.getDiagnosticHandler();
   Ctxt.setDiagnosticHandler(std::make_unique<SwiftDiagnosticHandler>(Opts));
 
-  performLLVMOptimizations(Opts, Diags, DiagMutex, Module, TargetMachine,
+  performLLVMOptimizations(Opts, Diags, DiagMutex, Module, TargetMachine, FS,
                            OutputFile ? &OutputFile->getOS() : nullptr);
 
   if (Stats) {
@@ -1145,8 +1177,7 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx,
   }
 
   std::string Error;
-  const Target *Target =
-      TargetRegistry::lookupTarget(EffectiveTriple.str(), Error);
+  const Target *Target = TargetRegistry::lookupTarget(EffectiveTriple, Error);
   if (!Target) {
     Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target, EffectiveTriple.str(),
                        Error);
@@ -1383,7 +1414,7 @@ swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
   // Create the IR emitter.
   IRGenModule *IGM = new IRGenModule(
       *irgen, std::move(targetMachine), nullptr, "", OutputFilename,
-      MainInputFilenameForDebugInfo, PrivateDiscriminator);
+      MainInputFilenameForDebugInfo, PrivateDiscriminator, "");
 
   initLLVMModule(*IGM, *SILMod);
 
@@ -1489,10 +1520,23 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   auto targetMachine = irgen.createTargetMachine();
   if (!targetMachine) return GeneratedModule::null();
 
+  std::string cacheKeyForJob;
+  if (desc.cacheKeyForJob) {
+    auto moduleKey =
+        createCompileJobCacheKeyForOutput(*desc.CAS, *desc.cacheKeyForJob, 0);
+    if (!moduleKey) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::error_cas,
+                         "IRGenModule compute cache key",
+                         toString(moduleKey.takeError()));
+      return GeneratedModule::null();
+    }
+    cacheKeyForJob = desc.CAS->getID(*moduleKey).toString();
+  }
+
   // Create the IR emitter.
   IRGenModule IGM(irgen, std::move(targetMachine), primaryFile, desc.ModuleName,
                   PSPs.OutputFilename, PSPs.MainInputFilenameForDebugInfo,
-                  desc.PrivateDiscriminator);
+                  desc.PrivateDiscriminator, cacheKeyForJob);
 
   initLLVMModule(IGM, *SILMod);
 
@@ -1610,6 +1654,7 @@ struct LLVMCodeGenThreads {
         embedBitcode(IGM->getModule(), parent.irgen->Opts);
         performLLVM(parent.irgen->Opts, IGM->Context.Diags, diagMutex,
                     IGM->ModuleHash, IGM->getModule(), IGM->TargetMachine.get(),
+                    IGM->Context.SourceMgr.getFileSystem(),
                     IGM->OutputFilename, IGM->Context.getOutputBackend(),
                     IGM->Context.Stats);
         if (IGM->Context.Diags.hadAnyError())
@@ -1711,6 +1756,19 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   bool IGMcreated = false;
 
   auto &Ctx = M->getASTContext();
+  std::string cacheKeyForJob;
+  if (desc.cacheKeyForJob) {
+    auto moduleKey =
+        createCompileJobCacheKeyForOutput(*desc.CAS, *desc.cacheKeyForJob, 0);
+    if (!moduleKey) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::error_cas,
+                         "IRGenModule compute cache key",
+                         toString(moduleKey.takeError()));
+      return;
+    }
+    cacheKeyForJob = desc.CAS->getID(*moduleKey).toString();
+  }
+
   // Create an IRGenModule for each source file.
   bool DidRunSILCodeGenPreparePasses = false;
   unsigned idx = 0;
@@ -1743,7 +1801,8 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
     IRGenModule *IGM = new IRGenModule(
         irgen, std::move(targetMachine), nextSF, desc.ModuleName, outputName,
-        nextSF->getFilename(), nextSF->getPrivateDiscriminator().str());
+        nextSF->getFilename(), nextSF->getPrivateDiscriminator().str(),
+        cacheKeyForJob);
 
     initLLVMModule(*IGM, *SILMod, idx++);
     if (!DidRunSILCodeGenPreparePasses) {
@@ -1948,7 +2007,12 @@ GeneratedModule swift::performIRGeneration(
     ArrayRef<std::string> parallelOutputFilenames,
     ArrayRef<std::string> parallelIROutputFilenames,
     llvm::GlobalVariable **outModuleHash,
+<<<<<<< HEAD
     cas::SwiftCASOutputBackend *casBackend) {
+=======
+    cas::SwiftCASOutputBackend *casBackend,
+    std::optional<llvm::cas::ObjectRef> cacheKeyForJob) {
+>>>>>>> origin/main
   // Get a pointer to the SILModule to avoid a potential use-after-move.
   const auto *SILModPtr = SILMod.get();
   const auto &SILOpts = SILModPtr->getOptions();
@@ -1956,7 +2020,11 @@ GeneratedModule swift::performIRGeneration(
       M, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
       ModuleName, PSPs, std::move(CAS), /*symsToEmit*/ std::nullopt,
       parallelOutputFilenames, parallelIROutputFilenames, outModuleHash,
+<<<<<<< HEAD
       casBackend);
+=======
+      casBackend, cacheKeyForJob);
+>>>>>>> origin/main
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty() &&
@@ -1975,14 +2043,23 @@ GeneratedModule swift::performIRGeneration(
     const PrimarySpecificPaths &PSPs,
     std::shared_ptr<llvm::cas::ObjectStore> CAS, StringRef PrivateDiscriminator,
     llvm::GlobalVariable **outModuleHash,
+<<<<<<< HEAD
     cas::SwiftCASOutputBackend *casBackend) {
+=======
+    cas::SwiftCASOutputBackend *casBackend,
+    std::optional<llvm::cas::ObjectRef> cacheKeyForJob) {
+>>>>>>> origin/main
   // Get a pointer to the SILModule to avoid a potential use-after-move.
   const auto *SILModPtr = SILMod.get();
   const auto &SILOpts = SILModPtr->getOptions();
   auto desc = IRGenDescriptor::forFile(
       file, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
       ModuleName, PSPs, std::move(CAS), PrivateDiscriminator,
+<<<<<<< HEAD
       /*symsToEmit*/ std::nullopt, outModuleHash, casBackend);
+=======
+      /*symsToEmit*/ std::nullopt, outModuleHash, casBackend, cacheKeyForJob);
+>>>>>>> origin/main
   return evaluateOrFatal(file->getASTContext().evaluator, IRGenRequest{desc});
 }
 
@@ -2003,7 +2080,7 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   if (!targetMachine) return;
 
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr,
-                  OutputPath, OutputPath, "", "");
+                  OutputPath, OutputPath, "", "", "");
   initLLVMModule(IGM, SILMod);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
@@ -2049,7 +2126,7 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   ASTSym->setAlignment(llvm::MaybeAlign(serialization::SWIFTMODULE_ALIGNMENT));
   IGM.finalize();
   ::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, IGM.getModule(),
-                IGM.TargetMachine.get(),
+                IGM.TargetMachine.get(), Ctx.SourceMgr.getFileSystem(),
                 OutputPath, Ctx.getOutputBackend(), Ctx.Stats);
 }
 
@@ -2066,8 +2143,8 @@ bool swift::performLLVM(const IRGenOptions &Opts, ASTContext &Ctx,
 
   embedBitcode(Module, Opts);
   if (::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, Module,
-                    TargetMachine.get(), OutputFilename, Ctx.getOutputBackend(),
-                    Ctx.Stats))
+                    TargetMachine.get(), Ctx.SourceMgr.getFileSystem(),
+                    OutputFilename, Ctx.getOutputBackend(), Ctx.Stats))
     return true;
   return false;
 }
@@ -2093,7 +2170,8 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
     return irMod;
 
   performLLVMOptimizations(desc.Opts, ctx.Diags, nullptr, irMod.getModule(),
-                           irMod.getTargetMachine(), desc.out);
+                           irMod.getTargetMachine(),
+                           ctx.SourceMgr.getFileSystem(), desc.out);
   return irMod;
 }
 

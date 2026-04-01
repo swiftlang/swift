@@ -24,7 +24,7 @@
 
 //--- macro-1.swift
 import SwiftSyntax
-@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntaxMacros
 
 public struct AssertMacro: ExpressionMacro {
   public static func expansion(
@@ -41,7 +41,7 @@ public struct AssertMacro: ExpressionMacro {
 
 //--- macro-2.swift
 import SwiftSyntax
-@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntaxMacros
 
 public struct StringifyMacro: ExpressionMacro {
   public static func expansion(

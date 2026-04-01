@@ -24,10 +24,12 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -106,17 +108,6 @@ bool swift::specializeAppliesInFunction(SILFunction &F,
       auto *Callee = Apply.getReferencedFunctionOrNull();
       if (!Callee)
         continue;
-
-      // TODO: Enable GenericSpecializer for borrow accessors in OSSA
-      // Currently disabled since GenericSpecializer generates store_borrow to a
-      // temporary stack location and returns a projection from the
-      // store_borrow. This does not work for borrow accessors that return the
-      // projection from within the store_borrow scope.
-      if (F.hasOwnership() &&
-          (Callee->getConventions().hasAddressResult() ||
-           Callee->getConventions().hasGuaranteedResult())) {
-        continue;
-      }
 
       FunctionBuilder.getModule().performOnceForPrespecializedImportedExtensions(
         [&FunctionBuilder](AbstractFunctionDecl *pre) {
@@ -215,6 +206,11 @@ class GenericSpecializer : public SILFunctionTransform {
 
     if (specializeAppliesInFunction(F, this, /*isMandatory*/ false)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      removeUnreachableBlocks(F);
+      if (F.needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), &F);
+      if (F.needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), &F);
     }
   }
 };

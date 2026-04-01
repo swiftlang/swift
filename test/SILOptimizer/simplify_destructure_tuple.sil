@@ -133,6 +133,7 @@ bb0(%0 : @owned $String, %1 : $Int):
   cond_br undef, bb1, bb2
 bb1:
   destroy_value %3
+  destroy_value [dead_end] %2
   unreachable
 bb2:
   (%4, %5) = destructure_tuple %3
@@ -151,5 +152,18 @@ bb0(%0 : $(Int, Int)):
   (%1, %2) = destructure_tuple %0
   %3 = struct $TrivialS (%1, %2)
   return %3
+}
+
+// CHECK-LABEL: sil [ossa] @guaranteed_to_tuple_extract :
+// CHECK:         %1 = tuple_extract %0 : $(String, Int), 0
+// CHECK:         %2 = tuple_extract %0 : $(String, Int), 1
+// CHECK:       } // end sil function 'guaranteed_to_tuple_extract'
+sil [ossa] @guaranteed_to_tuple_extract : $@convention(thin) (@guaranteed (String, Int)) -> () {
+bb0(%0 : @guaranteed $(String, Int)):
+  (%1, %2) = destructure_tuple %0
+  fix_lifetime %1
+  fix_lifetime %2
+  %r = tuple ()
+  return %r
 }
 

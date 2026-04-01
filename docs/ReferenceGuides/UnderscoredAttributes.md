@@ -29,19 +29,7 @@ Forces conformances of the attributed protocol to always have their Type Metadat
 
 ## `@_alwaysEmitIntoClient`
 
-Forces the body of a function to be emitted into client code.
-
-Note that this is distinct from `@inline(__always)`; it doesn't force inlining
-at call-sites, it only means that the implementation is compiled into the
-module which uses the code.
-
-This means that `@_alwaysEmitIntoClient` definitions are _not_ part of the
-defining module's ABI, so changing the implementation at a later stage
-does not break ABI.
-
-Most notably, default argument expressions are implicitly
-`@_alwaysEmitIntoClient`, which means that adding a default argument to a
-function which did not have one previously does not break ABI.
+Forces the body of a function to be emitted into client code. This underscored attribute was formalized as `@export(implementation)` as part of [SE-0497](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0497-definition-visibility.md).
 
 ## `@_assemblyVision`
 
@@ -957,6 +945,44 @@ More generally, multiple availabilities can be specified, like so:
 @_originallyDefinedIn(module: "ToasterKit", toasterOS 57, bowlOS 69, mugOS 69)
 enum Toast { ... }
 ```
+
+## `@_owned`
+
+Indicates that the [conservative access pattern](/docs/Lexicon.md#access-pattern)
+for some storage (a subscript or a property) should use the `get` accessor instead of `_read`.
+
+This attribute is particularly useful for accessors returning noncopyable values.
+By default, all explicitly-declared `get` accessors that return a noncopyable value and are declared in
+resilient libraries, or accessed opaquely via a protocol, are treated as if they return a borrowed value, 
+rather than one that is valid to consume:
+
+```swift
+// MutableSpan is noncopyable
+
+public protocol Giver {
+  var mutableSpan: MutableSpan { get } // has 'yielding borrow' semantics
+} 
+
+func example(_ s: some Giver) {
+  let x = s.mutableSpan // error
+}
+```
+
+This `@_owned` attribute allows you to override that behavior, so that the `get` requirement (or accessor) is truly
+exposed in a resilient interface, yielding an owned value of noncopyable type:
+
+```swift
+public protocol Giver {
+  @_owned
+  var mutableSpan: MutableSpan { get } // has 'get' semantics
+}
+
+func example(_ s: some Giver) {
+  let x = s.mutableSpan // ok
+}
+```
+
+Adding or removing this attribute is potentially an ABI and Source breaking change.
 
 ## `@_preInverseGenerics`
 

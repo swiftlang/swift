@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckMacros.h"
-#include "../AST/InlinableText.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/ABI/MetadataValues.h"
@@ -35,6 +34,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Defer.h"
@@ -285,7 +285,7 @@ initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
 #if SWIFT_BUILD_SWIFT_SYNTAX
     llvm::SmallString<128> resolvedLibraryPath;
     auto fs = ctx.CASOpts.HasImmutableFileSystem
-                  ? llvm::vfs::getRealFileSystem()
+                  ? llvm::vfs::createPhysicalFileSystem()
                   : ctx.SourceMgr.getFileSystem();
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
       return llvm::createStringError(err, err.message());
@@ -700,7 +700,11 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
       auto *var = dyn_cast<VarDecl>(attachedTo);
       if (var && var->isLet()) {
         ctx.Diags.diagnose(var->getLoc(), diag::let_accessor_expansion)
+<<<<<<< HEAD
             .warnUntilLanguageMode(6);
+=======
+            .warnUntilLanguageMode(LanguageMode::v6);
+>>>>>>> origin/main
       }
 
       continue;
@@ -1005,6 +1009,21 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   llvm_unreachable("unhandled MacroRole");
 }
 
+static void remarkMacroExpansionsEmitDiags(ASTContext &ctx, unsigned macroBufferID) {
+  SourceManager &sourceMgr = ctx.SourceMgr;
+  CharSourceRange range = sourceMgr.getRangeForBuffer(macroBufferID);
+  SourceLoc start = range.getStart();
+  StringRef content(start.getPointer(), range.getByteLength());
+  size_t newline;
+  do {
+    newline = content.find('\n');
+    StringRef line = content.take_front(newline);
+    content = content.drop_front(newline + 1);
+
+    ctx.Diags.diagnose(SourceLoc::getFromPointer(line.begin()), diag::macro_expansion_line, line);
+  } while (newline != StringRef::npos);
+}
+
 static SourceFile *
 createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
                       MacroRole role, ASTNode target, DeclContext *dc,
@@ -1068,6 +1087,10 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
       originModule = cast<Decl *>(target)->getModuleContextForNameLookup();
     performImportResolutionForClangMacroBuffer(*macroSourceFile, originModule);
   }
+
+  if (ctx.LangOpts.RemarkMacroExpansions)
+    remarkMacroExpansionsEmitDiags(ctx, macroBufferID);
+
   return macroSourceFile;
 }
 
@@ -1359,6 +1382,7 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
   return macroSourceFile->getBufferID();
 }
 
+
 static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
                                          CustomAttr *attr,
                                          bool passParentContext, MacroRole role,
@@ -1369,7 +1393,11 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     dc = attachedTo->getDeclContext();
   } else if (role == MacroRole::Conformance || role == MacroRole::Extension) {
     // Conformance macros always expand to extensions at file-scope.
-    dc = attachedTo->getDeclContext()->getParentSourceFile();
+    dc = attachedTo->getDeclContext();
+    if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+      dc = dc->getParentSourceFile();
+    else
+      ASSERT(isa<FileUnit>(dc) && !isa<SourceFile>(dc) && "decls imported from Clang should not have a SourceFile");
   } else {
     dc = attachedTo->getInnermostDeclContext();
   }

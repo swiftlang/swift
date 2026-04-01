@@ -42,7 +42,7 @@ protocol OverloadedProtocol {
 ------------------------------
 extension SimpleProtocol {
     /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @_disfavoredOverload public
       func myFunc(_ ptr: UnsafeBufferPointer<CInt>) {
         let len = CInt(exactly: ptr.count)!
         return unsafe myFunc(ptr.baseAddress!, len)
@@ -53,15 +53,19 @@ extension SimpleProtocol {
 ------------------------------
 extension SpanProtocol {
     /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @_disfavoredOverload public
       func foo(_ ptr: Span<CInt>) {
         let len = CInt(exactly: ptr.count)!
-        return unsafe ptr.withUnsafeBufferPointer { _ptrPtr in
-          return unsafe foo(_ptrPtr.baseAddress!, len)
+        let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
+            unsafe $0
         }
+        defer {
+            _fixLifetime(ptr)
+        }
+        return unsafe foo(_ptrPtr.baseAddress!, len)
     }
     /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(borrow self) @_disfavoredOverload
+@_alwaysEmitIntoClient @_lifetime(borrow self) @_disfavoredOverload public
       func bar(_ len: CInt) -> Span<CInt> {
         return unsafe _swiftifyOverrideLifetime(Span<CInt>(_unsafeStart: unsafe bar(len), count: Int(len)), copying: ())
     }
@@ -71,16 +75,20 @@ extension SpanProtocol {
 ------------------------------
 extension MixedProtocol {
     /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @_disfavoredOverload public
       /// Some doc comment
       func foo(_ ptr: Span<CInt>) {
         let len = CInt(exactly: ptr.count)!
-        return unsafe ptr.withUnsafeBufferPointer { _ptrPtr in
-          return unsafe foo(_ptrPtr.baseAddress!, len)
+        let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
+            unsafe $0
         }
+        defer {
+            _fixLifetime(ptr)
+        }
+        return unsafe foo(_ptrPtr.baseAddress!, len)
     }
     /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @_disfavoredOverload public
       func bar(_ ptr: UnsafeBufferPointer<CInt>) {
         let len = CInt(exactly: ptr.count)!
         return unsafe bar(ptr.baseAddress!, len)
@@ -91,13 +99,13 @@ extension MixedProtocol {
 ------------------------------
 extension OverloadedProtocol {
     /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @_disfavoredOverload public
       func foo(_ ptr: UnsafeBufferPointer<CInt>) {
         let len1 = CInt(exactly: ptr.count)!
         return unsafe foo(ptr.baseAddress!, len1)
     }
     /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @_disfavoredOverload public
       func foo(bar: UnsafeBufferPointer<CInt>) {
         let len2 = CInt(exactly: bar.count)!
         return unsafe foo(bar: bar.baseAddress!, len2)

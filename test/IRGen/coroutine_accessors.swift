@@ -23,6 +23,20 @@
 // CHECK-SAME:    i32 0
 // CHECK-SAME:  }>
 
+// CHECK-arm64e-LABEL: _swift_coro_free.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_coro_free,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 ptrtoint (
+// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
+// CHECK-arm64e-SAME:        ptr @_swift_coro_typed_malloc_allocator,
+// CHECK-arm64e-SAME:        i32 0,
+// CHECK-arm64e-SAME:        i32 2
+// CHECK-arm64e-SAME:      )
+// CHECK-arm64e-SAME:    )
+// CHECK-arm64e-SAME:    i64 40879 },
+// CHECK-arm64e-SAME:  section "llvm.ptrauth",
+// CHECK-arm64e-SAME:  align 8
+
 // CHECK-arm64e-LABEL: _swift_coro_malloc.ptrauth = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_malloc,
 // CHECK-arm64e-SAME:    i32 0,
@@ -36,6 +50,7 @@
 // CHECK-arm64e-SAME:    i64 24469 }
 // CHECK-arm64e-SAME:  section "llvm.ptrauth"
 // CHECK-arm64e-SAME:  align 8
+<<<<<<< HEAD
 // CHECK-arm64e-LABEL: _swift_coro_free.ptrauth = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_free,
 // CHECK-arm64e-SAME:    i32 0,
@@ -49,6 +64,9 @@
 // CHECK-arm64e-SAME:    i64 40879 },
 // CHECK-arm64e-SAME:  section "llvm.ptrauth",
 // CHECK-arm64e-SAME:  align 8
+=======
+
+>>>>>>> origin/main
 // CHECK-arm64e-LABEL: _swift_coro_malloc.ptrauth.{{.*}} = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_malloc,
 // CHECK-arm64e-SAME:    i32 0,
@@ -248,7 +266,7 @@ public var irm: Int {
 // CHECK-SAME:          )
 // CHECK:               unreachable
 // CHECK:           }
-  read {
+  yielding borrow {
     yield _i
   }
 // CHECK-LABEL:     define{{.*}} { ptr, ptr } @"$s19coroutine_accessors1SV3irmSivx"(
@@ -287,7 +305,7 @@ public var irm: Int {
 // CHECK:               [[REGISTER_8:%[^,]+]] = call i1 @llvm.coro.end(ptr [[HANDLE]], i1 false, token none)
 // CHECK:               unreachable
 // CHECK:           }
-  modify {
+  yielding mutate {
     yield &_i
   }
 } // public var irm
@@ -415,7 +433,7 @@ public var force_yield_once_convention : () {
 }
 
 public var force_yield_once_2_convention : () {
-  read {
+  yielding borrow {
     let nothing: () = ()
     yield nothing
   }
@@ -456,7 +474,7 @@ public var force_yield_once_2_convention : () {
 // CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
   @_silgen_name("increment_irm_yield_once_2")
-  modify {
+  yielding mutate {
     increment(&irm)
 
     var nothing: () = ()

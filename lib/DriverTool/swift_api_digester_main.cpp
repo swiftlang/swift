@@ -674,7 +674,17 @@ public:
         !D->getIntroducingVersion().hasOSAvailability() &&
         !D->hasDeclAttribute(DeclAttrKind::AlwaysEmitIntoClient) &&
         !D->hasDeclAttribute(DeclAttrKind::Marker)) {
-      D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
+      // Check if this SPI group should ignore new API warnings
+      bool shouldIgnoreNewAPI = false;
+      for(auto spi: D->getSPIGroups()) {
+        if (Ctx.getOpts().SPIGroupNamesToIgnoreNewAPI.contains(spi)) {
+          shouldIgnoreNewAPI = true;
+          break;
+        }
+      }
+      if (!shouldIgnoreNewAPI) {
+        D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
+      }
     }
   }
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
@@ -2188,6 +2198,8 @@ static StringRef getBaselineFilename(llvm::Triple Triple) {
     return "windows.json";
   else if (Triple.isXROS())
     return "xros.json";
+  else if (Triple.isAppleFirmware())
+    return "firmware.json";
   else {
     llvm::errs() << "Unsupported triple target\n";
     exit(1);
@@ -2363,7 +2375,7 @@ public:
     SDK = ParsedArgs.getLastArgValue(OPT_sdk).str();
     BaselineSDK = ParsedArgs.getLastArgValue(OPT_bsdk).str();
     Triple = ParsedArgs.getLastArgValue(OPT_target).str();
-    SwiftVersion = ParsedArgs.getLastArgValue(OPT_swift_version).str();
+    SwiftVersion = ParsedArgs.getLastArgValue(OPT_language_mode).str();
     SystemFrameworkPaths = ParsedArgs.getAllArgValues(OPT_Fsystem);
     BaselineFrameworkPaths = ParsedArgs.getAllArgValues(OPT_BF);
     FrameworkPaths = ParsedArgs.getAllArgValues(OPT_F);
@@ -2404,6 +2416,8 @@ public:
       CheckerOpts.ToolArgs.push_back(Arg);
     for(auto spi: ParsedArgs.getAllArgValues(OPT_ignore_spi_groups))
       CheckerOpts.SPIGroupNamesToIgnore.insert(spi);
+    for(auto spi: ParsedArgs.getAllArgValues(OPT_ignore_spi_groups_new_api))
+      CheckerOpts.SPIGroupNamesToIgnoreNewAPI.insert(spi);
     if (!SDK.empty()) {
       auto Ver = getSDKBuildVersion(SDK);
       if (!Ver.empty()) {

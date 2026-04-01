@@ -14,6 +14,7 @@
 #define SWIFT_BASIC_FEATURE_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LanguageMode.h"
 
 #include "llvm/ADT/StringRef.h"
 #include <optional>
@@ -80,9 +81,16 @@ struct Feature {
   /// one.
   static std::optional<Feature> getExperimentalFeature(StringRef name);
 
+<<<<<<< HEAD
   /// Get the major language version in which this feature was introduced, or
   /// \c None if it does not have such a version.
   std::optional<unsigned> getLanguageMode() const;
+=======
+  /// Get the earliest language mode that includes this feature, or
+  /// `std::nullopt` if the feature is not associated with a language mode
+  /// (i.e., not an upcoming feature).
+  std::optional<LanguageMode> getLanguageMode() const;
+>>>>>>> origin/main
 };
 
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \

@@ -1,8 +1,10 @@
-// RUN:%target-swift-frontend -emit-silgen %s -enable-experimental-feature BorrowAndMutateAccessors | %FileCheck %s
+// RUN:%target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN:%target-swift-frontend -c %s -Xllvm -sil-print-after=SILGenCleanup 2>&1 | %FileCheck %s --check-prefixes=CHECK-SIL
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
-public final class Klass {}
+public final class Klass {
+  let id: Int = 0
+}
 
 public struct NC : ~Copyable {}
 
@@ -11,7 +13,7 @@ func use(_ t: Klass) {}
 func use(_ t: borrowing NC) {}
 
 public struct S {
-  var _k: Klass
+  var _k = Klass()
 
   var k: Klass {
     borrow {
@@ -23,9 +25,26 @@ public struct S {
   }
 }
 
+let global_int = 0
+let global_klass = Klass()
+let global_wrapper = Wrapper()
+let global_nc = NC()
+let global_ncwrapper = NCWrapper()
+let global_generic: AnyObject = Klass()
+
 public struct Wrapper {
-  var _k: Klass
-  var _s: S
+  var _k = Klass()
+  var _s = S()
+  var _id = 0
+
+  var id: Int {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
 
   var s: S {
     borrow {
@@ -81,9 +100,57 @@ public struct Wrapper {
     }
   }
 
-  var literal: Int {
+  var k_ownership_modifier: Klass {
+    borrowing borrow {
+      return _k
+    }
+    mutating mutate {
+      return &_k
+    }
+  }
+
+  var id_ownership_modifier: Int {
+    borrowing borrow {
+      return _id
+    }
+    mutating mutate {
+      return &_id
+    }
+  }
+
+  var global_int_prop: Int {
     borrow {
-      return 0
+      return global_int
+    }
+  }
+
+  var global_k1: Klass {
+    borrow {
+      return global_klass
+    }
+  }
+
+  var global_k2: Klass {
+    borrow {
+      return global_wrapper._k
+    }
+  }
+
+  var global_k3: Klass {
+    borrow {
+      return global_wrapper.k
+    }
+  }
+
+  var global_k4: AnyObject {
+    borrow {
+      return global_generic
+    }
+  }
+
+  var class_let: Int {
+    borrow {
+      return _k.id
     }
   }
 }
@@ -106,6 +173,16 @@ public struct GenWrapper<T> {
   var _w: SimpleWrapper<T>
   var _k: Klass
   var _s: S
+  var _id: Int
+
+  var id: Int {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
 
   public var prop: T {
     borrow {
@@ -188,15 +265,36 @@ public struct GenWrapper<T> {
     }
   }
 
-  var literal: Int {
+  var prop_ownership_modifier: T {
+    borrowing borrow {
+      return _prop
+    }
+    mutating mutate {
+      return &_prop
+    }
+  }
+
+  var global_k1: Klass {
     borrow {
-      return 0
+      return global_klass
+    }
+  }
+
+  var global_k2: Klass {
+    borrow {
+      return global_wrapper._k
+    }
+  }
+
+  var global_k3: Klass {
+    borrow {
+      return global_wrapper.k
     }
   }
 }
 
 public struct NCS: ~Copyable {
-  var _nc: NC
+  var _nc = NC()
 
   var nc: NC {
     borrow {
@@ -209,8 +307,8 @@ public struct NCS: ~Copyable {
 }
 
 public struct NCWrapper: ~Copyable {
-  var _nc: NC
-  var _s: NCS
+  var _nc = NC()
+  var _s = NCS()
 
   var nc: NC {
     borrow {
@@ -257,9 +355,30 @@ public struct NCWrapper: ~Copyable {
     }
   }
 
-  var literal: Int {
+  var nc_ownership_modifier: NC {
+    borrowing borrow {
+      return _nc
+    }
+    mutating mutate {
+      return &_nc
+    }
+  }
+
+  var global_nc1: NC {
     borrow {
-      return 0
+      return global_nc
+    }
+  }
+
+  var global_nc2: NC {
+    borrow {
+      return global_ncwrapper._nc
+    }
+  }
+
+  var global_nc3: NC {
+    borrow {
+      return global_ncwrapper.nc
     }
   }
 }
@@ -361,12 +480,6 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
     }
     mutate {
       return &self[0]
-    }
-  }
-
-  var literal: Int {
-    borrow {
-      return 0
     }
   }
 }
@@ -496,6 +609,14 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG4]]
 // CHECK: }
 
+// CHECK-SIL: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV1sAA1SVvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed S {
+// CHECK-SIL: bb0([[REG0:%.*]] : $*GenWrapper<T>):
+// CHECK-SIL:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
+// CHECK-SIL:   [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._s
+// CHECK-SIL:   [[REG3:%.*]] = load_borrow [[REG2]]
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG3]])
+// CHECK-SIL: }
+
 // CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV1sAA1SVvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @inout S {
 // CHECK:bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
@@ -512,6 +633,14 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   end_borrow [[REG3]]
 // CHECK:   return [[REG4]]
 // CHECK: }
+
+// CHECK-SIL: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV1kAA5KlassCvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed Klass {
+// CHECK-SIL: bb0([[REG0:%.*]] : $*GenWrapper<T>):
+// CHECK-SIL:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
+// CHECK-SIL:   [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._k
+// CHECK-SIL:   [[REG3:%.*]] = load_borrow [[REG2]]
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG3]])
+// CHECK-SIL: }
 
 // CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV1kAA5KlassCvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @inout Klass {
 // CHECK:bb0([[REG0:%.*]] : $*GenWrapper<T>):
@@ -552,11 +681,21 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._s
 // CHECK:   [[REG3:%.*]] = load_borrow [[REG2]]
 // CHECK:   [[REG4:%.*]] = function_ref @$s15borrow_accessor1SV1kAA5KlassCvb : $@convention(method) (@guaranteed S) -> @guaranteed Klass
-// CHECK:   [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@guaranteed S) -> @guaranteed Klass
-// CHECK:   [[REG6:%.*]] = unchecked_ownership [[REG5]]
+// CHECK:   [[REG5:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   [[REG6:%.*]] = apply [[REG4]]([[REG5]]) : $@convention(method) (@guaranteed S) -> @guaranteed Klass
 // CHECK:   end_borrow [[REG3]]
 // CHECK:   return [[REG6]]
 // CHECK: }
+
+// CHECK-SIL: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV9nested_k1AA5KlassCvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed Klass {
+// CHECK-SIL: bb0([[REG0:%.*]] : $*GenWrapper<T>):
+// CHECK-SIL:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
+// CHECK-SIL:   [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._s
+// CHECK-SIL:   [[REG3:%.*]] = load_borrow [[REG2]]
+// CHECK-SIL:   [[REG4:%.*]] = function_ref @$s15borrow_accessor1SV1kAA5KlassCvb : $@convention(method) (@guaranteed S) -> @guaranteed Klass
+// CHECK-SIL:   [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@guaranteed S) -> @guaranteed Klass
+// CHECK-SIL:   return_borrow [[REG5]] from_scopes ([[REG3]])
+// CHECK-SIL: }
 
 // CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV9nested_k1AA5KlassCvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @inout Klass {
 // CHECK:bb0([[REG0:%.*]] : $*GenWrapper<T>):
@@ -654,6 +793,15 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG5]]
 // CHECK: }
 
+// CHECK-SIL: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE2ncAA2NCVvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed NC {
+// CHECK-SIL: bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
+// CHECK-SIL:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
+// CHECK-SIL:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
+// CHECK-SIL:   [[REG3:%.*]] = struct_element_addr [[REG2]], #GenNCWrapper._nc
+// CHECK-SIL:   [[REG4:%.*]] = load_borrow [[REG3]]
+// CHECK-SIL:   return_borrow [[REG4]] from_scopes ([[REG4]])
+// CHECK-SIL: }
+
 // CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE2ncAA2NCVvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @inout NC {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
@@ -672,6 +820,15 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   end_borrow [[REG4]]
 // CHECK:   return [[REG5]]
 // CHECK: }
+
+// CHECK-SIL: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE3ncwAA0D0Vvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed NCWrapper {
+// CHECK-SIL: bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
+// CHECK-SIL:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
+// CHECK-SIL:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
+// CHECK-SIL:   [[REG3:%.*]] = struct_element_addr [[REG2]], #GenNCWrapper._ncw
+// CHECK-SIL:   [[REG4:%.*]] = load_borrow [[REG3]]
+// CHECK-SIL:   return_borrow [[REG4]] from_scopes ([[REG4]])
+// CHECK-SIL: }
 
 // CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE3ncwAA0D0Vvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @inout NCWrapper {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
@@ -730,8 +887,8 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   [[REG3:%.*]] = struct_element_addr [[REG2]], #GenNCWrapper._ncw
 // CHECK:   [[REG4:%.*]] = load_borrow [[REG3]]
 // CHECK:   [[REG5:%.*]] = function_ref @$s15borrow_accessor9NCWrapperV2ncAA2NCVvb : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC
-// CHECK:   [[REG6:%.*]] = apply [[REG5]]([[REG4]]) : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC
-// CHECK:   [[REG7:%.*]] = unchecked_ownership [[REG6]]
+// CHECK:   [[REG6:%.*]] = unchecked_ownership [[REG4]]
+// CHECK:   [[REG7:%.*]] = apply [[REG5]]([[REG6]]) : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC
 // CHECK:   [[REG9:%.*]] = copy_value [[REG7]]
 // CHECK:   [[REG10:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG9]]
 // CHECK:   [[REG11:%.*]] = begin_borrow [[REG10]]
@@ -740,6 +897,20 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   destroy_value [[REG10]]
 // CHECK:   return [[REG7]]
 // CHECK: }
+
+// CHECK-SIL: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE10nested_nc1AA2NCVvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed NC {
+// CHECK-SIL: bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
+// CHECK-SIL:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
+// CHECK-SIL:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
+// CHECK-SIL:   [[REG3:%.*]] = struct_element_addr [[REG2]], #GenNCWrapper._ncw
+// CHECK-SIL:   [[REG4:%.*]] = load_borrow [[REG3]]
+// CHECK-SIL:   [[REG5:%.*]] = function_ref @$s15borrow_accessor9NCWrapperV2ncAA2NCVvb : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC
+// CHECK-SIL:   [[REG6:%.*]] = apply [[REG5]]([[REG4]]) : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC
+// CHECK-SIL:   [[REG7:%.*]] = copy_value [[REG6]]
+// CHECK-SIL:   [[REG8:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG7]]
+// CHECK-SIL:   destroy_value [[REG8]]
+// CHECK-SIL:   return_borrow [[REG6]] from_scopes ([[REG4]])
+// CHECK-SIL: }
 
 // CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE10nested_nc1AA2NCVvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @inout NC {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
@@ -831,4 +1002,226 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:  [[REG9:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[REG8]]
 // CHECK:  return [[REG9]]
 // CHECK: }
+
+public struct SafeContainer<Element: ~Copyable >: ~Copyable {
+  var _storage: UnsafeMutableBufferPointer<Element>
+  var _count: Int
+
+  public subscript(index: Int) -> Element {
+    @_unsafeSelfDependentResult
+    borrow {
+      precondition(index >= 0 && index < _count, "Index out of bounds")
+      return _storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
+    }
+    @_unsafeSelfDependentResult
+    nonmutating mutate {
+      precondition(index >= 0 && index < _count, "Index out of bounds")
+      return &_storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
+    }
+  }
+}
+
+public enum E<T> {
+  case none
+  case some(T)
+
+  var global_int_prop: Int {
+    borrow {
+      return global_int
+    }
+  }
+
+  var global_k1: Klass {
+    borrow {
+      return global_klass
+    }
+  }
+
+  var global_k2: Klass {
+    borrow {
+      return global_wrapper._k
+    }
+  }
+
+  var global_k3: Klass {
+    borrow {
+      return global_wrapper.k
+    }
+  }
+
+  var global_k4: AnyObject {
+    borrow {
+      return global_generic
+    }
+  }
+}
+
+class KlassBorrowLet {
+  let _k: Klass
+
+  init(_ k: Klass) {
+    self._k = k
+  }
+
+  var k: Klass {
+    borrow {
+      return _k
+    }
+  }
+}
+
+class KlassBorrowGlobalLet {
+  var k: Klass {
+    borrow {
+      return global_klass
+    }
+  }
+}
+
+class KlassBorrowMutateUMBP<Element> {
+  let _storage: UnsafeMutableBufferPointer<Element>
+
+  init(_ storage: UnsafeMutableBufferPointer<Element>) {
+    self._storage = storage
+  }
+
+  var first: Element {
+    @_unsafeSelfDependentResult
+    borrow {
+      return unsafe _storage.baseAddress.unsafelyUnwrapped.pointee
+    }
+    @_unsafeSelfDependentResult
+    mutate {
+      return unsafe &_storage.baseAddress.unsafelyUnwrapped.pointee
+    }
+  }
+}
+
+// CHECK: sil hidden [ossa] @$s15borrow_accessor14KlassBorrowLetC1kAA0C0Cvb : $@convention(method) (@guaranteed KlassBorrowLet) -> @guaranteed Klass {
+// CHECK: bb0([[REG0:%.*]] : @guaranteed $KlassBorrowLet):
+// CHECK:   [[REG2:%.*]] = ref_element_addr [[REG0]], #KlassBorrowLet._k
+// CHECK:   [[REG3:%.*]] = load_borrow [[REG2]]
+// CHECK:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   end_borrow [[REG3]]
+// CHECK:   return [[REG4]]
+// CHECK: }
+
+// CHECK: sil hidden [ossa] @$s15borrow_accessor20KlassBorrowGlobalLetC1kAA0C0Cvb : $@convention(method) (@guaranteed KlassBorrowGlobalLet) -> @guaranteed Klass {
+// CHECK: bb0([[REG0:%.*]] : @guaranteed $KlassBorrowGlobalLet):
+// CHECK:   [[REG1:%.*]] = global_addr @$s15borrow_accessor12global_klassAA5KlassCvp : $*Klass
+// CHECK:   [[REG3:%.*]] = load_borrow [[REG1]]
+// CHECK:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   end_borrow [[REG3]]
+// CHECK:   return [[REG4]]
+// CHECK: }
+
+// CHECK: sil hidden [ossa] @$s15borrow_accessor21KlassBorrowMutateUMBPC5firstxvb : $@convention(method) <Element> (@guaranteed KlassBorrowMutateUMBP<Element>) -> @guaranteed_address Element {
+// CHECK: bb0([[REG0:%.*]] : @guaranteed $KlassBorrowMutateUMBP<Element>):
+// CHECK:   [[REG2:%.*]] = ref_element_addr [[REG0]], #KlassBorrowMutateUMBP._storage
+// CHECK:   [[REG3:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
+// CHECK:   [[REG4:%.*]] = load [trivial] [[REG2]]
+// CHECK:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   store [[REG6]] to [trivial] [[REG3]]
+// CHECK:   [[REG8:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
+// CHECK:   [[REG9:%.*]] = function_ref @$sSq17unsafelyUnwrappedxvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
+// CHECK:   [[REG10:%.*]] = apply [[REG9]]<UnsafeMutablePointer<Element>>([[REG8]], [[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
+// CHECK:   [[REG11:%.*]] = load [trivial] [[REG8]]
+// CHECK:   [[REG12:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG14:%.*]] = struct_extract [[REG13]], #UnsafePointer._rawValue
+// CHECK:   [[REG15:%.*]] = pointer_to_address [[REG14]] to [strict] $*Element
+// CHECK:   [[REG16:%.*]] = mark_dependence [unresolved] [[REG15]] on [[REG11]]
+// CHECK:   [[REG17:%.*]] = begin_access [read] [unsafe] [[REG16]]
+// CHECK:   end_access [[REG17]]
+// CHECK:   dealloc_stack [[REG8]]
+// CHECK:   dealloc_stack [[REG3]]
+// CHECK:   return [[REG17]]
+// CHECK: }
+
+// CHECK: sil hidden [ossa] @$s15borrow_accessor21KlassBorrowMutateUMBPC5firstxvz : $@convention(method) <Element> (@guaranteed KlassBorrowMutateUMBP<Element>) -> @inout Element {
+// CHECK: bb0([[REG0:%.*]] : @guaranteed $KlassBorrowMutateUMBP<Element>):
+// CHECK:   [[REG2:%.*]] = ref_element_addr [[REG0]], #KlassBorrowMutateUMBP._storage
+// CHECK:   [[REG3:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
+// CHECK:   [[REG4:%.*]] = load [trivial] [[REG2]]
+// CHECK:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   store [[REG6]] to [trivial] [[REG3]]
+// CHECK:   [[REG8:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
+// CHECK:   [[REG9:%.*]] = function_ref @$sSq17unsafelyUnwrappedxvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
+// CHECK:   [[REG10:%.*]] = apply [[REG9]]<UnsafeMutablePointer<Element>>([[REG8]], [[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
+// CHECK:   [[REG11:%.*]] = load [trivial] [[REG8]]
+// CHECK:   [[REG12:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG14:%.*]] = struct_extract [[REG13]], #UnsafePointer._rawValue
+// CHECK:   [[REG15:%.*]] = pointer_to_address [[REG14]] to [strict] $*Element
+// CHECK:   [[REG16:%.*]] = mark_dependence [unresolved] [[REG15]] on [[REG11]]
+// CHECK:   [[REG17:%.*]] = begin_access [read] [unsafe] [[REG16]]
+// CHECK:   end_access [[REG17]]
+// CHECK:   dealloc_stack [[REG8]]
+// CHECK:   dealloc_stack [[REG3]]
+// CHECK:   return [[REG17]]
+// CHECK: }
+
+// CHECK-SIL: sil hidden [ossa] @$s15borrow_accessor14KlassBorrowLetC1kAA0C0Cvb : $@convention(method) (@guaranteed KlassBorrowLet) -> @guaranteed Klass {
+// CHECK-SIL: bb0([[REG0:%.*]] : @guaranteed $KlassBorrowLet):
+// CHECK-SIL:   [[REG2:%.*]] = ref_element_addr [[REG0]], #KlassBorrowLet._k
+// CHECK-SIL:   [[REG3:%.*]] = load_borrow [[REG2]]
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG3]])
+// CHECK-SIL: }
+
+// CHECK-SIL: sil hidden [ossa] @$s15borrow_accessor20KlassBorrowGlobalLetC1kAA0C0Cvb : $@convention(method) (@guaranteed KlassBorrowGlobalLet) -> @guaranteed Klass {
+// CHECK-SIL: bb0([[REG0:%.*]] : @guaranteed $KlassBorrowGlobalLet):
+// CHECK-SIL:   [[REG1:%.*]] = global_addr @$s15borrow_accessor12global_klassAA5KlassCvp : $*Klass
+// CHECK-SIL:   [[REG3:%.*]] = load_borrow [[REG1]]
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG3]])
+// CHECK-SIL: }
+
+// CHECK-SIL: sil hidden [ossa] @$s15borrow_accessor21KlassBorrowMutateUMBPC5firstxvb : $@convention(method) <Element> (@guaranteed KlassBorrowMutateUMBP<Element>) -> @guaranteed_address Element {
+// CHECK-SIL: bb0([[REG0:%.*]] : @guaranteed $KlassBorrowMutateUMBP<Element>):
+// CHECK-SIL:   [[REG2:%.*]] = ref_element_addr [[REG0]], #KlassBorrowMutateUMBP._storage
+// CHECK-SIL:   [[REG3:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
+// CHECK-SIL:   [[REG4:%.*]] = load [trivial] [[REG2]]
+// CHECK-SIL:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK-SIL:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK-SIL:   store [[REG6]] to [trivial] [[REG3]]
+// CHECK-SIL:   [[REG8:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
+// CHECK-SIL:   [[REG9:%.*]] = function_ref @$sSq17unsafelyUnwrappedxvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
+// CHECK-SIL:   [[REG10:%.*]] = apply [[REG9]]<UnsafeMutablePointer<Element>>([[REG8]], [[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
+// CHECK-SIL:   [[REG11:%.*]] = load [trivial] [[REG8]]
+// CHECK-SIL:   [[REG12:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK-SIL:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK-SIL:   [[REG14:%.*]] = struct_extract [[REG13]], #UnsafePointer._rawValue
+// CHECK-SIL:   [[REG15:%.*]] = pointer_to_address [[REG14]] to [strict] $*Element
+// CHECK-SIL:   [[REG16:%.*]] = mark_dependence [unresolved] [[REG15]] on [[REG11]]
+// CHECK-SIL:   [[REG17:%.*]] = begin_access [read] [unsafe] [[REG16]]
+// CHECK-SIL:   end_access [[REG17]]
+// CHECK-SIL:   dealloc_stack [[REG8]]
+// CHECK-SIL:   dealloc_stack [[REG3]]
+// CHECK-SIL:   return [[REG17]]
+// CHECK-SIL: }
+
+// CHECK-SIL: sil hidden [ossa] @$s15borrow_accessor21KlassBorrowMutateUMBPC5firstxvz : $@convention(method) <Element> (@guaranteed KlassBorrowMutateUMBP<Element>) -> @inout Element {
+// CHECK-SIL: bb0([[REG0:%.*]] : @guaranteed $KlassBorrowMutateUMBP<Element>):
+// CHECK-SIL:   [[REG2:%.*]] = ref_element_addr [[REG0]], #KlassBorrowMutateUMBP._storage
+// CHECK-SIL:   [[REG3:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
+// CHECK-SIL:   [[REG4:%.*]] = load [trivial] [[REG2]]
+// CHECK-SIL:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK-SIL:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK-SIL:   store [[REG6]] to [trivial] [[REG3]]
+// CHECK-SIL:   [[REG8:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
+// CHECK-SIL:   [[REG9:%.*]] = function_ref @$sSq17unsafelyUnwrappedxvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
+// CHECK-SIL:   [[REG10:%.*]] = apply [[REG9]]<UnsafeMutablePointer<Element>>([[REG8]], [[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
+// CHECK-SIL:   [[REG11:%.*]] = load [trivial] [[REG8]]
+// CHECK-SIL:   [[REG12:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK-SIL:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK-SIL:   [[REG14:%.*]] = struct_extract [[REG13]], #UnsafePointer._rawValue
+// CHECK-SIL:   [[REG15:%.*]] = pointer_to_address [[REG14]] to [strict] $*Element
+// CHECK-SIL:   [[REG16:%.*]] = mark_dependence [unresolved] [[REG15]] on [[REG11]]
+// CHECK-SIL:   [[REG17:%.*]] = begin_access [read] [unsafe] [[REG16]]
+// CHECK-SIL:   end_access [[REG17]]
+// CHECK-SIL:   dealloc_stack [[REG8]]
+// CHECK-SIL:   dealloc_stack [[REG3]]
+// CHECK-SIL:   return [[REG17]]
+// CHECK-SIL: }
 

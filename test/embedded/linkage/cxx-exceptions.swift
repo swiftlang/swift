@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-experimental-feature Embedded -O -c -o %t/main.o -cxx-interoperability-mode=default
+<<<<<<< HEAD
 // RUN: %target-clang %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
+=======
+// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o %target-embedded-posix-shim -o %t/a.out -dead_strip
+>>>>>>> origin/main
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler

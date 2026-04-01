@@ -183,8 +183,8 @@ const char InvalidEnumValueError::ID = '\0';
 void InvalidEnumValueError::anchor() {}
 const char ConformanceXRefError::ID = '\0';
 void ConformanceXRefError::anchor() {}
-const char InavalidAvailabilityDomainError::ID = '\0';
-void InavalidAvailabilityDomainError::anchor() {}
+const char InvalidAvailabilityDomainError::ID = '\0';
+void InvalidAvailabilityDomainError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -222,7 +222,7 @@ SourceLoc ModularizationError::getSourceLoc() const {
   // so try to print a simple representation of the reference.
   std::string S;
   llvm::raw_string_ostream OS(S);
-  OS << expectedModule->getName() << "." << name;
+  OS << expectedModule->getName() << "." << path.getFullName();
 
   // If we enable these remarks by default we may want to reuse these buffers.
   auto bufferID = SourceMgr.addMemBufferCopy(S, filename);
@@ -234,25 +234,26 @@ ModularizationError::diagnose(const ModuleFile *MF,
                               DiagnosticBehavior limit) const {
   auto &ctx = MF->getContext();
   auto loc = getSourceLoc();
+  std::string fullName = path.getFullName();
 
   auto diagnoseError = [&](Kind errorKind) {
     switch (errorKind) {
     case Kind::DeclMoved:
       return ctx.Diags.diagnose(loc,
                                 diag::modularization_issue_decl_moved,
-                                declIsType, name, expectedModule,
+                                declIsType, fullName, expectedModule,
                                 foundModule);
     case Kind::DeclKindChanged:
       return
         ctx.Diags.diagnose(loc,
                            diag::modularization_issue_decl_type_changed,
-                           declIsType, name, expectedModule,
+                           declIsType, fullName, expectedModule,
                            referenceModule->getName(), foundModule,
-                           foundModule != expectedModule);
+                           foundModule != expectedModule && foundModule);
     case Kind::DeclNotFound:
       return ctx.Diags.diagnose(loc,
                                 diag::modularization_issue_decl_not_found,
-                                declIsType, name, expectedModule);
+                                declIsType, fullName, expectedModule);
     }
     llvm_unreachable("Unhandled ModularizationError::Kind in switch.");
   };
@@ -360,6 +361,7 @@ ModularizationError::diagnose(const ModuleFile *MF,
          expectedModuleName.starts_with(foundModuleName)) &&
         (expectedUnderlying ||
          expectedModule->findUnderlyingClangModule())) {
+      std::string name = path.getFullName();
       ctx.Diags.diagnose(loc,
                          diag::modularization_issue_related_modules,
                          declIsType, name);
@@ -740,7 +742,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
     decls_block::SILLayoutLayout::readRecord(scratch, rawGenericSig,
                                              capturesGenerics,
                                              numFields, types);
-    
+
     SmallVector<SILField, 4> fields;
     for (auto fieldInfo : types.slice(0, numFields)) {
       bool isMutable = fieldInfo & 0x80000000U;
@@ -749,7 +751,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
         SILField(getType(typeId)->getCanonicalType(),
                  isMutable));
     }
-    
+
     CanGenericSignature canSig;
     if (auto sig = getGenericSignature(rawGenericSig))
       canSig = sig.getCanonicalSignature();
@@ -1070,14 +1072,14 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
       ProtocolConformanceState::Incomplete,
       ProtocolConformanceOptions(rawOptions, globalActorTypeExpr));
 
-  if (conformance->isConformanceOfProtocol()) {
+  if (conformance->isConformanceOfProtocol() && !conformance->isReparented()) {
     auto &C = dc->getASTContext();
 
     // Currently this should only be happening for the
     // "DistributedActor as Actor" SILGen generated conformance.
     // See `isConformanceOfProtocol` for details, if adding more such
     // conformances, consider changing the way we structure their construction.
-    assert(conformance->getProtocol()->getInterfaceType()->isEqual(
+    ASSERT(conformance->getProtocol()->getInterfaceType()->isEqual(
                C.getProtocol(KnownProtocolKind::Actor)->getInterfaceType()) &&
            "Only expected to 'skip' finishNormalConformance for manually "
            "created DistributedActor-as-Actor conformance.");
@@ -2251,15 +2253,15 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     }
     break;
   }
-      
+
   case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
     IdentifierID DefiningDeclNameID;
-    
+
     XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, DefiningDeclNameID);
-    
+
     auto name = getIdentifier(DefiningDeclNameID);
     pathTrace.addOpaqueReturnType(name);
-    
+
     if (auto opaque = baseModule->lookupOpaqueResultType(name.str())) {
       values.push_back(opaque);
     }
@@ -2351,7 +2353,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         IdentifierID IID;
         XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, IID);
         auto mangledName = getIdentifier(IID);
-        
+
         SmallString<64> buf;
         {
           llvm::raw_svector_ostream os(buf);
@@ -2359,7 +2361,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
           os << mangledName.str();
           os << ">>";
         }
-        
+
         result = getContext().getIdentifier(buf);
         break;
       }
@@ -2473,9 +2475,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       }
     }
 
-    auto declName = getXRefDeclNameForError();
-    auto error = llvm::make_error<ModularizationError>(declName,
-                                                       isType,
+    auto error = llvm::make_error<ModularizationError>(isType,
                                                        errorKind,
                                                        baseModule,
                                                        this,
@@ -2484,11 +2484,13 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                                        mismatchingTypes);
 
     // If we want to workaround broken modularization, we can keep going if
-    // we found a matching top-level decl in a different module. This is
-    // obviously dangerous as it could just be some other decl that happens to
-    // match.
-    if (getContext().LangOpts.ForceWorkaroundBrokenModules &&
+    // we found a matching top-level decl in a different module. The risk
+    // here would be to pick an unrelated decl that happens to share the same
+    // signature. Even if we recover, print as a warning the errors we skip.
+    if (getContext().LangOpts.EnableWorkaroundBrokenModules &&
         errorKind == ModularizationError::Kind::DeclMoved &&
+        baseModule->findUnderlyingClangModule() &&
+        foundIn->findUnderlyingClangModule() &&
         !values.empty()) {
       // Print the error as a warning and notify of the recovery attempt.
       llvm::handleAllErrors(std::move(error),
@@ -2615,7 +2617,7 @@ giveUpFastPath:
         ctorInit = getActualCtorInitializerKind(kind);
         break;
       }
-        
+
       default:
         fatal(llvm::make_error<InvalidRecordKindError>(recordID,
                                                        "Unhandled path piece"));
@@ -2699,8 +2701,33 @@ giveUpFastPath:
         auto members = nominal->lookupDirect(memberName);
         values.append(members.begin(), members.end());
       }
+
+      std::optional<ValueDecl*> matchBeforeFiltering = std::nullopt;
+      if (!values.empty())
+        matchBeforeFiltering = values[0];
+
       filterValues(filterTy, M, genericSig, isType, inProtocolExt,
                    importedFromClang, isStatic, ctorInit, values);
+
+      // Pass up modularization issue.
+      if (values.empty()) {
+        auto errorKind = matchBeforeFiltering.has_value() ?
+          ModularizationError::Kind::DeclKindChanged :
+          ModularizationError::Kind::DeclNotFound;
+
+        std::optional<std::pair<Type, Type>> mismatchingTypes;
+        if (matchBeforeFiltering.has_value() && filterTy) {
+          auto expectedTy = filterTy->getCanonicalType();
+          auto foundTy = (*matchBeforeFiltering)->getInterfaceType();
+          if (expectedTy && foundTy && !expectedTy->isEqual(foundTy))
+            mismatchingTypes = std::make_pair(expectedTy, foundTy);
+        }
+
+        return llvm::make_error<ModularizationError>(
+            isType, errorKind, baseModule, this,
+            /*foundIn*/nullptr, pathTrace, mismatchingTypes);
+      }
+
       break;
     }
 
@@ -2831,16 +2858,16 @@ giveUpFastPath:
 
       break;
     }
-        
+
     case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
       values.clear();
       IdentifierID DefiningDeclNameID;
-      
+
       XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, DefiningDeclNameID);
-      
+
       auto name = getIdentifier(DefiningDeclNameID);
       pathTrace.addOpaqueReturnType(name);
-    
+
       auto lookupModule = M ? M : baseModule;
       if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str())) {
         values.push_back(opaqueTy);
@@ -3229,7 +3256,8 @@ getActualOpaqueReadOwnership(unsigned rawKind) {
   case serialization::OpaqueReadOwnership::KIND: \
     return swift::OpaqueReadOwnership::KIND;
   CASE(Owned)
-  CASE(Borrowed)
+  CASE(YieldingBorrow)
+  CASE(Borrow)
   CASE(OwnedOrBorrowed)
 #undef CASE
   }
@@ -3247,7 +3275,7 @@ getActualReadImplKind(unsigned rawKind) {
   CASE(Inherited)
   CASE(Address)
   CASE(Read)
-  CASE(Read2)
+  CASE(YieldingBorrow)
   CASE(Borrow)
 #undef CASE
   }
@@ -3267,7 +3295,7 @@ getActualWriteImplKind(unsigned rawKind) {
   CASE(InheritedWithObservers)
   CASE(MutableAddress)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(Mutate)
 #undef CASE
   }
@@ -3285,7 +3313,7 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
   CASE(Mutate)
@@ -3479,8 +3507,8 @@ class DeclDeserializer {
 
       // The next bits are the protocol conformance options.
       // Update the mask below whenever this changes.
-      static_assert(NumProtocolConformanceOptions == 6);
-      ProtocolConformanceOptions options(rawID & 0x3F, /*global actor*/nullptr);
+      static_assert(NumProtocolConformanceOptions == 7);
+      ProtocolConformanceOptions options(rawID & 0x7F, /*global actor*/nullptr);
       rawID = rawID >> NumProtocolConformanceOptions;
 
       TypeID typeID = rawID;
@@ -4003,7 +4031,6 @@ public:
     bool isImplicit, isObjC, isStatic;
     uint8_t rawIntroducer;
     bool isGetterMutating, isSetterMutating;
-    bool isLazyStorageProperty;
     bool isTopLevelGlobal;
     DeclID lazyStorageID;
     unsigned numAccessors, numBackingProperties;
@@ -4019,7 +4046,6 @@ public:
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, rawIntroducer,
                                        isGetterMutating, isSetterMutating,
-                                       isLazyStorageProperty,
                                        isTopLevelGlobal,
                                        lazyStorageID,
                                        opaqueReadOwnership,
@@ -4170,9 +4196,9 @@ public:
       VarDecl *storage = cast<VarDecl>(lazyStorageDecl.get());
       ctx.evaluator.cacheOutput(
           LazyStoragePropertyRequest{var}, std::move(storage));
+      storage->setLazyStorageFor(var);
     }
 
-    var->setLazyStorageProperty(isLazyStorageProperty);
     var->setTopLevelGlobal(isTopLevelGlobal);
 
     // If there are any backing properties, record them.
@@ -4909,7 +4935,7 @@ public:
     ctx.evaluator.cacheOutput(
         OperatorPrecedenceGroupRequest{result},
         std::move(cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get())));
-    
+
     declOrOffset = result;
     return result;
   }
@@ -5124,7 +5150,7 @@ public:
     if (isObjC) {
       theEnum->setHasFixedRawValues();
     }
-    
+
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setIsObjC(isObjC);
@@ -5315,7 +5341,7 @@ public:
     SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(parent));
     if (declOrOffset.isComplete())
       return declOrOffset;
-    
+
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
     if (!staticSpelling.has_value())
       return MF.diagnoseFatal();
@@ -5778,9 +5804,9 @@ decodeDomainKind(uint8_t kind) {
   }
 }
 
-static std::optional<AvailabilityDomain>
-decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
-                         PlatformKind platformKind, ValueDecl *decl) {
+static AvailabilityDomain
+decodeNonCustomAvailabilityDomain(AvailabilityDomainKind domainKind,
+                                  PlatformKind platformKind) {
   switch (domainKind) {
   case AvailabilityDomainKind::Universal:
     return AvailabilityDomain::forUniversal();
@@ -5795,7 +5821,8 @@ decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
   case AvailabilityDomainKind::Platform:
     return AvailabilityDomain::forPlatform(platformKind);
   case AvailabilityDomainKind::Custom:
-    return AvailabilityDomain::forCustom(decl);
+    llvm_unreachable("custom domains aren't handled here");
+    return AvailabilityDomain::forUniversal();
   }
 }
 
@@ -5809,7 +5836,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   bool isSPI;
   uint8_t rawDomainKind;
   unsigned rawPlatform;
-  DeclID domainDeclID;
+  DeclID customDomainID;
   DEF_VER_TUPLE_PIECES(Introduced);
   DEF_VER_TUPLE_PIECES(Deprecated);
   DEF_VER_TUPLE_PIECES(Obsoleted);
@@ -5818,7 +5845,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   // Decode the record, pulling the version tuple information.
   serialization::decls_block::AvailableDeclAttrLayout::readRecord(
       scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync, isSPI,
-      rawDomainKind, rawPlatform, domainDeclID,
+      rawDomainKind, rawPlatform, customDomainID,
       LIST_VER_TUPLE_PIECES(Introduced), LIST_VER_TUPLE_PIECES(Deprecated),
       LIST_VER_TUPLE_PIECES(Obsoleted), messageSize, renameSize);
 
@@ -5850,24 +5877,49 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   else
     kind = AvailableAttr::Kind::Default;
 
-  ValueDecl *domainDecl = nullptr;
-  if (domainDeclID) {
-    Decl *decodedDomainDecl = nullptr;
-    SET_OR_RETURN_ERROR(decodedDomainDecl, MF.getDeclChecked(domainDeclID));
+  AvailabilityDomain domain;
+  if (domainKind == AvailabilityDomainKind::Custom) {
+    if (customDomainID & 0x01) {
+      IdentifierID customDomainNameID = customDomainID >> 1;
+      Identifier customDomainName = MF.getIdentifier(customDomainNameID);
+      SmallVector<AvailabilityDomain, 1> foundDomains;
+      if (ctx.MainModule) {
+        ctx.MainModule->lookupAvailabilityDomains(
+            customDomainName, foundDomains);
+      }
 
-    if (decodedDomainDecl) {
-      domainDecl = dyn_cast<ValueDecl>(decodedDomainDecl);
-      if (!domainDecl)
-        return llvm::make_error<InavalidAvailabilityDomainError>();
+      if (foundDomains.size() == 1) {
+        domain = foundDomains[0];
+      } else {
+        ctx.Diags.diagnose(
+            SourceLoc(), diag::serialization_dropped_custom_availability,
+            customDomainName);
+        domain = AvailabilityDomain::forUniversal();
+      }
+    } else {
+      DeclID domainDeclID = customDomainID >> 1;
+      Decl *decodedDomainDecl = nullptr;
+      SET_OR_RETURN_ERROR(decodedDomainDecl, MF.getDeclChecked(domainDeclID));
+
+      if (decodedDomainDecl) {
+        auto domainDecl = dyn_cast<ValueDecl>(decodedDomainDecl);
+        if (!domainDecl)
+          return llvm::make_error<InvalidAvailabilityDomainError>();
+
+        if (auto customDomain = AvailabilityDomain::forCustom(domainDecl))
+          domain = *customDomain;
+        else
+          return llvm::make_error<InvalidAvailabilityDomainError>();
+      } else {
+        return llvm::make_error<InvalidAvailabilityDomainError>();
+      }
     }
+  } else {
+    domain = decodeNonCustomAvailabilityDomain(domainKind, platform);
   }
 
-  auto domain = decodeAvailabilityDomain(domainKind, platform, domainDecl);
-  if (!domain)
-    return llvm::make_error<InavalidAvailabilityDomainError>();
-
   auto attr = new (ctx)
-      AvailableAttr(SourceLoc(), SourceRange(), *domain, SourceLoc(), kind,
+      AvailableAttr(SourceLoc(), SourceRange(), domain, SourceLoc(), kind,
                     message, rename, Introduced, SourceRange(), Deprecated,
                     SourceRange(), Obsoleted, SourceRange(), isImplicit, isSPI);
   return attr;
@@ -6630,7 +6682,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         serialization::decls_block::RawLayoutDeclAttrLayout::
           readRecord(scratch, isImplicit, typeID, countID, rawSize, rawAlign,
                      movesAsLike);
-        
+
         if (typeID) {
           auto type = MF.getTypeChecked(typeID);
           if (!type) {
@@ -6656,7 +6708,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             break;
           }
         }
-        
+
         Attr = new (ctx) RawLayoutAttr(rawSize, rawAlign,
                                        SourceLoc(), SourceRange());
         break;
@@ -6843,7 +6895,7 @@ DeclDeserializer::getDeclCheckedImpl(
     declOrOffset = resolved.get();
     break;
   }
-  
+
   default:
     // We don't know how to deserialize this kind of decl.
     MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
@@ -6996,7 +7048,7 @@ getActualSILParameterOptions(uint8_t raw) {
     options -= serialization::SILParameterInfoFlags::ImplicitLeading;
     result |= SILParameterInfo::ImplicitLeading;
   }
-  
+
   if (options.contains(serialization::SILParameterInfoFlags::Const)) {
     options -= serialization::SILParameterInfoFlags::Const;
     result |= SILParameterInfo::Const;
@@ -7118,23 +7170,37 @@ DESERIALIZE_TYPE(BUILTIN_FIXED_ARRAY_TYPE)(
   TypeID elementTypeID;
   decls_block::BuiltinFixedArrayTypeLayout::readRecord(scratch, sizeID,
                                                        elementTypeID);
-                                                       
-  
+
   auto sizeOrError = MF.getTypeChecked(sizeID);
   if (!sizeOrError) {
     return sizeOrError.takeError();
   }
   auto size = sizeOrError.get()->getCanonicalType();
-  
+
   auto elementTypeOrError = MF.getTypeChecked(elementTypeID);
   if (!elementTypeOrError) {
     return elementTypeOrError.takeError();
   }
   auto elementType = elementTypeOrError.get()->getCanonicalType();
-  
+
   return BuiltinFixedArrayType::get(size, elementType);
 }
 
+Expected<Type>
+DESERIALIZE_TYPE(BUILTIN_BORROW_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData)
+{
+  TypeID referentID;
+  decls_block::BuiltinBorrowTypeLayout::readRecord(scratch, referentID);
+
+  auto referentOrError = MF.getTypeChecked(referentID);
+  if (!referentOrError) {
+    return referentOrError.takeError();
+  }
+  auto referent = referentOrError.get()->getCanonicalType();
+
+  return BuiltinBorrowType::get(referent);
+}
 
 Expected<Type> DESERIALIZE_TYPE(NAME_ALIAS_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
@@ -8279,7 +8345,7 @@ Expected<Type> DESERIALIZE_TYPE(INTEGER_TYPE)(ModuleFile &MF,
                                               StringRef blobData) {
   auto &ctx = MF.getContext();
   bool isNegative;
-  
+
   decls_block::IntegerTypeLayout::readRecord(scratch, isNegative);
 
   return IntegerType::get(blobData, isNegative, ctx);
@@ -8597,7 +8663,7 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
   return handleErrorAndSupplyMissingMiscMember(std::move(error));
 }
 
-void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
+void ModuleFile::loadStorageMembers(Decl *container, uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", container);
   ++NumMemberListsLoaded;
 
@@ -9096,13 +9162,13 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
         // Print context to stderr.
         PrintOptions Opts;
-        llvm::errs() << "Requirements:\n";
+        llvm::errs() << "Requirements seen by this invocation:\n";
         for (auto req: requirements) {
           req.print(llvm::errs(), Opts);
           llvm::errs() << "\n";
         }
 
-        llvm::errs() << "Conformances:\n";
+        llvm::errs() << "\nConformances written in the swiftmodule:\n";
         for (auto req: reqConformances) {
           req.print(llvm::errs());
           llvm::errs() << "\n";
@@ -9172,12 +9238,12 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   bool needToFillInOpaqueValueWitnesses = false;
   while (valueCount--) {
     ValueDecl *req;
-    
+
     auto trySetWitness = [&](Witness w) {
       if (req)
         conformance->setWitness(req, w);
     };
-    
+
     auto deserializedReq = getDeclChecked(*rawIDIter++);
     if (deserializedReq) {
       req = cast_or_null<ValueDecl>(*deserializedReq);
@@ -9188,7 +9254,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     } else {
       fatal(deserializedReq.takeError());
     }
-    
+
     bool isOpaque = false;
     ValueDecl *witness;
     auto deserializedWitness = getDeclChecked(*rawIDIter++);
@@ -9254,7 +9320,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
           witness, witnessSubstitutions.get(), enterIsolation));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
-  
+
   // Fill in opaque value witnesses if we need to.
   if (needToFillInOpaqueValueWitnesses) {
     for (auto member : proto->getMembers()) {
@@ -9263,7 +9329,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       if (!valueMember || !valueMember->isProtocolRequirement()
           || isa<AssociatedTypeDecl>(valueMember))
         continue;
-      
+
       if (!conformance->hasWitness(valueMember))
         conformance->setWitness(valueMember, Witness::forOpaque(valueMember));
     }
@@ -9522,12 +9588,13 @@ ModuleFile::maybeReadLifetimeDependence() {
   unsigned targetIndex;
   unsigned paramIndicesLength;
   bool isImmortal;
+  bool isFromAnnotation;
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
   bool hasAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
-      scratch, targetIndex, paramIndicesLength, isImmortal,
+      scratch, targetIndex, paramIndicesLength, isImmortal, isFromAnnotation,
       hasInheritLifetimeParamIndices, hasScopeLifetimeParamIndices,
       hasAddressableParamIndices, lifetimeDependenceData);
 
@@ -9563,8 +9630,9 @@ ModuleFile::maybeReadLifetimeDependence() {
       hasScopeLifetimeParamIndices
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
           : nullptr,
-      targetIndex, isImmortal,
+      targetIndex, isImmortal, isFromAnnotation,
       hasAddressableParamIndices
           ? IndexSubset::get(ctx, addressableParamIndices)
-          : nullptr);
+          : nullptr,
+      nullptr);
 }

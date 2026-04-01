@@ -838,9 +838,9 @@ RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
       return static_cast<bool>(
           storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine);
   } else {
-    if (storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed)
+    if (storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutineComputed)
       return static_cast<bool>(
-          storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine);
+          storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutine);
   }
   return std::nullopt;
 }
@@ -852,8 +852,8 @@ void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
     storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
     storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
   } else {
-    storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed = 1;
-    storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine = value;
+    storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutineComputed = 1;
+    storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutine = value;
   }
 }
 
@@ -1027,24 +1027,6 @@ void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 //----------------------------------------------------------------------------//
 // EnumRawValuesRequest computation.
 //----------------------------------------------------------------------------//
-
-bool EnumRawValuesRequest::isCached() const {
-  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
-}
-
-std::optional<evaluator::SideEffect>
-EnumRawValuesRequest::getCachedResult() const {
-  auto *ED = std::get<0>(getStorage());
-  if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValuesAndTypes))
-    return std::make_tuple<>();
-  return std::nullopt;
-}
-
-void EnumRawValuesRequest::cacheResult(evaluator::SideEffect) const {
-  auto *ED = std::get<0>(getStorage());
-  ED->SemanticFlags |= OptionSet<EnumDecl::SemanticInfoFlags>{
-      EnumDecl::HasFixedRawValues | EnumDecl::HasFixedRawValuesAndTypes};
-}
 
 void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // This request computes the raw type, and so participates in cycles involving
@@ -2769,6 +2751,7 @@ void LifetimeDependenceInfoRequest::cacheResult(
     }
     auto *eed = cast<EnumElementDecl>(decl);
     eed->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+    return;
   }
 
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
@@ -2889,4 +2872,40 @@ void IsCustomAvailabilityDomainPermanentlyEnabled::cacheResult(
 
   domain->flags.isPermanentlyEnabledComputed = true;
   domain->flags.isPermanentlyEnabled = isPermanentlyEnabled;
+}
+
+//----------------------------------------------------------------------------//
+// ObjCKeyPathStringRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<Expr *> ObjCKeyPathStringRequest::getCachedResult() const {
+  auto *KP = std::get<0>(getStorage());
+  if (!KP->ObjCStringLiteralExpr)
+    return std::nullopt;
+
+  return KP->ObjCStringLiteralExpr;
+}
+
+void ObjCKeyPathStringRequest::cacheResult(Expr *strExpr) const {
+  auto *KP = std::get<0>(getStorage());
+  ASSERT(strExpr);
+  ASSERT(!KP->ObjCStringLiteralExpr || KP->ObjCStringLiteralExpr == strExpr);
+  KP->ObjCStringLiteralExpr = strExpr;
+}
+
+//----------------------------------------------------------------------------//
+// DesugarForEachStmtRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<BraceStmt *> DesugarForEachStmtRequest::getCachedResult() const {
+  auto *fes = std::get<0>(getStorage());
+  if (!fes->desugaredStmtAndComputed.getInt()) {
+    return std::nullopt;
+  }
+  return fes->desugaredStmtAndComputed.getPointer();
+}
+
+void DesugarForEachStmtRequest::cacheResult(BraceStmt *stmt) const {
+  auto *fes = std::get<0>(getStorage());
+  fes->desugaredStmtAndComputed.setInt(true);
+  fes->setDesugaredStmt(stmt);
 }

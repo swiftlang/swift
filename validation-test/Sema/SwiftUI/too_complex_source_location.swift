@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5
+=======
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -target %target-cpu-apple-macosx10.15 -swift-version 5
+>>>>>>> origin/main
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
@@ -22,6 +26,7 @@ struct ContentView: View {
 
     var body: some View {
         ScrollView {
+<<<<<<< HEAD
             VStack {
                 Picker(selection: $selection) {
                     ForEach(["a", "b", "c"], id: \.self) {
@@ -33,6 +38,22 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
             }
             .padding(.horizontal)
+=======
+          VStack {
+            VStack {
+              Picker(selection: $selection) {
+                ForEach(["a", "b", "c"], id: \.self) {
+                  Text($0)  // expected-error {{ reasonable time}}
+                    .foregroundStyl(.red) // Typo is here
+                }
+              } label: {
+              }
+              .pickerStyle(.segmented)
+            }
+            .padding(.vertical)
+          }
+          .padding(.horizontal)
+>>>>>>> origin/main
         }
         .onChange(of: a) { oldValue, newValue in
         }

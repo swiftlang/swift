@@ -64,9 +64,7 @@ SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
       FileIDsByFilePath(SM->computeFileIDMap(/*shouldDiagnose=*/true)) {
   const SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
-    // FIXME: Create file system to read the profile. In the future, the vfs
-    // needs to come from CompilerInstance.
-    auto FS = llvm::vfs::getRealFileSystem();
+    auto FS = M.getASTContext().SourceMgr.getFileSystem();
     auto ReaderOrErr =
         llvm::IndexedInstrProfReader::create(Opts.UseProfile, *FS);
     if (auto E = ReaderOrErr.takeError()) {
@@ -527,24 +525,25 @@ Type SILGenModule::getConfiguredExecutorFactory() {
     mainType->lookupQualified(mainType,
                               DeclNameRef(identifier),
                               SourceLoc(),
-                              NL_RemoveNonVisible | NL_RemoveOverridden
-                              | NL_OnlyTypes | NL_ProtocolMembers,
+                              NL_RemoveNonVisible |
+                              NL_RemoveOverridden |
+                              NL_OnlyTypes |
+                              NL_RemoveAssociatedTypes |
+                              NL_ProtocolMembers,
                               decls);
     for (auto decl : decls) {
-      TypeDecl *typeDecl = dyn_cast<TypeDecl>(decl);
-      if (typeDecl) {
-        if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
-          return nominalDecl->getDeclaredType();
-        }
+      auto *genericDecl = cast<GenericTypeDecl>(decl);
 
-        if (isa<AssociatedTypeDecl>(typeDecl)) {
-          // We ignore associatedtype declarations; those with a default will
-          // turn into a `typealias` instead.
+      // Skip generic declarations.
+      if (genericDecl->hasGenericParamList())
+        continue;
+
+      // Skip typealiases with an unbound generic type as their underlying type.
+      if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(genericDecl))
+        if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
           continue;
-        }
 
-        return typeDecl->getDeclaredInterfaceType();
-      }
+      return genericDecl->getDeclaredInterfaceType();
     }
   }
 
@@ -881,6 +880,8 @@ bool SILGenModule::shouldSkipDecl(Decl *D) {
 }
 
 void SILGenModule::visit(Decl *D) {
+  PrettyStackTraceDecl debugStack("silgen visitDecl", D);
+
   if (shouldSkipDecl(D))
     return;
 

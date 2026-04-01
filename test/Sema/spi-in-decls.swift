@@ -61,8 +61,8 @@ public struct TestGenericParams<T: BadProto> {} // expected-error {{cannot use p
 public struct TestGenericParamsWhereClause<T> where T: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; it is SPI}}
 
 public enum TestCase {
-  case x(BadStruct) // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-  case y(Int, BadStruct) // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  case x(BadStruct) // expected-error {{cannot use struct 'BadStruct' in an associated value of a public or '@usableFromInline' enum; it is SPI}}
+  case y(Int, BadStruct) // expected-error {{cannot use struct 'BadStruct' in an associated value of a public or '@usableFromInline' enum; it is SPI}}
 }
 
 public func testGenericParams<T: BadProto>(_: T) {} // expected-error {{cannot use protocol 'BadProto' here; it is SPI}}

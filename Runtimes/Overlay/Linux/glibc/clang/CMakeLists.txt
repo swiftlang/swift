@@ -8,7 +8,7 @@ file(CONFIGURE
 ---
 version: 0
 case-sensitive: false
-use-external-names: false
+use-external-names: true
 roots:
   - name: "/usr/include"
     type: directory
@@ -27,6 +27,8 @@ add_library(SwiftGlibcClangOverlay INTERFACE
   glibc.modulemap)
 target_compile_options(SwiftGlibcClangOverlay INTERFACE
   "$<BUILD_INTERFACE:$<$<COMPILE_LANGUAGE:Swift>:SHELL:-vfsoverlay ${CMAKE_CURRENT_BINARY_DIR}/glibc-overlay.yml>>")
+
+install(TARGETS SwiftGlibcClangOverlay EXPORT SwiftOverlayTargets)
 
 install(
   FILES

@@ -372,7 +372,10 @@ def fit_function_to_data_by_least_squares(objective, params, bounds, xs, ys):
     def inner(ps):
         s = 0.0
         for (x, y) in data:
-            s += (y - objective(ps, x)) ** 2
+            try:
+                s += (y - objective(ps, x)) ** 2
+            except OverflowError:
+                return math.inf
         return s
 
     retries = 100

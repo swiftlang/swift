@@ -34,6 +34,7 @@
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -1723,7 +1724,12 @@ bool VJPCloner::Implementation::run() {
   PullbackCloner PullbackCloner(cloner);
   if (PullbackCloner.run()) {
     errorOccurred = true;
-    return true;
+  }
+  if (!errorOccurred) {
+    auto *pm = &context.getPassManager();
+    pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(vjp);
+    completeAllLifetimes(pm, vjp);
+    pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
   }
   return errorOccurred;
 }

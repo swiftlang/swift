@@ -34,6 +34,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LookupKinds.h"
@@ -50,6 +51,7 @@
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/StorageImpl.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
@@ -79,7 +81,6 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
-#include "InlinableText.h"
 #include <algorithm>
 
 using namespace swift;
@@ -282,11 +283,11 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::MutableAddressor;
 
      case AccessorKind::Read:
-     case AccessorKind::Read2:
+     case AccessorKind::YieldingBorrow:
        return DescriptiveDeclKind::ReadAccessor;
 
      case AccessorKind::Modify:
-     case AccessorKind::Modify2:
+     case AccessorKind::YieldingMutate:
        return DescriptiveDeclKind::ModifyAccessor;
 
      case AccessorKind::Init:
@@ -409,7 +410,9 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(MacroExpansion, "pound literal");
   ENTRY(Using, "using");
   ENTRY(BorrowAccessor, "borrow accessor");
-  ENTRY(MutateAccessor, "Mutate accessor");
+  ENTRY(MutateAccessor, "mutate accessor");
+  ENTRY(YieldingBorrowAccessor, "yielding borrow accessor");
+  ENTRY(YieldingMutateAccessor, "yielding mutate accessor");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -630,7 +633,8 @@ bool Decl::isBackDeployed() const {
   if (auto VD = dyn_cast<ValueDecl>(this)) {
     auto access =
         VD->getFormalAccessScope(/*useDC=*/nullptr,
-                                 /*treatUsableFromInlineAsPublic=*/true);
+                                 /*treatUsableFromInlineAsPublic=*/true,
+                                 /*ignoreImportAccessLevel=*/false);
     if (!access.isPublic())
       return false;
   }
@@ -1231,7 +1235,11 @@ bool Decl::preconcurrency() const {
 
   // Variables declared in top-level code are @_predatesConcurrency
   if (const VarDecl *var = dyn_cast<VarDecl>(this)) {
+<<<<<<< HEAD
     return !getASTContext().isLanguageModeAtLeast(6) &&
+=======
+    return !getASTContext().isLanguageModeAtLeast(LanguageMode::v6) &&
+>>>>>>> origin/main
            var->isTopLevelGlobal() && var->getDeclContext()->isAsyncContext();
   }
 
@@ -1908,6 +1916,8 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
       setOption(ProtocolConformanceFlags::Preconcurrency);
     if (typeRepr->findAttrLoc(TypeAttrKind::Nonisolated).isValid())
       setOption(ProtocolConformanceFlags::Nonisolated);
+    if (typeRepr->findAttrLoc(TypeAttrKind::Reparented).isValid())
+      setOption(ProtocolConformanceFlags::Reparented);
 
     // Dig out the custom attribute that should be the global actor isolation.
     if (auto customAttr = typeRepr->findCustomAttr()) {
@@ -2255,6 +2265,20 @@ ExtensionDecl::isAddingConformanceToInvertible() const {
           return kind;
   }
   return std::nullopt;
+}
+
+bool ExtensionDecl::isForReparenting() const {
+  // Must be a protocol extension
+  if (!getExtendedProtocolDecl())
+    return false;
+
+  // Must be at least one @reparented inherited entry.
+  for (auto const& entry : getInherited().getEntries()) {
+    if (entry.isReparented())
+      return true;
+  }
+
+  return false;
 }
 
 bool Decl::hasOnlyCEntryPoint() const {
@@ -2767,50 +2791,92 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
   return getPatternList()[i].getAnchoringVarDecl();
 }
 
-bool VarDecl::isInitExposedToClients() const {
+bool PatternBindingDecl::hasSingleVarConstantFoldedInit() const {
+  auto *singleVar = getSingleVar();
+  return singleVar && singleVar->isConstValue() &&
+         getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
+}
+
+Expr *PatternBindingDecl::getExecutableInit(unsigned i) const {
+  auto idxInit = getPatternList()[i].getExecutableInit();
+  if (auto &ctx = getASTContext(); idxInit && hasSingleVarConstantFoldedInit())
+    return evaluateOrDefault(ctx.evaluator,
+                             ConstantFoldExpression{idxInit, &ctx}, {});
+  return idxInit;
+}
+
+ExportedLevel VarDecl::getInitExposedLevel() const {
   // 'lazy' initializers are emitted inside the getter, which is never
   // @inlinable.
   if (getAttrs().hasAttribute<LazyAttr>())
-    return false;
+    return ExportedLevel::None;
 
-  return hasInitialValue() && isLayoutExposedToClients();
+  if (!hasInitialValue())
+    return ExportedLevel::None;
+
+  return isLayoutExposedToClients(/*forceCheckClasses=*/true);
 }
 
-bool VarDecl::isLayoutExposedToClients(bool applyImplicit) const {
+bool VarDecl::isInitExposedToClients() const {
+  auto level = getInitExposedLevel();
+  auto minToBeExported = getASTContext().LangOpts.hasFeature(Feature::Embedded)
+                         ? ExportedLevel::ImplicitlyExported
+                         : ExportedLevel::Exported;
+  return level >= minToBeExported;
+}
+
+ExportedLevel VarDecl::isLayoutExposedToClients(bool forceCheckClasses) const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
-  if (!parent) return false;
-  if (isStatic()) return false;
+  if (!parent) return ExportedLevel::None;
+  if (isStatic()) return ExportedLevel::None;
 
-  auto M = getDeclContext()->getParentModule();
-  auto nominalAccess =
-    parent->getFormalAccessScope(/*useDC=*/nullptr,
-                                 /*treatUsableFromInlineAsPublic=*/true);
-
-  // Resilient modules and classes hide layouts by default.
-  bool layoutIsHiddenByDefault = !applyImplicit ||
-    !getASTContext().LangOpts.hasFeature(Feature::CheckImplementationOnly) ||
-    M->getResilienceStrategy() == ResilienceStrategy::Resilient;
-  if (layoutIsHiddenByDefault) {
-    if (!nominalAccess.isPublic())
-      return false;
-
-    if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
-        !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
-    return false;
-  } else {
-    // Non-resilient module: layouts are exposed by default unless marked
-    // otherwise.
-    if (parent->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-      return false;
-  }
-
+  // Does it contribute to the layout?
   if (!hasStorage() &&
       !getAttrs().hasAttribute<LazyAttr>() &&
       !hasAttachedPropertyWrapper()) {
-    return false;
+    return ExportedLevel::None;
   }
 
-  return true;
+  // Is it a member of a frozen type?
+  auto nominalAccess =
+    parent->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/true,
+                                 /*ignoreImportAccessLevel=*/false);
+  if (nominalAccess.isPublic() &&
+      (parent->getAttrs().hasAttribute<FrozenAttr>() ||
+       parent->getAttrs().hasAttribute<FixedLayoutAttr>()))
+    return ExportedLevel::Exported;
+
+  // Is it a member of an `@_implementationOnly` type?
+  if (parent->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return ExportedLevel::None;
+
+  // Class layouts are not exposed to clients, except for subclassing.
+  if (!forceCheckClasses &&
+      isa<ClassDecl>(parent) &&
+      !parent->hasOpenAccess(getDeclContext())) {
+
+    if (!parent->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+      return ExportedLevel::None;
+
+    // In embedded, we need to ensure the class has a deinit marked
+    // '@export(interface)'.
+    for (auto member : parent->getMembers()) {
+      if (isa<DestructorDecl>(member) &&
+          member->isNeverEmittedIntoClient()) {
+        return ExportedLevel::None;
+      }
+    }
+  }
+
+  auto M = getDeclContext()->getParentModule();
+  if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+    // Non-resilient module expose layouts by default.
+    return ExportedLevel::ImplicitlyExported;
+  } else {
+    // Resilient modules hide layouts by default.
+    return ExportedLevel::None;
+  }
 }
 
 /// Check whether the given type representation will be
@@ -2834,7 +2900,11 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr, ASTContext &ctx) {
     return true;
 
   // Also support the desugared 'Optional<T>' spelling.
+<<<<<<< HEAD
   if (!ctx.isLanguageModeAtLeast(5)) {
+=======
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
+>>>>>>> origin/main
     if (typeRepr->isSimpleUnqualifiedIdentifier(ctx.Id_Void)) {
       return true;
     }
@@ -3015,7 +3085,11 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
   assert(defer->isDeferBody());
 
   // In Swift 6+, then yes.
+<<<<<<< HEAD
   if (defer->getASTContext().isLanguageModeAtLeast(6))
+=======
+  if (defer->getASTContext().isLanguageModeAtLeast(LanguageMode::v6))
+>>>>>>> origin/main
     return true;
 
   // If the defer is part of a function that is a member of an actor or
@@ -3089,7 +3163,11 @@ static bool isDirectToStorageAccess(const DeclContext *UseDC,
     // In Swift 5 and later, the access must also be a member access on 'self'.
     if (!isAccessOnSelf &&
         var->getDeclContext()->isTypeContext() &&
+<<<<<<< HEAD
         var->getASTContext().isLanguageModeAtLeast(5))
+=======
+        var->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
+>>>>>>> origin/main
       return false;
 
     // As a special case, 'read' and 'modify' coroutines with forced static
@@ -3137,8 +3215,8 @@ getDirectReadAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadImplKind::Read:
     return AccessStrategy::getAccessor(AccessorKind::Read,
                                        /*dispatch*/ false);
-  case ReadImplKind::Read2:
-    return AccessStrategy::getAccessor(AccessorKind::Read2,
+  case ReadImplKind::YieldingBorrow:
+    return AccessStrategy::getAccessor(AccessorKind::YieldingBorrow,
                                        /*dispatch*/ false);
   case ReadImplKind::Borrow:
     return AccessStrategy::getAccessor(AccessorKind::Borrow,
@@ -3178,8 +3256,8 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case WriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
-  case WriteImplKind::Modify2:
-    return AccessStrategy::getAccessor(AccessorKind::Modify2,
+  case WriteImplKind::YieldingMutate:
+    return AccessStrategy::getAccessor(AccessorKind::YieldingMutate,
                                        /*dispatch*/ false);
   case WriteImplKind::Mutate:
     return AccessStrategy::getAccessor(AccessorKind::Mutate,
@@ -3219,14 +3297,14 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadWriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
-  case ReadWriteImplKind::Modify2:
-    return AccessStrategy::getAccessor(AccessorKind::Modify2,
+  case ReadWriteImplKind::YieldingMutate:
+    return AccessStrategy::getAccessor(AccessorKind::YieldingMutate,
                                        /*dispatch*/ false);
   case ReadWriteImplKind::StoredWithDidSet:
   case ReadWriteImplKind::InheritedWithDidSet:
-    if (storage->requiresOpaqueModify2Coroutine() &&
+    if (storage->requiresOpaqueYieldingMutateCoroutine() &&
         storage->getParsedAccessor(AccessorKind::DidSet)->isSimpleDidSet()) {
-      return AccessStrategy::getAccessor(AccessorKind::Modify2,
+      return AccessStrategy::getAccessor(AccessorKind::YieldingMutate,
                                          /*dispatch*/ false);
     } else if (storage->requiresOpaqueModifyCoroutine() &&
                storage->getParsedAccessor(AccessorKind::DidSet)
@@ -3297,20 +3375,18 @@ static AccessStrategy getOpaqueReadAccessStrategy(
     std::optional<std::pair<SourceRange, const DeclContext *>> location,
     bool useOldABI) {
   if (useOldABI) {
-    assert(storage->requiresOpaqueRead2Coroutine());
+    assert(storage->requiresOpaqueYieldingBorrowCoroutine());
     assert(storage->requiresOpaqueReadCoroutine());
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
   }
-  if (storage->requiresOpaqueRead2Coroutine() &&
+  if (storage->requiresOpaqueYieldingBorrowCoroutine() &&
       mayReferenceUseCoroutineAccessorOnStorage(module, expansion, location,
                                                 storage))
-    return AccessStrategy::getAccessor(AccessorKind::Read2, dispatch);
+    return AccessStrategy::getAccessor(AccessorKind::YieldingBorrow, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
-
-  if (storage->getParsedAccessor(AccessorKind::Borrow)) {
+  if (storage->requiresOpaqueBorrowAccessor())
     return AccessStrategy::getAccessor(AccessorKind::Borrow, dispatch);
-  }
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
 }
 
@@ -3318,6 +3394,8 @@ static AccessStrategy
 getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) {
   if (storage->hasInitAccessor() && !storage->getAccessor(AccessorKind::Set))
     return AccessStrategy::getAccessor(AccessorKind::Init, dispatch);
+  if (storage->requiresOpaqueMutateAccessor())
+    return AccessStrategy::getAccessor(AccessorKind::Mutate, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Set, dispatch);
 }
 
@@ -3327,14 +3405,14 @@ static AccessStrategy getOpaqueReadWriteAccessStrategy(
     std::optional<std::pair<SourceRange, const DeclContext *>> location,
     bool useOldABI) {
   if (useOldABI) {
-    assert(storage->requiresOpaqueModify2Coroutine());
+    assert(storage->requiresOpaqueYieldingMutateCoroutine());
     assert(storage->requiresOpaqueModifyCoroutine());
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
   }
-  if (storage->requiresOpaqueModify2Coroutine() &&
+  if (storage->requiresOpaqueYieldingMutateCoroutine() &&
       mayReferenceUseCoroutineAccessorOnStorage(module, expansion, location,
                                                 storage))
-    return AccessStrategy::getAccessor(AccessorKind::Modify2, dispatch);
+    return AccessStrategy::getAccessor(AccessorKind::YieldingMutate, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
   return AccessStrategy::getMaterializeToTemporary(
@@ -3462,14 +3540,17 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
     return requiresOpaqueSetter();
   case AccessorKind::Read:
     return requiresOpaqueReadCoroutine();
-  case AccessorKind::Read2:
-    return requiresOpaqueRead2Coroutine();
+  case AccessorKind::YieldingBorrow:
+    return requiresOpaqueYieldingBorrowCoroutine();
   case AccessorKind::Modify:
     return requiresOpaqueModifyCoroutine();
-  case AccessorKind::Modify2:
-    return requiresOpaqueModify2Coroutine();
-
-  // Other accessors are never part of the opaque-accessors set.
+  case AccessorKind::YieldingMutate:
+    return requiresOpaqueYieldingMutateCoroutine();
+  case AccessorKind::Borrow:
+    return requiresOpaqueBorrowAccessor();
+  case AccessorKind::Mutate:
+    return requiresOpaqueMutateAccessor();
+    // Other accessors are never part of the opaque-accessors set.
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
@@ -3482,6 +3563,9 @@ bool AbstractStorageDecl::requiresOpaqueSetter() const {
   if (!supportsMutation()) {
     return false;
   }
+  if (getParsedAccessor(AccessorKind::Mutate)) {
+    return false;
+  }
   return true;
 }
 
@@ -3489,25 +3573,39 @@ bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
   ASTContext &ctx = getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
     return requiresCorrespondingUnderscoredCoroutineAccessor(
-        AccessorKind::Read2);
+        AccessorKind::YieldingBorrow);
 
-  // If a borrow accessor is present, we don't need a read coroutine.
-  if (getParsedAccessor(AccessorKind::Borrow)) {
-    return false;
-  }
-  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+  return getOpaqueReadOwnership() == OpaqueReadOwnership::YieldingBorrow ||
+         getOpaqueReadOwnership() == OpaqueReadOwnership::OwnedOrBorrowed;
 }
 
-bool AbstractStorageDecl::requiresOpaqueRead2Coroutine() const {
+bool AbstractStorageDecl::requiresOpaqueYieldingBorrowCoroutine() const {
   ASTContext &ctx = getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
     return false;
 
+  // If a `_read` accessor is explicitly present and the CoroutineAccessors
+  // feature is enabled, we need to synthesize a `yielding borrow`.
+  // This is because we assume that with introduction of the feature we can
+  // call it.
+  assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
+  if (getParsedAccessor(AccessorKind::Read) &&
+      this->getModuleContext()->getResilienceStrategy() ==
+        ResilienceStrategy::Resilient &&
+      isExported(this) != ExportedLevel::None) {
+    return true;
+  }
+  
   // If a borrow accessor is present, we don't need a read coroutine.
   if (getParsedAccessor(AccessorKind::Borrow)) {
     return false;
   }
-  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+
+  return getOpaqueReadOwnership() !=  OpaqueReadOwnership::Owned;
+}
+
+bool AbstractStorageDecl::requiresOpaqueBorrowAccessor() const {
+  return getOpaqueReadOwnership() == OpaqueReadOwnership::Borrow;
 }
 
 bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
@@ -3519,13 +3617,17 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
       false);
 }
 
-bool AbstractStorageDecl::requiresOpaqueModify2Coroutine() const {
+bool AbstractStorageDecl::requiresOpaqueYieldingMutateCoroutine() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(
       ctx.evaluator,
       RequiresOpaqueModifyCoroutineRequest{
           const_cast<AbstractStorageDecl *>(this), /*isUnderscored=*/false},
       false);
+}
+
+bool AbstractStorageDecl::requiresOpaqueMutateAccessor() const {
+  return getParsedAccessor(AccessorKind::Mutate) != nullptr;
 }
 
 AccessorDecl *
@@ -3622,8 +3724,8 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
   if (requiresOpaqueReadCoroutine())
     visit(AccessorKind::Read);
 
-  if (requiresOpaqueRead2Coroutine())
-    visit(AccessorKind::Read2);
+  if (requiresOpaqueYieldingBorrowCoroutine())
+    visit(AccessorKind::YieldingBorrow);
 
   // All mutable storage should have a setter.
   if (requiresOpaqueSetter())
@@ -3633,8 +3735,14 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
   if (requiresOpaqueModifyCoroutine())
     visit(AccessorKind::Modify);
 
-  if (requiresOpaqueModify2Coroutine())
-    visit(AccessorKind::Modify2);
+  if (requiresOpaqueYieldingMutateCoroutine())
+    visit(AccessorKind::YieldingMutate);
+
+  if (requiresOpaqueBorrowAccessor())
+    visit(AccessorKind::Borrow);
+
+  if (requiresOpaqueMutateAccessor())
+    visit(AccessorKind::Mutate);
 }
 
 void AbstractStorageDecl::visitOpaqueAccessors(
@@ -3694,7 +3802,8 @@ bool AbstractStorageDecl::isResilient() const {
   // Non-public global and static variables always have a
   // fixed layout.
   auto accessScope = getFormalAccessScope(/*useDC=*/nullptr,
-                                          /*treatUsableFromInlineAsPublic=*/true);
+                                          /*treatUsableFromInlineAsPublic=*/true,
+                                          /*ignoreImportAccessLevel=*/false);
   if (!accessScope.isPublicOrPackage())
     return false;
 
@@ -4057,7 +4166,11 @@ bool swift::conflicting(ASTContext &ctx,
     // Prior to Swift 5, we permitted redeclarations of variables as different
     // declarations if the variable was declared in an extension of a generic
     // type. Make sure we maintain this behaviour in versions < 5.
+<<<<<<< HEAD
     if (!ctx.isLanguageModeAtLeast(5)) {
+=======
+    if (!ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
+>>>>>>> origin/main
       if ((sig1.IsVariable && sig1.InExtensionOfGenericType) ||
           (sig2.IsVariable && sig2.InExtensionOfGenericType)) {
         if (wouldConflictInSwift5)
@@ -4081,7 +4194,11 @@ bool swift::conflicting(ASTContext &ctx,
   // Swift 5, a variable not in an extension of a generic type got a null
   // overload type instead of a function type as it does now, so we really
   // follow that behaviour and warn if there's going to be a conflict in future.
+<<<<<<< HEAD
   if (!ctx.isLanguageModeAtLeast(5)) {
+=======
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
+>>>>>>> origin/main
     auto swift4Sig1Type = sig1.IsVariable && !sig1.InExtensionOfGenericType
                               ? CanType()
                               : sig1Type;
@@ -4594,9 +4711,11 @@ bool ValueDecl::isLocalCapture() const {
 }
 
 ArrayRef<ValueDecl *>
-ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
-  // Dig out the nominal type.
-  NominalTypeDecl *NTD = getDeclContext()->getSelfNominalTypeDecl();
+ValueDecl::getSatisfiedProtocolRequirements(bool Sorted,
+                                            NominalTypeDecl *NTD) const {
+  // Dig out the nominal type if needed.
+  if (!NTD)
+    NTD = getDeclContext()->getSelfNominalTypeDecl();
   if (!NTD || isa<ProtocolDecl>(NTD))
     return {};
 
@@ -4962,7 +5081,8 @@ bool ValueDecl::hasAttributeWithInlinableSemantics() const {
   // @inline(always) implies @inlinable on "public" (open, public, package)
   // declarations.
   AccessScope access =
-        getFormalAccessScope(nullptr, /*treatUsableFromInlineAsPublic*/false);
+        getFormalAccessScope(nullptr, /*treatUsableFromInlineAsPublic*/false,
+                             /*ignoreImportAccessLevel*/false);
   if (!access.isPublicOrPackage())
     return false;
 
@@ -5266,7 +5386,8 @@ static AccessScope
 getAccessScopeForFormalAccess(const ValueDecl *VD,
                               AccessLevel formalAccess,
                               const DeclContext *useDC,
-                              bool treatUsableFromInlineAsPublic) {
+                              bool treatUsableFromInlineAsPublic,
+                              bool ignoreImportAccessLevel) {
   AccessLevel access = getAdjustedFormalAccess(VD, formalAccess, useDC,
                                                treatUsableFromInlineAsPublic);
   const DeclContext *resultDC = VD->getDeclContext();
@@ -5305,17 +5426,19 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     resultDC = resultDC->getParent();
   }
 
-  auto localImportRestriction = VD->getImportAccessFrom(useDC);
-  if (localImportRestriction.has_value()) {
-    AccessLevel importAccessLevel =
-      localImportRestriction.value().accessLevel;
-    auto isVisible = access >= AccessLevel::Public ||
-      (access == AccessLevel::Package &&
-       useDC->getParentModule()->inSamePackage(resultDC->getParentModule()));
+  if (!ignoreImportAccessLevel) {
+    auto localImportRestriction = VD->getImportAccessFrom(useDC);
+    if (localImportRestriction.has_value()) {
+      AccessLevel importAccessLevel =
+        localImportRestriction.value().accessLevel;
+      auto isVisible = access >= AccessLevel::Public ||
+        (access == AccessLevel::Package &&
+         useDC->getParentModule()->inSamePackage(resultDC->getParentModule()));
 
-    if (access > importAccessLevel && isVisible) {
-      access = std::min(access, importAccessLevel);
-      resultDC = useDC->getParentSourceFile();
+      if (access > importAccessLevel && isVisible) {
+        access = std::min(access, importAccessLevel);
+        resultDC = useDC->getParentSourceFile();
+      }
     }
   }
 
@@ -5346,9 +5469,11 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
 
 AccessScope
 ValueDecl::getFormalAccessScope(const DeclContext *useDC,
-                                bool treatUsableFromInlineAsPublic) const {
+                                bool treatUsableFromInlineAsPublic,
+                                bool ignoreImportAccessLevel) const {
   return getAccessScopeForFormalAccess(this, getFormalAccess(), useDC,
-                                       treatUsableFromInlineAsPublic);
+                                       treatUsableFromInlineAsPublic,
+                                       ignoreImportAccessLevel);
 }
 
 /// Checks if \p VD may be used from \p useDC, taking \@testable imports into
@@ -5394,7 +5519,8 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
 
   AccessScope accessScope = getAccessScopeForFormalAccess(
       VD, access, useDC,
-      /*treatUsableFromInlineAsPublic*/ includeInlineable);
+      /*treatUsableFromInlineAsPublic*/ includeInlineable,
+      /*ignoreImportAccessLevel*/ false);
   if (accessScope.getDeclContext() == useDC)
     return true;
   if (!AccessScope(useDC).isChildOf(accessScope))
@@ -5535,15 +5661,26 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return srcPkg && usePkg && usePkg->isSamePackageAs(srcPkg);
   }
   case AccessLevel::Public:
-  case AccessLevel::Open:
+  case AccessLevel::Open: {
+    if (VD->getASTContext().LangOpts.hasFeature(
+            Feature::EnforceSPIOperatorGroup) &&
+        VD->isOperator() && VD->isSPI()) {
+      const DeclContext *useFile = useDC->getModuleScopeContext();
+      if (useFile->getParentModule() == sourceDC->getParentModule())
+        return true;
+      auto *useSF = dyn_cast<SourceFile>(useFile);
+      return !useSF || useSF->isImportedAsSPI(VD);
+    }
     return true;
+  }
   }
   llvm_unreachable("bad access level");
 }
 
 bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
   auto scope = getFormalAccessScope(/*UseDC=*/nullptr,
-                                    /*treatUsableFromInlineAsPublic=*/true);
+                                    /*treatUsableFromInlineAsPublic=*/true,
+                                    /*ignoreImportAccessLevel=*/false);
 
   // 'other' may have come from a @testable import, so we need to upgrade it's
   // visibility to public here. That is not the same as whether 'other' is
@@ -5551,7 +5688,8 @@ bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
   // differently in that case.
   auto otherScope =
       other->getFormalAccessScope(getDeclContext(),
-                                  /*treatUsableFromInlineAsPublic=*/true);
+                                  /*treatUsableFromInlineAsPublic=*/true,
+                                  /*ignoreImportAccessLevel=*/false);
 
   if (scope.isPublic())
     return !otherScope.isPublic();
@@ -5738,6 +5876,16 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
       return result;
   }
 
+  // Prefer non-reparentable protocols.
+  if (auto *proto1 = dyn_cast<ProtocolDecl>(type1)) {
+    if (auto *proto2 = dyn_cast<ProtocolDecl>(type2)) {
+      auto rp1 = proto1->getAttrs().hasAttribute<ReparentableAttr>();
+      auto rp2 = proto2->getAttrs().hasAttribute<ReparentableAttr>();
+      if (rp1 != rp2)
+        return int(rp1) < int(rp2) ? -1 : +1;
+    }
+  }
+
   if (int result = type1->getBaseIdentifier().str().compare(
                                   type2->getBaseIdentifier().str()))
     return result;
@@ -5754,7 +5902,8 @@ bool NominalTypeDecl::isFormallyResilient() const {
   // Private and (unversioned) internal types always have a
   // fixed layout.
   if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublicOrPackage())
+                            /*treatUsableFromInlineAsPublic=*/true,
+                            /*ignoreImportAccessLevel=*/false).isPublicOrPackage())
     return false;
 
   // Check for an explicit @_fixed_layout or @frozen attribute.
@@ -5982,13 +6131,12 @@ NominalTypeDecl::getInitAccessorProperties() const {
       {});
 }
 
-ArrayRef<VarDecl *>
-NominalTypeDecl::getMemberwiseInitProperties() const {
+ArrayRef<VarDecl *> NominalTypeDecl::getMemberwiseInitProperties(
+    MemberwiseInitKind initKind) const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(
-      ctx.evaluator,
-      MemberwiseInitPropertiesRequest{mutableThis},
+      ctx.evaluator, MemberwiseInitPropertiesRequest{mutableThis, initKind},
       {});
 }
 
@@ -6422,7 +6570,8 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   Bits.StructDecl.IsCxxNonTrivial = false;
 }
 
-bool NominalTypeDecl::hasMemberwiseInitializer() const {
+bool NominalTypeDecl::hasMemberwiseInitializer(
+    MemberwiseInitKind initKind) const {
   // Currently only structs can have memberwise initializers.
   auto *sd = dyn_cast<StructDecl>(this);
   if (!sd)
@@ -6430,18 +6579,20 @@ bool NominalTypeDecl::hasMemberwiseInitializer() const {
 
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<StructDecl *>(sd);
-  return evaluateOrDefault(ctx.evaluator, HasMemberwiseInitRequest{mutableThis},
-                           false);
+  return evaluateOrDefault(
+      ctx.evaluator, HasMemberwiseInitRequest{mutableThis, initKind}, false);
 }
 
-ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() const {
-  if (!hasMemberwiseInitializer())
+ConstructorDecl *
+NominalTypeDecl::getMemberwiseInitializer(MemberwiseInitKind initKind) const {
+  if (!hasMemberwiseInitializer(initKind))
     return nullptr;
 
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(
-      ctx.evaluator, SynthesizeMemberwiseInitRequest{mutableThis}, nullptr);
+      ctx.evaluator, SynthesizeMemberwiseInitRequest{mutableThis, initKind},
+      nullptr);
 }
 
 ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
@@ -6966,6 +7117,20 @@ ArtificialMainKind Decl::getArtificialMainKind() const {
   llvm_unreachable("type has no @Main attr?!");
 }
 
+bool Decl::canSupportBorrowAccessors() const {
+  if (isa<StructDecl>(this) || isa<EnumDecl>(this) || isa<ClassDecl>(this)) {
+    return true;
+  }
+  if (auto *extension = dyn_cast<ExtensionDecl>(this)) {
+    auto *extendedNominal = extension->getExtendedNominal();
+    if (extendedNominal && extendedNominal->canSupportBorrowAccessors()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static bool isOverridingDecl(const ValueDecl *Derived,
                              const ValueDecl *Base) {
   while (Derived) {
@@ -7047,12 +7212,10 @@ bool ClassDecl::isForeignReferenceType() const {
   if (!clangRecordDecl)
     return false;
 
-  // `importerImpl` is set to nullptr here to avoid diagnostics during this
-  // CxxRecordSemantics evaluation.
-  CxxRecordSemanticsKind kind = evaluateOrDefault(
-      getASTContext().evaluator,
-      CxxRecordSemantics({clangRecordDecl, getASTContext(), nullptr}), {});
-  return kind == CxxRecordSemanticsKind::Reference;
+  auto info =
+      evaluateOrDefault(getASTContext().evaluator,
+                        ForeignReferenceTypeInfoRequest({clangRecordDecl}), {});
+  return info.isReference();
 }
 
 bool ClassDecl::hasRefCountingAnnotations() const {
@@ -7168,7 +7331,8 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
 
   // Non-public, non-versioned enums are always exhaustive.
   AccessScope accessScope = getFormalAccessScope(/*useDC*/ nullptr,
-                                                 /*respectVersioned*/ true);
+                                                 /*treatUsableFromInlineAsPublic*/ true,
+                                                 /*ignoreImportAccessLevel*/ false);
   if (!accessScope.isPublicOrPackage())
     return true;
 
@@ -7286,6 +7450,13 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getAllInheritedProtocols() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            AllInheritedProtocolsRequest{mutThis},
                            {});
+}
+
+ArrayRef<ReparentingProtocolsRequest::Result>
+ProtocolDecl::getReparentingProtocols() const {
+  auto *mutThis = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ReparentingProtocolsRequest{mutThis}, {});
 }
 
 ArrayRef<AssociatedTypeDecl *>
@@ -7461,7 +7632,14 @@ ArrayRef<StructuralRequirement>
 ProtocolDecl::getStructuralRequirements() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
-      StructuralRequirementsRequest{const_cast<ProtocolDecl *>(this)}, {});
+      StructuralRequirementsRequest{const_cast<ProtocolDecl *>(this)}, {}).first;
+}
+
+ArrayRef<InverseRequirement>
+ProtocolDecl::getInverseRequirements() const {
+  return evaluateOrDefault(
+    getASTContext().evaluator,
+    ProtocolInversesRequest{const_cast<ProtocolDecl *>(this)}, {});
 }
 
 ArrayRef<Requirement>
@@ -7543,7 +7721,8 @@ void ProtocolDecl::computeKnownProtocolKind() const {
       !module->getName().is("Foundation") &&
       !module->getName().is("_Differentiation") &&
       !module->getName().is("_Concurrency") &&
-      !module->getName().is("Distributed")) {
+      !module->getName().is("Distributed") && 
+      !module->getName().is("Cxx")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -7622,19 +7801,13 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::MutableAddress:
     return article ? "a mutable addressor" : "mutable addressor";
   case AccessorKind::Read:
-    if (underscored)
-      return article ? "a '_read' accessor" : "'_read' accessor";
-    // Fall through to the non-underscored spelling.
-    LLVM_FALLTHROUGH;
-  case AccessorKind::Read2:
-    return article ? "a 'read' accessor" : "'read' accessor";
+    return article ? "a '_read' accessor" : "'_read' accessor";
+  case AccessorKind::YieldingBorrow:
+    return article ? "a 'yielding borrow' accessor" : "'yielding borrow' accessor";
   case AccessorKind::Modify:
-    if (underscored)
-      return article ? "a '_modify' accessor" : "'_modify' accessor";
-    // Fall through to the non-underscored spelling.
-    LLVM_FALLTHROUGH;
-  case AccessorKind::Modify2:
-    return article ? "a 'modify' accessor" : "'modify' accessor";
+    return article ? "a '_modify' accessor" : "'_modify' accessor";
+  case AccessorKind::YieldingMutate:
+    return article ? "a 'yielding mutate' accessor" : "'yielding mutate' accessor";
   case AccessorKind::WillSet:
     return "'willSet'";
   case AccessorKind::DidSet:
@@ -7866,7 +8039,8 @@ AccessScope
 AbstractStorageDecl::getSetterFormalAccessScope(const DeclContext *useDC,
                                     bool treatUsableFromInlineAsPublic) const {
   return getAccessScopeForFormalAccess(this, getSetterFormalAccess(), useDC,
-                                       treatUsableFromInlineAsPublic);
+                                       treatUsableFromInlineAsPublic,
+                                       /*ignoreImportAccessLevel*/ false);
 }
 
 void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
@@ -8438,20 +8612,8 @@ bool VarDecl::isActorSelf() const {
   return nominal && nominal->isActor();
 }
 
-/// Whether the given variable is the backing storage property for
-/// a declared property that is either `lazy` or has an attached
-/// property wrapper.
-static bool isBackingStorageForDeclaredProperty(const VarDecl *var) {
-  if (var->isLazyStorageProperty())
-    return true;
-
-  if (var->getOriginalWrappedProperty())
-    return true;
-
-  return false;
-}
-
-/// Whether the given variable is a declared property that has separate backing storage.
+/// Whether the given variable is a declared property that has separate backing
+/// storage.
 static bool isDeclaredPropertyWithBackingStorage(const VarDecl *var) {
   if (var->getAttrs().hasAttribute<LazyAttr>())
     return true;
@@ -8462,26 +8624,75 @@ static bool isDeclaredPropertyWithBackingStorage(const VarDecl *var) {
   return false;
 }
 
-bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
+/// Checks whether this is a VarDecl with an initial value that should be
+/// excluded for the memberwise initializer based on its access level.
+static bool isMemberwiseInitExcludedVar(const VarDecl *VD,
+                                        MemberwiseInitKind initKind,
+                                        std::optional<AccessLevel> minAccess) {
+  auto &ctx = VD->getASTContext();
+
+  // For property wrappers, the property must be at least internal. This
+  // predates SE-0502.
+  if (VD->hasAttachedPropertyWrapper()) {
+    minAccess.emplace(AccessLevel::Internal);
+  } else if (initKind == MemberwiseInitKind::Compatibility) {
+    // We don't exclude private VarDecls for the compatibility overload.
+    return false;
+  }
+
+  if (!minAccess) {
+    // If we weren't provided a minimum access level, we should take whatever
+    // is the most accessible property of the memberwise initializer, up to
+    // internal.
+    auto *NTD = cast<NominalTypeDecl>(VD->getDeclContext());
+    minAccess =
+        evaluateOrDefault(ctx.evaluator, MemberwiseInitMaxAccessLevel{NTD},
+                          AccessLevel::Internal);
+  }
+
+  // If the decl has at least the minimum access level, we're good.
+  if (VD->getFormalAccess() >= minAccess.value())
+    return false;
+
+  // The variable must have an initial value or be default initialized.
+  if (VD->hasInitialValue())
+    return true;
+
+  if (auto *PBD = VD->getParentPatternBinding()) {
+    auto entry = PBD->getPatternEntryIndexForVarDecl(VD);
+    if (PBD->isDefaultInitializable(entry))
+      return true;
+  }
+  return false;
+}
+
+bool VarDecl::isMemberwiseInitialized(
+    MemberwiseInitKind initKind, bool preferDeclaredProperties,
+    std::optional<AccessLevel> minAccess) const {
   // Only non-static properties in type context can be part of a memberwise
   // initializer.
   if (!getDeclContext()->isTypeContext() || isStatic())
     return false;
 
-  // If this is a stored property, and not a backing property in a case where
-  // we only want to see the declared properties, it can be memberwise
-  // initialized.
-  if (hasStorage() && preferDeclaredProperties &&
-      isBackingStorageForDeclaredProperty(this))
+  // If this is a backing property in a case where we only want to see the
+  // declared properties, it can't be memberwise initialized. Otherwise it can
+  // be memberwise initialized if the original can be.
+  if (auto *original = getOriginalVarForBackingStorage()) {
+    if (preferDeclaredProperties)
+      return false;
+
+    return original->isMemberwiseInitialized(initKind, /*preferDeclared*/ true);
+  }
+
+  // Check whether this is an initialized private var that should be excluded.
+  if (isMemberwiseInitExcludedVar(this, initKind, minAccess))
     return false;
 
   // If this is a computed property with `init` accessor, it's
   // memberwise initializable when it could be used to initialize
   // other stored properties.
-  if (hasInitAccessor()) {
-    if (getAccessor(AccessorKind::Init))
-      return true;
-  }
+  if (hasInitAccessor() && getAccessor(AccessorKind::Init))
+    return true;
 
   // If this is a computed property, it's not memberwise initialized unless
   // the caller has asked for the declared properties and it is either a
@@ -8495,20 +8706,6 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   // to the memberwise initializer since they already have an initial
   // value that cannot be overridden.
   if (isLet() && isParentInitialized())
-    return false;
-
-  // Properties with attached wrappers that have an access level < internal
-  // but do have an initializer don't participate in the memberwise
-  // initializer, because they would arbitrarily lower the access of the
-  // memberwise initializer.
-  auto origVar = this;
-  if (auto origWrapped = getOriginalWrappedProperty())
-    origVar = origWrapped;
-  if (origVar->getFormalAccess() < AccessLevel::Internal &&
-      origVar->hasAttachedPropertyWrapper() &&
-      (origVar->isParentInitialized() ||
-       (origVar->getParentPatternBinding() &&
-        origVar->getParentPatternBinding()->isDefaultInitializable())))
     return false;
 
   return true;
@@ -9949,9 +10146,9 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
     case AccessorKind::Borrow:
     case AccessorKind::Mutate:
       return subscript ? subscript->getName()
@@ -10786,7 +10983,8 @@ bool AbstractFunctionDecl::isResilient() const {
   // Functions in non-public access scopes are not resilient.
   auto accessScope =
       getFormalAccessScope(/*useDC=*/nullptr,
-                           /*treatUsableFromInlineAsPublic=*/true);
+                           /*treatUsableFromInlineAsPublic=*/true,
+                           /*ignoreImportAccessLevel=*/false);
   if (!accessScope.isPublicOrPackage())
     return false;
 
@@ -11363,9 +11561,9 @@ StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Borrow:
@@ -11380,7 +11578,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Borrow:
     return true;
 
@@ -11389,7 +11587,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
   case AccessorKind::Init:
   case AccessorKind::Mutate:
     return false;
@@ -11705,7 +11903,7 @@ SourceRange FuncDecl::getSourceRange() const {
 EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
                                  ParameterList *Params,
                                  SourceLoc EqualsLoc,
-                                 LiteralExpr *RawValueExpr,
+                                 Expr *RawValueExpr,
                                  DeclContext *DC)
   : DeclContext(DeclContextKind::EnumElementDecl, DC),
     ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
@@ -11769,28 +11967,37 @@ EnumCaseDecl *EnumElementDecl::getParentCase() const {
 
   llvm_unreachable("enum element not in case of parent enum");
 }
-      
+
+Expr *EnumElementDecl::getOriginalRawValueExpr() const {
+  // The return value of this request is irrelevant - it exists as
+  // a cache-warmer.
+  (void)evaluateOrDefault(
+      getASTContext().evaluator,
+      EnumRawValuesRequest{getParentEnum()},
+      {});
+  return RawValueExpr;
+}
+
 LiteralExpr *EnumElementDecl::getRawValueExpr() const {
   // The return value of this request is irrelevant - it exists as
   // a cache-warmer.
-  (void)evaluateOrDefault(
-      getASTContext().evaluator,
-      EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Interface},
-      {});
-  return RawValueExpr;
+  (void)evaluateOrDefault(getASTContext().evaluator,
+                          EnumRawValuesRequest{getParentEnum()}, {});
+  // This request will have been evaluated during the above
+  // 'EnumRawValuesRequest' so this is meant to return the
+  // cached result, if the above request was successful.
+  if (RawValueExpr)
+    if (getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions))
+      return dyn_cast<LiteralExpr>(evaluateOrDefault(
+            getASTContext().evaluator,
+            ConstantFoldExpression{RawValueExpr, &getASTContext()}, {}));
+    else
+      return dyn_cast<LiteralExpr>(RawValueExpr);
+  else
+    return nullptr;
 }
 
-LiteralExpr *EnumElementDecl::getStructuralRawValueExpr() const {
-  // The return value of this request is irrelevant - it exists as
-  // a cache-warmer.
-  (void)evaluateOrDefault(
-      getASTContext().evaluator,
-      EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Structural},
-      {});
-  return RawValueExpr;
-}
-
-void EnumElementDecl::setRawValueExpr(LiteralExpr *e) {
+void EnumElementDecl::setRawValueExpr(Expr *e) {
   assert((!RawValueExpr || e == RawValueExpr || e->getType()) &&
          "Illegal mutation of raw value expr");
   RawValueExpr = e;
@@ -12207,7 +12414,11 @@ ActorIsolation swift::getActorIsolationOfContext(
         ctx.LangOpts.StrictConcurrencyLevel >= StrictConcurrency::Complete) {
       if (Type mainActor = ctx.getMainActorType())
         return ActorIsolation::forGlobalActor(mainActor).withPreconcurrency(
+<<<<<<< HEAD
             !ctx.isLanguageModeAtLeast(6));
+=======
+            !ctx.isLanguageModeAtLeast(LanguageMode::v6));
+>>>>>>> origin/main
     }
   }
 
@@ -12408,10 +12619,21 @@ void swift::simple_display(llvm::raw_ostream &out, const GenericParamList *GPL) 
 
 StringRef swift::getAccessorLabel(AccessorKind kind) {
   switch (kind) {
+  #define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE)
   #define SINGLETON_ACCESSOR(ID, KEYWORD) \
     case AccessorKind::ID: return #KEYWORD;
 #define ACCESSOR(ID, KEYWORD)
 #include "swift/AST/AccessorKinds.def"
+
+    // Transitional terminology.  Let's use this for a little
+    // while to ease the transition.  (Both forms are parsed
+    // correctly, this just changes what gets written into
+    // .swiftinterface files.)
+    case AccessorKind::YieldingBorrow: return "read";
+    case AccessorKind::YieldingMutate: return "modify";
+    // TODO: Switch to the final terminology before shipping...
+    // case AccessorKind::YieldingBorrow: return "yielding borrow";
+    // case AccessorKind::YieldingMutate: return "yielding mutate";
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -13095,6 +13317,77 @@ MacroDiscriminatorContext
 MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
   return getParentOf(
       expansion->getPoundLoc(), expansion->getDeclContext());
+}
+
+void swift::printMemberwiseInit(NominalTypeDecl *nominal,
+                                MemberwiseInitKind initKind,
+                                llvm::raw_ostream &out) {
+  auto &ctx = nominal->getASTContext();
+  auto &SM = ctx.SourceMgr;
+
+  auto printMemberName = [](Identifier name, llvm::raw_ostream &OS) {
+    if (escapeIdentifierInContext(name, PrintNameContext::TypeMember)) {
+      OS << '`' << name << '`';
+    } else {
+      OS << name;
+    }
+  };
+
+  SmallVector<VarDecl *, 4> vars;
+  for (auto *var : nominal->getMemberwiseInitProperties(initKind)) {
+    // Skip printing lazy properties since we don't have a way of spelling
+    // their initialization in source (since we'd be initializing the backing
+    // variable).
+    if (var->getAttrs().hasAttribute<LazyAttr>())
+      continue;
+
+    vars.push_back(var);
+  }
+
+  out << "init(";
+
+  // Process the list of members, inserting commas as appropriate.
+  for (const auto &[idx, var] : llvm::enumerate(vars)) {
+    if (idx > 0)
+      out << ", ";
+
+    printMemberName(var->getName(), out);
+    out << ": ";
+
+    // Unconditionally print '@escaping' if we print out a function type -
+    // the assignments we generate below will escape this parameter.
+    auto ty = var->getTypeInContext();
+    if (ty->is<AnyFunctionType>())
+      out << "@" << TypeAttribute::getAttrName(TypeAttrKind::Escaping) << " ";
+
+    out << ty.getString();
+
+    bool hasAddedDefault = false;
+    if (auto *PBD = var->getParentPatternBinding()) {
+      auto idx = PBD->getPatternEntryIndexForVarDecl(var);
+      auto *init = PBD->getOriginalInit(idx);
+      if (auto range = init ? init->getSourceRange() : SourceRange()) {
+        auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+        out << " = " << SM.extractText(charRange);
+        hasAddedDefault = true;
+      }
+    }
+    if (!hasAddedDefault && ty->isOptional())
+      out << " = nil";
+  }
+
+  // Print the body.
+  out << ") {\n";
+  for (auto *var : vars) {
+    // self.<property> = <property>
+    auto name = var->getName();
+    out << "self.";
+    printMemberName(name, out);
+    out << " = ";
+    printMemberName(name, out);
+    out << "\n";
+  }
+  out << "}";
 }
 
 std::optional<Type>

@@ -561,10 +561,11 @@ public:
   void cacheResult(bool value) const;
 };
 
-class StructuralRequirementsRequest :
-    public SimpleRequest<StructuralRequirementsRequest,
-                         ArrayRef<StructuralRequirement>(ProtocolDecl *),
-                         RequestFlags::Cached> {
+class StructuralRequirementsRequest
+    : public SimpleRequest<StructuralRequirementsRequest,
+                       std::pair<ArrayRef<StructuralRequirement>,
+                                 ArrayRef<InverseRequirement>>(ProtocolDecl *),
+                       RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -572,7 +573,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<StructuralRequirement>
+  std::pair<ArrayRef<StructuralRequirement>, ArrayRef<InverseRequirement>>
   evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
@@ -611,6 +612,25 @@ private:
 
   // Evaluation.
   ArrayRef<ProtocolDecl *>
+  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class ProtocolInversesRequest :
+    public SimpleRequest<ProtocolInversesRequest,
+                         ArrayRef<InverseRequirement>(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<InverseRequirement>
   evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
@@ -1929,6 +1949,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Request to obtain a list of properties that can be initalized.
+class InitializablePropertiesRequest
+    : public SimpleRequest<InitializablePropertiesRequest,
+                           ArrayRef<VarDecl *>(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<VarDecl *> evaluate(Evaluator &evaluator,
+                               NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Request to obtain a list of computed properties with init accesors
 /// in the given nominal type.
 class InitAccessorPropertiesRequest :
@@ -1941,11 +1980,9 @@ public:
 private:
   friend SimpleRequest;
 
+  // Evaluation.
   ArrayRef<VarDecl *>
   evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -1953,21 +1990,39 @@ public:
 
 /// Request to obtain a list of properties that will be reflected in the parameters of a
 /// memberwise initializer.
-class MemberwiseInitPropertiesRequest :
-    public SimpleRequest<MemberwiseInitPropertiesRequest,
-                         ArrayRef<VarDecl *>(NominalTypeDecl *),
-                         RequestFlags::Cached> {
+class MemberwiseInitPropertiesRequest
+    : public SimpleRequest<MemberwiseInitPropertiesRequest,
+                           ArrayRef<VarDecl *>(NominalTypeDecl *,
+                                               MemberwiseInitKind),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  ArrayRef<VarDecl *>
-  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+  // Evaluation.
+  ArrayRef<VarDecl *> evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
+                               MemberwiseInitKind initKind) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// The maximum access level the memberwise initializer can be for a given
+/// nominal decl.
+class MemberwiseInitMaxAccessLevel
+    : public SimpleRequest<MemberwiseInitMaxAccessLevel,
+                           AccessLevel(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+  AccessLevel evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
 
 public:
   bool isCached() const { return true; }
@@ -2351,8 +2406,8 @@ public:
 /// Computes the raw values for an enum type.
 class EnumRawValuesRequest :
     public SimpleRequest<EnumRawValuesRequest,
-                         evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
-                         RequestFlags::SeparatelyCached> {
+                         evaluator::SideEffect (EnumDecl *),
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
   
@@ -2361,17 +2416,15 @@ private:
   
   // Evaluation.
   evaluator::SideEffect
-  evaluate(Evaluator &evaluator, EnumDecl *ED, TypeResolutionStage stage) const;
+  evaluate(Evaluator &evaluator, EnumDecl *ED) const;
   
 public:
   // Cycle handling.
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
                            
-  // Separate caching.
-  bool isCached() const;
-  std::optional<evaluator::SideEffect> getCachedResult() const;
-  void cacheResult(evaluator::SideEffect value) const;
+  // Caching.
+  bool isCached() const { return true; }
 };
 
 /// Determines if an override is ABI compatible with its base method.
@@ -2808,7 +2861,8 @@ public:
 
 /// Checks whether this type has a synthesized memberwise initializer.
 class HasMemberwiseInitRequest
-    : public SimpleRequest<HasMemberwiseInitRequest, bool(StructDecl *),
+    : public SimpleRequest<HasMemberwiseInitRequest,
+                           bool(StructDecl *, MemberwiseInitKind),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2817,7 +2871,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, StructDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, StructDecl *decl,
+                MemberwiseInitKind initKind) const;
 
 public:
   // Caching.
@@ -2827,7 +2882,8 @@ public:
 /// Synthesizes a memberwise initializer for a given type.
 class SynthesizeMemberwiseInitRequest
     : public SimpleRequest<SynthesizeMemberwiseInitRequest,
-                           ConstructorDecl *(NominalTypeDecl *),
+                           ConstructorDecl *(NominalTypeDecl *,
+                                             MemberwiseInitKind),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2836,7 +2892,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
+                            MemberwiseInitKind initKind) const;
 
 public:
   // Caching.
@@ -4961,6 +5018,24 @@ public:
 bool isCached() const { return true; }
 };
 
+/// A request to constant-fold an expression node
+class ConstantFoldExpression
+: public SimpleRequest<ConstantFoldExpression,
+                       Expr *(const Expr *, ASTContext *),
+                       RequestFlags::Cached> {
+public:
+using SimpleRequest::SimpleRequest;
+
+private:
+friend SimpleRequest;
+
+Expr *
+evaluate(Evaluator &evaluator, const Expr *expr, ASTContext *ctx) const;
+
+public:
+bool isCached() const { return true; }
+};
+
 /// Check @c enums for compatibility with C.
 class TypeCheckCDeclEnumRequest
     : public SimpleRequest<TypeCheckCDeclEnumRequest,
@@ -5174,6 +5249,27 @@ private:
 
 public:
   bool isCached() const { return true; }
+};
+
+/// Computes the string literal expression for an Obj-C `#keyPath`.
+class ObjCKeyPathStringRequest
+    : public SimpleRequest<ObjCKeyPathStringRequest,
+                           Expr *(KeyPathExpr *, DeclContext *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Expr *evaluate(Evaluator &evaluator, KeyPathExpr *keyPath,
+                 DeclContext *dc) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<Expr *> getCachedResult() const;
+  void cacheResult(Expr *) const;
 };
 
 /// Finds the import declaration that effectively imports a given module in a
@@ -5473,22 +5569,6 @@ public:
   bool isCached() const { return true; }
 };
 
-class ModuleHasTypeCheckerPerformanceHacksEnabledRequest
-    : public SimpleRequest<ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
-                           bool(const ModuleDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, const ModuleDecl *module) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 class AvailabilityDomainForDeclRequest
     : public SimpleRequest<AvailabilityDomainForDeclRequest,
                            std::optional<AvailabilityDomain>(ValueDecl *),
@@ -5530,6 +5610,25 @@ public:
     auto *domain = std::get<0>(getStorage());
     return extractNearestSourceLoc(domain->getDecl());
   }
+};
+
+class DesugarForEachStmtRequest
+    : public SimpleRequest<DesugarForEachStmtRequest,
+                           BraceStmt *(ForEachStmt *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  BraceStmt *evaluate(Evaluator &evaluator, ForEachStmt *FES) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<BraceStmt *> getCachedResult() const;
+  void cacheResult(BraceStmt *stmt) const;
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

@@ -63,9 +63,11 @@ public:
   static bool isFixed() { return false; }
 
   StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                             const llvm::Twine &name) const override {
+                             const llvm::Twine &name,
+                             StackAllocationIsNested_t isNested =
+                                 StackAllocationIsNested) const override {
     // Allocate memory on the stack.
-    auto alloca = IGF.emitDynamicAlloca(T, name);
+    auto alloca = IGF.emitDynamicStackAllocation(T, isNested, name);
     IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
     return alloca.withAddress(
              getAsBitCastAddress(IGF, alloca.getAddressPointer()));
@@ -74,7 +76,7 @@ public:
   void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
                        SILType T) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
-    IGF.emitDeallocateDynamicAlloca(stackAddress);
+    IGF.emitDynamicStackDeallocation(stackAddress);
   }
 
   void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
@@ -105,6 +107,14 @@ public:
 
   llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
     return emitLoadOfIsBitwiseTakable(IGF, T);
+  }
+
+  llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsBitwiseBorrowable(IGF, T);
+  }
+
+  llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsAddressableForDependencies(IGF, T);
   }
 
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,

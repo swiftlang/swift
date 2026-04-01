@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "gtest/gtest.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Frontend/Frontend.h"
@@ -20,6 +19,7 @@
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include "gtest/gtest.h"
 
 using namespace swift;
 

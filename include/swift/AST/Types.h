@@ -54,6 +54,10 @@ namespace llvm {
 struct fltSemantics;
 } // namespace llvm
 
+namespace clang {
+class FunctionType;
+} // namespace clang
+
 namespace swift {
 
 enum class AllocationArena;
@@ -160,8 +164,8 @@ public:
     /// This type contains an Error type without an underlying original type.
     HasBareError         = 0x100,
 
-    /// This type contains a DependentMemberType.
-    HasDependentMember   = 0x200,
+    /// Whether this type contains a JoinType or MeetType.
+    HasJoinOrMeet        = 0x200,
 
     /// This type contains an OpaqueTypeArchetype.
     HasOpaqueArchetype   = 0x400,
@@ -234,10 +238,6 @@ public:
   /// Does this type contain an error without an original type?
   bool hasBareError() const { return Bits & HasBareError; }
 
-  /// Does this type contain a dependent member type, possibly with a
-  /// non-type parameter base, such as a type variable or concrete type?
-  bool hasDependentMember() const { return Bits & HasDependentMember; }
-
   /// Does a type with these properties structurally contain an
   /// opened existential archetype?
   bool hasOpenedExistential() const { return Bits & HasOpenedExistential; }
@@ -282,6 +282,8 @@ public:
 
   bool isUnsafe() const { return Bits & IsUnsafe; }
 
+  bool hasJoinOrMeet() const { return Bits & HasJoinOrMeet; }
+
   /// Does a type with these properties structurally contain a
   /// parameterized existential type?
   bool hasParameterizedExistential() const {
@@ -311,11 +313,6 @@ public:
   /// Remove the HasTypeParameter property from this set.
   void removeHasTypeParameter() {
     Bits &= ~HasTypeParameter;
-  }
-
-  /// Remove the HasDependentMember property from this set.
-  void removeHasDependentMember() {
-    Bits &= ~HasDependentMember;
   }
 
   /// Remove the IsUnsafe property from this set.
@@ -439,14 +436,15 @@ protected:
     HasCachedType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
     HasExtInfo : 1,
     HasClangTypeInfo : 1,
     HasThrownError : 1,
-    HasLifetimeDependencies : 1
+    HasLifetimeDependencies : 1,
+    HasSendableDependence : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -818,6 +816,10 @@ public:
     return getRecursiveProperties().hasParameterizedExistential();
   }
 
+  /// Determine whether the type involves the 'join' or 'meet' type, produced by
+  /// the algorithms in lib/Sema/Subtyping.cpp.
+  bool hasJoinOrMeet() const { return getRecursiveProperties().hasJoinOrMeet(); }
+
   /// Determine whether the type involves a local archetype from the given
   /// environment.
   bool hasLocalArchetypeFromEnvironment(GenericEnvironment *env) const;
@@ -953,12 +955,6 @@ public:
   /// Whether this is a top-level ErrorType without an underlying original
   /// type, i.e prints as `_`.
   bool isBareErrorType() const;
-
-  /// Does this type contain a dependent member type, possibly with a
-  /// non-type parameter base, such as a type variable or concrete type?
-  bool hasDependentMember() const {
-    return getRecursiveProperties().hasDependentMember();
-  }
 
   /// Whether this type represents a generic constraint.
   bool isConstraintType() const;
@@ -1108,6 +1104,12 @@ public:
   /// Check if this is a CGFloat type from CoreGraphics framework
   /// on macOS or Foundation on Linux.
   bool isCGFloat();
+
+  /// Check if this is an integer type coming from the Swift module
+  bool isStdlibInteger();
+
+  /// Check if this is a floating-point type coming from the Swift module
+  bool isStdlibFloat();
 
   /// Check if this is a ObjCBool type from the Objective-C module.
   bool isObjCBool();
@@ -1395,6 +1397,11 @@ public:
   /// For a ReferenceStorageType like @unowned, this returns the referent.
   /// Otherwise, it returns the type itself.
   Type getReferenceStorageReferent();
+
+  /// Replace all type variables and placeholders in the type with ErrorType.
+  /// This is necessary in a small number of cases where we need to ensure that
+  /// a type isn't solver allocated, for e.g diagnostic printing.
+  Type replaceTypeVariablesAndPlaceholdersWithErrors();
 
   /// Assumes this is a nominal type. Returns a substitution map that sends each
   /// generic parameter of the declaration's generic signature to the corresponding
@@ -1823,7 +1830,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinGenericType, BuiltinType)
 /// value may be copied, moved, or destroyed.
 class BuiltinFixedArrayType : public BuiltinGenericType,
                               public llvm::FoldingSetNode {
-  friend class ASTContext;
+  friend ASTContext;
   
   CanType Size;
   CanType ElementType;
@@ -1879,6 +1886,47 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFixedArrayType, BuiltinGenericType)
+
+/// BuiltinBorrowType - The builtin type representing a reified borrow of
+/// another value.
+class BuiltinBorrowType : public BuiltinGenericType,
+                          public llvm::FoldingSetNode
+{
+  friend ASTContext;
+
+  CanType Referent;
+
+  BuiltinBorrowType(CanType Referent, RecursiveTypeProperties properties)
+    : BuiltinGenericType(TypeKind::BuiltinBorrow,
+                         Referent->getASTContext(),
+                         properties),
+      Referent(Referent)
+  {}
+
+  friend BuiltinGenericType;
+  /// Get the generic arguments as a substitution map.
+  SubstitutionMap buildSubstitutions() const;
+  
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinBorrow;
+  }
+  
+  static CanTypeWrapper<BuiltinBorrowType>
+  get(CanType Referent);
+
+  /// Get the type of the referenced borrow.
+  CanType getReferentType() const { return Referent; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getReferentType());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      CanType Referent) {
+    ID.AddPointer(Referent.getPointer());
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBorrowType, BuiltinGenericType)
 
 /// BuiltinRawPointerType - The builtin raw (and dangling) pointer type.  This
 /// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.
@@ -3662,6 +3710,8 @@ protected:
       assert(!Bits.AnyFunctionType.HasThrownError || Info->isThrowing());
       Bits.AnyFunctionType.HasLifetimeDependencies =
           !Info.value().getLifetimeDependencies().empty();
+      Bits.AnyFunctionType.HasSendableDependence =
+          !Info->getSendableDependentType().isNull();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3674,6 +3724,7 @@ protected:
       Bits.AnyFunctionType.ExtInfoBits = 0;
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependencies = false;
+      Bits.AnyFunctionType.HasSendableDependence = false;
     }
     this->NumParams = NumParams;
     assert(this->NumParams == NumParams && "Params dropped!");
@@ -3730,15 +3781,28 @@ public:
     return Bits.AnyFunctionType.HasThrownError;
   }
 
+  bool hasSendableDependentType() const {
+    return Bits.AnyFunctionType.HasSendableDependence;
+  }
+
   bool hasLifetimeDependencies() const {
     return Bits.AnyFunctionType.HasLifetimeDependencies;
   }
+
+  /// Type has lifetime dependencies derived from explicit @_lifetime
+  /// attributes.
+  bool hasExplicitLifetimeDependencies() const;
 
   ClangTypeInfo getClangTypeInfo() const;
   ClangTypeInfo getCanonicalClangTypeInfo() const;
 
   Type getGlobalActor() const;
   Type getThrownError() const;
+
+  /// A dependent type that determines whether the function is @Sendable. This
+  /// is only used within the constraint system, and will contain type
+  /// variables if present.
+  Type getSendableDependentType() const;
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
@@ -3792,7 +3856,7 @@ public:
     assert(hasExtInfo());
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
                    getGlobalActor(), getThrownError(),
-                   getLifetimeDependencies());
+                   getSendableDependentType(), getLifetimeDependencies());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -4041,7 +4105,7 @@ class FunctionType final
   }
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return hasGlobalActor() + hasThrownError();
+    return hasGlobalActor() + hasThrownError() + hasSendableDependentType();
   }
 
   size_t numTrailingObjects(OverloadToken<size_t>) const {
@@ -4083,6 +4147,15 @@ public:
     return getTrailingObjects<Type>()[hasGlobalActor()];
   }
 
+  /// A dependent type that determines whether the function is @Sendable. This
+  /// is only used within the constraint system, and will contain type
+  /// variables if present.
+  Type getSendableDependentType() const {
+    if (!hasSendableDependentType())
+      return Type();
+    return getTrailingObjects<Type>()[hasGlobalActor() + hasThrownError()];
+  }
+
   inline size_t getNumLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
       return 0;
@@ -4105,6 +4178,10 @@ public:
   std::optional<LifetimeDependenceInfo> getLifetimeDependenceForResult() const {
     return getLifetimeDependenceFor(getNumParams());
   }
+
+  uint16_t
+  getPointerAuthDiscriminator(ModuleDecl &m,
+                              const clang::FunctionType *clangType = nullptr);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     std::optional<ExtInfo> info = std::nullopt;
@@ -5039,6 +5116,10 @@ public:
            getConvention() == ResultConvention::GuaranteedAddress;
   }
 
+  bool isGuaranteedAddressResult() const {
+    return getConvention() == ResultConvention::GuaranteedAddress;
+  }
+
   /// Transform this SILResultInfo by applying the user-provided
   /// function to its type.
   ///
@@ -5142,15 +5223,17 @@ enum class SILCoroutineKind : uint8_t {
   /// results and may not have yield results.
   None,
 
-  /// This function is a yield-once coroutine (used by e.g. accessors).
-  /// It must not have normal results and may have arbitrary yield results.
+  /// This function is a yield-once coroutine (used by legacy
+  /// `_read` and `_modify` accessors).
+  /// It must not have normal results and may have arbitrary
+  /// yield results.
   YieldOnce,
 
-  /// This function is a yield-once coroutine (used by read and modify
-  /// accessors).  It has the following differences from YieldOnce:
-  /// - it does not observe errors thrown by its caller (unless the feature
-  /// CoroutineAccessorsUnwindOnCallerError is enabled)
-  /// - it uses the callee-allocated ABI
+  /// This function is a yield-once coroutine (used by `yielding borrow`
+  /// and `yielding mutate` accessors).
+  /// Unlike YieldOnce, the second half of the coroutine is _always_
+  /// run, even if an error is thrown within the access scope.
+  /// It also uses a more efficient callee-allocated ABI.
   YieldOnce2,
 
   /// This function is a yield-many coroutine (used by e.g. generators).
@@ -5491,6 +5574,13 @@ public:
       return false;
     }
     return getResults()[0].isAddressResult(loweredAddresses);
+  }
+
+  bool hasGuaranteedAddressResult() const {
+    if (getNumResults() != 1) {
+      return false;
+    }
+    return getResults()[0].isGuaranteedAddressResult();
   }
 
   struct IndirectFormalResultFilter {
@@ -5954,6 +6044,10 @@ public:
       bool isReabstractionThunk = false,
       CanType origTypeOfAbstraction = CanType());
 
+  /// If \p M is nullptr, the type is not substituted.
+  uint16_t getPointerAuthDiscriminator(SILModule *M);
+
+  uint16_t getCoroutineYieldTypesDiscriminator(SILModule &M);
 
   /// Returns the type of the transpose function for the given parameter
   /// indices, transpose function generic signature (optional), and other
@@ -7123,6 +7217,10 @@ public:
   /// type we can represent.
   Type getExistentialType() const;
 
+  /// Determine whether it's possible for this type to have an isolated
+  /// conformance. This could be prohibited in the generic signature.
+  bool mayHaveIsolatedConformance() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_ArchetypeType
@@ -7913,6 +8011,42 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
+
+/// A type to represent a type join between a type variable and a concrete type.
+///
+/// For now, this is a singleton type that does not store the constituent parts
+/// of the join. If we want, we can add this in the future, in service of
+/// diagnostics for example.
+class JoinType final : public TypeBase {
+  friend class ASTContext;
+  JoinType(const ASTContext &C)
+    : TypeBase(TypeKind::Join, &C, RecursiveTypeProperties::HasJoinOrMeet) {}
+public:
+  // The singleton instance of this type is ASTContext::TheJoinType.
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Join;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(JoinType, Type)
+
+/// A type to represent a type meet between a type variable and a concrete type.
+///
+/// For now, this is a singleton type that does not store the constituent parts
+/// of the meet. If we want, we can add this in the future, in service of
+/// diagnostics for example.
+class MeetType final : public TypeBase {
+  friend class ASTContext;
+  MeetType(const ASTContext &C)
+    : TypeBase(TypeKind::Meet, &C, RecursiveTypeProperties::HasJoinOrMeet) {}
+public:
+  // The singleton instance of this type is ASTContext::TheMeetType.
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Meet;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(MeetType, Type)
 
 /// PackType - The type of a pack of arguments provided to a
 /// \c PackExpansionType to guide the pack expansion process.

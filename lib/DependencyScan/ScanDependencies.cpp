@@ -11,22 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift-c/DependencyScan/DependencyScan.h"
-#include "swift/AST/DiagnosticsCommon.h"
-#include "swift/Basic/PrettyStackTrace.h"
-
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsDriver.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
-#include "swift/AST/SourceFile.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
@@ -45,11 +38,11 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
+#include "swift/FrontendTool/Dependencies.h"
 #include "swift/Strings.h"
 #include "clang/CAS/IncludeTree.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
@@ -58,16 +51,12 @@
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
-#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <set>
-#include <sstream>
 #include <stack>
 #include <string>
 
@@ -497,6 +486,19 @@ private:
           commandline.push_back("-read-legacy-type-info-path=" +
                                 scanner.remapPath(legacyLayoutPath));
       }
+      // const-gather-protocols-file
+      StringRef ConstProtocolFile = instance.getInvocation()
+                                        .getSearchPathOptions()
+                                        .ConstGatherProtocolListFilePath;
+      if (!ConstProtocolFile.empty())
+        tracker->trackFile(ConstProtocolFile);
+
+      // Profile Data.
+      tracker->trackFile(instance.getInvocation().getIRGenOptions().UseProfile);
+      tracker->trackFile(instance.getInvocation().getIRGenOptions().UseIRProfile);
+      tracker->trackFile(
+          instance.getInvocation().getIRGenOptions().UseSampleProfile);
+
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
@@ -913,7 +915,6 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
             create_clone(clangDeps->moduleMapFile.c_str()),
             create_clone(clangDeps->contextHash.c_str()),
             create_set(clangDeps->buildCommandLine),
-            create_clone(clangDeps->CASFileSystemRootID.c_str()),
             create_clone(clangDeps->CASClangIncludeTreeRootID.c_str()),
             create_clone(clangDeps->moduleCacheKey.c_str())};
       }
@@ -930,6 +931,22 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
     moduleInfo->source_files = create_set(sourceFiles);
     moduleInfo->direct_dependencies = create_set(bridgeDependencyIDs(cache.getAllDependencies(moduleID)));
     moduleInfo->details = getModuleDetails();
+
+    // Set library level
+    switch (moduleDependencyInfo.getLibraryLevel()) {
+    case LibraryLevel::Other:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_OTHER;
+      break;
+    case LibraryLevel::IPI:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_IPI;
+      break;
+    case LibraryLevel::SPI:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_SPI;
+      break;
+    case LibraryLevel::API:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_API;
+      break;
+    }
 
     // Create a link libraries set for this module
     auto linkLibraries = moduleDependencyInfo.getLinkLibraries();
@@ -1405,12 +1422,13 @@ performModuleScanImpl(
     }
   }
 
-  auto scanner = ModuleDependencyScanner(
-      service, cache, instance->getInvocation(), instance->getSILOptions(),
-      instance->getASTContext(), *instance->getDependencyTracker(),
-      instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
-      instance->getDiags(),
-      instance->getInvocation().getFrontendOptions().ParallelDependencyScan);
+  auto expectedScannerPtr =
+      ModuleDependencyScanner::create(service, instance, cache);
+
+  if (!expectedScannerPtr)
+    return expectedScannerPtr.getError();
+
+  auto &scanner = **expectedScannerPtr;
 
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
@@ -1438,6 +1456,12 @@ performModuleScanImpl(
     ctx.Stats->getFrontendCounters().NumDepScanFilesystemLookups =
         scanner.getNumLookups();
 
+  if (!ctx.hadError()) {
+    emitLoadedModuleTraceIfNeeded(
+        mainModuleID, cache, ctx,
+        instance->getInvocation().getFrontendOptions());
+  }
+
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
   if (opts.SerializeDependencyScannerCache) {
@@ -1457,12 +1481,14 @@ static llvm::ErrorOr<swiftscan_import_set_t> performModulePrescanImpl(
     ModuleDependenciesCache &cache,
     DepScanInMemoryDiagnosticCollector *diagnosticCollector) {
   // Setup the scanner
-  auto scanner = ModuleDependencyScanner(
-      service, cache, instance->getInvocation(), instance->getSILOptions(),
-      instance->getASTContext(), *instance->getDependencyTracker(),
-      instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
-      instance->getDiags(),
-      instance->getInvocation().getFrontendOptions().ParallelDependencyScan);
+  auto expectedScannerPtr =
+      ModuleDependencyScanner::create(service, instance, cache);
+
+  if (!expectedScannerPtr)
+    return expectedScannerPtr.getError();
+
+  auto &scanner = **expectedScannerPtr;
+
   // Execute import prescan, and write JSON output to the output stream
   auto mainDependencies =
       scanner.getMainModuleDependencyInfo(instance->getMainModule());
@@ -1599,7 +1625,6 @@ void swift::dependencies::incremental::validateInterModuleDependenciesCache(
                       emitRemarks, visited, modulesRequiringRescan);
   for (const auto &outOfDateModID : modulesRequiringRescan)
     cache.removeDependency(outOfDateModID);
-
   // Regardless of invalidation, always re-scan main module.
   cache.removeDependency(rootModuleID);
 }

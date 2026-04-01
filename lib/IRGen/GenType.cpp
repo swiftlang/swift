@@ -239,6 +239,17 @@ llvm::Value *FixedTypeInfo::getIsBitwiseTakable(IRGenFunction &IGF, SILType T) c
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
       getBitwiseTakable(ResilienceExpansion::Maximal) >= IsBitwiseTakableOnly);
 }
+llvm::Value *FixedTypeInfo::getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const {
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+      getBitwiseTakable(ResilienceExpansion::Maximal) == IsBitwiseTakableAndBorrowable);
+}
+llvm::Value *FixedTypeInfo::getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const {
+
+  bool isAFD = T.isAddressableForDeps(IGF.IGM.getSILModule(),
+                                      TypeExpansionContext::minimal());
+  
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty, isAFD);
+}
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return IGM.getSize(getFixedStride());
 }
@@ -1360,6 +1371,12 @@ namespace {
     llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
+    llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
     llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                           SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -1373,8 +1390,9 @@ namespace {
     llvm::Constant *getStaticStride(IRGenModule &IGM) const override {
       return nullptr;
     }
-    StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                               const llvm::Twine &name) const override {
+    StackAddress
+    allocateStack(IRGenFunction &IGF, SILType T, const llvm::Twine &name,
+                  StackAllocationIsNested_t isNested) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
     void deallocateStack(IRGenFunction &IGF, StackAddress addr,
@@ -2319,6 +2337,10 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     
   case TypeKind::BuiltinFixedArray: {
     return convertBuiltinFixedArrayType(cast<BuiltinFixedArrayType>(ty));
+  }
+
+  case TypeKind::BuiltinBorrow: {
+    return convertBuiltinBorrowType(cast<BuiltinBorrowType>(ty));
   }
 
   case TypeKind::PrimaryArchetype:

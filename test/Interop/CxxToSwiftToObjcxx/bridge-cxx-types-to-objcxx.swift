@@ -5,6 +5,9 @@
 
 // REQUIRES: OS=macosx
 
+// This test is slow, because it triggers Clang module build for the C++ stdlib and Foundation.
+// REQUIRES: long_test
+
 import Foundation
 import MyCxxModule
 

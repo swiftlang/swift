@@ -288,3 +288,28 @@ public final class TestSetterRef {
   public func test_err(_ kp: WritableKeyPath<TestSetterRef, Int> = \.v) {}
   // expected-warning@-1 {{setter for property 'v' is internal and should not be referenced from a default argument value}}
 }
+
+// Property wrapper declaration with Sendable key paths
+do {
+  @propertyWrapper
+  struct Wrapper<Value> {
+    public init(wrappedValue: Value) {}
+    public var wrappedValue: Value {
+      get { fatalError() }
+      set {}
+    }
+
+    static subscript<EnclosingSelf>(
+      _enclosingInstance object: EnclosingSelf,
+      wrapped wrappedKeyPath: KeyPath<EnclosingSelf, Int> & Sendable,
+      storage storageKeyPath: any WritableKeyPath<EnclosingSelf, Wrapper<Int>> & Sendable
+    ) -> Value {
+      get { fatalError() }
+      set {}
+    }
+  }
+
+  final class Test: @unchecked Sendable {
+    @Wrapper var value: Int = 0 // Ok
+  }
+}

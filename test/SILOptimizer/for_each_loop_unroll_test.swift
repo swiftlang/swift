@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -primary-file %s -sil-verify-all | %FileCheck %s
 
 // Tests for the ForEachLoopUnroll mandatory optimization pass that unrolls
 // Sequence.forEach calls over array literals.
@@ -108,4 +108,17 @@ func unrollMultipleLoops(x: Int64, y: Int64, z: Bool) {
   }
     // CHECK-NOT: forEach
     // CHECK-LABEL: end sil function '$s25for_each_loop_unroll_test0D13MultipleLoops1x1y1zys5Int64V_AGSbtF'
+}
+
+// Ensure no verifier crash
+func testNonDominatingElementStores() {
+  let string : String? = String("http://domain")
+  let validURLs : [String?] = [
+      string!, string!,
+      string!, string!,
+  ]
+
+  validURLs.forEach { url in
+    print(url)
+  }
 }

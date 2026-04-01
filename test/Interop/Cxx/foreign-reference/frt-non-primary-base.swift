@@ -8,9 +8,24 @@ func go() {
     let frt = DerivedFRT()
     let copy = frt
 }
+<<<<<<< HEAD
 
 go()
 
+=======
+go()
+// CHECK: RefCount: 1, message: Ctor
+// CHECK: RefCount: 2, message: retain
+// CHECK: RefCount: 1, message: release
+// CHECK: RefCount: 0, message: release
+// CHECK: RefCount: 0, message: Dtor
+
+func go2() {
+    let frt = DerivedFRT2()
+    let copy = frt
+}
+go2()
+>>>>>>> origin/main
 // CHECK: RefCount: 1, message: Ctor
 // CHECK: RefCount: 2, message: retain
 // CHECK: RefCount: 1, message: release

@@ -114,8 +114,13 @@ void printSupportedFeatures(llvm::raw_ostream &out) {
       });
       out << "]";
     }
+<<<<<<< HEAD
     if (auto version = feature.getLanguageMode()) {
       out << ", \"enabled_in\": \"" << *version << "\"";
+=======
+    if (auto languageMode = feature.getLanguageMode()) {
+      out << ", \"enabled_in\": \"" << languageMode->versionString() << "\"";
+>>>>>>> origin/main
     }
 
     if (auto flagName = optionalFlagName(feature)) {

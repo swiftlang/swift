@@ -14,18 +14,24 @@
 
 using namespace swift;
 
-const std::string FeatureParsingTest::defaultLangMode = "5";
+const swift::LanguageMode FeatureParsingTest::defaultLanguageMode =
+    LanguageMode::v5;
 
 FeatureParsingTest::FeatureParsingTest() : ArgParsingTest() {
-  this->langMode = defaultLangMode;
+  this->languageMode = defaultLanguageMode.versionString();
 }
 
+<<<<<<< HEAD
 FeatureWrapper::FeatureWrapper(Feature id) : id(id), name(id.getName().data()) {
   auto langMode = id.getLanguageMode();
   if (langMode) {
     this->langMode = std::to_string(*langMode);
   }
 }
+=======
+FeatureWrapper::FeatureWrapper(Feature feature)
+    : Feature(feature), name(getName().str()) {}
+>>>>>>> origin/main
 
 void swift::PrintTo(const StrictConcurrency &value, std::ostream *os) {
   switch (value) {

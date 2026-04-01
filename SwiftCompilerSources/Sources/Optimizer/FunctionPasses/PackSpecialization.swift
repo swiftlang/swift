@@ -353,6 +353,7 @@ private struct CallSiteSpecializer {
     var directResults = resultInstruction.results.makeIterator()
     var substitutedResultTupleElements = [any Value]()
     var mappedResultPacks = self.callee.resultMap.makeIterator()
+    var indirectResultIterator = self.apply.indirectResultOperands.makeIterator()
 
     for resultInfo in self.apply.functionConvention.results {
       // We only need to handle direct and pack results, since indirect results are handled above
@@ -360,29 +361,37 @@ private struct CallSiteSpecializer {
         // Direct results of the original function are mapped to direct results of the specialized function.
         substitutedResultTupleElements.append(directResults.next()!)
 
-      } else if resultInfo.type.shouldExplode {
-        // Some elements of pack results may get mapped to direct results of the specialized function.
-        // We handle those here.
-        let mapped = mappedResultPacks.next()!
+      } else {
+        guard let indirectResult = indirectResultIterator.next()?.value,
+              indirectResult.type.shouldExplode
+        else {
+          continue
+        }
 
-        let originalPackArgument = self.apply.arguments[mapped.argumentIndex]
-        let packIndices = packArgumentIndices[mapped.argumentIndex]!
+        do {
+          // Some elements of pack results may get mapped to direct results of the specialized function.
+          // We handle those here.
+          let mapped = mappedResultPacks.next()!
 
-        for (mappedDirectResult, (packIndex, elementType)) in zip(
-          mapped.expandedElements, zip(packIndices, originalPackArgument.type.packElements)
-        )
-            where !mappedDirectResult.isSILIndirect
-        {
 
-          let result = directResults.next()!
-          let outputResultAddress = builder.createPackElementGet(
-            packIndex: packIndex, pack: originalPackArgument,
-            elementType: elementType)
+          let packIndices = packArgumentIndices[mapped.argumentIndex]!
 
-          builder.createStore(
-            source: result, destination: outputResultAddress,
-            // The callee is responsible for initializing return pack elements
-            ownership: storeOwnership(for: result, normal: .initialize))
+          for (mappedDirectResult, (packIndex, elementType)) in zip(
+                mapped.expandedElements, zip(packIndices, indirectResult.type.packElements)
+              )
+              where !mappedDirectResult.isSILIndirect
+          {
+
+            let result = directResults.next()!
+            let outputResultAddress = builder.createPackElementGet(
+              packIndex: packIndex, pack: indirectResult,
+              elementType: elementType)
+
+            builder.createStore(
+              source: result, destination: outputResultAddress,
+              // The callee is responsible for initializing return pack elements
+              ownership: storeOwnership(for: result, normal: .initialize))
+          }
         }
       }
     }
@@ -499,6 +508,14 @@ private struct PackExplodedFunction {
     /// Index of this pack in the function's result type tuple.
     /// For a non-tuple result, this is 0.
     let resultIndex: Int
+    /// ResultInfo for the results produced by exploding the original result.
+    ///
+    /// NOTE: The expandedElements members of MappedResult & MappedParameter
+    /// correspond to slices of the [ResultInfo] and [ParameterInfo] arrays
+    /// produced at the same time as the ResultMap & ParameterMap respectively.
+    /// Replacing these members with integer ranges or spans referring to those
+    /// full arrays could be an easy performance optimization if this pass
+    /// becomes a bottleneck.
     let expandedElements: [ResultInfo]
   }
 
@@ -510,6 +527,7 @@ private struct PackExplodedFunction {
   /// order.
   struct MappedParameter {
     let argumentIndex: Int
+    /// ParameterInfo for the parameters produced by exploding the original parameter.
     let expandedElements: [ParameterInfo]
   }
 
@@ -600,10 +618,9 @@ private struct PackExplodedFunction {
 
     for (argument, parameterInfo) in zip(function.parameters, function.convention.parameters) {
       if argument.type.shouldExplode {
-
         let mappedParameterInfos = argument.type.packElements.map { element in
           ParameterInfo(
-            type: element.canonicalType,
+            type: element.hasArchetype ? element.rawType.mapOutOfEnvironment().canonical : element.canonicalType,
             convention: explodedPackElementArgumentConvention(
               pack: parameterInfo, type: element, in: function),
             options: parameterInfo.options,
@@ -631,36 +648,42 @@ private struct PackExplodedFunction {
     var resultMap = ResultMap()
     var newResults = [ResultInfo]()
 
-    var indirectResultIdx = 0
+    var indirectResultIterator = function.arguments[0..<function.convention.indirectSILResultCount]
+      .lazy.enumerated().makeIterator()
+
     for (resultIndex, resultInfo) in function.convention.results.enumerated() {
-      let silType = resultInfo.type.loweredType(in: function)
-      if silType.shouldExplode {
-        let mappedResultInfos = silType.packElements.map { elem in
-          // TODO: Determine correct values for options and hasLoweredAddress
-          ResultInfo(
-            type: elem.canonicalType,
-            convention: explodedPackElementResultConvention(in: function, type: elem),
-            options: resultInfo.options,
-            hasLoweredAddresses: resultInfo.hasLoweredAddresses)
-        }
+      assert(
+        !resultInfo.isSILIndirect || !indirectResultIterator.isEmpty,
+        "There must be exactly as many indirect results in the function convention and argument list."
+      )
 
-        resultMap.append(
-          MappedResult(
-            argumentIndex: indirectResultIdx, resultIndex: resultIndex,
-            expandedElements: mappedResultInfos))
-        newResults += mappedResultInfos
-      } else {
-        // Leave the original result unchanged
+      guard resultInfo.isSILIndirect,
+        // There should always be a value here (expressed by the assert above).
+        let (indirectResultIdx, indirectResult) = indirectResultIterator.next(),
+        indirectResult.type.shouldExplode
+      else {
         newResults.append(resultInfo)
+        continue
       }
 
-      if resultInfo.isSILIndirect {
-        indirectResultIdx += 1
+      let mappedResultInfos = indirectResult.type.packElements.map { element in
+        ResultInfo(
+          type: element.hasArchetype ? element.rawType.mapOutOfEnvironment().canonical : element.canonicalType,
+          convention: explodedPackElementResultConvention(in: function, type: element),
+          options: resultInfo.options,
+          hasLoweredAddresses: resultInfo.hasLoweredAddresses)
       }
+
+      resultMap.append(
+        MappedResult(
+          argumentIndex: indirectResultIdx, resultIndex: resultIndex,
+          expandedElements: mappedResultInfos))
+      newResults += mappedResultInfos
+
     }
 
     assert(
-      indirectResultIdx == function.argumentConventions.firstParameterIndex,
+      indirectResultIterator.isEmpty,
       "We should have walked through all the indirect results, and no further.")
 
     return (newResults, resultMap)
@@ -726,31 +749,36 @@ private struct PackExplodedFunction {
     let originalValue = originalReturn.returnedValue
 
     let originalReturnTupleElements: [Value]
-    if originalValue.type.isTuple {
+    if originalValue.type.isVoid {
+      originalReturnTupleElements = []
+    } else if originalValue.type.isTuple {
       originalReturnTupleElements = [Value](
         builder.createDestructureTuple(tuple: originalValue).results)
     } else {
       originalReturnTupleElements = [originalValue]
     }
 
-    var returnValues = [any Value]()
-
     // Thread together the original and exploded direct return values.
-    var resultMapIndex = 0
-    var originalReturnIndex = 0
-    for (i, originalResult) in self.original.convention.results.enumerated()
-        where originalResult.type.shouldExplode
-                || !originalResult.isSILIndirect
-    {
-      if !resultMap.indices.contains(resultMapIndex) || resultMap[resultMapIndex].resultIndex != i {
-        returnValues.append(originalReturnTupleElements[originalReturnIndex])
-        originalReturnIndex += 1
+    let theReturnValues: [any Value]
+    do {
+      var returnValues = [any Value]()
+      // The next original result to process.
+      var resultIndex = 0
+      var originalDirectResultIterator = originalReturnTupleElements.makeIterator()
 
-      } else {
+      for mappedResult in resultMap {
 
-        let mapped = resultMap[resultMapIndex]
+        // Collect any direct results before the next mappedResult.
+        while resultIndex < mappedResult.resultIndex {
+          if !self.original.convention.results[resultIndex].isSILIndirect {
+            returnValues.append(originalDirectResultIterator.next()!)
+          }
+          resultIndex += 1
+        }
 
-        let argumentMapping = argumentMap[mapped.argumentIndex]!
+        assert(resultIndex == mappedResult.resultIndex, "The next pack result is not skipped.")
+
+        let argumentMapping = argumentMap[mappedResult.argumentIndex]!
         for argument in argumentMapping.arguments {
 
           switch argument.resources {
@@ -769,18 +797,26 @@ private struct PackExplodedFunction {
           }
         }
 
-        resultMapIndex += 1
+        // We have finished processing mappedResult, so step forward.
+        resultIndex += 1
       }
+
+      // Collect any remaining original direct results.
+      while let directResult = originalDirectResultIterator.next() {
+        returnValues.append(directResult)
+      }
+
+      theReturnValues = returnValues
     }
 
-    // Return the single value directly, rather than constructing a single-element tuple for it.
-    if returnValues.count == 1 {
-      builder.createReturn(of: returnValues[0])
+    // Return a single return value directly, rather than constructing a single-element tuple for it.
+    if theReturnValues.count == 1 {
+      builder.createReturn(of: theReturnValues[0])
     } else {
-      let tupleElementTypes = returnValues.map { $0.type }
+      let tupleElementTypes = theReturnValues.map { $0.type }
       let tupleType = context.getTupleType(elements: tupleElementTypes).loweredType(
         in: specialized)
-      let tuple = builder.createTuple(type: tupleType, elements: returnValues)
+      let tuple = builder.createTuple(type: tupleType, elements: theReturnValues)
       builder.createReturn(of: tuple)
     }
 
@@ -1026,7 +1062,7 @@ private func loadOwnership(for value: any Value, normal: LoadInst.LoadOwnership)
   }
 }
 
-extension TypeProperties {
+extension Type {
   /// A pack argument can explode if it contains no pack expansion types
   fileprivate var shouldExplode: Bool {
     // For now, we only attempt to explode indirect packs, since these are the most common and inefficient.

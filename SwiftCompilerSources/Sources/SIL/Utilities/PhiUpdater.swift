@@ -263,3 +263,13 @@ func registerPhiUpdater() {
     public let notifyInstructionChanged: (Instruction) -> () = { inst in }
   }
 }
+
+//===--------------------------------------------------------------------===//
+//                              Tests
+//===--------------------------------------------------------------------===//
+
+let updateBorrowedFromTest = Test("update_borrowed_from") {
+  function, arguments, context in
+
+  updateBorrowedFrom(in: function, context)
+}

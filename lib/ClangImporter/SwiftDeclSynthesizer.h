@@ -14,6 +14,7 @@
 #define SWIFT_SWIFT_DECL_SYNTHESIZER_H
 
 #include "ImporterImpl.h"
+#include "swift/AST/Decl.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "clang/AST/DeclCXX.h"
@@ -135,6 +136,9 @@ public:
                                                      VarDecl *storedRawValue,
                                                      bool wantLabel,
                                                      bool wantBody);
+
+  /// Create a constructor that initializes a class from a smart pointer.
+  VarDecl *createSmartPtrBridgingProperty(FuncDecl *bridgingFunction);
 
   /// Make a struct declaration into a raw-value-backed struct, with
   /// bridged computed rawValue property which differs from stored backing
@@ -336,6 +340,10 @@ public:
   CallExpr *makeDefaultArgument(const clang::ParmVarDecl *param,
                                 const swift::Type &swiftParamTy,
                                 SourceLoc paramLoc);
+
+  /// Synthesizes a constructor for a functional type imported from C++, which
+  /// takes a Swift closure as a single parameter.
+  static ConstructorDecl *makeClosureConstructor(NominalTypeDecl *decl);
 
   /// Synthesize a static factory method for a C++ foreign reference type,
   /// returning a `CXXMethodDecl*` or `nullptr` if the required constructor or

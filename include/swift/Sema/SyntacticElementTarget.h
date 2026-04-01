@@ -30,36 +30,6 @@
 namespace swift {
 
 namespace constraints {
-/// Describes information about a for-in loop over a sequence that needs to be
-/// tracked in the constraint system.
-struct SequenceIterationInfo {
-  /// The type of the sequence.
-  Type sequenceType;
-
-  /// The type of an element in the sequence.
-  Type elementType;
-
-  /// The type of the pattern that matches the elements.
-  Type initType;
-
-  /// Implicit `$iterator = <sequence>.makeIterator()`
-  PatternBindingDecl *makeIteratorVar;
-
-  /// Implicit `$iterator.next()` call.
-  Expr *nextCall;
-};
-
-/// Describes information about a for-in loop over a pack that needs to be
-/// tracked in the constraint system.
-struct PackIterationInfo {
-  /// The type of the pattern that matches the elements.
-  Type patternType;
-};
-
-/// Describes information about a for-in loop that needs to be tracked
-/// within the constraint system.
-using ForEachStmtInfo = TaggedUnion<SequenceIterationInfo, PackIterationInfo>;
-
 /// Describes the target (a unit of type-checking) to which a constraint
 /// system's solution can be applied.
 class SyntacticElementTarget {
@@ -166,7 +136,6 @@ private:
       ForEachStmt *stmt;
       DeclContext *dc;
       Pattern *pattern;
-      ForEachStmtInfo info;
     } forEachPreamble;
 
     PatternBindingDecl *patternBinding;
@@ -550,16 +519,6 @@ public:
     return expression.initialization.patternBindingIndex;
   }
 
-  const ForEachStmtInfo &getForEachStmtInfo() const {
-    assert(isForEachPreamble());
-    return forEachPreamble.info;
-  }
-
-  ForEachStmtInfo &getForEachStmtInfo() {
-    assert(isForEachPreamble());
-    return forEachPreamble.info;
-  }
-
   /// Whether this context infers an opaque return type.
   bool infersOpaqueReturnType() const;
 
@@ -841,7 +800,7 @@ public:
     case Kind::forEachPreamble:
       auto *stmt = forEachPreamble.stmt;
       SourceLoc startLoc = stmt->getForLoc();
-      SourceLoc endLoc = stmt->getParsedSequence()->getEndLoc();
+      SourceLoc endLoc = stmt->getSequence()->getEndLoc();
 
       if (auto *whereExpr = stmt->getWhere()) {
         endLoc = whereExpr->getEndLoc();

@@ -56,6 +56,12 @@
     },
     {
        "name": "api-digester-Xcc"
+<<<<<<< HEAD
+=======
+    },
+    {
+       "name": "debug-info-explicit-dependency"
+>>>>>>> origin/main
     }
   ]
 }

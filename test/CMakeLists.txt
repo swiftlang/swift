@@ -400,12 +400,6 @@ foreach(SDK ${SWIFT_SDKS})
       set(validation_test_bin_dir
           "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
 
-      if(LLVM_ENABLE_LIBXML2)
-        set(SWIFT_HAVE_LIBXML2 TRUE)
-      else()
-        set(SWIFT_HAVE_LIBXML2 FALSE)
-      endif()
-
       set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
       set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
 
@@ -474,9 +468,11 @@ foreach(SDK ${SWIFT_SDKS})
         list(APPEND test_dependencies "touch-covering-tests")
       endif()
 
-      list(APPEND test_dependencies
-        "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-        "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+      if(SWIFT_BUILD_STDLIB)
+        list(APPEND test_dependencies
+          "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
+          "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+      endif()
 
       set(validation_test_dependencies)
 

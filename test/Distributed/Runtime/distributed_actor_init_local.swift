@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift( -target %target-swift-5.7-abi-triple -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-sil-opaque-values -target %target-swift-5.7-abi-triple -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,9 +9,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-
-// FIXME(distributed): Seems something remains incorrect here
-// REQUIRES: rdar92952551
 
 import Distributed
 

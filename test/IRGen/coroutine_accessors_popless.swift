@@ -25,37 +25,6 @@
 // CHECK-SAME:    i32 0
 // CHECK-SAME:  }>
 
-// CHECK-arm64e-LABEL: _swift_coro_task_alloc.ptrauth = private constant {
-// CHECK-arm64e-SAME:    ptr @_swift_coro_task_alloc,
-// CHECK-arm64e-SAME:    i32 0,
-// CHECK-arm64e-SAME:    i64 ptrtoint (
-// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
-// CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 1
-// CHECK-arm64e-SAME:      )
-// CHECK-arm64e-SAME:    )
-// CHECK-arm64e-SAME:    i64 24469 }
-// CHECK-arm64e-SAME:  section "llvm.ptrauth"
-// CHECK-arm64e-SAME:  align 8
-// CHECK-arm64e-LABEL: @_swift_coro_task_dealloc.ptrauth = private constant {
-// CHECK-arm64e-SAME:    ptr @_swift_coro_task_dealloc,
-// CHECK-arm64e-SAME:    i32 0,
-// CHECK-arm64e-SAME:    i64 ptrtoint (
-// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
-// CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 2
-// CHECK-arm64e-SAME:      )
-// CHECK-arm64e-SAME:    )
-// CHECK-arm64e-SAME:    i64 40879 },
-// CHECK-arm64e-SAME:  section "llvm.ptrauth",
-// CHECK-arm64e-SAME:  align 8
-// CHECK-LABEL: _swift_coro_async_allocator = linkonce_odr hidden constant %swift.coro_allocator {
-// CHECK-SAME:      i32 1,
-// CHECK-SAME:      _swift_coro_task_alloc
-// CHECK-SAME:      _swift_coro_task_dealloc
-// CHECK-SAME:  }
 // CHECK-arm64e-LABEL: _swift_coro_typed_malloc.ptrauth = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_typed_malloc,
 // CHECK-arm64e-SAME:    i32 0,
@@ -84,11 +53,45 @@
 // CHECK-arm64e-SAME:    i64 40879 },
 // CHECK-arm64e-SAME:  section "llvm.ptrauth",
 // CHECK-arm64e-SAME:  align 8
+
 // CHECK-apple-LABEL: _swift_coro_typed_malloc_allocator = linkonce_odr hidden constant %swift.coro_allocator {
 // CHECK-apple-SAME:       i32 259,
 // CHECK-apple-SAME:       _swift_coro_typed_malloc
-// CHECK-apple-SAME:       _swift_coro_free 
+// CHECK-apple-SAME:       _swift_coro_free
 // CHECK-apple-SAME:  }
+
+// CHECK-arm64e-LABEL: _swift_coro_task_alloc.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_coro_task_alloc,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 ptrtoint (
+// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
+// CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
+// CHECK-arm64e-SAME:        i32 0,
+// CHECK-arm64e-SAME:        i32 1
+// CHECK-arm64e-SAME:      )
+// CHECK-arm64e-SAME:    )
+// CHECK-arm64e-SAME:    i64 24469 }
+// CHECK-arm64e-SAME:  section "llvm.ptrauth"
+// CHECK-arm64e-SAME:  align 8
+// CHECK-arm64e-LABEL: @_swift_coro_task_dealloc.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_coro_task_dealloc,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 ptrtoint (
+// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
+// CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
+// CHECK-arm64e-SAME:        i32 0,
+// CHECK-arm64e-SAME:        i32 2
+// CHECK-arm64e-SAME:      )
+// CHECK-arm64e-SAME:    )
+// CHECK-arm64e-SAME:    i64 40879 },
+// CHECK-arm64e-SAME:  section "llvm.ptrauth",
+// CHECK-arm64e-SAME:  align 8
+
+// CHECK-LABEL: _swift_coro_async_allocator = linkonce_odr hidden constant %swift.coro_allocator {
+// CHECK-SAME:      i32 1,
+// CHECK-SAME:      _swift_coro_task_alloc
+// CHECK-SAME:      _swift_coro_task_dealloc
+// CHECK-SAME:  }
 
 // CHECK-LABEL: @_swift_coro_alloc(
 // CHECK-SAME:      ptr [[FRAME:%[^,]+]]
@@ -170,10 +173,10 @@
 public var _i: Int = 0
 
 public var i: Int {
-  read {
+  yielding borrow {
     yield _i
   }
-  modify {
+  yielding mutate {
     yield &_i
   }
 }
@@ -306,7 +309,7 @@ public var force_yield_once_convention : () {
 }
 
 public var force_yield_once_2_convention : () {
-  read {
+  yielding borrow {
     let nothing: () = ()
     yield nothing
   }
@@ -345,7 +348,7 @@ public var force_yield_once_2_convention : () {
 // CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
   @_silgen_name("increment_i_yield_once_2")
-  modify {
+  yielding mutate {
     increment(&i)
 
     var nothing: () = ()

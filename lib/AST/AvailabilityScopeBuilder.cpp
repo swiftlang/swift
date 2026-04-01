@@ -479,7 +479,7 @@ private:
     if (decl->isSPI())
       return true;
 
-    return !isExported(decl);
+    return isExported(decl) != ExportedLevel::Exported;
   }
 
   /// Returns the source range which should be refined by declaration. This
@@ -1096,15 +1096,28 @@ private:
           if (isUnavailability.value())
             continue;
 
-          DiagnosticEngine &diags = Context.Diags;
-          if (currentScope->getReason() != AvailabilityScope::Reason::Root) {
-            diags.diagnose(query->getLoc(),
-                           diag::availability_query_useless_enclosing_scope,
-                           domain.getNameForAttributePrinting());
-            diags.diagnose(
-                currentScope->getIntroductionLoc(),
-                diag::availability_query_useless_enclosing_scope_here);
+          if (currentScope->getReason() == AvailabilityScope::Reason::Root)
+            continue;
+
+          // Skip diagnosing useless availability in fragile functions with
+          // opaque result types since removing an availability check could
+          // change the ABI of the function and result in a miscompilation.
+          auto *dc = getCurrentDeclContext();
+          if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+            if (auto decl = dc->getInnermostDeclarationDeclContext()) {
+              if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+                if (afd->getOpaqueResultTypeDecl())
+                  continue;
+              }
+            }
           }
+
+          DiagnosticEngine &diags = Context.Diags;
+          diags.diagnose(query->getLoc(),
+                         diag::availability_query_useless_enclosing_scope,
+                         domain.getNameForAttributePrinting());
+          diags.diagnose(currentScope->getIntroductionLoc(),
+                         diag::availability_query_useless_enclosing_scope_here);
         }
 
         continue;

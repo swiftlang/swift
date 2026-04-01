@@ -120,8 +120,13 @@ extension Mutex where Value: ~Copyable {
   ///   as it will only be executed if the calling thread acquires
   ///   the lock.
   ///
-  /// - Returns: The return value, if any, of the `body` closure parameter
-  ///   or nil if the lock couldn't be acquired.
+  /// - Returns: The return value, if any, of the `body` closure parameter or
+  ///   `nil` if the lock couldn’t be acquired.
+  ///
+  /// - Note: This function cannot spuriously fail to acquire the lock. The
+  ///   behavior of similar functions in other languages (such as C's
+  ///   `mtx_trylock()`) is platform-dependent and may differ from Swift's
+  ///   behavior.
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent

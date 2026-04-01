@@ -289,7 +289,7 @@ class GetDeallocThroughFn {
     ///   TaskAllocator Allocator;
     /// }
     struct PrivateLayout {
-      enum Kind {
+      enum Kind : uint8_t {
         Old32Bit,
         Old64Bit,
         New32BitSansEscalation,

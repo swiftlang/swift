@@ -1,7 +1,7 @@
 # REQUIRES: standalone_build
 
 # RUN: %empty-directory(%t)
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --cmake %cmake --foundation --swift-testing --swift-testing-macros --install-foundation --install-swift-testing-macros --install-llvm --cross-compile-hosts=android-aarch64 --cross-compile-build-swift-tools=False --android --android-ndk %t/ndk/ --android-arch aarch64 2>&1 | %FileCheck %s
+# RUN: env SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --cmake %cmake --foundation --swift-testing --swift-testing-macros --install-foundation --install-swift-testing-macros --install-llvm --cross-compile-hosts=android-aarch64 --cross-compile-build-swift-tools=False --android --android-ndk %t/ndk/ --android-arch aarch64 2>&1 | %FileCheck %s
 
 # CHECK: pushd {{.*}}/llvm-android-aarch64
 # CHECK-NOT: cmake --build {{.*}}/llvm-android-aarch64 --config

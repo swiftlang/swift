@@ -12,7 +12,8 @@ set_target_properties(swiftRegexBuilder PROPERTIES
 target_link_libraries(swiftRegexBuilder PRIVATE
   swift_RegexParser
   swift_StringProcessing
-  swiftCore)
+  swiftCore
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 install(TARGETS swiftRegexBuilder
   ARCHIVE DESTINATION "${SwiftStringProcessing_INSTALL_LIBDIR}"
@@ -21,4 +22,5 @@ install(TARGETS swiftRegexBuilder
 emit_swift_interface(swiftRegexBuilder)
 install_swift_interface(swiftRegexBuilder)
 
+generate_plist(swiftRegexBuilder "${CMAKE_PROJECT_VERSION}" swiftRegexBuilder)
 embed_manifest(swiftRegexBuilder)

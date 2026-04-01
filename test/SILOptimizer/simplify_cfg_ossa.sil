@@ -574,18 +574,6 @@ bb6(%8 : $Int64):
   return %8 : $Int64
 }
 
-// CHECK-LABEL: @infinite_loop
-// CHECK: bb0
-// CHECK-NEXT: br bb1
-// CHECK: bb1
-// CHECK-NEXT: br bb1
-sil [ossa] @infinite_loop : $@convention(thin) () -> () {
-bb0:
-  br bb1
-bb1:
-  br bb1
-}
-
 // CHECK-LABEL: @dead_loop
 // CHECK-NOT: br bb
 sil [ossa] @dead_loop : $@convention(thin) () -> () {

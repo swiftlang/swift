@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# RUN: ${python} %s %target-swiftmodule-name %platform-sdk-overlay-dir \
+# RUN: %{python} %s %target-swiftmodule-name %platform-sdk-overlay-dir \
 # RUN:     %swift_src_root \
 # RUN:     %target-sil-opt -sdk %sdk -enable-sil-verify-all \
 # RUN:       -F %sdk/System/Library/PrivateFrameworks \

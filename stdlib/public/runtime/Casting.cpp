@@ -81,12 +81,10 @@ static void _buildNameForMetadata(const Metadata *type,
 #if SWIFT_OBJC_INTEROP
   if (type->getKind() == MetadataKind::Class) {
     auto classType = static_cast<const ClassMetadata *>(type);
-    // Look through artificial subclasses.
-    while (classType->isTypeMetadata() && classType->isArtificialSubclass())
-      classType = classType->Superclass;
-
-    // Ask the Objective-C runtime to name ObjC classes.
-    if (!classType->isTypeMetadata()) {
+    // Ask the Objective-C runtime to name ObjC classes. isTypeMetadata should
+    // always be true here (pure ObjC classes get ObjCClassWrappers), but check
+    // it just to be sure.
+    if (!classType->isTypeMetadata() || !classType->getDescription()) {
       result += class_getName(classType);
       return;
     }

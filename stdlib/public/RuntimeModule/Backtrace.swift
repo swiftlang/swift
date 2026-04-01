@@ -16,7 +16,7 @@
 
 import Swift
 
-// #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+// #if os(anyAppleOS)
 // internal import Darwin
 // #elseif os(Windows)
 // internal import ucrt
@@ -27,13 +27,17 @@ import Swift
 // #endif
 
 /// Holds a backtrace.
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 public struct Backtrace: CustomStringConvertible, Sendable {
   /// The type of an address.
   ///
   /// This is used as an opaque type; if you have some Address, you
   /// can ask if it's NULL, and you can attempt to convert it to a
-  /// FixedWidthInteger.
+  /// ``FixedWidthInteger``.
   ///
   /// This is intentionally _not_ a pointer, because you shouldn't be
   /// dereferencing them; they may refer to some other process, for
@@ -301,8 +305,9 @@ public struct Backtrace: CustomStringConvertible, Sendable {
                              offset: Int = 0,
                              top: Int = 16,
                              images: ImageMap? = nil) throws -> Backtrace {
-    #if os(Linux)
-    // On Linux, we need the captured images to resolve async functions
+    #if os(Linux) || os(Windows)
+    // On Linux, we need the captured images to resolve async functions;
+    // on Windows, we need them because they contain unwind information.
     let theImages = images ?? ImageMap.capture()
     #else
     let theImages = images
@@ -352,18 +357,48 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   /// Return a symbolicated version of the backtrace.
   ///
   /// - images:  Specifies the set of images to use for symbolication.
-  ///            If `nil`, the function will look to see if the `Backtrace`
+  ///            If `nil`, the function will look to see if the ``Backtrace``
   ///            has already captured images.  If it has, those will be
   ///            used; otherwise we will capture images at this point.
   ///
-  /// - options: Symbolication options; see `SymbolicationOptions`.
+  /// - options: Symbolication options; see ``SymbolicationOptions``.
   public func symbolicated(with images: ImageMap? = nil,
                            options: SymbolicationOptions = .default)
+    -> SymbolicatedBacktrace? {
+    return symbolicated(with: images,
+                        platform: .default,
+                        options: options)
+  }
+
+  @_spi(Internal)
+  public enum SymbolicationPlatform {
+    case Darwin
+    case Linux
+    case Windows
+
+    #if os(anyAppleOS)
+    static public let `default` = SymbolicationPlatform.Darwin
+    #elseif os(Linux)
+    static public let `default` = SymbolicationPlatform.Linux
+    #elseif os(Windows)
+    static public let `default` = SymbolicationPlatform.Windows
+    #endif
+  }
+
+  @_spi(Internal)
+  public func symbolicated(with images: ImageMap? = nil,
+                           platform: SymbolicationPlatform,
+                           options: SymbolicationOptions = .default,
+                           symbolLocator: SymbolLocator =
+                            DefaultSymbolLocator.shared,
+                           )
     -> SymbolicatedBacktrace? {
     return SymbolicatedBacktrace.symbolicate(
       backtrace: self,
       images: images,
-      options: options
+      platform: platform,
+      options: options,
+      symbolLocator: symbolLocator
     )
   }
 
@@ -394,7 +429,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     return lines.joined(separator: "\n")
   }
 
-  /// Initialise a Backtrace from a sequence of `RichFrame`s
+  /// Initialise a Backtrace from a sequence of ``RichFrame``s
   @_spi(Internal)
   public init<Address: FixedWidthInteger>(architecture: String,
        frames: some Sequence<RichFrame<Address>>,
@@ -407,12 +442,22 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
 // -- Capture Implementation -------------------------------------------------
 
+<<<<<<< HEAD
 @available(Backtracing 6.2, *)
+=======
+@available(BacktracingDT 6.2, *)
+>>>>>>> origin/main
 extension Backtrace {
 
   // ###FIXME: There is a problem with @_specialize here that results in the
   //           arguments not lining up properly when this gets used from
   //           swift-backtrace.
+
+  #if os(Windows)
+  @_spi(Internal) public typealias CaptureableContext = Win32Context
+  #else
+  @_spi(Internal) public typealias CaptureableContext = Context
+  #endif
 
   @_spi(Internal)
   //@_specialize(exported: true, kind: full, where Ctx == HostContext, Rdr == UnsafeLocalMemoryReader)
@@ -421,7 +466,7 @@ extension Backtrace {
   //@_specialize(exported: true, kind: full, where Ctx == HostContext, Rdr == MemserverMemoryReader)
   //#endif
   @inlinable
-  public static func capture<Ctx: Context, Rdr: MemoryReader>(
+  public static func capture<Ctx: CaptureableContext, Rdr: MemoryReader>(
     from context: Ctx,
     using memoryReader: Rdr,
     images: ImageMap?,
@@ -431,14 +476,37 @@ extension Backtrace {
     top: Int = 16
   ) throws -> Backtrace {
     switch algorithm {
-      // All of them, for now, use the frame pointer unwinder.  In the long
-      // run, we should be using DWARF EH frame data for .precise.
+      // Eventually it would be nice to support using DWARF EH unwind info
+      // when doing .precise unwinding, rather than just using the frame
+      // pointer unwinder.
       case .auto, .fast, .precise:
+        #if os(Windows)
+        context.withNTContext { ntContext in
+          let unwinder =
+            Win32Unwinder(context: context,
+                          ntContext: ntContext,
+                          images: images!,
+                          memoryReader: memoryReader)
+          if let limit = limit {
+            let limited = LimitSequence(unwinder,
+                                        limit: limit,
+                                        offset: offset,
+                                        top: top)
+
+            return Backtrace(architecture: context.architecture,
+                             frames: limited,
+                             images: images)
+          }
+
+          return Backtrace(architecture: context.architecture,
+                           frames: unwinder.dropFirst(offset),
+                           images: images)
+        }
+        #else // !os(Windows)
         let unwinder =
           FramePointerUnwinder(context: context,
                                images: images,
                                memoryReader: memoryReader)
-
         if let limit = limit {
           let limited = LimitSequence(unwinder,
                                       limit: limit,
@@ -453,6 +521,7 @@ extension Backtrace {
         return Backtrace(architecture: context.architecture,
                          frames: unwinder.dropFirst(offset),
                          images: images)
+        #endif
 
       @unknown default:
         // This will never execute but its needed to avoid warnings when

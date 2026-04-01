@@ -1088,6 +1088,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         break;
       case ExtraStringFlavor::WasmImportModule:
         WasmImportModule = blobData;
+<<<<<<< HEAD
         if (!WasmImportField.empty())
           fn->setWasmImportModuleAndField(WasmImportModule, WasmImportField);
         break;
@@ -1095,6 +1096,11 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         WasmImportField = blobData;
         if (!WasmImportModule.empty())
           fn->setWasmImportModuleAndField(WasmImportModule, WasmImportField);
+=======
+        break;
+      case ExtraStringFlavor::WasmImportName:
+        WasmImportField = blobData;
+>>>>>>> origin/main
         break;
       }
       continue;
@@ -1151,6 +1157,11 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
           spiGroup, spiModule, availability));
     }
   }
+
+  // If either wasm import attribute was present, record both even if one is
+  // empty.
+  if (!WasmImportModule.empty() || !WasmImportField.empty())
+    fn->setWasmImportModuleAndField(WasmImportModule, WasmImportField);
 
   GenericEnvironment *genericEnv = nullptr;
   // Generic signatures are stored for declarations as well in a debug context.
@@ -1281,6 +1292,10 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   if (SILMod.hasUnresolvedLocalArchetypeDefinitions())
     llvm_unreachable(
         "All forward definitions of local archetypes should be resolved");
+
+  // The de-serialized SIL is assumed to be in a correct state.
+  fn->setNeedBreakInfiniteLoops(false);
+  fn->setNeedCompleteLifetimes(false);
 
   if (Callback)
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
@@ -1833,9 +1848,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto isLexical = IsLexical_t((Attr >> 1) & 0x1);
     auto isFromVarDecl = IsFromVarDecl_t((Attr >> 2) & 0x1);
     auto wasMoved = UsesMoveableValueDebugInfo_t((Attr >> 3) & 0x1);
-    ResultInst = Builder.createAllocStack(
+    auto isNested = StackAllocationIsNested_t((Attr >> 4) & 0x1);
+    auto ASI = Builder.createAllocStack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
         std::nullopt, hasDynamicLifetime, isLexical, isFromVarDecl, wasMoved);
+    ASI->setStackAllocationIsNested(isNested);
+    ResultInst = ASI;
     break;
   }
   case SILInstructionKind::AllocPackInst: {
@@ -2205,6 +2223,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     unsigned Flags = ListOfValues[0];
     bool isObjC = (bool)(Flags & 1);
     bool canAllocOnStack = (bool)((Flags >> 1) & 1);
+    bool isBare = (bool)((Flags >> 2) & 1);
+    auto isNested = StackAllocationIsNested_t((bool) ((Flags >> 3) & 1));
     SILType ClassTy =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
     SmallVector<SILValue, 4> Counts;
@@ -2228,12 +2248,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                           ListOfValues[i], MetadataType);
       ResultInst = Builder.createAllocRefDynamic(Loc, MetadataOp, ClassTy,
                                                  isObjC, canAllocOnStack,
+                                                 isNested,
                                                  TailTypes, Counts);
     } else {
       assert(i == NumVals);
-      bool isBare = (bool)((Flags >> 2) & 1);
       ResultInst = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack, isBare,
-                                          TailTypes, Counts);
+                                          isNested, TailTypes, Counts);
     }
     break;
   }
@@ -2350,10 +2370,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                        ? PartialApplyInst::OnStackKind::OnStack
                        : PartialApplyInst::OnStackKind::NotOnStack;
 
+    unsigned flags = ApplyCallerIsolation;
+    auto isNested = StackAllocationIsNested_t(
+      IsNestedEncoding((flags >> 0) & 1) == IsNestedEncoding::IsNested);
+
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultInst = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args,
-        closureTy->getCalleeConvention(), closureTy->getIsolation(), onStack);
+        closureTy->getCalleeConvention(), closureTy->getIsolation(), onStack,
+        isNested);
     break;
   }
   case SILInstructionKind::BuiltinInst: {
@@ -2741,6 +2766,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(AbortApply)
   UNARY_INSTRUCTION(ExtractExecutor)
   UNARY_INSTRUCTION(FunctionExtractIsolation)
+  UNARY_INSTRUCTION(MakeBorrow)
+  UNARY_INSTRUCTION(DereferenceBorrow)
+  UNARY_INSTRUCTION(MakeAddrBorrow)
+  UNARY_INSTRUCTION(DereferenceAddrBorrow)
+  UNARY_INSTRUCTION(DereferenceBorrowAddr)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
@@ -3084,6 +3114,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool fromBuiltin = (Attr >> 4) & 0x01;
     ResultInst = Builder.createEndUnpairedAccess(Loc, op, enforcement, aborted,
                                                  fromBuiltin);
+    break;
+  }
+  case SILInstructionKind::InitBorrowAddrInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory, Fn);
+    auto refType = SILType::getPrimitiveAddressType(
+      addrType.castTo<BuiltinBorrowType>()->getReferentType());
+    auto referent = getLocalValue(Builder.maybeGetFunction(), ValID, refType);
+    auto borrow = getLocalValue(Builder.maybeGetFunction(), ValID2, addrType);
+    ResultInst = Builder.createInitBorrowAddr(Loc, borrow, referent);
     break;
   }
   case SILInstructionKind::CopyAddrInst: {
@@ -4462,12 +4502,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
   std::vector<SILVTable::Entry> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
-  while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_OVERRIDE_TABLE && kind != SIL_FUNCTION &&
-         kind != SIL_PROPERTY && kind != SIL_MOVEONLY_DEINIT) {
-    assert(kind == SIL_VTABLE_ENTRY &&
-           "Content of Vtable should be in SIL_VTABLE_ENTRY.");
+  while (kind == SIL_VTABLE_ENTRY) {
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
     unsigned RawEntryKind, IsNonOverridden;

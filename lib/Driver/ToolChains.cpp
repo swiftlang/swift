@@ -349,7 +349,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_stable_abi_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
-  inputArgs.AddLastArg(arguments, options::OPT_swift_version);
+  inputArgs.AddLastArg(arguments, options::OPT_language_mode);
   inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
   inputArgs.AddLastArg(arguments, options::OPT_tools_directory);
@@ -696,6 +696,21 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-debug-info-store-invocation");
   }
 
+  if (context.Args.hasArg(options::OPT_g))
+    for (auto Output : context.Output.getAdditionalOutputsForType(
+             file_types::ID::TY_SwiftModuleFile)) {
+      // This communicates the output of an action that depends on this action's
+      // output, which is why we're recomputing the name here.
+      llvm::SmallString<128> Path(Output);
+      assert(!Path.empty());
+      llvm::sys::path::remove_filename(Path);
+      llvm::sys::path::append(Path, context.OI.ModuleName);
+      llvm::sys::path::replace_extension(
+          Path, file_types::getExtension(file_types::ID::TY_SwiftModuleFile));
+      Arguments.push_back("-debug-module-path");
+      Arguments.push_back(context.Args.MakeArgString(Path));
+    }
+
   if (context.Args.hasArg(
                       options::OPT_disable_autolinking_runtime_compatibility)) {
     Arguments.push_back("-disable-autolinking-runtime-compatibility");
@@ -786,6 +801,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-scan-dependencies";
   case file_types::TY_JSONArguments:
     return "-emit-supported-arguments";
+  case file_types::TY_JSONPolyglotAST:
+    return "-emit-polyglot-ast";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -1078,6 +1095,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_IndexData:
     case file_types::TY_JSONDependencies:
     case file_types::TY_JSONArguments:
+    case file_types::TY_JSONPolyglotAST:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:
@@ -1665,6 +1683,7 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
                                        const llvm::opt::ArgList &args,
                                        StringRef SDKPath, bool shared) const {
   SmallString<128> scratchPath;
+  scratchPath.clear();
   getResourceDirPath(scratchPath, args, shared);
   runtimeLibPaths.push_back(std::string(scratchPath.str()));
 

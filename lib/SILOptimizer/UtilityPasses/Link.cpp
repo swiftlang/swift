@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILModule.h"
@@ -121,12 +123,20 @@ linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT, StringRef(#CC) == "C_CC");    \
     SILModule &M = *getModule();
 
     bool allocating = false;
-    for (RuntimeEffect rt : effects)
+    bool exclusivity = false;
+    for (RuntimeEffect rt : effects) {
       if (rt == RuntimeEffect::Allocating || rt == RuntimeEffect::Deallocating)
         allocating = true;
+      if (rt == RuntimeEffect::ExclusivityChecking)
+        exclusivity = true;
+    }
 
     // Don't link allocating runtime functions in -no-allocations mode.
     if (M.getOptions().NoAllocations && allocating) return;
+
+    // Don't link exclusivity-checking functions in
+    // -enforce-exclusivity=unchecked mode.
+    if (!M.getOptions().EnforceExclusivityDynamic && exclusivity) return;
 
     // Swift Runtime functions are all expected to be SILLinkage::PublicExternal
     linkUsedFunctionByName(name, SILLinkage::PublicExternal, byAsmName);
@@ -158,8 +168,25 @@ linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT, StringRef(#CC) == "C_CC");    \
     if (auto *Fn = M.lookUpFunction(name, byAsmName)) return Fn;
 
     SILFunction *Fn =
-        M.getSILLoader()->lookupSILFunction(name, Linkage, byAsmName);
-    if (!Fn) return nullptr;
+        M.getSILLoader()->lookupSILFunction(name, Linkage,byAsmName);
+
+    if (!Fn) {
+      SILFunction *fnWithWrongLinkage =
+          M.getSILLoader()->lookupSILFunction(name, {}, byAsmName);
+
+      if (fnWithWrongLinkage) {
+        auto fnName = Demangle::demangleSymbolAsString(name,
+                        Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+        auto &diags = getModule()->getASTContext().Diags;
+        diags.diagnose(fnWithWrongLinkage->getLocation().getSourceLoc(),
+                       diag::deserialize_function_linkage_mismatch,
+                       fnName, getLinkageString(fnWithWrongLinkage->getLinkage()),
+                       getLinkageString(*Linkage));
+        diags.flushConsumers();
+        exit(1);
+      }
+      return nullptr;
+    }
 
     if (M.linkFunction(Fn, LinkMode))
       invalidateAnalysis(Fn, SILAnalysis::InvalidationKind::Everything);

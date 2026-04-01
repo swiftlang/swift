@@ -92,6 +92,11 @@ public class Instruction : CustomStringConvertible, Hashable {
     return Location(bridged: bridged.getLocation())
   }
 
+  final public func set(location: Location, _ context: some MutatingContext) {
+    bridged.setLocation(location.bridged)
+    context.notifyInstructionsChanged()
+  }
+
   public final func move(before otherInstruction: Instruction, _ context: some MutatingContext) {
     BridgedContext.moveInstructionBefore(bridged, otherInstruction.bridged)
     context.notifyInstructionsChanged()
@@ -142,6 +147,11 @@ public class Instruction : CustomStringConvertible, Hashable {
   public final var mayAccessPointer: Bool {
     return bridged.mayAccessPointer()
   }
+
+  /// True if arbitrary functions may be called by this instruction.
+  /// This can be either directly, e.g. by an `apply` instruction, or indirectly by destroying a value which
+  /// might have a deinitializer which can call functions.
+  public var mayCallFunction: Bool { false }
 
   public final var mayLoadWeakOrUnowned: Bool {
     return bridged.mayLoadWeakOrUnowned()
@@ -331,6 +341,8 @@ final public class StoreInst : Instruction, StoringInstruction {
   public var storeOwnership: StoreOwnership {
     StoreOwnership(rawValue: bridged.StoreInst_getStoreOwnership())!
   }
+
+  public override var mayCallFunction: Bool { storeOwnership == .assign }
 }
 
 final public class StoreWeakInst : Instruction, StoringInstruction { }
@@ -344,6 +356,15 @@ final public class AssignInst : Instruction, StoringInstruction {
 
   public var assignOwnership: AssignOwnership {
     AssignOwnership(rawValue: bridged.AssignInst_getAssignOwnership())!
+  }
+
+  public override var mayCallFunction: Bool {
+    switch assignOwnership {
+    case .unknown, .reassign, .reinitialize:
+      true
+    case .initialize:
+      false
+    }
   }
 }
 
@@ -382,6 +403,7 @@ final public class CopyAddrInst : Instruction, SourceDestAddrInstruction {
     bridged.CopyAddrInst_setIsInitializationOfDest(isInitializationOfDestination)
     context.notifyInstructionChanged(self)
   }
+  public override var mayCallFunction: Bool { !isInitializationOfDestination }
 }
 
 final public class ExplicitCopyAddrInst : Instruction, SourceDestAddrInstruction {
@@ -394,6 +416,7 @@ final public class ExplicitCopyAddrInst : Instruction, SourceDestAddrInstruction
   public var isInitializationOfDestination: Bool {
     bridged.ExplicitCopyAddrInst_isInitializationOfDest()
   }
+  public override var mayCallFunction: Bool { !isInitializationOfDestination }
 }
 
 final public class MarkUninitializedInst : SingleValueInstruction, UnaryInstruction {
@@ -639,10 +662,12 @@ final public class RetainValueAddrInst : RefCountingInst {
 }
 
 final public class ReleaseValueAddrInst : RefCountingInst {
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class StrongReleaseInst : RefCountingInst {
   public var instance: Value { operand.value }
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class UnownedReleaseInst : RefCountingInst {
@@ -651,10 +676,12 @@ final public class UnownedReleaseInst : RefCountingInst {
 
 final public class ReleaseValueInst : RefCountingInst {
   public var value: Value { return operand.value }
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class UnmanagedReleaseValueInst : RefCountingInst {
   public var value: Value { return operand.value }
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class AutoreleaseValueInst : RefCountingInst {}
@@ -667,10 +694,14 @@ final public class DestroyValueInst : Instruction, UnaryInstruction {
   /// end the lifetime of its operand.
   /// Such `destroy_value` instructions are lowered to no-ops.
   public var isDeadEnd: Bool { bridged.DestroyValueInst_isDeadEnd() }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class DestroyAddrInst : Instruction, UnaryInstruction {
   public var destroyedAddress: Value { operand.value }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class EndLifetimeInst : Instruction, UnaryInstruction {}
@@ -761,6 +792,15 @@ final public class BuiltinInst : SingleValueInstruction {
 
   public var arguments: LazyMapSequence<OperandArray, Value> {
     operands.values
+  }
+
+  public override var mayCallFunction: Bool {
+    switch id {
+    case .Once, .OnFastPath, .Destroy, .DestroyArray, .DestroyTaskGroup, .DestroyDefaultActor, .Release:
+      true
+    default:
+      false
+    }
   }
 }
 
@@ -879,7 +919,15 @@ final public
 class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitExistentialAddrInst_getConformances())
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitExistentialAddrInst_getFormalConcreteType())
+  }
+}
 
 final public
 class DeinitExistentialAddrInst : Instruction, UnaryInstruction {}
@@ -1081,6 +1129,17 @@ final public class InitEnumDataAddrInst : SingleValueInstruction, UnaryInstructi
 final public class UncheckedTakeEnumDataAddrInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
   public var `enum`: Value { operand.value }
   public var caseIndex: Int { bridged.UncheckedTakeEnumDataAddrInst_caseIndex() }
+
+  /// True, if this instruction invalidates the operand memory value.
+  /// This happens for certain enum kinds because the enum tag must be cleared before the payload may be used.
+  public var isDestructive: Bool { bridged.UncheckedTakeEnumDataAddrInst_isDestructive() }
+
+  /// True, if this instruction may invalidate the operand memory value.
+  public var mayBeDestructive: Bool {
+    return isDestructive ||
+           // We don't know the layout of resilient enums. So be conservative and assume they are destructive.
+           self.enum.type.nominal!.isResilient(in: parentFunction)
+  }
 }
 
 final public class SelectEnumInst : SingleValueInstruction {
@@ -1353,6 +1412,16 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var hasUnknownResultIsolation: Bool { bridged.PartialApplyInst_hasUnknownResultIsolation() }
   public var unappliedArgumentCount: Int { bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() }
   public var calleeConvention: ArgumentConvention { type.bridged.getCalleeConvention().convention }
+
+  /// True if this `partial_apply [on_stack]` follows proper stack allocation nesting rules.
+  /// When true, the closure and its corresponding destroy instructions must be properly nested
+  /// with respect to other stack operations, similar to `alloc_stack`/`dealloc_stack` pairs.
+  public var isNested: Bool { bridged.PartialApplyInst_isStackAllocationNested() }
+
+  public func set(isNested: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.PartialApplyInst_setStackAllocationIsNested(isNested)
+  }
 }
 
 final public class ApplyInst : SingleValueInstruction, FullApplySite {
@@ -1367,6 +1436,8 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public typealias SpecializationInfo = BridgedGenericSpecializationInformation
 
   public var specializationInfo: SpecializationInfo { bridged.ApplyInst_getSpecializationInfo() }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class FunctionExtractIsolationInst : SingleValueInstruction {}
@@ -1467,10 +1538,29 @@ final public class VectorBaseAddrInst : SingleValueInstruction, UnaryInstruction
   public var vector: Value { operand.value }
 }
 
-final public class DifferentiableFunctionInst: SingleValueInstruction {}
+public enum DifferentiableFunctionTypeComponent: Int {
+  case original = 0
+  case jvp = 1
+  case vjp = 2
+}
+
+final public class DifferentiableFunctionInst: SingleValueInstruction {
+  public func getExtractee(extractee: DifferentiableFunctionTypeComponent) -> Value? {
+    if bridged.DifferentiableFunctionInst_hasExtractee(extractee.rawValue) {
+      return bridged.DifferentiableFunctionInst_getExtractee(extractee.rawValue).value
+    }
+    return nil
+  }
+}
 
 final public class LinearFunctionInst: SingleValueInstruction {}
-final public class DifferentiableFunctionExtractInst: SingleValueInstruction {}
+
+final public class DifferentiableFunctionExtractInst: SingleValueInstruction {
+  public var extractee: DifferentiableFunctionTypeComponent {
+    DifferentiableFunctionTypeComponent(rawValue: bridged.DifferentiableFunctionExtractInst_getExtractee())!
+  }
+}
+
 final public class LinearFunctionExtractInst: SingleValueInstruction {}
 final public class DifferentiabilityWitnessFunctionInst: SingleValueInstruction {}
 
@@ -1513,6 +1603,17 @@ public class AllocRefInstBase : SingleValueInstruction, Allocation {
   public final func setIsStackAllocatable(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.AllocRefInstBase_setIsStackAllocatable()
+    context.notifyInstructionChanged(self)
+  }
+
+  public final var isStackAllocationNested: Bool {
+    bridged.AllocRefInstBase_isStackAllocationNested();
+  }
+
+  public final func setStackAllocationNested(_ isNested: Bool,
+                                             _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.AllocRefInstBase_setStackAllocationIsNested(isNested)
     context.notifyInstructionChanged(self)
   }
 
@@ -1644,7 +1745,12 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
     case read = 1
     case modify = 2
     case `deinit` = 3
+
+    public func conflicts(with other: AccessKind) -> Bool {
+      return self != .read || other != .read
+    }
   }
+
   public var accessKind: AccessKind {
     AccessKind(rawValue: bridged.BeginAccessInst_getAccessKind())!
   }
@@ -1726,11 +1832,15 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
 
   public var isNonThrowing: Bool { bridged.BeginApplyInst_getNonThrowing() }
   public var isNonAsync: Bool { bridged.BeginApplyInst_getNonAsync() }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class EndApplyInst : SingleValueInstruction, UnaryInstruction {
   public var token: MultipleValueInstructionResult { operand.value as! MultipleValueInstructionResult }
   public var beginApply: BeginApplyInst { token.parentInstruction as! BeginApplyInst }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class AbortApplyInst : Instruction, UnaryInstruction {
@@ -1927,6 +2037,8 @@ final public class TryApplyInst : TermInst, FullApplySite {
 
   public var isNonAsync: Bool { bridged.TryApplyInst_getNonAsync() }
   public var specializationInfo: ApplyInst.SpecializationInfo { bridged.TryApplyInst_getSpecializationInfo() }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class BranchInst : TermInst {
@@ -1992,10 +2104,16 @@ final public class SwitchEnumInst : TermInst {
     zip(caseIndices, successors)
   }
 
+  public var numCases: Int { caseIndices.count }
+
   // This does not handle the special case where the default covers exactly
   // the "missing" case.
   public func getUniqueSuccessor(forCaseIndex: Int) -> BasicBlock? {
     cases.first(where: { $0.0 == forCaseIndex })?.1
+  }
+
+  public func getSuccessorForDefault() -> BasicBlock? {
+    return self.bridged.SwitchEnumInst_getSuccessorForDefault().block
   }
 
   // This does not handle the special case where the default covers exactly
@@ -2105,4 +2223,48 @@ final public class IgnoredUseInst : Instruction, UnaryInstruction {
 }
 
 final public class ImplicitActorToOpaqueIsolationCastInst
+  : SingleValueInstruction, UnaryInstruction {}
+
+public protocol MakeBorrowInstruction
+  : SingleValueInstruction, UnaryInstruction {
+  var referent: Value { get }
+}
+
+extension MakeBorrowInstruction {
+  public var referent: Value {
+    operands[0].value
+  }
+}
+
+final public class MakeBorrowInst 
+  : SingleValueInstruction, MakeBorrowInstruction, UnaryInstruction {}
+
+final public class DereferenceBorrowInst
+  : SingleValueInstruction, UnaryInstruction {
+  public var borrow: Value {
+    operands[0].value
+  }
+}
+
+final public class MakeAddrBorrowInst
+  : SingleValueInstruction, MakeBorrowInstruction, UnaryInstruction {}
+
+final public class DereferenceAddrBorrowInst
+  : SingleValueInstruction, UnaryInstruction {
+  public var borrow: Value {
+    operands[0].value
+  }
+}
+
+final public class InitBorrowAddrInst: Instruction {
+  public var borrow: Value {
+    operands[0].value
+  }
+
+  public var referent: Value {
+    operands[1].value
+  }
+}
+
+final public class DereferenceBorrowAddrInst
   : SingleValueInstruction, UnaryInstruction {}

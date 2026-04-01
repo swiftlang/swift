@@ -6,12 +6,14 @@
 #include <string>
 #include <vector>
 
-#ifndef __counted_by // cstddef already imports ptrcheck.h on apple platforms
-#if defined(__has_feature) && __has_feature(bounds_safety_attributes)
-  #define __counted_by(x) __attribute__((__counted_by__(x)))
-#else
-  #define __counted_by(x)
+#ifdef __counted_by
+#undef __counted_by // some libstdc++ versions seem to include incompatible definitions of __counted_by??
 #endif
+
+#if defined(__has_feature) && __has_feature(bounds_safety_attributes)
+#define __counted_by(x) __attribute__((__counted_by__(x)))
+#else
+#define __counted_by(x)
 #endif
 
 using ConstSpanOfInt = std::span<const int>;
@@ -92,6 +94,7 @@ inline ConstSpanOfInt funcWithSafeWrapper3(const VecOfInt &v
 
 struct X {
   inline void methodWithSafeWrapper(ConstSpanOfInt s [[clang::noescape]]) {}
+  SpanOfInt getMutable(ConstSpanOfInt s [[clang::noescape]]) [[clang::lifetimebound]];
 };
 
 inline ConstSpanOfInt mixedFuncWithSafeWrapper1(const int * __counted_by(len) p
@@ -197,5 +200,20 @@ struct IMMORTAL_FRT DependsOnSelfFRT {
     return SpanOfInt(v.data(), v.size());
   }
 };
+
+struct NonCopyable {
+  NonCopyable(int n) : number(n) {}
+  NonCopyable(const NonCopyable &other) = delete;
+  NonCopyable(NonCopyable &&other) = default;
+  ~NonCopyable() {}
+  int number;
+};
+
+using SpanOfNonCopyable = std::span<NonCopyable>;
+
+inline SpanOfNonCopyable makeSpanOfNonCopyable() {
+  static NonCopyable arr[]{1, 2, 3};
+  return SpanOfNonCopyable(arr);
+}
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H

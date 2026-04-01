@@ -29,7 +29,7 @@ public class SyncClassDefaultPublic {
 // CHECK-NOT: #
 // CHECK: open class SyncClassGlobalActorOpen {
 // CHECK-NOT: #
-// CHECK: {{(@objc )?}}@_Concurrency.MainActor deinit
+// CHECK: {{(@objc )?}}@_Concurrency::MainActor deinit
 // CHECK-NOT: #
 // CHECK: }
 open class SyncClassGlobalActorOpen {
@@ -40,14 +40,14 @@ open class SyncClassGlobalActorOpen {
 // CHECK: public class SyncClassGlobalActorPublic {
 // CHECK-NOT: #
 // CHECK-NOT: #
-// CHECK: {{(@objc )?}}@_Concurrency.MainActor deinit
+// CHECK: {{(@objc )?}}@_Concurrency::MainActor deinit
 // CHECK: }
 public class SyncClassGlobalActorPublic {
     @MainActor deinit {}
 }
 
 // CHECK-NOT: #
-// CHECK: @_Concurrency.MainActor open class SyncClassIsolatedOpen {
+// CHECK: @_Concurrency::MainActor open class SyncClassIsolatedOpen {
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}isolated deinit
 // CHECK-NOT: #
@@ -58,7 +58,7 @@ open class SyncClassIsolatedOpen {
 }
 
 // CHECK-NOT: #
-// CHECK: @_Concurrency.MainActor public class SyncClassIsolatedPublic {
+// CHECK: @_Concurrency::MainActor public class SyncClassIsolatedPublic {
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}isolated deinit
 // CHECK: }
@@ -68,7 +68,7 @@ public class SyncClassIsolatedPublic {
 }
 
 // CHECK-NOT: #
-// CHECK: @_Concurrency.MainActor open class SyncClassNonisolatedOpen {
+// CHECK: @_Concurrency::MainActor open class SyncClassNonisolatedOpen {
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}nonisolated deinit
 // CHECK-NOT: #
@@ -79,7 +79,7 @@ open class SyncClassNonisolatedOpen {
 }
 
 // CHECK-NOT: #
-// CHECK: @_Concurrency.MainActor public class SyncClassNonisolatedPublic {
+// CHECK: @_Concurrency::MainActor public class SyncClassNonisolatedPublic {
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}nonisolated deinit
 // CHECK: }
@@ -103,7 +103,7 @@ public actor SyncActorDefaultPublic {
 // CHECK-NOT: #
 // CHECK: public actor SyncActorGlobalActorPublic {
 // CHECK-NOT: #
-// CHECK: {{(@objc )?}}@_Concurrency.MainActor deinit
+// CHECK: {{(@objc )?}}@_Concurrency::MainActor deinit
 // CHECK: }
 public actor SyncActorGlobalActorPublic {
     @MainActor deinit {}

@@ -70,16 +70,6 @@ ParseIncompleteOSSA("parse-incomplete-ossa",
 //===----------------------------------------------------------------------===//
 
 SILParserState::~SILParserState() {
-  if (!ForwardRefFns.empty()) {
-    for (auto Entry : ForwardRefFns) {
-      if (Entry.second.Loc.isValid()) {
-        M.getASTContext().Diags.diagnose(Entry.second.Loc,
-                                         diag::sil_use_of_undefined_value,
-                                         Entry.first.str());
-      }
-    }
-  }
-
   // Turn any debug-info-only function declarations into zombies.
   markZombies();
 }
@@ -91,6 +81,21 @@ void SILParserState::markZombies() {
       M.eraseFunction(Fn);
     }
   }
+}
+
+bool SILParserState::diagnoseUndefinedValues(DiagnosticEngine &diags) {
+  bool hasError = false;
+  if (!ForwardRefFns.empty()) {
+    for (auto Entry : ForwardRefFns) {
+      if (Entry.second.Loc.isValid()) {
+        diags.diagnose(Entry.second.Loc,
+                       diag::sil_use_of_undefined_value,
+                       Entry.first.str());
+        hasError = true;
+      }
+    }
+  }
+  return hasError;
 }
 
 std::unique_ptr<SILModule>
@@ -111,6 +116,10 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   }
 
   auto hadError = parser.parseTopLevelSIL();
+
+  if (parserState.diagnoseUndefinedValues(parser.Diags))
+    hadError = true;
+
   if (hadError) {
     // The rest of the SIL pipeline expects well-formed SIL, so if we encounter
     // a parsing error, just return an empty SIL module.
@@ -737,6 +746,8 @@ static bool parseDeclSILOptional(
       *isThunk = IsReabstractionThunk;
     else if (isThunk && SP.P.Tok.getText() == "back_deployed_thunk")
       *isThunk = IsBackDeployedThunk;
+    else if (isThunk && SP.P.Tok.getText() == "distributed_thunk")
+      *isThunk = IsDistributedThunk;
     else if (isWithoutActuallyEscapingThunk
              && SP.P.Tok.getText() == "without_actually_escaping")
       *isWithoutActuallyEscapingThunk = true;
@@ -801,7 +812,7 @@ static bool parseDeclSILOptional(
       // representation of an actor that can be parsed back. For now this is
       // just a quick hack so we can write tests.
       auto optIsolation = ActorIsolation::forSILString(
-          SP.P.Context.getIdentifier(rawString).str());
+          M, SP.P.Context.getIdentifier(rawString).str());
       if (!optIsolation) {
         SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
         return true;
@@ -1335,9 +1346,11 @@ static std::optional<AccessorKind> getAccessorKind(StringRef ident) {
       .Case("addressor", AccessorKind::Address)
       .Case("mutableAddressor", AccessorKind::MutableAddress)
       .Case("read", AccessorKind::Read)
-      .Case("read2", AccessorKind::Read2)
+      .Case("read2", AccessorKind::YieldingBorrow)
+      .Case("yielding_borrow", AccessorKind::YieldingBorrow)
       .Case("modify", AccessorKind::Modify)
-      .Case("modify2", AccessorKind::Modify2)
+      .Case("modify2", AccessorKind::YieldingMutate)
+      .Case("yielding_mutate", AccessorKind::YieldingMutate)
       .Default(std::nullopt);
 }
 
@@ -3443,6 +3456,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   REFCOUNTING_INSTRUCTION(Name##Release)                                       \
   UNARY_INSTRUCTION(StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
+    UNARY_INSTRUCTION(MakeBorrow)
+    UNARY_INSTRUCTION(DereferenceBorrow)
+    UNARY_INSTRUCTION(MakeAddrBorrow)
+    UNARY_INSTRUCTION(DereferenceAddrBorrow)
+    UNARY_INSTRUCTION(DereferenceBorrowAddr)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
@@ -3630,7 +3648,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
 
     if (B.getFunction().hasOwnership()) {
-      if (Value->getOwnershipKind() != OwnershipKind::Guaranteed) {
+      if (!Value->getOwnershipKind().isCompatibleWith(
+              OwnershipKind::Guaranteed)) {
         P.diagnose(ValueLoc, diag::sil_operand_has_wrong_ownership_kind,
                    Value->getOwnershipKind().asString(),
                    OwnershipKind(OwnershipKind::Guaranteed).asString());
@@ -4997,6 +5016,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     auto isFromVarDecl = IsNotFromVarDecl;
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
         DoesNotUseMoveableValueDebugInfo;
+    auto isNested = StackAllocationIsNested;
 
     StringRef attributeName;
     SourceLoc attributeLoc;
@@ -5009,6 +5029,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         isFromVarDecl = IsFromVarDecl;
       else if (attributeName == "moveable_value_debuginfo")
         usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
+      else if (attributeName == "non_nested")
+        isNested = StackAllocationIsNotNested;
       else {
         P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
                    attributeName, "alloc_stack");
@@ -5028,14 +5050,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
 
     // It doesn't make sense to attach a debug var info if the name is empty
+    AllocStackInst *ASI;
     if (VarInfo.Name.size())
-      ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
-                                     isLexical, isFromVarDecl,
-                                     usesMoveableValueDebugInfo);
+      ASI = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
+                               isLexical, isFromVarDecl,
+                               usesMoveableValueDebugInfo);
     else
-      ResultVal =
-          B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime, isLexical,
-                             isFromVarDecl, usesMoveableValueDebugInfo);
+      ASI = B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime, isLexical,
+                               isFromVarDecl, usesMoveableValueDebugInfo);
+    ASI->setStackAllocationIsNested(isNested);
+    ResultVal = ASI;
     break;
   }
   case SILInstructionKind::MetatypeInst: {
@@ -5054,6 +5078,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     bool IsObjC = false;
     bool OnStack = false;
     bool isBare = false;
+    auto isNested = StackAllocationIsNested;
     SmallVector<SILType, 2> ElementTypes;
     SmallVector<SILValue, 2> ElementCounts;
     while (P.consumeIf(tok::l_square)) {
@@ -5066,6 +5091,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         OnStack = true;
       } else if (Optional == "bare" && Opcode == SILInstructionKind::AllocRefInst) {
         isBare = true;
+      } else if (Optional == "non_nested") {
+        isNested = StackAllocationIsNotNested;
       } else if (Optional == "tail_elems") {
         SILType ElemTy;
         if (parseSILType(ElemTy) || !P.Tok.isAnyOperator() ||
@@ -5104,11 +5131,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     if (Opcode == SILInstructionKind::AllocRefDynamicInst) {
       ResultVal = B.createAllocRefDynamic(InstLoc, Metadata, ObjectType, IsObjC,
-                                          OnStack,
+                                          OnStack, isNested,
                                           ElementTypes, ElementCounts);
     } else {
       ResultVal = B.createAllocRef(InstLoc, ObjectType, IsObjC, OnStack, isBare,
-                                   ElementTypes, ElementCounts);
+                                   isNested, ElementTypes, ElementCounts);
     }
     break;
   }
@@ -5662,6 +5689,26 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
       ResultVal = B.createWitnessMethod(InstLoc, LookupTy, conformance, Member,
                                         MethodTy);
+      break;
+    }
+    case SILInstructionKind::InitBorrowAddrInst: {
+      SILValue dest, referent;
+      Identifier withToken;
+      SourceLoc destLoc, referentLoc, withLoc;
+
+      if (parseTypedValueRef(dest, destLoc, B)
+          || parseSILIdentifier(withToken, withLoc, diag::expected_tok_in_sil_instr,
+                                "with")
+          || parseTypedValueRef(referent, referentLoc, B)) {
+        return true;
+      }
+
+      if (withToken.str() != "with") {
+        P.diagnose(withLoc, diag::expected_tok_in_sil_instr, "with");
+        return true;
+      }
+
+      ResultVal = B.createInitBorrowAddr(InstLoc, dest, referent);
       break;
     }
     case SILInstructionKind::CopyAddrInst: {
@@ -6887,6 +6934,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   SILOptionalAttrValue AttrValue;
   SourceLoc AttrValueLoc;
   std::optional<ApplyIsolationCrossing> isolationCrossing;
+  std::optional<StackAllocationIsNested_t> isNested;
 
   while (parseSILOptional(AttrName, AttrLoc, AttrValue, AttrValueLoc, *this)) {
     if (AttrName == "nothrow") {
@@ -6919,9 +6967,15 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       continue;
     }
 
+    if (AttrName == "non_nested") {
+      assert(!bool(AttrValue));
+      isNested = StackAllocationIsNotNested;
+      continue;
+    }
+
     if (AttrName == "callee_isolation") {
-      auto applyIsolation =
-          ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
+      auto applyIsolation = ActorIsolation::forSILString(
+          B.getModule(), std::get<StringRef>(*AttrValue));
       if (!applyIsolation) {
         P.diagnose(AttrValueLoc, diag::expected_in_attribute_list);
         return true;
@@ -6933,8 +6987,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     if (AttrName == "caller_isolation") {
-      auto applyIsolation =
-          ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
+      auto applyIsolation = ActorIsolation::forSILString(
+          B.getModule(), std::get<StringRef>(*AttrValue));
       if (!applyIsolation) {
         P.diagnose(AttrValueLoc, diag::expected_in_attribute_list);
         return true;
@@ -7102,7 +7156,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
         InstLoc, FnVal, subs, Args, PartialApplyConvention,
         PartialApplyIsolation,
         IsNoEscape ? PartialApplyInst::OnStackKind::OnStack
-                   : PartialApplyInst::OnStackKind::NotOnStack);
+                   : PartialApplyInst::OnStackKind::NotOnStack,
+        isNested ? *isNested : StackAllocationIsNested);
     break;
   }
   case SILInstructionKind::TryApplyInst: {
@@ -7518,6 +7573,10 @@ bool SILParserState::parseDeclSIL(Parser &P) {
         if (M.hasUnresolvedLocalArchetypeDefinitions())
           llvm_unreachable(
               "All forward definitions of local archetypes should be resolved");
+        // We expect the parsed SIL to comply with the no-infinite loops rule.
+        FunctionState.F->setNeedBreakInfiniteLoops(false);
+        // We expect the parsed SIL to have complete lifetimes.
+        FunctionState.F->setNeedCompleteLifetimes(false);
       }
     }
 

@@ -142,12 +142,18 @@ public func registerTests() {
   // Register each test.
   registerTests(
     parseTestSpecificationTest,
+    basicBlockTest,
+    instructionIterationTest,
+    instructionWorklistTest,
     smallProjectionPathTest,
     getAccessBaseTest,
+    accessPathTest,
+    updateBorrowedFromTest,
     borrowIntroducersTest,
     enclosingValuesTest,
     forwardingDefUseTest,
     forwardingUseDefTest,
+    rangeTest,
     addressableTest
   )
 

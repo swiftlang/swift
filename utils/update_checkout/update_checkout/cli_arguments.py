@@ -1,5 +1,6 @@
 import argparse
-from typing import List, Optional
+from pathlib import Path
+from typing import Any, List, Optional
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
@@ -9,6 +10,7 @@ class CliArguments(argparse.Namespace):
     clone_with_ssh: bool
     skip_history: bool
     skip_tags: bool
+    partial_clone: bool
     skip_repository_list: List[str]
     all_repositories: bool
     scheme: Optional[str]
@@ -22,9 +24,11 @@ class CliArguments(argparse.Namespace):
     tag: Optional[str]
     match_timestamp: bool
     n_processes: int
-    source_root: str
+    source_root: Path
     use_submodules: bool
     verbose: bool
+    command: Optional[Any]
+    max_retries: int
 
     @staticmethod
     def parse_args() -> "CliArguments":
@@ -37,7 +41,7 @@ repositories.
         )
         parser.add_argument(
             "--clone",
-            help="obtain sources for Swift and related projects",
+            help="Obtain sources for Swift and related projects",
             action="store_true",
         )
         parser.add_argument(
@@ -52,6 +56,13 @@ repositories.
         )
         parser.add_argument(
             "--skip-tags", help="Skip tags when obtaining sources", action="store_true"
+        )
+        parser.add_argument(
+            "--partial-clone",
+            help="Use partial clones (--filter=blob:none) to fetch only commits and "
+            "trees, deferring blob downloads until they are needed. Significantly "
+            "reduces clone size for CI. Requires Git 2.19 or later.",
+            action="store_true",
         )
         parser.add_argument(
             "--skip-repository",
@@ -128,6 +139,14 @@ repositories.
             action="store_true",
         )
         parser.add_argument(
+            "--max-retries",
+            help="Maximum number of times update-checkout will retry if the"
+            " cloning of any repository failed. 0 for no retries, -1 for"
+            " unlimited retries.",
+            type=int,
+            default=0,
+        )
+        parser.add_argument(
             "-j",
             "--jobs",
             type=int,
@@ -139,6 +158,7 @@ repositories.
             "--source-root",
             help="The root directory to checkout repositories",
             default=SWIFT_SOURCE_ROOT,
+            type=Path,
         )
         parser.add_argument(
             "--use-submodules",
@@ -151,4 +171,8 @@ repositories.
             help="Increases the script's verbosity.",
             action="store_true",
         )
+
+        subparsers = parser.add_subparsers(dest='command')
+        subparsers.add_parser('status', help='Print the status of all the repositories')
+
         return parser.parse_args()

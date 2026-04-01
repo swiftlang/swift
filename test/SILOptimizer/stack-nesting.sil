@@ -3,6 +3,8 @@
 import Builtin
 import Swift
 
+class MyClass {}
+
 // CHECK-LABEL: sil [ossa] @test_simple
 // CHECK:         integer_literal $Builtin.Int32, 1
 // CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
@@ -233,7 +235,7 @@ bb3:
 //   We need to delete the dealloc_stacks in bb3 because the stack is in
 //   an incoherent state entering bb3. The allocation and deallocation in
 //   the loop is required, however.
-// CHECK-LABEL: sil [ossa] @test_merge_alloc_dead_end_loop
+// CHECK-LABEL: sil @test_merge_alloc_dead_end_loop
 // CHECK:         integer_literal $Builtin.Int32, 1
 // CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
 // CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
@@ -253,7 +255,7 @@ bb3:
 // CHECK-NEXT:    br bb4
 
 // CHECK-LABEL: // end sil function 'test_merge_alloc_dead_end_loop'
-sil [ossa] @test_merge_alloc_dead_end_loop : $@convention(thin) (Builtin.Int1) -> () {
+sil @test_merge_alloc_dead_end_loop : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%cond: $Builtin.Int1):
   specify_test "stack_nesting_fixup"
   integer_literal $Builtin.Int32, 1
@@ -280,4 +282,368 @@ bb4:
 bb5:
   dealloc_stack %d
   br bb4
+}
+
+// We only re-order b and c. We leave a alone.
+// CHECK-LABEL: sil [ossa] @test_simple_non_nested
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-LABEL: // end sil function 'test_simple_non_nested'
+sil [ossa] @test_simple_non_nested : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack [non_nested] $Int
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+  integer_literal $Builtin.Int32, 2
+  dealloc_stack %a
+  dealloc_stack %b
+  dealloc_stack %c
+  integer_literal $Builtin.Int32, 3
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil private @async_let_helper : $@convention(thin) @Sendable @async () -> (@out Int, @error any Error) {
+bb0(%out : $*Int):
+  unreachable
+}
+
+// b and c must be marked as non-nested
+// CHECK-LABEL: sil [ossa] @test_async_let_non_nested
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK:         [[PTR:%.*]] = address_to_pointer [[A]] to $Builtin.RawPointer
+// CHECK-NEXT:    [[LET:%.*]] = builtin "startAsyncLetWithLocalBuffer"<Int>({{%.*}}, {{%.*}}, [[PTR]])
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:    builtin "finishAsyncLet"([[LET]], [[PTR]])
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 4
+// CHECK-LABEL: // end sil function 'test_async_let_non_nested'
+sil [ossa] @test_async_let_non_nested : $@convention(thin) @async (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+
+  %fn = function_ref @async_let_helper : $@convention(thin) @Sendable @async () -> (@out Int, @error any Error)
+  %async_let_fn = thin_to_thick_function %fn to $@Sendable @async () -> (@out Int, @error any Error)
+  %scratch = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+  %resultPtr = address_to_pointer %a to $Builtin.RawPointer
+  %al = builtin "startAsyncLetWithLocalBuffer"<Int>(%scratch, %fn, %resultPtr) : $Builtin.RawPointer
+
+  integer_literal $Builtin.Int32, 2
+
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+
+  dealloc_stack %b
+
+  integer_literal $Builtin.Int32, 3
+
+  %out = builtin "finishAsyncLet"(%al, %resultPtr) : $()
+
+  dealloc_stack %a
+  dealloc_stack %c
+  integer_literal $Builtin.Int32, 4
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// Make sure we don't panic when there's still an already-deallocated
+// async let on the state stack.
+// CHECK-LABEL: sil [ossa] @test_two_async_lets :
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK:         [[PTR:%.*]] = address_to_pointer [[A]] to $Builtin.RawPointer
+// CHECK-NEXT:    [[LET1:%.*]] = builtin "startAsyncLetWithLocalBuffer"<Int>({{%.*}}, {{%.*}}, [[PTR]])
+// CHECK-NEXT:    [[LET2:%.*]] = builtin "startAsyncLetWithLocalBuffer"<Int>({{%.*}}, {{%.*}}, [[PTR]])
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:    builtin "finishAsyncLet"([[LET2]], [[PTR]])
+// CHECK-NEXT:    builtin "finishAsyncLet"([[LET1]], [[PTR]])
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 4
+// CHECK-LABEL: // end sil function 'test_two_async_lets'
+sil [ossa] @test_two_async_lets : $@convention(thin) @async (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+
+  // Reusing result pointers and passing nil as the scratch space are not
+  // actually legitimate at runtime, but it's convenient and doesn't affect
+  // what we're testing.
+  %fn = function_ref @async_let_helper : $@convention(thin) @Sendable @async () -> (@out Int, @error any Error)
+  %async_let_fn = thin_to_thick_function %fn to $@Sendable @async () -> (@out Int, @error any Error)
+  %scratch = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+  %resultPtr = address_to_pointer %a to $Builtin.RawPointer
+
+  %al1 = builtin "startAsyncLetWithLocalBuffer"<Int>(%scratch, %fn, %resultPtr) : $Builtin.RawPointer
+  %al2 = builtin "startAsyncLetWithLocalBuffer"<Int>(%scratch, %fn, %resultPtr) : $Builtin.RawPointer
+
+  integer_literal $Builtin.Int32, 2
+
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+  dealloc_stack %c
+
+  integer_literal $Builtin.Int32, 3
+
+  %out2 = builtin "finishAsyncLet"(%al2, %resultPtr) : $()
+  %out1 = builtin "finishAsyncLet"(%al1, %resultPtr) : $()
+
+  dealloc_stack %b
+  dealloc_stack %a
+  integer_literal $Builtin.Int32, 4
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil private @cancellation_helper : $@convention(thin) () -> () {
+bb0:
+  unreachable
+}
+
+// The cancellation handler builtins cannot be reordered.
+// CHECK-LABEL: sil [ossa] @test_cancellation_non_nested :
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK:         [[HANDLER:%.*]] = builtin "taskAddCancellationHandler"({{%.*}})
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[D:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    dealloc_stack [[D]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:    builtin "taskRemoveCancellationHandler"([[HANDLER]])
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 4
+// CHECK-LABEL: // end sil function 'test_cancellation_non_nested'
+sil [ossa] @test_cancellation_non_nested : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+
+  %fn = function_ref @cancellation_helper : $@convention(thin) () -> ()
+  %thick_fn = thin_to_thick_function %fn to $@noescape @callee_guaranteed () -> ()
+  %handler = builtin "taskAddCancellationHandler"(%thick_fn : $@noescape @callee_guaranteed () -> ()) : $UnsafeRawPointer
+
+  integer_literal $Builtin.Int32, 2
+
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+  %d = alloc_stack $Int
+
+  dealloc_stack %d
+  dealloc_stack %b
+
+  integer_literal $Builtin.Int32, 3
+
+  %out = builtin "taskRemoveCancellationHandler"(%handler) : $()
+
+  dealloc_stack %a
+  dealloc_stack %c
+  integer_literal $Builtin.Int32, 4
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil private @priority_helper : $@convention(thin) (UInt8, UInt8) -> () {
+bb0(%0 : $UInt8, %1 : $UInt8):
+  unreachable
+}
+
+// The priority escalation handler builtins cannot be reordered.
+// CHECK-LABEL: sil [ossa] @test_priority_non_nested :
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK:         [[HANDLER:%.*]] = builtin "taskAddPriorityEscalationHandler"({{%.*}})
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[D:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    dealloc_stack [[D]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:    builtin "taskRemovePriorityEscalationHandler"([[HANDLER]])
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 4
+// CHECK-LABEL: // end sil function 'test_priority_non_nested'
+sil [ossa] @test_priority_non_nested : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+
+  %fn = function_ref @priority_helper : $@convention(thin) (UInt8, UInt8) -> ()
+  %thick_fn = thin_to_thick_function %fn to $@noescape @callee_guaranteed (UInt8, UInt8) -> ()
+  %handler = builtin "taskAddPriorityEscalationHandler"(%thick_fn) : $UnsafeRawPointer
+
+  integer_literal $Builtin.Int32, 2
+
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+  %d = alloc_stack $Int
+
+  dealloc_stack %d
+  dealloc_stack %b
+
+  integer_literal $Builtin.Int32, 3
+
+  %out = builtin "taskRemovePriorityEscalationHandler"(%handler) : $()
+
+  dealloc_stack %a
+  dealloc_stack %c
+  integer_literal $Builtin.Int32, 4
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil [ossa] @partial_apply_helper : $@convention(thin) (@in_guaranteed Int) -> () {
+bb0(%0: $*Int):
+  unreachable
+}
+
+// partial_apply [on_stack] must be markable as non-nested
+// CHECK-LABEL: sil @test_mark_partial_apply_non_nested :
+// CHECK:         [[FN:%.*]] = function_ref @partial_apply_helper
+// CHECK:         partial_apply [callee_guaranteed] [on_stack] [non_nested] [[FN]](
+// CHECK-LABEL: // end sil function 'test_mark_partial_apply_non_nested'
+sil @test_mark_partial_apply_non_nested : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "stack_nesting_fixup"
+
+  %a = alloc_stack $Int
+
+  %fn = function_ref @priority_helper : $@convention(thin) (UInt8, UInt8) -> ()
+  %thick_fn = thin_to_thick_function %fn to $@noescape @callee_guaranteed (UInt8, UInt8) -> ()
+  %handler = builtin "taskAddPriorityEscalationHandler"(%thick_fn) : $UnsafeRawPointer
+
+  %pafn = function_ref @partial_apply_helper : $@convention(thin) (@in_guaranteed Int) -> ()
+  %b = partial_apply [callee_guaranteed] [on_stack] %pafn(%a) : $@convention(thin) (@in_guaranteed Int) -> ()
+
+  %out = builtin "taskRemovePriorityEscalationHandler"(%handler) : $()
+
+  dealloc_stack %b
+  dealloc_stack %a
+
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// alloc_ref [stack] must be markable as non-nested
+// CHECK-LABEL: sil [ossa] @test_mark_alloc_ref_non_nested :
+// CHECK:         alloc_ref [stack] [non_nested] $MyClass
+// CHECK-LABEL: // end sil function 'test_mark_alloc_ref_non_nested'
+sil [ossa] @test_mark_alloc_ref_non_nested : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "stack_nesting_fixup"
+
+  %fn = function_ref @priority_helper : $@convention(thin) (UInt8, UInt8) -> ()
+  %thick_fn = thin_to_thick_function %fn to $@noescape @callee_guaranteed (UInt8, UInt8) -> ()
+  %handler = builtin "taskAddPriorityEscalationHandler"(%thick_fn) : $UnsafeRawPointer
+
+  %b = alloc_ref [stack] $MyClass
+
+  %out = builtin "taskRemovePriorityEscalationHandler"(%handler) : $()
+
+  destroy_value %b
+  dealloc_stack_ref %b
+
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// alloc_ref_dynamic [stack] must be markable as non-nested
+// CHECK-LABEL: sil [ossa] @test_mark_alloc_ref_dynamic_non_nested :
+// CHECK:         [[METATYPE:%.*]] = metatype $@thick MyClass.Type
+// CHECK:         alloc_ref_dynamic [stack] [non_nested] [[METATYPE]]
+// CHECK-LABEL: // end sil function 'test_mark_alloc_ref_dynamic_non_nested'
+sil [ossa] @test_mark_alloc_ref_dynamic_non_nested : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "stack_nesting_fixup"
+
+  %fn = function_ref @priority_helper : $@convention(thin) (UInt8, UInt8) -> ()
+  %thick_fn = thin_to_thick_function %fn to $@noescape @callee_guaranteed (UInt8, UInt8) -> ()
+  %handler = builtin "taskAddPriorityEscalationHandler"(%thick_fn) : $UnsafeRawPointer
+
+  %metatype = metatype $@thick MyClass.Type
+
+  %b = alloc_ref_dynamic [stack] %metatype, $MyClass
+
+  %out = builtin "taskRemovePriorityEscalationHandler"(%handler) : $()
+
+  destroy_value %b
+  dealloc_stack_ref %b
+
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// The task local value builtins cannot be reordered.
+// CHECK-LABEL: sil [ossa] @test_task_local_non_nested :
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK:         [[BINDING:%.*]] = builtin "addTaskLocalValue"<Int>({{.*}}, [[A]])
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[D:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    dealloc_stack [[D]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:    builtin "removeTaskLocalValue"([[BINDING]])
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 4
+// CHECK-LABEL: // end sil function 'test_task_local_non_nested'
+sil [ossa] @test_task_local_non_nested : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+
+  %key = address_to_pointer %a to $Builtin.RawPointer
+  %binding = builtin "addTaskLocalValue"<Int>(%key, %a) : $Builtin.RawPointer
+
+  integer_literal $Builtin.Int32, 2
+
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+  %d = alloc_stack $Int
+
+  dealloc_stack %d
+  dealloc_stack %b
+
+  integer_literal $Builtin.Int32, 3
+
+  %out = builtin "removeTaskLocalValue"(%binding) : $()
+
+  dealloc_stack %a
+  dealloc_stack %c
+  integer_literal $Builtin.Int32, 4
+  %ret = tuple ()
+  return %ret : $()
 }

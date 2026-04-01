@@ -15,8 +15,12 @@ import SIL
 // Note: this simplifications are not SILCombineSimplifiable, because SILCombine has
 // its own simplifications for those cast instructions which are not ported to Swift, yet.
 
-extension CheckedCastBranchInst : OnoneSimplifiable {
+extension CheckedCastBranchInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
+    if removeIfDead(context) {
+      return
+    }
+
     // Has only an effect if the source is an (existential) reference.
     simplifySourceOperandOfRefCast(context)
   }
@@ -26,6 +30,58 @@ extension UncheckedRefCastInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     simplifySourceOperandOfRefCast(context)
   }
+}
+
+private extension CheckedCastBranchInst {
+
+  /// Removes the `checked_cast_br` if it is dead:
+  /// ```
+  ///   checked_cast_br B in %1 to X, bb1, bb2
+  /// bb1(%2 : @owned $X):
+  ///   destroy_value %2         // no other instructions in this block
+  ///   br bb3
+  /// bb2(%4 : @owned $B):
+  ///   destroy_value %4         // no other instructions in this block
+  ///   br bb3
+  /// ```
+  ///
+  func removeIfDead(_ context: SimplifyContext) -> Bool {
+    guard let successTarget = getTargetOfEmpty(block: successBlock),
+          let failureTarget = getTargetOfEmpty(block: failureBlock),
+          successTarget == failureTarget
+    else {
+      return false
+    }
+
+    let builder = Builder(before: self, context)
+    if source.ownership == .owned {
+      builder.createDestroyValue(operand: source)
+    }
+    builder.createBranch(to: successTarget)
+    context.erase(instruction: self)
+    return true
+  }
+}
+
+private func getTargetOfEmpty(block: BasicBlock) -> BasicBlock? {
+  for inst in block.instructions {
+    switch inst {
+    case let destroy as DestroyValueInst:
+      guard let blockArg = block.arguments.singleElement,
+            destroy.destroyedValue == blockArg
+      else {
+        return nil
+      }
+    case let branch as BranchInst:
+      guard branch.operands.isEmpty else {
+        return nil
+      }
+      return branch.targetBlock
+    default:
+      return nil
+    }
+  }
+  fatalError("didn't visit terminator instruction of block")
 }
 
 private extension UnaryInstruction {

@@ -1,44 +1,43 @@
-// RUN: not %target-swift-frontend -enable-experimental-async-top-level -swift-version 6 -typecheck %s %S/Inputs/foo.swift 2>&1 | %FileCheck %s --check-prefixes='Swift6-CHECK,CHECK'
-// RUN: not %target-swift-frontend -enable-experimental-async-top-level -swift-version 5 -typecheck %s %S/Inputs/foo.swift 2>&1 | %FileCheck %s --check-prefixes='Swift5-CHECK,CHECK'
+// RUN: %empty-directory(%t)
+// RUN: split-file --leading-lines %s %t
 
-var a = 10
+// RUN: %target-swift-frontend -typecheck -verify %t/main.swift %t/foo.swift -swift-version 6 -verify-additional-prefix swift6-
+// RUN: %target-swift-frontend -typecheck -verify %t/main.swift %t/foo.swift -swift-version 5 -verify-additional-prefix swift5-
+
+//--- foo.swift
+func foo() -> Int {
+  // expected-swift6-note@-1 {{add '@MainActor' to make global function 'foo()' part of global actor 'MainActor'}}
+  a + 10
+  // expected-swift6-error@-1 {{main actor-isolated var 'a' can not be referenced from a nonisolated context}}
+}
+
+//--- main.swift
+var a = 10 // expected-swift6-note 2{{var declared here}}
 
 @MainActor
-var b = 14
-// CHECK: top-level code variables cannot have a global actor
+var b = 14 // expected-error {{top-level code variables cannot have a global actor}}
 
 func nonIsolatedSynchronous() {
+  // expected-swift6-note@-1 {{add '@MainActor' to make global function 'nonIsolatedSynchronous()' part of global actor 'MainActor'}}
     print(a)
-// Swift6-CHECK: main actor-isolated var 'a' can not be referenced from a nonisolated context
-// Swift6-CHECK: add '@MainActor' to make global function 'nonIsolatedSynchronous()' part of global actor 'MainActor'
-
-// Swift5-CHECK-NOT: main actor-isolated var 'a' can not be referenced from a nonisolated context
-// Swift5-CHECK-NOT: add '@MainActor' to make global function 'nonIsolatedSynchronous()' part of global actor 'MainActor'
+// expected-swift6-error@-1 {{main actor-isolated var 'a' can not be referenced from a nonisolated context}}
 }
 
 func nonIsolatedAsync() async {
-    print(a)
-// CHECK: expression is 'async' but is not marked with 'await'
-// CHECK: property access is 'async'
+  print(a)
+  // expected-swift6-error@-1 {{main actor-isolated var 'a' cannot be accessed from outside of the actor}}
+  // expected-swift5-warning@-2 {{main actor-isolated var 'a' cannot be accessed from outside of the actor}}
 }
 
 await nonIsolatedAsync()
 
-// Swift6-CHECK: foo.swift{{.*}}main actor-isolated var 'a' can not be referenced from a nonisolated context
-// Swift6-CHECK-DAG: var declared here
-// Swift6-CHECK-DAG: add '@MainActor' to make global function 'foo()' part of global actor 'MainActor'
-
-// Swift5-CHECK-NOT: foo.swift{{.*}}main actor-isolated var 'a' can not be referenced from a nonisolated context
-// Swift5-CHECK-NOT: var declared here
-// Swift5-CHECK-NOT: add '@MainActor' to make global function 'foo()' part of global actor 'MainActor'
-
 @MainActor
 func isolated() {
-    print(a)
+  print(a)
 }
 
 func asyncFun() async {
-    await print(a)
+  await print(a)
 }
 
 await asyncFun()
