@@ -445,25 +445,23 @@ def profile_stats_entities: Flag<["-"], "profile-stats-entities">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Profile changes to stats in -stats-output-dir, subdivided by source entity">;
 
-def ftime_trace : Flag<["-"], "ftime-trace">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
+def time_trace : Flag<["-"], "time-trace">,
+  Flags<[FrontendOption, NoInteractiveOption, CacheInvariant]>,
   HelpText<"Turn on time profiler, emit trace output as JSON">;
-def ftime_trace_path : Separate<["-"], "ftime-trace-path">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput, CacheInvariant]>,
+def time_trace_path : Separate<["-"], "time-trace-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Emit time trace output to <path>">,
   MetaVarName<"<path>">;
-def ftime_trace_path_EQ : Joined<["-"], "ftime-trace-path=">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput, CacheInvariant]>,
-  Alias<ftime_trace_path>;
-def ftime_trace_granularity : Separate<["-"], "ftime-trace-granularity">,
+def time_trace_path_EQ : Joined<["-"], "time-trace-path=">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, CacheInvariant]>,
+  Alias<time_trace_path>;
+def time_trace_granularity : Separate<["-"], "time-trace-granularity">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Minimum time granularity (in microseconds) for time trace events">,
   MetaVarName<"<microseconds>">;
-def ftime_trace_granularity_EQ : Joined<["-"], "ftime-trace-granularity=">,
+def time_trace_granularity_EQ : Joined<["-"], "time-trace-granularity=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
-  Alias<ftime_trace_granularity>;
+  Alias<time_trace_granularity>;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,

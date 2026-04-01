@@ -716,7 +716,6 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleSemanticInfoOutputPath = ModuleSemanticInfoOutputPath;
   sop.YAMLOptRecordPath = YAMLOptRecordPath;
   sop.BitstreamOptRecordPath = bitstreamOptRecordPath;
-  sop.TimeTracePath = pathsFromArguments.TimeTracePath;
   sop.SILOutputPath = SILOutputPath;
   sop.LLVMIROutputPath = LLVMIROutputPath;
   return sop;

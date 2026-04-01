@@ -328,22 +328,6 @@ bool ArgsToFrontendOptionsConverter::convert(
       computeMainAndSupplementaryOutputFilenames())
     return true;
 
-  // If time trace path wasn't set from command-line args, check if it was
-  // provided via the supplementary output file map (used by the driver in
-  // multi-file compilation).
-  if (Opts.TimeTracePath.empty()) {
-    Opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
-        [&](const InputFile &input) -> bool {
-          const auto &sop =
-              input.getPrimarySpecificPaths().SupplementaryOutputs;
-          if (!sop.TimeTracePath.empty()) {
-            Opts.TimeTracePath = sop.TimeTracePath;
-            return true; // stop iterating
-          }
-          return false;
-        });
-  }
-
   if (checkUnusedSupplementaryOutputPaths())
     return true;
 
@@ -541,9 +525,9 @@ void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
 
 void ArgsToFrontendOptionsConverter::computeTimeTraceOptions() {
   using namespace options;
-  if (const Arg *A = Args.getLastArg(OPT_ftime_trace_path)) {
+  if (const Arg *A = Args.getLastArg(OPT_time_trace_path)) {
     Opts.TimeTracePath = A->getValue();
-  } else if (Args.hasArg(OPT_ftime_trace)) {
+  } else if (Args.hasArg(OPT_time_trace)) {
     // Derive from primary output (-o), or from input file if no -o.
     std::string Base = Opts.InputsAndOutputs.getSingleOutputFilename();
     if (Base.empty())
@@ -553,7 +537,7 @@ void ArgsToFrontendOptionsConverter::computeTimeTraceOptions() {
     Opts.TimeTracePath = Path.str().str();
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_ftime_trace_granularity)) {
+  if (const Arg *A = Args.getLastArg(OPT_time_trace_granularity)) {
     unsigned Val;
     if (StringRef(A->getValue()).getAsInteger(10, Val))
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
