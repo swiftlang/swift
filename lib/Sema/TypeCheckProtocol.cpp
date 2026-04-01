@@ -766,7 +766,9 @@ static PossibleEffects getEffects(ValueDecl *value);
 
 RequirementMatch swift::matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-    llvm::function_ref<MatchWitnessTypes(void)> setup,
+    llvm::function_ref<
+        std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type>(void)>
+        setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
     llvm::function_ref<std::optional<RequirementMatch>(
         const LifetimeDependentInterface &, const LifetimeDependentInterface &)>
@@ -785,11 +787,11 @@ RequirementMatch swift::matchWitness(
   // in the process.
   Type reqType, witnessType, reqThrownError, witnessThrownError;
   {
-    auto types = setup();
-    reqType = types.requirement;
-    witnessType = types.witness;
-    reqThrownError = types.requirementThrows;
-    witnessThrownError = types.witnessThrows;
+    std::optional<RequirementMatch> result;
+    std::tie(result, reqType, witnessType, reqThrownError, witnessThrownError) = setup();
+    if (result) {
+      return std::move(result.value());
+    }
   }
 
   SmallVector<OptionalAdjustment, 2> optionalAdjustments;
@@ -1261,7 +1263,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
   // Set up the constraint system for matching.
   auto setup =
-      [&]() -> MatchWitnessTypes {
+      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type> {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
@@ -1325,8 +1327,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
     Type witnessThrownError = openWitnessTypeInfo.thrownErrorTypeOnAccess;
 
-    return MatchWitnessTypes{reqType, openWitnessType, reqThrownError,
-                             witnessThrownError};
+    return std::make_tuple(std::nullopt, reqType, openWitnessType,
+                           reqThrownError, witnessThrownError);
   };
 
   // Attempt to add constraints to make the supplied function types match.
