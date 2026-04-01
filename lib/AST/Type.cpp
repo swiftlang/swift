@@ -1312,7 +1312,8 @@ bool TypeBase::isCGFloat() {
 
 bool TypeBase::isStdlibInteger() {
   return isInt() || isInt8() || isInt16() || isInt32() || isInt64() ||
-         isUInt() || isUInt8() || isUInt16() || isUInt32() || isUInt64();
+         isInt128() || isUInt() || isUInt8() || isUInt16() || isUInt32() ||
+         isUInt64() || isUInt128();
 }
 
 bool TypeBase::isStdlibFloat() {
