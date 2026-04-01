@@ -3,7 +3,6 @@
 //--- Main.swift
 import FromClang // NOTE: line offset = -4
 
-// REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_LifetimeDependence
 
 // The macro-generated interface we're looking up source info for
@@ -15,7 +14,6 @@ import FromClang // NOTE: line offset = -4
 // RUN: %target-swift-ide-test \
 // RUN:   -print-module -module-to-print=FromClang -source-filename=x \
 // RUN:   -plugin-path %swift-plugin-dir -I %t/Inputs \
-// RUN:   -enable-experimental-feature SafeInteropWrappers \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN: | %FileCheck %t/Main.swift --check-prefix INTERFACE
 
@@ -23,7 +21,6 @@ import FromClang // NOTE: line offset = -4
 public func callWithBufferPtr(_ p: UnsafeMutableBufferPointer<CInt>) {
   hasBufferOverload(p)
 // RUN: %sourcekitd-test -req=cursor -pos=%(line-4):3 %t/Main.swift -- -I %t/Inputs %t/Main.swift \
-// RUN:   -enable-experimental-feature SafeInteropWrappers \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN: | %FileCheck %t/Inputs/from-clang.h --check-prefix BUFFER-OVERLOAD
 }
@@ -34,7 +31,6 @@ public func callWithBufferPtr(_ p: UnsafeMutableBufferPointer<CInt>) {
 public func callReturnLifetimeBound(_ p: inout MutableSpan<CInt>) {
   hasSpanOverload(p)
 // RUN: %sourcekitd-test -req=cursor -pos=%(line-4):3 %t/Main.swift -- -I %t/Inputs %t/Main.swift \
-// RUN:   -enable-experimental-feature SafeInteropWrappers \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN: | %FileCheck %t/Inputs/from-clang.h --check-prefix SPAN-OVERLOAD
 }

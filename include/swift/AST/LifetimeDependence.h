@@ -21,6 +21,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Ownership.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
@@ -31,8 +32,10 @@
 namespace swift {
 
 class AbstractFunctionDecl;
+class AnyFunctionType;
 class FunctionTypeRepr;
 class LifetimeDependentTypeRepr;
+class LifetimeTypeAttr;
 class SILParameterInfo;
 class SILResultInfo;
 
@@ -134,24 +137,14 @@ public:
 
   SourceLoc getLoc() const { return loc; }
 
-  bool isImmortal() const {
+  bool isImmortalSpecifier() const {
     if (getDescriptorKind() != LifetimeDescriptor::DescriptorKind::Named) {
       return false;
     }
     return getName().str() == "immortal";
   }
 
-  std::string getString() const {
-    switch (kind) {
-    case DescriptorKind::Named:
-      return getName().str().str();
-    case DescriptorKind::Ordered:
-      return std::to_string(getIndex());
-    case DescriptorKind::Self:
-      return "self";
-    }
-    llvm_unreachable("Invalid DescriptorKind");
-  }
+  std::string getString() const;
 };
 
 class LifetimeEntry final
@@ -170,7 +163,7 @@ private:
       : startLoc(startLoc), endLoc(endLoc), numSources(sources.size()),
         targetDescriptor(targetDescriptor) {
     std::uninitialized_copy(sources.begin(), sources.end(),
-                            getTrailingObjects<LifetimeDescriptor>());
+                            getTrailingObjects());
   }
 
   size_t numTrailingObjects(OverloadToken<LifetimeDescriptor>) const {
@@ -189,7 +182,7 @@ public:
   SourceLoc getEndLoc() const { return endLoc; }
 
   ArrayRef<LifetimeDescriptor> getSources() const {
-    return {getTrailingObjects<LifetimeDescriptor>(), numSources};
+    return getTrailingObjects(numSources);
   }
 
   std::optional<LifetimeDescriptor> getTargetDescriptor() const {
@@ -200,26 +193,38 @@ public:
 class LifetimeDependenceInfo {
   IndexSubset *inheritLifetimeParamIndices;
   IndexSubset *scopeLifetimeParamIndices;
-  llvm::PointerIntPair<IndexSubset *, 1, bool>
-    addressableParamIndicesAndImmortal;
+  // The outer bool is the "isFromAnnotation" bit. The inner one is the
+  // "hasImmortalSpecifier" bit.
+  llvm::PointerIntPair<llvm::PointerIntPair<IndexSubset *, 1, bool>, 1, bool>
+      addressableParamIndicesAndImmortalAndFromAnnotation;
   IndexSubset *conditionallyAddressableParamIndices;
 
   unsigned targetIndex;
 
+  static unsigned numParams(IndexSubset *paramIndices) {
+    return paramIndices ? paramIndices->getCapacity() : 0;
+  }
+
+  bool hasDependencySource() const {
+    return inheritLifetimeParamIndices || scopeLifetimeParamIndices;
+  };
+
 public:
+  /// Fully-initialized dependence info.
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
-                         unsigned targetIndex, bool isImmortal,
-                         // set during SIL type lowering
-                         IndexSubset *addressableParamIndices = nullptr,
-                         IndexSubset *conditionallyAddressableParamIndices = nullptr)
+                         unsigned targetIndex, bool hasImmortalSpecifier,
+                         bool isFromAnnotation,
+                         IndexSubset *addressableParamIndices,
+                         IndexSubset *conditionallyAddressableParamIndices)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
         scopeLifetimeParamIndices(scopeLifetimeParamIndices),
-        addressableParamIndicesAndImmortal(addressableParamIndices, isImmortal),
-        conditionallyAddressableParamIndices(conditionallyAddressableParamIndices),
+        addressableParamIndicesAndImmortalAndFromAnnotation(
+            {addressableParamIndices, hasImmortalSpecifier}, isFromAnnotation),
+        conditionallyAddressableParamIndices(
+            conditionallyAddressableParamIndices),
         targetIndex(targetIndex) {
-    assert(this->isImmortal() || inheritLifetimeParamIndices ||
-           scopeLifetimeParamIndices);
+    ASSERT(this->hasImmortalSpecifier() || hasDependencySource());
     ASSERT(!inheritLifetimeParamIndices ||
            !inheritLifetimeParamIndices->isEmpty());
     ASSERT(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
@@ -231,31 +236,61 @@ public:
     if (CONDITIONAL_ASSERT_enabled()) {
       // Ensure inherit/scope/addressable param indices are of the same length
       // or 0.
-      unsigned paramIndicesLength = 0;
-      if (inheritLifetimeParamIndices) {
-        paramIndicesLength = inheritLifetimeParamIndices->getCapacity();
-      }
+      unsigned paramIndicesLength = numParams(inheritLifetimeParamIndices);
       if (scopeLifetimeParamIndices) {
-        ASSERT(paramIndicesLength == 0 ||
-               paramIndicesLength == scopeLifetimeParamIndices->getCapacity());
-        paramIndicesLength = scopeLifetimeParamIndices->getCapacity();
+        unsigned scopeIndicesLength = numParams(scopeLifetimeParamIndices);
+        if (paramIndicesLength == 0) {
+          paramIndicesLength = scopeIndicesLength;
+        } else {
+          ASSERT(paramIndicesLength == scopeIndicesLength);
+        }
       }
       if (addressableParamIndices) {
-        ASSERT(paramIndicesLength == 0 ||
-               paramIndicesLength == addressableParamIndices->getCapacity());
-        paramIndicesLength = addressableParamIndices->getCapacity();
+        unsigned addressableIndicesLength = numParams(addressableParamIndices);
+        if (paramIndicesLength == 0) {
+          paramIndicesLength = addressableIndicesLength;
+        } else {
+          ASSERT(paramIndicesLength == addressableIndicesLength);
+        }
       }
     }
   }
 
+  /// Partially-initialized dependence info, with addressable & conditionally
+  /// addressable parameter indices unset for now.
+  LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
+                         IndexSubset *scopeLifetimeParamIndices,
+                         unsigned targetIndex, bool hasImmortalSpecifier,
+                         bool isFromAnnotation)
+      : LifetimeDependenceInfo(inheritLifetimeParamIndices,
+                               scopeLifetimeParamIndices, targetIndex,
+                               hasImmortalSpecifier, isFromAnnotation,
+                               // set during SIL type lowering
+                               nullptr, nullptr) {}
+
   operator bool() const { return !empty(); }
 
   bool empty() const {
-    return !isImmortal() && inheritLifetimeParamIndices == nullptr &&
+    return !hasImmortalSpecifier() && inheritLifetimeParamIndices == nullptr &&
            scopeLifetimeParamIndices == nullptr;
   }
 
-  bool isImmortal() const { return addressableParamIndicesAndImmortal.getInt(); }
+  bool hasImmortalSpecifier() const {
+    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
+        .getInt();
+  }
+
+  bool isImmortal() const {
+    return hasImmortalSpecifier() && !hasDependencySource();
+  }
+
+  /// Whether this lifetime dependence corresponds to a @lifetime annotation in
+  /// the source program (Swift or SIL). Such dependencies are likely to differ
+  /// from the default (inferred) ones, so they must be included when printing a
+  /// Swift function's type.
+  bool isFromAnnotation() const {
+    return addressableParamIndicesAndImmortalAndFromAnnotation.getInt();
+  }
 
   unsigned getTargetIndex() const { return targetIndex; }
 
@@ -266,7 +301,8 @@ public:
     return scopeLifetimeParamIndices != nullptr;
   }
   bool hasAddressableParamIndices() const {
-    return addressableParamIndicesAndImmortal.getPointer() != nullptr;
+    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
+               .getPointer() != nullptr;
   }
 
   unsigned getParamIndicesLength() const {
@@ -292,7 +328,8 @@ public:
   /// not only on the value, but the memory location of a particular instance
   /// of the value.
   IndexSubset *getAddressableIndices() const {
-    return addressableParamIndicesAndImmortal.getPointer();
+    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
+        .getPointer();
   }
   /// Return the set of parameters which may have addressable dependencies
   /// depending on the type of the parameter.
@@ -317,6 +354,12 @@ public:
       && scopeLifetimeParamIndices->contains(index);
   }
 
+  /// Get a string representation of this LifetimeDependenceInfo suitable for
+  /// printing in SIL. The target is not included, since this is determined by
+  /// the position of the attribute in SIL.
+  ///
+  /// For printing function type lifetimes in Swift, see
+  /// ASTPrinter::printSwiftLifetimeDependence.
   std::string getString() const;
   void Profile(llvm::FoldingSetNodeID &ID) const;
   void getConcatenatedData(SmallVectorImpl<bool> &concatenatedData) const;
@@ -331,8 +374,29 @@ public:
   getFromSIL(FunctionTypeRepr *funcRepr, ArrayRef<SILParameterInfo> params,
              ArrayRef<SILResultInfo> results, DeclContext *dc);
 
+  /// Builds LifetimeDependenceInfo from a function type.
+  static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+  getFromAST(FunctionTypeRepr *funcRepr, AnyFunctionType *funcType,
+             ArrayRef<LifetimeTypeAttr *> lifetimeAttributes, DeclContext *dc,
+             GenericEnvironment *env);
+
+  /// Compute a LifetimeDependenceInfo list for the uncurried form of a curried
+  /// function whose inner type has LifetimeDependenceInfo list
+  /// 'inner'.
+  ///
+  /// TODO: Add support for merging with lifetime dependencies from the outer
+  /// type. The outer type's result's dependencies should be copied to any
+  /// inner-type dependencies that include closure context dependencies,
+  /// replacing the closure context dependence for those entries.
+  ///
+  /// numInnerParams: number of parameters of the inner function type
+  /// numOuterParams: number of parameters of the outer function type
+  static ArrayRef<LifetimeDependenceInfo>
+  uncurry(ASTContext &ctx, ArrayRef<LifetimeDependenceInfo> inner,
+          unsigned numInnerParams, unsigned numOuterParams);
+
   bool operator==(const LifetimeDependenceInfo &other) const {
-    return this->isImmortal() == other.isImmortal() &&
+    return this->hasImmortalSpecifier() == other.hasImmortalSpecifier() &&
            this->getTargetIndex() == other.getTargetIndex() &&
            this->getInheritIndices() == other.getInheritIndices() &&
            this->getAddressableIndices() == other.getAddressableIndices() &&
@@ -344,6 +408,104 @@ public:
   }
   
   SWIFT_DEBUG_DUMPER(dump());
+};
+
+/// The interface of a function or method with lifetime dependencies.
+///
+/// This type abstracts over inconsistencies in the representation of function
+/// type lifetime dependencies.
+///
+/// The lifetime dependencies of normal function types are attached directly
+/// to the function type:
+///
+///     @_lifetime(...) (Params...) -> Result
+///
+/// Instance methods have curried function types. Since lifetime dependencies
+/// can involve the self parameter, they are attached to the outer type:
+///
+///     @_lifetime(...) (Self) -> (Params...) -> Result
+///
+/// Static methods cannot have lifetime dependencies involving self, so their
+/// lifetime dependencies are attached to the actual interface type.
+///
+///     (Self.Type) -> @_lifetime(...) (Params...) -> Result
+class LifetimeDependentInterface {
+  /// (Params...) -> Result: The function's interface type.
+  AnyFunctionType *interface;
+  /// Self: The type of self, if it exists.
+  std::optional<Type> implicitSelfType;
+  /// @_lifetime(...): The lifetime dependencies of the interface.
+  ArrayRef<LifetimeDependenceInfo> lifetimes;
+
+public:
+  /// Construct a lifetime-dependent interface for a function declaration with
+  /// the specified interface type.
+  ///
+  /// For methods, the interface type should be the "inner" function type.
+  /// I.e. (Params...) -> Result
+  LifetimeDependentInterface(AbstractFunctionDecl *afd,
+                             AnyFunctionType *interface);
+
+  /// Construct a lifetime-dependent interface for a function type.
+  LifetimeDependentInterface(AnyFunctionType *type);
+
+  /// Construct a LifetimeDependentInterface from a ValueDecl and interface
+  /// type. If the ValueDecl is an instance of AbstractFunctionDecl, call the
+  /// (AbstractFunctionDecl*, AnyFunctionType*) constructor. Otherwise, call the
+  /// (AnyFunctionType*) constructor with 'interface'.
+  static LifetimeDependentInterface fromValueDecl(ValueDecl *decl,
+                                                  AnyFunctionType *interface);
+
+  ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
+    return lifetimes;
+  }
+
+  /// Get the type of the lifetime source or target with the given index.
+  Type getSourceOrTargetType(unsigned index) const;
+
+  /// Determine whether this interface's lifetime dependencies
+  /// are compatible with those specified by 'to'. If they are, and all
+  /// other aspects of the types are compatible, a function with this interface
+  /// can be cast to type 'to'.
+  ///
+  /// This is determined according to the Lifetime Subtyping rules in
+  /// ‎docs/ReferenceGuides/LifetimeAnnotation.md.
+  ///
+  /// Examples:
+  ///   struct NE: ~Escapable {}
+  ///   @_lifetime(copy ne0, copy ne1)
+  ///   func copying01(ne0: NE, ne1: NE) -> NE {
+  ///     return ne1
+  ///   }
+  ///   @_lifetime(copy ne0)
+  ///   func copying0(ne0: NE, ne1: NE) -> NE {
+  ///     return ne0
+  ///   }
+  ///   func takeCopying01(
+  ///     f: @_lifetime(copy ne0, copy ne1)
+  ///       (_ ne0: NE, _ ne1: NE) -> NE) {}
+  ///   func takeCopying0(
+  ///     f: @_lifetime(copy ne0)
+  ///       (_ ne0: NE, _ ne1: NE) -> NE) {}
+  ///
+  ///   takeCopying0(f: copying0)    // OK: Dependencies match exactly.
+  ///   takeCopying01(f: copying01)  // OK: Dependencies match exactly.
+  ///   takeCopying01(f: copying0)   // OK: No dependencies are dropped.
+  ///   takeCopying0(f: copying01)   // Error: The dependence on the second
+  ///   parameter is dropped.
+  bool canConvertTo(const LifetimeDependentInterface &to) const;
+
+  /// Whether the lifetime dependencies 'fromDeps' are convertible to those
+  /// of the target with the same index in 'to'.
+  /// See canConvertTo.
+  ///
+  /// 'fromDeps' is assumed to be a member of this->lifetimes.
+  bool canConvertTargetTo(const LifetimeDependenceInfo &fromDeps,
+                          const LifetimeDependentInterface &to) const;
+
+  /// Whether this interface has a lifetime dependence target with the given
+  /// index.
+  bool hasTarget(unsigned targetIndex) const;
 };
 
 std::optional<LifetimeDependenceInfo>

@@ -69,6 +69,30 @@ _swift_formatUnsigned(unsigned u, char buffer[22])
   }
 }
 
+SWIFT_RUNTIME_STDLIB_INTERNAL void
+_swift_formatHexDWORD(unsigned u, char buffer[10])
+{
+  char *ptr = buffer + 10;
+  *--ptr = '\0';
+  while (ptr > buffer) {
+    char digit = '0' + (u & 0xf);
+    if (digit > '9')
+      digit += 'a' - '0' - 10;
+    *--ptr = digit;
+    u >>= 4;
+    if (!u)
+      break;
+  }
+
+  // Left-justify in the buffer
+  if (ptr > buffer) {
+    char *pt2 = buffer;
+    while (*ptr)
+      *pt2++ = *ptr++;
+    *pt2++ = '\0';
+  }
+}
+
 } // namespace backtracing
 } // namespace runtime
 } // namespace swift

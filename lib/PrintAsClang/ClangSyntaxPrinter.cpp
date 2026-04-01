@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangSyntaxPrinter.h"
+#include "DeclAndTypePrinter.h"
 #include "PrimitiveTypeMapping.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -83,7 +84,7 @@ void ClangSyntaxPrinter::printModuleNamespaceQualifiersIfNeeded(
 
 bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclTemplateSpecifiers(
     const NominalTypeDecl *typeDecl) {
-  if (!typeDecl->isGeneric())
+  if (!typeDecl->hasGenericParamList())
     return true;
   printGenericSignature(
       typeDecl->getGenericSignature().getCanonicalSignature());
@@ -92,7 +93,7 @@ bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclTemplateSpecifiers(
 
 bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclInnerStaticAssert(
     const NominalTypeDecl *typeDecl) {
-  if (!typeDecl->isGeneric())
+  if (!typeDecl->hasGenericParamList())
     return true;
   printGenericSignatureInnerStaticAsserts(
       typeDecl->getGenericSignature().getCanonicalSignature());
@@ -100,6 +101,12 @@ bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclInnerStaticAssert(
 }
 
 void ClangSyntaxPrinter::printClangTypeReference(const clang::Decl *typeDecl) {
+  StringRef osObjectName = DeclAndTypePrinter::maybeGetOSObjectBaseName(
+      dyn_cast<clang::NamedDecl>(cast<clang::NamedDecl>(typeDecl)));
+  if (!osObjectName.empty()) {
+    os << osObjectName << "_t";
+    return;
+  }
   if (cast<clang::NamedDecl>(typeDecl)->getDeclName().isEmpty() &&
       isa<clang::TagDecl>(typeDecl)) {
     if (auto *tnd =
@@ -166,7 +173,7 @@ void ClangSyntaxPrinter::printNominalTypeReference(
   if (!printNestedTypeNamespaceQualifiers(typeDecl))
     os << "::";
   ClangSyntaxPrinter(typeDecl->getASTContext(), os).printBaseName(typeDecl);
-  if (typeDecl->isGeneric())
+  if (typeDecl->hasGenericParamList())
     printGenericSignatureParams(
         typeDecl->getGenericSignature().getCanonicalSignature());
 }

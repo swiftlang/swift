@@ -228,3 +228,11 @@ Specifies that the optimizer and IRGen must not add runtime calls which
 are not in the function originally. This attribute is set for functions
 with performance constraints or functions which are called from
 functions with performance constraints.
+
+### Naming
+
+```
+sil-function-attribute :: '[' asmname "' identifier '" ']'
+```
+
+Specifies that the SIL function should be lowered to LLVM IR with the given function name.

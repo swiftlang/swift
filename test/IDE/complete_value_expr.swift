@@ -775,7 +775,7 @@ class TestResolveFuncParam2 {
 
 func testResolveFuncParam3<Foo : FooProtocol>(_ foo: Foo) {
   foo.#^RESOLVE_FUNC_PARAM_3^#
-// RESOLVE_FUNC_PARAM_3-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_FUNC_PARAM_3-DAG: Keyword[self]/CurrNominal: self[#FooProtocol#]; name=self
 // RESOLVE_FUNC_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_3-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
@@ -784,7 +784,7 @@ func testResolveFuncParam3<Foo : FooProtocol>(_ foo: Foo) {
 
 func testResolveFuncParam4<FooBar : FooProtocol & BarProtocol>(_ fooBar: FooBar) {
   fooBar.#^RESOLVE_FUNC_PARAM_4^#
-// RESOLVE_FUNC_PARAM_4-DAG: Keyword[self]/CurrNominal: self[#FooBar#]; name=self
+// RESOLVE_FUNC_PARAM_4-DAG: Keyword[self]/CurrNominal: self[#BarProtocol & FooProtocol#]; name=self
 // RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceVar]/CurrNominal:    barInstanceVar[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceMethod]/CurrNominal: barInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceMethod]/CurrNominal: barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
@@ -796,7 +796,7 @@ func testResolveFuncParam4<FooBar : FooProtocol & BarProtocol>(_ fooBar: FooBar)
 
 func testResolveFuncParam5<FooExBarEx : FooExProtocol & BarExProtocol>(_ a: FooExBarEx) {
   a.#^RESOLVE_FUNC_PARAM_5^#
-// RESOLVE_FUNC_PARAM_5-DAG: Keyword[self]/CurrNominal: self[#FooExBarEx#]; name=self
+// RESOLVE_FUNC_PARAM_5-DAG: Keyword[self]/CurrNominal: self[#BarExProtocol & FooExProtocol#]; name=self
 // RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceMethod]/CurrNominal: barExInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceVar]/Super: barInstanceVar[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceMethod]/Super: barInstanceFunc0()[#Double#]{{; name=.+$}}
@@ -810,7 +810,7 @@ func testResolveFuncParam5<FooExBarEx : FooExProtocol & BarExProtocol>(_ a: FooE
 
 func testResolveFuncParam6<Foo : FooProtocol where Foo : FooClass>(_ foo: Foo) {
   foo.#^RESOLVE_FUNC_PARAM_6^#
-// RESOLVE_FUNC_PARAM_6-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_FUNC_PARAM_6-DAG: Keyword[self]/CurrNominal: self[#FooClass & FooProtocol#]; name=self
 // RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
@@ -829,7 +829,7 @@ class TestResolveConstructorParam1 {
 class TestResolveConstructorParam2 {
   init<Foo : FooProtocol>(foo: Foo) {
     foo.#^RESOLVE_CONSTRUCTOR_PARAM_2^#
-// RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Keyword[self]/CurrNominal: self[#FooProtocol#]; name=self
 // RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar1[#Int#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
@@ -840,7 +840,7 @@ class TestResolveConstructorParam2 {
 class TestResolveConstructorParam3<Foo : FooProtocol> {
   init(foo: Foo) {
     foo.#^RESOLVE_CONSTRUCTOR_PARAM_3^#
-// RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Keyword[self]/CurrNominal: self[#FooProtocol#]; name=self
 // RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar1[#Int#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
@@ -913,10 +913,10 @@ func testChainedCalls2() {
 
 func testChainedCalls3() {
   // doBaz() takes a Double.  Check that we can recover.
-  SomeBuilder(42).doFoo().doBaz(SomeBuilder(24))#^CHAINED_CALLS_3?xfail=FIXME^#
+  SomeBuilder(42).doFoo().doBaz(SomeBuilder(24))#^CHAINED_CALLS_3^#
 // CHAINED_CALLS_3-DAG: Decl[InstanceMethod]/CurrNominal: .doFoo()[#SomeBuilder#]{{; name=.+$}}
 // CHAINED_CALLS_3-DAG: Decl[InstanceMethod]/CurrNominal: .doBar()[#SomeBuilder#]{{; name=.+$}}
-// CHAINED_CALLS_3-DAG: Decl[InstanceMethod]/CurrNominal: .doBaz({#z: Double#})[#SomeBuilder#]{{; name=.+$}}
+// CHAINED_CALLS_3-DAG: Decl[InstanceMethod]/CurrNominal: .doBaz({#(z): Double#})[#SomeBuilder#]{{; name=.+$}}
 // CHAINED_CALLS_3-DAG: Keyword[self]/CurrNominal: .self[#SomeBuilder#]; name=self
 }
 
@@ -953,7 +953,7 @@ func testResolveGenericParams2<Foo : FooProtocol>(_ foo: Foo) {
 // RESOLVE_GENERIC_PARAMS_2-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): FooProtocol#})[#Void#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): FooProtocol#})[#FooProtocol#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<Foo>#]; name=self
+// RESOLVE_GENERIC_PARAMS_2-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooProtocol>#]; name=self
 
   FooGenericStruct<Foo>#^RESOLVE_GENERIC_PARAMS_2_STATIC^#
 // RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<FooProtocol>#]; name=()
@@ -966,8 +966,8 @@ func testResolveGenericParams2<Foo : FooProtocol>(_ foo: Foo) {
 // RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): FooProtocol#})[#Void#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooProtocol#})[#FooProtocol#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<Foo>.Type#]; name=self
-// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Keyword/CurrNominal:              .Type[#FooGenericStruct<Foo>.Type#]; name=Type
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooProtocol>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Keyword/CurrNominal:              .Type[#FooGenericStruct<FooProtocol>.Type#]; name=Type
 
 }
 
@@ -1074,19 +1074,19 @@ class BuilderStyle<T> {
 func testTypeCheckWithUnsolvedVariables1() {
   BuilderStyle().#^TC_UNSOLVED_VARIABLES_1^#
 }
-// TC_UNSOLVED_VARIABLES_1-DAG: Keyword[self]/CurrNominal: self[#BuilderStyle<_>#]; name=self
+// TC_UNSOLVED_VARIABLES_1-DAG: Keyword[self]/CurrNominal: self[#BuilderStyle<T>#]; name=self
 // TC_UNSOLVED_VARIABLES_1-DAG: Decl[InstanceVar]/CurrNominal: count[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_1-DAG: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<_>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_1-DAG: Decl[InstanceMethod]/CurrNominal: add({#(t): _#})[#BuilderStyle<_>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_1-DAG: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<T>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_1-DAG: Decl[InstanceMethod]/CurrNominal: add({#(t): T#})[#BuilderStyle<T>#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_1-DAG: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
 
 func testTypeCheckWithUnsolvedVariables2() {
   BuilderStyle().addString("abc").#^TC_UNSOLVED_VARIABLES_2^#
 }
-// TC_UNSOLVED_VARIABLES_2-DAG: Keyword[self]/CurrNominal: self[#BuilderStyle<_>#]; name=self
+// TC_UNSOLVED_VARIABLES_2-DAG: Keyword[self]/CurrNominal: self[#BuilderStyle<T>#]; name=self
 // TC_UNSOLVED_VARIABLES_2-DAG: Decl[InstanceVar]/CurrNominal:    count[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_2-DAG: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<_>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_2-DAG: Decl[InstanceMethod]/CurrNominal: add({#(t): _#})[#BuilderStyle<_>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_2-DAG: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<T>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_2-DAG: Decl[InstanceMethod]/CurrNominal: add({#(t): T#})[#BuilderStyle<T>#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_2-DAG: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
 
 func testTypeCheckWithUnsolvedVariables3() {
@@ -1571,7 +1571,7 @@ func testDeDuped3<T : dedupP where T.T == Int>(_ x: T) {
 // PROTOCOL_EXT_DEDUP_3-DAG: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
 // PROTOCOL_EXT_DEDUP_3-DAG: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
 // PROTOCOL_EXT_DEDUP_3-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}][#Int#]; name=[:]
-// PROTOCOL_EXT_DEDUP_3-DAG: Keyword[self]/CurrNominal:          .self[#T#]; name=self
+// PROTOCOL_EXT_DEDUP_3-DAG: Keyword[self]/CurrNominal:          .self[#dedupP#]; name=self
 }
 
 //===--- Check calls that may throw
@@ -1617,8 +1617,8 @@ func testThrows006() {
 
 // rdar://21346928
 // Just sample some String API to soundness check.
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal{{.*}}:      {{.*}}unicodeScalars[#String.UnicodeScalarView#]
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal{{.*}}:      {{.*}}utf16[#String.UTF16View#]
+// AUTOCLOSURE_STRING-DAG: Decl[InstanceVar]/CurrNominal{{.*}}:      {{.*}}unicodeScalars[#String.UnicodeScalarView#]
+// AUTOCLOSURE_STRING-DAG: Decl[InstanceVar]/CurrNominal{{.*}}:      {{.*}}utf16[#String.UTF16View#]
 func testWithAutoClosure1(_ x: String?) {
   (x ?? "autoclosure").#^AUTOCLOSURE1?check=AUTOCLOSURE_STRING^#
 }

@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift( -Xfrontend -enable-experimental-move-only -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -enable-experimental-move-only -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -64,6 +66,11 @@ actor MyActor {
 
   func test(expectedExecutor: NaiveQueueExecutor, expectedQueue: DispatchQueue) {
     expectedExecutor.preconditionIsolated("Expected deep equality to trigger for \(expectedExecutor) and our \(self.executor)")
+
+    // Ensure we get a usable value from asSerialExecutor() when the executor
+    // has complex equality.
+    _ = expectedExecutor.asUnownedSerialExecutor().asSerialExecutor()!.asUnownedSerialExecutor()
+
     print("\(Self.self): [\(self.executor.name)] on same context as [\(expectedExecutor.name)]")
   }
 }

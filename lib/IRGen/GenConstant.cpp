@@ -66,42 +66,6 @@ llvm::Constant *irgen::emitConstantInt(IRGenModule &IGM,
   return llvm::ConstantInt::get(IGM.getLLVMContext(), value);
 }
 
-llvm::Constant *irgen::emitConstantZero(IRGenModule &IGM, BuiltinInst *BI) {
-  assert(IGM.getSILModule().getBuiltinInfo(BI->getName()).ID ==
-         BuiltinValueKind::ZeroInitializer);
-
-  auto helper = [&](CanType astType) -> llvm::Constant * {
-    if (auto type = astType->getAs<BuiltinIntegerType>()) {
-      APInt zero(type->getWidth().getLeastWidth(), 0);
-      return llvm::ConstantInt::get(IGM.getLLVMContext(), zero);
-    }
-
-    if (auto type = astType->getAs<BuiltinFloatType>()) {
-      const llvm::fltSemantics *sema = nullptr;
-      switch (type->getFPKind()) {
-      case BuiltinFloatType::IEEE16: sema = &APFloat::IEEEhalf(); break;
-      case BuiltinFloatType::IEEE32: sema = &APFloat::IEEEsingle(); break;
-      case BuiltinFloatType::IEEE64: sema = &APFloat::IEEEdouble(); break;
-      case BuiltinFloatType::IEEE80: sema = &APFloat::x87DoubleExtended(); break;
-      case BuiltinFloatType::IEEE128: sema = &APFloat::IEEEquad(); break;
-      case BuiltinFloatType::PPC128: sema = &APFloat::PPCDoubleDouble(); break;
-      }
-      auto zero = APFloat::getZero(*sema);
-      return llvm::ConstantFP::get(IGM.getLLVMContext(), zero);
-    }
-
-    llvm_unreachable("SIL allowed an unknown type?");
-  };
-
-  if (auto vector = BI->getType().getAs<BuiltinVectorType>()) {
-    auto zero = helper(vector.getElementType());
-    auto count = llvm::ElementCount::getFixed(vector->getNumElements());
-    return llvm::ConstantVector::getSplat(count, zero);
-  }
-
-  return helper(BI->getType().getASTType());
-}
-
 llvm::Constant *irgen::emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI) {
   return llvm::ConstantFP::get(IGM.getLLVMContext(), FLI->getValue());
 }
@@ -115,7 +79,9 @@ llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
   case StringLiteralInst::Encoding::Bytes:
   case StringLiteralInst::Encoding::UTF8:
   case StringLiteralInst::Encoding::UTF8_OSLOG:
-    return IGM.getAddrOfGlobalString(SLI->getValue(), false, useOSLogEncoding);
+    return IGM.getAddrOfGlobalString(
+        SLI->getValue(), useOSLogEncoding ? CStringSectionType::OSLogString
+                                          : CStringSectionType::Default);
 
   case StringLiteralInst::Encoding::ObjCSelector:
     llvm_unreachable("cannot get the address of an Objective-C selector");
@@ -303,6 +269,13 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     strategy.emitValueInjection(IGM, builder, ei->getElement(), data, out);
     return replaceUnalignedIntegerValues(IGM, std::move(out));
   } else if (auto *ILI = dyn_cast<IntegerLiteralInst>(operand)) {
+    if (ILI->getType().is<BuiltinIntegerLiteralType>()) {
+      auto pair = emitConstantIntegerLiteral(IGM, ILI);
+      Explosion e;
+      e.add(pair.Data);
+      e.add(pair.Flags);
+      return e;
+    }
     return emitConstantInt(IGM, ILI);
   } else if (auto *FLI = dyn_cast<FloatLiteralInst>(operand)) {
     return emitConstantFP(IGM, FLI);
@@ -311,8 +284,15 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
   } else if (auto *BI = dyn_cast<BuiltinInst>(operand)) {
     auto args = BI->getArguments();
     switch (IGM.getSILModule().getBuiltinInfo(BI->getName()).ID) {
-      case BuiltinValueKind::ZeroInitializer:
-        return emitConstantZero(IGM, BI);
+      case BuiltinValueKind::ZeroInitializer: {
+        auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(BI->getType()));
+        auto schema = resultTI.getSchema();
+        Explosion out;
+        for (auto &elt : schema) {
+          out.add(llvm::Constant::getNullValue(elt.getScalarType()));
+        }
+        return out;
+      }
       case BuiltinValueKind::PtrToInt: {
         auto *ptr = emitConstantValue(IGM, args[0]).claimNextConstant();
         return llvm::ConstantExpr::getPtrToInt(ptr, IGM.IntPtrTy);

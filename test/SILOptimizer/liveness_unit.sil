@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -update-borrowed-from -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -20,57 +20,6 @@ class D {
 struct PairC {
   var first: C
   var second: C
-}
-
-// CHECK-LABEL: testSelfLoop: ssa_liveness
-// CHECK: SSA lifetime analysis:   [[V:%.*]] = copy_value %0 : $C
-// CHECK: bb1: LiveOut
-// CHECK: bb2: LiveWithin
-// CHECK: lifetime-ending user:   br bb1([[V]] : $C)
-// CHECK: last user:   br bb1([[V]] : $C)
-// CHECK-NOT: dead def
-sil [ossa] @testSelfLoop : $@convention(thin) (@guaranteed C) -> () {
-bb0(%0 : @guaranteed $C):
-  br bb3
-
-bb1(%1 : @owned $C):
-  destroy_value %1 : $C
-  %2 = copy_value %0 : $C
-  specify_test "ssa_liveness @trace[0]"
-  debug_value [trace] %2 : $C
-  br bb2
-
-bb2:
-  br bb1(%2 : $C)
-
-bb3:
-  %99 = tuple()
-  return %99 : $()
-}
-
-// CHECK-LABEL: testSelfKill: ssa_liveness
-// CHECK:SSA lifetime analysis:   [[V:%.*]] = move_value %1 : $C
-// CHECK: bb1: LiveOut
-// CHECK: bb2: LiveWithin
-// CHECK: lifetime-ending user:   br bb1([[V]] : $C)
-// CHECK: last user:   br bb1([[V]] : $C)
-// CHECK-NOT: dead def
-sil [ossa] @testSelfKill : $@convention(thin) () -> () {
-bb0:
-  br bb3
-
-bb1(%1 : @owned $C):
-  %2 = move_value %1 : $C
-  specify_test "ssa_liveness @trace[0]"
-  debug_value [trace] %2 : $C
-  br bb2
-
-bb2:
-  br bb1(%2 : $C)
-
-bb3:
-  %99 = tuple()
-  return %99 : $()
 }
 
 // Test a live range that is extended through reborrows,
@@ -103,7 +52,8 @@ bb2:
   debug_value [trace] %borrow2 : $C
   br bb3(%borrow2 : $C)
 
-bb3(%reborrow : @guaranteed $C):
+bb3(%8 : @guaranteed $C):
+  %reborrow = borrowed %8 from (%0)
   debug_value [trace] %reborrow : $C
   end_borrow %reborrow : $C
   br bb4
@@ -245,7 +195,8 @@ bb2:
   %d2 = unchecked_ref_cast %0 : $C to $D
   br bb3(%d2 : $D)
 
-bb3(%phi : @guaranteed $D):
+bb3(%7 : @guaranteed $D):
+  %phi = borrowed %7 from (%0)
   %f = ref_element_addr %phi : $D, #D.object  
   %99 = tuple()
   return %99 : $()
@@ -269,7 +220,9 @@ bb0(%0 : @guaranteed $C):
   %aggregate = struct $PairC(%borrow0 : $C, %borrow0 : $C)
   br bb1(%borrow0 : $C, %aggregate : $PairC)
 
-bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+bb1(%5 : @guaranteed $C, %6 : @guaranteed $PairC):
+  %phi = borrowed %6 from (%5)
+  %reborrow = borrowed %5 from (%0)
   %first = struct_extract %phi : $PairC, #PairC.first
   %d = unchecked_ref_cast %first : $C to $D
   %f = ref_element_addr %d : $D, #D.object  
@@ -308,7 +261,8 @@ bb2:
   %d2 = unchecked_ref_cast %0 : $C to $D
   br bb3(%d2 : $D)
 
-bb3(%deadPhi : @guaranteed $D):
+bb3(%7 : @guaranteed $D):
+  %deadPhi = borrowed %7 from (%0)
   %99 = tuple()
   return %99 : $()
 }
@@ -342,7 +296,8 @@ bb2:
   %d2 = unchecked_ref_cast %0 : $C to $D
   br bb3(%d2 : $D)
 
-bb3(%phi : @guaranteed $D):
+bb3(%7 : @guaranteed $D):
+  %phi = borrowed %7 from (%0)
   %f = ref_element_addr %phi : $D, #D.object  
   %o = load [copy] %f : $*C
   destroy_value %o : $C
@@ -361,19 +316,21 @@ bb3(%phi : @guaranteed $D):
 sil [ossa] @testSSAPartialDominatedPhi : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
 bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
   specify_test "ssa_liveness @argument[0]"
-  %borrow1 = begin_borrow %1 : $C
-  %aggregate = struct $PairC(%0 : $C, %borrow1 : $C)
-  br bb1(%borrow1 : $C, %aggregate : $PairC)
+  %3 = begin_borrow %1
+  %4 = struct $PairC (%0, %3)
+  br bb1(%3, %4)
 
-bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
-  %first = struct_extract %phi : $PairC, #PairC.first
-  %d = unchecked_ref_cast %first : $C to $D
-  %f = ref_element_addr %d : $D, #D.object  
-  %o = load [copy] %f : $*C
-  destroy_value %o : $C
-  end_borrow %reborrow : $C
-  %99 = tuple()
-  return %99 : $()
+bb1(%6 : @reborrow $C, %7 : @guaranteed $PairC):
+  %8 = borrowed %7 from (%6, %0)
+  %9 = borrowed %6 from (%1)
+  %10 = struct_extract %8, #PairC.first
+  %11 = unchecked_ref_cast %10 to $D
+  %12 = ref_element_addr %11, #D.object
+  %13 = load [copy] %12
+  destroy_value %13
+  end_borrow %9
+  %16 = tuple ()
+  return %16
 }
 
 // The phi is protected by an outer adjacent reborrow. It is not part
@@ -394,7 +351,9 @@ bb0(%0 : @guaranteed $C):
   %aggregate = struct $PairC(%borrow : $C, %borrow : $C)
   br bb1(%borrow : $C, %aggregate : $PairC)
 
-bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+bb1(%6 : @guaranteed $C, %7 : @guaranteed $PairC):
+  %phi = borrowed %7 from (%6)
+  %reborrow = borrowed %6 from (%0)
   %first = struct_extract %phi : $PairC, #PairC.first
   %d = unchecked_ref_cast %first : $C to $D
   %f = ref_element_addr %d : $D, #D.object  

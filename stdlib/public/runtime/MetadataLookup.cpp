@@ -23,7 +23,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
-#include "swift/RemoteInspection/Records.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
@@ -48,7 +47,8 @@
 
 using namespace swift;
 using namespace Demangle;
-using namespace reflection;
+
+using FieldDescriptor = reflection::TargetFieldDescriptor<InProcess>;
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
@@ -2479,6 +2479,12 @@ public:
     return BuiltType(swift_getFixedArrayTypeMetadata(MetadataState::Abstract,
                                                      size.getValue(),
                                                      element.getMetadata()));
+  }
+
+  TypeLookupErrorOr<BuiltType> createBuiltinBorrowType(BuiltType referent) {
+    llvm_unreachable("not implemented");
+    // return BuiltType(swift_getBorrowTypeMetadata(MetadataState::Abstract,
+    //                                                  referent.getValue());
   }
 };
 

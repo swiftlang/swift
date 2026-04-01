@@ -51,27 +51,27 @@ func consumeType_OneArgumentAtFirstUsageDynamic_Dynamic(line: UInt = #line) {
 
 @inline(never)
 func doit() {
-  // CHECK: [[STATIC_METADATA_ADDRESS:[0-9a-f]+]] @ 55
+  // CHECK: [[STATIC_METADATA_ADDRESS:[0-9a-f]+]] @ [[@LINE+1]]
   consumeType_OneArgumentAtFirstUsageStatic_Static()
-  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 57
+  // CHECK: [[STATIC_METADATA_ADDRESS]] @ [[@LINE+1]]
   consumeType_OneArgumentAtFirstUsageStatic_Dynamic()
-  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 59
+  // CHECK: [[STATIC_METADATA_ADDRESS]] @ [[@LINE+1]]
   consumeType_OneArgumentAtFirstUsageStatic_Dynamic()
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ 61
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ [[@LINE+1]]
   consumeType_OneArgumentAtFirstUsageDynamic_Dynamic()
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ 63
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ [[@LINE+1]]
   consumeType_OneArgumentAtFirstUsageDynamic_Dynamic()
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ 65
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ [[@LINE+1]]
   consumeType_OneArgumentAtFirstUsageDynamic_Static()
 
   let staticMetadata = ptr(to: OneArgument<FirstUsageStatic>.self)
-  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 69
+  // CHECK: [[STATIC_METADATA_ADDRESS]] @ [[@LINE+1]]
   print(staticMetadata, "@", #line)
   assert(isStaticallySpecializedGenericMetadata(staticMetadata))
   assert(!isCanonicalStaticallySpecializedGenericMetadata(staticMetadata))
 
   let dynamicMetadata = ptr(to: OneArgument<FirstUsageDynamic>.self)
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ 75
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ [[@LINE+1]]
   print(dynamicMetadata, "@", #line)
   assert(!isStaticallySpecializedGenericMetadata(dynamicMetadata))
   assert(!isCanonicalStaticallySpecializedGenericMetadata(dynamicMetadata))

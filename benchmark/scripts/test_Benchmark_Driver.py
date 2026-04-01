@@ -112,7 +112,7 @@ class Test_parse_args(unittest.TestCase):
             [
                 "error:",
                 "argument -o/--optimization: invalid choice: 'bogus'",
-                "(choose from 'O', 'Onone', 'Osize')",
+                "(choose from ",
             ],
             err.getvalue(),
         )

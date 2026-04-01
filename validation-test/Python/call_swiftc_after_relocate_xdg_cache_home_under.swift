@@ -4,7 +4,7 @@
 // RUN: mkdir -p %t
 // RUN: split-file %s %t
 //
-// RUN: PYTHONPATH=%utils %{python} %t/run_swiftc_with_relocated_xdg_cache_home.py %t/.cache %swiftc_driver_plain %t/hello.swift
+// RUN: env PYTHONPATH=%utils %{python} %t/run_swiftc_with_relocated_xdg_cache_home.py %t/.cache %swiftc_driver_plain %t/hello.swift
 // RUN: ls %t/.cache/clang/ModuleCache
 
 //--- run_swiftc_with_relocated_xdg_cache_home.py

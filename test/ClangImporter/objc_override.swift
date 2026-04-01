@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unrelated -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 
@@ -81,6 +81,20 @@ class SomeCellSub5 : SomeCell {
 
   @objc(enabled)
   func otherIsEnabled() { } // should not conflict
+}
+
+class SomeCellSub6 : SomeCell {
+  @available(*, unavailable)
+  @objc override init(string: String) {
+    super.init(string: string)
+  }
+}
+
+class SomeCellSub7 : SomeCell {
+  @available(swift, obsoleted: 4)
+  @objc override init(string: String) {
+    super.init(string: string)
+  }
 }
 
 class FailSub : FailBase {

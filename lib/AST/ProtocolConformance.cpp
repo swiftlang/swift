@@ -28,10 +28,12 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackConformance.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -227,6 +229,13 @@ void NormalProtocolConformance::setSourceKindAndImplyingConformance(
   }
 }
 
+bool ProtocolConformance::isReparented() const {
+  if (auto *normal = dyn_cast<NormalProtocolConformance>(getRootConformance())) {
+    return normal->isReparented();
+  }
+  return false;
+}
+
 bool ProtocolConformance::isRetroactive() const {
   auto extensionModule = getDeclContext()->getParentModule();
   auto protocolModule = getProtocol()->getParentModule();
@@ -246,6 +255,18 @@ bool ProtocolConformance::isRetroactive() const {
   if (conformingTypeDecl) {
     auto conformingTypeModule = conformingTypeDecl->getParentModule();
     if (isSameRetroactiveContext(extensionModule, conformingTypeModule)) {
+      return false;
+    }
+
+    auto *useSF = getDeclContext()->getOutermostParentSourceFile();
+    auto blessesSF = [&](auto &blessed) {
+      auto blessedFileID = SourceFile::FileIDStr::parse(blessed.first);
+      return blessedFileID && blessedFileID->matches(useSF);
+    };
+    auto *clangDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+        conformingTypeDecl->getClangDecl());
+    if (clangDecl &&
+        llvm::any_of(importer::getPrivateFileIDAttrs(clangDecl), blessesSF)) {
       return false;
     }
   }
@@ -1223,19 +1244,38 @@ void NominalTypeDecl::prepareConformanceTable() const {
     }
   }
 
-  // Non-copyable and non-escaping types do not implicitly conform to
-  // any other protocols.
-  if (hasSuppressedConformances)
-    return;
-
   // Don't do any more for synthesized FileUnits.
   if (file->getKind() == FileUnitKind::Synthesized)
     return;
 
   // Add protocols for any synthesized protocol attributes.
   for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
-    addSynthesized(attr->getProtocol());
+    if (attr->isSuppressed())
+      continue;
+
+    auto proto = attr->getProtocol();
+    // If the type is ~Copyable or ~Escapable, check that proto has the same
+    // suppressed conformances.
+    auto protoInverses = proto->getInverseRequirements();
+    bool canConformToProto =
+        llvm::all_of(inverses, [&](InvertibleProtocolKind ip) {
+          bool containsInverseReq =
+              llvm::any_of(protoInverses, [&](const InverseRequirement &ir) {
+                return ir.getKind() == ip;
+              });
+          ASSERT(containsInverseReq &&
+                 "this synthesized conformance is invalid");
+          return containsInverseReq;
+        });
+
+    if (canConformToProto)
+      addSynthesized(proto);
   }
+
+  // Non-copyable and non-escaping types do not implicitly conform to
+  // any other protocols.
+  if (hasSuppressedConformances)
+    return;
 
   // Add any implicit conformances.
   if (auto theEnum = dyn_cast<EnumDecl>(mutableThis)) {
@@ -1253,7 +1293,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
     }
   }
 
-  // Actor classes conform to the actor protocol.
+  // Actor classes conform to the appropriate actor protocol.
   if (auto classDecl = dyn_cast<ClassDecl>(mutableThis)) {
     if (classDecl->isDistributedActor()) {
       addSynthesized(ctx.getProtocol(KnownProtocolKind::DistributedActor));
@@ -1354,7 +1394,6 @@ ArrayRef<ValueDecl *>
 NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
                                              const ValueDecl *member,
                                              bool sorted) const {
-  assert(member->getDeclContext()->getSelfNominalTypeDecl() == this);
   assert(!isa<ProtocolDecl>(this));
   prepareConformanceTable();
   return ConformanceTable->getSatisfiedProtocolRequirementsForMember(member,
@@ -1452,6 +1491,37 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   return result;
 }
 
+// Some protocols have self conformances and/or reparented conformances.
+// ProtocolDecl's do not use the ConformanceTable. Instead, this function serves
+// to create all of the ProtocolConformance's for a protocol.
+static std::vector<ProtocolConformance *>
+createProtocolToProtocolConformances(ProtocolDecl *protocol) {
+  auto &ctx = protocol->getASTContext();
+  std::vector<ProtocolConformance *> conformances;
+
+  if (protocol->requiresSelfConformanceWitnessTable()) {
+    conformances.push_back(ctx.getSelfConformance(protocol));
+  }
+
+  for (auto &[newBase, ext, index] : protocol->getReparentingProtocols()) {
+    // We say that 'Self' is what conforms to the @reparented entry.
+    auto conformingType = protocol->getDeclaredInterfaceType();
+    auto const &entry = ext->getInherited().getEntry(index);
+    assert(entry.isReparented());
+
+    auto loc = entry.getLoc();
+    if (!loc)
+      loc = ext->getLoc();
+
+    conformances.push_back(ctx.getNormalConformance(
+        conformingType, newBase, loc, entry.getTypeRepr(), /*dc=*/ext,
+        ProtocolConformanceState::Incomplete,
+        ProtocolConformanceFlags::Reparented));
+  }
+
+  return conformances;
+}
+
 std::vector<ProtocolConformance *>
 LookupAllConformancesInContextRequest::evaluate(
     Evaluator &eval, const IterableDeclContext *IDC) const {
@@ -1462,13 +1532,22 @@ LookupAllConformancesInContextRequest::evaluate(
     return { };
   }
 
-  // Protocols only have self-conformances.
+  // Protocols only have self-conformances or reparented conformances.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
-    if (protocol->requiresSelfConformanceWitnessTable()) {
-      return { protocol->getASTContext().getSelfConformance(protocol) };
+    auto &ctx = protocol->getASTContext();
+
+    // All extensions have the same conformances as the protocol itself;
+    // there are no conditionally inherited protocols or conditional
+    // protocol-to-protocol conformances.
+    //
+    // This short-cut avoids needless work searching extensions repeatedly,
+    // as protocols are not using the ConformanceTable for bookkeeping.
+    if (isa<ExtensionDecl>(IDC)) {
+      return evaluateOrDefault(
+          ctx.evaluator, LookupAllConformancesInContextRequest{protocol}, {});
     }
 
-    return { };
+    return createProtocolToProtocolConformances(protocol);
   }
 
   // Record all potential conformances.

@@ -12,6 +12,7 @@
 import Distributed
 
 @Resolvable
+@available(iOS 666, macOS 777, tvOS 888, visionOS 999, *)
 public protocol Greeter: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
   @available(iOS 6666, macOS 7777, tvOS 8888, visionOS 9999, *)
   distributed func greet(name: String) -> String
@@ -22,12 +23,14 @@ public protocol Greeter: DistributedActor where ActorSystem: DistributedActorSys
 
 // @Resolvable ->
 
+// CHECK: @available(iOS 666, macOS 777, tvOS 888, visionOS 999, *)
 // CHECK: public distributed actor $Greeter<ActorSystem>: Greeter,
 // CHECK:   Distributed._DistributedActorStub
 // CHECK:   where ActorSystem: DistributedActorSystem<any Codable>
 // CHECK: {
 // CHECK: }
 
+// CHECK: @available(iOS 666, macOS 777, tvOS 888, visionOS 999, *)
 // CHECK: extension Greeter where Self: Distributed._DistributedActorStub {
 // CHECK:   @available(iOS 6666, macOS 7777, tvOS 8888, visionOS 9999, *)
 // CHECK:   public

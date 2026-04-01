@@ -539,8 +539,8 @@ void decodeRequirement(
               .Case("D", LayoutConstraintKind::NativeClass)
               .Case("T", LayoutConstraintKind::Trivial)
               .Case("B", LayoutConstraintKind::BridgeObject)
-              .Cases("E", "e", LayoutConstraintKind::TrivialOfExactSize)
-              .Cases("M", "m", LayoutConstraintKind::TrivialOfAtMostSize)
+              .Cases({"E", "e"}, LayoutConstraintKind::TrivialOfExactSize)
+              .Cases({"M", "m"}, LayoutConstraintKind::TrivialOfAtMostSize)
               .Case("S", LayoutConstraintKind::TrivialStride)
               .Default(std::nullopt);
 
@@ -571,6 +571,43 @@ void decodeRequirement(
       break;
     }
   }
+}
+
+/// Extract the protocol and requirement nodes from a shape symbol.
+static inline std::pair<NodePointer, NodePointer>
+decodeShape(NodePointer Node) {
+  if (!Node || Node->getKind() != Node::Kind::Global ||
+      Node->getNumChildren() != 1)
+    return {nullptr, nullptr};
+  Node = Node->getChild(0);
+  if (Node && (Node->getKind() == Node::Kind::Uniquable) &&
+      Node->getNumChildren() == 1)
+    Node = Node->getChild(0);
+  if (!Node || Node->getKind() != Node::Kind::ExtendedExistentialTypeShape ||
+      Node->getNumChildren() != 2)
+    return {nullptr, nullptr};
+  Node = Node->getChild(1);
+  if (!Node || Node->getKind() != Node::Kind::Type ||
+      Node->getNumChildren() != 1)
+    return {nullptr, nullptr};
+  Node = Node->getChild(0);
+  if (!Node || Node->getKind() != Node::Kind::ConstrainedExistential ||
+      Node->getNumChildren() != 2)
+    return {nullptr, nullptr};
+  NodePointer Requirements = Node->getChild(1);
+  if (!Requirements || Requirements->getKind() !=
+                           Node::Kind::ConstrainedExistentialRequirementList)
+    return {nullptr, nullptr};
+
+  Node = Node->getChild(0);
+  if (!Node || Node->getKind() != Node::Kind::Type ||
+      Node->getNumChildren() != 1)
+    return {nullptr, nullptr};
+  NodePointer Protocol = Node;
+  if (!Protocol)
+    return {nullptr, nullptr};
+
+  return {Protocol, Requirements};
 }
 
 #define MAKE_NODE_TYPE_ERROR(Node, Fmt, ...)                                   \
@@ -1577,21 +1614,33 @@ protected:
       return Builder.createNegativeIntegerType((intptr_t)Node->getIndex());
     }
 
+    case NodeKind::BuiltinBorrow: {
+      if (Node->getNumChildren() < 1) {
+        return MAKE_NODE_TYPE_ERROR(Node,
+                                    "fewer children (%zu) than required (1)",
+                                    Node->getNumChildren());
+      }
+      auto referent = decodeMangledType(Node->getChild(0), depth + 1);
+      if (referent.isError())
+        return referent;
+      return Builder.createBuiltinBorrowType(referent.getType());
+    }
+
     case NodeKind::BuiltinFixedArray: {
-      if (Node->getNumChildren() < 2)
+      if (Node->getNumChildren() < 2) {
         return MAKE_NODE_TYPE_ERROR(Node,
                                     "fewer children (%zu) than required (2)",
                                     Node->getNumChildren());
-
+      }
       auto size = decodeMangledType(Node->getChild(0), depth + 1);
       if (size.isError())
         return size;
-
       auto element = decodeMangledType(Node->getChild(1), depth + 1);
       if (element.isError())
         return element;
 
-      return Builder.createBuiltinFixedArrayType(size.getType(), element.getType());
+      return Builder.createBuiltinFixedArrayType(size.getType(),
+                                                 element.getType());
     }
 
     // TODO: Handle OpaqueReturnType, when we're in the middle of reconstructing

@@ -35,7 +35,8 @@ namespace swift {
     WatchOS,
     WatchOSSimulator,
     VisionOS,
-    VisionOSSimulator
+    VisionOSSimulator,
+    Firmware,
   };
 
   /// Returns true if the given triple represents iOS running in a simulator.
@@ -84,6 +85,9 @@ namespace swift {
   /// If the triple does not correspond to a known platform, the empty string is
   /// returned.
   StringRef getPlatformNameForTriple(const llvm::Triple &triple);
+
+  /// Returns the version tuple for a given target triple
+  llvm::VersionTuple getVersionForTriple(const llvm::Triple &triple);
 
   /// Returns the platform Kind for Darwin triples.
   DarwinPlatformKind getDarwinPlatformKind(const llvm::Triple &triple);

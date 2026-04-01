@@ -42,13 +42,24 @@ class SwiftTestingMacros(product.Product):
         return True
 
     def should_build(self, host_target):
-        return True
+        build_macros = not self.is_cross_compile_target(host_target) or \
+            self.args.cross_compile_build_swift_tools
+        if not build_macros:
+            print("Skipping building Testing Macros for %s, because the host tools "
+                  "are not being built" % host_target)
+        return build_macros
 
     def should_test(self, host_target):
         return False
 
     def should_install(self, host_target):
-        return self.args.install_swift_testing_macros
+        install_macros = self.args.install_swift_testing_macros and \
+            (not self.is_cross_compile_target(host_target) or
+             self.args.cross_compile_build_swift_tools)
+        if self.args.install_swift_testing_macros and not install_macros:
+            print("Skipping installing Testing Macros for %s, because the host tools "
+                  "are not being built" % host_target)
+        return install_macros
 
     def _cmake_product(self, host_target):
         build_root = os.path.dirname(self.build_dir)
@@ -121,3 +132,11 @@ class SwiftTestingMacrosCMakeShim(cmake_product.CMakeProduct):
         install_prefix = install_destdir + self.args.install_prefix
 
         self.install_with_cmake(['install'], install_prefix)
+
+    @classmethod
+    def is_build_script_impl_product(cls):
+        return False
+
+    @classmethod
+    def is_before_build_script_impl_product(cls):
+        return False

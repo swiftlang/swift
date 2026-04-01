@@ -82,18 +82,22 @@ extension OutputSpan where Element: ~Copyable {
 extension OutputSpan where Element: ~Copyable {
   /// The number of initialized elements in this span.
   @_alwaysEmitIntoClient
-  public var count: Int { _count }
+  @_semantics("fixed_storage.get_count")
+  public var count: Int { _assumeNonNegative(_count) }
 
   /// The number of additional elements that can be added to this span.
   @_alwaysEmitIntoClient
+  @_transparent
   public var freeCapacity: Int { capacity &- _count }
 
   /// A Boolean value indicating whether the span is empty.
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { _count == 0 }
 
   /// A Boolean value indicating whether the span is full.
   @_alwaysEmitIntoClient
+  @_transparent
   public var isFull: Bool { _count == capacity }
 }
 
@@ -163,7 +167,7 @@ extension OutputSpan {
   /// the common case of a completely uninitialized `buffer`.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - buffer: a slice of an `UnsafeMutableBufferPointer` to be initialized
   ///   - initializedCount: the number of initialized elements
   ///                       at the beginning of `buffer`.
   @unsafe
@@ -190,7 +194,15 @@ extension OutputSpan where Element: ~Copyable {
   /// The range of initialized positions for this `OutputSpan`.
   @_alwaysEmitIntoClient
   public var indices: Range<Index> {
-    unsafe Range(_uncheckedBounds: (0, _count))
+    unsafe Range(_uncheckedBounds: (0, count))
+  }
+
+  // SILOptimizer looks for fixed_storage.check_index semantics for bounds check optimizations.
+  @_semantics("fixed_storage.check_index")
+  @inline(__always)
+  @_alwaysEmitIntoClient
+  internal func _checkIndex(_ index: Index) {
+    _precondition(indices.contains(index), "index out of bounds")
   }
 
   /// Accesses the element at the specified position.
@@ -201,12 +213,12 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript(_ index: Index) -> Element {
     unsafeAddress {
-      _precondition(indices.contains(index), "index out of bounds")
+      _checkIndex(index)
       return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: index))
     }
     @lifetime(self: copy self)
     unsafeMutableAddress {
-      _precondition(indices.contains(index), "index out of bounds")
+      _checkIndex(index)
       return unsafe _unsafeAddressOfElement(unchecked: index)
     }
   }
@@ -247,14 +259,14 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func swapAt(_ i: Index, _ j: Index) {
-    _precondition(indices.contains(Index(i)))
-    _precondition(indices.contains(Index(j)))
+    _precondition(indices.contains(i))
+    _precondition(indices.contains(j))
     unsafe swapAt(unchecked: i, unchecked: j)
   }
 
   /// Exchange the elements at the two given offsets
   ///
-  /// This subscript does not validate `i` or `j`; this is an unsafe operation.
+  /// This function does not validate `i` or `j`; this is an unsafe operation.
   ///
   /// - Parameter i: A valid index into this span.
   /// - Parameter j: A valid index into this span.
@@ -315,6 +327,7 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func removeAll() {
+    guard count > 0 else { return }
     _ = unsafe _start().withMemoryRebound(to: Element.self, capacity: _count) {
       unsafe $0.deinitialize(count: _count)
     }
@@ -344,6 +357,7 @@ extension OutputSpan {
 extension OutputSpan where Element: ~Copyable {
   /// Borrow the underlying initialized memory for read-only access.
   @_alwaysEmitIntoClient
+  @_transparent
   public var span: Span<Element> {
     @lifetime(borrow self)
     borrowing get {
@@ -356,6 +370,7 @@ extension OutputSpan where Element: ~Copyable {
 
   /// Exclusively borrow the underlying initialized memory for mutation.
   @_alwaysEmitIntoClient
+  @_transparent
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
     mutating get {
@@ -394,6 +409,7 @@ extension OutputSpan where Element: ~Copyable {
   /// this is an unsafe operation. Violating the invariants of `OutputSpan`
   /// may result in undefined behavior.
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(self: copy self)
   public mutating func withUnsafeMutableBufferPointer<E: Error, R: ~Copyable>(
     _ body: (
@@ -401,29 +417,10 @@ extension OutputSpan where Element: ~Copyable {
       _ initializedCount: inout Int
     ) throws(E) -> R
   ) throws(E) -> R {
-    guard let start = unsafe _pointer, capacity > 0 else {
-      let buffer = UnsafeMutableBufferPointer<Element>(_empty: ())
-      var initializedCount = 0
-      defer {
-        _precondition(initializedCount == 0, "OutputSpan capacity overflow")
-      }
-      return unsafe try body(buffer, &initializedCount)
-    }
-    // bind memory by hand to sidestep alignment concerns
-    let binding = Builtin.bindMemory(
-      start._rawValue, capacity._builtinWordValue, Element.self
+    let bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: _pointer, count: capacity &* MemoryLayout<Element>.stride
     )
-    defer { Builtin.rebindMemory(start._rawValue, binding) }
-#if SPAN_COMPATIBILITY_STUB
-    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
-      start: .init(start._rawValue), count: capacity
-    )
-#else
-    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
-      _uncheckedStart: .init(start._rawValue), count: capacity
-    )
-#endif
-    var initializedCount = self._count
+    var initializedCount = _count
     defer {
       _precondition(
         0 <= initializedCount && initializedCount <= capacity,
@@ -431,7 +428,10 @@ extension OutputSpan where Element: ~Copyable {
       )
       self._count = initializedCount
     }
-    return unsafe try body(buffer, &initializedCount)
+    return try unsafe bytes.withMemoryRebound(to: Element.self) {
+      buffer throws(E) -> R in
+      try unsafe body(buffer, &initializedCount)
+    }
   }
 }
 

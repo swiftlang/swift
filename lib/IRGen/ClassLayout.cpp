@@ -15,10 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/SIL/SILType.h"
+#include "llvm/ADT/SmallVector.h"
 
+#include "ClassLayout.h"
+#include "GenHeap.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "ClassLayout.h"
 #include "TypeInfo.h"
 
 using namespace swift;
@@ -80,4 +83,34 @@ Size ClassLayout::getInstanceStart() const {
 
   // If there are no non-empty elements, just return the computed size.
   return getSize();
+}
+
+std::optional<uint64_t>
+ClassLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM,
+                                              SILType selfType) const {
+  if (!isFixedSize()) {
+    return std::nullopt;
+  }
+  llvm::SmallVector<SILType> storageEntries;
+
+  auto rawPointerType = SILType::getRawPointerType(IGM.Context);
+
+  // Add the heap header as the first entry
+  if (hasObjCImplementation()) {
+    storageEntries.push_back(rawPointerType);
+  } else if (!HeaderSize.isZero()) {
+    assert(HeaderSize == IGM.RefCountedStructSize &&
+           "Swift object with non-standard header size");
+    storageEntries.push_back(rawPointerType);
+    storageEntries.push_back(rawPointerType);
+  }
+
+  // Add entries for each stored property
+  for (auto field : AllStoredProperties) {
+    assert(field.isConcrete() && "Missing member on fixed size class");
+    auto fieldType = field.getType(IGM, selfType).getObjectType();
+    storageEntries.push_back(fieldType);
+  }
+
+  return irgen::computeTypedMallocTypeDescriptor(IGM, storageEntries);
 }

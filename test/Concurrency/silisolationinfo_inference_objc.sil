@@ -1,0 +1,69 @@
+// RUN: %target-sil-opt -module-name infer --test-runner %s 2>&1 | %FileCheck %s
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+// REQUIRES: objc_interop
+
+// PLEASE READ THIS!
+//
+// This test is specifically meant to test how we infer isolation for specific
+// values that depend on objc
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+actor CustomActorInstance {}
+
+@globalActor
+struct CustomActor {
+  static let shared = CustomActorInstance()
+}
+
+@objc protocol MyObjCProtocol {
+}
+
+//////////////////////////////////////////
+// MARK: Isolated Conformance Inference //
+//////////////////////////////////////////
+
+// These currently use a different entrypoint to merge in the information. It
+// should be changed to use ::get like everything else, but this is ok for now.
+
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_ref_get_conformance_test_globalactor: sil_isolation_info_get_conformance_isolation_inferrence with: @trace[0]
+// CHECK-NEXT: Input Value:   %3 = init_existential_ref %2 : $Self : $Self, $any MyObjCProtocol // user: %4
+// CHECK-NEXT: Isolation: global actor 'CustomActor'-isolated isolated-conformance-to(MyObjCProtocol)
+// CHECK-NEXT: end running test 1 of 1 on init_existential_ref_get_conformance_test_globalactor: sil_isolation_info_get_conformance_isolation_inferrence with: @trace[0]
+sil [isolation "global_actor(CustomActor)"] [ossa] @init_existential_ref_get_conformance_test_globalactor : $@convention(method) <Self where Self : MyObjCProtocol> (@guaranteed Self) -> () {
+bb0(%0 : @guaranteed $Self):
+  specify_test "sil_isolation_info_get_conformance_isolation_inferrence @trace[0]"
+  debug_value %0, let, name "self", argno 1
+  %2 = copy_value %0
+  %3 = init_existential_ref %2 : $Self : $Self, $any MyObjCProtocol
+  debug_value [trace] %3
+  destroy_value %3
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_ref_get_conformance_test_nonisolated: sil_isolation_info_get_conformance_isolation_inferrence with: @trace[0]
+// CHECK-NEXT: Input Value:   %3 = init_existential_ref %2 : $Self : $Self, $any MyObjCProtocol // user: %4
+// CHECK-NEXT: Isolation: task-isolated isolated-conformance-to(MyObjCProtocol)
+// CHECK-NEXT: end running test 1 of 1 on init_existential_ref_get_conformance_test_nonisolated: sil_isolation_info_get_conformance_isolation_inferrence with: @trace[0]
+sil [isolation "nonisolated"] [ossa] @init_existential_ref_get_conformance_test_nonisolated : $@convention(method) <Self where Self : MyObjCProtocol> (@guaranteed Self) -> () {
+bb0(%0 : @guaranteed $Self):
+  specify_test "sil_isolation_info_get_conformance_isolation_inferrence @trace[0]"
+  debug_value %0, let, name "self", argno 1
+  %2 = copy_value %0
+  %3 = init_existential_ref %2 : $Self : $Self, $any MyObjCProtocol
+  debug_value [trace] %3
+  destroy_value %3
+  %8 = tuple ()
+  return %8
+}

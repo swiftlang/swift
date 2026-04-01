@@ -45,8 +45,8 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -204,6 +204,9 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::InitEnumDataAddrInst:
   case SILInstructionKind::InjectEnumAddrInst:
     return true;
+
+  case SILInstructionKind::InitBorrowAddrInst:
+    return cast<InitBorrowAddrInst>(memInst)->getDest() == address;
 
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::TryApplyInst:

@@ -61,6 +61,35 @@ using namespace swift;
 #error "The runtime must be built with a compiler that supports swiftcall."
 #endif
 
+#if SWIFT_REFCOUNT_CC_PRESERVEMOST
+// These assembly definitions support the retain/release fast paths in the
+// swiftSwiftDirectRuntime library which is currently implemented for ARM64 Mach-O.
+#if __arm64__ && __LP64__ && defined(__APPLE__) && defined(__MACH__)
+asm(R"(
+// Define a mask used by swift_retain/releaseDirect in the SwiftDirectRuntime
+// library to determine when it must call into the runtime. The symbol's address
+// is used as the mask, rather than its contents, to eliminate one load
+// instruction when using it. This is imported weakly, which makes its address
+// zero when running against older runtimes. SwiftDirectRuntime references it using
+// an addend of 0x8000000000000000, which produces the appropriate mask in that
+// case. Since the mask is still unchanged in this version of the runtime, we
+// export this symbol as zero. If a different mask is ever needed, the address
+// of this symbol needs to be set to 0x8000000000000000 less than that value so
+// that it comes out right in SwiftDirectRuntime.
+  .globl __swift_retainRelease_slowpath_mask_v1
+  .set __swift_retainRelease_slowpath_mask_v1, 0
+
+// Define aliases for swift_retain/release that indicate they use preservemost.
+// SwiftDirectRuntime will reference these so that it can fall back to a
+// register-preserving shim on older runtimes.
+  .globl _swift_retain_preservemost
+  .set _swift_retain_preservemost, _swift_retain
+  .globl _swift_release_preservemost
+  .set _swift_release_preservemost, _swift_release
+)");
+#endif
+#endif
+
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
 SWIFT_ALWAYS_INLINE
@@ -116,6 +145,20 @@ static HeapObject *_swift_tryRetain_(HeapObject *object)
   return _ ## name ## _ args; \
 } while(0)
 
+// SWIFT_REFCOUNT_CC functions make the call to the "might be swizzled" path
+// through an adapter marked noinline and with the refcount CC. This allows the
+// fast path to avoid pushing a stack frame. Without this adapter, clang emits
+// code that pushes a stack frame right away, then does the fast path or slow
+// path.
+#define CALL_IMPL_SWIFT_REFCOUNT_CC(name, args)                                          \
+  do {                                                                                   \
+    if (SWIFT_UNLIKELY(                                                                  \
+            _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly \
+                .load(std::memory_order_relaxed)))                                       \
+      SWIFT_MUSTTAIL return _##name##_adapter args;                                      \
+    return _##name##_ args;                                                              \
+  } while (0)
+
 #define CALL_IMPL_CHECK(name, args) do { \
   void *fptr; \
   memcpy(&fptr, (void *)&_ ## name, sizeof(fptr)); \
@@ -133,6 +176,9 @@ static HeapObject *_swift_tryRetain_(HeapObject *object)
 
 // If retain/release etc. aren't overridable, just call the real implementation.
 #define CALL_IMPL(name, args) \
+    return _ ## name ## _ args;
+
+#define CALL_IMPL_SWIFT_REFCOUNT_CC(name, args) \
     return _ ## name ## _ args;
 
 #define CALL_IMPL_CHECK(name, args) \
@@ -421,26 +467,48 @@ HeapObject *swift::swift_allocEmptyBox() {
 }
 
 // Forward-declare this, but define it after swift_release.
-extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED SWIFT_REFCOUNT_CC
+void
 _swift_release_dealloc(HeapObject *object);
 
-SWIFT_ALWAYS_INLINE
-static HeapObject *_swift_retain_(HeapObject *object) {
+SWIFT_ALWAYS_INLINE static HeapObject *_swift_retain_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
   if (isValidPointerForNativeRetain(object)) {
+    // swift_bridgeObjectRetain might call us with a pointer that has spare bits
+    // set, and expects us to return that unmasked value. Mask off those bits
+    // for the actual increment operation.
+    HeapObject *masked = (HeapObject *)((uintptr_t)object &
+                                        ~heap_object_abi::SwiftSpareBitsMask);
+
     // Return the result of increment() to make the eventual call to
     // incrementSlow a tail call, which avoids pushing a stack frame on the fast
     // path on ARM64.
-    return object->refCounts.increment(1);
+    return masked->refCounts.increment(object, 1);
   }
   return object;
 }
+
+#ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+SWIFT_REFCOUNT_CC
+static HeapObject *_swift_retain_adapterImpl(HeapObject *object) {
+  HeapObject *masked =
+      (HeapObject *)((uintptr_t)object & ~heap_object_abi::SwiftSpareBitsMask);
+  _swift_retain(masked);
+  return object;
+}
+
+// This strange construct prevents the compiler from creating an unnecessary
+// stack frame in swift_retain. A direct tail call to _swift_retain_adapterImpl
+// somehow causes clang to emit a stack frame.
+static HeapObject *(*SWIFT_REFCOUNT_CC volatile _swift_retain_adapter)(
+    HeapObject *object) = _swift_retain_adapterImpl;
+#endif
 
 HeapObject *swift::swift_retain(HeapObject *object) {
 #ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_retain(object);
 #else
-  CALL_IMPL(swift_retain, (object));
+  CALL_IMPL_SWIFT_REFCOUNT_CC(swift_retain, (object));
 #endif
 }
 
@@ -457,7 +525,7 @@ SWIFT_ALWAYS_INLINE
 static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain_n);
   if (isValidPointerForNativeRetain(object))
-    object->refCounts.increment(n);
+    return object->refCounts.increment(object, n);
   return object;
 }
 
@@ -483,11 +551,18 @@ static void _swift_release_(HeapObject *object) {
     object->refCounts.decrementAndMaybeDeinit(1);
 }
 
+#ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+SWIFT_REFCOUNT_CC SWIFT_NOINLINE
+static void _swift_release_adapter(HeapObject *object) {
+  _swift_release(object);
+}
+#endif
+
 void swift::swift_release(HeapObject *object) {
 #ifdef SWIFT_THREADING_NONE
   swift_nonatomic_release(object);
 #else
-  CALL_IMPL(swift_release, (object));
+  CALL_IMPL_SWIFT_REFCOUNT_CC(swift_release, (object));
 #endif
 }
 

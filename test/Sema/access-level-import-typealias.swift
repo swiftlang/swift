@@ -7,9 +7,9 @@
 // RUN: %target-swift-emit-module-interface(%t/Aliases.swiftinterface) %t/Aliases.swift -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Aliases.swiftinterface) -I %t
 
-// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesNoImport.swift -I %t \
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/UsesAliasesNoImport.swift -I %t \
 // RUN:   -swift-version 5 -enable-library-evolution
-// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesNoImport.swift -I %t \
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/UsesAliasesNoImport.swift -I %t \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault
 

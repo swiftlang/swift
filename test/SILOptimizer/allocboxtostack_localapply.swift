@@ -179,6 +179,7 @@ public func testdfs2() -> Int {
 
 // CHECK-LABEL: sil @$s26allocboxtostack_localapply15call2localfuncsSiyF :
 // CHECK-NOT:     alloc_box
+// CHECK-NOT:     begin_access
 // CHECK-LABEL:} // end sil function '$s26allocboxtostack_localapply15call2localfuncsSiyF'
 public func call2localfuncs() -> Int {
     var a1 = 1
@@ -194,3 +195,6 @@ public func call2localfuncs() -> Int {
     return a1
 }
 
+// CHECK-LABEL: sil {{.*}} @$s26allocboxtostack_localapply15call2localfuncsSiyF13innerFunctionL_yyFTf0s_n :
+// CHECK-NOT:     begin_access
+// CHECK:       } // end sil function '$s26allocboxtostack_localapply15call2localfuncsSiyF13innerFunctionL_yyFTf0s_n'

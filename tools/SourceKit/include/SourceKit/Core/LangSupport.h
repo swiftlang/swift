@@ -35,6 +35,12 @@ namespace llvm {
   class MemoryBuffer;
 }
 
+namespace swift {
+namespace ide {
+struct FormattedSignatureHelp;
+} // namespace ide
+} // namespace swift
+
 namespace SourceKit {
 class GlobalConfig;
 using swift::ide::CancellableResult;
@@ -213,7 +219,8 @@ struct FilterRule {
 
 enum class DiagnosticSeverityKind {
   Warning,
-  Error
+  Error,
+  Remark
 };
 
 enum class DiagnosticCategory {
@@ -922,6 +929,7 @@ struct IndexStoreOptions {
   bool IgnoreStdlib = false;
   bool DisableImplicitModules = false;
   bool IncludeLocals = false;
+  bool Compress = false;
 };
 
 struct IndexStoreInfo{};
@@ -1005,6 +1013,19 @@ public:
   virtual ~ConformingMethodListConsumer() {}
 
   virtual void handleResult(const ConformingMethodListResult &Result) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
+  virtual void failed(StringRef ErrDescription) = 0;
+  virtual void cancelled() = 0;
+};
+
+class SignatureHelpConsumer {
+  virtual void anchor();
+
+public:
+  virtual ~SignatureHelpConsumer() {}
+
+  virtual void
+  handleResult(const swift::ide::FormattedSignatureHelp &Result) = 0;
   virtual void setReusingASTContext(bool flag) = 0;
   virtual void failed(StringRef ErrDescription) = 0;
   virtual void cancelled() = 0;
@@ -1149,6 +1170,13 @@ public:
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
                      Receiver) = 0;
 
+  virtual void
+  getPolyglotAST(StringRef PrimaryFilePath, ArrayRef<const char *> Args,
+                 std::optional<VFSOptions> VfsOptions,
+                 SourceKitCancellationToken CancellationToken,
+                 std::function<void(const RequestResult<std::string> &)>
+                     Receiver) = 0;
+
   virtual void getSemanticTokens(
       StringRef PrimaryFilePath, StringRef InputBufferName,
       ArrayRef<const char *> Args, std::optional<VFSOptions> VfsOptions,
@@ -1265,6 +1293,12 @@ public:
       SourceKitCancellationToken CancellationToken,
       ConformingMethodListConsumer &Consumer,
       std::optional<VFSOptions> vfsOptions) = 0;
+
+  virtual void getSignatureHelp(StringRef PrimaryFilePath, unsigned Offset,
+                                ArrayRef<const char *> Args,
+                                SourceKitCancellationToken CancellationToken,
+                                SignatureHelpConsumer &Consumer,
+                                std::optional<VFSOptions> vfsOptions) = 0;
 
   virtual void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
                                         ArrayRef<const char *> args,

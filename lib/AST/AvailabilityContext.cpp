@@ -14,10 +14,10 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContextStorage.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -155,6 +155,30 @@ AvailabilityContext::forDeploymentTarget(const ASTContext &ctx) {
       AvailabilityRange::forDeploymentTarget(ctx), ctx);
 }
 
+static AvailabilityContext
+contextForLocationInSourceFile(SourceLoc loc, SourceFile *sf,
+                               AvailabilityContext baseAvailability,
+                               const AvailabilityScope **refinedScope) {
+  if (!sf || loc.isInvalid())
+    return baseAvailability;
+
+  auto &ctx = sf->getASTContext();
+  auto *rootScope = AvailabilityScope::getOrBuildForSourceFile(*sf);
+  if (!rootScope)
+    return baseAvailability;
+
+  auto *scope = rootScope->findMostRefinedSubContext(loc, ctx);
+  if (!scope)
+    return baseAvailability;
+
+  if (refinedScope)
+    *refinedScope = scope;
+
+  auto availability = scope->getAvailabilityContext();
+  availability.constrainWithContext(baseAvailability, ctx);
+  return availability;
+}
+
 AvailabilityContext
 AvailabilityContext::forLocation(SourceLoc loc, const DeclContext *declContext,
                                  const AvailabilityScope **refinedScope) {
@@ -191,37 +215,25 @@ AvailabilityContext::forLocation(SourceLoc loc, const DeclContext *declContext,
     declContext = decl->getDeclContext();
   }
 
-  if (!sf || loc.isInvalid())
-    return baseAvailability;
-
-  auto *rootScope = AvailabilityScope::getOrBuildForSourceFile(*sf);
-  if (!rootScope)
-    return baseAvailability;
-
-  auto *scope = rootScope->findMostRefinedSubContext(loc, ctx);
-  if (!scope)
-    return baseAvailability;
-
-  if (refinedScope)
-    *refinedScope = scope;
-
-  auto availability = scope->getAvailabilityContext();
-  availability.constrainWithContext(baseAvailability, ctx);
-  return availability;
+  return contextForLocationInSourceFile(loc, sf, baseAvailability,
+                                        refinedScope);
 }
 
 AvailabilityContext AvailabilityContext::forDeclSignature(const Decl *decl) {
-  // For decls with valid source locations, query the availability scope tree.
+  // For decls with valid source locations in source files, we can query the
+  // availability scope tree.
   auto loc = decl->getLoc();
-  if (loc.isValid())
-    return forLocation(loc, decl->getInnermostDeclContext());
-
-  // Otherwise, walk the decl hierarchy to compute availability. This can't be
-  // delegated to `AvailabilityContext::forLocation()` since it walks up the
-  // `DeclContext` hierachy for invalid source locations and that may skip
-  // some declarations with availability attributes.
   auto &ctx = decl->getASTContext();
   auto availability = forInliningTarget(ctx);
+
+  if (loc.isValid()) {
+    if (auto sf = decl->getDeclContext()
+                      ->getParentModule()
+                      ->getSourceFileContainingLocation(loc))
+      return contextForLocationInSourceFile(loc, sf, availability, nullptr);
+  }
+
+  // Otherwise, just walk the decl hierarchy to compute availability.
   while (decl) {
     availability.constrainWithDecl(decl);
     decl = decl->parentDeclForAvailability();
@@ -265,10 +277,13 @@ bool AvailabilityContext::isUnavailable() const {
   return false;
 }
 
-bool AvailabilityContext::containsUnavailableDomain(
+bool AvailabilityContext::isUnavailableForDomain(
     AvailabilityDomain domain) const {
   for (auto domainInfo : storage->getDomainInfos()) {
     if (domainInfo.isUnavailable()) {
+      if (domainInfo.getDomain().isUniversal())
+        return true;
+
       if (domainInfo.getDomain().contains(domain))
         return true;
     }
@@ -342,10 +357,13 @@ void AvailabilityContext::constrainWithDecl(const Decl *decl) {
 void AvailabilityContext::constrainWithDeclAndPlatformRange(
     const Decl *decl, const AvailabilityRange &otherPlatformRange) {
   auto &ctx = decl->getASTContext();
+
+  // Constrain the platform range first since this may have an effect on
+  // whether the decl is considered obsolete.
+  constrainWithPlatformRange(otherPlatformRange, ctx);
+
   bool isConstrained = false;
   auto platformRange = storage->platformRange;
-  isConstrained |= constrainRange(platformRange, otherPlatformRange);
-
   bool isDeprecated = storage->isDeprecated;
   isConstrained |= constrainBool(isDeprecated, decl->isDeprecated());
 
@@ -361,12 +379,12 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
     auto attr = constraint.getAttr();
     auto domain = attr.getDomain();
     switch (constraint.getReason()) {
-    case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
-    case AvailabilityConstraint::Reason::Obsoleted:
-    case AvailabilityConstraint::Reason::UnavailableForDeployment:
+    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+    case AvailabilityConstraint::Reason::UnavailableObsolete:
+    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
       declDomainInfos.push_back(DomainInfo::unavailable(domain));
       break;
-    case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+    case AvailabilityConstraint::Reason::Unintroduced:
       if (auto introducedRange = attr.getIntroducedRange(ctx)) {
         if (domain.isActivePlatform(ctx)) {
           isConstrained |= constrainRange(platformRange, *introducedRange);

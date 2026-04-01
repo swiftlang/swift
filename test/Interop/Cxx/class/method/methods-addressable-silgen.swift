@@ -17,7 +17,7 @@ public func addressableTest(x: borrowing @_addressable NonTrivialInWrapper, y: i
   // CHECK: %{{[0-9]+}} = apply %{{[0-9]+}}([[UNWRAPPED]], %{{[0-9]+}}) : $@convention(cxx_method) (@in_guaranteed NonTrivialInWrapper, @in_guaranteed HasMethods) -> ()
   var m2 = HasMethods()
   // CHECK: [[ACCESS:%[0-9]+]] = begin_access [modify] [unknown] [[INPUT2]]
-  // CHECK: %{{[0-9]+}} = apply %32([[ACCESS]], %{{[0-9]+}}) : $@convention(cxx_method) (@inout NonTrivialInWrapper, @in_guaranteed HasMethods) -> ()
+  // CHECK: %{{[0-9]+}} = apply %{{[0-9]+}}([[ACCESS]], %{{[0-9]+}}) : $@convention(cxx_method) (@inout NonTrivialInWrapper, @in_guaranteed HasMethods) -> ()
   // CHECK-NEXT: end_access [[ACCESS]]
   m2.nonTrivialTakesRef(&y)
 }

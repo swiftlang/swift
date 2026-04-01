@@ -20,6 +20,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -27,6 +28,7 @@
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/TargetParser/Triple.h"
+#include <optional>
 
 using namespace swift;
 using namespace swift::serialization;
@@ -226,6 +228,15 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::STRICT_MEMORY_SAFETY:
       extendedInfo.setStrictMemorySafety(true);
       break;
+    case options_block::DEFERRED_CODE_GEN:
+      extendedInfo.setDeferredCodeGen(true);
+      break;
+    case options_block::OSLOG_STRING_SECTION_NAME:
+      extendedInfo.setOSLogStringSectionName(blobData);
+      break;
+    case options_block::AGGRESSIVE_CMO:
+      extendedInfo.setAggressiveCMOEnabled(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -239,7 +250,6 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
 static ValidationInfo validateControlBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
     std::pair<uint16_t, uint16_t> expectedVersion,
-    bool requiresOSSAModules,
     bool requiresRevisionMatch,
     StringRef requiredSDK,
     std::optional<llvm::Triple> target,
@@ -481,12 +491,6 @@ static ValidationInfo validateControlBlock(
       }
       break;
     }
-    case control_block::IS_OSSA: {
-      auto isModuleInOSSA = scratch[0];
-      if (requiresOSSAModules && !isModuleInOSSA)
-        result.status = Status::NotInOSSA;
-      break;
-    }
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -507,7 +511,9 @@ static ValidationInfo validateControlBlock(
 static bool validateInputBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
-    SmallVectorImpl<SearchPath> *searchPaths) {
+    SmallVectorImpl<SearchPath> *searchPaths,
+    ExplicitSwiftModuleMap *explicitSwiftModuleMap,
+    ExplicitClangModuleMap *explicitClangModuleMap) {
   SmallVector<StringRef, 4> dependencyDirectories;
   SmallString<256> dependencyFullPathBuffer;
 
@@ -536,20 +542,20 @@ static bool validateInputBlock(
     }
     unsigned kind = maybeKind.get();
     switch (kind) {
-    case input_block::FILE_DEPENDENCY:
+    case input_block::FILE_DEPENDENCY: {
+      StringRef path = blobData;
+      size_t directoryIndex = scratch[4];
+      if (directoryIndex != 0) {
+        if (directoryIndex > dependencyDirectories.size())
+          return true;
+        dependencyFullPathBuffer = dependencyDirectories[directoryIndex - 1];
+        llvm::sys::path::append(dependencyFullPathBuffer, blobData);
+        path = dependencyFullPathBuffer;
+      }
+
       if (dependencies) {
         bool isHashBased = scratch[2] != 0;
         bool isSDKRelative = scratch[3] != 0;
-
-        StringRef path = blobData;
-        size_t directoryIndex = scratch[4];
-        if (directoryIndex != 0) {
-          if (directoryIndex > dependencyDirectories.size())
-            return true;
-          dependencyFullPathBuffer = dependencyDirectories[directoryIndex - 1];
-          llvm::sys::path::append(dependencyFullPathBuffer, blobData);
-          path = dependencyFullPathBuffer;
-        }
 
         if (isHashBased)
           dependencies->push_back(
@@ -560,10 +566,9 @@ static bool validateInputBlock(
               SerializationOptions::FileDependency::modTimeBased(
                   path, isSDKRelative, scratch[0], scratch[1]));
       }
-      break;
+    } break;
     case input_block::DEPENDENCY_DIRECTORY:
-      if (dependencies)
-        dependencyDirectories.push_back(blobData);
+      dependencyDirectories.push_back(blobData);
       break;
     case input_block::SEARCH_PATH:
       if (searchPaths) {
@@ -574,6 +579,77 @@ static bool validateInputBlock(
         searchPaths->push_back({std::string(blobData), isFramework, isSystem});
       }
       break;
+    case input_block::EXPLICIT_MODULE_MAP_ENTRY: {
+      if (!explicitSwiftModuleMap || !explicitClangModuleMap)
+        break;
+      bool isFramework;
+      bool isSystem;
+      bool isBridgedHeaderDependency;
+      unsigned modPathIdx, modDocIdx, modSrcIdx, clangMapIdx;
+      input_block::ExplicitModuleMapEntryLayout::readRecord(
+          scratch, isFramework, isSystem, isBridgedHeaderDependency, modPathIdx,
+          modDocIdx, modSrcIdx, clangMapIdx);
+      StringRef rest, moduleName, moduleAlias, modulePath, moduleDocPath,
+          moduleSourceInfoPath, moduleCacheKey, clangModuleMapPath,
+          headerDependencyPath;
+      std::string modulePathStr, moduleDocPathStr, moduleSourceInfoPathStr,
+          clangModuleMapPathStr;
+      std::tie(moduleName, rest) = blobData.split('\0');
+      std::tie(modulePath, rest) = rest.split('\0');
+      std::tie(moduleAlias, rest) = rest.split('\0');
+      std::tie(moduleDocPath, rest) = rest.split('\0');
+      std::tie(moduleSourceInfoPath, rest) = rest.split('\0');
+      std::tie(moduleCacheKey, rest) = rest.split('\0');
+      std::tie(clangModuleMapPath, rest) = rest.split('\0');
+      auto updatePath = [&](std::string &out, StringRef path,
+                            unsigned directoryIndex) {
+        if (!directoryIndex) {
+          out = path.str();
+          return false;
+        }
+        if (directoryIndex > dependencyDirectories.size())
+          return true;
+        dependencyFullPathBuffer = dependencyDirectories[directoryIndex - 1];
+        llvm::sys::path::append(dependencyFullPathBuffer, path);
+        out = dependencyFullPathBuffer.str();
+        return false;
+      };
+      if (updatePath(modulePathStr, modulePath, modPathIdx) ||
+          updatePath(moduleDocPathStr, moduleDocPath, modDocIdx) ||
+          updatePath(moduleSourceInfoPathStr, moduleSourceInfoPath,
+                     modSrcIdx) ||
+          updatePath(clangModuleMapPathStr, clangModuleMapPath, clangMapIdx))
+        return true;
+
+      auto optStr = [](std::string s) -> std::optional<std::string> {
+        if (s.empty())
+          return std::nullopt;
+        return s;
+      };
+      if (clangModuleMapPathStr.empty()) {
+        std::vector<std::string> headerDependencyPaths;
+        while (!rest.empty()) {
+          std::tie(headerDependencyPath, rest) = rest.split('\0');
+          headerDependencyPaths.push_back(headerDependencyPath.str());
+        }
+        ExplicitSwiftModuleInputInfo entry(
+            modulePathStr, optStr(moduleAlias.str()), optStr(moduleDocPathStr),
+            optStr(moduleSourceInfoPathStr),
+            headerDependencyPaths.size()
+                ? std::optional<std::vector<std::string>>(headerDependencyPaths)
+                : std::nullopt,
+            isFramework, isSystem, optStr(moduleCacheKey.str()));
+
+        explicitSwiftModuleMap->insert({moduleName, std::move(entry)});
+      } else {
+        ExplicitClangModuleInputInfo entry(
+            clangModuleMapPathStr, modulePathStr, optStr(moduleAlias.str()),
+            isFramework, isSystem, isBridgedHeaderDependency,
+            optStr(moduleCacheKey.str()));
+
+        explicitClangModuleMap->insert({moduleName, std::move(entry)});
+      }
+    } break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -590,7 +666,6 @@ std::string serialization::StatusToString(Status S) {
   case Status::FormatTooNew: return "FormatTooNew";
   case Status::RevisionIncompatible: return "RevisionIncompatible";
   case Status::ChannelIncompatible: return "ChannelIncompatible";
-  case Status::NotInOSSA: return "NotInOSSA";
   case Status::MissingDependency: return "MissingDependency";
   case Status::MissingUnderlyingModule: return "MissingUnderlyingModule";
   case Status::CircularDependency: return "CircularDependency";
@@ -612,11 +687,11 @@ bool serialization::isSerializedAST(StringRef data) {
 }
 
 ValidationInfo serialization::validateSerializedAST(
-    StringRef data, bool requiresOSSAModules,
-    StringRef requiredSDK,
-    ExtendedValidationInfo *extendedInfo,
+    StringRef data, StringRef requiredSDK, ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
     SmallVectorImpl<SearchPath> *searchPaths,
+    ExplicitSwiftModuleMap *explicitSwiftModuleMap,
+    ExplicitClangModuleMap *explicitClangModuleMap,
     std::optional<llvm::Triple> target) {
   ValidationInfo result;
 
@@ -658,7 +733,6 @@ ValidationInfo serialization::validateSerializedAST(
       result = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          requiresOSSAModules,
           /*requiresRevisionMatch=*/true,
           requiredSDK, target,
           extendedInfo, localObfuscator);
@@ -673,7 +747,8 @@ ValidationInfo serialization::validateSerializedAST(
         result.status = Status::Malformed;
         return result;
       }
-      if (validateInputBlock(cursor, scratch, dependencies, searchPaths)) {
+      if (validateInputBlock(cursor, scratch, dependencies, searchPaths,
+                             explicitSwiftModuleMap, explicitClangModuleMap)) {
         result.status = Status::Malformed;
         return result;
       }
@@ -1210,7 +1285,6 @@ bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer)
 
       info = validateControlBlock(
           docCursor, scratch, {SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR},
-          RequiresOSSAModules,
           /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*target*/std::nullopt,
           /*extendedInfo*/nullptr, pathRecoverer);
@@ -1356,7 +1430,6 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent(PathObfuscator &pathRec
       info = validateControlBlock(
           infoCursor, scratch,
           {SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR},
-          RequiresOSSAModules,
           /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*target*/std::nullopt,
           /*extendedInfo*/nullptr, pathRecoverer);
@@ -1422,11 +1495,13 @@ StringRef ModuleFileSharedCore::getIdentifierText(IdentifierID IID) const {
 
   assert(!IdentifierData.empty() && "no identifier data in module");
 
-  StringRef rawStrPtr = IdentifierData.substr(offset);
-  size_t terminatorOffset = rawStrPtr.find('\0');
-  assert(terminatorOffset != StringRef::npos &&
+  size_t endOffset = ((rawID + 1 < Identifiers.size()) ?
+    Identifiers[rawID + 1] : IdentifierData.size()) - 1;
+
+  ASSERT(IdentifierData[endOffset] == '\0' &&
          "unterminated identifier string data");
-  return rawStrPtr.slice(0, terminatorOffset);
+
+  return IdentifierData.slice(offset, endOffset);
 }
 
 ModuleFileSharedCore::ModuleFileSharedCore(
@@ -1434,14 +1509,12 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
     bool isFramework,
-    bool requiresOSSAModules,
     StringRef requiredSDK,
     std::optional<llvm::Triple> target,
     serialization::ValidationInfo &info, PathObfuscator &pathRecoverer)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
-      ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)),
-      RequiresOSSAModules(requiresOSSAModules) {
+      ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)) {
   assert(!hasError());
   Bits.IsFramework = isFramework;
 
@@ -1488,7 +1561,6 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       info = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          RequiresOSSAModules,
           /*requiresRevisionMatch=*/true, requiredSDK, target,
           &extInfo, pathRecoverer);
       if (info.status != Status::Valid) {
@@ -1518,12 +1590,16 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
       Bits.StrictMemorySafety = extInfo.strictMemorySafety();
+      Bits.DeferredCodeGen = extInfo.deferredCodeGen();
+      Bits.AggressiveCMOEnabled = extInfo.isAggressiveCMOEnabled();
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();
       ModulePackageName = extInfo.getModulePackageName();
       ModuleExportAsName = extInfo.getExportAsName();
       PublicModuleName = extInfo.getPublicModuleName();
+      OSLogStringSectionName = extInfo.getOSLogStringSectionName();
+      
       SwiftInterfaceCompilerVersion =
           extInfo.getSwiftInterfaceCompilerVersion();
 
@@ -1569,9 +1645,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           unsigned rawImportControl;
           bool scoped;
           bool hasSPI;
-          input_block::ImportedModuleLayout::readRecord(scratch,
-                                                        rawImportControl,
-                                                        scoped, hasSPI);
+          input_block::ImportedModuleLayout::readRecord(
+              scratch, rawImportControl, scoped, hasSPI);
           auto importKind = getActualImportControl(rawImportControl);
           if (!importKind) {
             // We don't know how to import this dependency.
@@ -1588,16 +1663,17 @@ ModuleFileSharedCore::ModuleFileSharedCore(
             unsigned recordID = fatalIfUnexpected(
                 cursor.readRecord(entry.ID, scratch, &spiBlob));
             assert(recordID == input_block::IMPORTED_MODULE_SPIS);
-            input_block::ImportedModuleLayoutSPI::readRecord(scratch);
-            (void) recordID;
-          } else {
-            spiBlob = StringRef();
+            input_block::ImportedModuleSPILayout::readRecord(scratch);
+            (void)recordID;
           }
 
           Dependencies.push_back(
               {blobData, spiBlob, importKind.value(), scoped});
           break;
         }
+        case input_block::EXPLICIT_MODULE_MAP_ENTRY:
+          // Consumed by validateInputBlock.
+          break;
         case input_block::LINK_LIBRARY: {
           uint8_t rawKind;
           bool isStaticLibrary;

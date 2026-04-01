@@ -76,7 +76,11 @@ public:
   /// As a convenience, build a metadata object with internal linkage
   /// consisting solely of the standard heap metadata.
   llvm::Constant *getPrivateMetadata(IRGenModule &IGM,
-                                     llvm::Constant *captureDescriptor) const;
+                                     llvm::Constant *captureDescriptor,
+                                     const llvm::Twine &name) const;
+
+  std::optional<uint64_t>
+  computeTypedMallocTypeDescriptor(IRGenModule &IGM) const;
 };
 
 class HeapNonFixedOffsets : public NonFixedOffsetsImpl {
@@ -180,6 +184,10 @@ llvm::Value *emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 
 /// What isa-encoding mechanism does a type use?
 IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
+
+std::optional<uint64_t>
+computeTypedMallocTypeDescriptor(IRGenModule &IGM,
+                                 llvm::SmallVectorImpl<SILType> &fieldTypes);
 
 } // end namespace irgen
 } // end namespace swift

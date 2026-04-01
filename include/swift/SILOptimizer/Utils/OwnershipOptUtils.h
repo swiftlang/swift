@@ -48,7 +48,7 @@ inline bool requiresOSSACleanup(SILValue v) {
 ///
 /// Precondition: lifetimeBoundary is a superset of ownedValue's current
 /// lifetime (therefore, none of the safety checks done during
-/// CanonicalizeOSSALifetime are needed here).
+/// OSSACanonicalizeOwned are needed here).
 void extendOwnedLifetime(SILValue ownedValue,
                          PrunedLivenessBoundary &lifetimeBoundary,
                          InstructionDeleter &deleter);
@@ -61,7 +61,7 @@ void extendOwnedLifetime(SILValue ownedValue,
 ///
 /// Precondition: guaranteedBoundary is a superset of beginBorrow's current
 /// scope (therefore, none of the safety checks done during
-/// CanonicalizeBorrowScope are needed here).
+/// OSSACanonicalizeGuaranteed are needed here).
 void extendLocalBorrow(BeginBorrowInst *beginBorrow,
                        PrunedLivenessBoundary &guaranteedBoundary,
                        InstructionDeleter &deleter);
@@ -78,11 +78,6 @@ void extendLocalBorrow(BeginBorrowInst *beginBorrow,
 /// Note: This may be called on partially invalid OSSA form, where multiple
 /// newly created phis do not yet have a borrow scope.
 bool createBorrowScopeForPhiOperands(SILPhiArgument *newPhi);
-
-SILValue
-makeGuaranteedValueAvailable(SILValue value, SILInstruction *user,
-                             DeadEndBlocks &deBlocks,
-                             InstModCallbacks callbacks = InstModCallbacks());
 
 /// Compute the liveness boundary for a guaranteed value. Returns true if no
 /// uses are pointer escapes. If pointer escapes are present, the liveness
@@ -106,16 +101,19 @@ class GuaranteedOwnershipExtension {
   DeadEndBlocks &deBlocks;
 
   // --- analysis state
+  SmallVector<SILBasicBlock *> guaranteedLivenessBlocks;
   MultiDefPrunedLiveness guaranteedLiveness;
+  SmallVector<SILBasicBlock *> ownedLifetimeBlocks;
   SSAPrunedLiveness ownedLifetime;
-  SmallVector<SILBasicBlock *, 4> ownedConsumeBlocks;
   BeginBorrowInst *beginBorrow = nullptr;
 
 public:
   GuaranteedOwnershipExtension(InstructionDeleter &deleter,
                                DeadEndBlocks &deBlocks, SILFunction *function)
     : deleter(deleter), deBlocks(deBlocks),
-      guaranteedLiveness(function), ownedLifetime(function) {}
+      guaranteedLiveness(function, &guaranteedLivenessBlocks),
+      ownedLifetime(function, &ownedLifetimeBlocks)
+  {}
 
   /// Invalid indicates that the current guaranteed scope is insufficient, and
   /// it does not meet the precondition for scope extension.
@@ -224,16 +222,18 @@ public:
   /// can be replaced as-is with it's existing uses, create an instance of
   /// OwnershipRAUWHelper and check its validity.
   static bool hasValidRAUWOwnership(SILValue oldValue, SILValue newValue,
-                                    ArrayRef<Operand *> oldUses);
+                                    ArrayRef<Operand *> oldUses,
+                                    bool respectLexicalFlags);
 
   static bool hasValidNonLexicalRAUWOwnership(SILValue oldValue,
-                                              SILValue newValue) {
+                                              SILValue newValue,
+                                              bool respectLexicalFlags) {
     if (oldValue->isLexical() || newValue->isLexical())
       return false;
 
     // Pretend that we have no uses since they are only used to check lexical
     // lifetimes.
-    return hasValidRAUWOwnership(oldValue, newValue, {});
+    return hasValidRAUWOwnership(oldValue, newValue, {}, respectLexicalFlags);
   }
 
 private:
@@ -266,7 +266,7 @@ public:
   /// address, then these transforms can only transform the address into a
   /// derived address.
   OwnershipRAUWHelper(OwnershipFixupContext &ctx, SILValue oldValue,
-                      SILValue newValue);
+                      SILValue newValue, bool respectLexicalFlags);
 
   /// Returns true if this helper was initialized into a valid state.
   operator bool() const { return isValid(); }
@@ -340,7 +340,7 @@ public:
   /// NOTE: For now we only support objects, not addresses so addresses will
   /// always yield an invalid helper.
   OwnershipReplaceSingleUseHelper(OwnershipFixupContext &ctx, Operand *use,
-                                  SILValue newValue);
+                                  SILValue newValue, bool respectLexicalFlags);
 
   ~OwnershipReplaceSingleUseHelper() { if (ctx) ctx->clear(); }
 
@@ -373,6 +373,16 @@ void updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
 
 /// Replaces phis with the unique incoming values if all incoming values are the same.
 void replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
+
+/// Complete lifetimes which were cut off by an `unreachable` instruction.
+/// For details see the swift implementation `completeLifetimes(in: Function)`.
+void completeAllLifetimes(SILPassManager *pm, SILFunction *f, bool includeTrivialVars = false);
+
+/// Complete lifetimes of all `values` at `deadEnds` instructions.
+/// Instead of completing the lifetimes at `unreachable` instructions, they are
+/// complete at custom `deadEnd` points.
+/// The `values` must be in dominance order.
+void completeLifetimes(SILPassManager *pm, ArrayRef<SILValue> values, ArrayRef<SILInstruction *> deadEnds);
 
 bool hasOwnershipOperandsOrResults(SILInstruction *inst);
 

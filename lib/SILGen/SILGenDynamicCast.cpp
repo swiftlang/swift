@@ -59,7 +59,7 @@ namespace {
 
       SGFContext ctx;
 
-      std::unique_ptr<TemporaryInitialization> temporary;
+      TemporaryInitializationPtr temporary;
       if (isOperandIndirect()) {
         temporary = SGF.emitTemporary(Loc, origSourceTL);
         ctx = SGFContext(temporary.get());
@@ -417,7 +417,7 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
   if (!hasAbstraction && (!requiresAddress || src.getType().isAddress()))
     return src;
   
-  std::unique_ptr<TemporaryInitialization> init;
+  TemporaryInitializationPtr init;
   if (requiresAddress) {
     init = SGF.emitTemporary(loc, srcAbstractTL);
 

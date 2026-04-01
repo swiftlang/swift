@@ -285,10 +285,19 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
   set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
   set(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY TRUE)
-  set(SWIFT_STDLIB_CONCURRENCY_TRACING FALSE)
+  set(SWIFT_STDLIB_TRACING FALSE)
   set(SWIFT_STDLIB_HAS_ENVIRON FALSE)
   set(SWIFT_STDLIB_HAS_ASL FALSE)
   list(APPEND LLVM_OPTIONAL_SOURCES ExecutorImpl.cpp)
+
+  # Under Embedded Swift, all stdlib APIs should be available always. Replace
+  # all availability macros with an empty expansion (`*`).
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
+  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+    string(REGEX REPLACE ":.*" ":*" replaced "${def}")
+    list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
+  endforeach()
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
 
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
@@ -312,6 +321,15 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         # Host is macOS with a macOS SDK. To be able to build the C++ Concurrency runtime for non-Darwin targets using the macOS SDK,
         # we need to pass some extra flags and search paths.
         set(extra_c_compile_flags -stdlib=libc++ -isystem${SWIFT_SDK_OSX_PATH}/usr/include/c++/v1 -isystem${SWIFT_SDK_OSX_PATH}/usr/include -D__APPLE__)
+        # Before Xcode 26.4, we were getting these macros from TargetConditionals.h
+        # now it's on us to define those to keep using the macOS SDK for non Darwin targets
+        if("${arch}" MATCHES "armv7")
+          list(APPEND extra_c_compile_flags -DTARGET_CPU_ARM=1)
+        elseif("${arch}" MATCHES "arm64")
+          list(APPEND extra_c_compile_flags -DTARGET_CPU_ARM64=1)
+        elseif("${arch}" MATCHES "x86_64")
+          list(APPEND extra_c_compile_flags -DTARGET_CPU_X86_64=1)
+        endif()
       endif()
     endif()
 
@@ -335,6 +353,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
+    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+      set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+      set(SWIFT_SDK_embedded_ARCH_${mod}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+    endif()
 
     # lib/swift/embedded/_Concurrency.swiftmodule
     # lib/swift/embedded/<triple>/libswift_Concurrency.a
@@ -381,6 +403,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     if(NOT "${arch}" MATCHES "wasm32")
       set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
     endif()
+
+    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-${mod} ${triple})
+
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
 
     # lib/swift/embedded/<triple>/libswift_ConcurrencyDefaultExecutor.a
@@ -411,6 +436,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
     set_property(TARGET embedded-concurrency-default-executor-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+
+    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-default-executor-${mod} ${triple})
+
     add_dependencies(embedded-concurrency embedded-concurrency-default-executor-${mod})
   endforeach()
 

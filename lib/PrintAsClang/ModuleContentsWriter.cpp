@@ -20,6 +20,7 @@
 #include "PrintSwiftToClangCoreScaffold.h"
 #include "SwiftToClangInteropContext.h"
 
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -29,6 +30,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILInstruction.h"
@@ -39,6 +41,7 @@
 #include "clang/Basic/Module.h"
 
 #include "llvm/Support/raw_ostream.h"
+#include <utility>
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -153,8 +156,7 @@ static std::string getMangledNameString(const Decl *D) {
   if (!VD)
     return std::string();
   Mangle::ASTMangler mangler(VD->getASTContext());
-  return mangler.mangleAnyDecl(VD, /*prefix=*/true,
-                               /*respectOriginallyDefinedIn=*/true);
+  return mangler.mangleAnyDecl(VD, /*addPrefix*/ true);
 }
 
 static std::string getTypeString(const ValueDecl *VD) {
@@ -459,7 +461,7 @@ public:
 
     if (isa<EnumDecl>(D) && !D->hasClangNode() &&
         outputLangMode != OutputLanguageMode::Cxx) {
-      // We don't want to add an import for a @cdecl or @objc enum declared
+      // We don't want to add an import for a @c or @objc enum declared
       // in Swift. We either do nothing for special enums like Optional as
       // done in the prologue here, or we forward declare them.
       return false;
@@ -538,20 +540,17 @@ public:
   }
 
   void forwardDeclare(const EnumDecl *ED) {
-    assert(ED->isObjC() || ED->getAttrs().getAttribute<CDeclAttr>() ||
-           ED->hasClangNode());
+    // Optional and Never don't need to be forward-declared.
+    if (ED->isOptionalDecl() || ED->getASTContext().getNeverDecl() == ED)
+      return;
+
+    assert(ED->isCCompatibleEnum() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
-      if (ED->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
-        // Forward declare in a way to be compatible with older C standards.
-        os << "typedef SWIFT_ENUM_FWD_DECL(";
-        printer.print(ED->getRawType());
-        os << ", " << getNameForObjC(ED) << ")\n";
-      } else {
-        os << "enum " << getNameForObjC(ED) << " : ";
-        printer.print(ED->getRawType());
-        os << ";\n";
-      }
+      // Forward declare in a way to be compatible with older C standards.
+      os << "SWIFT_ENUM_FWD_DECL(";
+      printer.print(ED->getRawType());
+      os << ", " << getNameForObjC(ED) << ")\n";
     });
   }
 
@@ -569,11 +568,12 @@ public:
     }
     if (!isa<clang::TypeDecl>(clangDecl))
       return;
-    // Get the underlying clang type from a type alias decl or record decl.
+    // Get the underlying clang type from a type alias decl, record decl, or
+    // enum decl.
     auto clangType = clangDecl->getASTContext()
                          .getTypeDeclType(cast<clang::TypeDecl>(clangDecl))
                          .getCanonicalType();
-    if (!isa<clang::RecordType>(clangType.getTypePtr()))
+    if (!isa<clang::RecordType, clang::EnumType>(clangType.getTypePtr()))
       return;
     auto it = seenClangTypes.insert(clangType.getTypePtr());
     if (it.second)
@@ -594,6 +594,9 @@ public:
         if (!addImport(NTD))
           forwardDeclareCxxValueTypeIfNeeded(NTD);
         else if (isa<StructDecl>(TD) && NTD->hasClangNode())
+          emitReferencedClangTypeMetadata(NTD);
+        else if (isa<EnumDecl>(TD) && NTD->hasClangNode() &&
+                 isa<clang::EnumDecl>(NTD->getClangDecl()))
           emitReferencedClangTypeMetadata(NTD);
         else if (const auto *cd = dyn_cast<ClassDecl>(TD))
           if ((cd->isObjC() && cd->getClangDecl()) ||
@@ -616,7 +619,7 @@ public:
       bool imported = false;
       if (TAD->hasClangNode())
         imported = addImport(TD);
-      assert((imported || !TAD->isGeneric()) &&
+      assert((imported || !TAD->hasGenericParamList()) &&
              "referencing non-imported generic typealias?");
     } else if (addImport(TD)) {
       return;
@@ -1003,8 +1006,8 @@ public:
         else if (auto SD = dyn_cast<StructDecl>(D))
           success = writeStruct(SD);
         else if (auto *vd = dyn_cast<ValueDecl>(D))
-          topLevelEmissionScope.additionalUnrepresentableDeclarations.push_back(
-              vd);
+          topLevelEmissionScope.additionalUnrepresentableDeclarations.insert(
+              {vd, ""});
       } else if (isa<ValueDecl>(D)) {
         if (auto PD = dyn_cast<ProtocolDecl>(D))
           success = writeProtocol(PD);
@@ -1051,9 +1054,10 @@ public:
     if (outputLangMode != OutputLanguageMode::Cxx)
       return;
     auto &emissionScope = topLevelEmissionScope;
+
     auto removedVDList = std::vector<const ValueDecl *>(
         removedValueDecls.begin(), removedValueDecls.end());
-    for (const auto *removedVD :
+    for (const auto &[removedVD, reason] :
          emissionScope.additionalUnrepresentableDeclarations)
       removedVDList.push_back(removedVD);
 
@@ -1063,7 +1067,8 @@ public:
     // library. Also skip structs from the standard library, they can cause
     // ambiguities because of the arithmetic types that conflict with types we
     // already have in `swift::` namespace. Also skip `Error` protocol from
-    // stdlib, we have experimental support for it.
+    // stdlib, we have experimental support for it. Also skip explicitly exluded
+    // declarations.
     removedVDList.erase(
         llvm::remove_if(
             removedVDList,
@@ -1073,7 +1078,8 @@ public:
                       vd->getBaseIdentifier().hasUnderscoredNaming()) ||
                      (vd->isStdlibDecl() && isa<StructDecl>(vd)) ||
                      (vd->isStdlibDecl() &&
-                      vd->getASTContext().getErrorDecl() == vd);
+                      vd->getASTContext().getErrorDecl() == vd) ||
+                     swift::hasExposeNotCxxAttr(vd);
             }),
         removedVDList.end());
     // Sort the unavaiable decls by their name and kind.
@@ -1091,29 +1097,34 @@ public:
     for (const auto *vd : removedVDList) {
       assert(!vd->isObjC());
       os << "\n";
-      auto emitStubComment = [&]() {
-        // Emit a generic comment for an handled declaration.
+      auto emitStubComment = [&](StringRef reason = "") {
         os << "// Unavailable in C++: Swift "
-           << vd->getDescriptiveKindName(vd->getDescriptiveKind()) << " '";
+           << Decl::getDescriptiveKindName(vd->getDescriptiveKind()) << " '";
         vd->getName().print(os);
-        os << "'.\n";
+        os << "'.";
+        if (!reason.empty())
+          os << " " << reason << ".";
+        os << "\n";
       };
 
       // Do not emit a C++ declaration with a specific C++ name more than once.
       auto cxxName = cxx_translation::getNameForCxx(vd);
-      if (emissionScope.emittedDeclarationNames.contains(cxxName)) {
-        emitStubComment();
-        continue;
-      }
-      emissionScope.emittedDeclarationNames.insert(cxxName);
+      bool isDuplicateName =
+          !emissionScope.emittedDeclarationNames.insert(cxxName).second;
 
       // Emit an unavailable stub for a Swift type.
       if (auto *nmtd = dyn_cast<NominalTypeDecl>(vd)) {
+        // Do not emit a C++ class stub if a declaration with this name was
+        // already emitted; just emit the comment.
+        if (isDuplicateName) {
+          emitStubComment();
+          continue;
+        }
         auto representation = cxx_translation::getDeclRepresentation(
             vd, [this](const NominalTypeDecl *decl) {
               return printer.isZeroSized(decl);
             });
-        if (nmtd->isGeneric()) {
+        if (nmtd->hasGenericParamList()) {
           auto genericSignature =
               nmtd->getGenericSignature().getCanonicalSignature();
           ClangSyntaxPrinter(nmtd->getASTContext(), os).printGenericSignature(genericSignature);
@@ -1140,25 +1151,53 @@ public:
         continue;
       }
 
-      // FIXME: Emit an unavailable stub for a function / function overload set
-      // / variable.
-      // FIXME: Note unrepresented type aliases too.
-      emitStubComment();
+      // Emit a comment with a reason for functions, variables, and other
+      // non-type value decls.
+      auto reasonIt =
+          emissionScope.additionalUnrepresentableDeclarations.find(vd);
+      if (reasonIt !=
+              emissionScope.additionalUnrepresentableDeclarations.end() &&
+          !reasonIt->second.empty()) {
+        emitStubComment(reasonIt->second);
+      } else {
+        auto representation = cxx_translation::getDeclRepresentation(
+            vd, [this](const NominalTypeDecl *decl) {
+              return printer.isZeroSized(decl);
+            });
+        std::string reasonStr;
+        if (representation.isUnsupported() &&
+            representation.error.has_value()) {
+          auto diag = cxx_translation::diagnoseRepresenationError(
+              *representation.error, const_cast<ValueDecl *>(vd));
+          auto diagString =
+              M.getASTContext().Diags.getFormatStringForDiagnostic(
+                  diag.getID());
+          llvm::raw_string_ostream reasonOS(reasonStr);
+          DiagnosticEngine::formatDiagnosticText(
+              reasonOS, diagString, diag.getArgs(), DiagnosticFormatOptions());
+        }
+        emitStubComment(reasonStr);
+      }
     }
   }
 };
 } // end anonymous namespace
 
-static AccessLevel getRequiredAccess(const ModuleDecl &M) {
+static AccessLevel getRequiredAccess(const ModuleDecl &M,
+                                     std::optional<AccessLevel> minAccess) {
+  if (minAccess)
+    return *minAccess;
   return M.isExternallyConsumed() ? AccessLevel::Public : AccessLevel::Internal;
 }
 
 void swift::printModuleContentsAsObjC(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext,
+    std::optional<AccessLevel> minAccess) {
   llvm::raw_null_ostream prologueOS;
   llvm::StringSet<> exposedModules;
-  ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
+  ModuleWriter(os, prologueOS, imports, M, interopContext,
+               getRequiredAccess(M, minAccess),
                /*requiresExposedAttribute=*/false, exposedModules,
                OutputLanguageMode::ObjC)
       .write();
@@ -1166,10 +1205,12 @@ void swift::printModuleContentsAsObjC(
 
 void swift::printModuleContentsAsC(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext,
+    std::optional<AccessLevel> minAccess) {
   llvm::raw_null_ostream prologueOS;
   llvm::StringSet<> exposedModules;
-  ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
+  ModuleWriter(os, prologueOS, imports, M, interopContext,
+               getRequiredAccess(M, minAccess),
                /*requiresExposedAttribute=*/false, exposedModules,
                OutputLanguageMode::C)
       .write();
@@ -1177,25 +1218,27 @@ void swift::printModuleContentsAsC(
 
 EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     raw_ostream &os, ModuleDecl &M, SwiftToClangInteropContext &interopContext,
-    bool requiresExposedAttribute, llvm::StringSet<> &exposedModules) {
+    AccessLevel minAccess, bool requiresExposedAttribute,
+    llvm::StringSet<> &exposedModules) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
   llvm::raw_string_ostream prologueOS{modulePrologueBuf};
   EmittedClangHeaderDependencyInfo info;
+  auto &context = M.getASTContext();
 
   // Define the `SWIFT_SYMBOL` macro.
   os << "#ifdef SWIFT_SYMBOL\n";
   os << "#undef SWIFT_SYMBOL\n";
   os << "#endif\n";
   os << "#define SWIFT_SYMBOL(usrValue) SWIFT_SYMBOL_MODULE_USR(\"";
-  ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M);
+  ClangSyntaxPrinter(context, os).printBaseName(&M);
   os << "\", usrValue)\n";
 
   // FIXME: Use getRequiredAccess once @expose is supported.
   ModuleWriter writer(moduleOS, prologueOS, info.imports, M, interopContext,
-                      AccessLevel::Public, requiresExposedAttribute,
-                      exposedModules, OutputLanguageMode::Cxx);
+                      minAccess, requiresExposedAttribute, exposedModules,
+                      OutputLanguageMode::Cxx);
   writer.write();
   info.dependsOnStandardLibrary = writer.isStdlibRequired();
   if (M.isStdlibModule()) {
@@ -1204,9 +1247,11 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "#include <string>\n";
     os << "#endif\n";
     os << "#include <new>\n";
+    if (context.LangOpts.hasFeature(Feature::Embedded))
+      os << "#define __EmbeddedSwift__\n";
     // Embed an overlay for the standard library.
-    ClangSyntaxPrinter(M.getASTContext(), moduleOS).printIncludeForShimHeader(
-        "_SwiftStdlibCxxOverlay.h");
+    ClangSyntaxPrinter(context, moduleOS)
+        .printIncludeForShimHeader("_SwiftStdlibCxxOverlay.h");
     // Ignore typos in Swift stdlib doc comments.
     os << "#pragma clang diagnostic push\n";
     os << "#pragma clang diagnostic ignored \"-Wdocumentation\"\n";
@@ -1214,7 +1259,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";
   os << "#define SWIFT_PRINTED_CORE\n";
-  printSwiftToClangCoreScaffold(interopContext, M.getASTContext(),
+  printSwiftToClangCoreScaffold(interopContext, context,
                                 writer.getTypeMapping(), os);
   os << "#endif\n";
 
@@ -1226,9 +1271,9 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
       os << "#endif\n";
     os << "#ifdef __cplusplus\n";
     os << "namespace ";
-    ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M);
+    ClangSyntaxPrinter(context, os).printBaseName(&M);
     os << " SWIFT_PRIVATE_ATTR";
-    ClangSyntaxPrinter(M.getASTContext(), os).printSymbolUSRAttribute(&M);
+    ClangSyntaxPrinter(context, os).printSymbolUSRAttribute(&M);
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
     os << "extern \"C\" {\n";
@@ -1246,10 +1291,13 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wreserved-identifier\"\n";
   // Construct a C++ namespace for the module.
-  ClangSyntaxPrinter(M.getASTContext(), os).printNamespace(
-      [&](raw_ostream &os) { ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M); },
-      [&](raw_ostream &os) { os << moduleOS.str(); },
-      ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate, &M);
+  ClangSyntaxPrinter(context, os)
+      .printNamespace(
+          [&](raw_ostream &os) {
+            ClangSyntaxPrinter(context, os).printBaseName(&M);
+          },
+          [&](raw_ostream &os) { os << moduleOS.str(); },
+          ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate, &M);
   os << "#pragma clang diagnostic pop\n";
 
   if (M.isStdlibModule()) {

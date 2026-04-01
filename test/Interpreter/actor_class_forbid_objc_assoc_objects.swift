@@ -17,7 +17,6 @@ defer { runAllTests() }
 
 var Tests = TestSuite("Actor.AssocObject")
 
-@available(SwiftStdlib 5.0, *)
 final actor Actor {
 }
 
@@ -31,7 +30,6 @@ if #available(SwiftStdlib 5.0, *) {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
 actor Actor2 {
 }
 
@@ -45,7 +43,6 @@ if #available(SwiftStdlib 5.0, *) {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
 actor Actor5<T> {
   var state: T
   init(state: T) { self.state = state }
@@ -69,7 +66,6 @@ if #available(SwiftStdlib 5.0, *) {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
 actor ActorNSObjectSubKlass : NSObject {}
 
 if #available(SwiftStdlib 5.0, *) {
@@ -80,7 +76,6 @@ if #available(SwiftStdlib 5.0, *) {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
 actor ActorNSObjectSubKlassGeneric<T> : NSObject {
   var state: T
   init(state: T) { self.state = state }

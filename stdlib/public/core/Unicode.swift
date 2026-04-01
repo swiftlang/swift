@@ -58,7 +58,7 @@ public enum UnicodeDecodingResult: Equatable, Sendable {
 /// UTF-8, UTF-16, and UTF-32 encoding schemes as the `UTF8`, `UTF16`, and
 /// `UTF32` types, respectively. Use the `Unicode.Scalar` type to work with
 /// decoded Unicode scalar values.
-public protocol UnicodeCodec: Unicode.Encoding {
+public protocol UnicodeCodec: _UnicodeEncoding {
 
   /// Creates an instance of the codec.
   init()

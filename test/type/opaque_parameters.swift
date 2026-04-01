@@ -106,7 +106,7 @@ func testPrimaries(
   takePrimaryCollections(setOfStrings, setOfInts)
   takePrimaryCollections(setOfStrings, arrayOfInts)
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
-  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without a type annotation}}
+  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{failed to produce diagnostic for expression}}
 }
 
 
@@ -114,7 +114,7 @@ func testPrimaries(
 typealias FnType<T> = (T) -> Void
 
 func consumingA(fn: (some P) -> Void) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(some P) -> Void'}}
-func consumingB(fn: FnType<some P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(some P) -> Void'}}
+func consumingB(fn: FnType<some P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type 'FnType<some P>' (aka '(some P) -> ()')}}
 
 // https://github.com/apple/swift/issues/61387
 struct I61387 {

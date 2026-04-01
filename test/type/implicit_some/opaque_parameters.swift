@@ -59,7 +59,7 @@ func testInOut() {
 typealias FnType<T> = (T) -> Void
 
 func consumingA(fn: (P) -> Void) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}
-func consumingB(fn: FnType<P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}
+func consumingB(fn: FnType<P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type 'FnType<P>' (aka '(P) -> ()')}}
 
 
 func takePrimaryCollections(
@@ -86,5 +86,5 @@ func testPrimaries(
   takePrimaryCollections(setOfStrings, setOfInts)
   takePrimaryCollections(setOfStrings, arrayOfInts)
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
-  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without a type annotation}}
+  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{failed to produce diagnostic for expression}}
 }

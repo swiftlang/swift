@@ -9,32 +9,25 @@ if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
   cmake_policy(SET CMP0157 OLD)
 endif()
 
-if($ENV{BUILD_NUMBER})
-  math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
-  set(BUILD_NUMBER ".${BUILD_NUMBER}")
-endif()
+list(APPEND CMAKE_MODULE_PATH
+  "${CMAKE_SOURCE_DIR}/../cmake/modules"
+  "${CMAKE_SOURCE_DIR}/../../cmake/modules")
+
+include(LanguageVersions)
+include(SwiftProjectVersion)
 project(SwiftDistributed
   LANGUAGES C CXX Swift
-  VERSION 6.3.0${BUILD_NUMBER})
+  VERSION ${SWIFT_RUNTIME_VERSION})
 
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Distributed must build as a standalone project")
 endif()
 
-set(CMAKE_Swift_LANGUAGE_VERSION 5)
-
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
-
-set(CMAKE_CXX_EXTENSIONS NO)
-set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
-
 set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../../"
@@ -72,13 +65,13 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization"
   ${SwiftCore_ENABLE_PRESPECIALIZATION})
 
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Werror StrictMemorySafety>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypesWithDefaults>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>"
@@ -87,9 +80,22 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
+  "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
+find_package(SwiftSwiftDirectRuntime)
+
+# LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
+# LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
+# LNK4217: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj' in function 'function'
+#
+# We cannot selectively filter the linker warnings as we do not use the MSVC
+# frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
+# a compromise, treat all linker warnings as errors.
+add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 add_library(swiftDistributed
   DistributedActor.cpp
@@ -107,6 +113,13 @@ cmake_policy(GET CMP0157 Policy157Enabled)
 if(Policy157Enabled STREQUAL NEW)
   set_target_properties(swiftDistributed PROPERTIES
     LINKER_LANGUAGE CXX)
+  # `CMAKE_STATIC_LIBRARY_PREFIX_Swift` will not impact the prefix for this
+  # library because we have changed the linker language to C++. This is required
+  # for Windows to properly reference this library.
+  if(NOT BUILD_SHARED_LIBS)
+    set_target_properties(swiftDistributed PROPERTIES
+      PREFIX lib)
+  endif()
 endif()
 
 target_compile_definitions(swiftDistributed PRIVATE
@@ -130,24 +143,25 @@ target_include_directories(swiftDistributed PRIVATE
   "${PROJECT_SOURCE_DIR}/include")
 
 target_link_libraries(swiftDistributed PRIVATE
-    swiftShims
-    swiftCore
-    swift_Concurrency
-    swift_Builtin_float
-    $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
-    # swiftDarwin/Libc/Platform
+  swiftShims
+  swiftCore
+  swift_Concurrency
+  swift_Builtin_float
+  $<$<PLATFORM_ID:Android>:swiftAndroid>
+  $<$<PLATFORM_ID:Windows>:swiftWinSDK>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 install(TARGETS swiftDistributed
-    EXPORT SwiftDistributedTargets
-    COMPONENT ${PROJECT_NAME}_runtime
-    ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
-    LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  EXPORT SwiftDistributedTargets
+  COMPONENT ${PROJECT_NAME}_runtime
+  ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftDistributed)
 install_swift_interface(swiftDistributed)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftDistributed)
+generate_plist(swiftDistributed "${CMAKE_PROJECT_VERSION}" swiftDistributed)
 embed_manifest(swiftDistributed)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swiftDistributed.cmake" OPTIONAL)

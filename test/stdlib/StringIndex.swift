@@ -1034,6 +1034,29 @@ suite.test("UTF-16 breadcrumbs") {
   }
 }
 
+// For Strings decoded from UTF16, we store their UTF16 length as a single crumb
+suite.test("UTF-16 single breadcrumb") {
+  let original = #"""
+    The powerful programming language that is also easy to learn.
+    손쉽게 학습할 수 있는 강력한 프로그래밍 언어.
+    🪙 A 🥞 short 🍰 piece 🫘 of 🌰 text 👨‍👨‍👧‍👧 with 👨‍👩‍👦 some 🚶🏽 emoji 🇺🇸🇨🇦 characters 🧈
+    some🔩times 🛺 placed 🎣 in 🥌 the 🆘 mid🔀dle 🇦🇶or🏁 around 🏳️‍🌈 a 🍇 w🍑o🥒r🥨d
+    Unicode is such fun!
+    U̷n̷i̷c̷o̴d̴e̷ ̶i̸s̷ ̸s̵u̵c̸h̷ ̸f̵u̷n̴!̵
+    U̴̡̲͋̾n̵̻̳͌ì̶̠̕c̴̭̈͘ǫ̷̯͋̊d̸͖̩̈̈́ḛ̴́ ̴̟͎͐̈i̴̦̓s̴̜̱͘ ̶̲̮̚s̶̙̞͘u̵͕̯̎̽c̵̛͕̜̓h̶̘̍̽ ̸̜̞̿f̵̤̽ṷ̴͇̎͘ń̷͓̒!̷͍̾̚
+    U̷̢̢̧̨̼̬̰̪͓̞̠͔̗̼̙͕͕̭̻̗̮̮̥̣͉̫͉̬̲̺͍̺͊̂ͅ\#
+    n̶̨̢̨̯͓̹̝̲̣̖̞̼̺̬̤̝̊̌́̑̋̋͜͝ͅ\#
+    ḭ̸̦̺̺͉̳͎́͑\#
+    c̵̛̘̥̮̙̥̟̘̝͙̤̮͉͔̭̺̺̅̀̽̒̽̏̊̆͒͌̂͌̌̓̈́̐̔̿̂͑͠͝͝ͅ\#
+    """#
+  
+  var string = String(decoding: original.utf16, as: UTF16.self)
+  string.reserveCapacity(1000) //make sure that when we mutate, we mutate in-place
+  expectEqual(string.utf16.count, original.utf16.count)
+  string.append(contentsOf: "test")
+  expectNotEqual(string.utf16.count, original.utf16.count)
+}
+
 suite.test("String.replaceSubrange index validation")
 .forEach(in: examples) { string in
   guard #available(SwiftStdlib 5.7, *) else {
@@ -1243,8 +1266,16 @@ if #available(SwiftStdlib 6.1, *) {
 suite.test("String index debugDescription backdeployment") {
   // Note: no availability check
   let str = "i\u{308}"
-  expectEqual(str.startIndex.debugDescription, "0[any]")
-  expectEqual(str.endIndex.debugDescription, "3[utf8]")
+  // Result can be `any` or `unknown` depending on inlining behavior
+  expectTrue(
+    str.startIndex.debugDescription == "0[any]" ||
+    str.startIndex.debugDescription == "0[unknown]"
+  )
+  // Result can be `utf8` or `unknown` depending on inlining behavior
+  expectTrue(
+    str.endIndex.debugDescription == "3[utf8]" ||
+    str.endIndex.debugDescription == "3[unknown]"
+  )
 }
 
 

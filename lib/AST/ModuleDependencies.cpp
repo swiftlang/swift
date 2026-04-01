@@ -23,6 +23,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Strings.h"
+#include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Path.h"
 using namespace swift;
@@ -320,11 +321,6 @@ std::optional<std::string> ModuleDependencyInfo::getCASFSRootID() const {
     Root = swiftSourceStorage->textualModuleDetails.CASFileSystemRootID;
     break;
   }
-  case swift::ModuleDependencyKind::Clang: {
-    auto clangModuleStorage = cast<ClangModuleDependencyStorage>(storage.get());
-    Root = clangModuleStorage->CASFileSystemRootID;
-    break;
-  }
   default:
     return std::nullopt;
   }
@@ -471,6 +467,32 @@ void ModuleDependencyInfo::addBridgingHeaderIncludeTree(StringRef ID) {
   }
 }
 
+void ModuleDependencyInfo::addDependencyOnlyImport(StringRef ID) {
+  switch (getKind()) {
+  case swift::ModuleDependencyKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    swiftSourceStorage->addDependencyOnlyImport(ID);
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
+  }
+}
+
+const std::vector<std::string> &
+ModuleDependencyInfo::getDependencyOnlyImports() const {
+  switch (getKind()) {
+  case swift::ModuleDependencyKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    return swiftSourceStorage->getDependencyOnlyImports();
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
+  }
+}
+
 void ModuleDependencyInfo::setChainedBridgingHeaderBuffer(StringRef path,
                                                           StringRef buffer) {
   switch (getKind()) {
@@ -513,14 +535,14 @@ void ModuleDependencyInfo::setOutputPathAndHash(StringRef outputPath,
   }
 }
 
-SwiftDependencyScanningService::SwiftDependencyScanningService() {
+SwiftDependencyScanningService::SwiftDependencyScanningService()
+    : Alloc(), Saver(Alloc) {
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      clang::tooling::dependencies::ScanningOutputFormat::FullTree,
+      clang::tooling::dependencies::ScanningOutputFormat::Full,
       clang::CASOptions(),
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
-      /* SharedFS */ nullptr,
       // ScanningOptimizations::Default excludes the current working
       // directory optimization. Clang needs to communicate with
       // the build system to handle the optimization safely.
@@ -636,9 +658,9 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   if (!Instance.getInvocation().getCASOptions().EnableCaching)
     return false;
 
-  if (CASOpts) {
+  if (CASConfig) {
     // If CASOption matches, the service is initialized already.
-    if (*CASOpts == Instance.getInvocation().getCASOptions().CASOpts)
+    if (*CASConfig == Instance.getInvocation().getCASOptions().Config)
       return false;
 
     // CASOption mismatch, return error.
@@ -647,20 +669,29 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   }
 
   // Setup CAS.
-  CASOpts = Instance.getInvocation().getCASOptions().CASOpts;
+  CASConfig = Instance.getInvocation().getCASOptions().Config;
+
+  clang::CASOptions CASOpts;
+  CASOpts.CASPath = CASConfig->CASPath;
+  CASOpts.PluginPath = CASConfig->PluginPath;
+  CASOpts.PluginOptions = CASConfig->PluginOptions;
 
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
       clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree,
-      Instance.getInvocation().getCASOptions().CASOpts,
-      Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      /*CachingOnDiskFileSystem=*/nullptr,
+      CASOpts, Instance.getSharedCASInstance(),
+      Instance.getSharedCacheInstance(),
       // The current working directory optimization (off by default)
       // should not impact CAS. We set the optization to all to be
       // consistent with the non-CAS case.
       clang::tooling::dependencies::ScanningOptimizations::All);
 
   return false;
+}
+
+StringRef SwiftDependencyScanningService::save(StringRef str) {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
+  return Saver.save(str);
 }
 
 ModuleDependenciesCache::ModuleDependenciesCache(
@@ -716,18 +747,6 @@ ModuleDependenciesCache::findDependency(
   auto known = map.find(moduleName);
   if (known != map.end())
     optionalDep = &(known->second);
-
-  // During a scan, only produce the cached source module info for the current
-  // module under scan.
-  if (optionalDep.has_value()) {
-    auto dep = optionalDep.value();
-    if (dep->getAsSwiftSourceModule() &&
-        moduleName != mainScanModuleName &&
-        moduleName != "MainModuleCrossImportOverlays") {
-      return std::nullopt;
-    }
-  }
-
   return optionalDep;
 }
 
@@ -736,8 +755,6 @@ ModuleDependenciesCache::findSwiftDependency(StringRef moduleName) const {
   if (auto found = findDependency(moduleName, ModuleDependencyKind::SwiftInterface))
     return found;
   if (auto found = findDependency(moduleName, ModuleDependencyKind::SwiftBinary))
-    return found;
-  if (auto found = findDependency(moduleName, ModuleDependencyKind::SwiftSource))
     return found;
   return std::nullopt;
 }
@@ -759,18 +776,22 @@ bool ModuleDependenciesCache::hasDependency(
   return findDependency(moduleName, kind).has_value();
 }
 
-bool ModuleDependenciesCache::hasDependency(StringRef moduleName) const {
-  for (auto kind = ModuleDependencyKind::FirstKind;
-       kind != ModuleDependencyKind::LastKind; ++kind)
-    if (findDependency(moduleName, kind).has_value())
-      return true;
-  return false;
+bool ModuleDependenciesCache::hasClangDependency(StringRef moduleName) const {
+  return findDependency(moduleName, ModuleDependencyKind::Clang).has_value();
 }
 
-bool ModuleDependenciesCache::hasSwiftDependency(StringRef moduleName) const {
-  return findSwiftDependency(moduleName).has_value();
+bool ModuleDependenciesCache::hasQueriedSwiftDependency(StringRef moduleName) const {
+  auto recordedDep = findSwiftDependency(moduleName).has_value();
+  return recordedDep || negativeSwiftDependencyCache.contains(moduleName);
 }
 
+int ModuleDependenciesCache::numberOfClangDependencies() const {
+  return ModuleDependenciesMap.at(ModuleDependencyKind::Clang).size();
+}
+int ModuleDependenciesCache::numberOfSwiftDependencies() const {
+  return ModuleDependenciesMap.at(ModuleDependencyKind::SwiftInterface).size() +
+         ModuleDependenciesMap.at(ModuleDependencyKind::SwiftBinary).size();
+}
 void ModuleDependenciesCache::recordDependency(
     StringRef moduleName, ModuleDependencyInfo dependency) {
   auto dependenciesKind = dependency.getKind();
@@ -779,63 +800,81 @@ void ModuleDependenciesCache::recordDependency(
 }
 
 void ModuleDependenciesCache::recordClangDependencies(
-    ModuleDependencyVector dependencies, DiagnosticEngine &diags) {
-  for (const auto &dep : dependencies) {
-    ASSERT(dep.first.Kind == ModuleDependencyKind::Clang);
-    auto newClangModuleDetails = dep.second.getAsClangModule();
-    if (hasDependency(dep.first)) {
-      auto priorClangModuleDetails =
-          findKnownDependency(dep.first).getAsClangModule();
-      DEBUG_ASSERT(priorClangModuleDetails && newClangModuleDetails);
-      auto priorContextHash = priorClangModuleDetails->contextHash;
-      auto newContextHash = newClangModuleDetails->contextHash;
-      if (priorContextHash != newContextHash) {
-        // This situation means that within the same scanning action, Clang
-        // Dependency Scanner has produced two different variants of the same
-        // module. This is not supposed to happen, but we are currently
-        // hunting down the rare cases where it does, seemingly due to
-        // differences in Clang Scanner direct by-name queries and transitive
-        // header lookup queries.
-        //
-        // Emit a failure diagnostic here that is hopefully more actionable
-        // for the time being.
-        diags.diagnose(SourceLoc(), diag::dependency_scan_unexpected_variant,
-                       dep.first.ModuleName);
-        diags.diagnose(
-            SourceLoc(),
-            diag::dependency_scan_unexpected_variant_context_hash_note,
-            priorContextHash, newContextHash);
-        diags.diagnose(
-            SourceLoc(),
-            diag::dependency_scan_unexpected_variant_module_map_note,
-            priorClangModuleDetails->moduleMapFile,
-            newClangModuleDetails->moduleMapFile);
+    const clang::tooling::dependencies::ModuleDepsGraph &dependencies,
+    DiagnosticEngine &diags,
+    BridgeClangDependencyCallback bridgeClangModule) {
+  for (const auto &dep : dependencies)
+    recordClangDependency(dep, diags, bridgeClangModule);
+}
 
-        auto diagnoseExtraCommandLineFlags =
-            [&diags](const ClangModuleDependencyStorage *checkModuleDetails,
-                     const ClangModuleDependencyStorage *baseModuleDetails,
-                     bool isNewlyDiscovered) -> void {
-          std::unordered_set<std::string> baseCommandLineSet(
-              baseModuleDetails->buildCommandLine.begin(),
-              baseModuleDetails->buildCommandLine.end());
-          for (const auto &checkArg : checkModuleDetails->buildCommandLine)
-            if (baseCommandLineSet.find(checkArg) == baseCommandLineSet.end())
-              diags.diagnose(
-                  SourceLoc(),
-                  diag::dependency_scan_unexpected_variant_extra_arg_note,
-                  isNewlyDiscovered, checkArg);
-        };
-        diagnoseExtraCommandLineFlags(priorClangModuleDetails,
-                                      newClangModuleDetails, true);
-        diagnoseExtraCommandLineFlags(newClangModuleDetails,
-                                      priorClangModuleDetails, false);
-      }
-    } else {
-      recordDependency(dep.first.ModuleName, dep.second);
-      addSeenClangModule(clang::tooling::dependencies::ModuleID{
-        dep.first.ModuleName, newClangModuleDetails->contextHash});
-    }
+void ModuleDependenciesCache::recordClangDependency(
+    const clang::tooling::dependencies::ModuleDeps &dependency,
+    DiagnosticEngine &diags, BridgeClangDependencyCallback bridgeClangModule) {
+  if (!hasClangDependency(dependency.ID.ModuleName)) {
+    recordDependency(dependency.ID.ModuleName, bridgeClangModule(dependency));
+    addSeenClangModule(dependency.ID);
+    return;
   }
+
+  auto depID =
+      ModuleDependencyID{dependency.ID.ModuleName, ModuleDependencyKind::Clang};
+  auto priorClangModuleDetails = findKnownDependency(depID).getAsClangModule();
+  DEBUG_ASSERT(priorClangModuleDetails);
+  auto priorContextHash = priorClangModuleDetails->contextHash;
+  auto newContextHash = dependency.ID.ContextHash;
+  if (priorContextHash != newContextHash) {
+    // This situation means that within the same scanning action, Clang
+    // Dependency Scanner has produced two different variants of the same
+    // module. This is not supposed to happen, but we are currently
+    // hunting down the rare cases where it does, seemingly due to
+    // differences in Clang Scanner direct by-name queries and transitive
+    // header lookup queries.
+    //
+    // Emit a failure diagnostic here that is hopefully more actionable
+    // for the time being.
+    diags.diagnose(SourceLoc(),
+                       diag::dependency_scan_unexpected_variant,
+                   dependency.ID.ModuleName);
+    diags.diagnose(
+        SourceLoc(),
+        diag::dependency_scan_unexpected_variant_context_hash_note,
+        priorContextHash, newContextHash);
+    diags.diagnose(
+        SourceLoc(),
+        diag::dependency_scan_unexpected_variant_module_map_note,
+        priorClangModuleDetails->moduleMapFile, dependency.ClangModuleMapFile);
+
+    auto newClangModuleInfo = bridgeClangModule(dependency);
+    auto newClangModuleDetails = newClangModuleInfo.getAsClangModule();
+    auto diagnoseExtraCommandLineFlags =
+        [&diags](const ClangModuleDependencyStorage *checkModuleDetails,
+               const ClangModuleDependencyStorage *baseModuleDetails,
+               bool isNewlyDiscovered) -> void {
+      std::unordered_set<std::string> baseCommandLineSet(
+          baseModuleDetails->buildCommandLine.begin(),
+          baseModuleDetails->buildCommandLine.end());
+      for (const auto &checkArg : checkModuleDetails->buildCommandLine)
+        if (baseCommandLineSet.find(checkArg) == baseCommandLineSet.end())
+          diags.diagnose(
+              SourceLoc(),
+              diag::dependency_scan_unexpected_variant_extra_arg_note,
+              isNewlyDiscovered, checkArg);
+    };
+    diagnoseExtraCommandLineFlags(priorClangModuleDetails,
+                                  newClangModuleDetails, true);
+    diagnoseExtraCommandLineFlags(newClangModuleDetails,
+                                  priorClangModuleDetails, false);
+  }
+}
+
+void ModuleDependenciesCache::setVisibleClangModulesFromLookup(
+    ModuleDependencyID moduleID,
+    const std::vector<std::string> &visibleModules) {
+  ASSERT(moduleID.Kind == ModuleDependencyKind::Clang);
+  if (visibleModules.empty())
+    return;
+
+  clangModulesVisibleFromNamedLookup[moduleID.ModuleName] = visibleModules;
 }
 
 void ModuleDependenciesCache::updateDependency(
@@ -848,166 +887,205 @@ void ModuleDependenciesCache::updateDependency(
 void ModuleDependenciesCache::removeDependency(ModuleDependencyID moduleID) {
   auto &map = getDependenciesMap(moduleID.Kind);
   map.erase(moduleID.ModuleName);
+  // If we are removing a Clang module which was queried by-name
+  // in a prior scan, we must re-compute its set of visible modules.
+  if (moduleID.Kind == ModuleDependencyKind::Clang)
+    clangModulesVisibleFromNamedLookup.erase(moduleID.ModuleName);
 }
 
-void
-ModuleDependenciesCache::setImportedSwiftDependencies(ModuleDependencyID moduleID,
-                                                      const ArrayRef<ModuleDependencyID> dependencyIDs) {
+void ModuleDependenciesCache::setImportedSwiftDependencies(
+    ModuleDependencyID moduleID,
+    const ArrayRef<ModuleDependencyID> dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
   assert(dependencyInfo.getImportedSwiftDependencies().empty());
 #ifndef NDEBUG
   for (const auto &depID : dependencyIDs)
     assert(depID.Kind != ModuleDependencyKind::Clang);
 #endif
-  // Copy the existing info to a mutable one we can then replace it with, after setting its overlay dependencies.
+  // Copy the existing info to a mutable one we can then replace it with, after
+  // setting its overlay dependencies.
   auto updatedDependencyInfo = dependencyInfo;
   updatedDependencyInfo.setImportedSwiftDependencies(dependencyIDs);
   updateDependency(moduleID, updatedDependencyInfo);
 }
-void
-ModuleDependenciesCache::setImportedClangDependencies(ModuleDependencyID moduleID,
-                                                      const ArrayRef<ModuleDependencyID> dependencyIDs) {
+void ModuleDependenciesCache::setImportedClangDependencies(
+    ModuleDependencyID moduleID,
+    const ArrayRef<ModuleDependencyID> dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
   assert(dependencyInfo.getImportedClangDependencies().empty());
 #ifndef NDEBUG
   for (const auto &depID : dependencyIDs)
     assert(depID.Kind == ModuleDependencyKind::Clang);
 #endif
-  // Copy the existing info to a mutable one we can then replace it with, after setting its overlay dependencies.
+  // Copy the existing info to a mutable one we can then replace it with, after
+  // setting its overlay dependencies.
   auto updatedDependencyInfo = dependencyInfo;
   updatedDependencyInfo.setImportedClangDependencies(dependencyIDs);
   updateDependency(moduleID, updatedDependencyInfo);
 }
-void
-ModuleDependenciesCache::setHeaderClangDependencies(ModuleDependencyID moduleID,
-                                                    const ArrayRef<ModuleDependencyID> dependencyIDs) {
+void ModuleDependenciesCache::setHeaderClangDependencies(
+    ModuleDependencyID moduleID,
+    const ArrayRef<ModuleDependencyID> dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
 #ifndef NDEBUG
   for (const auto &depID : dependencyIDs)
     assert(depID.Kind == ModuleDependencyKind::Clang);
 #endif
-  // Copy the existing info to a mutable one we can then replace it with, after setting its overlay dependencies.
+  // Copy the existing info to a mutable one we can then replace it with, after
+  // setting its overlay dependencies.
   auto updatedDependencyInfo = dependencyInfo;
   updatedDependencyInfo.setHeaderClangDependencies(dependencyIDs);
   updateDependency(moduleID, updatedDependencyInfo);
 }
-void ModuleDependenciesCache::setSwiftOverlayDependencies(ModuleDependencyID moduleID,
-                                                          const ArrayRef<ModuleDependencyID> dependencyIDs) {
+void ModuleDependenciesCache::setSwiftOverlayDependencies(
+    ModuleDependencyID moduleID,
+    const ArrayRef<ModuleDependencyID> dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
-  assert(dependencyInfo.getSwiftOverlayDependencies().empty());
 #ifndef NDEBUG
   for (const auto &depID : dependencyIDs)
     assert(depID.Kind != ModuleDependencyKind::Clang);
 #endif
-  // Copy the existing info to a mutable one we can then replace it with, after setting its overlay dependencies.
+  // Copy the existing info to a mutable one we can then replace it with, after
+  // setting its overlay dependencies.
   auto updatedDependencyInfo = dependencyInfo;
   updatedDependencyInfo.setSwiftOverlayDependencies(dependencyIDs);
   updateDependency(moduleID, updatedDependencyInfo);
 }
-void
-ModuleDependenciesCache::setCrossImportOverlayDependencies(ModuleDependencyID moduleID,
-                                                           const ArrayRef<ModuleDependencyID> dependencyIDs) {
+void ModuleDependenciesCache::setCrossImportOverlayDependencies(
+    ModuleDependencyID moduleID,
+    const ModuleDependencyIDCollectionView dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
-  assert(dependencyInfo.getCrossImportOverlayDependencies().empty());
-  // Copy the existing info to a mutable one we can then replace it with, after setting its overlay dependencies.
+  // Copy the existing info to a mutable one we can then replace it with,
+  // after setting its overlay dependencies.
   auto updatedDependencyInfo = dependencyInfo;
   updatedDependencyInfo.setCrossImportOverlayDependencies(dependencyIDs);
   updateDependency(moduleID, updatedDependencyInfo);
 }
 
-void
-ModuleDependenciesCache::addVisibleClangModules(ModuleDependencyID moduleID,
-                                                const std::vector<std::string> &moduleNames) {
-  if (moduleNames.empty())
-    return;
-  auto dependencyInfo = findKnownDependency(moduleID);
-  auto updatedDependencyInfo = dependencyInfo;
-  updatedDependencyInfo.addVisibleClangModules(moduleNames);
-  updateDependency(moduleID, updatedDependencyInfo);
+ModuleDependencyIDCollectionView ModuleDependenciesCache::getAllDependencies(
+    const ModuleDependencyID &moduleID) const {
+  const auto &moduleInfo = findKnownDependency(moduleID);
+  return ModuleDependencyIDCollectionView(
+      moduleInfo.getImportedSwiftDependencies(),
+      moduleInfo.getHeaderClangDependencies(),
+      moduleInfo.getSwiftOverlayDependencies(),
+      moduleInfo.getCrossImportOverlayDependencies(),
+      moduleInfo.getImportedClangDependencies());
 }
 
-llvm::StringSet<> &ModuleDependenciesCache::getVisibleClangModules(ModuleDependencyID moduleID) const {
+void ModuleDependenciesCache::recordFailedSwiftDependencyLookup(
+    StringRef moduleIdentifier) {
+  negativeSwiftDependencyCache.insert(moduleIdentifier);
+}
+
+llvm::StringSet<> ModuleDependenciesCache::getAllVisibleClangModules(
+    ModuleDependencyID moduleID) const {
   ASSERT(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
          moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
          moduleID.Kind == ModuleDependencyKind::SwiftBinary);
-  return findKnownDependency(moduleID).getVisibleClangModules();
-}
-
-ModuleDependencyIDSetVector
-ModuleDependenciesCache::getAllDependencies(const ModuleDependencyID &moduleID) const {
-  const auto &moduleInfo = findKnownDependency(moduleID);
-  ModuleDependencyIDSetVector result;
-  if (moduleInfo.isSwiftModule()) {
-    auto swiftImportedDepsRef = moduleInfo.getImportedSwiftDependencies();
-    auto headerClangDepsRef = moduleInfo.getHeaderClangDependencies();
-    auto overlayDependenciesRef = moduleInfo.getSwiftOverlayDependencies();
-    result.insert(swiftImportedDepsRef.begin(),
-                  swiftImportedDepsRef.end());
-    result.insert(headerClangDepsRef.begin(),
-                  headerClangDepsRef.end());
-    result.insert(overlayDependenciesRef.begin(),
-                  overlayDependenciesRef.end());
+  llvm::StringSet<> result;
+  auto headerVisibleModules = getVisibleClangModulesViaHeader(moduleID);
+  result.insert(headerVisibleModules.begin(), headerVisibleModules.end());
+  for (const auto &clangDepID :
+       findKnownDependency(moduleID).getImportedClangDependencies()) {
+    assert(hasVisibleClangModulesFromLookup(clangDepID.ModuleName));
+    auto visibleModulesViaImport =
+      getVisibleClangModulesFromLookup(clangDepID.ModuleName);
+    result.insert(visibleModulesViaImport.begin(),
+                  visibleModulesViaImport.end());
   }
-
-  if (moduleInfo.isSwiftSourceModule()) {
-    auto crossImportOverlayDepsRef = moduleInfo.getCrossImportOverlayDependencies();
-    result.insert(crossImportOverlayDepsRef.begin(),
-                  crossImportOverlayDepsRef.end());
-  }
-
-  auto clangImportedDepsRef = moduleInfo.getImportedClangDependencies();
-  result.insert(clangImportedDepsRef.begin(),
-                clangImportedDepsRef.end());
-
   return result;
 }
 
-ModuleDependencyIDSetVector
-ModuleDependenciesCache::getClangDependencies(const ModuleDependencyID &moduleID) const {
+ArrayRef<std::string> ModuleDependenciesCache::getVisibleClangModulesFromLookup(
+    StringRef moduleName) const {
+  return clangModulesVisibleFromNamedLookup.at(moduleName);
+}
+
+bool ModuleDependenciesCache::hasVisibleClangModulesFromLookup(
+    StringRef moduleName) const {
+  return clangModulesVisibleFromNamedLookup.contains(moduleName);
+}
+
+llvm::ArrayRef<std::string>
+ModuleDependenciesCache::getVisibleClangModulesViaHeader(
+    ModuleDependencyID moduleID) const {
+  assert(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
+         moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
+         moduleID.Kind == ModuleDependencyKind::SwiftBinary);
+  return findKnownDependency(moduleID).getHeaderVisibleClangModules();
+}
+bool ModuleDependenciesCache::hasVisibleClangModulesViaHeader(
+    ModuleDependencyID moduleID) const {
+  assert(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
+         moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
+         moduleID.Kind == ModuleDependencyKind::SwiftBinary);
+  return !getVisibleClangModulesViaHeader(moduleID).empty();
+}
+
+ModuleDependencyIDCollectionView
+ModuleDependenciesCache::getDirectImportedDependencies(
+    const ModuleDependencyID &moduleID) const {
   const auto &moduleInfo = findKnownDependency(moduleID);
-  ModuleDependencyIDSetVector result;
-  auto clangImportedDepsRef = moduleInfo.getImportedClangDependencies();
-  result.insert(clangImportedDepsRef.begin(),
-                clangImportedDepsRef.end());
-  if (moduleInfo.isSwiftSourceModule() || moduleInfo.isSwiftBinaryModule()) {
-    auto headerClangDepsRef = moduleInfo.getHeaderClangDependencies();
-    result.insert(headerClangDepsRef.begin(),
-                  headerClangDepsRef.end());
-  }
-  return result;
+  return ModuleDependencyIDCollectionView(
+      moduleInfo.getImportedSwiftDependencies(),
+      moduleInfo.getImportedClangDependencies());
+}
+
+ModuleDependencyIDCollectionView
+ModuleDependenciesCache::getAllClangDependencies(
+    const ModuleDependencyID &moduleID) const {
+  const auto &moduleInfo = findKnownDependency(moduleID);
+  return ModuleDependencyIDCollectionView(
+      moduleInfo.getImportedClangDependencies(),
+      moduleInfo.getHeaderClangDependencies());
+}
+
+ModuleDependencyIDCollectionView
+ModuleDependenciesCache::getAllSwiftDependencies(
+    const ModuleDependencyID &moduleID) const {
+  const auto &moduleInfo = findKnownDependency(moduleID);
+  return ModuleDependencyIDCollectionView(
+      moduleInfo.getImportedSwiftDependencies(),
+      moduleInfo.getSwiftOverlayDependencies(),
+      moduleInfo.getCrossImportOverlayDependencies());
 }
 
 llvm::ArrayRef<ModuleDependencyID>
-ModuleDependenciesCache::getImportedSwiftDependencies(const ModuleDependencyID &moduleID) const {
+ModuleDependenciesCache::getImportedSwiftDependencies(
+    const ModuleDependencyID &moduleID) const {
   const auto &moduleInfo = findKnownDependency(moduleID);
   assert(moduleInfo.isSwiftModule());
   return moduleInfo.getImportedSwiftDependencies();
 }
 
 llvm::ArrayRef<ModuleDependencyID>
-ModuleDependenciesCache::getImportedClangDependencies(const ModuleDependencyID &moduleID) const {
+ModuleDependenciesCache::getImportedClangDependencies(
+    const ModuleDependencyID &moduleID) const {
   const auto &moduleInfo = findKnownDependency(moduleID);
   return moduleInfo.getImportedClangDependencies();
 }
 
 llvm::ArrayRef<ModuleDependencyID>
-ModuleDependenciesCache::getHeaderClangDependencies(const ModuleDependencyID &moduleID) const {
+ModuleDependenciesCache::getHeaderClangDependencies(
+    const ModuleDependencyID &moduleID) const {
   const auto &moduleInfo = findKnownDependency(moduleID);
   assert(moduleInfo.isSwiftModule());
   return moduleInfo.getHeaderClangDependencies();
 }
 
 llvm::ArrayRef<ModuleDependencyID>
-ModuleDependenciesCache::getSwiftOverlayDependencies(const ModuleDependencyID &moduleID) const {
+ModuleDependenciesCache::getSwiftOverlayDependencies(
+    const ModuleDependencyID &moduleID) const {
   const auto &moduleInfo = findKnownDependency(moduleID);
   assert(moduleInfo.isSwiftModule());
   return moduleInfo.getSwiftOverlayDependencies();
 }
 
 llvm::ArrayRef<ModuleDependencyID>
-ModuleDependenciesCache::getCrossImportOverlayDependencies(const ModuleDependencyID &moduleID) const {
+ModuleDependenciesCache::getCrossImportOverlayDependencies(
+    const ModuleDependencyID &moduleID) const {
   const auto &moduleInfo = findKnownDependency(moduleID);
   assert(moduleInfo.isSwiftSourceModule());
   return moduleInfo.getCrossImportOverlayDependencies();
 }
-

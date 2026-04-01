@@ -147,27 +147,20 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   if (Info.ID == diag::lex_editor_placeholder.ID ||
       Info.ID == diag::oslog_invalid_log_message.ID)
     return;
-
   bool IsNote = (Info.Kind == DiagnosticKind::Note);
 
   if (IsNote && !haveLastDiag())
     // Is this possible?
     return;
 
-  if (Info.Kind == DiagnosticKind::Remark) {
-    // FIXME: we may want to handle optimization remarks in sourcekitd.
-    LOG_WARN_FUNC("unhandled optimization remark");
-    return;
-  }
-
   DiagnosticEntryInfo SKInfo;
 
   SKInfo.ID = DiagnosticEngine::diagnosticIDStringFor(Info.ID).str();
 
-  if (Info.Category == "deprecation" ||
-      Info.Category.starts_with("Deprecated")) {
+  if (Info.getCategoryName() == "deprecation" ||
+      Info.getCategoryName().starts_with("Deprecated")) {
     SKInfo.Categories.push_back(DiagnosticCategory::Deprecation);
-  } else if (Info.Category == "no-usage") {
+  } else if (Info.getCategoryName() == "no-usage") {
     SKInfo.Categories.push_back(DiagnosticCategory::NoUsage);
   }
 
@@ -180,8 +173,8 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
   SKInfo.Description = Text.str();
 
-  if (!Info.CategoryDocumentationURL.empty())
-    SKInfo.EducationalNotePaths.push_back(Info.CategoryDocumentationURL);
+  if (!Info.getCategoryDocumentationURL().empty())
+    SKInfo.EducationalNotePaths.push_back(Info.getCategoryDocumentationURL().str());
 
   std::optional<unsigned> BufferIDOpt;
   if (Info.Loc.isValid()) {
@@ -237,7 +230,6 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     getLastDiag().Notes.push_back(std::move(SKInfo));
     return;
   }
-
   switch (Info.Kind) {
   case DiagnosticKind::Error:
     SKInfo.Severity = DiagnosticSeverityKind::Error;
@@ -245,8 +237,10 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   case DiagnosticKind::Warning:
     SKInfo.Severity = DiagnosticSeverityKind::Warning;
     break;
-  case DiagnosticKind::Note:
   case DiagnosticKind::Remark:
+    SKInfo.Severity = DiagnosticSeverityKind::Remark;
+    break;
+  case DiagnosticKind::Note:
     llvm_unreachable("already covered");
   }
 
@@ -1033,12 +1027,11 @@ public:
     if (!Range.isValid())
       return;
 
-    // If we are walking into macro expansions, make sure we only report ranges
-    // from the requested buffer, not any buffers of child macro expansions.
-    if (IsWalkingMacroExpansionBuffer &&
-        SM.findBufferContainingLoc(Range.getStart()) != BufferID) {
+    // Make sure we only report from the requested buffer, not any buffers of
+    // child macro expansions.
+    if (SM.findBufferContainingLoc(Range.getStart()) != BufferID)
       return;
-    }
+
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
     auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
@@ -2223,7 +2216,7 @@ llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 SwiftEditorDocument::getFileSystem() const {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
   return Impl.SemanticInfo ? Impl.SemanticInfo->getFileSystem()
-                           : llvm::vfs::getRealFileSystem();
+                           : llvm::vfs::createPhysicalFileSystem();
 }
 
 void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,

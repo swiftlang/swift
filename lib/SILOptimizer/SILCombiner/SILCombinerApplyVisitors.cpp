@@ -172,6 +172,18 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto oldOpParamTypes = substConventions.getParameterSILTypes(context);
   auto newOpParamTypes = convertConventions.getParameterSILTypes(context);
 
+  // Currently we cannot deal with generic arguments/returns. Bail in this case.
+  for (auto newRetTy : newOpRetTypes) {
+    if (newRetTy.hasTypeParameter())
+      return nullptr;
+  }
+  for (auto newParamTy : newOpParamTypes) {
+    if (newParamTy.hasTypeParameter())
+      return nullptr;
+  }
+  if (newIndirectErrorResultType && newIndirectErrorResultType.hasTypeParameter())
+    return nullptr;
+
   llvm::SmallVector<SILValue, 8> Args;
   llvm::SmallVector<BeginBorrowInst *, 8> Borrows;
   auto convertOp = [&](SILValue Op, SILType OldOpType, SILType NewOpType,
@@ -599,10 +611,6 @@ bool swift::tryOptimizeKeypath(ApplyInst *AI, SILBuilder Builder) {
 ///   %addr = struct_element_addr/ref_element_addr %root_object
 ///   // use %inout_addr
 bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
-  // Disable in OSSA because KeyPathProjector is not fully ported
-  if (AI->getFunction()->hasOwnership())
-    return false;
-
   SILFunction *callee = AI->getReferencedFunctionOrNull();
   if (!callee)
     return false;
@@ -1525,6 +1533,8 @@ SILInstruction *SILCombiner::legacyVisitApplyInst(ApplyInst *AI) {
       callee = cee->getOperand();
     } else if (auto *mdi = dyn_cast<MarkDependenceInst>(callee)) {
       callee = mdi->getValue();
+    } else if (auto *cvi = dyn_cast<CopyValueInst>(callee)) {
+      callee = cvi->getOperand();
     } else {
       break;
     }
@@ -1549,14 +1559,6 @@ SILInstruction *SILCombiner::legacyVisitApplyInst(ApplyInst *AI) {
   }
 
   if (SF) {
-    if (SF->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED)) {
-      UserListTy Users;
-      // If the uninitialized array is only written into then it can be removed.
-      if (recursivelyCollectARCUsers(Users, AI)) {
-        if (eraseApply(AI, Users))
-          return nullptr;
-      }
-    }
     if (SF->hasSemanticsAttr(semantics::ARRAY_GET_CONTIGUOUSARRAYSTORAGETYPE)) {
       auto silTy = AI->getType();
       auto storageTy = AI->getType().getASTType();

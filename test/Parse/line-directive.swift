@@ -84,3 +84,6 @@ class I55049 {
 // expected-error@+1 {{#line directive was renamed to #sourceLocation}}
 #line 1_000 "issue-55049.swift"
 class I55049_1 {}
+
+#sourceLocation
+(file: "nextLine.swift", line: 400) // expected-warning {{expression of type '(file: String, line: Int)' is unused}}

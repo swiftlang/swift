@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "CodeSynthesis.h"
+#include "LiteralExpressionFolding.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
@@ -190,7 +191,8 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   return dc->getParentModule();
 }
 
-void swift::bindExtensions(ModuleDecl &mod) {
+evaluator::SideEffect
+BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
   bool excludeMacroExpansions = true;
 
   // Utility function to try and resolve the extended type without diagnosing.
@@ -199,6 +201,7 @@ void swift::bindExtensions(ModuleDecl &mod) {
     assert(!ext->canNeverBeBound() &&
            "Only extensions that can ever be bound get here.");
     if (auto nominal = ext->computeExtendedNominal(excludeMacroExpansions)) {
+      ext->setExtendedNominal(nominal);
       nominal->addExtension(ext);
       return true;
     }
@@ -210,7 +213,7 @@ void swift::bindExtensions(ModuleDecl &mod) {
   // resolved to a worklist.
   SmallVector<ExtensionDecl *, 8> worklist;
 
-  for (auto file : mod.getFiles()) {
+  for (auto file : M->getFiles()) {
     auto *SF = dyn_cast<SourceFile>(file);
     if (!SF)
       continue;
@@ -254,6 +257,15 @@ void swift::bindExtensions(ModuleDecl &mod) {
   
   // Any remaining extensions are invalid. They will be diagnosed later by
   // typeCheckDecl().
+  for (auto *ext : worklist)
+    ext->setExtendedNominal(nullptr);
+
+  return {};
+}
+
+void swift::bindExtensions(ModuleDecl &mod) {
+  auto &eval = mod.getASTContext().evaluator;
+  (void)evaluateOrDefault(eval, BindExtensionsRequest{&mod}, {});
 }
 
 void swift::performTypeChecking(SourceFile &SF) {
@@ -326,6 +338,10 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
     SF->typeCheckDelayedFunctions();
+
+    for (auto *opaqueDecl : SF->getOpaqueReturnTypeDecls()) {
+      TypeChecker::checkCircularOpaqueReturnTypeDecl(opaqueDecl);
+    }
   }
 
   // If region-based isolation is enabled, we diagnose unnecessary
@@ -368,6 +384,10 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
+
+  // Opt-in performance hint diagnostics for performance-critical code.
+  if (performanceHintDiagnosticsEnabled(Ctx, SF))
+    evaluateOrDefault(Ctx.evaluator, EmitPerformanceHints{SF}, {});
 
   // Perform various AST transforms we've been asked to perform.
   if (!Ctx.hadError() && Ctx.LangOpts.DebuggerTestingTransform)
@@ -430,6 +450,42 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   }
 }
 
+void swift::handleOSLogStringSectionName(ModuleDecl &module) {
+  /// We only care about the OSLog module.
+  if (!module.getName().is("OSLog"))
+    return;
+
+  /// The name of the variable that defines the section name.
+  static const StringRef sectionVarName = "osLogStringSectionName";
+
+  ASTContext &ctx = module.getASTContext();
+  SmallVector<ValueDecl *, 1> results;
+  module.lookupValue(ctx.getIdentifier(sectionVarName), {}, results);
+  for (const auto& result: results) {
+    auto var = dyn_cast<VarDecl>(result);
+    if (!var)
+      continue;
+
+    if (auto init = var->getParentInitializer()) {
+      if (auto folded = foldLiteralExpression(init, &ctx)) {
+        if (auto literal = dyn_cast<StringLiteralExpr>(folded)) {
+          ctx.LangOpts.OSLogStringSectionName = literal->getValue().str();
+          return;
+        }
+      }
+
+      ctx.Diags.diagnose(init->getLoc(), diag::oslog_string_section_not_literal)
+        .highlight(init->getSourceRange());
+      return;
+    }
+
+    ctx.Diags.diagnose(var, diag::oslog_string_section_not_literal);
+    return;
+  }
+
+  ctx.Diags.diagnose(SourceLoc(), diag::oslog_missing_string_section);
+}
+
 bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
   auto &ctx = SF.getASTContext();
   // Return true if `AdditiveArithmetic` derived conformances are explicitly
@@ -459,11 +515,9 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
 
   return TypeResolution::forInterface(
              DC, GenericSig, options,
-             [](auto unboundTy) {
-               // FIXME: Don't let unbound generic types escape type resolution.
-               // For now, just return the unbound generic type.
-               return unboundTy;
-             },
+             // FIXME: Don't let unbound generic types escape type resolution.
+             // For now, just return the unbound generic type.
+             TypeResolution::defaultUnboundTypeOpener,
              // FIXME: Don't let placeholder types escape type resolution.
              // For now, just return the placeholder type.
              PlaceholderType::get,
@@ -556,13 +610,6 @@ bool swift::typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
       true);
 }
 
-bool swift::typeCheckForCodeCompletion(
-    constraints::SyntacticElementTarget &target, bool needsPrecheck,
-    llvm::function_ref<void(const constraints::Solution &)> callback) {
-  return TypeChecker::typeCheckForCodeCompletion(target, needsPrecheck,
-                                                 callback);
-}
-
 Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                 DeclContext *Context) {
   return TypeChecker::resolveDeclRefExpr(UDRE, Context);
@@ -602,7 +649,7 @@ bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
                                    DeclContext *dc,
                                    std::optional<TypeResolutionStage> stage) {
   if (stage)
-    type = dc->mapTypeIntoContext(type);
+    type = dc->mapTypeIntoEnvironment(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
       LookUpConformanceInModule());
   if (!tanSpace)

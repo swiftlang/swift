@@ -30,7 +30,10 @@ if(SWIFT_BUILD_SDK_OVERLAY
   endif()
   # Currently SwiftReflectionTest cannot be built on Windows, due to
   # dependencies on POSIX symbols
-  if (SWIFT_INCLUDE_TESTS AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Windows"))
+  if (SWIFT_INCLUDE_TESTS
+      AND NOT CMAKE_SYSTEM_NAME STREQUAL "Windows"
+      AND NOT (CMAKE_SYSTEM_NAME STREQUAL "OpenBSD"
+               AND CMAKE_SYSTEM_VERSION VERSION_LESS "7.8"))
     add_subdirectory(SwiftReflectionTest)
   endif()
 endif()

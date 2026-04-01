@@ -58,6 +58,11 @@ enum KlassOptional {
   case none
 }
 
+enum Result<S, F> {
+  case success(S)
+  case failure(F)
+}
+
 sil [ossa] @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
 sil [ossa] @get_nontrivialenum : $@convention(thin) () -> @owned NonTrivialEnum
 sil [ossa] @get_optionalnontrivialstruct : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
@@ -1076,6 +1081,7 @@ bb7:
   br bb6
 
 bb8(%err : @owned $Error):
+  destroy_value [dead_end] %err
   unreachable
 }
 
@@ -1510,6 +1516,8 @@ bb3:
   cond_br undef, bb5, bb4
 
 bb4:
+  end_borrow %2
+  destroy_value [dead_end] %1
   unreachable
 
 bb5:
@@ -1537,15 +1545,179 @@ bb6:
 bb7:
   end_borrow %17
   dealloc_stack %16
+  end_borrow %15
+  end_borrow %14
+  end_borrow %12
+  end_borrow %2
+  destroy_value [dead_end] %1
   unreachable
 
 bb8:
   end_borrow %6
   dealloc_stack %5
+  end_borrow %2
+  destroy_value [dead_end] %1
   unreachable
 
 bb9:
   end_borrow %6
   dealloc_stack %5
   br bb3
+}
+
+// CHECK-LABEL: sil [ossa] @test_end_lifetime_of_trivial_enum_case :
+// CHECK-NOT:     alloc_stack
+// CHECK:       bb2(%{{[0-9]+}} : $Int): 
+// CHECK:         fix_lifetime
+// CHECK:         end_borrow
+// CHECK:         end_lifetime %1
+// CHECK:       bb3:
+// CHECK-LABEL: } // end sil function 'test_end_lifetime_of_trivial_enum_case'
+sil [ossa] @test_end_lifetime_of_trivial_enum_case : $@convention(thin) (@inout X, @owned Result<X, Int>) -> () {
+bb0(%0 : $*X, %1 : @owned $Result<X, Int>):
+  %2 = alloc_stack $Result<X, Int>
+  store %1 to [init] %2
+  %3 = load_borrow %2
+  switch_enum %3, case #Result.success!enumelt: bb1, case #Result.failure!enumelt: bb2
+
+bb1(%10 : @guaranteed $X):
+  end_borrow %3
+  %12 = load [take] %2
+  %13 = unchecked_enum_data %12 : $Result<X, Int>, #Result.success!enumelt
+  store %13 to [assign] %0
+  br bb3
+
+bb2(%20 : $Int):
+  end_borrow %3
+  %22 = load_borrow %2
+  %23 = unchecked_enum_data %22, #Result.failure!enumelt
+  fix_lifetime %23
+  end_borrow %22
+  br bb3
+
+bb3:
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack : {{.*}} {
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[IN:%[^,]+]] = load [copy]
+// CHECK:         [[IN_BORROW:%[^,]+]] = begin_borrow [[IN]]
+// CHECK:         switch_enum [[IN_BORROW]]
+// CHECK-SAME:        case #Result.success!enumelt: [[INT:bb[0-9]+]]
+// CHECK:       [[INT]]({{%[^,]+}} : $Int):
+// CHECK:         end_borrow [[IN_BORROW]]
+// CHECK:         end_lifetime [[IN]]
+// CHECK-LABEL: } // end sil function 'end_lifetime_at_trivial_case_dealloc_stack'
+sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack : $@convention(thin) (@in_guaranteed Result<Int, X>) -> () {
+entry(%in_addr : $*Result<Int, X>):
+  %main_addr = alloc_stack $Result<Int, X>
+  %in = load [copy] %in_addr
+  store %in to [init] %main_addr
+  %in_borrow = load_borrow %main_addr
+  switch_enum %in_borrow,
+      case #Result.success!enumelt: int,
+      case #Result.failure!enumelt: full
+
+int(%6 : $Int):
+  end_borrow %in_borrow
+  %temp = alloc_stack $Result<Int, X>
+  %in_copy = load [copy] %main_addr
+  store %in_copy to [init] %temp
+  br int2
+
+int2:
+  dealloc_stack %temp
+  br exit
+
+full(%13 : @guaranteed $X):
+  end_borrow %in_borrow
+  br exit
+
+exit:
+  destroy_addr %main_addr
+  dealloc_stack %main_addr
+  %18 = tuple ()
+  return %18
+}
+
+// CHECK-LABEL: sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack_2 : {{.*}} {
+// CHECK:       bb0([[IN_ADDR:%[^,]+]] :
+// CHECK:         [[IN_COPY:%[^,]+]] = load [copy] [[IN_ADDR]]
+// CHECK:         [[IN_BORROW:%[^,]+]] = begin_borrow [[IN_COPY]]
+// CHECK:         switch_enum [[IN_BORROW]]
+// CHECK:             case #Result.success!enumelt: [[INT:bb[0-9]+]]
+// CHECK:       [[INT]]
+// CHECK:         end_borrow [[IN_BORROW]]
+// CHECK:         end_lifetime [[IN_COPY]]
+// CHECK-LABEL: } // end sil function 'end_lifetime_at_trivial_case_dealloc_stack_2'
+sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack_2 : $@convention(thin) (@in_guaranteed Result<Int, X>) -> () {
+entry(%in_addr : $*Result<Int, X>):
+  %main_addr = alloc_stack $Result<Int, X>
+  %temp = alloc_stack $Result<Int, X>
+  %in = load [copy] %in_addr
+  store %in to [init] %main_addr
+  %in_borrow = load_borrow %main_addr
+  switch_enum %in_borrow,
+      case #Result.success!enumelt: int,
+      case #Result.failure!enumelt: x
+
+int(%int : $Int):
+  end_borrow %in_borrow
+  %in_copy = load [copy] %main_addr
+  store %in_copy to [init] %temp
+  br int2
+
+int2:
+  br exit
+
+x(%13 : @guaranteed $X):
+  end_borrow %in_borrow
+  br exit
+
+exit:
+  destroy_addr %main_addr
+  dealloc_stack %temp
+  dealloc_stack %main_addr
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack_3 : {{.*}} {
+// CHECK:       bb0([[IN_ADDR:%[^,]+]] :
+// CHECK:         [[IN_BORROW:%[^,]+]] = load_borrow [[IN_ADDR]]
+// CHECK:         switch_enum [[IN_BORROW]]
+// CHECK:             case #Result.success!enumelt: [[INT:bb[0-9]+]]
+// CHECK:       [[INT]]
+// CHECK:         end_borrow [[IN_BORROW]]
+// CHECK:         [[IN_COPY:%[^,]+]] = load [copy] [[IN_ADDR]]
+// CHECK:         end_lifetime [[IN_COPY]]
+// CHECK-LABEL: } // end sil function 'end_lifetime_at_trivial_case_dealloc_stack_3'
+sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack_3 : $@convention(thin) (@in_guaranteed Result<Int, X>) -> () {
+entry(%in_addr : $*Result<Int, X>):
+  %in_borrow = load_borrow %in_addr
+  switch_enum %in_borrow,
+      case #Result.success!enumelt: int,
+      case #Result.failure!enumelt: x
+
+int(%int : $Int):
+  end_borrow %in_borrow
+  %temp = alloc_stack $Result<Int, X>
+  %in_copy = load [copy] %in_addr
+  store %in_copy to [init] %temp
+  dealloc_stack %temp
+  br int2
+
+int2:
+  br exit
+
+x(%13 : @guaranteed $X):
+  end_borrow %in_borrow
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval
 }

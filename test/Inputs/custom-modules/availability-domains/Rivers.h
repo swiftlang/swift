@@ -1,7 +1,9 @@
-#include <feature-availability.h>
+#include <availability_domain.h>
 
-static struct __AvailabilityDomain colorado_domain __attribute__((
-    availability_domain(Colorado))) = {__AVAILABILITY_DOMAIN_DISABLED, 0};
+CLANG_DISABLED_AVAILABILITY_DOMAIN(Colorado);
+
+__attribute__((deprecated("Use Colorado instead")))
+CLANG_DISABLED_AVAILABILITY_DOMAIN(Grand);
 
 #define AVAIL 0
 #define UNAVAIL 1

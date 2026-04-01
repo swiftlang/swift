@@ -375,6 +375,41 @@ bb0(%0 : @owned $String, %1 : @guaranteed $String):
   ...
 ```
 
+## The Control Flow Graph
+
+The basic blocks of a function form a control flow graph (CFG). The nodes of
+the CFG are the blocks. Edges are defined by the set of target blocks to which
+the terminator instruction of a block may jump to. In the following example,
+block `bb1` has two successor blocks `bb2` and `bb3` because the `cond_br`
+might branch to `bb2` or `bb3`.
+```
+    bb1:
+      cond_br %cond, bb2, bb3
+```
+
+## Control Flow Graph Invariants
+
+In OSSA following rules apply to the CFG of a function:
+
+- No critical edges: every edge in the CFG must have either a single
+  predecessor or a single successor block.
+
+- No unreachable blocks: All blocks must be reachable from the entry block
+  of the function.
+
+- No infinite loops: all cyclic strongly connected components (SCC) in the
+  CFG must have at least one edge which is exiting the cyclic SCC.
+
+Optimization passes must make sure to leave the CFG of an OSSA function in a
+valid state by:
+
+- inserting blocks at critical edges
+
+- removing unreachable blocks
+
+- creating artificial exit edges from infinite loops to dead-end blocks
+  (= blocks which end in an `unreachable` instruction)
+
 # Values and Operands
 
 SIL values are introduced with the `%` sigil and named by an
@@ -779,6 +814,218 @@ _lexical_ in order to specify this property for all contributing lifetimes.
 
 For details see [Variable Lifetimes](Ownership.md#variable-lifetimes) in the
 Ownership document.
+
+# Dominance
+
+## Value and instruction dominance
+
+Whenever an instruction uses a [value](#values-and-operands) as an
+operand, the definition of the value must dominate the instruction.
+This is a common concept across all SSA-like representations. SIL
+uses a standard definition of dominance, modified slightly to account
+for SIL's use of basic block arguments rather than phi instructions:
+
+- The value `undef` always dominates an instruction.
+
+- An instruction result `R` dominates an instruction `I` if the
+  instruction that defines `R` dominates `I`.
+
+- An argument of a basic block `B` dominates an instruction `I` if all
+  initial paths passing through `I` must also pass through the start
+  of `B`.
+
+An instruction `D` dominates another instruction `I` if they are
+different instructions and all initial paths passing through `I`
+must also pass through `D`.
+
+See [below](#definition-of-a-path) for the formal definition of an
+initial path.
+
+## Basic block dominance
+
+A basic block `B1` dominates a basic block `B2` if they are different
+blocks and if all initial paths passing through the start of `B2` must
+also pass through through the start of `B1`.
+
+This relationship between blocks can be thought of as creating a
+directed acyclic graph of basic blocks, called the *dominance tree*.
+The dominance tree is not directly represented in SIL; it is just
+an emergent property of the dominance requirement on SIL functions.
+
+## Joint post-dominance
+
+Certain instructions are required to have a *joint post-dominance*
+relationship with certain other instructions. Informally, this means
+that all terminating paths through the first instruction must
+eventually pass through one of the others. This is common for
+instructions that define a scope in the SIL function, such as
+`alloc_stack` and `begin_access`.
+
+The dominating instruction is called the *scope instruction*,
+and the post-dominating instructions are called the *scope-ending
+instructions*. The specific joint post-dominance requirement
+defines the set of instructions that count as scope-ending
+instructions for the begin instruction.
+
+For example, an `alloc_stack` instruction must be jointly
+post-dominated by the set of `dealloc_stack` instructions
+whose operand is the result of the `alloc_stack`. The
+`alloc_stack` is the scope instruction, and the `dealloc_stack`s
+are the scope-ending instructions.
+
+The *scope* of a joint post-dominance relationship is the set
+of all points in the function following the scope instruction
+but prior to a scope-ending instruction. Making this precisely
+defined is part of the point of the joint post-dominance rules.
+A formal definition is given later.
+
+In SIL, if an instruction acts as a scope instruction, it always
+has exactly one set of scope-ending instructions associated
+with it, and so it forms exactly one scope. People will therefore
+often talk about, e.g., the scope of an `alloc_stack`, meaning
+the scope between it and its `dealloc_stack`s. Furthermore,
+there are no instructions in SIL which act as scope-ending
+instructions for multiple scopes.
+
+A scope instruction `I` is jointly post-dominated by its
+scope-ending instructions if:
+
+- All initial paths that pass through a scope-ending instruction
+  of `I` must also pass through `I`. (This is just the normal
+  dominance rule, and it is typically already required by the
+  definition of the joint post-dominance relationship. For example,
+  a `dealloc_stack` must be dominated by its associated
+  `alloc_stack` because it uses its result as an operand.)
+
+- All initial paths that pass through `I` twice must also pass
+  through a scope-ending instruction of `I` in between.
+
+- All initial paths that pass through a scope-ending instruction
+  of `I` twice (not necessarily the same instruction) must also
+  pass through `I` in between.
+
+- All terminating initial paths that pass through `I` must also
+  pass through a scope-ending instruction of `I`.
+
+In other words, all paths must strictly alternate between `I`
+and its scope-ending instructions, starting with `I` and (if
+the path exits) ending with a scope-ending instruction.
+
+Note that a scope-ending instruction does not need to appear on
+a path following a scope instruction if the path doesn't exit
+the function. In fact, a function needn't include any scope-ending
+instructions for a particular scope instruction if all paths from
+that point are non-terminating, such as by ending in `unreachable`
+or containing an infinite loop.
+
+A scope instruction `I` is *coherently* jointly post-dominated
+by its scope-ending instructions if there is no point in the
+function for which it is possible to construct two paths, both
+ending in that point, which differ by whether they most recently
+passed through `I` or one of its scope-ending instructions.
+This is always true for points from which it is possible to
+construct a terminating path, but it can be false for dead-end
+points.
+
+Several important joint post-dominance requirements in SIL
+do not require coherence, including the stack-allocation rule.
+Non-coherence allows optimizations to be more aggressive
+across control flow that enters dead-end regions. Note that
+control flow internal to a dead-end region is not special
+in this way, so SIL analyses must not not simply check
+whether a destination block is dead-end.
+
+The *scope* defined by a joint post-dominance relationship for a
+scope instruction `I` is the set of points in the function for
+which:
+
+- there exists an initial path that ends at that point and
+  passes through `I`, but
+
+- there does not an exist a simple initial path that ends at
+  that point and passes through a scope-ending instruction
+  of `I`.
+
+In the absence of coherence, this second rule conservatively
+shrinks the scope to the set of points that cannot possibly
+have passed through a scope-ending instruction.
+
+For a coherent joint post-dominance relationship, this
+definition simplifies to the set of points for which there
+exists an initial path that ends at that point and passes
+through `I`, but which does not pass through a scope-ending
+instruction of `I`.
+
+Note that the point before a scope-ending instruction is always
+within the scope.
+
+## Definition of a path
+
+A *point* in a SIL function is the moment before an instruction.
+Every basic block has an entry point, which is the point before
+its first instruction. The entry point of the entry block is also
+called the entry point of the function.
+
+A path through a SIL function is a path (in the usual graph-theory
+sense) in the underlying directed graph of points, in which:
+
+- every point in the SIL function is a vertex in the graph,
+
+- each non-terminator instruction creates an edge from the point
+  before it to the point after it, and
+
+- each terminator instruction creates edges from the point before
+  the terminator to the initial point of each its successor blocks.
+
+A path is said to pass through an instruction if it includes
+any of the edges created by that instruction. A path is said to
+pass through the start of a basic block if it visits the entry
+point of that block.
+
+An *initial path* is a path which begins at the entry point of the
+function. A *terminating path* is a path which ends at the point
+before an exiting instruction, such as `return` or `throw`.
+
+Note that the dominance rules generally require only an initial path,
+not a terminating path. A path that simply stops in the middle of a
+block still counts for dominance. Among other things, this ensures that
+dominance holds in blocks that are part of an infinite loop.
+
+A *dead-end point* is a point which cannot be included on any
+terminating path. A *dead-end block* is a block for which the
+entry point is a dead-end point. A *dead-end region* is a
+strongly-connected component of the CFG containing only dead-end
+blocks.
+
+Note also that paths consider successors without regard to the
+nature of the terminator. Paths that are provably impossible because
+of value relationships still count for dominance. For example,
+consider the following function:
+
+```
+    bb0(%cond : $Builtin.Int1):
+      cond_br %cond, bb1, b22
+    bb1:
+      %value = integer_literal $Builtin.Int32, 0
+      br bb3
+    bb2:
+      br bb3
+    bb3:
+      cond_br %cond, bb4, bb5
+    bb4:
+      %twice_value = builtin "add_Int32"(%value, %value) : $Builtin.Int32
+      br bb6
+    bb5:
+      br bb6
+    bb6:
+      ret %cond
+```
+
+Dynamically, it is impossible to reach the `builtin` instruction
+without passing through the definition of `%value`: to reach
+the `builtin`, `%cond` must be `true`, and so the first `cond_br`
+must have branched to `bb1`. This is not taken into consideration
+by dominance, and so this function is ill-formed.
 
 # Debug Information
 
@@ -1364,48 +1611,39 @@ stack deallocation instructions. It can even be paired with no
 instructions at all; by the rules below, this can only happen in
 non-terminating functions.
 
--   At any point in a SIL function, there is an ordered list of stack
-    allocation instructions called the *active allocations list*.
+- All stack allocation instructions must be jointly post-dominated
+  by stack deallocation instructions paired with them.
 
--   The active allocations list is defined to be empty at the initial
-    point of the entry block of the function.
+- No path through the function that passes through a stack allocation
+  instruction `B`, having already passed a stack allocation
+  instruction `A`, may subsequently pass through a stack deallocation
+  instruction paired with `A` without first passing through a stack
+  deallocation instruction paired with `B`.
 
--   The active allocations list is required to be the same at the
-    initial point of any successor block as it is at the final point of
-    any predecessor block. Note that this also requires all
-    predecessors/successors of a given block to have the same
-    final/initial active allocations lists.
+These two rules statically enforce that all stack allocations are
+properly nested. In simpler terms:
 
-    In other words, the set of active stack allocations must be the same
-    at a given place in the function no matter how it was reached.
+- At every point in a SIL function, there is an ordered list of stack
+  allocation instructions called the *active allocations list*.
 
--   The active allocations list for the point following a stack
-    allocation instruction is defined to be the result of adding that
-    instruction to the end of the active allocations list for the point
-    preceding the instruction.
+- The active allocations list is empty at the start of the entry block
+  of the function, and it must be empty again whenever an instruction
+  that exits the function is reached, like `return` or `throw`.
 
--   The active allocations list for the point following a stack
-    deallocation instruction is defined to be the result of removing the
-    instruction from the end of the active allocations list for the
-    point preceding the instruction. The active allocations list for the
-    preceding point is required to be non-empty, and the last
-    instruction in it must be paired with the deallocation instruction.
+- Whenever a stack allocation instruction is reached, it is added to
+  the end of the list.
 
-    In other words, all stack allocations must be deallocated in
-    last-in, first-out order, aka stack order.
+- Whenever a stack deallocation instruction is reached, its paired
+  stack allocation instruction must be at the end of the list, which it
+  is then removed from.
 
--   The active allocations list for the point following any other
-    instruction is defined to be the same as the active allocations list
-    for the point preceding the instruction.
+- The active allocations list always be the same on both sides of a
+  control flow edge. This implies both that all successors of a block
+  must start with the same list and that all predecessors of a block
+  must end with the same list.
 
--   The active allocations list is required to be empty prior to
-    `return` or `throw` instructions.
-
-    In other words, all stack allocations must be deallocated prior to
-    exiting the function.
-
-Note that these rules implicitly prevent an allocation instruction from
-still being active when it is reached.
+Note that these rules implicitly prevent stack allocations from leaking
+or being double-freed.
 
 The control-flow rule forbids certain patterns that would theoretically
 be useful, such as conditionally performing an allocation around an
@@ -1413,6 +1651,12 @@ operation. SIL generally makes this sort of pattern somewhat difficult
 to use, however, as it is illegal to locally abstract over addresses,
 and therefore a conditional allocation cannot be used in the
 intermediate operation anyway.
+
+The stack discipline rules do not require coherent joint post-dominance.
+This means that different control-flow paths entering a dead-end region
+may disagree about the state of the stack. In such a region, the stack
+discipline rules permit further allocation, but nothing that was not
+allocated within the region can be deallocated.
 
 # Structural type matching for pack indices
 

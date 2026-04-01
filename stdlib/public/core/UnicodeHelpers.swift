@@ -61,7 +61,7 @@ internal func _decodeUTF8(
   return Unicode.Scalar(_unchecked: value)
 }
 
-@inlinable
+@inlinable @inline(__always)
 internal func _decodeScalar(
   _ utf8: UnsafeBufferPointer<UInt8>, startingAt i: Int
 ) -> (Unicode.Scalar, scalarLength: Int) {
@@ -207,7 +207,7 @@ extension _StringGuts {
     }
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal func fastUTF8Scalar(startingAt i: Int) -> Unicode.Scalar {
     _internalInvariant(isFastUTF8)
     return unsafe self.withFastUTF8 { unsafe _decodeScalar($0, startingAt: i).0 }

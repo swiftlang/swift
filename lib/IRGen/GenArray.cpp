@@ -180,6 +180,14 @@ public:
                           Element.destroy(IGF, elt[0], eltTy, isOutlined);
                         }, {address});
   }
+
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    auto &IGM = collector.IGF.IGM;
+    auto elementTy = getElementSILType(IGM, T);
+    IGM.getTypeInfo(elementTy).collectMetadataForOutlining(collector,
+                                                           elementTy);
+  }
 };
 
 template<typename BaseTypeInfo>
@@ -240,9 +248,15 @@ protected:
     
     // Take spare bits from the first element only.
     SpareBitVector result = elementTI.getSpareBits();
+
     // We can use the padding to the next element as spare bits too.
-    result.appendSetBits(getArraySize(arraySize, elementTI).getValueInBits()
-                           - result.size());
+    auto padding = elementTI.getFixedStride() - elementTI.getFixedSize();
+    result.appendSetBits(padding.getValueInBits());
+
+    // spare bits of any other elements should not be considered
+    result.appendClearBits(
+        getArraySize(arraySize - 1, elementTI).getValueInBits());
+
     return result;
   }
   
@@ -567,6 +581,16 @@ public:
     return Element.getIsBitwiseTakable(IGF,
                                        getElementSILType(IGF.IGM, T));
   }
+  llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF,
+                                      SILType T) const override {
+    return Element.getIsBitwiseBorrowable(IGF,
+                                          getElementSILType(IGF.IGM, T));
+  }
+  llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF,
+                                      SILType T) const override {
+    return Element.getIsAddressableForDependencies(IGF,
+                                          getElementSILType(IGF.IGM, T));
+  }
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override {
     auto startBB = IGF.Builder.GetInsertBlock();
@@ -624,10 +648,11 @@ public:
     return nullptr;
   }
 
-  StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                             const llvm::Twine &name) const override {
+  StackAddress
+  allocateStack(IRGenFunction &IGF, SILType T, const llvm::Twine &name,
+                StackAllocationIsNested_t isNested) const override {
     // Allocate memory on the stack.
-    auto alloca = IGF.emitDynamicAlloca(T, name);
+    auto alloca = IGF.emitDynamicStackAllocation(T, isNested, name);
     IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
     return alloca.withAddress(getAddressForPointer(alloca.getAddressPointer()));
   }
@@ -635,7 +660,7 @@ public:
   void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
                        SILType T) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
-    IGF.emitDeallocateDynamicAlloca(stackAddress);
+    IGF.emitDynamicStackDeallocation(stackAddress);
   }
 
   void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,

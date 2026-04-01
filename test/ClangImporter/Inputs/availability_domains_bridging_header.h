@@ -1,11 +1,7 @@
-#include <feature-availability.h>
+#include <availability_domain.h>
 
-static struct __AvailabilityDomain bay_bridge
-    __attribute__((availability_domain(BayBridge))) = {
-        __AVAILABILITY_DOMAIN_ENABLED, 0};
-static struct __AvailabilityDomain golden_gate_bridge
-    __attribute__((availability_domain(GoldenGateBridge))) = {
-        __AVAILABILITY_DOMAIN_DISABLED, 0};
+CLANG_DISABLED_AVAILABILITY_DOMAIN(BayBridge);
+CLANG_DISABLED_AVAILABILITY_DOMAIN(GoldenGateBridge);
 
 #define AVAIL 0
 #define UNAVAIL 1

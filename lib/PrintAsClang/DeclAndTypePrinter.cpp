@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -50,6 +51,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -253,7 +255,6 @@ private:
   /// Prints the members of a class, extension, or protocol.
   template <bool AllowDelayed = false, typename R>
   void printMembers(R &&members) {
-    CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
     // Using statements for nested types.
     if (outputLang == OutputLanguageMode::Cxx) {
       for (const Decl *member : members) {
@@ -373,7 +374,12 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
       ClangClassTypePrinter(os).printClassTypeDecl(
-          CD, [&]() { printMembers(CD->getAllMembers()); }, owningPrinter);
+          CD,
+          [&]() {
+            CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
+            printMembers(CD->getAllMembers());
+          },
+          owningPrinter);
       recordEmittedDeclInCurrentCxxLexicalScope(CD);
       return;
     }
@@ -426,6 +432,7 @@ private:
     printer.printValueTypeDecl(
         SD, /*bodyPrinter=*/
         [&]() {
+          CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
           printMembers(SD->getAllMembers());
           for (const auto *ed :
                owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
@@ -922,6 +929,7 @@ private:
           os << "  }\n"; // operator cases()'s closing bracket
           os << "\n";
 
+          CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
           printMembers(ED->getAllMembers());
 
           for (const auto *ext :
@@ -973,7 +981,7 @@ private:
       }
 
       // Print the raw values, even the ones that we synthesize.
-      auto *ILE = cast<IntegerLiteralExpr>(Elt->getStructuralRawValueExpr());
+      auto *ILE = cast<IntegerLiteralExpr>(Elt->getRawValueExpr());
       os << " = ";
       if (ILE->isNegative())
         os << "-";
@@ -1094,6 +1102,32 @@ private:
            sel.getSelectorPieces().front().str() == "init";
   }
 
+  /// Returns the C++ parameter type strings for a function as they would
+  /// appear in the C++ inline thunk signature.
+  llvm::SmallVector<std::string, 4>
+  getCxxParamTypes(const AbstractFunctionDecl *funcDecl) const {
+    llvm::SmallVector<std::string, 4> result;
+    auto *params = funcDecl->getParameters();
+    if (!params)
+      return result;
+    auto *emittedModule = funcDecl->getModuleContext();
+    for (auto *param : *params) {
+      auto type = param->getInterfaceType();
+      // In C++ different integer types have different bitwidths. To
+      // avoid producing redefinition errors, we are conservative with
+      // these types and consider all integral types the same.
+      if (type->isStdlibInteger()) {
+        result.push_back("int");
+      } else {
+        std::string typeStr;
+        llvm::raw_string_ostream typeOS(typeStr);
+        owningPrinter.printTypeName(typeOS, type, emittedModule);
+        result.push_back(typeStr);
+      }
+    }
+    return result;
+  }
+
   /// Returns true if the given function overload is safe to emit in the current
   /// C++ lexical scope.
   bool canPrintOverloadOfFunction(const AbstractFunctionDecl *funcDecl) const {
@@ -1101,29 +1135,24 @@ private:
     auto &overloads =
         owningPrinter.getCxxDeclEmissionScope().emittedFunctionOverloads;
     auto cxxName = cxx_translation::getNameForCxx(funcDecl);
-    auto overloadIt = overloads.find(cxxName);
-    if (overloadIt == overloads.end()) {
-      overloads.insert(std::make_pair(
-          cxxName,
-          llvm::SmallVector<const AbstractFunctionDecl *>({funcDecl})));
+    auto paramTypes = getCxxParamTypes(funcDecl);
+    auto [overloadIt, inserted] = overloads.try_emplace(
+        cxxName,
+        llvm::SmallVector<CxxDeclEmissionScope::EmittedFunctionOverload, 2>(
+            {{funcDecl, paramTypes}}));
+    if (inserted)
       return true;
-    }
-    auto selfArity =
-        funcDecl->getParameters() ? funcDecl->getParameters()->size() : 0;
-    for (const auto *overload : overloadIt->second) {
-      auto arity =
-          overload->getParameters() ? overload->getParameters()->size() : 0;
-      // Avoid printing out an overload with the same and arity, as that might
-      // be an ambiguous overload on the C++ side.
-      // FIXME: we should take types into account, not all overloads with the
-      // same arity are ambiguous in C++.
-      if (selfArity == arity) {
+    for (const auto &overload : overloadIt->second) {
+      if (overload.cxxParamTypes == paramTypes) {
         owningPrinter.getCxxDeclEmissionScope()
-            .additionalUnrepresentableDeclarations.push_back(funcDecl);
+            .additionalUnrepresentableDeclarations.insert(
+                {funcDecl,
+                 "An overload with the same C++ parameter types already "
+                 "exists"});
         return false;
       }
     }
-    overloadIt->second.push_back(funcDecl);
+    overloadIt->second.push_back({funcDecl, paramTypes});
     return true;
   }
 
@@ -1244,7 +1273,8 @@ private:
     // Constructors and methods returning DynamicSelf return
     // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
-        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelfResult() &&
+        (isa<FuncDecl>(AFD) &&
+         cast<FuncDecl>(AFD)->getResultInterfaceType()->hasDynamicSelfType() &&
          !AFD->hasAsync())) {
       if (errorConvention && errorConvention->stripsResultOptionality()) {
         printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);
@@ -1415,7 +1445,7 @@ private:
       // because it's a diagnostic inflicted on /clients/, but it's close
       // enough. It really is invalid to call +new when -init is unavailable.
       StringRef annotationName = "SWIFT_UNAVAILABLE_MSG";
-      if (!getASTContext().isSwiftVersionAtLeast(5))
+      if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
         annotationName = "SWIFT_DEPRECATED_MSG";
       os << "+ (nonnull instancetype)new " << annotationName
          << "(\"-init is unavailable\");\n";
@@ -1566,8 +1596,40 @@ private:
     }
     os << "\n";
     if (representation.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
     return representation;
+  }
+
+  /// Returns a reason string describing why a function's signature can't be
+  /// represented in C++, identifying the specific unsupported type if possible.
+  std::string getUnsupportedTypeReason(AbstractFunctionDecl *FD) {
+    auto &mod = owningPrinter.M;
+    auto isUnsupported = [&](Type ty) {
+      return DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
+                 owningPrinter.typeMapping, owningPrinter.interopContext,
+                 owningPrinter, &mod, ty)
+          .isUnsupported();
+    };
+
+    if (auto *funcDecl = dyn_cast<FuncDecl>(FD)) {
+      auto resultTy = funcDecl->getResultInterfaceType();
+      if (resultTy && !resultTy->isVoid() && isUnsupported(resultTy))
+        return "Return type '" + resultTy->getString() +
+               "' is not representable in C++";
+    }
+
+    for (auto [i, param] : llvm::enumerate(*FD->getParameters())) {
+      auto paramTy = param->getInterfaceType();
+      if (isUnsupported(paramTy)) {
+        auto name = param->getNameStr();
+        if (name.empty() || name == "_")
+          return "Parameter #" + std::to_string(i) + " of type '" +
+                 paramTy->getString() + "' is not representable in C++";
+        return "Parameter '" + name.str() + "' of type '" +
+               paramTy->getString() + "' is not representable in C++";
+      }
+    }
+    return "";
   }
 
   // Print out the extern C Swift ABI function signature.
@@ -1676,7 +1738,7 @@ private:
         FD->getParameters(), funcTy->isThrowing(), funcTy);
     os << "}\n";
     if (result.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
   }
 
   enum class PrintLeadingSpace : bool {
@@ -1775,8 +1837,9 @@ public:
         continue;
       }
 
+      auto platKind = AvAttr.getPlatform();
       const char *plat;
-      switch (AvAttr.getPlatform()) {
+      switch (platKind) {
       case PlatformKind::macOS:
         plat = "macos";
         break;
@@ -1813,6 +1876,16 @@ public:
       case PlatformKind::visionOSApplicationExtension:
         plat = "visionos_app_extension";
         break;
+      case PlatformKind::DriverKit:
+        plat = "driverkit";
+        break;
+      case PlatformKind::Swift:
+        // FIXME: [runtime availability] Figure out how to support this.
+        llvm::report_fatal_error("unsupported platform kind");
+        break;
+      case PlatformKind::anyAppleOS:
+        plat = "anyappleos";
+        break;
       case PlatformKind::FreeBSD:
         plat = "freebsd";
         break;
@@ -1821,6 +1894,9 @@ public:
         break;
       case PlatformKind::Windows:
         plat = "windows";
+        break;
+      case PlatformKind::Android:
+        plat = "android";
         break;
       case PlatformKind::none:
         llvm_unreachable("handled above");
@@ -1900,7 +1976,8 @@ private:
                          .printSwiftABIFunctionSignatureAsCxxFunction(FD);
       if (!funcABI) {
         owningPrinter.getCxxDeclEmissionScope()
-            .additionalUnrepresentableDeclarations.push_back(FD);
+            .additionalUnrepresentableDeclarations.insert(
+                {FD, getUnsupportedTypeReason(FD)});
         return;
       }
       if (!canPrintOverloadOfFunction(FD))
@@ -1974,7 +2051,7 @@ private:
       }
     }
 
-    if (ty->isObjCExistentialType() && !isCFTypeRef(ty))
+    if ((ty->isObjCExistentialType() || ty->isAny()) && !isCFTypeRef(ty))
       return true;
 
     return false;
@@ -2362,7 +2439,7 @@ private:
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang typedecl?");
 
       maybePrintTagKeyword(alias);
@@ -2372,7 +2449,7 @@ private:
         printNullability(optionalKind);
     } else if (auto *clangObjCClass
                = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang interface?");
 
       os << clangObjCClass->getName() << " *";
@@ -2406,10 +2483,11 @@ private:
   }
 
   void maybePrintTagKeyword(const TypeDecl *NTD) {
-    if (auto *ED = dyn_cast<EnumDecl>(NTD); !NTD->hasClangNode()) {
-      if (ED->getAttrs().hasAttribute<CDeclAttr>()) {
+    auto *ED = dyn_cast<EnumDecl>(NTD);
+    if (ED && !NTD->hasClangNode()) {
+      if (ED->isCDeclEnum()) {
         // We should be able to use the tag macro for all printed enums but
-        // for now restrict it to @cdecl to guard it behind the feature flag.
+        // for now restrict it to @c to guard it behind the feature flag.
         os << "SWIFT_ENUM_TAG ";
       } else {
         os << "enum ";
@@ -2693,7 +2771,7 @@ private:
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
       const ClassDecl *extendedClass = extension->getSelfClassDecl();
-      assert(extendedClass->isGeneric());
+      assert(extendedClass->hasGenericParamList());
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
              "extensions with custom generic parameters?");
@@ -2968,6 +3046,17 @@ static bool excludeForObjCImplementation(const ValueDecl *VD) {
   return false;
 }
 
+bool swift::hasExposeNotCxxAttr(const ValueDecl *VD) {
+  for (const auto *attr : VD->getAttrs().getAttributes<ExposeAttr>())
+    if (attr->getExposureKind() == ExposureKind::NotCxx)
+      return true;
+  if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
+    return hasExposeNotCxxAttr(NMT);
+  if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
+    return hasExposeNotCxxAttr(ED->getExtendedNominal());
+  return false;
+}
+
 static bool isExposedToThisModule(const ModuleDecl &M, const ValueDecl *VD,
                                   const llvm::StringSet<> &exposedModules) {
   if (VD->hasClangNode())
@@ -3019,6 +3108,9 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   if (requiresExposedAttribute && !hasExposeAttr(VD))
     return false;
 
+  if (hasExposeNotCxxAttr(VD))
+    return false;
+
   if (!isVisible(VD))
     return false;
 
@@ -3033,7 +3125,7 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
       return false;
   }
 
-  // In C output mode print only the C variant `@cdecl` (no `@_cdecl`),
+  // In C output mode print only the C variant `@c` (no `@_cdecl`),
   // while in other modes print only `@_cdecl`.
   std::optional<ForeignLanguage> cdeclKind = std::nullopt;
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD))
@@ -3043,14 +3135,14 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
        (outputLang == OutputLanguageMode::C))
     return false;
 
-  // C output mode only prints @cdecl functions and enums.
+  // C output mode only prints @c functions and enums.
   if (outputLang == OutputLanguageMode::C &&
       !cdeclKind && !isa<EnumDecl>(VD)) {
     return false;
   }
 
-  // The C mode prints @cdecl enums and reject other enums,
-  // while other modes accept other enums and reject @cdecl ones.
+  // The C mode prints @c enums and reject other enums,
+  // while other modes accept other enums and reject @c ones.
   if (isa<EnumDecl>(VD) &&
       VD->getAttrs().hasAttribute<CDeclAttr>() !=
         (outputLang == OutputLanguageMode::C)) {
@@ -3126,6 +3218,8 @@ const TypeDecl *DeclAndTypePrinter::getObjCTypeDecl(const TypeDecl* TD) {
 
 StringRef
 DeclAndTypePrinter::maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
+  if (!decl)
+    return StringRef();
   StringRef name = decl->getName();
   if (!name.consume_front("OS_"))
     return StringRef();

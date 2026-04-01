@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -354,13 +354,13 @@ extension _UnsafeBitset.Word: @unsafe Sequence, @unsafe IteratorProtocol {
 extension _UnsafeBitset {
   @_alwaysEmitIntoClient
   @inline(__always)
-  internal static func _withTemporaryUninitializedBitset<R>(
+  internal static func _withTemporaryUninitializedBitset<R, E: Error>(
     wordCount: Int,
-    body: (_UnsafeBitset) throws -> R
-  ) rethrows -> R {
+    body: (_UnsafeBitset) throws(E) -> R
+  ) throws(E) -> R {
     try unsafe withUnsafeTemporaryAllocation(
       of: _UnsafeBitset.Word.self, capacity: wordCount
-    ) { buffer in
+    ) { (buffer: UnsafeMutableBufferPointer<_UnsafeBitset.Word>) throws(E) -> R in
       let bitset = unsafe _UnsafeBitset(
         words: buffer.baseAddress!, wordCount: buffer.count)
       return try unsafe body(bitset)
@@ -369,14 +369,14 @@ extension _UnsafeBitset {
 
   @_alwaysEmitIntoClient
   @inline(__always)
-  internal static func withTemporaryBitset<R>(
+  internal static func withTemporaryBitset<R, E: Error>(
     capacity: Int,
-    body: (_UnsafeBitset) throws -> R
-  ) rethrows -> R {
+    body: (_UnsafeBitset) throws(E) -> R
+  ) throws(E) -> R {
     let wordCount = unsafe Swift.max(1, Self.wordCount(forCapacity: capacity))
     return try unsafe _withTemporaryUninitializedBitset(
       wordCount: wordCount
-    ) { bitset in
+    ) { (bitset: _UnsafeBitset) throws(E) -> R in
       unsafe bitset.clear()
       return try unsafe body(bitset)
     }
@@ -386,13 +386,13 @@ extension _UnsafeBitset {
 extension _UnsafeBitset {
   @_alwaysEmitIntoClient
   @inline(__always)
-  internal static func withTemporaryCopy<R>(
+  internal static func withTemporaryCopy<R, E: Error>(
     of original: _UnsafeBitset,
-    body: (_UnsafeBitset) throws -> R
-  ) rethrows -> R {
+    body: (_UnsafeBitset) throws(E) -> R
+  ) throws(E) -> R {
     try unsafe _withTemporaryUninitializedBitset(
       wordCount: original.wordCount
-    ) { bitset in
+    ) { (bitset: _UnsafeBitset) throws(E) -> R in
       unsafe bitset.words.initialize(from: original.words, count: original.wordCount)
       return try unsafe body(bitset)
     }

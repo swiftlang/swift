@@ -327,28 +327,28 @@ func test_pack_expansions_with_closures() {
 func test_pack_expansion_specialization(tuple: (Int, String, Float)) {
   struct Data<each T> {
     init(_: repeat each T) {} // expected-note 4 {{'init(_:)' declared here}}
-    init(vals: repeat each T) {}
-    init<each U>(x: Int, _: repeat each T, y: repeat each U) {}
+    init(vals: repeat each T) {} // expected-note {{'init(vals:)' declared here}}
+    init<each U>(x: Int, _: repeat each T, y: repeat each U) {} // expected-note 3 {{'init(x:_:y:)' declared here}}
   }
 
   _ = Data<Int>() // expected-error {{missing argument for parameter #1 in call}}
   _ = Data<Int>(0) // Ok
   _ = Data<Int, String>(42, "") // Ok
-  _ = Data<Int>(42, "") // expected-error {{pack expansion requires that 'Int' and 'Int, String' have the same shape}}
+  _ = Data<Int>(42, "") // expected-error {{extra argument in call}}
   _ = Data<Int, String>((42, ""))
   // expected-error@-1 {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{25-26=}} {{32-33=}}
   _ = Data<Int, String, Float>(vals: (42, "", 0))
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Int)' have the same shape}}
+  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
   _ = Data<Int, String, Float>((vals: 42, "", 0))
   // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{32-33=}} {{48-49=}}
   _ = Data<Int, String, Float>(tuple)
   // expected-error@-1 {{initializer expects 3 separate arguments}}
   _ = Data<Int, String, Float>(x: 42, tuple)
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Float)' have the same shape}}
+  // expected-error@-1 {{missing arguments for parameters #2, #2 in call}}
   _ = Data<Int, String, Float>(x: 42, tuple, y: 1, 2, 3)
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Float)' have the same shape}}
+  // expected-error@-1 {{missing arguments for parameters #2, #2 in call}}
   _ = Data<Int, String, Float>(x: 42, (42, "", 0), y: 1, 2, 3)
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Int)' have the same shape}}
+  // expected-error@-1 {{missing arguments for parameters #2, #2 in call}}
 
   struct Ambiguity<each T> {
     func test(_: repeat each T) -> Int { 42 }
@@ -360,7 +360,7 @@ func test_pack_expansion_specialization(tuple: (Int, String, Float)) {
 }
 
 // rdar://107280056 - "Ambiguous without more context" with opaque return type + variadics
-protocol Q {
+protocol Q<B> {
   associatedtype B
 }
 
@@ -608,6 +608,47 @@ do {
   }
 }
 
+// https://github.com/swiftlang/swift/issues/69245
+do {
+  func want_tuple<each T>(_ arg: (repeat each T)) {}
+  func give_arg<each T>(_ arg: repeat each T) {
+  	want_tuple(repeat each arg)
+    // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type '(repeat each T)'}}
+    // expected-note@-2 {{did you mean to expand the pack into a tuple?}} {{15-15=(}}{{30-30=)}}
+  }
+
+  func want_tuples<each T>(a: (repeat each T), b: (repeat each T)) {}
+  func give_args<each T>(_ arg: repeat each T) {
+    want_tuples(a: repeat each arg, b: repeat each arg)
+    // expected-error@-1 2 {{cannot pass value pack expansion to non-pack parameter of type '(repeat each T)'}}
+    // expected-note@-2:20 {{did you mean to expand the pack into a tuple?}} {{20-20=(}}{{35-35=)}}
+    // expected-note@-3:40 {{did you mean to expand the pack into a tuple?}} {{40-40=(}}{{55-55=)}}
+  }
+
+  struct S<each T> {
+    let tuple: (repeat each T)
+  }
+
+  func initWithPack<each T>(xs: repeat each T) -> S<repeat each T> {
+    return S(tuple: repeat each xs)
+    // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type '(repeat each T)'}}
+    // expected-note@-2 {{did you mean to expand the pack into a tuple?}} {{21-21=(}}{{35-35=)}}
+  }
+
+  struct Box<T> {
+    let v: T
+    init(_ v: T) {
+      self.v = v
+    }
+  }
+  
+  func wants_nested_tuple<each T>(_ arg: Box<(repeat each T)>) {}
+  func gives_nested<each T>(_ arg: repeat each T) {
+    wants_nested_tuple(Box(repeat each arg))
+    // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'T'}}
+  }
+}
+
 // rdar://110401127 - name lookup bug when abstract tuple stored property shadows a global
 do {
   let c = [false, true]
@@ -813,5 +854,43 @@ func testPackToScalarShortFormConstructor() {
   // Make sure we diagnose.
   func foo<each T>(_ xs: repeat each T) {
     S(repeat each xs) // expected-error {{cannot pass value pack expansion to non-pack parameter of type 'Int'}}
+  }
+}
+
+
+func test_dependent_members() {
+  struct Variadic<each T>: Q {
+    typealias B = (repeat (each T)?)
+
+    init(_: repeat each T) {}
+    static func f(_: repeat each T) -> Self {}
+  }
+
+  func test_init<C1, C2>(_ c1: C1, _ c2: C2) -> some Q<(C1?, C2?)> {
+    return Variadic(c1, c2) // Ok
+  }
+
+  func test_static<C1, C2>(_ c1: C1, _ c2: C2) -> some Q<(C1?, C2?)> {
+    return Variadic.f(c1, c2) // Ok
+  }
+}
+
+protocol P2 {
+  associatedtype X
+}
+
+extension P2 {
+  func foo() where X == Bool {}
+  func foo() where X == String {}
+}
+
+do {
+  struct S<each E>: P2 {
+    typealias X = String
+    init(_ fn: () -> (repeat each E)) {}
+  }
+
+  func foo(_ x: Int) {
+    S { x }.foo() // Make sure we can pick the right 'foo' here.
   }
 }

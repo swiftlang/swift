@@ -18,11 +18,15 @@
 // RUN:       | %FileCheck --check-prefix CHECK-DISABLED %s
 
 
-// CHECK-ENABLED: cold
+// CHECK-ENABLED: .cold
 
-// CHECK-DISABLED-NOT: cold
+// CHECK-DISABLED-NOT: .cold
 
 enum MyError: Error { case err }
+
+func reportError() -> Never {
+  fatalError()
+}
 
 func getRandom(_ b: Bool) throws -> Int {
     if b {
@@ -37,6 +41,6 @@ public func numberWithLogging(_ b: Bool) -> Int {
         return try getRandom(b)
     } catch {
         print("Log: random number generator failed with b=\(b)")
-        return 1337
+        reportError()
     }
 }

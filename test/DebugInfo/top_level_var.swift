@@ -8,6 +8,6 @@ markUsed(a)
 // CHECK: !DIGlobalVariable(name: "a",
 // CHECK-SAME:              scope: ![[MOD:[0-9]+]]
 // CHECK: ![[MOD]] = !DIModule(scope: null, name: "top_level_var"
-// CHECK: ![[MAIN:.*]] = distinct !DISubprogram(name: "main",
+// CHECK: ![[MAIN:.*]] = distinct !DISubprogram(name: "{{(__)?}}main{{(_argc_argv)?}}",
 // CHECK-SAME:                                  line: 1
 // CHECK-SAME:                                  DISPFlagDefinition

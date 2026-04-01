@@ -484,3 +484,30 @@ dynamic func toBeReplaced(arg: Int) {}
 
 @_dynamicReplacement(for: toBeReplaced(arg:))
 func toReplaceWith(arg: Int) {}
+
+// Regression test: Swift 6.2 and earlier crashed trying to form the type USR
+// of the "module type" of a `DotSyntaxBaseIgnoredExpr` when calling a
+// module-qualified free function.
+func moduleTypeUSRRegressionTest() {
+    Swift.print("")
+}
+
+// Regression test: When a function captures another function, don't print the
+// entire captured decl. This causes infinite recursion in the dumper when a
+// local (nested) function captures itself.
+func outerFn() {
+    func innerFun(shouldRecurse: Bool) {
+        if shouldRecurse {
+            innerFun(shouldRecurse: false)
+        }
+    }
+    innerFun(shouldRecurse: true)
+}
+
+// Regression test: Discarded async lets were calling `printCommon` twice,
+// which resulted in invalid JSON (and not-so-great S-expression output)
+// either.
+func discardedAsyncLet() async {
+    func someTask() async {}
+    async let _ = someTask()
+}

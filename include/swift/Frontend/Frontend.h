@@ -43,6 +43,7 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
@@ -95,6 +96,7 @@ class CompilerInvocation {
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
   MigratorOptions MigratorOpts;
@@ -247,8 +249,6 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
-  void setPlatformAvailabilityInheritanceMapPath(StringRef Path);
-
   /// Compute the default prebuilt module cache path for a given resource path
   /// and SDK version. This function is also used by LLDB.
   static std::string
@@ -273,6 +273,9 @@ public:
   /// Determine which C++ stdlib should be used for this compilation, and which
   /// C++ stdlib is the default for the specified target.
   void computeCXXStdlibOptions();
+
+  /// Compute whether or not we support aarch64TBI
+  void computeAArch64TBIOptions();
 
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
@@ -503,6 +506,7 @@ class CompilerInstance {
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   std::shared_ptr<llvm::cas::ActionCache> ResultCache;
   std::optional<llvm::cas::ObjectRef> CompileJobBaseKey;
+  std::string CASIDForPCH;
 
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
@@ -600,6 +604,11 @@ public:
   }
   std::shared_ptr<llvm::cas::ObjectStore> getSharedCASInstance() const {
     return CAS;
+  }
+  void setSharedCASInstances(std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                             std::shared_ptr<llvm::cas::ActionCache> Cache) {
+    this->CAS = std::move(CAS);
+    this->ResultCache = std::move(Cache);
   }
   std::optional<llvm::cas::ObjectRef> getCompilerBaseKey() const {
     return CompileJobBaseKey;
@@ -710,13 +719,21 @@ public:
     }
   }
 
+  SourceFile &getPrimaryOrMainSourceFile() const {
+    if (SourceFile *SF = getPrimarySourceFile())
+      return *SF;
+    return getMainModule()->getMainSourceFile();
+  }
+
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation, std::string &Error,
              ArrayRef<const char *> Args = {});
 
   /// The fast setup function for cache replay.
   bool setupForReplay(const CompilerInvocation &Invocation, std::string &Error,
-                      ArrayRef<const char *> Args = {});
+                      ArrayRef<const char *> Args,
+                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                      std::shared_ptr<llvm::cas::ActionCache> Cache);
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 
@@ -791,6 +808,9 @@ public:
   /// \param silModule The SIL module that was generated during SILGen.
   /// \returns true if any errors occurred.
   bool performSILProcessing(SILModule *silModule);
+
+  /// Dumps any debugging output for the compilation, if requested.
+  void emitEndOfPipelineDebuggingOutput();
 
 private:
   /// Creates a new source file for the main module.

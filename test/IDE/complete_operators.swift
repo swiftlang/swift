@@ -72,7 +72,7 @@ func testPostfix9<G: P where G.T == Int>(x: G) {
 func testPostfix10<G: P where G.T : Fooable>(x: G) {
   x.foo()#^POSTFIX_10^#
 }
-// POSTFIX_10: Decl[PostfixOperatorFunction]/CurrModule: ***[#G.T#]
+// POSTFIX_10: Decl[PostfixOperatorFunction]/CurrModule: ***[#Fooable#]
 
 func testPostfixSpace(x: inout S) {
   x #^S_POSTFIX_SPACE^#
@@ -172,7 +172,7 @@ func ****<T: Fooable>(x: T, y: T) -> T { return x }
 func testInfix9<T: P where T.T: Fooable>(x: T) {
   x.foo()#^INFIX_9?check=FOOABLE_INFIX^#
 }
-// FOOABLE_INFIX: Decl[InfixOperatorFunction]/CurrModule:   **** {#T.T#}[#T.T#]
+// FOOABLE_INFIX: Decl[InfixOperatorFunction]/CurrModule:   **** {#T.T#}[#Fooable#]
 
 func testInfix10<T: P where T.T: Fooable>(x: T) {
   (x.foo() **** x.foo())#^INFIX_10?check=FOOABLE_INFIX^#
@@ -210,8 +210,8 @@ func testInfix15<T: P where T.T == S2>() {
 // INFIX_15: Begin completions, 6 items
 // INFIX_15-DAG: Decl[AssociatedType]/CurrNominal:   .T; name=T
 // INFIX_15-DAG: Decl[InstanceMethod]/CurrNominal:   .foo({#(self): P#})[#() -> S2#]; name=foo(:)
-// INFIX_15-DAG: Keyword[self]/CurrNominal:          .self[#T.Type#]; name=self
-// INFIX_15-DAG: Keyword/CurrNominal:                .Type[#T.Type#]; name=Type
+// INFIX_15-DAG: Keyword[self]/CurrNominal:          .self[#P.Type#]; name=self
+// INFIX_15-DAG: Keyword/CurrNominal:                .Type[#P.Type#]; name=Type
 // INFIX_15-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#(any (~Copyable & ~Escapable).Type)?#}[#Bool#];
 // INFIX_15-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#(any (~Copyable & ~Escapable).Type)?#}[#Bool#];
 
@@ -221,7 +221,7 @@ func testInfix16<T: P where T.T == S2>() {
 
 // INFIX_16: Begin completions, 2 items
 // INFIX_16-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(self): P#})[#() -> S2#]; name=(:)
-// INFIX_16-DAG: Keyword[self]/CurrNominal:        .self[#(T) -> () -> S2#]; name=self
+// INFIX_16-DAG: Keyword[self]/CurrNominal:        .self[#(P) -> () -> S2#]; name=self
 
 func testInfix17(x: Void) {
   x#^INFIX_17?check=VOID_OPERATORS^#

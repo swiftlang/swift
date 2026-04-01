@@ -55,13 +55,13 @@ enum ContextualTypePurpose : uint8_t {
   CTP_ThrowStmt,         ///< Value specified to a 'throw' statement.
   CTP_DiscardStmt,       ///< Value specified to a 'discard' statement.
   CTP_EnumCaseRawValue,  ///< Raw value specified for "case X = 42" in enum.
+  CTP_IntGenericParam,   ///< Integer expression specified for a generic value argument.
   CTP_DefaultParameter,  ///< Default value in parameter 'foo(a : Int = 42)'.
 
   /// Default value in @autoclosure parameter
   /// 'foo(a : @autoclosure () -> Int = 42)'.
   CTP_AutoclosureDefaultParameter,
 
-  CTP_CalleeResult,     ///< Constraint is placed on the result of a callee.
   CTP_CallArgument,     ///< Call to function or operator requires type.
   CTP_ClosureResult,    ///< Closure result expects a specific type.
   CTP_ArrayElement,     ///< ArrayExpr wants elements to have a specific type.
@@ -76,23 +76,14 @@ enum ContextualTypePurpose : uint8_t {
   CTP_CaseStmt,         ///< A single case statement associated with a `switch` or
                         ///  a `do-catch` statement. It has to be convertible
                         ///  to a type of a switch subject or an `Error` type.
-  CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
-                        ///< is expected to conform to 'Sequence' protocol.
-  CTP_ForEachSequence,  ///< Sequence expression associated with `for-in` loop,
-                        ///  this element acts slightly differently compared to
-                        ///  \c CTP_ForEachStmt in a sence that it would
-                        ///  produce conformance constraints.
+  CTP_ForEachSequence,  ///< Sequence expression associated with `for-in` loop.
   CTP_WrappedProperty,  ///< Property type expected to match 'wrappedValue' type
-  CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
-                               ///< former 'wrappedValue' type
 
   CTP_SingleValueStmtBranch, ///< The contextual type for a branch in a single
                              ///< value statement expression.
 
   CTP_ExprPattern,      ///< `~=` operator application associated with expression
                         /// pattern.
-
-  CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 
 namespace constraints {
@@ -163,19 +154,19 @@ public:
     /// subclass, returning \c None if unsuccessful.
     template <class T>
     std::optional<T> getAs() const {
-      if (auto *result = dyn_cast<T>(this))
+      if (auto *result = llvm::dyn_cast<T>(this))
         return *result;
       return std::nullopt;
     }
 
     /// Cast the path element to a specific \c LocatorPathElt subclass.
     template <class T>
-    T castTo() const { return *cast<T>(this); }
+    T castTo() const { return *llvm::cast<T>(this); }
 
     /// Checks whether the path element is a specific \c LocatorPathElt
     /// subclass.
     template <class T>
-    bool is() const { return isa<T>(this); }
+    bool is() const { return llvm::isa<T>(this); }
 
     /// Return the summary flags for this particular element.
     unsigned getNewSummaryFlags() const;
@@ -259,6 +250,10 @@ public:
   /// Determine whether this locator points to a member component
   /// of the key path at some index.
   bool isKeyPathMemberComponent() const;
+
+  /// Determine whether this locator points to an apply component of the key
+  /// path at some index.
+  bool isKeyPathApplyComponent() const;
 
   /// Determine whether this locator points to the member found
   /// via key path dynamic member lookup.
@@ -1014,26 +1009,6 @@ public:
   }
 };
 
-class LocatorPathElt::ImplicitConversion final
-    : public StoredIntegerElement<1> {
-public:
-  ImplicitConversion(ConversionRestrictionKind kind)
-      : StoredIntegerElement(ConstraintLocator::ImplicitConversion,
-                             static_cast<unsigned>(kind)) {}
-
-  ConversionRestrictionKind getConversionKind() const {
-    return static_cast<ConversionRestrictionKind>(getValue());
-  }
-
-  bool is(ConversionRestrictionKind kind) const {
-    return getConversionKind() == kind;
-  }
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::ImplicitConversion;
-  }
-};
-
 class LocatorPathElt::ContextualType final : public StoredIntegerElement<1> {
 public:
   ContextualType(ContextualTypePurpose purpose)
@@ -1110,7 +1085,7 @@ public:
 
   Stmt *asStmt() const {
     auto node = ASTNode::getFromOpaqueValue(getStoredPointer());
-    return node.get<Stmt *>();
+    return cast<Stmt *>(node);
   }
 
   static bool classof(const LocatorPathElt *elt) {

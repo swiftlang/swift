@@ -172,7 +172,8 @@ swift_task_enqueueMainExecutorOrig(Job *job) {
 
 void
 swift::swift_task_enqueueMainExecutor(Job *job) {
-  concurrency::trace::job_enqueue_main_executor(job);
+  concurrency::trace::job_enqueue_executor(
+      job, swift_task_getMainExecutor(), TaskExecutorRef::undefined());
   if (SWIFT_UNLIKELY(swift_task_enqueueMainExecutor_hook))
     swift_task_enqueueMainExecutor_hook(job, swift_task_enqueueMainExecutorOrig);
   else

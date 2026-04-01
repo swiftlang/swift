@@ -22,7 +22,6 @@ install(FILES
   System.h
   Target.h
   ThreadLocalStorage.h
-  UnicodeData.h
   Visibility.h
   _SwiftConcurrency.h
   _SwiftDistributed.h

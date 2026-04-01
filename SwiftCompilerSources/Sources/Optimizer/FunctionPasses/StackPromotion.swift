@@ -57,7 +57,7 @@ let stackPromotion = FunctionPass(name: "stack-promotion") {
   }
   if needFixStackNesting {
     // Make sure that all stack allocating instructions are nested correctly.
-    function.fixStackNesting(context)
+    context.fixStackNesting(in: function)
   }
 }
 
@@ -329,18 +329,4 @@ private extension BasicBlockRange {
   func containsCriticalExitEdges(deadEndBlocks: DeadEndBlocksAnalysis) -> Bool {
     exits.contains { !deadEndBlocks.isDeadEnd($0) && !$0.hasSinglePredecessor }
   }
-}
-
-private func isInLoop(block startBlock: BasicBlock, _ context: FunctionPassContext) -> Bool {
-  var worklist = BasicBlockWorklist(context)
-  defer { worklist.deinitialize() }
-
-  worklist.pushIfNotVisited(contentsOf: startBlock.successors)
-  while let block = worklist.pop() {
-    if block == startBlock {
-      return true
-    }
-    worklist.pushIfNotVisited(contentsOf: block.successors)
-  }
-  return false
 }

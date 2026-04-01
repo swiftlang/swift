@@ -11,6 +11,9 @@ import AppKit
 var _: AttributeScopes.AppKitAttributes.UnderlineStyleAttribute! = nil
 
 var _ = NSEvent.SpecialKey.upArrow.rawValue
+var _ = NSEvent.SpecialKey.enter.rawValue
+var _ = NSUpArrowFunctionKey
+var _ = NSEnterCharacter
 
 #elseif canImport(UIKit)
 import UIKit

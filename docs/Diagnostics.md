@@ -138,7 +138,8 @@ To add a new diagnostics group:
 5. Create a new entry in `DiagnosticGroups.def` that provides the name for your new diagnostic group along with the name of the file you added in step (4), without an extension.
 6. Find each diagnostic you want to make part of this group in the various `Diagnostics*.def` files. For each diagnostic, replace the `ERROR` or `WARNING` with `GROUPED_ERROR` or `GROUPED_WARNING`, respectively, and put the diagnostic group name after the string literal for the diagnostic message.
 7. If possible, rebuild the compiler and try recompiling your test program. Your new diagnostic group should appear as `[#<group name>]` at the end of the diagnostic, with a link to the diagnostic file.
-8. That's it! The new diagnostic group is now ready to be submitted as a pull request on GitHub.
+8. If possible, generate updated doc indexes by running `./utils/generate-doc-index.swift .`. Otherwise, the `userdoc_indices` test will fail, since your new diagnostic group won't be in `diagnostic-groups.md` yet.
+9. That's it! The new diagnostic group is now ready to be submitted as a pull request on GitHub.
 
 If you run into any issues or have questions while following the steps above, feel free to post a question on the Swift forums or open a work-in-progress pull request on GitHub.
 
@@ -187,6 +188,15 @@ If the `-verify` frontend flag is used, the Swift compiler will check emitted di
 An expected diagnostic is denoted by a comment which begins with `expected-error`, `expected-warning`, `expected-note`, or `expected-remark`. (You can use `-verify-additional-prefix <string>` to add expectations with additional prefixes, e.g. `-verify-additional-prefix foo-` will pick up both `expected-error` and `expected-foo-error`.) It is followed by:
 
 - (Optional) Location information. By default, the comment will match any diagnostic emitted on the same line. However, it's possible to override this behavior and/or specify column information as well. `// expected-error@-1 ...` looks for an error on the previous line, `// expected-warning@+1:3 ...` looks for a warning on the next line at the third column, and `// expected-note@:7 ...` looks for a note on the same line at the seventh column.
+
+  Named location markers can also be used instead of line offsets. A marker is defined by placing `// #name` in a comment (where `name` consists of alphanumeric characters, hyphens, or underscores, and must be the only content in the comment). The marker can then be referenced with `@#name`:
+
+  ```swift
+  let x: Int = "hello" // #myMarker
+  // expected-error@#myMarker {{cannot convert value}}
+  ```
+
+  Markers are especially useful when the diagnostic and its expectation are far apart, when lines are frequently added or removed nearby, or when referring to diagnostics in a different file. An optional column can also be specified: `// expected-error@#myMarker:14 ...`.
 
 - (Optional) A match count which specifies how many times the diagnostic is expected to appear. This may be a positive integer or `*`, which allows for zero or more matches. The match count must be surrounded by whitespace if present. For example, `// expected-error 2 ...` looks for two matching errors, and `// expected-warning * ...` looks for any number of matching warnings.
 

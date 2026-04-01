@@ -1,0 +1,4 @@
+module ObjCFrozenEnum {
+  header "ObjCFrozenEnum.h"
+  export *
+}

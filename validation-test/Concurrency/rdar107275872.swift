@@ -7,6 +7,7 @@
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime || use_os_stdlib
 
 // rdar://108260399
 // REQUIRES: optimized_stdlib

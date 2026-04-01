@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -41,7 +43,7 @@ enum SomeError: Error {
       return 11
     }
 
-    let result = try! await t1.get() + t2.get() + t3.get() + t4.get()
+    let result = try! await t1.value + t2.value + t3.value + t4.value
     assert(result == 32)
   }
 }

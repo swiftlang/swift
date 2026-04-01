@@ -20,6 +20,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/CatchNode.h"
 #include "swift/Sema/Constraint.h"
 #include "llvm/ADT/ilist.h"
 #include <vector>
@@ -36,6 +37,7 @@ class TypeVariableType;
 namespace constraints {
 
 class Constraint;
+enum ScoreKind : unsigned int;
 struct SyntacticElementTargetKey;
 
 namespace inference {
@@ -145,7 +147,13 @@ public:
         /// of a PotentialBinding.
         Type BindingType;
         PointerUnion<Constraint *, ConstraintLocator *> BindingSource;
+        TypeVariableType *Originator;
       } Binding;
+
+      struct {
+        Constraint *Disjunction;
+        FunctionType *ArgFuncType;
+      } Disjunction;
 
       ConstraintFix *TheFix;
       ConstraintLocator *TheLocator;
@@ -175,9 +183,9 @@ public:
 #define SCORE_CHANGE(Name) static Change Name(ScoreKind kind, unsigned value);
 #define GRAPH_NODE_CHANGE(Name) static Change Name(TypeVariableType *typeVar, \
                                                    Constraint *constraint);
-#define BINDING_RELATION_CHANGE(Name) static Change Name(TypeVariableType *typeVar, \
-                                                         TypeVariableType *otherTypeVar, \
-                                                         Constraint *constraint);
+#define BINDING_RELATION_CHANGE(Name)                                          \
+  static Change Name(TypeVariableType *typeVar,                                \
+                     TypeVariableType *otherTypeVar, Constraint *constraint);
 #include "swift/Sema/CSTrail.def"
 
     /// Create a change that added a type variable.
@@ -253,10 +261,19 @@ public:
     static Change RetiredConstraint(llvm::ilist<Constraint>::iterator where,
                                     Constraint *constraint);
 
+    /// Create a change that added a binding to a type variable's potential
+    /// bindings. This could be caused by direct or transitive inference.
+    static Change AddedBinding(TypeVariableType *typeVar,
+                               inference::PotentialBinding binding);
+
     /// Create a change that removed a binding from a type variable's potential
     /// bindings.
     static Change RetractedBinding(TypeVariableType *typeVar,
                                    inference::PotentialBinding binding);
+
+    /// Create a change that disjunction pruning was performed.
+    static Change PrunedDisjunction(Constraint *disjunction,
+                                    FunctionType *argFuncType);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

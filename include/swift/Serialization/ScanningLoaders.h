@@ -22,6 +22,11 @@ namespace swift {
 /// Result of looking up a Swift module on the current filesystem
 /// search paths.
 struct SwiftModuleScannerQueryResult {
+  // Checked for by the scanner as a special case
+  // for downgrading imcompatible-candidate-only lookup result
+  // to a warning.
+  static constexpr const char *BUILT_FOR_INCOMPATIBLE_TARGET =
+      "built for incompatible target";
   struct IncompatibleCandidate {
     std::string path;
     std::string incompatibilityReason;
@@ -38,18 +43,6 @@ struct SwiftModuleScannerQueryResult {
 
   std::optional<ModuleDependencyInfo> foundDependencyInfo;
   std::vector<IncompatibleCandidate> incompatibleCandidates;
-};
-
-/// Result of looking up a Clang module on the current filesystem
-/// search paths.
-struct ClangModuleScannerQueryResult {
-  ClangModuleScannerQueryResult(const ModuleDependencyVector &dependencyModuleGraph,
-                                const std::vector<std::string> &visibleModuleIdentifiers)
-      : foundDependencyModuleGraph(dependencyModuleGraph),
-        visibleModuleIdentifiers(visibleModuleIdentifiers) {}
-
-  ModuleDependencyVector foundDependencyModuleGraph;
-  std::vector<std::string> visibleModuleIdentifiers;
 };
 
 /// A module "loader" that looks for .swiftinterface and .swiftmodule files
@@ -75,12 +68,18 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool SkipBuildingInterface, bool IsFramework,
+      bool IsCanImportLookup, bool IsFramework,
       bool IsTestableDependencyLookup) override;
 
   bool canImportModule(ImportPath::Module named, SourceLoc loc,
                        ModuleVersionInfo *versionInfo,
                        bool isTestableImport) override;
+
+  bool handlePossibleTargetMismatch(
+      SourceLoc sourceLocation,
+      StringRef moduleName,
+      const SerializedModuleBaseName &BaseName,
+      bool isCanImportLookup) override;
 
   virtual void collectVisibleTopLevelModuleNames(
       SmallVectorImpl<Identifier> &names) const override {
@@ -89,10 +88,6 @@ private:
 
   /// AST delegate to be used for textual interface scanning
   InterfaceSubContextDelegate &astDelegate;
-  /// Location where pre-built modules are to be built into.
-  std::string moduleOutputPath;
-  /// Location where pre-built SDK modules are to be built into.
-  std::string sdkModuleOutputPath;
   /// Clang-specific (-Xcc) command-line flags to include on
   /// Swift module compilation commands
   std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
@@ -108,14 +103,12 @@ private:
 public:
   SwiftModuleScanner(
       ASTContext &ctx, ModuleLoadingMode LoadMode,
-      InterfaceSubContextDelegate &astDelegate, StringRef moduleOutputPath,
-      StringRef sdkModuleOutputPath,
+      InterfaceSubContextDelegate &astDelegate,
       std::vector<std::string> swiftModuleClangCC1CommandLineArgs,
       llvm::StringMap<std::string> &explicitSwiftModuleInputs)
       : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                    /*IgnoreSwiftSourceInfoFile=*/true),
-        astDelegate(astDelegate), moduleOutputPath(moduleOutputPath),
-        sdkModuleOutputPath(sdkModuleOutputPath),
+        astDelegate(astDelegate),
         swiftModuleClangCC1CommandLineArgs(swiftModuleClangCC1CommandLineArgs),
         explicitSwiftModuleInputs(explicitSwiftModuleInputs) {
   }

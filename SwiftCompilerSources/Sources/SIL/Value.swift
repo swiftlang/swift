@@ -101,6 +101,10 @@ public enum Ownership {
     }
   }
 
+  public init(in function: Function, of type: Type, with convention: ArgumentConvention) {
+    self = Ownership(bridged: BridgedValueOwnership_init(function.bridged, type.bridged, convention.bridged))
+  }
+
   public var _bridged: BridgedValue.Ownership {
     switch self {
       case .unowned:    return BridgedValue.Ownership.Unowned
@@ -298,6 +302,10 @@ public final class Undef : Value {
   public var hasTrivialNonPointerType: Bool { false }
 
   public var isLexical: Bool { false }
+
+  public static func get(type: Type, _ context: some MutatingContext) -> Undef {
+    context._bridged.getSILUndef(type.bridged).value as! Undef
+  }
 }
 
 final class PlaceholderValue : Value {

@@ -12,6 +12,14 @@ public func unavailableFunc() -> S {
   return S()
 }
 
+// CHECK-LABEL: sil{{.*}}@$s4Test33unavailableFuncIntroducedInSwift5yyF
+// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
+// CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:       } // end sil function '$s4Test33unavailableFuncIntroducedInSwift5yyF'
+@available(*, unavailable)
+@available(swift 5)
+public func unavailableFuncIntroducedInSwift5() { }
+
 // CHECK-LABEL: sil{{.*}}@$s4Test025unavailableFuncWithNestedC0yyF
 // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
 // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()

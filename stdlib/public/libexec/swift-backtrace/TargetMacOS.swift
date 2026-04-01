@@ -377,7 +377,12 @@ class Target {
     }
   }
 
-  public func withDebugger(_ body: () -> ()) throws {
+  enum DebuggerResult {
+    case abort
+    case handOffToDebugger
+  }
+
+  public func withDebugger(_ body: () -> DebuggerResult) throws {
     #if os(macOS)
     return try withTemporaryDirectory(pattern: "/tmp/backtrace.XXXXXXXX") {
       tmpdir in
@@ -404,13 +409,15 @@ class Target {
 
       try spawn("/usr/bin/open", args: ["open", cmdfile])
 
-      body()
+      if body() == .handOffToDebugger {
+        exit(0)
+      }
     }
     #else
     print("""
             From another shell, please run
 
-            lldb --attach-pid \(target.pid) -o c
+            lldb --attach-pid \(pid) -o c
             """)
     body()
     #endif

@@ -71,3 +71,26 @@ bb3:
 
 
 // CHECK-IR: ![[DBG_VAR]] = !DILocalVariable(name: "hello"
+
+struct T {
+  @_hasStorage let x: Builtin.Int32 { get }
+  init(x: Builtin.Int32)
+}
+
+// This test verifies that splitAggregateLoad in CanonicalizeInstruction.cpp
+// salvages debug info attached to the loaded aggregate in optimized builds.
+//
+// CHECK-LABEL: sil @split_aggregate_load : $@convention(thin) (@in T) -> Builtin.Int32 {
+// CHECK:       bb0([[ARG:%[0-9]+]] : $*T):
+// CHECK-NEXT:    [[ELEM_ADDR:%[0-9]+]] = struct_element_addr [[ARG]] : $*T, #T.x
+// CHECK-NEXT:    [[ELEM:%[0-9]+]] = load [[ELEM_ADDR]]
+// CHECK-NEXT:    debug_value [[ARG]] : $*T, let, name "var", expr op_deref
+// CHECK-NEXT:    return [[ELEM]] : $Builtin.Int32
+// CHECK-LABEL: } // end sil function 'split_aggregate_load'
+sil @split_aggregate_load : $@convention(thin) (@in T) -> Builtin.Int32 {
+bb0(%0 : $*T):
+  %1 = load %0
+  debug_value %1, let, name "var"
+  %2 = struct_extract %1, #T.x
+  return %2
+}

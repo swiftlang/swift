@@ -340,7 +340,7 @@ extension LifetimeDependence.Scope {
     assert(iter.next() == nil,
            "guaranteed phis not allowed when diagnosing lifetime dependence")
     switch beginBorrow {
-    case .beginBorrow, .loadBorrow:
+    case .beginBorrow, .loadBorrow, .dereferenceBorrow:
       self = .borrowed(beginBorrow)
     case let .beginApply(value):
       self = .yield(value)
@@ -381,7 +381,29 @@ extension LifetimeDependence.Scope {
   }
 }
 
+// Scope helpers.
 extension LifetimeDependence.Scope {
+  // If the LifetimeDependenceScope is .initialized, then return the alloc_stack.
+  var allocStackInstruction: AllocStackInst? {
+    switch self {
+    case let .initialized(initializer):
+      switch initializer {
+      case let .store(initializingStore: store, initialAddress):
+        if let allocStackInst = initialAddress as? AllocStackInst {
+          return allocStackInst
+        }
+        if let sb = store as? StoreBorrowInst {
+          return sb.allocStack
+        }
+        return nil
+      default:
+        return nil
+      }
+      default:
+        return nil
+    }
+  }
+
   /// Ignore "irrelevant" borrow scopes: load_borrow or begin_borrow without [var_decl]
   func ignoreBorrowScope(_ context: some Context) -> LifetimeDependence.Scope? {
     guard case let .borrowed(beginBorrowVal) = self else {
@@ -405,6 +427,10 @@ extension LifetimeDependence.Scope {
   /// Compute the range of the dependence scope. 
   ///
   /// Returns nil if the dependence scope covers the entire function. Returns an empty range for an unknown scope.
+  ///
+  /// When this Scope is live on unreachable paths, the returned range may include blocks that are not dominated by the
+  /// scope introducer. Even though 'range.isValid == false' for such a range, it is still valid for checking that
+  /// dependencies are in scope since we already know that the Scope introducer dominates all dependent uses.
   ///
   /// Ignore the lifetime of temporary trivial values (with .initialized and .unknown scopes). Temporaries have an
   /// unknown Scope, which means that LifetimeDependence.Scope did not recognize a VariableScopeInstruction. This is
@@ -456,7 +482,7 @@ extension LifetimeDependence.Scope {
       }
       let address = initializer.initialAddress
       if address.type.objectType.isTrivial(in: address.parentFunction) {
-        return nil
+        return LifetimeDependence.Scope.computeAddressableRange(initializer: initializer, context)
       }
       return LifetimeDependence.Scope.computeInitializedRange(initializer: initializer, context)
     case let .unknown(value):
@@ -503,6 +529,68 @@ extension LifetimeDependence.Scope {
     }
     return range
   }
+
+  // For trivial values, compute the range in which the value may have its address taken.
+  // Returns nil unless the address has both an addressable parameter use and a dealloc_stack use.
+  //
+  // This extended range is convervative. In theory, it can lead to a "false positive" diagnostic if this scope was
+  // computed for a apply site that takes this address as *non-addressable*, as opposed to the apply site discovered
+  // here that takes the alloc_stack as an *addressable* argument. This won't normally happen because addressability
+  // depends on the value's type (via @_addressableForDepenencies), so all other lifetime-dependent applies should be
+  // addressable. Furthermore, SILGen only creates temporary stack locations for addressable arguments for a single
+  // argument.
+  private static func computeAddressableRange(initializer: AccessBase.Initializer, _ context: Context)
+    -> InstructionRange? {
+    switch initializer {
+    case .argument, .yield:
+      return nil
+    case let .store(initializingStore, initialAddr):
+      guard initialAddr is AllocStackInst else {
+        return nil
+      }
+      var isAddressable = false
+      var deallocInsts = SingleInlineArray<DeallocStackInst>()
+      for use in initialAddr.uses {
+        let inst = use.instruction
+        switch inst {
+        case let apply as ApplySite:
+          isAddressable = isAddressable || apply.isAddressable(operand: use)
+        case let dealloc as DeallocStackInst:
+          deallocInsts.append(dealloc)
+        default:
+          break
+        }
+      }
+      guard isAddressable, !deallocInsts.isEmpty else {
+        // Valid on all paths to function exit.
+        return nil
+      }
+      var range = InstructionRange(begin: initializingStore, context)
+      range.insert(contentsOf: deallocInsts)
+
+      // Insert unreachable paths with no dealloc_stack.
+      var forwardUnreachableWalk = BasicBlockWorklist(context)
+      defer { forwardUnreachableWalk.deinitialize() }
+
+      // TODO: ensure complete dealloc_stack on all paths in SIL verification, then assert exitBlock.isEmpty.
+      for exitBlock in range.exitBlocks {
+        forwardUnreachableWalk.pushIfNotVisited(exitBlock)
+      }
+      while let b = forwardUnreachableWalk.pop() {
+        if let unreachableInst = b.terminator as? UnreachableInst {
+          // Note: 'unreachableInst' is not necessarilly dominated by 'initializingStore'. This marks the range invalid,
+          // but leaves it in a usable state that includes all blocks covered by the temporary allocation. The extra
+          // blocks (backward up to the function entry) are irrelevant becase we already know that 'initializingStore'
+          // dominates dependent uses.
+          range.insert(unreachableInst)
+        }
+        for succBlock in b.successors {
+          forwardUnreachableWalk.pushIfNotVisited(succBlock)
+        }
+      }
+      return range
+    }
+  }
 }
 
 // =============================================================================
@@ -526,7 +614,7 @@ extension LifetimeDependence.Scope {
 ///   leafUse(of: Operand) -> WalkResult
 ///   deadValue(_ value: Value, using operand: Operand?) -> WalkResult
 ///   escapingDependence(on operand: Operand) -> WalkResult
-///   inoutDependence(argument: FunctionArgument, on: Operand) -> WalkResult
+///   inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult
 ///   returnedDependence(result: Operand) -> WalkResult
 ///   returnedDependence(address: FunctionArgument, on: Operand) -> WalkResult
 ///   yieldedDependence(result: Operand) -> WalkResult
@@ -534,6 +622,9 @@ extension LifetimeDependence.Scope {
 ///   walkDown(dependence: LifetimeDependence)
 ///
 /// Note: this may visit values that are not dominated by `dependence` because of dependent phi operands.
+///
+/// WARNING: Do not return .abortWalk at this level or below. .abortWalk may only be returned by an overridden callback
+/// or the default implementation of unknownAddressUse().
 protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
                                           OwnershipUseVisitor,
                                           AddressUseVisitor {
@@ -546,9 +637,9 @@ protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
 
   mutating func escapingDependence(on operand: Operand) -> WalkResult
 
-  // Assignment to an inout argument. This does not include the indirect out result, which is considered a return
+  // Assignment to an inout argument. This does not include the @out result, which is considered a return
   // value.
-  mutating func inoutDependence(argument: FunctionArgument, on: Operand) -> WalkResult
+  mutating func inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult
 
   mutating func returnedDependence(result: Operand) -> WalkResult
 
@@ -574,11 +665,37 @@ extension LifetimeDependenceDefUseWalker {
     }
     let root = dependence.dependentValue
     if root.type.isAddress { 
-      // The root address may be an escapable mark_dependence that guards its address uses (unsafeAddress), an
-      // allocation, an incoming argument, or an outgoing argument. In all these cases, walk down the address uses.
+      // 'root' may be an incoming ~Escapable argument (where the argument is both the scope and the dependent value).
+      // If it is @inout, treat it like a local variable initialized on entry and possibly reassigned.
+      if let arg = root as? FunctionArgument, arg.convention.isInout {
+        return visitInoutAccess(argument: arg)
+      }
+
+      // Conservatively walk down any other address. This includes:
+      // An @in argument: assume it is initialized on entry and never reassigned.
+      // An @out argument: assume the first address use is the one and only assignment on each return path.
+      // An escapable mark_dependence that guards its address uses (unsafeAddress).
+      // Any other unknown address producer.
       return walkDownAddressUses(of: root)
     }
     return walkDownUses(of: root, using: nil)
+  }
+
+  // Find all @inout local variable uses reachabile from function entry. If local analysis fails to gather reachable
+  // uses, fall back to walkDownAddressUse to produce a better diagnostic.
+  mutating func visitInoutAccess(argument: FunctionArgument) -> WalkResult {
+    guard let localReachability = localReachabilityCache.reachability(for: argument, walkerContext) else {
+      return walkDownAddressUses(of: argument)
+    }
+    var reachableUses = Stack<LocalVariableAccess>(walkerContext)
+    defer { reachableUses.deinitialize() }
+
+    if !localReachability.gatherAllReachableDependentUsesFromEntry(in: &reachableUses) {
+      return walkDownAddressUses(of: argument)
+    }
+    return reachableUses.walk { localAccess in
+      visitLocalAccess(allocation: argument, localAccess: localAccess)
+    }
   }
 }
 
@@ -613,7 +730,7 @@ extension LifetimeDependenceDefUseWalker {
     if let apply = operand.instruction as? FullApplySite {
       return visitAppliedUse(of: operand, by: apply)
     }
-    if operand.instruction is ReturnInst, !operand.value.isEscapable {
+    if operand.instruction is ReturnInstruction, !operand.value.isEscapable {
       return returnedDependence(result: operand)
     }
     if operand.instruction is YieldInst, !operand.value.isEscapable {
@@ -654,13 +771,22 @@ extension LifetimeDependenceDefUseWalker {
       // Catch .instantaneousUse operations that are dependence leaf uses.
       return leafUse(of: operand)
 
-    case is DestroyValueInst, is EndLifetimeInst, is DeallocRefInst,
+    case is DeallocRefInst,
          is DeallocBoxInst, is DeallocExistentialBoxInst,
          is BeginCOWMutationInst, is EndCOWMutationInst,
          is EndInitLetRefInst, is DeallocPartialRefInst, is BeginDeallocRefInst:
       // Catch .destroyingConsume operations that are dependence leaf
       // uses.
       return leafUse(of: operand)
+
+    case let destroy as DestroyValueInst:
+      if destroy.isDeadEnd {
+        return .continueWalk
+      }
+      return leafUse(of: operand)
+
+    case is EndLifetimeInst:
+      return .continueWalk
 
     case let si as StoringInstruction where si.sourceOperand == operand:
       return visitStoredUses(of: operand, into: si.destinationOperand.value)
@@ -774,7 +900,7 @@ extension LifetimeDependenceDefUseWalker {
     return walkDownUses(of: value, using: operand)
   }    
 
-  // copy_addr
+  // copy_addr %operand to %address; %_newAddr = mark_dependence %address on %operand
   mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand) -> WalkResult {
     if leafUse(of: operand) == .abortWalk {
       return .abortWalk
@@ -883,7 +1009,29 @@ extension LifetimeDependenceDefUseWalker {
       break
     case .yield:
       return storeToYieldDependence(address: address, of: operand)
-    case .global, .class, .tail, .storeBorrow, .pointer, .index, .unidentified:
+    case let .pointer(p2a):
+      if !address.isEscapable, let base = p2a.isResultOfUnsafeAddressor() {
+        let selfValue = base.value
+        if selfValue.type.isAddress {
+          // Normally an unsafeMutableAddressor is mutating, so this is the common case (address-type
+          // 'selfValue'). Treat the store to this pointer-to-address projection just like any store to the local
+          // variable holding 'selfValue'.
+          return visitStoredUses(of: operand, into: selfValue)
+        }
+        // selfValue.type might not an be address:
+        // (1) mark_dependence on unsafeAddress is handled like a storedUse
+        // (2) nonmutating unsafeMutableAddress (e.g. UnsafeMutable[Buffer]Pointer).
+        // A nonmutating unsafeMutableAddress is only expected to happen for UnsafeMutable[Buffer]Pointer, in which case
+
+        // If selfValue is trivial (UnsafeMutable[Buffer]Pointer), its uses can be ignored.
+        if selfValue.type.isTrivial(in: selfValue.parentFunction) {
+          return .continueWalk
+        }
+        // Otherwise a store to indirect memory is conservatively escaping.
+        return escapingDependence(on: operand)
+      }
+      break
+    case .global, .class, .tail, .storeBorrow, .index, .unidentified:
       // An address produced by .storeBorrow should never be stored into.
       //
       // TODO: allow storing an immortal value into a global.
@@ -912,18 +1060,15 @@ extension LifetimeDependenceDefUseWalker {
     if case let .access(beginAccess) = storeAddress.enclosingAccessScope {
       storeAccess = beginAccess
     }
-    if !localReachability.gatherAllReachableUses(of: storeAccess, in: &accessStack) {
+    if !localReachability.gatherAllReachableDependentUses(of: storeAccess, in: &accessStack) {
       return escapingDependence(on: storedOperand)
     }
-    for localAccess in accessStack {
-      if visitLocalAccess(allocation: allocation, localAccess: localAccess, initialValue: storedOperand) == .abortWalk {
-        return .abortWalk
-      }
+    return accessStack.walk { localAccess in
+      visitLocalAccess(allocation: allocation, localAccess: localAccess)
     }
-    return .continueWalk
   }
 
-  private mutating func visitLocalAccess(allocation: Value, localAccess: LocalVariableAccess, initialValue: Operand)
+  private mutating func visitLocalAccess(allocation: Value, localAccess: LocalVariableAccess)
     -> WalkResult {
     switch localAccess.kind {
     case .beginAccess:
@@ -936,12 +1081,14 @@ extension LifetimeDependenceDefUseWalker {
         return loadedAddressUse(of: localAccess.operand!, intoValue: load)
       case let copyAddr as SourceDestAddrInstruction:
         return loadedAddressUse(of: localAccess.operand!, intoAddress: copyAddr.destinationOperand)
+      case let castAddr as CheckedCastAddrBranchInst:
+        return loadedAddressUse(of: localAccess.operand!, intoAddress: castAddr.destinationOperand)
       case is SwitchEnumAddrInst:
         // switch_enum_addr does not produce any values. Subsequent uses of the address (unchecked_enum_data_addr)
         // directly use the original address.
         return .continueWalk
       default:
-        return .abortWalk
+        return unknownAddressUse(of: localAccess.operand!)
       }
     case .dependenceSource:
       switch localAccess.instruction! {
@@ -953,11 +1100,11 @@ extension LifetimeDependenceDefUseWalker {
       case let md as MarkDependenceAddrInst:
         return loadedAddressUse(of: localAccess.operand!, intoAddress: md.addressOperand)
       default:
-        return .abortWalk
+        return unknownAddressUse(of: localAccess.operand!)
       }
     case .dependenceDest:
       // Simply a marker that indicates the start of an in-memory dependent value. If this was a mark_dependence, uses
-      // of its forwarded address has were visited by LocalVariableAccessWalker and recorded as separate local accesses.
+      // of its forwarded address were visited by LocalVariableAccessWalker and recorded as separate local accesses.
       return .continueWalk
     case .store, .storeBorrow:
       // A store does not use the previous in-memory value.
@@ -969,8 +1116,8 @@ extension LifetimeDependenceDefUseWalker {
       return escapingDependence(on: localAccess.operand!)
     case .outgoingArgument:
       let arg = allocation as! FunctionArgument
-      assert(arg.type.isAddress, "returned local must be allocated with an indirect argument")
-      return inoutDependence(argument: arg, on: initialValue)
+      assert(arg.type.isAddress || arg.type.isBox, "returned local must be allocated with an indirect argument")
+      return inoutDependence(argument: arg, functionExit: localAccess.instruction!)
     case .inoutYield:
       return yieldedDependence(result: localAccess.operand!)
     case .incomingArgument:
@@ -988,15 +1135,28 @@ extension LifetimeDependenceDefUseWalker {
     if apply.isCallee(operand: operand) {
       return leafUse(of: operand)
     }
+    // Find any copied dependence on this source operand, either targeting the result or an inout parameter. If the
+    // lifetime dependence is scoped, then we can ignore it because a mark_dependence [nonescaping] represents the
+    // dependence.
+    for targetOperand in apply.argumentOperands {
+      guard !targetOperand.value.isEscapable else {
+        continue
+      }
+      if let dep = apply.parameterDependence(target: targetOperand, source: operand),
+         !dep.isScoped {
+        let targetAddress = targetOperand.value
+        assert(targetAddress.type.isAddress, "a parameter dependence target must be 'inout'")
+        if dependentUse(of: operand, dependentAddress: targetAddress) == .abortWalk {
+          return .abortWalk
+        }
+      }
+    }
     if let dep = apply.resultDependence(on: operand),
        !dep.isScoped {
       // Operand is nonescapable and passed as a call argument. If the
       // result inherits its lifetime, then consider any nonescapable
       // result value to be a dependent use.
       //
-      // If the lifetime dependence is scoped, then we can ignore it
-      // because a mark_dependence [nonescaping] represents the
-      // dependence.
       if let result = apply.singleDirectResult, !result.isEscapable {
         if dependentUse(of: operand, dependentValue: result) == .abortWalk {
           return .abortWalk
@@ -1070,8 +1230,8 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
     return .continueWalk
   }
 
-  mutating func inoutDependence(argument: FunctionArgument, on operand: Operand) -> WalkResult {
-    print("Out use: \(operand) in: \(argument)")
+  mutating func inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult {
+    print("Returned inout: \(argument) exit: \(functionExit)")
     return .continueWalk
   }
 

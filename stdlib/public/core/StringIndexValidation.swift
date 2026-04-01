@@ -400,20 +400,3 @@ extension _StringGuts {
       scalarAlign(validateInclusiveSubscalarIndex_5_7(i)))
   }
 }
-
-// Word index validation (String)
-extension _StringGuts {
-  internal func validateWordIndex(
-    _ i: String.Index
-  ) -> String.Index {
-    return roundDownToNearestWord(scalarAlign(validateSubscalarIndex(i)))
-  }
-
-  internal func validateInclusiveWordIndex(
-    _ i: String.Index
-  ) -> String.Index {
-    return roundDownToNearestWord(
-      scalarAlign(validateInclusiveSubscalarIndex(i))
-    )
-  }
-}

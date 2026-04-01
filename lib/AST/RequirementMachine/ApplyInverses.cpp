@@ -54,13 +54,14 @@ void swift::rewriting::applyInverses(
   }
 
   const bool allowInverseOnAssocType =
-      ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes);
+      ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes) ||
+      ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypesWithDefaults);
       
   llvm::DenseMap<CanType, CanType> representativeGPs;
   
   // Start with an identity mapping.
   for (auto gp : gps) {
-    auto canGP = gp->getCanonicalType();
+    auto canGP = stripBoundDependentMemberTypes(gp)->getCanonicalType();
     representativeGPs.insert({canGP, canGP});
   }
   bool hadSameTypeConstraintInScope = false;
@@ -95,8 +96,12 @@ void swift::rewriting::applyInverses(
     // If one end of the same-type requirement is in scope, and the other is
     // a concrete type or out-of-scope generic parameter, then the other
     // parameter is also effectively out of scope.
-    auto firstTy = explicitReqt.req.getFirstType()->getCanonicalType();
-    auto secondTy = explicitReqt.req.getSecondType()->getCanonicalType();
+    auto firstTy =
+        stripBoundDependentMemberTypes(explicitReqt.req.getFirstType())
+            ->getCanonicalType();
+    auto secondTy =
+        stripBoundDependentMemberTypes(explicitReqt.req.getSecondType())
+            ->getCanonicalType();
     if (!representativeGPs.count(firstTy)
         && !representativeGPs.count(secondTy)) {
       // Same type constraint doesn't involve any in-scope generic parameters.
@@ -118,23 +123,27 @@ void swift::rewriting::applyInverses(
       typeOutOfScope = firstTy;
     } else {
       // Otherwise, both ends of the same-type constraint are in scope.
-      // Fold the lexicographically-greater parameter with the lesser.
-      auto firstGP = cast<GenericTypeParamType>(firstTy);
-      auto secondGP = cast<GenericTypeParamType>(secondTy);
-      
-      if (firstGP == secondGP) {
+
+      // Choose one parameter to be the representative for the other, using
+      // a notion of "order" where we prefer the lexicographically smaller
+      // type to be the representative for the larger one.
+      const int sign = compareDependentTypes(firstTy, secondTy);
+      if (sign == 0) {
         // `T == T` has no effect.
         continue;
       }
-      
-      if (firstGP->getDepth() > secondGP->getDepth()
-          || (firstGP->getDepth() == secondGP->getDepth()
-              && firstGP->getIndex() > secondGP->getIndex())) {
-        std::swap(firstGP, secondGP);
+
+      CanType smaller, larger;
+      if (sign < 0) {
+        smaller = firstTy;
+        larger = secondTy;
+      } else {
+        smaller = secondTy;
+        larger = firstTy;
       }
       
       hadSameTypeConstraintInScope = true;
-      representativeGPs.insert_or_assign(secondGP, representativeGPFor(firstGP));
+      representativeGPs.insert_or_assign(larger, representativeGPFor(smaller));
       continue;
     }
 
@@ -164,7 +173,8 @@ void swift::rewriting::applyInverses(
   // Summarize the inverses and diagnose ones that are incorrect.
   llvm::DenseMap<CanType, InvertibleProtocolSet> inverses;
   for (auto inverse : inverseList) {
-    auto canSubject = inverse.subject->getCanonicalType();
+    auto canSubject =
+        stripBoundDependentMemberTypes(inverse.subject)->getCanonicalType();
 
     // Inverses on associated types are experimental.
     if (!allowInverseOnAssocType && canSubject->is<DependentMemberType>()) {
@@ -194,7 +204,8 @@ void swift::rewriting::applyInverses(
     //       func f() where Self: ~Copyable
     //     }
     //
-    if (representativeGPs.find(canSubject) == representativeGPs.end()) {
+    auto subjectRoot = canSubject->getDependentMemberRoot()->getCanonicalType();
+    if (representativeGPs.find(subjectRoot) == representativeGPs.end()) {
       errors.push_back(
           RequirementError::forInvalidInverseOuterSubject(inverse));
       continue;
@@ -212,7 +223,7 @@ void swift::rewriting::applyInverses(
       continue;
     }
 
-    auto state = inverses.getOrInsertDefault(representativeSubject);
+    auto &state = inverses[representativeSubject];
 
     // Check if this inverse has already been seen.
     auto inverseKind = inverse.getKind();
@@ -244,7 +255,7 @@ void swift::rewriting::applyInverses(
     }
 
     // See if this subject is in-scope.
-    auto subject = req.getFirstType()->getCanonicalType();
+    auto subject = stripBoundDependentMemberTypes(req.getFirstType())->getCanonicalType();
     auto representative = representativeGPs.find(subject);
     if (representative == representativeGPs.end()) {
       return false;

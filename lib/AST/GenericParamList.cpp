@@ -39,8 +39,7 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
     WhereLoc(WhereLoc), Requirements(Requirements),
     OuterParameters(nullptr)
 {
-  std::uninitialized_copy(Params.begin(), Params.end(),
-                          getTrailingObjects<GenericTypeParamDecl *>());
+  std::uninitialized_copy(Params.begin(), Params.end(), getTrailingObjects());
 }
 
 GenericParamList *
@@ -123,7 +122,7 @@ TrailingWhereClause::TrailingWhereClause(
     NumRequirements(requirements.size())
 {
   std::uninitialized_copy(requirements.begin(), requirements.end(),
-                          getTrailingObjects<RequirementRepr>());
+                          getTrailingObjects());
 }
 
 TrailingWhereClause *TrailingWhereClause::create(

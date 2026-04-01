@@ -60,6 +60,11 @@ let objectOutliner = FunctionPass(name: "object-outliner") {
     return
   }
 
+  if function.linkage.isExternal {
+    // Don't outline objects in external functions because this would "duplicate" singletons.
+    return
+  }
+
   var allocRefs = Stack<AllocRefInstBase>(context)
   defer { allocRefs.deinitialize() }
 
@@ -109,7 +114,8 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
         type: allocRef.type, linkage: .private,
         // Only if it's a COW object we can be sure that the object allocated in the global is not mutated.
         // If someone wants to mutate it, it has to be copied first.
-        isLet: endOfInitInst is EndCOWMutationInst)
+        isLet: endOfInitInst is EndCOWMutationInst,
+        markedAsUsed: false)
 
   constructObject(of: allocRef, inInitializerOf: outlinedGlobal, storesToClassFields, storesToTailElements, context)
   context.erase(instructions: storesToClassFields)
@@ -363,13 +369,13 @@ private func constructObject(of allocRef: AllocRefInstBase,
                              inInitializerOf global: GlobalVariable,
                              _ storesToClassFields: [StoreInst], _ storesToTailElements: [StoreInst],
                              _ context: FunctionPassContext) {
-  var cloner = StaticInitCloner(cloneTo: global, context)
+  var cloner = Cloner(cloneToGlobal: global, context)
   defer { cloner.deinitialize() }
 
   // Create the initializers for the fields
   var objectArgs = [Value]()
   for store in storesToClassFields {
-    objectArgs.append(cloner.clone(store.source as! SingleValueInstruction))
+    objectArgs.append(cloner.cloneRecursively(globalInitValue: store.source as! SingleValueInstruction))
   }
   let globalBuilder = Builder(staticInitializerOf: global, context)
 
@@ -381,7 +387,7 @@ private func constructObject(of allocRef: AllocRefInstBase,
       for elementIdx in 0..<allocRef.numTailElements! {
         let tupleElems = (0..<numTailTupleElems).map { tupleIdx in
             let store = storesToTailElements[elementIdx * numTailTupleElems + tupleIdx]
-            return cloner.clone(store.source as! SingleValueInstruction)
+            return cloner.cloneRecursively(globalInitValue: store.source as! SingleValueInstruction)
         }
         let tuple = globalBuilder.createTuple(type: allocRef.tailAllocatedTypes[0], elements: tupleElems)
         objectArgs.append(tuple)
@@ -389,7 +395,7 @@ private func constructObject(of allocRef: AllocRefInstBase,
     } else {
       // The non-tuple element case.
       for store in storesToTailElements {
-        objectArgs.append(cloner.clone(store.source as! SingleValueInstruction))
+        objectArgs.append(cloner.cloneRecursively(globalInitValue: store.source as! SingleValueInstruction))
       }
     }
   }
@@ -555,7 +561,7 @@ private func replace(findStringCall: ApplyInst,
 
   // Create an "opaque" global variable which is passed as inout to
   // _findStringSwitchCaseWithCache and into which the function stores the "cache".
-  let cacheVar = context.createGlobalVariable(name: name, type: cacheType, linkage: .private, isLet: false)
+  let cacheVar = context.createGlobalVariable(name: name, type: cacheType, linkage: .private, isLet: false, markedAsUsed: false)
 
   let varBuilder = Builder(staticInitializerOf: cacheVar, context)
   let zero = varBuilder.createIntegerLiteral(0, type: wordTy)

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/struct_differentiable_other_module.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -primary-file %s %S/Inputs/struct_differentiable_other_module.swift
 
 import _Differentiation
 

@@ -174,5 +174,32 @@ StringBridgeTests.test("Character from NSString") {
   expectNil((ns3 as String).utf8.withContiguousStorageIfAvailable(returnOne))
 }
 
+StringBridgeTests.test("lengthOfBytes(using:)") {
+  let ascii = "The quick brown fox jumps over the lazy dog"
+  let utf8 = "The quick brown fox jümps over the lazy dog"
+  let asciiAsASCIILen = ascii.lengthOfBytes(using: .ascii)
+  let asciiAsUTF8Len = ascii.lengthOfBytes(using: .utf8)
+  let asciiAsUTF16Len = ascii.lengthOfBytes(using: .utf16)
+  let asciiAsMacRomanLen = ascii.lengthOfBytes(using: .macOSRoman)
+  let utf8AsASCIILen = utf8.lengthOfBytes(using: .ascii)
+  let utf8AsUTF8Len = utf8.lengthOfBytes(using: .utf8)
+  let utf8AsUTF16Len = utf8.lengthOfBytes(using: .utf16)
+  let utf8AsMacRomanLen = utf8.lengthOfBytes(using: .macOSRoman)
+  expectEqual(asciiAsASCIILen, 43)
+  expectEqual(asciiAsUTF8Len, 43)
+  expectEqual(asciiAsUTF16Len, 86)
+  expectEqual(asciiAsMacRomanLen, 43)
+  expectEqual(utf8AsASCIILen, 0)
+  expectEqual(utf8AsUTF8Len, 44)
+  expectEqual(utf8AsUTF16Len, 86)
+  expectEqual(utf8AsMacRomanLen, 43)
+}
+
+StringBridgeTests.test("Equal UTF16 lengths but unequal UTF8") {
+  let utf8 = "чебурашка@ящик-с-апельсинами.рф" //Native, UTF16 count: 31, UTF8 count: 58
+  let nsascii = "2166002315@874404110.1042078977" as NSString //Non-native, UTF16 count: 31, UTF8 count: 31
+  let nsutf8 = String(decoding: utf8.utf8, as: UTF8.self) as NSString //bridged native
+  expectFalse(nsutf8.isEqual(nsascii))
+}
 
 runAllTests()

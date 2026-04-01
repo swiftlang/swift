@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swiftxx-frontend -typecheck -I %t/Inputs %t/test.swift -verify
+// RUN: %target-swiftxx-frontend -typecheck -I %t/Inputs %t/test.swift -verify -verify-ignore-unrelated
 
 //--- Inputs/module.modulemap
 module FriendClass {

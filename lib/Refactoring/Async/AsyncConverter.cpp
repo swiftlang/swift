@@ -48,7 +48,7 @@ bool AsyncConverter::createLegacyBody() {
   if (!canCreateLegacyBody())
     return false;
 
-  FuncDecl *FD = cast<FuncDecl>(StartNode.get<Decl *>());
+  FuncDecl *FD = cast<FuncDecl>(cast<Decl *>(StartNode));
   OS << tok::l_brace << "\n"; // start function body
   OS << "Task " << tok::l_brace << "\n";
   addHoistedNamedCallback(FD, TopHandler, TopHandler.getNameStr(), [&]() {
@@ -71,7 +71,7 @@ bool AsyncConverter::createLegacyBody() {
 
 bool AsyncConverter::createAsyncWrapper() {
   assert(Buffer.empty() && "AsyncConverter can only be used once");
-  auto *FD = cast<FuncDecl>(StartNode.get<Decl *>());
+  auto *FD = cast<FuncDecl>(cast<Decl *>(StartNode));
 
   // First add the new async function declaration.
   addFuncDecl(FD);
@@ -424,6 +424,11 @@ bool AsyncConverter::walkToDeclPost(Decl *D) {
 #define PLACEHOLDER_START "<#"
 #define PLACEHOLDER_END "#>"
 bool AsyncConverter::walkToExprPre(Expr *E) {
+  // We've already added any shorthand if declaration, don't add its
+  // synthesized initializer as well.
+  if (shorthandIfInits.contains(E))
+    return true;
+
   // TODO: Handle Result.get as well
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *D = DRE->getDecl()) {
@@ -530,6 +535,15 @@ bool AsyncConverter::walkToExprPost(Expr *E) {
 #undef PLACEHOLDER_END
 
 bool AsyncConverter::walkToStmtPre(Stmt *S) {
+  // Keep track of any shorthand initializer expressions
+  if (auto *labeledConditional = dyn_cast<LabeledConditionalStmt>(S)) {
+    for (const auto &condition : labeledConditional->getCond()) {
+      if (auto *init = condition.getSynthesizedShorthandInitOrNull()) {
+        shorthandIfInits.insert(init);
+      }
+    }
+  }
+
   // CaseStmt has an implicit BraceStmt inside it, which *should* start a new
   // scope, so don't check isImplicit here.
   if (startsNewScope(S)) {
@@ -651,8 +665,8 @@ void AsyncConverter::addFuncDecl(const FuncDecl *FD) {
     LeftEndLoc = Lexer::getLocForEndOfToken(
         SM, Params->get(TopHandler.Index - 1)->getEndLoc());
     // Skip to the end of any comments
-    Token Next =
-        Lexer::getTokenAtLocation(SM, LeftEndLoc, CommentRetentionMode::None);
+    Token Next = Lexer::getTokenAtLocation(
+        SM, LeftEndLoc, CommentRetentionMode::AttachToNextToken);
     if (Next.getKind() != tok::NUM_TOKENS)
       LeftEndLoc = Next.getLoc();
     break;
@@ -1429,7 +1443,7 @@ void AsyncConverter::addAwaitCall(const CallExpr *CE,
         convertPattern(P);
         return;
       }
-      OS << newNameFor(Elt.get<const Decl *>());
+      OS << newNameFor(cast<const Decl *>(Elt));
     });
     OS << " " << tok::equal << " ";
   }
@@ -1880,7 +1894,7 @@ void AsyncConverter::addAsyncFuncReturnType(
 
 void AsyncConverter::addResultTypeAnnotationIfNecessary(
     const FuncDecl *FD, const AsyncHandlerDesc &HandlerDesc) {
-  if (FD->isGeneric()) {
+  if (FD->hasGenericParamList()) {
     OS << tok::colon << " ";
     addAsyncFuncReturnType(HandlerDesc);
   }

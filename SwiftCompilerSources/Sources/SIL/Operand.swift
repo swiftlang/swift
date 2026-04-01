@@ -27,6 +27,10 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren, Equatable
 
   public var value: Value { bridged.getValue().value }
 
+  public func set(to value: Value, _ context: some MutatingContext) {
+    instruction.setOperand(at: index, to: value, context)
+  }
+
   public static func ==(lhs: Operand, rhs: Operand) -> Bool {
     return lhs.bridged.op == rhs.bridged.op
   }
@@ -44,6 +48,12 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren, Equatable
   public var endsLifetime: Bool { bridged.isLifetimeEnding() }
 
   public func canAccept(ownership: Ownership) -> Bool { bridged.canAcceptOwnership(ownership._bridged) }
+
+  public func changeOwnership(from: Ownership, to: Ownership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.changeOwnership(from._bridged, to._bridged)
+    context.notifyInstructionChanged(instruction)
+  }
 
   public var description: String { "operand #\(index) of \(instruction)" }
 }
@@ -94,10 +104,6 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
       base: OptionalBridgedOperand(op: base.advancedBy(bounds.lowerBound).op),
       count: bounds.upperBound - bounds.lowerBound)
   }
-
-  public var values: LazyMapSequence<LazySequence<OperandArray>.Elements, Value> {
-    self.lazy.map { $0.value }
-  }
 }
 
 public struct UseList : CollectionLikeSequence {
@@ -133,16 +139,11 @@ public struct UseList : CollectionLikeSequence {
 }
 
 extension Sequence where Element == Operand {
-  public var singleUse: Operand? {
-    var result: Operand? = nil
-    for op in self {
-      if result != nil {
-        return nil
-      }
-      result = op
-    }
-    return result
+  public var values: LazyMapSequence<Self, Value> {
+    self.lazy.map { $0.value }
   }
+
+  public var singleUse: Operand? { singleElement }
 
   public var isSingleUse: Bool { singleUse != nil }
 
@@ -151,14 +152,14 @@ extension Sequence where Element == Operand {
   }
 
   public var ignoreDebugUses: LazyFilterSequence<Self> {
-    self.lazy.filter { !($0.instruction is DebugValueInst) }
+    ignore(usersOfType: DebugValueInst.self)
   }
 
-  public func filterUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
+  public func filter<I: Instruction>(usersOfType: I.Type) -> LazyFilterSequence<Self> {
     self.lazy.filter { $0.instruction is I }
   }
 
-  public func ignoreUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
+  public func ignore<I: Instruction>(usersOfType: I.Type) -> LazyFilterSequence<Self> {
     self.lazy.filter { !($0.instruction is I) }
   }
 
@@ -166,12 +167,12 @@ extension Sequence where Element == Operand {
     self.lazy.filter { !($0.instruction == user) }
   }
 
-  public func getSingleUser<I: Instruction>(ofType: I.Type) -> I? {
-    filterUsers(ofType: I.self).singleUse?.instruction as? I
+  public func singleUser<I: Instruction>(ofType: I.Type) -> I? {
+    filter(usersOfType: I.self).singleUse?.instruction as? I
   }
 
-  public func getSingleUser<I: Instruction>(notOfType: I.Type) -> Instruction? {
-    ignoreUsers(ofType: I.self).singleUse?.instruction
+  public func singleUser<I: Instruction>(notOfType: I.Type) -> Instruction? {
+    ignore(usersOfType: I.self).singleUse?.instruction
   }
 
   public var endingLifetime: LazyFilterSequence<Self> {
@@ -184,6 +185,12 @@ extension Sequence where Element == Operand {
 
   public func users<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, I> {
     self.lazy.filter{ $0.instruction is I }.lazy.map { $0.instruction as! I }
+  }
+
+  public func replaceAll(with replacement: Value, _ context: some MutatingContext) {
+    for use in self {
+      use.set(to: replacement, context)
+    }
   }
 }
 

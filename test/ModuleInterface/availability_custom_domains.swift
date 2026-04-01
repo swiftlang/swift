@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-emit-module-interface(%t/Test.swiftinterface) %s \
+// RUN:   -target %target-swift-5.1-abi-triple \
 // RUN:   -I %S/../Inputs/custom-modules/availability-domains \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -module-name Test
@@ -15,18 +16,45 @@
 
 import Oceans // re-exports Rivers
 
-// CHECK:      #if compiler(>=5.3) && $CustomAvailability
-// CHECK-NEXT: @available(Colorado)
+// CHECK-NOT:  $CustomAvailability
+
+// CHECK:      @available(Colorado)
 // CHECK-NEXT: public func availableInColorado()
-// CHECK-NEXT: #endif
 @available(Colorado)
 public func availableInColorado() { }
 
-// CHECK:      #if compiler(>=5.3) && $CustomAvailability
-// CHECK-NEXT: @available(Arctic, unavailable)
+// CHECK:      @available(Arctic, unavailable)
 // CHECK-NEXT: @available(Pacific)
 // CHECK-NEXT: public func unavailableInArcticButAvailableInPacific()
-// CHECK-NEXT: #endif
 @available(Arctic, unavailable)
 @available(Pacific)
 public func unavailableInArcticButAvailableInPacific() { }
+
+// CHECK:      @available(Colorado)
+// CHECK-NEXT: @available(Pacific)
+// CHECK-NEXT: @_Concurrency::MainActor public class AvailableInColoradoAndPacificMainActorClass
+@available(Colorado)
+@available(Pacific)
+@MainActor
+public class AvailableInColoradoAndPacificMainActorClass { }
+
+// CHECK:      @available(Colorado)
+// CHECK-NEXT: @available(Pacific)
+// CHECK-NEXT: public enum AvailableInColoradoAndPacificEquatableEnum
+@available(Colorado)
+@available(Pacific)
+public enum AvailableInColoradoAndPacificEquatableEnum {
+  case a
+}
+
+// CHECK:      @available(Colorado)
+// CHECK-NEXT: @available(Pacific)
+// CHECK-NEXT: extension Test::AvailableInColoradoAndPacificMainActorClass : Swift::Sendable {}
+
+// CHECK:      @available(Colorado)
+// CHECK-NEXT: @available(Pacific)
+// CHECK-NEXT: extension Test::AvailableInColoradoAndPacificEquatableEnum : Swift::Equatable {}
+
+// CHECK:      @available(Colorado)
+// CHECK-NEXT: @available(Pacific)
+// CHECK-NEXT: extension Test::AvailableInColoradoAndPacificEquatableEnum : Swift::Hashable {}

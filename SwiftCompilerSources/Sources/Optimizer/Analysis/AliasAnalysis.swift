@@ -15,7 +15,7 @@ import SIL
 
 extension FunctionPassContext {
   var aliasAnalysis: AliasAnalysis {
-    let bridgedAA = _bridged.getAliasAnalysis()
+    let bridgedAA = bridgedPassContext.getAliasAnalysis()
     return AliasAnalysis(bridged: bridgedAA, context: self)
   }
 }
@@ -113,7 +113,7 @@ struct AliasAnalysis {
         bridgedAliasAnalysis.mutableCachePointer.assumingMemoryBound(to: Cache.self).deinitialize(count: 1)
       },
       // getMemEffectsFn
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedAddr: BridgedValue,
          bridgedInst: BridgedInstruction) -> BridgedMemoryBehavior in
@@ -121,7 +121,7 @@ struct AliasAnalysis {
         return aa.getMemoryEffect(of: bridgedInst.instruction, on: bridgedAddr.value).bridged
       },
       // isObjReleasedFn
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedObj: BridgedValue,
          bridgedInst: BridgedInstruction) -> Bool in
@@ -142,7 +142,7 @@ struct AliasAnalysis {
       },
 
       // isAddrVisibleFromObj
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedAddr: BridgedValue,
          bridgedObj: BridgedValue) -> Bool in
@@ -159,7 +159,7 @@ struct AliasAnalysis {
       },
 
       // mayAliasFn
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedLhs: BridgedValue,
          bridgedRhs: BridgedValue) -> Bool in
@@ -220,7 +220,8 @@ struct AliasAnalysis {
          is StrongCopyUnmanagedValueInst,
          is StrongCopyWeakValueInst,
          is BeginBorrowInst,
-         is BeginCOWMutationInst:
+         is BeginCOWMutationInst,
+         is DebugStepInst:
       return .noEffects
 
     case let load as LoadInst:
@@ -679,7 +680,7 @@ private enum ImmutableScope {
         }
 
         switch singleBorrowIntroducer {
-        case .beginBorrow, .loadBorrow, .reborrow:
+        case .beginBorrow, .loadBorrow, .dereferenceBorrow, .reborrow:
           self = .borrow(singleBorrowIntroducer)
         case .functionArgument:
           self = .wholeFunction
@@ -774,7 +775,7 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
     let user = operand.instruction
-    if user is ReturnInst {
+    if user is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
@@ -804,7 +805,7 @@ private struct PartialApplyEffectsVisitor : EscapeVisitorWithResult {
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
     let user = operand.instruction
-    if user is ReturnInst {
+    if user is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
@@ -847,7 +848,7 @@ private struct EscapesToInstructionVisitor : EscapeVisitor {
     if user == target {
       return .abort
     }
-    if user is ReturnInst {
+    if user is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
@@ -974,3 +975,116 @@ private extension BridgedAliasAnalysis {
     UnsafeMutableRawPointer(aa)
   }
 }
+
+//===--------------------------------------------------------------------===//
+//                              Tests
+//===--------------------------------------------------------------------===//
+
+/// Prints the memory behavior of relevant instructions in relation to address values of the function.
+let aliasingTest = FunctionTest("aliasing") {
+  function, arguments, context in
+
+  let aliasAnalysis = context.aliasAnalysis
+
+  print("@\(function.name)")
+
+  let values = function.allValues
+
+  var pair = 0
+  for (index1, value1) in values.enumerated() {
+    for (index2, value2) in values.enumerated() {
+      if index2 >= index1 {
+        let result = aliasAnalysis.mayAlias(value1, value2)
+        precondition(result == aliasAnalysis.mayAlias(value2, value1), "alias analysis not symmetric")
+
+        print("PAIR #\(pair).")
+        print("  \(value1)")
+        print("  \(value2)")
+        if result {
+          print("  MayAlias")
+        } else if !value1.uses.isEmpty && !value2.uses.isEmpty {
+          print("  NoAlias")
+        } else {
+          print("  noalias?")
+        }
+
+        pair += 1
+      }
+    }
+  }
+}
+
+/// Prints the memory behavior of relevant instructions in relation to address values of the function.
+let memoryEffectsTest = FunctionTest("memory_effects") {
+  function, arguments, context in
+
+  let aliasAnalysis = context.aliasAnalysis
+
+  print("@\(function.name)")
+
+  let values = function.allValues
+
+  var currentPair = 0
+  for inst in function.instructions where inst.shouldTest {
+
+    for value in values where value.definingInstruction != inst {
+
+      if value.type.isAddress {
+        let read = inst.mayRead(fromAddress: value, aliasAnalysis)
+        let write = inst.mayWrite(toAddress: value, aliasAnalysis)
+        print("PAIR #\(currentPair).")
+        print("  \(inst)")
+        print("  \(value)")
+        print("  r=\(read ? 1 : 0),w=\(write ? 1 : 0)")
+        currentPair += 1
+      }
+    }
+  }
+  print()
+}
+
+private extension Instruction {
+  var shouldTest: Bool {
+    switch self {
+    case is ApplySite,
+         is EndApplyInst,
+         is AbortApplyInst,
+         is BeginAccessInst,
+         is EndAccessInst,
+         is EndCOWMutationInst,
+         is EndCOWMutationAddrInst,
+         is CopyValueInst,
+         is DestroyValueInst,
+         is StrongReleaseInst,
+         is IsUniqueInst,
+         is EndBorrowInst,
+         is LoadInst,
+         is LoadBorrowInst,
+         is StoreInst,
+         is CopyAddrInst,
+         is BuiltinInst,
+         is StoreBorrowInst,
+         is MarkDependenceInst,
+         is MarkDependenceAddrInst,
+         is DebugValueInst,
+         is DebugStepInst:
+      return true
+    default:
+      return false
+    }
+  }
+}
+
+private extension Function {
+  var allValues: [Value] {
+    var values: [Value] = []
+    for block in blocks {
+      values.append(contentsOf: block.arguments.map { $0 })
+      for inst in block.instructions {
+        values.append(contentsOf: inst.results)
+      }
+    }
+    return values
+  }
+}
+

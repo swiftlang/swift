@@ -13,6 +13,8 @@ typedef int NSInteger;
 #endif
 
 typedef __typeof__(__objc_yes) BOOL;
+#define YES __objc_yes
+#define NO  __objc_no
 
 typedef struct objc_selector    *SEL;
 SEL sel_registerName(const char *str);

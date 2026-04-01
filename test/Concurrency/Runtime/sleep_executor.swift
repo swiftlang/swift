@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift(%import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift(%import-libdispatch -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -13,16 +15,16 @@
 import Dispatch
 import StdlibUnittest
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftStdlib 6.3, *)
 actor MyActor {
   public func doSleep() async {
     try! await Task.sleep(for: .seconds(0.1))
   }
 }
 
-@available(SwiftStdlib 6.2, *)
-final class TestExecutor: TaskExecutor, SchedulableExecutor, @unchecked Sendable {
-  var asSchedulable: SchedulableExecutor? {
+@available(SwiftStdlib 6.3, *)
+final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable {
+  var asScheduling: SchedulingExecutor? {
     return self
   }
 
@@ -38,7 +40,7 @@ final class TestExecutor: TaskExecutor, SchedulableExecutor, @unchecked Sendable
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
     // Convert to `Swift.Duration`
-    let duration = clock.convert(from: delay)!
+    let duration = delay as! Swift.Duration
 
     // Now turn that into nanoseconds
     let (seconds, attoseconds) = duration.components
@@ -56,7 +58,7 @@ final class TestExecutor: TaskExecutor, SchedulableExecutor, @unchecked Sendable
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftStdlib 6.3, *)
 @main struct Main {
   static func main() async {
     let tests = TestSuite("sleep_executor")

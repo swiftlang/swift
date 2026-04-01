@@ -20,16 +20,11 @@ using namespace swift;
 AvailabilityDomainAndRange
 AvailabilityConstraint::getDomainAndRange(const ASTContext &ctx) const {
   switch (getReason()) {
-  case Reason::UnconditionallyUnavailable:
-    // Technically, unconditional unavailability doesn't have an associated
-    // range. However, if you view it as a special case of obsoletion, then an
-    // unconditionally unavailable declaration is "always obsoleted."
-    return AvailabilityDomainAndRange(getDomain().getRemappedDomain(ctx),
-                                      AvailabilityRange::alwaysAvailable());
-  case Reason::Obsoleted:
+  case Reason::UnavailableUnconditionally:
+  case Reason::UnavailableObsolete:
     return getAttr().getObsoletedDomainAndRange(ctx).value();
-  case Reason::UnavailableForDeployment:
-  case Reason::PotentiallyUnavailable:
+  case Reason::UnavailableUnintroduced:
+  case Reason::Unintroduced:
     return getAttr().getIntroducedDomainAndRange(ctx).value();
   }
 }
@@ -49,19 +44,24 @@ void AvailabilityConstraint::print(llvm::raw_ostream &os) const {
   getAttr().getDomain().print(os);
   os << ", ";
 
+  std::optional<llvm::VersionTuple> version;
   switch (getReason()) {
-  case Reason::UnconditionallyUnavailable:
+  case Reason::UnavailableUnconditionally:
     os << "unavailable";
     break;
-  case Reason::Obsoleted:
-    os << "obsoleted: " << getAttr().getObsoleted().value();
+  case Reason::UnavailableObsolete:
+    os << "obsoleted";
+    version = getAttr().getObsoleted();
     break;
-  case Reason::UnavailableForDeployment:
-  case Reason::PotentiallyUnavailable:
-    os << "introduced: " << getAttr().getIntroduced().value();
+  case Reason::UnavailableUnintroduced:
+  case Reason::Unintroduced:
+    os << "introduced";
+    version = getAttr().getIntroduced();
     break;
   }
 
+  if (version)
+    os << ": " << *version;
   os << ")";
 }
 
@@ -75,18 +75,20 @@ static bool constraintIsStronger(const AvailabilityConstraint &lhs,
     return lhs.getReason() < rhs.getReason();
 
   switch (lhs.getReason()) {
-  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
     // Just keep the first.
     return false;
 
-  case AvailabilityConstraint::Reason::Obsoleted:
+  case AvailabilityConstraint::Reason::UnavailableObsolete:
     // Pick the larger obsoleted range.
-    return *lhs.getAttr().getObsoleted() < *rhs.getAttr().getObsoleted();
+    return lhs.getAttr().getObsoleted().value() <
+           rhs.getAttr().getObsoleted().value();
 
-  case AvailabilityConstraint::Reason::UnavailableForDeployment:
-  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+  case AvailabilityConstraint::Reason::Unintroduced:
     // Pick the smaller introduced range.
-    return *lhs.getAttr().getIntroduced() > *rhs.getAttr().getIntroduced();
+    return lhs.getAttr().getIntroduced().value_or(llvm::VersionTuple()) >
+           rhs.getAttr().getIntroduced().value_or(llvm::VersionTuple());
   }
 }
 
@@ -121,10 +123,16 @@ DeclAvailabilityConstraints::getPrimaryConstraint() const {
     if (lhs.getReason() != rhs.getReason())
       return lhs.getReason() < rhs.getReason();
 
-    // Pick the constraint from the broader domain.
-    if (lhs.getDomain() != rhs.getDomain())
-      return rhs.getDomain().contains(lhs.getDomain());
-    
+    if (lhs.getDomain() != rhs.getDomain()) {
+      // Constraints in the universal domain are the strongest.
+      if (rhs.getDomain().isUniversal())
+        return true;
+
+      // Otherwise, pick the constraint from the broader domain.
+      if (lhs.getDomain() != rhs.getDomain())
+        return rhs.getDomain().contains(lhs.getDomain());
+    }
+
     return false;
   };
 
@@ -153,45 +161,26 @@ static bool canIgnoreConstraintInUnavailableContexts(
     const AvailabilityConstraintFlags flags) {
   auto domain = constraint.getDomain();
 
-  switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
-    if (flags.contains(AvailabilityConstraintFlag::
-                           AllowUniversallyUnavailableInCompatibleContexts))
-      return true;
-
-    // Always reject uses of universally unavailable declarations, regardless
-    // of context, since there are no possible compilation configurations in
-    // which they are available. However, make an exception for types and
-    // conformances, which can sometimes be awkward to avoid references to.
+  // Always reject uses of universally unavailable declarations, regardless
+  // of context, since there are no possible compilation configurations in
+  // which they are available. However, make an exception for types and
+  // conformances, which can sometimes be awkward to avoid references to.
+  if (!flags.contains(AvailabilityConstraintFlag::
+                      AllowUniversallyUnavailableInCompatibleContexts)) {
     if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
-      if (domain.isUniversal() || domain.isSwiftLanguage())
+      if (domain.isUniversal() || domain.isSwiftLanguageMode())
         return false;
     }
+  }
+
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
     return true;
 
-  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
-    switch (domain.getKind()) {
-    case AvailabilityDomain::Kind::Universal:
-    case AvailabilityDomain::Kind::SwiftLanguage:
-    case AvailabilityDomain::Kind::PackageDescription:
-    case AvailabilityDomain::Kind::Embedded:
-    case AvailabilityDomain::Kind::Custom:
-      return false;
-    case AvailabilityDomain::Kind::Platform:
-      // Platform availability only applies to the target triple that the
-      // binary is being compiled for. Since the same declaration can be
-      // potentially unavailable from a given context when compiling for one
-      // platform, but available from that context when compiling for a
-      // different platform, it is overly strict to enforce potential platform
-      // unavailability constraints in contexts that are unavailable to that
-      // platform.
-      return true;
-    }
-    return constraint.getDomain().isPlatform();
-
-  case AvailabilityConstraint::Reason::Obsoleted:
-  case AvailabilityConstraint::Reason::UnavailableForDeployment:
-    return false;
+  case AvailabilityConstraint::Reason::Unintroduced:
+  case AvailabilityConstraint::Reason::UnavailableObsolete:
+  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+    return domain.isVersioned();
   }
 }
 
@@ -206,7 +195,18 @@ shouldIgnoreConstraintInContext(const Decl *decl,
   if (!canIgnoreConstraintInUnavailableContexts(decl, constraint, flags))
     return false;
 
-  return context.containsUnavailableDomain(constraint.getDomain());
+  // If the constraint's domain is a superset of the compilation's target
+  // availability domain, use the more specific target availability domain
+  // instead. This allows declarations that are @available(macOS, unavailable)
+  // to be used in contexts that are @available(macOSApplicationExtension,
+  // unavailable), for example.
+  auto &ctx = decl->getASTContext();
+  auto domain = constraint.getDomain();
+  auto targetDomain = ctx.getTargetAvailabilityDomain();
+  if (domain.isSupersetOf(targetDomain))
+    domain = targetDomain;
+
+  return context.isUnavailableForDomain(domain);
 }
 
 /// Returns the `AvailabilityConstraint` that describes how \p attr restricts
@@ -217,34 +217,34 @@ getAvailabilityConstraintForAttr(const Decl *decl,
                                  const AvailabilityContext &context) {
   // Is the decl unconditionally unavailable?
   if (attr.isUnconditionallyUnavailable())
-    return AvailabilityConstraint::unconditionallyUnavailable(attr);
+    return AvailabilityConstraint::unavailableUnconditionally(attr);
 
   auto &ctx = decl->getASTContext();
   auto domain = attr.getDomain();
-  auto deploymentRange = domain.getDeploymentRange(ctx);
+  bool domainSupportsRefinement = domain.supportsContextRefinement();
 
-  // Is the decl obsoleted in the deployment context?
+  // Compute the available range in the given context. If there is no explicit
+  // range defined by the context, use the deployment range as fallback.
+  std::optional<AvailabilityRange> availableRange;
+  if (domainSupportsRefinement)
+    availableRange = context.getAvailabilityRange(domain, ctx);
+  if (!availableRange)
+    availableRange = domain.getDeploymentRange(ctx);
+
+  // Is the decl obsoleted in this context?
   if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
-    if (deploymentRange && deploymentRange->isContainedIn(*obsoletedRange))
-      return AvailabilityConstraint::obsoleted(attr);
+    if (availableRange && availableRange->isContainedIn(*obsoletedRange))
+      return AvailabilityConstraint::unavailableObsolete(attr);
   }
 
-  // Is the decl not yet introduced in the local context?
+  // Is the decl not yet introduced in this context?
   if (auto introducedRange = attr.getIntroducedRange(ctx)) {
-    if (domain.supportsContextRefinement()) {
-      auto availableRange = context.getAvailabilityRange(domain, ctx);
-      if (!availableRange || !availableRange->isContainedIn(*introducedRange))
-        return AvailabilityConstraint::potentiallyUnavailable(attr);
-
-      return std::nullopt;
-    }
-
-    // Is the decl not yet introduced in the deployment context?
-    if (deploymentRange && !deploymentRange->isContainedIn(*introducedRange))
-      return AvailabilityConstraint::unavailableForDeployment(attr);
+    if (!availableRange || !availableRange->isContainedIn(*introducedRange))
+      return domainSupportsRefinement
+                 ? AvailabilityConstraint::unintroduced(attr)
+                 : AvailabilityConstraint::unavailableUnintroduced(attr);
   }
 
-  // FIXME: [availability] Model deprecation as an availability constraint.
   return std::nullopt;
 }
 
@@ -311,6 +311,16 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
 
   getAvailabilityConstraintsForDecl(constraints, decl, context, flags);
 
+  // For requirements of reparentable protocols, add constraints from the
+  // enclosing protocol itself. We don't need to do this for ordinary protocols
+  // because of the rule that a protocol P cannot inherit from Q if Q is less
+  // available than P. Thus, the availability of the most derived protocol
+  // already carries the same or stricter constraints than its ancestors.
+  if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
+    if (proto->getAttrs().hasAttribute<ReparentableAttr>())
+      getAvailabilityConstraintsForDecl(constraints, proto, context, flags);
+  }
+
   if (flags.contains(AvailabilityConstraintFlag::SkipEnclosingExtension))
     return constraints;
 
@@ -342,4 +352,90 @@ swift::getAvailabilityConstraintForDeclInDomain(
   }
 
   return std::nullopt;
+}
+
+/// Returns true if unsatisfied `@available(..., unavailable)` constraints for
+/// \p domain make code unreachable at runtime
+static bool
+domainCanBeUnconditionallyUnavailableAtRuntime(AvailabilityDomain domain,
+                                               const ASTContext &ctx) {
+  switch (domain.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+    return true;
+
+  case AvailabilityDomain::Kind::Platform:
+    if (ctx.LangOpts.TargetVariant &&
+        domain.isActive(ctx, /*forTargetVariant=*/true))
+      return true;
+    return domain.isActive(ctx);
+
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return false;
+
+  case AvailabilityDomain::Kind::Embedded:
+    return ctx.LangOpts.hasFeature(Feature::Embedded);
+
+  case AvailabilityDomain::Kind::Custom:
+    switch (domain.getCustomDomain()->getKind()) {
+    case CustomAvailabilityDomain::Kind::Enabled:
+    case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+      return true;
+    case CustomAvailabilityDomain::Kind::Disabled:
+    case CustomAvailabilityDomain::Kind::Dynamic:
+      return false;
+    }
+  }
+}
+
+/// Returns true if unsatisfied introduction constraints for \p domain make
+/// code unreachable at runtime.
+static bool
+domainIsUnavailableAtRuntimeIfUnintroduced(AvailabilityDomain domain,
+                                           const ASTContext &ctx) {
+  switch (domain.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Platform:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return false;
+
+  case AvailabilityDomain::Kind::Embedded:
+    return !ctx.LangOpts.hasFeature(Feature::Embedded);
+
+  case AvailabilityDomain::Kind::Custom:
+    switch (domain.getCustomDomain()->getKind()) {
+    case CustomAvailabilityDomain::Kind::Enabled:
+    case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+    case CustomAvailabilityDomain::Kind::Dynamic:
+      return false;
+    case CustomAvailabilityDomain::Kind::Disabled:
+      return true;
+    }
+  }
+}
+
+static bool constraintIndicatesRuntimeUnavailability(
+    const AvailabilityConstraint &constraint, const ASTContext &ctx) {
+  auto domain = constraint.getDomain();
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+    return domainCanBeUnconditionallyUnavailableAtRuntime(domain, ctx);
+  case AvailabilityConstraint::Reason::UnavailableObsolete:
+  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+    return false;
+  case AvailabilityConstraint::Reason::Unintroduced:
+    return domainIsUnavailableAtRuntimeIfUnintroduced(domain, ctx);
+  }
+}
+
+void swift::getRuntimeUnavailableDomains(
+    const DeclAvailabilityConstraints &constraints,
+    llvm::SmallVectorImpl<AvailabilityDomain> &domains, const ASTContext &ctx) {
+  for (auto constraint : constraints) {
+    if (constraintIndicatesRuntimeUnavailability(constraint, ctx))
+      domains.push_back(constraint.getDomain());
+  }
 }

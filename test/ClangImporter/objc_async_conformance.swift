@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -disable-availability-checking  %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -disable-availability-checking  %s -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency

@@ -8,7 +8,7 @@ add_library(swiftDemangling OBJECT
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
-  "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/Errors.cpp")
+  "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/DemanglingErrorHandling.cpp")
 target_compile_definitions(swiftDemangling PRIVATE
   $<$<BOOL:${BUILD_SHARED_LIBS}>:-DswiftCore_EXPORTS>
   $<$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>:-DSWIFT_SUPPORT_OLD_MANGLING>
@@ -21,7 +21,8 @@ target_compile_definitions(swiftDemangling PRIVATE
 # compiler, in order to avoid possible ODR violations if both are statically
 # linked into the same binary. (see also commit message for 5b1daa9055c99904c84862ecc313641fd9b26e63)
 target_compile_definitions(swiftDemangling PUBLIC
-    $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_INLINE_NAMESPACE=__runtime>)
+  -DSWIFT_RUNTIME
+  $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_INLINE_NAMESPACE=__runtime>)
 
 target_include_directories(swiftDemangling
   PRIVATE

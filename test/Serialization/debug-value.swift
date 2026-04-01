@@ -35,7 +35,7 @@ public func fooCaller<T: AdditiveArithmetic>(_ x: T, _ y : T) -> T {
 // BEGIN Main.swift
 import MyModule
 // sil_scope should refer to the specialized version of foo
-//CHECK: sil_scope {{.*}} { loc "{{.*}}MyModule.swift":13:6 parent @$s8MyModule3fooyxx_xts18AdditiveArithmeticRzlFSi_TG5 {{.*}} inlined_at {{.*}} }
+//CHECK: sil_scope {{.*}} { loc "{{.*}}MyModule.swift":13:6 parent @$s8MyModule3fooyxx_xts18AdditiveArithmeticRzlFx_Ti5Si_TG5 {{.*}} inlined_at {{.*}} }
 let _ = fooCaller(1, 2)
 
 func test() {

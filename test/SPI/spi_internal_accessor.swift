@@ -79,12 +79,12 @@ public struct InternalSet {
     get { 0 }
     set { }
   }
-// CHECK-PRIVATE:   @_spi(X) public var long: Swift.Int {
+// CHECK-PRIVATE:   @_spi(X) public var long: Swift::Int {
 // CHECK-PRIVATE:     @_spi(X) get
 // CHECK-PRIVATE:   }
 
   @_spi(X) public internal(set) var short: Int
-// CHECK-PRIVATE:   @_spi(X) public var short: Swift.Int {
+// CHECK-PRIVATE:   @_spi(X) public var short: Swift::Int {
 // CHECK-PRIVATE:     get
 // CHECK-PRIVATE:   }
 }

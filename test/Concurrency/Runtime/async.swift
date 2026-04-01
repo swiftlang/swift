@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple %import-libdispatch)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple %import-libdispatch -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -59,7 +61,7 @@ if #available(SwiftStdlib 5.1, *) {
   asyncTests.test("GlobalDispatchQueue") {
     DispatchQueue.global(qos: .utility).async {
       async {
-#if (os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+#if os(anyAppleOS)
         // Non-Darwin platforms currently lack qos_class_self().
         assert(Task.currentPriority == .utility)
 #endif

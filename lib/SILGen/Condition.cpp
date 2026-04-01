@@ -100,7 +100,8 @@ void ConditionalValue::exitBranch(RValue &&condResult) {
     // already.
     assert(currentInitialization && "no current initialization?!");
     std::move(condResult).forwardInto(SGF, loc,
-                                      currentInitialization.release());
+                                      currentInitialization.get());
+    currentInitialization.reset();
     scope.reset();
     SGF.B.createBranch(loc, contBB);
   } else {

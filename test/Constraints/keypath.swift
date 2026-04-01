@@ -290,7 +290,7 @@ func test_invalid_argument_to_keypath_subscript() {
   // The diagnostic should point out that `ambiguous` is indeed ambiguous and that `5` is not a valid argument
   // for a key path subscript.
   ambiguous {
-    // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+    // expected-error@-1 {{failed to produce diagnostic for expression}}
     $0[keyPath: 5]
   }
 
@@ -341,4 +341,45 @@ func test_new_key_path_type_requirements() {
   test(\S.x)
   // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
   // expected-error@-2 {{local function 'test' requires that 'S' conform to 'Copyable'}}
+}
+
+// Test case for transitive key path root inference vs. keypath to function
+// conversion
+protocol Wrapper {
+  associatedtype Value
+}
+
+struct _MapWrapper<T, U>: Wrapper {
+  typealias Value = U
+}
+
+extension Wrapper {
+  func map<T>(_: (Value) -> T) -> _MapWrapper<Self, T> {
+    fatalError()
+  }
+}
+
+extension Optional: Wrapper where Wrapped: Wrapper {
+  typealias Value = Wrapped.Value
+}
+
+protocol Shape {}
+
+struct Empty: Shape {}
+
+struct Polygon {
+  init(_: Int) {}
+
+  var shape: any Shape {
+    fatalError()
+  }
+}
+
+func test_transitive_key_path_root_inference1(x: Int?) -> (any Shape)? {
+  return x.map(Polygon.init).map(\.shape)
+}
+
+func test_transitive_key_path_root_inference2(x: Int?) -> any Shape {
+  let shape = x.map(Polygon.init).map(\.shape) ?? Empty()
+  return shape
 }

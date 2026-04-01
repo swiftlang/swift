@@ -14,5 +14,5 @@ public macro myLogMacro(error: String) = #externalMacro(module: "CompilerPlugin"
 public macro myLogMacro(fault: String) = #externalMacro(module: "CompilerPlugin", type: "LogMacro")
 // expected-warning@-1 {{plugin for module 'CompilerPlugin' not found}}
 
-// CHECK: // Unavailable in C++: Swift macro 'myLogMacro(error:)'
-// CHECK: // Unavailable in C++: Swift macro 'myLogMacro(fault:)'
+// CHECK: // Unavailable in C++: Swift macro 'myLogMacro(error:)'. Swift macro can not yet be represented in C++.
+// CHECK: // Unavailable in C++: Swift macro 'myLogMacro(fault:)'. Swift macro can not yet be represented in C++.

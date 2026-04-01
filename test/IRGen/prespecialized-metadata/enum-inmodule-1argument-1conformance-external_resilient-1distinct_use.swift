@@ -14,8 +14,6 @@ import TestModule
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-// CHECK: @"$sytN" = external{{( dllimport)?}} global %swift.full_existential_type
-
 // CHECK-NOT: @"$s4main5ValueOySiGMf"
 
 extension Int : P {}

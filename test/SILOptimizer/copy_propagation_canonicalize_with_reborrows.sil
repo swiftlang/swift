@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -copy-propagation -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
 
 // REQUIRES: swift_in_compiler
 
@@ -10,7 +10,9 @@ enum FakeOptional<T> {
 }
 
 sil [ossa] @getX : $@convention(thin) () -> (@owned X)
-sil [ossa] @holdX : $@convention(thin) (@guaranteed X) -> ()
+sil [ossa] @holdX : $@convention(thin) (@guaranteed X) -> () {
+  [global:]
+}
 
 // CHECK-LABEL: sil [ossa] @nohoist_destroy_over_reborrow_endborrow : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow $X, [[VALUE:%[^,]+]] : @owned $X):
@@ -19,20 +21,21 @@ sil [ossa] @holdX : $@convention(thin) (@guaranteed X) -> ()
 // CHECK:         destroy_value [[VALUE]]
 // CHECK-LABEL: } // end sil function 'nohoist_destroy_over_reborrow_endborrow'
 sil [ossa] @nohoist_destroy_over_reborrow_endborrow : $@convention(thin) () -> () {
-entry:
-  %get = function_ref @getX : $@convention(thin) () -> @owned X
-  %value_1 = apply %get() : $@convention(thin) () -> @owned X
-  %lifetime = begin_borrow %value_1 : $X
-  br body(%lifetime : $X, %value_1 : $X)
+bb0:
+  %0 = function_ref @getX : $@convention(thin) () -> @owned X
+  %1 = apply %0() : $@convention(thin) () -> @owned X
+  %2 = begin_borrow %1
+  br bb1(%2, %1)
 
-body(%reborrow : @guaranteed $X, %value_2 : @owned $X):
-  end_borrow %reborrow : $X
-  destroy_value %value_2 : $X
-  br exit
+bb1(%4 : @reborrow $X, %5 : @owned $X):
+  %6 = borrowed %4 from (%5)
+  end_borrow %6
+  destroy_value %5
+  br bb2
 
-exit:
-  %retval = tuple ()
-  return %retval : $()
+bb2:
+  %10 = tuple ()
+  return %10
 }
 
 // CHECK-LABEL: sil [ossa] @hoist_destroy_over_unrelated_endborrow : {{.*}} {
@@ -42,22 +45,23 @@ exit:
 // CHECK:         end_borrow [[BF]]
 // CHECK-LABEL: } // end sil function 'hoist_destroy_over_unrelated_endborrow'
 sil [ossa] @hoist_destroy_over_unrelated_endborrow : $@convention(thin) (@guaranteed X) -> () {
-entry(%unrelated : @guaranteed $X):
-  %get = function_ref @getX : $@convention(thin) () -> @owned X
-  %value_1 = apply %get() : $@convention(thin) () -> @owned X
-  %borrow_1 = begin_borrow %unrelated : $X
-  br body(%borrow_1 : $X, %value_1 : $X)
+bb0(%0 : @guaranteed $X):
+  %1 = function_ref @getX : $@convention(thin) () -> @owned X
+  %2 = apply %1() : $@convention(thin) () -> @owned X
+  %3 = begin_borrow %0
+  br bb1(%3, %2)
 
-body(%borrow_2 : @guaranteed $X, %value_2 : @owned $X):
-  %hold = function_ref @holdX : $@convention(thin) (@guaranteed X) -> ()
-  apply %hold(%borrow_2) : $@convention(thin) (@guaranteed X) -> ()
-  end_borrow %borrow_2 : $X
-  destroy_value %value_2 : $X
-  br exit
+bb1(%5 : @reborrow $X, %6 : @owned $X):
+  %7 = borrowed %5 from (%0)
+  %8 = function_ref @holdX : $@convention(thin) (@guaranteed X) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed X) -> ()
+  end_borrow %7
+  destroy_value %6
+  br bb2
 
-exit:
-  %retval = tuple ()
-  return %retval : $()
+bb2:
+  %13 = tuple ()
+  return %13
 }
 
 // CHECK-LABEL: sil [ossa] @nohoist_destroy_over_reborrow_reborrow_endborrow : {{.*}} {
@@ -68,23 +72,25 @@ exit:
 // CHECK:         destroy_value [[VALUE]]
 // CHECK-LABEL: } // end sil function 'nohoist_destroy_over_reborrow_reborrow_endborrow'
 sil [ossa] @nohoist_destroy_over_reborrow_reborrow_endborrow : $@convention(thin) () -> () {
-entry:
-  %get = function_ref @getX : $@convention(thin) () -> @owned X
-  %value_1 = apply %get() : $@convention(thin) () -> @owned X
-  %lifetime = begin_borrow %value_1 : $X
-  br body1(%lifetime : $X, %value_1 : $X)
+bb0:
+  %0 = function_ref @getX : $@convention(thin) () -> @owned X
+  %1 = apply %0() : $@convention(thin) () -> @owned X
+  %2 = begin_borrow %1
+  br bb1(%2, %1)
 
-body1(%lifetime_2 : @guaranteed $X, %value_2 : @owned $X):
-  br body2(%lifetime_2 : $X, %value_2 : $X)
+bb1(%4 : @reborrow $X, %5 : @owned $X):
+  %6 = borrowed %4 from (%5)
+  br bb2(%6, %5)
 
-body2(%lifetime_3 : @guaranteed $X, %value_3 : @owned $X):
-  end_borrow %lifetime_3 : $X
-  destroy_value %value_3 : $X
-  br exit
+bb2(%8 : @reborrow $X, %9 : @owned $X):
+  %10 = borrowed %8 from (%9)
+  end_borrow %10
+  destroy_value %9
+  br bb3
 
-exit:
+bb3:
   %14 = tuple ()
-  return %14 : $()
+  return %14
 }
 
 // CHECK-LABEL: sil [ossa] @hoist_destroy_over_unrelated_reborrow_reborrow_endborrow : {{.*}} {
@@ -95,25 +101,27 @@ exit:
 // CHECK:         end_borrow [[BF]]
 // CHECK-LABEL: } // end sil function 'hoist_destroy_over_unrelated_reborrow_reborrow_endborrow'
 sil [ossa] @hoist_destroy_over_unrelated_reborrow_reborrow_endborrow : $@convention(thin) (@guaranteed X) -> () {
-entry(%unrelated : @guaranteed $X):
-  %get = function_ref @getX : $@convention(thin) () -> @owned X
-  %value_1 = apply %get() : $@convention(thin) () -> @owned X
-  %borrow_1 = begin_borrow %unrelated : $X
-  br body1(%borrow_1 : $X, %value_1 : $X)
+bb0(%0 : @guaranteed $X):
+  %1 = function_ref @getX : $@convention(thin) () -> @owned X
+  %2 = apply %1() : $@convention(thin) () -> @owned X
+  %3 = begin_borrow %0
+  br bb1(%3, %2)
 
-body1(%borrow_2 : @guaranteed $X, %value_2 : @owned $X):
-  br body2(%borrow_2 : $X, %value_2 : $X)
+bb1(%5 : @reborrow $X, %6 : @owned $X):
+  %7 = borrowed %5 from (%0)
+  br bb2(%7, %6)
 
-body2(%borrow_3 : @guaranteed $X, %value_3 : @owned $X):
-  %hold = function_ref @holdX : $@convention(thin) (@guaranteed X) -> ()
-  apply %hold(%borrow_3) : $@convention(thin) (@guaranteed X) -> ()
-  end_borrow %borrow_3 : $X
-  destroy_value %value_3 : $X
-  br exit
+bb2(%9 : @reborrow $X, %10 : @owned $X):
+  %11 = borrowed %9 from (%0)
+  %12 = function_ref @holdX : $@convention(thin) (@guaranteed X) -> ()
+  %13 = apply %12(%11) : $@convention(thin) (@guaranteed X) -> ()
+  end_borrow %11
+  destroy_value %10
+  br bb3
 
-exit:
-  %14 = tuple ()
-  return %14 : $()
+bb3:
+  %17 = tuple ()
+  return %17
 }
 
 // CHECK-LABEL: sil [ossa] @nohoist_destroy_over_forward_reborrow_endborrow : {{.*}} {
@@ -123,23 +131,24 @@ exit:
 // CHECK:         destroy_value [[VALUE]]
 // CHECK-LABEL: } // end sil function 'nohoist_destroy_over_forward_reborrow_endborrow'
 sil [ossa] @nohoist_destroy_over_forward_reborrow_endborrow : $@convention(thin) () -> () {
-entry:
-  %get = function_ref @getX : $@convention(thin) () -> @owned X
-  %value_1 = apply %get() : $@convention(thin) () -> @owned X
-  br body1(%value_1 : $X)
+bb0:
+  %0 = function_ref @getX : $@convention(thin) () -> @owned X
+  %1 = apply %0() : $@convention(thin) () -> @owned X
+  br bb1(%1)
 
-body1(%value_2 : @owned $X):
-  %lifetime_2 = begin_borrow %value_2 : $X
-  br body2(%lifetime_2 : $X, %value_2 : $X)
+bb1(%3 : @owned $X):
+  %4 = begin_borrow %3
+  br bb2(%4, %3)
 
-body2(%lifetime_3 : @guaranteed $X, %value_3 : @owned $X):
-  end_borrow %lifetime_3 : $X
-  destroy_value %value_3 : $X
-  br exit
+bb2(%6 : @reborrow $X, %7 : @owned $X):
+  %8 = borrowed %6 from (%7)
+  end_borrow %8
+  destroy_value %7
+  br bb3
 
-exit:
-  %retval = tuple ()
-  return %retval : $()
+bb3:
+  %12 = tuple ()
+  return %12
 }
 
 // CHECK-LABEL: sil [ossa] @nohoist_destroy_over_reborrow_loop : {{.*}} {
@@ -154,29 +163,30 @@ exit:
 // CHECK:         destroy_value [[VALUE]] : $FakeOptional<X>
 // CHECK-LABEL: } // end sil function 'nohoist_destroy_over_reborrow_loop'
 sil [ossa] @nohoist_destroy_over_reborrow_loop : $@convention(thin) () -> () {
-entry:
-  %none1 = enum $FakeOptional<X>, #FakeOptional.none!enumelt
-  %none2 = enum $FakeOptional<X>, #FakeOptional.none!enumelt
-  %none_borrow_2 = begin_borrow %none2 : $FakeOptional<X>
-  br head(%none_borrow_2 : $FakeOptional<X>, %none1 : $FakeOptional<X>)
+bb0:
+  %0 = enum $FakeOptional<X>, #FakeOptional.none!enumelt
+  %1 = enum $FakeOptional<X>, #FakeOptional.none!enumelt
+  %2 = begin_borrow %1
+  br bb1(%2, %0)
 
-head(%reborrow : @guaranteed $FakeOptional<X>, %value : @owned $FakeOptional<X>):
-  cond_br undef, body, exit
+bb1(%4 : @reborrow $FakeOptional<X>, %5 : @owned $FakeOptional<X>):
+  %6 = borrowed %4 from (%5)
+  cond_br undef, bb2, bb3
 
-body:
-  %get = function_ref @getX : $@convention(thin) () -> (@owned X)
-  %value_0 = apply %get() : $@convention(thin) () -> (@owned X)
-  end_borrow %reborrow : $FakeOptional<X>
-  destroy_value %value : $FakeOptional<X>
-  %some_value_0 = enum $FakeOptional<X>, #FakeOptional.some!enumelt, %value_0 : $X
-  %some_borrow_0 = begin_borrow %some_value_0 : $FakeOptional<X>
-  br head(%some_borrow_0 : $FakeOptional<X>, %some_value_0 : $FakeOptional<X>)
+bb2:
+  %8 = function_ref @getX : $@convention(thin) () -> @owned X
+  %9 = apply %8() : $@convention(thin) () -> @owned X
+  end_borrow %6
+  destroy_value %5
+  %12 = enum $FakeOptional<X>, #FakeOptional.some!enumelt, %9
+  %13 = begin_borrow %12
+  br bb1(%13, %12)
 
-exit:
-  %retval = tuple ()
-  end_borrow %reborrow : $FakeOptional<X>
-  destroy_value %value : $FakeOptional<X>
-  return %retval : $()
+bb3:
+  %15 = tuple ()
+  end_borrow %6
+  destroy_value %5
+  return %15
 }
 
 // Ensure that an adjacent reborrow phi being reborrowed doesn't get counted as
@@ -191,19 +201,21 @@ exit:
 // CHECK-LABEL: } // end sil function 'reborrow_adjacent_to_consume_doesnt_extend_lifetime'
 sil [ossa] @reborrow_adjacent_to_consume_doesnt_extend_lifetime : $@convention(thin) (@owned X) -> () {
 bb0(%0 : @owned $X):
-  %1 = begin_borrow %0 : $X
-  br bb1(%1 : $X, %0 : $X)
+  %1 = begin_borrow %0
+  br bb1(%1, %0)
 
-bb1(%3 : @guaranteed $X, %4 : @owned $X):
+bb1(%3 : @reborrow $X, %4 : @owned $X):
+  %5 = borrowed %3 from (%4)
   cond_br undef, bb2, bb10
 
 bb2:
   br bb3
 
 bb3:
-  br bb4(%3 : $X, %4 : $X)
+  br bb4(%5, %4)
 
-bb4(%8 : @guaranteed $X, %9 : @owned $X):
+bb4(%9 : @reborrow $X, %10 : @owned $X):
+  %11 = borrowed %9 from (%10)
   cond_br undef, bb5, bb8
 
 bb5:
@@ -213,24 +225,24 @@ bb6:
   br bb7
 
 bb7:
-  %13 = function_ref @getX : $@convention(thin) () -> @owned X
-  %14 = apply %13() : $@convention(thin) () -> @owned X
-  end_borrow %8 : $X
-  destroy_value %9 : $X
-  %17 = begin_borrow %14 : $X
-  br bb4(%17 : $X, %14 : $X)
+  %15 = function_ref @getX : $@convention(thin) () -> @owned X
+  %16 = apply %15() : $@convention(thin) () -> @owned X
+  end_borrow %11
+  destroy_value %10
+  %19 = begin_borrow %16
+  br bb4(%19, %16)
 
 bb8:
   br bb9
 
 bb9:
-  br bb1(%8 : $X, %9 : $X)
+  br bb1(%11, %10)
 
 bb10:
   %23 = tuple ()
-  end_borrow %3 : $X
-  destroy_value %4 : $X
-  return %23 : $()
+  end_borrow %5
+  destroy_value %4
+  return %23
 }
 
 // CHECK-LABEL: sil [ossa] @nohoist_destroy_over_endborrow_nonadjacent_reborrow : {{.*}} {
@@ -238,21 +250,23 @@ bb10:
 // CHECK:         destroy_value {{%[^,]+}}
 // CHECK-LABEL: } // end sil function 'nohoist_destroy_over_endborrow_nonadjacent_reborrow'
 sil [ossa] @nohoist_destroy_over_endborrow_nonadjacent_reborrow : $@convention(thin) (@owned X) -> () {
-entry(%value_1 : @owned $X):
-  %lifetime_1 = begin_borrow %value_1 : $X
-  br consume_and_reborrow(%lifetime_1 : $X, %value_1 : $X)
+bb0(%0 : @owned $X):
+  %1 = begin_borrow %0
+  br bb1(%1, %0)
 
-consume_and_reborrow(%lifetime_2 : @guaranteed $X, %value_2 : @owned $X):
-  br reborrow_only(%lifetime_2 : $X)
+bb1(%3 : @reborrow $X, %4 : @owned $X):
+  %5 = borrowed %3 from (%4)
+  br bb2(%5)
 
-reborrow_only(%lifetime_3 : @guaranteed $X):
-  br exit
+bb2(%7 : @reborrow $X):
+  %8 = borrowed %7 from (%4)
+  br bb3
 
-exit:
-  %retval = tuple ()
-  end_borrow %lifetime_3 : $X
-  destroy_value %value_2 : $X
-  return %retval : $()
+bb3:
+  %10 = tuple ()
+  end_borrow %8
+  destroy_value %4
+  return %10
 }
 
 // CHECK-LABEL: sil [ossa] @nohoist_destroy_over_endborrow_nonadjacent_reborrow_2 : {{.*}} {
@@ -260,24 +274,27 @@ exit:
 // CHECK:         destroy_value {{%[^,]+}}
 // CHECK-LABEL: } // end sil function 'nohoist_destroy_over_endborrow_nonadjacent_reborrow_2'
 sil [ossa] @nohoist_destroy_over_endborrow_nonadjacent_reborrow_2 : $@convention(thin) (@owned X) -> () {
-entry(%value_1 : @owned $X):
-  %lifetime_1 = begin_borrow %value_1 : $X
-  br consume_and_reborrow(%lifetime_1 : $X, %value_1 : $X)
+bb0(%0 : @owned $X):
+  %1 = begin_borrow %0
+  br bb1(%1, %0)
 
-consume_and_reborrow(%lifetime_2 : @guaranteed $X, %value_2 : @owned $X):
-  br reborrow_only_1(%lifetime_2 : $X)
+bb1(%3 : @reborrow $X, %4 : @owned $X):
+  %5 = borrowed %3 from (%4)
+  br bb2(%5)
 
-reborrow_only_1(%lifetime_3 : @guaranteed $X):
-  br reborrow_only_2(%lifetime_3 : $X)
+bb2(%7 : @reborrow $X):
+  %8 = borrowed %7 from (%4)
+  br bb3(%8)
 
-reborrow_only_2(%lifetime_4 : @guaranteed $X):
-  br exit
+bb3(%10 : @reborrow $X):
+  %11 = borrowed %10 from (%4)
+  br bb4
 
-exit:
-  %retval = tuple ()
-  end_borrow %lifetime_4 : $X
-  destroy_value %value_2 : $X
-  return %retval : $()
+bb4:
+  %13 = tuple ()
+  end_borrow %11
+  destroy_value %4
+  return %13
 }
 
 // The owned phi %5 has an inner adjacent phi %4, so its end_borrow is
@@ -289,14 +306,15 @@ exit:
 // CHECK:   destroy_value
 sil [ossa] @reborrow_adjacent_to_ownedphi : $@convention(thin) (@owned X) -> () {
 bb0(%0 : @owned $X):
-  %1 = begin_borrow %0 : $X
-  br bb1(%1 : $X, %0 : $X)
+  %1 = begin_borrow %0
+  br bb1(%1, %0)
 
-bb1(%4 : @guaranteed $X, %5 : @owned $X):
-  end_borrow %4 : $X
-  destroy_value %5 : $X
-  %23 = tuple ()
-  return %23 : $()
+bb1(%3 : @reborrow $X, %4 : @owned $X):
+  %5 = borrowed %3 from (%4)
+  end_borrow %5
+  destroy_value %4
+  %8 = tuple ()
+  return %8
 }
 
 // The owned phi %5 has an inner adjacent phi %4, so its reborrow use,
@@ -316,20 +334,22 @@ bb1(%4 : @guaranteed $X, %5 : @owned $X):
 // CHECK-NEXT:   destroy_value
 sil [ossa] @reborrow_adjacent_to_consume : $@convention(thin) () -> () {
 bb0:
-  %0 = apply undef() : $@convention(thin) () -> (@owned X)
-  %1 = begin_borrow %0 : $X
-  br bb1(%1 : $X, %0 : $X)
+  %0 = apply undef() : $@convention(thin) () -> @owned X
+  %1 = begin_borrow %0
+  br bb1(%1, %0)
 
-bb1(%4 : @guaranteed $X, %5 : @owned $X):
-  %copy = copy_value %5 : $X
-  destroy_value %copy : $X
-  br bb2(%4 : $X, %5 : $X)
+bb1(%3 : @reborrow $X, %4 : @owned $X):
+  %5 = borrowed %3 from (%4)
+  %6 = copy_value %4
+  destroy_value %6
+  br bb2(%5, %4)
 
-bb2(%6 : @guaranteed $X, %7 : @owned $X):
-  end_borrow %6 : $X
-  destroy_value %7 : $X
-  %23 = tuple ()
-  return %23 : $()
+bb2(%9 : @reborrow $X, %10 : @owned $X):
+  %11 = borrowed %9 from (%10)
+  end_borrow %11
+  destroy_value %10
+  %14 = tuple ()
+  return %14
 }
 
 // The owned phi %5 has an inner adjacent phi %4, so its reborrow use,
@@ -350,18 +370,20 @@ bb2(%6 : @guaranteed $X, %7 : @owned $X):
 // CHECK-NEXT:   destroy_value
 sil [ossa] @reborrow_no_adjacent_consume : $@convention(thin) () -> () {
 bb0:
-  %0 = apply undef() : $@convention(thin) () -> (@owned X)
-  %1 = begin_borrow %0 : $X
-  br bb1(%1 : $X, %0 : $X)
+  %0 = apply undef() : $@convention(thin) () -> @owned X
+  %1 = begin_borrow %0
+  br bb1(%1, %0)
 
-bb1(%4 : @guaranteed $X, %5 : @owned $X):
-  br bb2(%4 : $X)
+bb1(%3 : @reborrow $X, %4 : @owned $X):
+  %5 = borrowed %3 from (%4)
+  br bb2(%5)
 
-bb2(%6 : @guaranteed $X):
-  %copy = copy_value %5 : $X
-  destroy_value %copy : $X
-  end_borrow %6 : $X
-  destroy_value %5 : $X
-  %23 = tuple ()
-  return %23 : $()
+bb2(%7 : @reborrow $X):
+  %8 = borrowed %7 from (%4)
+  %9 = copy_value %4
+  destroy_value %9
+  end_borrow %8
+  destroy_value %4
+  %13 = tuple ()
+  return %13
 }

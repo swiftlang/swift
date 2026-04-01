@@ -12,14 +12,14 @@
 import Foundation
 
 // CHECK-SIL-LABEL: sil hidden [noinline] @$s4test0A17NonOptionalStringyyF
-// CHECK-SIL:     [[F1:%[0-9]+]] = function_ref @returnNSString
+// CHECK-SIL:     [[F1:%[0-9]+]] = function_ref @$sSo14returnNSStringSSyFTo
 // CHECK-SIL:     apply [[F1]]()
 // CHECK-SIL-NOT: apply
 // CHECK-SIL:     switch_enum
 // CHECK-SIL:     [[F2:%[0-9]+]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK-SIL:     apply [[F2]]
 // CHECK-SIL-NOT: apply
-// CHECK-SIL:     [[F3:%[0-9]+]] = function_ref @useNSString
+// CHECK-SIL:     [[F3:%[0-9]+]] = function_ref @$sSo11useNSStringyySSFTo
 // CHECK-SIL:     apply [[F3]]
 // CHECK-SIL: // end sil function '$s4test0A17NonOptionalStringyyF'
 @inline(never)
@@ -36,14 +36,14 @@ func testOptionalString(_ some: Bool) {
 }
 
 // CHECK-SIL-LABEL: sil hidden [noinline] @$s4test0a13NonOptionalToC6StringyyF
-// CHECK-SIL:     [[F1:%[0-9]+]] = function_ref @returnNSString
+// CHECK-SIL:     [[F1:%[0-9]+]] = function_ref @$sSo14returnNSStringSSyFTo
 // CHECK-SIL:     apply [[F1]]()
 // CHECK-SIL-NOT: apply
 // CHECK-SIL:     switch_enum
 // CHECK-SIL:     [[F2:%[0-9]+]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK-SIL:     apply [[F2]]
 // CHECK-SIL-NOT: apply
-// CHECK-SIL:     [[F3:%[0-9]+]] = function_ref @useOptNSString
+// CHECK-SIL:     [[F3:%[0-9]+]] = function_ref @$sSo14useOptNSStringyySSSgFTo
 // CHECK-SIL:     apply [[F3]]
 // CHECK-SIL: // end sil function '$s4test0a13NonOptionalToC6StringyyF'
 @inline(never)
@@ -62,14 +62,14 @@ func testOptionalToNonOptionalString(_ some: Bool) {
 }
 
 // CHECK-SIL-LABEL: sil hidden [noinline] @$s4test0A15NonOptionalLoopyySiF
-// CHECK-SIL:     [[F1:%[0-9]+]] = function_ref @returnNSString
+// CHECK-SIL:     [[F1:%[0-9]+]] = function_ref @$sSo14returnNSStringSSyFTo
 // CHECK-SIL:     apply [[F1]]()
 // CHECK-SIL-NOT: apply
 // CHECK-SIL:     switch_enum
 // CHECK-SIL:     [[F2:%[0-9]+]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK-SIL:     apply [[F2]]
 // CHECK-SIL-NOT: apply
-// CHECK-SIL:     [[F3:%[0-9]+]] = function_ref @useNSString
+// CHECK-SIL:     [[F3:%[0-9]+]] = function_ref @$sSo11useNSStringyySSFTo
 // CHECK-SIL:     apply [[F3]]
 // CHECK-SIL: // end sil function '$s4test0A15NonOptionalLoopyySiF'
 @inline(never)

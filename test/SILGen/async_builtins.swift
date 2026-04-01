@@ -2,6 +2,7 @@
 // REQUIRES: concurrency
 
 import Swift
+import _Concurrency
 
 public struct X {
   // CHECK-LABEL: sil hidden [ossa] @$s4test1XV14getCurrentTaskBoyYaF

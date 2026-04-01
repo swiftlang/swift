@@ -24,12 +24,6 @@
 // CHECK: }
 
 // CHECK: class B1 {
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftVirtualMethod() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func B1BarRename() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftParamsRename(b1 i: Int32) -> Int32
 // CHECK:  final func virtualMethod() -> Int32
 // CHECK:  final func swiftFooRename() -> Int32
 // CHECK:  final func swiftBarRename() -> Int32
@@ -37,8 +31,6 @@
 // CHECK: }
 
 // CHECK: class B2 {
-// CHECK:    @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:   final func B2BarRename() -> Int32
 // CHECK:   final func virtualMethod() -> Int32
 // CHECK:   final func swiftFooRename() -> Int32
 // CHECK:   final func swiftBarRename() -> Int32
@@ -48,25 +40,11 @@
 // CHECK: class C1 {
 // CHECK:  final func swiftFooRename() -> Int32
 // CHECK:  final func swiftBarRename() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftVirtualMethod() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func B1BarRename() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftParamsRename(b1 i: Int32) -> Int32
-// CHECK:  final func virtualMethod() -> Int32
 // CHECK:  final func swiftParamsRename(a1 i: Int32) -> Int32
+// CHECK:  final func virtualMethod() -> Int32
 // CHECK: }
 
 // CHECK: class C2 {
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftVirtualMethod() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func C2FooRename() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func B1BarRename() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftParamsRename(b1 i: Int32) -> Int32
 // CHECK:  final func virtualMethod() -> Int32
 // CHECK:  final func swiftFooRename() -> Int32
 // CHECK:  final func swiftBarRename() -> Int32
@@ -91,19 +69,15 @@
 // CHECK: }
 
 // CHECK: class D2 {
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftVirtualMethod() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func B1BarRename() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftParamsRename(b1 i: Int32) -> Int32
+// CHECK:  final func swiftFooRename() -> Int32
 // CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
 // CHECK:  final func virtualMethod() -> Int32
-// CHECK:  final func swiftFooRename() -> Int32
 // CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
 // CHECK:  final func swiftBarRename() -> Int32
 // CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
 // CHECK:  final func swiftParamsRename(a1 i: Int32) -> Int32
+// CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
+// CHECK:  final func swiftVirtualMethod() -> Int32
 // CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
 // CHECK:  final func A2BarRename() -> Int32
 // CHECK:  @available(*, unavailable, message: "overrides{{.*}}")
@@ -111,12 +85,6 @@
 // CHECK: }
 
 // CHECK: struct D3 {
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftVirtualMethod() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func B1BarRename() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftParamsRename(b1 i: Int32) -> Int32
 // CHECK:  final func virtualMethod() -> Int32
 // CHECK:  final func swiftFooRename() -> Int32
 // CHECK:  final func swiftBarRename() -> Int32
@@ -126,12 +94,67 @@
 // CHECK: struct D4 {
 // CHECK:  final func swiftFooRename() -> Int32
 // CHECK:  final func swiftBarRename() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftVirtualMethod() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func B1BarRename() -> Int32
-// CHECK:  @available(*, unavailable, message: "ignoring{{.*}}")
-// CHECK:  final func swiftParamsRename(b1 i: Int32) -> Int32
-// CHECK:  final func virtualMethod() -> Int32
 // CHECK:  final func swiftParamsRename(a1 i: Int32) -> Int32
+// CHECK:  final func virtualMethod() -> Int32
+// CHECK: }
+
+// CHECK: struct ValueType {
+// CHECK:   func virtualMethod() -> Int32
+// CHECK:   func swiftRenameMethodBase() -> Int32
+// CHECK:   func renameMethodDerived() -> Int32
+// CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
+// CHECK:   func pureVirtualMethod() -> Int32
+// CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
+// CHECK:   func swiftPureRenameBase() -> Int32
+// CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
+// CHECK:   func pureRenameDerived() -> Int32
+// CHECK: }
+
+// CHECK: class DerivedFRTValueType {
+// CHECK:   final func virtualMethod() -> Int32
+// CHECK:   final func swiftRenameMethodBase() -> Int32
+// CHECK:   final func renameMethodDerived() -> Int32
+// CHECK:   final func pureVirtualMethod() -> Int32
+// CHECK:   final func swiftPureRenameBase() -> Int32
+// CHECK:   final func pureRenameDerived() -> Int32
+// CHECK: }
+
+// CHECK: class EmptyDerivedFRTValueType {
+// CHECK:   func virtualMethod() -> Int32
+// CHECK:   func swiftRenameMethodBase() -> Int32
+// CHECK:   func renameMethodDerived() -> Int32
+// CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
+// CHECK:   func pureVirtualMethod() -> Int32
+// CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
+// CHECK:   func swiftPureRenameBase() -> Int32
+// CHECK:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
+// CHECK:   func pureRenameDerived() -> Int32
+// CHECK: }
+
+// CHECK: struct DerivedValueType {
+// CHECK:   func virtualMethod() -> Int32
+// CHECK:   func swiftRenameMethodBase() -> Int32
+// CHECK:   func renameMethodDerived() -> Int32
+// CHECK:   func pureVirtualMethod() -> Int32
+// CHECK:   func swiftPureRenameBase() -> Int32
+// CHECK:   func pureRenameDerived() -> Int32
+// CHECK: }
+
+// CHECK: class AbstractFRT {
+// CHECK:   final func pureVirtualMethod() -> Int32
+// CHECK:   final func swiftPureRenameBase() -> Int32
+// CHECK:   final func pureRenameDerived() -> Int32
+// CHECK: }
+
+// CHECK: class DerivedAbstractFRT {
+// CHECK:   init()
+// CHECK:   final func pureVirtualMethod() -> Int32
+// CHECK:   final func swiftPureRenameBase() -> Int32
+// CHECK:   final func pureRenameDerived() -> Int32
+// CHECK: }
+
+// CHECK: class EmptyDerivedAbstractFRT {
+// CHECK:   final func pureVirtualMethod() -> Int32
+// CHECK:   final func swiftPureRenameBase() -> Int32
+// CHECK:   final func pureRenameDerived() -> Int32
 // CHECK: }

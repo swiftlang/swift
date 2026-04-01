@@ -973,7 +973,7 @@ extension _StringObject {
 #if _runtime(_ObjC)
     if largeFastIsConstantCocoa {
       return unsafe withCocoaObject {
-        _getNSCFConstantStringContentsPointer($0)
+        unsafe _getNSCFConstantStringContentsPointer($0)
       }
     }
     if largeIsCocoa {
@@ -989,7 +989,7 @@ extension _StringObject {
   internal var sharedUTF8: UnsafeBufferPointer<UInt8> {
     @_effects(releasenone) @inline(never) get {
       _internalInvariant(largeFastIsShared)
-      let start = self.getSharedUTF8Start()
+      let start = unsafe self.getSharedUTF8Start()
       return unsafe UnsafeBufferPointer(start: start, count: largeCount)
     }
   }
@@ -1115,14 +1115,13 @@ extension _StringObject {
   @_alwaysEmitIntoClient
   @inlinable
   @inline(__always)
-  @_unavailableInEmbedded
-  internal var owner: AnyObject? {
+  internal var owner: _ConvertedObject? {
     guard self.isMortal else { return nil }
     #if !$Embedded
     let unmanaged = unsafe Unmanaged<AnyObject>.fromOpaque(largeAddress)
     return unsafe unmanaged.takeUnretainedValue()
     #else
-    fatalError("unreachable in embedded Swift")
+    return unsafe unsafeBitCast(largeAddress, to: _ConvertedObject.self)
     #endif
   }
 }

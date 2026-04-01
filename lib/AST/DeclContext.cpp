@@ -17,6 +17,7 @@
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
@@ -104,7 +105,7 @@ VarDecl *DeclContext::getNonLocalVarDecl() const {
 
 Type DeclContext::getDeclaredTypeInContext() const {
   if (auto declaredType = getDeclaredInterfaceType())
-    return mapTypeIntoContext(declaredType);
+    return mapTypeIntoEnvironment(declaredType);
   return Type();
 }
 
@@ -175,8 +176,8 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
   return nullptr;
 }
 
-Type DeclContext::mapTypeIntoContext(Type type) const {
-  return GenericEnvironment::mapTypeIntoContext(
+Type DeclContext::mapTypeIntoEnvironment(Type type) const {
+  return GenericEnvironment::mapTypeIntoEnvironment(
       getGenericEnvironmentOfContext(), type);
 }
 
@@ -214,8 +215,10 @@ AccessorDecl *DeclContext::getInnermostPropertyAccessorContext() {
         return nullptr;
 
       auto *storage = accessor->getStorage();
-      if (isa<VarDecl>(storage) && storage->getDeclContext()->isTypeContext())
+      if ((isa<VarDecl>(storage) || isa<SubscriptDecl>(storage)) &&
+          storage->getDeclContext()->isTypeContext()) {
         return accessor;
+      }
     }
   } while ((dc = dc->getParent()));
 
@@ -447,6 +450,16 @@ DeclContext *DeclContext::getModuleScopeContext() const {
 
 void DeclContext::getSeparatelyImportedOverlays(
     ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) const {
+  if (declaring->isStdlibModule()) {
+    auto &ctx = getASTContext();
+    for (auto overlayName: ctx.StdlibOverlayNames) {
+      if (auto module = ctx.getLoadedModule(overlayName))
+        overlays.push_back(module);
+    }
+    overlays.push_back(declaring);
+    return;
+  }
+
   if (auto SF = getOutermostParentSourceFile())
     SF->getSeparatelyImportedOverlays(declaring, overlays);
 }
@@ -476,6 +489,11 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
   case FragileFunctionKind::PropertyInitializer:
   case FragileFunctionKind::BackDeploy:
     return ResilienceExpansion::Minimal;
+
+  /// Embedded functions are treated as fragile for diagnostics only.
+  /// For code gen they are treated as normal and optimized later.
+  case FragileFunctionKind::EmbeddedAlwaysEmitIntoClient:
+
   case FragileFunctionKind::None:
     return ResilienceExpansion::Maximal;
   }
@@ -517,17 +535,27 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         return {FragileFunctionKind::DefaultArgument};
       }
 
+      if (VD->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+          !VD->isNeverEmittedIntoClient())
+        return {FragileFunctionKind::EmbeddedAlwaysEmitIntoClient};
       return {FragileFunctionKind::None};
     }
 
     // Stored property initializer contexts use minimal resilience expansion
     // if the type is formally fixed layout.
     if (auto *init = dyn_cast <PatternBindingInitializer>(dc)) {
-      auto bindingIndex = init->getBindingIndex();
-      if (auto *varDecl = init->getBinding()->getAnchoringVarDecl(bindingIndex)) {
-        if (varDecl->isInitExposedToClients()) {
+      auto index = init->getBindingIndex();
+      if (auto *varDecl = init->getBinding()->getAnchoringVarDecl(index)) {
+        switch (varDecl->getInitExposedLevel()) {
+        case ExportedLevel::Exported:
           return {FragileFunctionKind::PropertyInitializer};
-        }
+        case ExportedLevel::ImplicitlyExported:
+          if (init->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+            return {FragileFunctionKind::EmbeddedAlwaysEmitIntoClient};
+          break;
+        case ExportedLevel::None:
+          break;
+        };
       }
 
       return {FragileFunctionKind::None};
@@ -539,6 +567,23 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       if (AFD->getDeclContext()->isLocalContext())
         continue;
 
+      // Delay checking the implicit conditions after explicit declarations.
+      auto checkEmbeddedAlwaysEmitIntoClient = [&](const ValueDecl *VD) {
+        if (!VD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+          return FragileFunctionKind::None;
+
+        bool funcIsNEIC = VD->isNeverEmittedIntoClient();
+        bool storageIsNEIC = false;
+        if (auto accessor = dyn_cast<AccessorDecl>(VD))
+          storageIsNEIC = accessor->getStorage()->isNeverEmittedIntoClient();
+
+        // Accessors are implicitly EmbeddedAlwaysEmitIntoClient if neither the
+        // accessor or starage is marked @_neverEmitIntoClient.
+        if (!funcIsNEIC && !storageIsNEIC)
+          return FragileFunctionKind::EmbeddedAlwaysEmitIntoClient;
+        return FragileFunctionKind::None;
+      };
+
       auto funcAccess =
         AFD->getFormalAccessScope(/*useDC=*/nullptr,
                                   /*treatUsableFromInlineAsPublic=*/true);
@@ -546,7 +591,8 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       // If the function is not externally visible, we will not be serializing
       // its body.
       if (!funcAccess.isPublic()) {
-        return {FragileFunctionKind::None};
+        // For non-public decls, only check embedded mode correctness.
+        return {checkEmbeddedAlwaysEmitIntoClient(AFD)};
       }
 
       // If the function is public, @_transparent implies @inlinable.
@@ -554,15 +600,15 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         return {FragileFunctionKind::Transparent};
       }
 
-      if (AFD->getAttrs().hasAttribute<InlinableAttr>()) {
+      if (AFD->hasAttributeWithInlinableSemantics()) {
         return {FragileFunctionKind::Inlinable};
       }
 
-      if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+      if (AFD->isAlwaysEmittedIntoClient()) {
         return {FragileFunctionKind::AlwaysEmitIntoClient};
       }
 
-      if (AFD->isBackDeployed(context->getASTContext())) {
+      if (AFD->isBackDeployed()) {
         return {FragileFunctionKind::BackDeploy};
       }
 
@@ -570,16 +616,20 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       // @backDeployed, and @inlinable from their storage declarations.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
         auto *storage = accessor->getStorage();
-        if (storage->getAttrs().getAttribute<InlinableAttr>()) {
+        if (storage->hasAttributeWithInlinableSemantics()) {
           return {FragileFunctionKind::Inlinable};
         }
-        if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+        if (storage->isAlwaysEmittedIntoClient()) {
           return {FragileFunctionKind::AlwaysEmitIntoClient};
         }
-        if (storage->isBackDeployed(context->getASTContext())) {
+        if (storage->isBackDeployed()) {
           return {FragileFunctionKind::BackDeploy};
         }
       }
+
+      auto implicitKind = checkEmbeddedAlwaysEmitIntoClient(AFD);
+      if (implicitKind != FragileFunctionKind::None)
+        return {implicitKind};
     }
   }
 
@@ -590,7 +640,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
 bool DeclContext::isInnermostContextGeneric() const {
   if (auto Decl = getAsDecl())
     if (auto GC = Decl->getAsGenericContext())
-      return GC->isGeneric();
+      return GC->hasGenericParamList();
   return false;
 }
 
@@ -1028,7 +1078,7 @@ void IterableDeclContext::addMember(Decl *member, Decl *hint, bool insertAtHead)
   case IterableDeclContextKind::NominalTypeDecl: {
     auto nominal = cast<NominalTypeDecl>(this);
     nominal->addedMember(member);
-    assert(member->getDeclContext() == nominal &&
+    assert(member->getDeclContext() == static_cast<DeclContext *>(nominal) &&
            "Added member to the wrong context");
     break;
   }
@@ -1141,7 +1191,7 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, loader);
-  FirstDeclAndLazyMembers.setInt(true);
+  forceSetHasLazyMembers();
   contextInfo->memberData = contextData;
 
   ++NumLazyIterableDeclContexts;
@@ -1166,13 +1216,7 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   return true;
 }
 
-void IterableDeclContext::setHasLazyMembers(bool hasLazyMembers) const {
-  FirstDeclAndLazyMembers.setInt(hasLazyMembers);
-}
-
-void IterableDeclContext::loadAllMembers() const {
-  ASTContext &ctx = getASTContext();
-
+void IterableDeclContext::addParsedMembers() const {
   // For contexts within a source file, get the list of parsed members.
   if (getAsGenericContext()->getParentSourceFile()) {
     // Retrieve the parsed members. Even if we've already added the parsed
@@ -1189,18 +1233,35 @@ void IterableDeclContext::loadAllMembers() const {
       }
     }
   }
+}
 
-  if (!hasLazyMembers())
+void IterableDeclContext::loadStorageMembers() const {
+  addParsedMembers();
+
+  if (FirstDeclAndLazyMembers.getInt() == LazyMemberStatus::StorageLoaded ||
+      FirstDeclAndLazyMembers.getInt() == LazyMemberStatus::AllLoaded)
     return;
+  FirstDeclAndLazyMembers.setInt(LazyMemberStatus::StorageLoaded);
 
-  // Don't try to load all members re-entrant-ly.
-  setHasLazyMembers(false);
+  ASTContext &ctx = getASTContext();
+  auto ctxData = ctx.getOrCreateLazyIterableContextData(this,
+                                                        /*lazyLoader=*/nullptr);
+  ctxData->loader->loadStorageMembers(const_cast<Decl *>(getDecl()),
+                                      ctxData->memberData);
+}
 
-  const Decl *container = getDecl();
-  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
-    /*lazyLoader=*/nullptr);
-  contextInfo->loader->loadAllMembers(const_cast<Decl *>(container),
-                                      contextInfo->memberData);
+void IterableDeclContext::loadAllMembers() const {
+  loadStorageMembers();
+
+  if (FirstDeclAndLazyMembers.getInt() == LazyMemberStatus::AllLoaded)
+    return;
+  FirstDeclAndLazyMembers.setInt(LazyMemberStatus::AllLoaded);
+
+  ASTContext &ctx = getASTContext();
+  auto ctxData = ctx.getOrCreateLazyIterableContextData(this,
+                                                        /*lazyLoader=*/nullptr);
+  ctxData->loader->loadNonStorageMembers(const_cast<Decl *>(getDecl()),
+                                  ctxData->memberData);
 
   --NumUnloadedLazyIterableDeclContexts;
   // FIXME: (transitional) decrement the redundant "always-on" counter.
@@ -1229,10 +1290,9 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
   // If members were not deserialized, force load here.
   if (!didDeserializeMembers()) {
     // This needs to be set to force load all members if not done already.
-    setHasLazyMembers(true);
-    // Calling getMembers actually loads the members.
-    (void)getMembers();
-    assert(!hasLazyMembers());
+    forceSetHasLazyMembers();
+    loadAllMembers();
+    ASSERT(!hasLazyMembers());
     assert(didDeserializeMembers());
   }
   // Members could have been deserialized from other flows. Check
@@ -1497,14 +1557,32 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
     auto clangDecl = sourceNTD->getDecl()->getClangDecl();
 
     if (isa_and_nonnull<clang::EnumDecl>(clangDecl)) {
-      // Consider:  class C { private: enum class E { M }; };
-      // If sourceDC is a C++ enum (e.g, E), then we are looking at one of its
-      // members (e.g., E.M). If this is the case, then we should consider
-      // the SWIFT_PRIVATE_FILEID of its enclosing class decl (e.g., C), if any.
-      // Doing so allows the nested private enum's members to inherit the access
-      // of the nested enum type itself.
-      clangDecl = dyn_cast<clang::CXXRecordDecl>(clangDecl->getDeclContext());
-      sourceDC = sourceNTD->getDeclContext();
+      // C/C++ enums are an odd case for access checking because they can only
+      // contain variants as members, and those variants cannot be assigned
+      // access specifiers. Instead, those variants should simply inherit the
+      // access of their parent enum, if any. For instance:
+      //
+      //   class Base { protected: enum class E { M }; };
+      //   class Derived : public Base {};
+      //
+      // In C++, E::M should be accessible within Base and Derived; we should
+      // follow suit in Swift.
+      //
+      // When we check the access of something like E.M, clangDecl will point to
+      // enum class E (the DeclContext of M), and if we've gotten this far, we
+      // can infer that E was accessible in useDC, so its members should be too.
+      //
+      // This is technically unsound (i.e., encapsulation-breaking), because it
+      // is possible to extend imported Clang enums private in Swift extensions.
+      // With this hack, those private members would be accessible everywhere
+      // even though they shouldn't. But right here, when we're checking the E
+      // of E.M, there's no way to tell whether the M is something we imported
+      // from Clang (which we should allow) versus something we defined in Swift
+      // (which we should disallow), without over-complicating the access check.
+      // To limit the encapsulate the breakage, we do an additional check to
+      // ensure we're checking an imported enum that is *nested* in a Clang
+      // record (which is the only way this enum can be imported as private).
+      return isa_and_nonnull<clang::CXXRecordDecl>(clangDecl->getDeclContext());
     }
 
     if (!isa_and_nonnull<clang::CXXRecordDecl>(clangDecl))

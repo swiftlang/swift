@@ -94,8 +94,8 @@ static void withStatusRecordLock(
               status, newStatus,
               /*success*/ SWIFT_MEMORY_ORDER_CONSUME,
               /*failure*/ std::memory_order_relaxed)) {
+        newStatus.traceStatusChanged(task, status, false);
         status = newStatus;
-        status.traceStatusChanged(task, false);
         break;
       }
     }
@@ -130,7 +130,7 @@ static void withStatusRecordLock(
             status, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task, false);
+      newStatus.traceStatusChanged(task, status, false);
       break;
     }
   }
@@ -196,7 +196,7 @@ bool swift::addStatusRecord(AsyncTask *task, TaskStatusRecord *newRecord,
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(task, false);
+        newStatus.traceStatusChanged(task, oldStatus, false);
         return true;
       } else {
         // Retry
@@ -302,7 +302,7 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
             oldStatus, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task, false);
+      newStatus.traceStatusChanged(task, oldStatus, false);
       return;
     }
 
@@ -829,7 +829,7 @@ void swift::_swift_taskGroup_cancel_unlocked(TaskGroup *group,
 /**************************************************************************/
 
 /// Perform any cancellation actions required by the given record.
-static void performCancellationAction(TaskStatusRecord *record) {
+static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord *record) {
   switch (record->getKind()) {
   // Child tasks need to be recursively cancelled.
   case TaskStatusRecordKind::ChildTask: {
@@ -852,6 +852,10 @@ static void performCancellationAction(TaskStatusRecord *record) {
   case TaskStatusRecordKind::CancellationNotification: {
     auto notification =
       cast<CancellationNotificationStatusRecord>(record);
+    if (status.hasCancellationShield()) {
+      SWIFT_TASK_DEBUG_LOG("cancellation shielded: skip cancellation handler invocation in task = %p", swift_task_getCurrent());
+      return; 
+    }
     notification->run();
     return;
   }
@@ -888,7 +892,9 @@ static void swift_task_cancelImpl(AsyncTask *task) {
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
   while (true) {
-    if (oldStatus.isCancelled()) {
+    // Are we already cancelled? 
+    // Even if we have a cancellation shield active, we do want to set the isCancelled flag.
+    if (oldStatus.isCancelled(/*ignoreShield=*/false)) {
       return;
     }
 
@@ -904,10 +910,10 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     }
   }
 
-  newStatus.traceStatusChanged(task, false);
+  newStatus.traceStatusChanged(task, oldStatus, false);
   if (newStatus.getInnermostRecord() == nullptr) {
-     // No records, nothing to propagate
-     return;
+    // No records, nothing to propagate
+    return;
   }
 
   withStatusRecordLock(task, newStatus, [&](ActiveTaskStatus status) {
@@ -916,7 +922,9 @@ static void swift_task_cancelImpl(AsyncTask *task) {
       // modify this list that is being iterated. However, cancellation is
       // happening from outside of the task so we know that no new records will
       // be added since that's only possible while on task.
-      performCancellationAction(cur);
+      //
+      // Each action must independently take care of how to deal with cancellation shields.
+      performCancellationAction(newStatus, cur);
     }
   });
 }

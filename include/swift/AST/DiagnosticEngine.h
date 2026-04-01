@@ -21,13 +21,16 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticArgument.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/PrintDiagnosticNamesMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
-#include "swift/Basic/WarningAsErrorRule.h"
+#include "swift/Basic/WarningGroupBehaviorRule.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
@@ -48,6 +51,8 @@ namespace swift {
   class FuncDecl;
   class SourceManager;
   class SourceFile;
+  class ParamDecl;
+  class AnyPattern;
 
   /// Enumeration describing all of possible diagnostics.
   ///
@@ -55,7 +60,7 @@ namespace swift {
   /// this enumeration type that uniquely identifies it.
   enum class DiagID : uint32_t;
 
-  enum class DiagGroupID : uint16_t;
+  enum class DiagGroupID : uint32_t;
 
   /// Describes a diagnostic along with its argument types.
   ///
@@ -217,6 +222,9 @@ namespace swift {
     const class Decl *getDecl() const { return Decl; }
     DiagnosticBehavior getBehaviorLimit() const { return BehaviorLimit; }
 
+    /// Retrieve the stored SourceLoc, or the location of the stored Decl.
+    SourceLoc getLocOrDeclLoc() const;
+
     void setLoc(SourceLoc loc) { Loc = loc; }
     void setIsChildNote(bool isChildNote) { IsChildNote = isChildNote; }
     void setDecl(const class Decl *decl) { Decl = decl; }
@@ -279,31 +287,55 @@ namespace swift {
     }
   };
 
+  namespace detail {
+  /// Stores information for an active diagnostic that hasn't been emitted yet.
+  /// This includes both "in-flight" diagnostics as well as diagnostics queued
+  /// for a transaction.
+  struct ActiveDiagnostic {
+    Diagnostic Diag;
+
+    // NOTE: The `unique_ptr` here is important since we use a DiagnosticInfo
+    // pointer as the diagnostic argument for `Diag` when wrapping.
+    SmallVector<std::unique_ptr<DiagnosticInfo>, 2> WrappedDiagnostics;
+    SmallVector<std::vector<DiagnosticArgument>, 4> WrappedDiagnosticArgs;
+
+    ActiveDiagnostic(Diagnostic diag) : Diag(std::move(diag)) {}
+  };
+  } // namespace detail
+
   /// A diagnostic that has no input arguments, so it is trivially-destructable.
   using ZeroArgDiagnostic = Diag<>;
-  
+
   /// Describes an in-flight diagnostic, which is currently active
   /// within the diagnostic engine and can be augmented within additional
   /// information (source ranges, Fix-Its, etc.).
   ///
-  /// Only a single in-flight diagnostic can be active at one time, and all
-  /// additional information must be emitted through the active in-flight
-  /// diagnostic.
+  /// Multiple in-flight diagnostics can be active at the same time. They are
+  /// emitted in FIFO order (based on time of creation) once the number of
+  /// active diagnostics drops to 0. All additional information must be emitted
+  /// through the active in-flight diagnostic.
   class InFlightDiagnostic {
     friend class DiagnosticEngine;
     
     DiagnosticEngine *Engine;
+    unsigned Idx;
     bool IsActive;
     
     /// Create a new in-flight diagnostic. 
     ///
     /// This constructor is only available to the DiagnosticEngine.
-    InFlightDiagnostic(DiagnosticEngine &Engine)
-      : Engine(&Engine), IsActive(true) { }
-    
+    InFlightDiagnostic(DiagnosticEngine &Engine, unsigned idx)
+        : Engine(&Engine), Idx(idx), IsActive(true) {}
+
     InFlightDiagnostic(const InFlightDiagnostic &) = delete;
     InFlightDiagnostic &operator=(const InFlightDiagnostic &) = delete;
     InFlightDiagnostic &operator=(InFlightDiagnostic &&) = delete;
+
+    /// Retrieve the underlying active diagnostic information.
+    detail::ActiveDiagnostic &getActiveDiag() const;
+
+    /// Retrieve the underlying diagnostic.
+    Diagnostic &getDiag() const { return getActiveDiag().Diag; }
 
   public:
     /// Create an active but unattached in-flight diagnostic.
@@ -311,15 +343,15 @@ namespace swift {
     /// The resulting diagnostic can be used as a dummy, accepting the
     /// syntax to add additional information to a diagnostic without
     /// actually emitting a diagnostic.
-    InFlightDiagnostic() : Engine(0), IsActive(true) { }
-    
+    InFlightDiagnostic() : Engine(0), Idx(0), IsActive(true) {}
+
     /// Transfer an in-flight diagnostic to a new object, which is
     /// typically used when returning in-flight diagnostics.
     InFlightDiagnostic(InFlightDiagnostic &&Other)
-      : Engine(Other.Engine), IsActive(Other.IsActive) {
+        : Engine(Other.Engine), Idx(Other.Idx), IsActive(Other.IsActive) {
       Other.IsActive = false;
     }
-    
+
     ~InFlightDiagnostic() {
       if (IsActive)
         flush();
@@ -336,6 +368,12 @@ namespace swift {
     /// instance, if \c DiagnosticBehavior::Warning is passed, an error will be
     /// emitted as a warning, but a note will still be emitted as a note.
     InFlightDiagnostic &limitBehavior(DiagnosticBehavior limit);
+
+    /// Prevent the diagnostic from behaving more severely than \p limit or the
+    /// previously set limit. Use to compose conditions to downgrade a
+    /// diagnostic in succession.
+    InFlightDiagnostic
+    &limitBehaviorIfMorePermissive(DiagnosticBehavior limit);
 
     /// Conditionally prevent the diagnostic from behaving more severely than \p
     /// limit. If the condition is false, no limit is imposed.
@@ -363,8 +401,8 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &limitBehaviorUntilSwiftVersion(
-        DiagnosticBehavior limit, unsigned majorVersion);
+    InFlightDiagnostic &limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
+                                                       LanguageMode mode);
 
     /// Limits the diagnostic behavior to \c limit accordingly if
     /// preconcurrency applies. Otherwise, the behavior limit only applies
@@ -379,39 +417,23 @@ namespace swift {
     /// to stage in concurrency annotations even after their clients have
     /// migrated to Swift 6 using `@preconcurrency` alongside the newly added
     /// `@Sendable` or `@MainActor` annotations.
-    InFlightDiagnostic
-    &limitBehaviorWithPreconcurrency(DiagnosticBehavior limit,
-                                     bool preconcurrency,
-                                     unsigned languageMode = 6) {
+    InFlightDiagnostic &
+    limitBehaviorWithPreconcurrency(DiagnosticBehavior limit,
+                                    bool preconcurrency,
+                                    LanguageMode mode = LanguageMode::v6) {
       if (preconcurrency) {
         return limitBehavior(limit);
       }
 
-      return limitBehaviorUntilSwiftVersion(limit, languageMode);
+      return limitBehaviorUntilLanguageMode(limit, mode);
     }
 
-    /// Limit the diagnostic behavior to warning until the next future
-    /// language mode.
-    ///
-    /// This should be preferred over passing the next major version to
-    /// `warnUntilSwiftVersion` to make it easier to find and update clients
-    /// when a new language mode is introduced.
+    /// Limit the diagnostic behavior to warning until the specified language
+    /// mode.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilFutureSwiftVersion();
-
-    InFlightDiagnostic &warnUntilFutureSwiftVersionIf(bool shouldLimit) {
-      if (!shouldLimit)
-        return *this;
-      return warnUntilFutureSwiftVersion();
-    }
-
-    /// Limit the diagnostic behavior to warning until the specified version.
-    ///
-    /// This helps stage in fixes for stricter diagnostics as warnings
-    /// until the next major language version.
-    InFlightDiagnostic &warnUntilSwiftVersion(unsigned majorVersion);
+    InFlightDiagnostic &warnUntilLanguageMode(LanguageMode mode);
 
     /// Limit the diagnostic behavior to warning if the context is a
     /// swiftinterface.
@@ -423,15 +445,15 @@ namespace swift {
     InFlightDiagnostic &warnInSwiftInterface(const DeclContext *context);
 
     /// Conditionally limit the diagnostic behavior to warning until
-    /// the specified version.  If the condition is false, no limit is
+    /// the specified language mode. If the condition is false, no limit is
     /// imposed, meaning (presumably) it is treated as an error.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilSwiftVersionIf(bool shouldLimit,
-                                                unsigned majorVersion) {
+    InFlightDiagnostic &warnUntilLanguageModeIf(bool shouldLimit,
+                                                LanguageMode mode) {
       if (!shouldLimit) return *this;
-      return warnUntilSwiftVersion(majorVersion);
+      return warnUntilLanguageMode(mode);
     }
 
     /// Wraps this diagnostic in another diagnostic. That is, \p wrapper will be
@@ -587,6 +609,9 @@ namespace swift {
                                          ArrayRef<DiagnosticArgument> Args);
   };
 
+  using WarningGroupBehaviorMap =
+      llvm::MapVector<swift::DiagGroupID, WarningGroupBehaviorRule>;
+
   /// Class to track, map, and remap diagnostic severity and fatality
   ///
   class DiagnosticState {
@@ -596,14 +621,28 @@ namespace swift {
 
     /// Don't emit any warnings
     bool suppressWarnings = false;
+
+    /// Don't emit any notes
+    bool suppressNotes = false;
     
     /// Don't emit any remarks
     bool suppressRemarks = false;
 
-    /// A mapping from `DiagGroupID` identifiers to Boolean values indicating
-    /// whether warnings belonging to the respective diagnostic groups should be
-    /// escalated to errors.
-    llvm::BitVector warningsAsErrors;
+    /// Check for `@warn` diagnostic group behavior controls
+    bool checkSyntacticControls = false;
+
+    /// A mapping from `DiagGroupID` identifiers to `WarningGroupBehaviorRule`
+    /// values indicating how warnings belonging to the respective diagnostic groups
+    /// should be emitted. While there is duplication between this data structure
+    /// being a map keyed with `DiagGroupID` and containing a rule object which also
+    /// contains a matching `DiagGroupID`, this significantly simplifies bridging
+    /// values of this map to Swift clients.
+    WarningGroupBehaviorMap warningGroupBehaviorMap;
+
+    /// For compiler-internal purposes only, track which diagnostics should
+    /// be ignored completely. For example, this is used by LLDB to
+    /// suppress certain errors in expression evaluation.
+    llvm::BitVector compilerIgnoredDiagnostics;
 
     /// Whether a fatal error has occurred
     bool fatalErrorOccurred = false;
@@ -614,9 +653,6 @@ namespace swift {
     /// Track the previous emitted Behavior, useful for notes
     DiagnosticBehavior previousBehavior = DiagnosticBehavior::Unspecified;
 
-    /// Track which diagnostics should be ignored.
-    llvm::BitVector ignoredDiagnostics;
-
     friend class DiagnosticStateRAII;
 
   public:
@@ -624,7 +660,8 @@ namespace swift {
 
     /// Figure out the Behavior for the given diagnostic, taking current
     /// state such as fatality into account.
-    DiagnosticBehavior determineBehavior(const Diagnostic &diag) const;
+    DiagnosticBehavior determineBehavior(const Diagnostic &diag,
+                                         SourceManager &sourceMgr) const;
 
     /// Updates the diagnostic state for a diagnostic to emit.
     void updateFor(DiagnosticBehavior behavior);
@@ -639,36 +676,49 @@ namespace swift {
       return showDiagnosticsAfterFatalError;
     }
 
+    void setCheckSyntacticControls(bool val = true) {
+      checkSyntacticControls = val;
+    }
+    bool getCheckSyntacticControls() const {
+      return checkSyntacticControls;
+    }
+
     /// Whether to skip emitting warnings
     void setSuppressWarnings(bool val) { suppressWarnings = val; }
     bool getSuppressWarnings() const { return suppressWarnings; }
     
+    /// Whether to skip emitting notes
+    void setSuppressNotes(bool val) { suppressNotes = val; }
+    bool getSuppressNotes() const { return suppressNotes; }
+
     /// Whether to skip emitting remarks
     void setSuppressRemarks(bool val) { suppressRemarks = val; }
     bool getSuppressRemarks() const { return suppressRemarks; }
 
-    /// Sets whether warnings belonging to the diagnostic group identified by
-    /// `id` should be escalated to errors.
-    void setWarningsAsErrorsForDiagGroupID(DiagGroupID id, bool value) {
-      warningsAsErrors[(unsigned)id] = value;
+    /// Configure the command-line warning group handling
+    /// rules (`-Werrr`,`-Wwarning`,`-warnings-as-errors`)
+    void setWarningGroupControlRules(
+        const llvm::SmallVector<WarningGroupBehaviorRule, 4> &rules);
+
+    /// Add an individual command-line warning group behavior
+    void addWarningGroupControl(const DiagGroupID &groupID,
+                                WarningGroupBehavior behavior) {
+      warningGroupBehaviorMap.insert_or_assign(
+          groupID, WarningGroupBehaviorRule(behavior, groupID));
     }
 
-    /// Returns a Boolean value indicating whether warnings belonging to the
-    /// diagnostic group identified by `id` should be escalated to errors.
-    bool getWarningsAsErrorsForDiagGroupID(DiagGroupID id) const {
-      return warningsAsErrors[(unsigned)id];
+    const WarningGroupBehaviorMap&
+    getWarningGroupBehaviorControlMap() const {
+      return warningGroupBehaviorMap;
     }
 
-    /// Whether all warnings should be upgraded to errors or not.
-    void setAllWarningsAsErrors(bool value) {
-      // This works as intended because every diagnostic belongs to either a
-      // custom group or the top-level `DiagGroupID::no_group`, which is also
-      // a group.
-      if (value) {
-        warningsAsErrors.set();
-      } else {
-        warningsAsErrors.reset();
-      }
+    const std::vector<const WarningGroupBehaviorRule*>
+    getWarningGroupBehaviorControlRefArray() const {
+      std::vector<const WarningGroupBehaviorRule*> ruleRefArray;
+      ruleRefArray.reserve(warningGroupBehaviorMap.size());
+      for (const auto &rule: warningGroupBehaviorMap)
+        ruleRefArray.push_back(&rule.second);
+      return ruleRefArray;
     }
 
     void resetHadAnyError() {
@@ -676,20 +726,25 @@ namespace swift {
       fatalErrorOccurred = false;
     }
 
-    /// Set whether a diagnostic should be ignored.
-    void setIgnoredDiagnostic(DiagID id, bool ignored) {
-      ignoredDiagnostics[(unsigned)id] = ignored;
+    /// Set a specific diagnostic to be ignored by the compiler.
+    void compilerInternalIgnoreDiagnostic(DiagID id) {
+      compilerIgnoredDiagnostics[(unsigned)id] = true;
     }
 
+    /// Query whether a specific diagnostic group and *all*
+    /// of its subgroups are ignored.
+    bool isIgnoredDiagnosticGroupTree(DiagGroupID id) const;
+
     void swap(DiagnosticState &other) {
-      std::swap(showDiagnosticsAfterFatalError, other.showDiagnosticsAfterFatalError);
+      std::swap(showDiagnosticsAfterFatalError,
+                other.showDiagnosticsAfterFatalError);
       std::swap(suppressWarnings, other.suppressWarnings);
+      std::swap(suppressNotes, other.suppressNotes);
       std::swap(suppressRemarks, other.suppressRemarks);
-      std::swap(warningsAsErrors, other.warningsAsErrors);
+      std::swap(warningGroupBehaviorMap, other.warningGroupBehaviorMap);
       std::swap(fatalErrorOccurred, other.fatalErrorOccurred);
       std::swap(anyErrorOccurred, other.anyErrorOccurred);
       std::swap(previousBehavior, other.previousBehavior);
-      std::swap(ignoredDiagnostics, other.ignoredDiagnostics);
     }
 
   private:
@@ -699,6 +754,13 @@ namespace swift {
 
     DiagnosticState(DiagnosticState &&) = default;
     DiagnosticState &operator=(DiagnosticState &&) = default;
+
+    /// If this diagnostic is a warning belonging to a diagnostic group,
+    /// figure out if there is a source-level (`@warn`) control for this group
+    /// for this diagnostic's source location.
+    std::optional<DiagnosticBehavior>
+    determineUserControlledWarningBehavior(const Diagnostic &diag,
+                                           SourceManager &sourceMgr) const;
   };
 
   /// A lightweight reference to a diagnostic that's been fully applied to
@@ -784,16 +846,12 @@ namespace swift {
     /// Tracks diagnostic behaviors and state
     DiagnosticState state;
 
-    /// The currently active diagnostic, if there is one.
-    std::optional<Diagnostic> ActiveDiagnostic;
-
-    /// Diagnostics wrapped by ActiveDiagnostic, if any.
-    SmallVector<DiagnosticInfo, 2> WrappedDiagnostics;
-    SmallVector<std::vector<DiagnosticArgument>, 4> WrappedDiagnosticArgs;
+    /// The currently active diagnostics.
+    SmallVector<detail::ActiveDiagnostic, 4> ActiveDiagnostics;
 
     /// All diagnostics that have are no longer active but have not yet
     /// been emitted due to an open transaction.
-    SmallVector<Diagnostic, 4> TentativeDiagnostics;
+    SmallVector<detail::ActiveDiagnostic, 4> TentativeDiagnostics;
 
     llvm::BumpPtrAllocator TransactionAllocator;
     /// A set of all strings involved in current transactional chain.
@@ -816,6 +874,9 @@ namespace swift {
     /// emitted once all transactions have closed.
     unsigned TransactionCount = 0;
 
+    /// The number of currently in-flight diagnostics.
+    unsigned NumActiveDiags = 0;
+
     /// For batch mode, use this to know where to output a diagnostic from a
     /// non-primary file. It's any location in the buffer of the current primary
     /// input being compiled.
@@ -830,12 +891,16 @@ namespace swift {
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
 
+    /// Path to toolchain-local diagnostic documentation directory
+    /// relative to the compiler executable.
+    std::string localDiagnosticDocumentationPath = "";
+
     /// The Swift language version. This is used to limit diagnostic behavior
     /// until a specific language version, e.g. Swift 6.
     version::Version languageVersion;
 
     /// The stats reporter used to keep track of Swift 6 errors
-    /// diagnosed via \c warnUntilSwiftVersion(6).
+    /// diagnosed via \c warnUntilLanguageMode(LanguageMode::v6).
     UnifiedStatsReporter *statsReporter = nullptr;
 
     /// Whether we are actively pretty-printing a declaration as part of
@@ -851,7 +916,7 @@ namespace swift {
 
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
-        : SourceMgr(SourceMgr), ActiveDiagnostic(),
+        : SourceMgr(SourceMgr), ActiveDiagnostics(),
           TransactionStrings(TransactionAllocator),
           DiagnosticStringsSaver(DiagnosticStringsAllocator) {}
 
@@ -870,6 +935,7 @@ namespace swift {
     }
 
     void flushConsumers() {
+      ASSERT(NumActiveDiags == 0 && "Expected in-flight diags to be flushed");
       for (auto consumer : Consumers)
         consumer->flush();
     }
@@ -880,10 +946,24 @@ namespace swift {
       return state.getSuppressWarnings();
     }
 
+    /// Whether to skip emitting notes
+    void setSuppressNotes(bool val) { state.setSuppressNotes(val); }
+    bool getSuppressNotes() const {
+      return state.getSuppressNotes();
+    }
+
     /// Whether to skip emitting remarks
     void setSuppressRemarks(bool val) { state.setSuppressRemarks(val); }
     bool getSuppressRemarks() const {
       return state.getSuppressRemarks();
+    }
+
+    /// Whether to check syntactic `@warn` controls
+    void setCheckSyntacticControls(bool val = true) {
+      state.setCheckSyntacticControls(val);
+    }
+    bool getCheckSyntacticControls() const {
+      return state.getCheckSyntacticControls();
     }
 
     /// Apply rules specifing what warnings should or shouldn't be treated as
@@ -892,7 +972,20 @@ namespace swift {
     /// Rules are applied in order they appear in the vector.
     /// In case the vector contains rules affecting the same diagnostic ID
     /// the last rule wins.
-    void setWarningsAsErrorsRules(const std::vector<WarningAsErrorRule> &rules);
+    void setWarningGroupControlRules(
+        const llvm::SmallVector<WarningGroupBehaviorRule, 4> &rules) {
+      state.setWarningGroupControlRules(rules);
+    }
+
+    const WarningGroupBehaviorMap&
+    getWarningGroupBehaviorControlMap() const {
+      return state.getWarningGroupBehaviorControlMap();
+    }
+
+    const std::vector<const WarningGroupBehaviorRule*>
+    getWarningGroupBehaviorControlRefArray() const {
+      return state.getWarningGroupBehaviorControlRefArray();
+    }
 
     /// Whether to print diagnostic names after their messages
     void setPrintDiagnosticNamesMode(PrintDiagnosticNamesMode val) {
@@ -909,6 +1002,13 @@ namespace swift {
       return diagnosticDocumentationPath;
     }
 
+    void setLocalDiagnosticDocumentationPath(std::string path) {
+      localDiagnosticDocumentationPath = path;
+    }
+    StringRef getLocalDiagnosticDocumentationPath() {
+      return localDiagnosticDocumentationPath;
+    }
+
     bool isPrettyPrintingDecl() const { return IsPrettyPrintingDecl; }
 
     void setLanguageVersion(version::Version v) { languageVersion = v; }
@@ -923,8 +1023,12 @@ namespace swift {
       localization = diag::LocalizationProducer::producerFor(locale, path);
     }
 
+    /// Whether the specified SourceFile enables a given diagnostic group
+    /// either syntactically, or via command-line flags.
+    bool isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const;
+
     void ignoreDiagnostic(DiagID id) {
-      state.setIgnoredDiagnostic(id, true);
+      state.compilerInternalIgnoreDiagnostic(id);
     }
 
     void resetHadAnyError() {
@@ -1001,10 +1105,9 @@ namespace swift {
     /// \returns An in-flight diagnostic, to which additional information can
     /// be attached.
     InFlightDiagnostic diagnose(SourceLoc Loc, const Diagnostic &D) {
-      assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnostic = D;
-      ActiveDiagnostic->setLoc(Loc);
-      return InFlightDiagnostic(*this);
+      auto IFD = beginDiagnostic(D);
+      getActiveDiagnostic(IFD).Diag.setLoc(Loc);
+      return IFD;
     }
     
     /// Emit a diagnostic with the given set of diagnostic arguments.
@@ -1080,10 +1183,9 @@ namespace swift {
     /// \returns An in-flight diagnostic, to which additional information can
     /// be attached.
     InFlightDiagnostic diagnose(const Decl *decl, const Diagnostic &diag) {
-      assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnostic = diag;
-      ActiveDiagnostic->setDecl(decl);
-      return InFlightDiagnostic(*this);
+      auto IFD = beginDiagnostic(diag);
+      getActiveDiagnostic(IFD).Diag.setDecl(decl);
+      return IFD;
     }
 
     /// Emit a diagnostic with the given set of diagnostic arguments.
@@ -1137,16 +1239,21 @@ namespace swift {
         DiagnosticFormatOptions FormatOpts = DiagnosticFormatOptions());
 
   private:
+    /// Begins a new in-flight diagnostic.
+    InFlightDiagnostic beginDiagnostic(const Diagnostic &D);
+
+    /// Ends an in-flight diagnostic. Once all in-flight diagnostics have ended,
+    /// they will either be emitted, or captured by an open transaction.
+    void endDiagnostic(const InFlightDiagnostic &D);
+
     /// Called when tentative diagnostic is about to be flushed,
     /// to apply any required transformations e.g. copy string arguments
     /// to extend their lifetime.
     void onTentativeDiagnosticFlush(Diagnostic &diagnostic);
 
-    /// Flush the active diagnostic.
-    void flushActiveDiagnostic();
-    
-    /// Retrieve the active diagnostic.
-    Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
+    /// Retrieve the stored active diagnostic for a given InFlightDiagnostic.
+    detail::ActiveDiagnostic &
+    getActiveDiagnostic(const InFlightDiagnostic &diag);
 
     /// Generate DiagnosticInfo for a Diagnostic to be passed to consumers.
     std::optional<DiagnosticInfo>
@@ -1162,7 +1269,7 @@ namespace swift {
 
     /// Handle a new diagnostic, which will either be emitted, or added to an
     /// active transaction.
-    void handleDiagnostic(Diagnostic &&diag);
+    void handleDiagnostic(detail::ActiveDiagnostic &&diag);
 
     /// Clear any tentative diagnostics.
     void clearTentativeDiagnostics();
@@ -1291,12 +1398,13 @@ namespace swift {
     }
 
     bool hasErrors() const {
-      ArrayRef<Diagnostic> diagnostics(Engine.TentativeDiagnostics.begin() +
-                                           PrevDiagnostics,
-                                       Engine.TentativeDiagnostics.end());
+      ArrayRef<detail::ActiveDiagnostic> diagnostics(
+          Engine.TentativeDiagnostics.begin() + PrevDiagnostics,
+          Engine.TentativeDiagnostics.end());
 
       for (auto &diagnostic : diagnostics) {
-        auto behavior = Engine.state.determineBehavior(diagnostic);
+        auto behavior = Engine.state.determineBehavior(diagnostic.Diag,
+                                                       Engine.SourceMgr);
         if (behavior == DiagnosticBehavior::Fatal ||
             behavior == DiagnosticBehavior::Error)
           return true;
@@ -1361,14 +1469,14 @@ namespace swift {
 
       // The first diagnostic is assumed to be the parent. If this is not an
       // error or warning, we'll assert later when trying to add children.
-      Diagnostic &parent = Engine.TentativeDiagnostics[PrevDiagnostics];
+      Diagnostic &parent = Engine.TentativeDiagnostics[PrevDiagnostics].Diag;
 
       // Associate the children with the parent.
       for (auto diag =
                Engine.TentativeDiagnostics.begin() + PrevDiagnostics + 1;
            diag != Engine.TentativeDiagnostics.end(); ++diag) {
-        diag->setIsChildNote(true);
-        parent.addChildNote(std::move(*diag));
+        diag->Diag.setIsChildNote(true);
+        parent.addChildNote(std::move(diag->Diag));
       }
 
       // Erase the children, they'll be emitted alongside their parent.
@@ -1414,19 +1522,20 @@ namespace swift {
 
     /// Create a new diagnostic queue with a given engine to forward the
     /// diagnostics to.
-    explicit DiagnosticQueue(DiagnosticEngine &engine, bool emitOnDestruction)
-        : UnderlyingEngine(engine), QueueEngine(engine.SourceMgr),
-          EmitOnDestruction(emitOnDestruction) {
-      // Open a transaction to avoid emitting any diagnostics for the temporary
-      // engine.
-      QueueEngine.TransactionCount++;
-    }
+    explicit DiagnosticQueue(DiagnosticEngine &engine, bool emitOnDestruction);
 
     /// Retrieve the engine which may be used to enqueue diagnostics.
     DiagnosticEngine &getDiags() { return QueueEngine; }
 
     /// Retrieve the underlying engine which will receive the diagnostics.
     DiagnosticEngine &getUnderlyingDiags() const { return UnderlyingEngine; }
+
+    /// Iterates over each captured diagnostic, running a lambda with it.
+    void forEach(llvm::function_ref<void(const Diagnostic &)> body) const;
+
+    /// Filters the queued diagnostics, dropping any where the predicate
+    /// returns \c false.
+    void filter(llvm::function_ref<bool(const Diagnostic &)> predicate);
 
     /// Clear this queue and erase all diagnostics recorded.
     void clear() {

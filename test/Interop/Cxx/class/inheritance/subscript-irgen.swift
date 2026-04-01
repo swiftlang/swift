@@ -9,6 +9,6 @@ func testGetX() -> CInt {
 
 let _ = testGetX()
 
-// CHECK: define {{.*}}linkonce_odr{{.*}} i32 @{{(.*)(30CopyTrackedDerivedDerivedClass39__synthesizedBaseCall_operatorSubscript|__synthesizedBaseCall_operatorSubscript@CopyTrackedDerivedDerivedClass)(.*)}}(ptr {{.*}} %[[THIS_PTR:.*]], i32 {{.*}})
+// CHECK: define {{.*}}linkonce_odr{{.*}} i32 @{{.*}}synthesizedBaseCall_operatorSubscriptC{{.*}}(ptr {{.*}} %[[THIS_PTR:.*]], i32 {{.*}})
 // CHECK: %[[ADD_PTR:.*]] = getelementptr inbounds i8, ptr %{{.*}}, i{{32|64}} 4
 // CHECK: {{.*}}call {{.*}} i32 @{{.*}}CopyTrackedBaseClass{{.*}}(ptr {{.*}} %[[ADD_PTR]], i32 {{.*}}){{.*}}

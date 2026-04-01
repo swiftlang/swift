@@ -589,10 +589,17 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
 }
 
 bool irgen::isExportableField(Field field) {
-  if (field.getKind() == Field::Kind::Var &&
-      field.getVarDecl()->getClangDecl() &&
-      field.getVarDecl()->getFormalAccess() == AccessLevel::Private)
-    return false;
+  if (field.getKind() == Field::Kind::Var) {
+    if (field.getVarDecl()->getClangDecl() &&
+        field.getVarDecl()->getFormalAccess() == AccessLevel::Private)
+      return false;
+    // We should not be able to refer to anonymous types.
+    if (const auto *vd = dyn_cast_or_null<clang::ValueDecl>(
+            field.getVarDecl()->getClangDecl()))
+      if (const auto *rd = vd->getType()->getAsRecordDecl())
+        if (rd->isAnonymousStructOrUnion())
+          return false;
+  }
   // All other fields are exportable
   return true;
 }

@@ -84,7 +84,19 @@ struct STXXITXXII {
 struct MoS: ~Copyable {}
 struct MoE: ~Copyable {}
 
+struct UnsafeMutablePointer<T> {
+  var _rawValue: Builtin.RawPointer
+}
+
+struct Vector {
+  var storage: Builtin.FixedArray<2, AnyObject> { get set }
+}
+
+
 sil @unknown : $@convention(thin) () -> ()
+sil @nobarrier : $@convention(thin) () -> () {
+  [global:]
+}
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
 
 // This function is not a synchronization point.
@@ -95,6 +107,9 @@ sil @empty : $@convention(thin) () -> () {
 
 sil @f_out : $@convention(thin) <T> () -> @out T
 sil @f_bool : $@convention(thin) () -> Builtin.Int1
+sil @f_bool_no_barrier : $@convention(thin) () -> Builtin.Int1 {
+  [global:]
+}
 sil [ossa] @take_trivial_struct : $@convention(thin) (TrivialStruct) -> ()
 sil [ossa] @get_change_out : $@convention(thin) () -> @out Change
 sil [ossa] @coro : $@yield_once @convention(thin) (@inout X) -> @yields ()
@@ -279,7 +294,7 @@ bb0(%0 : $*T, %1 : $Builtin.Int1):
   cond_br %1, bb1, bb2
 
 bb1:
-  %8 = function_ref @unknown : $@convention(thin) () -> ()
+  %8 = function_ref @nobarrier : $@convention(thin) () -> ()
   %9 = apply %8() : $@convention(thin) () -> ()
   br bb3
 
@@ -352,7 +367,7 @@ bb0(%0 : $*T):
   br bb1
 
 bb1:
-  %f = function_ref @f_bool : $@convention(thin) () -> Builtin.Int1
+  %f = function_ref @f_bool_no_barrier : $@convention(thin) () -> Builtin.Int1
   %c = apply %f() : $@convention(thin) () -> Builtin.Int1
   cond_br %c, bb2, bb3
 
@@ -488,7 +503,8 @@ entry(%instance : @owned $S):
   br applier
 
 applier:
-  apply undef() : $@convention(thin) () -> ()
+  %f = function_ref @nobarrier : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
   br good
 
 good:
@@ -727,7 +743,7 @@ entry(%instance : @owned $S):
   end_access %store_scope : $*S
   %load_scope = begin_access [modify] [static] %addr : $*S
   %value = load [copy] %load_scope : $*S
-  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  %unknown = function_ref @nobarrier : $@convention(thin) () -> ()
   apply %unknown() : $@convention(thin) () -> ()
   end_access %load_scope : $*S
   destroy_addr %addr : $*S
@@ -1346,3 +1362,35 @@ entry(%c_addr : $*X):
   %retval = tuple ()
   return %retval
 }
+
+// CHECK-LABEL: sil [ossa] @no_hoist_into_load_borrow_scope : {{.*}} {
+// CHECK:         end_borrow
+// CHECK-NEXT:    destroy_addr
+// CHECK-LABEL: } // end sil function 'no_hoist_into_load_borrow_scope'
+sil [ossa] @no_hoist_into_load_borrow_scope : $@convention(thin) (@in X) -> () {
+entry(%c_addr_in : $*X):
+  %c_ptr = address_to_pointer [stack_protection] %c_addr_in to $Builtin.RawPointer
+  %c_up = struct $UnsafeMutablePointer<X> (%c_ptr)
+  %c_ptr_2 = struct_extract %c_up, #UnsafeMutablePointer._rawValue // user: %45
+  %c_addr = pointer_to_address %c_ptr_2 to [strict] $*X
+  %c_borrow = load_borrow %c_addr
+  apply undef(%c_borrow) : $@convention(thin) (@guaranteed X) -> ()
+  %c_copy = load [copy] %c_addr_in
+  end_borrow %c_borrow
+  %retval = tuple ()
+  destroy_addr %c_addr_in
+  destroy_value %c_copy
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @dont_destroy_source_of_addr_cast : {{.*}} {
+// CHECK:         store %1 to [assign] %2
+// CHECK-LABEL: } // end sil function 'dont_destroy_source_of_addr_cast'
+sil [ossa] @dont_destroy_source_of_addr_cast : $@convention(thin) (@inout Vector, @owned AnyObject) -> () {
+bb0(%0 : $*Vector, %1 : @owned $AnyObject):
+  %2 = unchecked_addr_cast %0 to $*AnyObject
+  store %1 to [assign] %2
+  %4 = tuple ()
+  return %4
+}
+

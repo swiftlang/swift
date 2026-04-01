@@ -152,7 +152,6 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
                                            SourceLoc diagLoc,
                                            bool forTestable) {
   ASTContext &ctx = getContext();
-  auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   ModuleDecl *M = file->getParentModule();
 
   bool missingDependency = false;
@@ -163,6 +162,11 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     assert(!dependency.isLoaded() && "already loaded?");
 
     if (dependency.isHeader()) {
+      auto clangImporter =
+          static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+      if (!clangImporter)
+        return Status::FailedToLoadBridgingHeader;
+
       // The path may be empty if the file being loaded is a partial AST,
       // and the current compiler invocation is a merge-modules step.
       if (!dependency.Core.RawPath.empty()) {
@@ -210,7 +214,6 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     auto importPath = builder.copyTo(ctx);
     auto modulePath = importPath.getModulePath(dependency.isScoped());
     auto accessPath = importPath.getAccessPath(dependency.isScoped());
-
     auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
       // If we're missing the module we're an overlay for, treat that specially.
@@ -292,7 +295,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
 
   StringRef SDKPath = ctx.SearchPathOpts.getSDKPath();
   // In Swift 6 mode, we do not inherit search paths from loaded non-SDK modules.
-  if (!ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v6) &&
       (SDKPath.empty() ||
        !Core->ModuleInputBuffer->getBufferIdentifier().starts_with(SDKPath))) {
     for (const auto &searchPath : Core->SearchPaths) {
@@ -426,7 +429,7 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
   bool isFramework = false;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(newBuf), nullptr, nullptr,
-      /*isFramework=*/isFramework, Ctx.SILOpts.EnableOSSAModules,
+      /*isFramework=*/isFramework,
       Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
   Name = loadedModuleFile->Name.str();
@@ -609,11 +612,10 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
                                     SourceLoc(), importPath.get());
       ID->setModule(M);
       if (Dep.isExported())
-        ID->getAttrs().add(
-            new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+        ID->addAttribute(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
       if (Dep.isImplementationOnly())
-        ID->getAttrs().add(
-            new (Ctx) ImplementationOnlyAttr(/*IsImplicit=*/false));
+        ID->addAttribute(new (Ctx)
+                             ImplementationOnlyAttr(/*IsImplicit=*/false));
 
       ImportDecls.push_back(ID);
     }
@@ -754,7 +756,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
     return;
   auto &ctx = originalAFD->getASTContext();
   Mangle::ASTMangler Mangler(ctx);
-  auto mangledName = Mangler.mangleDeclAsUSR(originalAFD, "");
+  auto mangledName = Mangler.mangleDeclWithPrefix(originalAFD, "");
   auto configs = Core->DerivativeFunctionConfigurations->find(mangledName);
   if (configs == Core->DerivativeFunctionConfigurations->end())
     return;

@@ -1,10 +1,8 @@
 // RUN: %target-swift-frontend -verify -emit-sil -o /dev/null %s
 // RUN: %target-swift-frontend -verify -emit-sil -o /dev/null %s -strict-concurrency=targeted
 // RUN: %target-swift-frontend -verify -emit-sil -o /dev/null %s -strict-concurrency=complete
-// RUN: %target-swift-frontend -verify -emit-sil -o /dev/null %s -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 @available(SwiftStdlib 5.1, *)
 class NotSendable { // expected-note 2{{class 'NotSendable' does not conform to the 'Sendable' protocol}}

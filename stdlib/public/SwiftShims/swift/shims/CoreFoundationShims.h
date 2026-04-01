@@ -83,7 +83,7 @@ _swift_stdlib_CreateIndirectTaggedPointerString(const __swift_uint8_t * _Nonnull
                                                 _swift_shims_CFIndex len);
 
 SWIFT_RUNTIME_STDLIB_API
-const _swift_shims_NSUInteger
+_swift_shims_NSUInteger
 _swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline(id _Nonnull obj,
                                                         unsigned long encoding);
 

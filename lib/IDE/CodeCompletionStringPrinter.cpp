@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletionStringPrinter.h"
-#include "CodeCompletionResultBuilder.h"
+#include "CodeCompletionStringBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
 

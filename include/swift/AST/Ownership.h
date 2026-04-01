@@ -153,7 +153,7 @@ ValueOwnership asValueOwnership(ParameterOwnership o);
 static inline llvm::StringRef getOwnershipSpelling(ValueOwnership ownership) {
   switch (ownership) {
   case ValueOwnership::Default:
-    return "";
+    return "default";
   case ValueOwnership::InOut:
     return "inout";
   case ValueOwnership::Shared:

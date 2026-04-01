@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -solver-expression-time-threshold=1
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -solver-scope-threshold=2000
 
-// REQUIRES: asserts,no_asan
 // REQUIRES: objc_interop
 
 // FIXME: This should be a scale-test but it doesn't allow passing `%clang-importer-sdk`

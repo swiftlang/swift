@@ -32,10 +32,6 @@ clang::CanQualType IRGenModule::getClangType(CanType type) {
 }
 
 clang::CanQualType IRGenModule::getClangType(SILType type) {
-  if (type.isForeignReferenceType())
-    return getClangType(type.getASTType()
-                            ->wrapInPointer(PTK_UnsafePointer)
-                            ->getCanonicalType());
   return getClangType(type.getASTType());
 }
 

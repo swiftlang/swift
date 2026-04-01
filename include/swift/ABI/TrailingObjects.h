@@ -421,6 +421,15 @@ public:
   }
 };
 
+// Helper function to determine at build time if a type has TrailingObjects.
+// This is useful for determining if trailingTypeCount and
+// sizeWithTrailingTypeCount are available for code that reads TrailingObjects
+// values in a generalized fashion.
+template <typename T>
+static constexpr bool typeHasTrailingObjects() {
+  return std::is_base_of_v<trailing_objects_internal::TrailingObjectsBase, T>;
+}
+
 } // end namespace ABI
 } // end namespace swift
 

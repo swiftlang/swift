@@ -203,6 +203,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
     ArrayRef<std::string> CompiledCandidates,
     StringRef CompilerVersion) {
   auto Invocation = Instance.getInvocation();
+
   // Try building forwarding module first. If succeed, return.
   if (Instance.getASTContext()
           .getModuleInterfaceChecker()
@@ -254,6 +255,9 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
                  builtByCompiler);
       }
     }
+
+    // If requested, dump debugging output before exiting.
+    Instance.emitEndOfPipelineDebuggingOutput();
   };
 
   Instance.performSema();
@@ -306,7 +310,6 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
       return std::make_error_code(std::errc::not_supported);
     SerializationOpts.Dependencies = Deps;
   }
-  SerializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
 
   SILMod->setSerializeSILAction([&]() {
     // We don't want to serialize module docs in the cache -- they

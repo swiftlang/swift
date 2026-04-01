@@ -15,6 +15,7 @@ import F
 
 /// --------Main module
 // CHECK-LABEL: "modulePath": "deps.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: sourceFiles
 // CHECK-NEXT: explicit-swift-dependencies.swift
 // CHECK-NEXT: ],
@@ -43,6 +44,7 @@ import F
 // ...
 // CHECK:                 "-explicit-interface-module-build",
 // CHECK-NEXT:            "-disable-implicit-swift-modules",
+// CHECK-NEXT:            "-disable-cross-import-overlay-search",
 // CHECK-NEXT:            "-Xcc",
 // CHECK-NEXT:            "-fno-implicit-modules",
 // CHECK-NEXT:            "-Xcc",

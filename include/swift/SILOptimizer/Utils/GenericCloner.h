@@ -30,8 +30,8 @@
 namespace swift {
 
 class GenericCloner
-  : public TypeSubstCloner<GenericCloner, SILOptFunctionBuilder> {
-  using SuperTy = TypeSubstCloner<GenericCloner, SILOptFunctionBuilder>;
+  : public TypeSubstCloner<GenericCloner> {
+  using SuperTy = TypeSubstCloner<GenericCloner>;
 
   SILOptFunctionBuilder &FuncBuilder;
   SerializedKind_t Serialized;
@@ -44,6 +44,7 @@ class GenericCloner
   llvm::SmallVector<StoreBorrowInst *, 8> StoreBorrowsToCleanup;
   AllocStackInst *ReturnValueAddr = nullptr;
   AllocStackInst *ErrorValueAddr = nullptr;
+  bool unreachableInserted = false;
 
 public:
   friend class SILCloner<GenericCloner>;
@@ -65,13 +66,7 @@ public:
                 const ReabstractionInfo &ReInfo,
                 SubstitutionMap ParamSubs,
                 StringRef NewName,
-                CloneCollector::CallbackType Callback =nullptr) {
-    // Clone and specialize the function.
-    GenericCloner SC(FuncBuilder, F, ReInfo, ParamSubs,
-                     NewName, Callback);
-    SC.populateCloned();
-    return SC.getCloned();
-  }
+                CloneCollector::CallbackType Callback =nullptr);
 
   void postFixUp(SILFunction *calleeFunction);
 

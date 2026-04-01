@@ -14,8 +14,9 @@ target_compile_definitions(swiftCRT PRIVATE
 target_compile_options(swiftCRT PRIVATE
   "SHELL:-Xfrontend -disable-force-load-symbols"
   "SHELL:-Xcc -D_USE_MATH_DEFINES")
+target_link_libraries(swiftCRT PUBLIC
+  ClangModules)
 target_link_libraries(swiftCRT PRIVATE
-  ClangModules
   swiftCore)
 
 # FIXME: Why is this not implicitly in the interface flags?

@@ -1,5 +1,14 @@
-// TODO: comment header
-
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
 extension UTF8Span {
@@ -92,6 +101,19 @@ extension UTF8Span {
           bothNFC: self.isKnownNFC && other.isKnownNFC)
       }
     }
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension UTF8Span {
+  /// Returns a Boolean value indicating whether two instances refer to the same
+  /// memory region, and have the same flags (such as ``isKnownASCII``).
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    unsafe (self._unsafeBaseAddress == other._unsafeBaseAddress) &&
+    (self._countAndFlags == other._countAndFlags)
   }
 }
 

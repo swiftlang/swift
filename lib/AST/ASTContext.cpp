@@ -19,8 +19,8 @@
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
-#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -59,14 +59,19 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeTransform.h"
 #include "swift/Basic/APIntMap.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/BlockList.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
@@ -332,8 +337,14 @@ struct ASTContext::Implementation {
   /// The declaration of 'AsyncSequence.makeAsyncIterator()'.
   FuncDecl *MakeAsyncIterator = nullptr;
 
+  /// The declaration of 'BorrowingSequence.makeBorrowingIterator()'.
+  FuncDecl *MakeBorrowingIterator = nullptr;
+
   /// The declaration of 'IteratorProtocol.next()'.
   FuncDecl *IteratorNext = nullptr;
+
+  /// The declaration of 'IteratorProtocol.nextSpan(maximumCount:)'.
+  FuncDecl *BorrowingIteratorNextSpan = nullptr;
 
   /// The declaration of 'AsyncIteratorProtocol.next()'.
   FuncDecl *AsyncIteratorNext = nullptr;
@@ -425,6 +436,13 @@ struct ASTContext::Implementation {
   ///  -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastOrVariantVersionAtLeastDecl = nullptr;
 
+  /// func _isSwiftRuntimeVersionAtLeast(
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.word)
+  ///  -> Builtin.Int1
+  FuncDecl *IsSwiftRuntimeVersionAtLeastDecl = nullptr;
+
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -437,6 +455,9 @@ struct ASTContext::Implementation {
 
   /// Singleton used to cache the import graph.
   swift::namelookup::ImportCache TheImportCache;
+
+  /// The module loader used to load explicit Swift modules.
+  SerializedModuleLoaderBase *TheExplicitSwiftModuleLoader = nullptr;
 
   /// The module loader used to load Clang modules.
   ClangModuleLoader *TheClangModuleLoader = nullptr;
@@ -507,13 +528,15 @@ struct ASTContext::Implementation {
   /// Mapping from property declarations to the backing variable types.
   llvm::DenseMap<const VarDecl *, Type> PropertyWrapperBackingVarTypes;
 
-  /// A mapping from the backing storage of a property that has a wrapper
-  /// to the original property with the wrapper.
-  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalWrappedProperties;
+  /// A mapping from the backing storage of a property that has a wrapper or
+  /// is `lazy` to the original property.
+  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalVarsForBackingStorage;
 
   /// The builtin initializer witness for a literal. Used when building
   /// LiteralExprs in fully-checked AST.
-  llvm::DenseMap<const NominalTypeDecl *, ConcreteDeclRef> BuiltinInitWitness;
+  llvm::DenseMap<std::pair<const NominalTypeDecl *, KnownProtocolKind>,
+                 ConcreteDeclRef>
+      BuiltinInitWitness;
 
   /// Mapping from the function decl to its original body's source range. This
   /// is populated if the body is reparsed from other source buffers.
@@ -525,6 +548,13 @@ struct ASTContext::Implementation {
 
   /// Local and closure discriminators per context.
   llvm::DenseMap<const DeclContext *, unsigned> NextDiscriminator;
+
+  /// Cached generic signatures for generic builtin types.
+  static const unsigned NumBuiltinGenericTypes
+    = unsigned(TypeKind::Last_BuiltinGenericType)
+        - unsigned(TypeKind::First_BuiltinGenericType) + 1;
+  std::array<GenericSignature, NumBuiltinGenericTypes>
+  BuiltinGenericTypeSignatures = {};
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -568,6 +598,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
+    llvm::FoldingSet<BuiltinBorrowType> BuiltinBorrowTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<ParameterizedProtocolType> ParameterizedProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
@@ -634,6 +665,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
+  llvm::FoldingSet<DeclNameRef::SelectiveDeclNameRef> SelectiveNameRefs;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
@@ -648,6 +680,10 @@ struct ASTContext::Implementation {
 
   /// The set of unique custom availability domains.
   llvm::FoldingSet<CustomAvailabilityDomain> CustomAvailabilityDomains;
+
+  /// The most specific platform AvailabilityDomain that corresponds to the
+  /// compilation's `-target`.
+  std::optional<AvailabilityDomain> TargetAvailabilityDomain;
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -808,37 +844,41 @@ ASTContext::ASTContext(
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
       blockListConfig(SourceMgr),
-      TheErrorType(new(*this, AllocationArena::Permanent) ErrorType(
-          *this, Type(), RecursiveTypeProperties::HasError)),
-      TheUnresolvedType(new(*this, AllocationArena::Permanent)
-                            UnresolvedType(*this)),
+      TheErrorType(new (*this, AllocationArena::Permanent)
+                       ErrorType(*this, Type())),
       TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
       TheEmptyPackType(PackType::get(*this, {})),
       TheAnyType(ProtocolCompositionType::theAnyType(*this)),
       TheUnconstrainedAnyType(
           ProtocolCompositionType::theUnconstrainedAnyType(*this)),
-      TheSelfType(CanGenericTypeParamType(
-          GenericTypeParamType::getType(0, 0, *this))),
+      TheSelfType(
+          CanGenericTypeParamType(GenericTypeParamType::getType(0, 0, *this))),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
 #include "swift/AST/TypeNodes.def"
-      TheIEEE32Type(new(*this, AllocationArena::Permanent)
+      TheIEEE32Type(new (*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE32, *this)),
-      TheIEEE64Type(new(*this, AllocationArena::Permanent)
+      TheIEEE64Type(new (*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE64, *this)),
-      TheIEEE16Type(new(*this, AllocationArena::Permanent)
+      TheIEEE16Type(new (*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE16, *this)),
-      TheIEEE80Type(new(*this, AllocationArena::Permanent)
+      TheIEEE80Type(new (*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE80, *this)),
-      TheIEEE128Type(new(*this, AllocationArena::Permanent)
+      TheIEEE128Type(new (*this, AllocationArena::Permanent)
                          BuiltinFloatType(BuiltinFloatType::IEEE128, *this)),
-      ThePPC128Type(new(*this, AllocationArena::Permanent)
+      ThePPC128Type(new (*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::PPC128, *this)) {
 
   // Initialize all of the known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Id_##Name = getIdentifier(IdStr);
 #include "swift/AST/KnownIdentifiers.def"
+
+  Identifier stdlibOverlayNames[] = {
+    Id_Concurrency,
+    Id_StringProcessing
+  };
+  StdlibOverlayNames = AllocateCopy(stdlibOverlayNames);
 
   // Record the initial set of search paths.
   for (const auto &path : SearchPathOpts.getImportSearchPaths())
@@ -891,7 +931,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(DefaultAssociatedConformanceWitnesses);
   SIZE_AND_BYTES(DefaultTypeRequestCaches);
   SIZE_AND_BYTES(PropertyWrapperBackingVarTypes);
-  SIZE_AND_BYTES(OriginalWrappedProperties);
+  SIZE_AND_BYTES(OriginalVarsForBackingStorage);
   SIZE_AND_BYTES(BuiltinInitWitness);
   SIZE_AND_BYTES(OriginalBodySourceRanges);
   SIZE_AND_BYTES(NextMacroDiscriminator);
@@ -1068,9 +1108,6 @@ static FuncDecl *lookupRequirement(ProtocolDecl *proto,
       continue;
 
     if (auto func = dyn_cast<FuncDecl>(result)) {
-      if (func->getParameters()->size() != 0)
-        continue;
-
       return func;
     }
   }
@@ -1089,6 +1126,23 @@ FuncDecl *ASTContext::getSequenceMakeIterator() const {
 
   if (auto *func = lookupRequirement(proto, Id_makeIterator)) {
     getImpl().MakeIterator = func;
+    return func;
+  }
+
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getBorrowingSequenceMakeBorrowingIterator() const {
+  if (getImpl().MakeBorrowingIterator) {
+    return getImpl().MakeBorrowingIterator;
+  }
+
+  auto proto = getProtocol(KnownProtocolKind::BorrowingSequence);
+  if (!proto)
+    return nullptr;
+
+  if (auto *func = lookupRequirement(proto, Id_makeBorrowingIterator)) {
+    getImpl().MakeBorrowingIterator = func;
     return func;
   }
 
@@ -1123,6 +1177,19 @@ FuncDecl *ASTContext::getIteratorNext() const {
 
   if (auto *func = lookupRequirement(proto, Id_next)) {
     getImpl().IteratorNext = func;
+    return func;
+  }
+
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getBorrowingIteratorNextSpan() const {
+  auto proto = getProtocol(KnownProtocolKind::BorrowingIteratorProtocol);
+  if (!proto)
+    return nullptr;
+
+  if (auto *func = lookupRequirement(proto, Id_nextSpan)) {
+    getImpl().BorrowingIteratorNextSpan = func;
     return func;
   }
 
@@ -1412,7 +1479,7 @@ ASTContext::synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const {
   protocol->setImplicit(true);
 
   // @_marker
-  protocol->getAttrs().add(new (*this) MarkerAttr(/*implicit=*/true));
+  protocol->addAttribute(new (*this) MarkerAttr(/*implicit=*/true));
 
   // public
   protocol->setAccess(AccessLevel::Public);
@@ -1477,6 +1544,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CxxMutableRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
+  case KnownProtocolKind::CxxBorrowingSequence:
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
   case KnownProtocolKind::CxxSpan:
@@ -1662,11 +1730,12 @@ ASTContext::getStringBuiltinInitDecl(NominalTypeDecl *stringDecl) const {
   return getBuiltinInitDecl(stringDecl, builtinProtocolKind, fn);
 }
 
-ConcreteDeclRef
-ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
-                               KnownProtocolKind builtinProtocolKind,
-               llvm::function_ref<DeclName (ASTContext &ctx)> initName) const {
-  auto &witness = getImpl().BuiltinInitWitness[decl];
+ConcreteDeclRef ASTContext::getBuiltinInitDecl(
+    NominalTypeDecl *decl, KnownProtocolKind builtinProtocolKind,
+    llvm::function_ref<DeclName(ASTContext &ctx)> initName) const {
+  // Note the initializer name is expected to be unique for each protocol kind
+  // so we don't need it to be part of the key.
+  auto &witness = getImpl().BuiltinInitWitness[{decl, builtinProtocolKind}];
   if (witness)
     return witness;
 
@@ -1674,7 +1743,6 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   auto builtinProtocol = getProtocol(builtinProtocolKind);
   auto builtinConformance = lookupConformance(type, builtinProtocol);
   if (builtinConformance.isInvalid()) {
-    assert(false && "Missing required conformance");
     witness = ConcreteDeclRef();
     return witness;
   }
@@ -1682,7 +1750,6 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   auto *ctx = const_cast<ASTContext *>(this);
   witness = builtinConformance.getWitnessByName(initName(*ctx));
   if (!witness) {
-    assert(false && "Missing required witness");
     witness = ConcreteDeclRef();
     return witness;
   }
@@ -1703,6 +1770,48 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
   auto *foundDecl = cast<ConstructorDecl>(results[0]);
   auto subs = regexType->getMemberSubstitutionMap(foundDecl);
   return ConcreteDeclRef(foundDecl, subs);
+}
+
+
+static ConcreteDeclRef getCGFloatOrDoubleInitDecl(
+    ASTContext &ctx, Type fromType, Type toType) {
+  if (!toType || !fromType)
+    return ConcreteDeclRef();
+
+  // OK: Implicit conversion, no module selector to drop here.
+  DeclNameRef initRef(ctx, /*module selector=*/Identifier(),
+                      DeclBaseName::createConstructor(), { Identifier() });
+
+  auto *toDecl = toType->getAnyNominal();
+  SmallVector<ValueDecl *, 2> candidates;
+
+  // Using the nominal type as the declaration context bypasses access
+  // control. But there is only going to be one overload that exactly
+  // with no label and the right argument type.
+  toDecl->lookupQualified(toDecl, initRef, SourceLoc(),
+                          NL_QualifiedDefault, candidates);
+
+  for (auto *candidate : candidates) {
+    auto *ctor = cast<ConstructorDecl>(candidate);
+    auto fnType = ctor->getMethodInterfaceType()->castTo<FunctionType>();
+    if (fnType->getNumParams() == 1 &&
+        fnType->getParams()[0] == AnyFunctionType::Param(fromType) &&
+        fnType->getResult()->isEqual(toType)) {
+      return ConcreteDeclRef(ctor);
+    }
+  }
+
+  return ConcreteDeclRef();
+}
+
+ConcreteDeclRef ASTContext::getCGFloatInitDecl() const {
+  return getCGFloatOrDoubleInitDecl(const_cast<ASTContext &>(*this),
+                                    getDoubleType(), getCGFloatType());
+}
+
+ConcreteDeclRef ASTContext::getDoubleInitDecl() const {
+  return getCGFloatOrDoubleInitDecl(const_cast<ASTContext &>(*this),
+                                    getCGFloatType(), getDoubleType());
 }
 
 static
@@ -1930,7 +2039,7 @@ FuncDecl *ASTContext::getIsVariantOSVersionAtLeastDecl() const {
 }
 
 FuncDecl *ASTContext::getIsOSVersionAtLeastOrVariantVersionAtLeast() const {
-if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
+  if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
     return getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl;
 
   auto decl = findLibraryIntrinsic(*this,
@@ -1939,6 +2048,18 @@ if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
     return nullptr;
 
   getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsSwiftRuntimeVersionAtLeast() const {
+  if (getImpl().IsSwiftRuntimeVersionAtLeastDecl)
+    return getImpl().IsSwiftRuntimeVersionAtLeastDecl;
+
+  auto decl = findLibraryIntrinsic(*this, "_isSwiftRuntimeVersionAtLeast");
+  if (!decl)
+    return nullptr;
+
+  getImpl().IsSwiftRuntimeVersionAtLeastDecl = decl;
   return decl;
 }
 
@@ -2136,14 +2257,54 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
     clangLoader->addSearchPath(searchPath, isFramework, isSystem);
 }
 
+ExplicitSwiftModuleMap *ASTContext::getExplicitSwiftModuleMap() {
+  if (getImpl().TheExplicitSwiftModuleLoader)
+    return getImpl().TheExplicitSwiftModuleLoader->getExplicitSwiftModuleMap();
+  return nullptr;
+}
+ExplicitClangModuleMap *ASTContext::getExplicitClangModuleMap() {
+  if (getImpl().TheExplicitSwiftModuleLoader)
+    return getImpl().TheExplicitSwiftModuleLoader->getExplicitClangModuleMap();
+  return nullptr;
+}
+
+std::optional<LibraryLevel>
+ASTContext::getExplicitModuleLibraryLevel(StringRef moduleName, bool isClang) {
+  auto getLevelStr = [&](auto *map) -> const std::optional<std::string> * {
+    if (!map)
+      return nullptr;
+    auto it = map->find(moduleName);
+    if (it == map->end())
+      return nullptr;
+    return &it->getValue().libraryLevel;
+  };
+
+  const std::optional<std::string> *levelStr =
+      isClang ? getLevelStr(getExplicitClangModuleMap())
+              : getLevelStr(getExplicitSwiftModuleMap());
+
+  if (!levelStr || !*levelStr)
+    return std::nullopt;
+
+  return llvm::StringSwitch<LibraryLevel>(**levelStr)
+      .Case("api", LibraryLevel::API)
+      .Case("spi", LibraryLevel::SPI)
+      .Case("ipi", LibraryLevel::IPI)
+      .Default(LibraryLevel::Other);
+}
+
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                                 bool IsClang, bool IsDwarf, bool IsInterface) {
+                                 bool IsClang, bool IsDwarf, bool IsInterface,
+                                 bool IsExplicit) {
   if (IsClang && !IsDwarf && !getImpl().TheClangModuleLoader)
     getImpl().TheClangModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
   if (IsClang && IsDwarf && !getImpl().TheDWARFModuleLoader)
     getImpl().TheDWARFModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
+  if (IsExplicit && !getImpl().TheExplicitSwiftModuleLoader)
+    getImpl().TheExplicitSwiftModuleLoader =
+        static_cast<SerializedModuleLoaderBase *>(loader.get());
   getImpl().ModuleLoaders.push_back(std::move(loader));
 }
 
@@ -2380,16 +2541,35 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
   // and a source file has 'import Foo', a module called Bar (real name)
   // will be loaded and added to the map.
-  getImpl().LoadedModules[M->getRealName()] = M;
+
+  auto RealName = M->getRealName();
+  auto ABIName = M->getABIName();
+
+  auto &LoadedModules = getImpl().LoadedModules;
+  auto &NameToModules = getImpl().NameToModules;
+
+  // If a module with the same name has been loaded before, remove it from the
+  // list of modules that share the same name.
+  if (auto *current = LoadedModules.lookup(RealName)) {
+    auto isCurrentModule = [&](ModuleDecl *module) {
+      return module == current;
+    };
+    llvm::erase_if(NameToModules[RealName], isCurrentModule);
+
+    if (RealName != ABIName)
+      llvm::erase_if(NameToModules[ABIName], isCurrentModule);
+  }
+
+  LoadedModules[RealName] = M;
 
   // Add the module to the mapping from module name to list of modules that
   // share that name.
-  getImpl().NameToModules[M->getRealName()].push_back(M);
+  NameToModules[RealName].push_back(M);
 
   // If the ABI name differs from the real name, also add the module to the list
   // that share that ABI name.
-  if (M->getRealName() != M->getABIName())
-    getImpl().NameToModules[M->getABIName()].push_back(M);
+  if (RealName != ABIName)
+    NameToModules[ABIName].push_back(M);
 }
 
 void ASTContext::removeLoadedModule(Identifier RealName) {
@@ -2499,8 +2679,7 @@ void OverriddenDeclsRequest::cacheResult(
 
   // Record the overrides in the context.
   auto &ctx = decl->getASTContext();
-  auto overriddenCopy =
-    ctx.AllocateCopy(value.operator ArrayRef<ValueDecl *>());
+  auto overriddenCopy = ctx.AllocateCopy(ArrayRef<ValueDecl *>(value));
   (void)ctx.getImpl().Overrides.insert({decl, overriddenCopy});
 }
 
@@ -2617,7 +2796,7 @@ void ASTContext::addSucceededCanImportModule(
 
 bool ASTContext::canImportModuleImpl(
     ImportPath::Module ModuleName, SourceLoc loc, llvm::VersionTuple version,
-    bool underlyingVersion, bool isSourceCanImport,
+    bool isUnderlyingVersion, bool isSourceCanImport,
     llvm::VersionTuple &foundVersion,
     llvm::VersionTuple &foundUnderlyingClangVersion) const {
   SmallString<64> FullModuleName;
@@ -2629,16 +2808,16 @@ bool ASTContext::canImportModuleImpl(
     return false;
 
   auto missingVersion = [this, &loc, &ModuleName,
-                                 &underlyingVersion]() -> bool {
+                         &isUnderlyingVersion]() -> bool {
     // The module version could not be parsed from the preferred source for
-    // this query. Diagnose and return `true` to indicate that the unversioned module
-    // will satisfy the query.
+    // this query. Diagnose and return `true` to indicate that the unversioned
+    // module will satisfy the query.
     auto mID = ModuleName[0];
     auto diagLoc = mID.Loc;
     if (mID.Loc.isInvalid())
       diagLoc = loc;
-    Diags.diagnose(diagLoc, diag::cannot_find_project_version, mID.Item.str(),
-                   underlyingVersion);
+    Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
+                   isUnderlyingVersion);
     return true;
   };
 
@@ -2650,9 +2829,9 @@ bool ASTContext::canImportModuleImpl(
     if (version.empty())
       return true;
 
-    const auto &foundComparisonVersion = underlyingVersion
-                                      ? Found->second.UnderlyingVersion
-                                      : Found->second.Version;
+    const auto &foundComparisonVersion = isUnderlyingVersion
+                                             ? Found->second.UnderlyingVersion
+                                             : Found->second.Version;
     if (!foundComparisonVersion.empty())
       return version <= foundComparisonVersion;
     else
@@ -2699,10 +2878,10 @@ bool ASTContext::canImportModuleImpl(
         bestUnderlyingVersionInfo = versionInfo;
     }
 
-    if (!underlyingVersion && !bestVersionInfo.isValid())
+    if (!isUnderlyingVersion && !bestVersionInfo.isValid())
       return false;
 
-    if (underlyingVersion && !bestUnderlyingVersionInfo.isValid())
+    if (isUnderlyingVersion && !bestUnderlyingVersionInfo.isValid())
       return false;
 
     foundVersion = bestVersionInfo.getVersion();
@@ -2751,7 +2930,8 @@ bool ASTContext::canImportModuleImpl(
   if (!lookupVersionedModule(versionInfo, underlyingVersionInfo))
     return false;
 
-  const auto &queryVersion = underlyingVersion ? underlyingVersionInfo : versionInfo;
+  const auto &queryVersion =
+      isUnderlyingVersion ? underlyingVersionInfo : versionInfo;
   if (queryVersion.getVersion().empty())
     return missingVersion();
 
@@ -2771,15 +2951,19 @@ bool ASTContext::canImportModule(ImportPath::Module moduleName, SourceLoc loc,
                                  bool underlyingVersion) {
   llvm::VersionTuple versionInfo;
   llvm::VersionTuple underlyingVersionInfo;
-  if (!canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
-                           versionInfo, underlyingVersionInfo))
-    return false;
+  bool canImport =
+      canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
+                          versionInfo, underlyingVersionInfo);
 
-  SmallString<64> fullModuleName;
-  moduleName.getString(fullModuleName);
-  
-  addSucceededCanImportModule(fullModuleName, versionInfo, underlyingVersionInfo);
-  return true;
+  // If found an import or resolved an version, recorded the module.
+  if (canImport || !versionInfo.empty() || !underlyingVersionInfo.empty()) {
+    SmallString<64> fullModuleName;
+    moduleName.getString(fullModuleName);
+
+    addSucceededCanImportModule(fullModuleName, versionInfo,
+                                underlyingVersionInfo);
+  }
+  return canImport;;
 }
 
 bool ASTContext::testImportModule(ImportPath::Module ModuleName,
@@ -3109,20 +3293,22 @@ ASTContext::getOrCreateLazyContextData(const Decl *decl,
                                        LazyMemberLoader *lazyLoader) {
   if (auto *data = getLazyContextData(decl)) {
     // Make sure we didn't provide an incompatible lazy loader.
-    assert(!lazyLoader || lazyLoader == data->loader);
+    ASSERT(!lazyLoader || lazyLoader == data->loader);
     return data;
   }
 
   LazyContextData *&entry = getImpl().LazyContexts[decl];
 
   // Create new lazy context data with the given loader.
-  assert(lazyLoader && "Queried lazy data for non-lazy iterable context");
+  ASSERT(lazyLoader && "Queried lazy data for non-lazy iterable context");
   if (isa<ProtocolDecl>(decl)) {
     entry = Allocate<LazyProtocolData>();
   } else if (isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl)) {
     entry = Allocate<LazyIterableDeclContextData>();
+  } else if (isa<OpaqueTypeDecl>(decl)) {
+    entry = Allocate<LazyOpaqueTypeData>();
   } else {
-    assert(isa<AssociatedTypeDecl>(decl));
+    ASSERT(isa<AssociatedTypeDecl>(decl));
     entry = Allocate<LazyAssociatedTypeData>();
   }
 
@@ -3453,7 +3639,7 @@ TypeAliasType::TypeAliasType(TypeAliasDecl *typealias, Type parent,
   // Record the parent (or absence of a parent).
   if (parent) {
     Bits.TypeAliasType.HasParent = true;
-    *getTrailingObjects<Type>() = parent;
+    *getTrailingObjects() = parent;
   } else {
     Bits.TypeAliasType.HasParent = false;
   }
@@ -3466,8 +3652,7 @@ TypeAliasType::TypeAliasType(TypeAliasDecl *typealias, Type parent,
     ASSERT(params->size() == count);
     Bits.TypeAliasType.GenericArgCount = count;
     std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
-                            getTrailingObjects<Type>() +
-                            (parent ? 1 : 0));
+                            getTrailingObjects() + (parent ? 1 : 0));
   } else {
     ASSERT(params == nullptr);
     Bits.TypeAliasType.GenericArgCount = 0;
@@ -3575,33 +3760,14 @@ void LocatableType::Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
 // Simple accessors.
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 
-static Type replacingTypeVariablesAndPlaceholders(Type ty) {
-  if (!ty || !ty->hasTypeVariableOrPlaceholder())
-    return ty;
-
-  auto &ctx = ty->getASTContext();
-
-  return ty.transformRec([&](Type ty) -> std::optional<Type> {
-    if (!ty->hasTypeVariableOrPlaceholder())
-      return ty;
-
-    // Match the logic in `Solution::simplifyType` and use UnresolvedType.
-    // FIXME: Ideally we'd get rid of UnresolvedType and just use a fresh
-    // PlaceholderType, but we don't currently support placeholders with no
-    // originators.
-    auto *typePtr = ty.getPointer();
-    if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
-      return ctx.TheUnresolvedType;
-
-    return std::nullopt;
-  });
-}
-
 Type ErrorType::get(Type originalType) {
   // The original type is only used for printing/debugging, and we don't support
   // solver-allocated ErrorTypes. As such, fold any type variables and
-  // placeholders into UnresolvedTypes, which print as placeholders.
-  originalType = replacingTypeVariablesAndPlaceholders(originalType);
+  // placeholders into ErrorTypes. If we have a top-level one, we can return
+  // that directly.
+  originalType = originalType->replaceTypeVariablesAndPlaceholdersWithErrors();
+  if (isa<ErrorType>(originalType.getPointer()))
+    return originalType;
 
   ASSERT(originalType);
   ASSERT(!originalType->getRecursiveProperties().isSolverAllocated() &&
@@ -3616,8 +3782,7 @@ Type ErrorType::get(Type originalType) {
 
   void *mem = ctx.Allocate(sizeof(ErrorType) + sizeof(Type),
                            alignof(ErrorType), arena);
-  return entry = new (mem) ErrorType(ctx, originalType,
-                                     RecursiveTypeProperties::HasError);
+  return entry = new (mem) ErrorType(ctx, originalType);
 }
 
 void ErrorUnionType::Profile(llvm::FoldingSetNodeID &id, ArrayRef<Type> terms) {
@@ -3673,6 +3838,9 @@ Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
 
     if (auto *depTy = originator.dyn_cast<DependentMemberType *>())
       return depTy->getRecursiveProperties();
+
+    if (auto *errTy = originator.dyn_cast<ErrorType *>())
+      return errTy->getRecursiveProperties();
 
     return RecursiveTypeProperties();
   }();
@@ -3758,6 +3926,29 @@ BuiltinFixedArrayType *BuiltinFixedArrayType::get(CanType Size,
   ctx.getImpl().getArena(arena).BuiltinFixedArrayTypes
       .InsertNode(faTy, insertPos);
   return faTy;
+}
+
+CanBuiltinBorrowType BuiltinBorrowType::get(CanType Referent) {
+  RecursiveTypeProperties properties;
+  properties |= Referent->getRecursiveProperties();
+
+  AllocationArena arena = getArena(properties);
+
+  llvm::FoldingSetNodeID id;
+  BuiltinBorrowType::Profile(id, Referent);
+  auto &ctx = Referent->getASTContext();
+
+  void *insertPos;
+  if (BuiltinBorrowType *faTy
+        = ctx.getImpl().getArena(arena).BuiltinBorrowTypes
+                 .FindNodeOrInsertPos(id, insertPos))
+    return CanBuiltinBorrowType(faTy);
+
+  BuiltinBorrowType *faTy
+    = new (ctx, arena) BuiltinBorrowType(Referent, properties);
+  ctx.getImpl().getArena(arena).BuiltinBorrowTypes
+      .InsertNode(faTy, insertPos);
+  return CanBuiltinBorrowType(faTy);
 }
 
 BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
@@ -4075,7 +4266,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // Methods returning 'Self' have a dynamic 'self'.
     //
     // FIXME: All methods of non-final classes should have this.
-    else if (wantDynamicSelf && FD->hasDynamicSelfResult())
+    else if (wantDynamicSelf && FD->getResultInterfaceType()->hasDynamicSelfType())
       isDynamicSelf = true;
 
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
@@ -4115,7 +4306,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // NOTE: it's important that we check if it's a convenience init only after
     // confirming it's not semantically final, or else there can be a request
     // evaluator cycle to determine the init kind for actors, which are final.
-    if (Ctx.isSwiftVersionAtLeast(5)) {
+    if (Ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
       if (wantDynamicSelf)
         if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
           if (!classDecl->isSemanticallyFinal() && CD->isConvenienceInit())
@@ -4631,8 +4822,8 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
 
 static RecursiveTypeProperties
 getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
-                               Type result, Type globalActor,
-                               Type thrownError) {
+                               Type result, Type globalActor, Type thrownError,
+                               Type sendableDependentType) {
   RecursiveTypeProperties properties;
   for (auto param : params)
     properties |= param.getPlainType()->getRecursiveProperties();
@@ -4641,6 +4832,11 @@ getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
     properties |= globalActor->getRecursiveProperties();
   if (thrownError)
     properties |= thrownError->getRecursiveProperties();
+  if (sendableDependentType) {
+    ASSERT(sendableDependentType->hasTypeVariable());
+    properties |= RecursiveTypeProperties::SolverAllocated;
+    properties |= RecursiveTypeProperties::HasTypeVariable;
+  }
   properties &= ~RecursiveTypeProperties::IsLValue;
   return properties;
 }
@@ -4663,6 +4859,8 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 // For now, generic function types cannot be dependent (in fact,
 // they erase dependence) or contain type variables, and they're
 // always materializable.
+// FIXME: This doesn't seem great, we should consider changing it to be opt-out
+// rather than opt-in.
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result, Type globalActor,
@@ -4671,34 +4869,25 @@ getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
-  for (auto param : params) {
-    if (param.getPlainType()->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (param.getPlainType()->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
+  using Prop = RecursiveTypeProperties::Property;
+  auto mask = (unsigned)Prop::HasError | Prop::IsUnsafe | Prop::HasPlaceholder;
+
+  auto unionBits = [&](Type ty) {
+    if (!ty)
+      return;
+    auto bits = ty->getRecursiveProperties().getBits();
+    properties |= Prop(bits & mask);
+  };
+
+  for (auto param : params)
+    unionBits(param.getPlainType());
 
   if (result->getRecursiveProperties().hasDynamicSelf())
     properties |= RecursiveTypeProperties::HasDynamicSelf;
-  if (result->getRecursiveProperties().hasError())
-    properties |= RecursiveTypeProperties::HasError;
-  if (result->getRecursiveProperties().isUnsafe())
-    properties |= RecursiveTypeProperties::IsUnsafe;
-  
-  if (globalActor) {
-    if (globalActor->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (globalActor->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
 
-  if (thrownError) {
-    if (thrownError->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (thrownError->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
-
+  unionBits(result);
+  unionBits(globalActor);
+  unionBits(thrownError);
   return properties;
 }
 
@@ -4830,13 +5019,15 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, std::optional<ExtInfo> info) {
   Type thrownError;
   Type globalActor;
+  Type sendableDependentType;
   if (info.has_value()) {
     thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
+    sendableDependentType = info->getSendableDependentType();
   }
 
   auto properties = getFunctionRecursiveProperties(
-      params, result, globalActor, thrownError);
+      params, result, globalActor, thrownError, sendableDependentType);
   auto arena = getArena(properties);
 
   if (info.has_value()) {
@@ -4868,7 +5059,8 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   bool hasClangInfo =
       info.has_value() && !info.value().getClangTypeInfo().empty();
 
-  unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0);
+  unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0) +
+                      (sendableDependentType ? 1 : 0);
 
   bool hasLifetimeDependenceInfo =
       info.has_value() ? !info->getLifetimeDependencies().empty() : false;
@@ -4928,13 +5120,19 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
     auto clangTypeInfo = info.value().getClangTypeInfo();
     if (!clangTypeInfo.empty())
       *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
-    unsigned thrownErrorIndex = 0;
+    unsigned typeIdx = 0;
     if (Type globalActor = info->getGlobalActor()) {
-      getTrailingObjects<Type>()[0] = globalActor;
-      ++thrownErrorIndex;
+      getTrailingObjects<Type>()[typeIdx] = globalActor;
+      typeIdx += 1;
     }
-    if (Type thrownError = info->getThrownError())
-      getTrailingObjects<Type>()[thrownErrorIndex] = thrownError;
+    if (Type thrownError = info->getThrownError()) {
+      getTrailingObjects<Type>()[typeIdx] = thrownError;
+      typeIdx += 1;
+    }
+    if (Type sendableDependentType = info->getSendableDependentType()) {
+      getTrailingObjects<Type>()[typeIdx] = sendableDependentType;
+      typeIdx += 1;
+    }
     auto lifetimeDependenceInfo = info->getLifetimeDependencies();
     if (!lifetimeDependenceInfo.empty()) {
       *getTrailingObjects<size_t>() = lifetimeDependenceInfo.size();
@@ -5002,6 +5200,9 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   if (info.has_value()) {
     thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
+
+    // Generic functions can't currently have Sendable dependence.
+    ASSERT(!info->getSendableDependentType());
   }
 
   if (thrownError) {
@@ -5350,8 +5551,13 @@ SILFunctionType::SILFunctionType(
              "Cannot return an @noescape function type");
     }
   }
+  bool hasIsolatedParameter = false; (void) hasIsolatedParameter;
   for (auto param : getParameters()) {
-    (void)param;
+    if (param.hasOption(SILParameterInfo::Isolated)) {
+      assert(!hasIsolatedParameter &&
+             "building SIL function type with multiple isolated parameters");
+      hasIsolatedParameter = true;
+    }
     assert(!isa<PackExpansionType>(param.getInterfaceType()) &&
            "Cannot have a pack expansion directly as a parameter");
     assert(param.isPack() == isa<SILPackType>(param.getInterfaceType()) &&
@@ -5487,7 +5693,6 @@ CanSILFunctionType SILFunctionType::get(
   // revisit this.
   if (genericSig || patternSubs) {
     properties.removeHasTypeParameter();
-    properties.removeHasDependentMember();
   }
 
   auto outerSubs = genericSig ? invocationSubs : patternSubs;
@@ -5657,7 +5862,6 @@ InOutType *InOutType::get(Type objectTy) {
 
 DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
   auto properties = base->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(name);
@@ -5676,7 +5880,6 @@ DependentMemberType *DependentMemberType::get(Type base,
                                               AssociatedTypeDecl *assocType) {
   assert(assocType && "Missing associated type");
   auto properties = base->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(assocType);
@@ -5706,7 +5909,8 @@ OpaqueTypeArchetypeType *OpaqueTypeArchetypeType::getNew(
   ASTContext &ctx = interfaceType->getASTContext();
   auto mem = ctx.Allocate(size, alignof(OpaqueTypeArchetypeType), arena);
   return ::new (mem)
-      OpaqueTypeArchetypeType(environment, properties, interfaceType,
+      OpaqueTypeArchetypeType(environment->isCanonical() ? &ctx : nullptr,
+                              environment, properties, interfaceType,
                               conformsTo, superclass, layout);
 }
 
@@ -5734,6 +5938,7 @@ CanTypeWrapper<ExistentialArchetypeType> ExistentialArchetypeType::getNew(
   void *mem = ctx.Allocate(size, alignof(ExistentialArchetypeType), arena);
 
   return CanExistentialArchetypeType(::new (mem) ExistentialArchetypeType(
+      environment->isCanonical() ? &ctx : nullptr,
       environment, interfaceType, conformsTo, superclass, layout,
       properties));
 }
@@ -5747,7 +5952,7 @@ CanExistentialArchetypeType ExistentialArchetypeType::get(CanType existential) {
       existentialSig.Generalization, UUID::fromTime());
 
   return cast<ExistentialArchetypeType>(
-    genericEnv->mapTypeIntoContext(existentialSig.SelfType)
+    genericEnv->mapTypeIntoEnvironment(existentialSig.SelfType)
       ->getCanonicalType());
 }
 
@@ -5837,7 +6042,7 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
   case TypeKind::GenericTypeParam:
   case TypeKind::TypeVariable:
   case TypeKind::DependentMember:
-  case TypeKind::Unresolved:
+  case TypeKind::Error:
   case TypeKind::Placeholder:
   case TypeKind::PrimaryArchetype:
   case TypeKind::PackArchetype:
@@ -5895,9 +6100,8 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
       ctx.Allocate(storageToAlloc, alignof(AvailabilityContext::Storage));
   auto *newNode = ::new (mem) AvailabilityContext::Storage(
       platformRange, isDeprecated, domainInfos.size());
-  std::uninitialized_copy(
-      domainInfos.begin(), domainInfos.end(),
-      newNode->getTrailingObjects<AvailabilityContext::DomainInfo>());
+  std::uninitialized_copy(domainInfos.begin(), domainInfos.end(),
+                          newNode->getTrailingObjects());
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
@@ -5905,7 +6109,7 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
 
 const CustomAvailabilityDomain *
 CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
-                              Decl *decl, FuncDecl *predicateFunc,
+                              ValueDecl *decl, FuncDecl *predicateFunc,
                               const ASTContext &ctx) {
   auto identifier = ctx.getIdentifier(name);
   llvm::FoldingSetNodeID id;
@@ -5983,6 +6187,25 @@ GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
   return newSig;
 }
 
+GenericSignature
+GenericSignature::forInvalid(ArrayRef<GenericTypeParamType *> params) {
+  ASSERT(!params.empty());
+  auto &ctx = params.front()->getASTContext();
+
+  // Add same type requirements that make each of the generic parameters
+  // concrete error types. This helps avoid downstream diagnostics and is
+  // handled the same as if the user wrote e.g `<T where T == Undefined>`.
+  SmallVector<Requirement, 2> requirements;
+  for (auto *param : params) {
+    if (param->isValue())
+      continue;
+
+    requirements.emplace_back(RequirementKind::SameType, param,
+                              ErrorType::get(ctx));
+  }
+  return GenericSignature::get(params, requirements);
+}
+
 GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
   auto &ctx = signature->getASTContext();
 
@@ -5990,8 +6213,8 @@ GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
   unsigned numGenericParams = signature.getGenericParams().size();
   size_t bytes = totalSizeToAlloc<SubstitutionMap,
                                   OpaqueEnvironmentData,
-                                  OpenedExistentialEnvironmentData,
-                                  OpenedElementEnvironmentData, Type>(
+                                  ExistentialEnvironmentData,
+                                  ElementEnvironmentData, Type>(
       0, 0, 0, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   return new (mem) GenericEnvironment(signature);
@@ -6001,10 +6224,10 @@ GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
 /// outer substitutions.
 GenericEnvironment *GenericEnvironment::forOpaqueType(
     OpaqueTypeDecl *opaque, SubstitutionMap subs) {
-  // TODO: We could attempt to preserve type sugar in the substitution map.
-  // Currently archetypes are assumed to be always canonical in many places,
-  // though, so doing so would require fixing those places.
-  subs = subs.getCanonical();
+  // Don't preserve sugar if we have type variables, because this leads to
+  // excessive solver arena memory usage.
+  if (subs.getRecursiveProperties().hasTypeVariable())
+    subs = subs.getCanonical();
 
   auto &ctx = opaque->getASTContext();
 
@@ -6020,9 +6243,9 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
     auto signature = opaque->getOpaqueInterfaceGenericSignature();
     unsigned numGenericParams = signature.getGenericParams().size();
     size_t bytes = totalSizeToAlloc<SubstitutionMap,
-                                  OpaqueEnvironmentData,
-                                    OpenedExistentialEnvironmentData,
-                                    OpenedElementEnvironmentData, Type>(
+                                    OpaqueEnvironmentData,
+                                    ExistentialEnvironmentData,
+                                    ElementEnvironmentData, Type>(
         1, 1, 0, 0, numGenericParams);
     void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment), arena);
     env = new (mem) GenericEnvironment(signature, opaque, subs);
@@ -6084,8 +6307,8 @@ GenericEnvironment::forOpenedExistential(
   unsigned numGenericParams = signature.getGenericParams().size();
   size_t bytes = totalSizeToAlloc<SubstitutionMap,
                                   OpaqueEnvironmentData,
-                                  OpenedExistentialEnvironmentData,
-                                  OpenedElementEnvironmentData, Type>(
+                                  ExistentialEnvironmentData,
+                                  ElementEnvironmentData, Type>(
       1, 0, 1, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv =
@@ -6122,8 +6345,8 @@ GenericEnvironment::forOpenedElement(GenericSignature signature,
   unsigned numOpenedParams = signature.getInnermostGenericParams().size();
   size_t bytes = totalSizeToAlloc<SubstitutionMap,
                                   OpaqueEnvironmentData,
-                                  OpenedExistentialEnvironmentData,
-                                  OpenedElementEnvironmentData,
+                                  ExistentialEnvironmentData,
+                                  ElementEnvironmentData,
                                   Type>(
       1, 0, 0, 1, numGenericParams + numOpenedParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
@@ -6176,6 +6399,39 @@ DeclName::DeclName(ASTContext &C, DeclBaseName baseName,
   for (auto P : *paramList)
     names.push_back(P->getArgumentName());
   initialize(C, baseName, names);
+}
+
+void DeclNameRef::SelectiveDeclNameRef::Profile(llvm::FoldingSetNodeID &id,
+                                                Identifier moduleSelector,
+                                                DeclName fullName) {
+  ASSERT(!moduleSelector.empty() &&
+         "Looking up SelectiveDeclNameRef with empty module?");
+  id.AddPointer(moduleSelector.getAsOpaquePointer());
+  id.AddPointer(fullName.getOpaqueValue());
+}
+
+void DeclNameRef::initialize(ASTContext &C, Identifier moduleSelector,
+                             DeclName fullName) {
+  if (moduleSelector.empty()) {
+    storage = fullName;
+    return;
+  }
+
+  llvm::FoldingSetNodeID id;
+  SelectiveDeclNameRef::Profile(id, moduleSelector, fullName);
+
+  void *insert = nullptr;
+  if (SelectiveDeclNameRef *selectiveRef
+        = C.getImpl().SelectiveNameRefs.FindNodeOrInsertPos(id, insert)) {
+    storage = selectiveRef;
+    return;
+  }
+
+  auto buf = C.Allocate(sizeof(SelectiveDeclNameRef),
+                        alignof(SelectiveDeclNameRef));
+  auto selectiveRef = new (buf) SelectiveDeclNameRef(moduleSelector, fullName);
+  storage = selectiveRef;
+  C.getImpl().SelectiveNameRefs.InsertNode(selectiveRef, insert);
 }
 
 /// Find the implementation of the named type in the given module.
@@ -6782,10 +7038,10 @@ bool ASTContext::overrideGenericSignatureReqsSatisfied(
   auto *baseCtx = base->getAsGenericContext();
   auto *derivedCtx = derived->getAsGenericContext();
 
-  if (baseCtx->isGeneric() != derivedCtx->isGeneric())
+  if (baseCtx->hasGenericParamList() != derivedCtx->hasGenericParamList())
     return false;
 
-  if (baseCtx->isGeneric() &&
+  if (baseCtx->hasGenericParamList() &&
       (baseCtx->getGenericParams()->size() !=
        derivedCtx->getGenericParams()->size()))
     return false;
@@ -6858,6 +7114,21 @@ SILLayout *SILLayout::get(ASTContext &C,
   return newLayout;
 }
 
+SILLayout *
+SILLayout::withMutable(ASTContext &ctx,
+                       std::initializer_list<std::pair<unsigned, bool>>
+                           fieldIndexMutabilityUpdatePairs) const {
+  // Copy the fields, setting the mutable field to newMutable.
+  SmallVector<SILField, 8> newFields;
+  llvm::copy(getFields(), std::back_inserter(newFields));
+  for (auto p : fieldIndexMutabilityUpdatePairs) {
+    newFields[p.first].setIsMutable(p.second);
+  }
+
+  return SILLayout::get(ctx, getGenericSignature(), newFields,
+                        capturesGenericEnvironment());
+}
+
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionMap Substitutions) {
@@ -6892,6 +7163,23 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
   auto subMap = SubstitutionMap::get(singleGenericParamSignature, boxedType,
                                      LookUpConformanceInModule());
   return get(boxedType->getASTContext(), layout, subMap);
+}
+
+CanSILBoxType
+SILBoxType::withMutable(ASTContext &ctx,
+                        std::initializer_list<std::pair<unsigned, bool>>
+                            fieldIndexMutabilityUpdatePairs) const {
+  return SILBoxType::get(
+      ctx, getLayout()->withMutable(ctx, fieldIndexMutabilityUpdatePairs),
+      getSubstitutions());
+}
+
+ArrayRef<SILField> SILBoxType::getFields() const {
+  return getLayout()->getFields();
+}
+
+bool SILBoxType::isFieldMutable(unsigned index) const {
+  return getFields()[index].isMutable();
 }
 
 LayoutConstraint
@@ -6953,9 +7241,8 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
   if (!Bits.VarDecl.IsPropertyWrapperBackingProperty)
     return nullptr;
 
-  ASTContext &ctx = getASTContext();
-  assert(ctx.getImpl().OriginalWrappedProperties.count(this) > 0);
-  auto original = ctx.getImpl().OriginalWrappedProperties[this];
+  auto *original = getOriginalVarForBackingStorage();
+  ASSERT(original);
   if (!kind)
     return original;
 
@@ -6973,8 +7260,24 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
 void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
   Bits.VarDecl.IsPropertyWrapperBackingProperty = true;
   ASTContext &ctx = getASTContext();
-  assert(ctx.getImpl().OriginalWrappedProperties.count(this) == 0);
-  ctx.getImpl().OriginalWrappedProperties[this] = originalProperty;
+  assert(ctx.getImpl().OriginalVarsForBackingStorage.count(this) == 0);
+  ctx.getImpl().OriginalVarsForBackingStorage[this] = originalProperty;
+}
+
+void VarDecl::setLazyStorageFor(VarDecl *VD) {
+  Bits.VarDecl.IsLazyStorageProperty = true;
+  ASTContext &ctx = getASTContext();
+  ASSERT(ctx.getImpl().OriginalVarsForBackingStorage.count(this) == 0);
+  ctx.getImpl().OriginalVarsForBackingStorage[this] = VD;
+}
+
+VarDecl *VarDecl::getOriginalVarForBackingStorage() const {
+  const auto &map = getASTContext().getImpl().OriginalVarsForBackingStorage;
+  auto iter = map.find(this);
+  if (iter == map.end())
+    return nullptr;
+
+  return iter->second;
 }
 
 #ifndef NDEBUG
@@ -7079,28 +7382,12 @@ clang::DarwinSDKInfo *ASTContext::getDarwinSDKInfo() const {
     } else if (!*SDKInfoOrErr) {
       getImpl().SDKInfo.emplace();
     } else {
-      getImpl().SDKInfo.emplace(std::make_unique<clang::DarwinSDKInfo>(**SDKInfoOrErr));
+      getImpl().SDKInfo.emplace(
+          std::make_unique<clang::DarwinSDKInfo>(**SDKInfoOrErr));
     }
   }
 
   return getImpl().SDKInfo->get();
-}
-
-const clang::DarwinSDKInfo::RelatedTargetVersionMapping
-*ASTContext::getAuxiliaryDarwinPlatformRemapInfo(clang::DarwinSDKInfo::OSEnvPair Kind) const {
-  if (SearchPathOpts.PlatformAvailabilityInheritanceMapPath) {
-    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
-            *llvm::vfs::getRealFileSystem(),
-            *SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
-    if (!SDKInfoOrErr || !*SDKInfoOrErr) {
-      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
-                            [](const llvm::ErrorInfoBase &) {
-        // Ignore the error for now..
-      });
-    }
-    return (*SDKInfoOrErr)->getVersionMapping(Kind);
-  }
-  return nullptr;
 }
 
 /// The special Builtin.TheTupleType, which parents tuple extensions and
@@ -7246,11 +7533,29 @@ ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
   llvm_unreachable("exhaustive switch");
 }
 
-AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
-  auto platform = swift::targetPlatform(LangOpts);
+static AvailabilityDomain
+targetAvailabilityDomainForPlatform(PlatformKind platform) {
   if (platform != PlatformKind::none)
     return AvailabilityDomain::forPlatform(platform);
 
   // Fall back to the universal domain for triples without a platform.
   return AvailabilityDomain::forUniversal();
+}
+
+AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
+  if (!getImpl().TargetAvailabilityDomain) {
+    getImpl().TargetAvailabilityDomain =
+        targetAvailabilityDomainForPlatform(swift::targetPlatform(LangOpts));
+  }
+  return *getImpl().TargetAvailabilityDomain;
+}
+
+GenericSignature &
+ASTContext::getCachedBuiltinGenericTypeSignature(TypeKind kind) {
+  ASSERT(kind >= TypeKind::First_BuiltinGenericType
+         && kind <= TypeKind::Last_BuiltinGenericType
+         && "not a builtin generic type kind");
+
+  return getImpl().BuiltinGenericTypeSignatures
+    [unsigned(kind) - unsigned(TypeKind::First_BuiltinGenericType)];
 }

@@ -1,7 +1,6 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature SendingArgsAndResults
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -enable-experimental-feature SendingArgsAndResults
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 // REQUIRES: swift_feature_SendingArgsAndResults
 
 // README: This test makes sure that we error when sending is placed in the
@@ -23,3 +22,8 @@ func test_repeated_sending_mixed(_ x: sending consuming sending inout Int) {}
 // Just until we get the results setup.
 func test_sending_result_in_tuple() -> (sending Int, Int) {}
 // expected-error @-1 {{'sending' cannot be applied to tuple elements}}
+
+// https://github.com/swiftlang/swift/issues/74846
+
+func test_good_returns_sending_opaque() -> sending (some Equatable) { 0 }
+func test_good_returns_sending_opaque_in_tuple() -> sending (some Equatable, Int) { (0, 0) }

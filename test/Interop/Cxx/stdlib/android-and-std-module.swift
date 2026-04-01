@@ -3,7 +3,9 @@
 // RUN: %target-swift-frontend %s -c -cxx-interoperability-mode=default -Xcc -std=c++17 -Xcc -fmodules-cache-path=%t
 // RUN: %target-swift-frontend %s -c -cxx-interoperability-mode=default -Xcc -std=c++20 -Xcc -fmodules-cache-path=%t
 
-// RUN: find %t | %FileCheck %s
+// Ensure that the pre-compiled modules are emitted.
+// RUN: stat %t/Android*.pcm
+// RUN: stat %t/std*.pcm
 
 // RUN: %empty-directory(%t)
 
@@ -25,5 +27,3 @@ func test() {
 #endif
 }
 
-// CHECK-DAG: Android{{.*}}.pcm
-// CHECK-DAG: std{{.*}}.pcm

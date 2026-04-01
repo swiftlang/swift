@@ -12,13 +12,14 @@
 
 #if !$Embedded
 
-/// A unique identifier for a class instance or metatype.
+/// A unique identifier for a class instance, actor instance, or metatype.
 ///
-/// This unique identifier is only valid for comparisons during the lifetime
+/// This unique identifier is valid for comparisons only during the lifetime
 /// of the instance.
 ///
-/// In Swift, only class instances and metatypes have unique identities. There
-/// is no notion of identity for structs, enums, functions, or tuples.
+/// In Swift, only instances of classes, instances of actors, and metatypes
+/// have unique identities. There's no notion of identity for structures,
+/// enumerations, functions, or tuples.
 @frozen // trivial-implementation
 public struct ObjectIdentifier: Sendable {
   @usableFromInline // trivial-implementation

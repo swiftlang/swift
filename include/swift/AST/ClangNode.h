@@ -14,6 +14,7 @@
 #define SWIFT_CLANGNODE_H
 
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace clang {
@@ -76,16 +77,16 @@ public:
   }
 
   const clang::Decl *castAsDecl() const {
-    return Ptr.get<Box<clang::Decl>>().value;
+    return cast<Box<clang::Decl>>(Ptr).value;
   }
   const clang::MacroInfo *castAsMacroInfo() const {
-    return Ptr.get<Box<clang::MacroInfo>>().value;
+    return cast<Box<clang::MacroInfo>>(Ptr).value;
   }
   const clang::ModuleMacro *castAsModuleMacro() const {
-    return Ptr.get<Box<clang::ModuleMacro>>().value;
+    return cast<Box<clang::ModuleMacro>>(Ptr).value;
   }
   const clang::Module *castAsModule() const {
-    return Ptr.get<Box<clang::Module>>().value;
+    return cast<Box<clang::Module>>(Ptr).value;
   }
 
   // Get the MacroInfo for a local definition, one imported from a

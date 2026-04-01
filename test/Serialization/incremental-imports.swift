@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %S/Inputs/incremental-imports/* %t
-// RUN: cp %t/A{-before,}.swift
+// RUN: cp %t/A-before.swift %t/A.swift
 
 
 // RUN: %target-swift-frontend -emit-module -module-name IncrementalImports -o %t/IncrementalImports~A.swiftmodule -primary-file %t/A.swift
@@ -17,7 +17,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp %S/Inputs/incremental-imports/* %t
-// RUN: cp %t/A{-after,}.swift
+// RUN: cp %t/A-after.swift %t/A.swift
 // RUN: %target-swift-frontend -emit-module -module-name IncrementalImports -o %t/IncrementalImports~A.swiftmodule -primary-file %t/A.swift
 // RUN: %target-swift-frontend -merge-modules -emit-module -module-name IncrementalImports -o %t/IncrementalImports.swiftmodule %t/IncrementalImports~A.swiftmodule
 

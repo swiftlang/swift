@@ -41,7 +41,8 @@ namespace swift {
 
   /// Emit diagnostics for syntactic restrictions on a given expression.
   void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
-                                       bool isExprStmt, bool isConstInitExpr);
+                                       bool isExprStmt, bool isConstInitExpr,
+                                       bool inForEachPreamble);
 
   /// Emit diagnostics for a given statement.
   void performStmtDiagnostics(const Stmt *S, DeclContext *DC);
@@ -53,10 +54,10 @@ namespace swift {
 
   /// Emit a fix-it to set the access of \p VD to \p desiredAccess.
   ///
-  /// This actually updates \p VD as well.
+  /// This actually updates \p VD as well if \p updateAttr is true.
   void fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
                    AccessLevel desiredAccess, bool isForSetter = false,
-                   bool shouldUseDefaultAccess = false);
+                   bool shouldUseDefaultAccess = false, bool updateAttr = true);
 
   /// Compute the location of the 'var' keyword for a 'var'-to-'let' Fix-It.
   SourceLoc getFixItLocForVarToLet(VarDecl *var);
@@ -135,10 +136,8 @@ namespace swift {
   void checkFunctionAsyncUsage(AbstractFunctionDecl *decl);
   void checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl);
 
-  /// Detect and diagnose a missing `try` in `for-in` loop sequence
-  /// expression in async context (denoted with `await` keyword).
-  bool diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
-                                             ForEachStmt *forEach);
+  /// Determine if any of the performance hint diagnostics are enabled.
+  bool performanceHintDiagnosticsEnabled(ASTContext &ctx, SourceFile *sf);
 
   class BaseDiagnosticWalker : public ASTWalker {
   protected:
@@ -188,6 +187,9 @@ namespace swift {
                      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) {
                        return E->getType();
                      });
+
+  /// Diagnose a declaration of typed throws at the given location.
+  void diagnoseUntypedThrows(const DeclContext *dc, SourceLoc throwsLoc);
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

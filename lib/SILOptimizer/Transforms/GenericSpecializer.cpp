@@ -24,10 +24,12 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -162,6 +164,19 @@ bool swift::specializeAppliesInFunction(SILFunction &F,
         recursivelyDeleteTriviallyDeadInstructions(AI, true);
         Changed = true;
       }
+      // Specialization might create new references to conformances.
+      // A specialized init_existential_ref might now refer to a concrete
+      // conformance.
+      // In Embedded swift protocol witness tables are emitted lazily. Therefore
+      // deserialization of the sil_witness_table becomes mandatory if it is
+      // referenced because we can't rely on it being defined in the originating
+      // module.
+      if (isMandatory &&
+          FunctionBuilder.getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        for (SILFunction *NewF : reverse(NewFunctions)) {
+          FunctionBuilder.getModule().linkFunction(NewF, SILModule::LinkingMode::LinkNormal);
+        }
+      }
 
       if (auto *sft = dyn_cast<SILFunctionTransform>(transform)) {
         // If calling the specialization utility resulted in new functions
@@ -191,6 +206,11 @@ class GenericSpecializer : public SILFunctionTransform {
 
     if (specializeAppliesInFunction(F, this, /*isMandatory*/ false)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      removeUnreachableBlocks(F);
+      if (F.needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), &F);
+      if (F.needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), &F);
     }
   }
 };

@@ -24,6 +24,11 @@ func printCxxStructNested() {
     print(s)
 }
 
+func printCxxStructWithAnonType() {
+    let s = HasAnonymousType(1, 2, 3)
+    print(s)
+}
+
 printCxxStructPrivateFields() 
 // CHECK: HasPrivateFieldsOnly()
 
@@ -35,3 +40,6 @@ printCxxStructPrivatePublicProtectedFields()
 
 printCxxStructNested()
 // CHECK: Outer(publStruct: {{.*}}.HasPrivatePublicProtectedFields(publ1: 8, publ2: 12))
+
+printCxxStructWithAnonType()
+// CHECK: HasAnonymousType(c: 3)

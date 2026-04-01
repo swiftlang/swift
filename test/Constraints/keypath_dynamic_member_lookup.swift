@@ -227,18 +227,18 @@ func test_keypath_dynamic_lookup_inside_keypath() {
   _ = \Lens<[[Int]]>.[0].count
 }
 
-func test_recursive_dynamic_lookup(_ lens: Lens<Lens<Point>>) {
+func test_recursive_dynamic_lookup(_ pointLens: Lens<Lens<Point>>, _ arrLens: Lens<Lens<[Point]>>) {
   // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
   // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
   // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
-  _ = lens.x
+  _ = pointLens.x
   // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
   // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
-  _ = lens.obj.x
+  _ = pointLens.obj.x
   // CHECK: [[FIRST_OBJ:%.*]] = struct_extract {{.*}} : $Lens<Lens<Point>>, #Lens.obj
   // CHECK-NEXT: [[SECOND_OBJ:%.*]] = struct_extract [[FIRST_OBJ]] : $Lens<Point>, #Lens.obj
   // CHECK-NEXT: struct_extract [[SECOND_OBJ]] : $Point, #Point.y
-  _ = lens.obj.obj.y
+  _ = pointLens.obj.obj.y
   // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
   // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
   // CHECK-NEXT: keypath $KeyPath<Lens<Lens<Point>>, Lens<Lens<Int>>>, (root $Lens<Lens<Point>>; gettable_property $Lens<Lens<Int>>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
@@ -249,6 +249,21 @@ func test_recursive_dynamic_lookup(_ lens: Lens<Lens<Point>>) {
   // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
   // CHECK-NEXT: keypath $KeyPath<Lens<Lens<Rectangle>>, Lens<Lens<Int>>>, (root $Lens<Lens<Rectangle>>; settable_property $Lens<Lens<Point>>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig : {{.*}})
   _ = \Lens<Lens<Rectangle>>.topLeft.x
+
+  // CHECK: keypath $WritableKeyPath<Array<Point>, Point>, (root $Array<Point>; settable_property $Point, id @$sSayxSicig
+  // CHECK-NEXT: keypath $WritableKeyPath<Lens<Array<Point>>, Lens<Point>>, (root $Lens<Array<Point>>; settable_property $Lens<Point>, id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
+  // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
+  // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>, id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
+  _ = arrLens[0].x // arrLens[dynamicMember: \.[dynamicMember: \.[0]]][dynamicMember: \.[dynamicMember: \.x]]
+
+  _ = \Lens<Lens<[Point]>>.[0].x // \Lens<Lens<[Point]>>.[dynamicMember: \.[dynamicMember: \.[0]]].[dynamicMember: \.[dynamicMember: \.x]]
+  // CHECK: keypath $WritableKeyPath<Array<Point>, Point>, (root $Array<Point>; settable_property $Point, id @$sSayxSicig
+  // CHECK-NEXT: keypath $WritableKeyPath<Lens<Array<Point>>, Lens<Point>>, (root $Lens<Array<Point>>; settable_property $Lens<Point>, id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
+  // CHECK-NEXT: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
+  // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>, id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
+  // CHECK-NEXT: keypath $KeyPath<Lens<Lens<Array<Point>>>, Lens<Lens<Int>>>, (root $Lens<Lens<Array<Point>>>; settable_property $Lens<Lens<Point>>, id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
 }
 
 @dynamicMemberLookup
@@ -557,4 +572,83 @@ struct S_54150 {
     // CHECK: function_ref @swift_getAtKeyPath
     // CHECK-NEXT: apply %{{.*}}<S_54150, T>({{.*}})
   }
+}
+
+// https://github.com/swiftlang/swift/issues/56837
+@dynamicMemberLookup
+struct Issue56837<Value, Integer: FixedWidthInteger> {
+    var value: Value
+    init(_ value: Value) {
+        self.value = value
+    }
+    subscript<T>(dynamicMember keyPath: KeyPath<Value, T>) -> T {
+        get { return self.value[keyPath: keyPath] }
+    }
+    subscript(type value: Integer) -> Bool {
+        get { return true }
+    }
+}
+struct TestIssue56837 {
+    typealias T1 = Issue56837<String, Int8>
+    typealias T2 = Issue56837<T1, Int16>
+    typealias T3 = Issue56837<T2, Int32>
+    typealias T4 = Issue56837<T3, Int64>
+    static func test() {
+        let value: T4 = .init(.init(.init(.init("Swift"))))
+        _ = value[type: Int64.max]
+        _ = value[type: Int32.max]
+        _ = value[type: Int16.max]
+        _ = value[type: Int8.max]
+    }
+}
+
+@dynamicMemberLookup
+class TestDynamicSelf {
+  struct S {
+    subscript() -> Int { 0 }
+  }
+  func foo() -> Self {
+    // Make sure we can do dynamic member lookup on a dynamic self.
+    _ = self[]
+    return self
+  }
+  subscript<T>(dynamicMember dynamicMember: KeyPath<S, T>) -> T {
+    fatalError()
+  }
+}
+
+@dynamicMemberLookup
+protocol P1 {}
+
+extension P1 {
+  subscript<T>(dynamicMember dynamicMemberLookup: KeyPath<TestOverloaded.S2, T>) -> T {
+    fatalError()
+  }
+}
+
+struct TestOverloaded {
+  struct S1: P1 {
+    subscript(x: String) -> Int {
+      fatalError()
+    }
+    func f(_ x: String) -> Int {
+      return self[x]
+    }
+  }
+  struct S2: P1 {}
+}
+
+@dynamicMemberLookup
+struct SingleLens<T> {
+  var value: T
+  init(_ value: T) {
+    self.value = value
+  }
+  subscript<U>(dynamicMember keyPath: KeyPath<T, U>) -> U {
+    value[keyPath: keyPath]
+  }
+}
+
+func testRecursiveSingleSubscript(_ x: SingleLens<SingleLens<SingleLens<SingleLens<[Int]>>>>) {
+  _ = x[0]
 }

@@ -102,7 +102,7 @@ public class C<R> {
 // IR-DAG: ![[GRS_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GRS_T:[0-9]+]], {{.*}}type: ![[LET_TUPLE:[0-9]+]]
 // IR-DAG: ![[SP_GRS_T]] = {{.*}}linkageName: "$s1A1gyyxlFx_qd__t_Ti5"
 // IR-DAG: ![[GRS_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GRS_U:[0-9]+]], {{.*}}type: ![[LET_TUPLE:[0-9]+]]
-// IR-DAG: ![[SP_GRS_U]] = {{.*}}linkageName: "$s1A1hyyxlFx_qd__t_Ti5"
+// IR-DAG: ![[SP_GRS_U]] = {{.*}}linkageName: "$s1A1hyyxlFx_Ti5x_qd__t_Ti5"
 // IR-DAG: ![[LET_TUPLE]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[TUPLE:[0-9]+]])
 // IR-DAG: ![[TUPLE]] = {{.*}}DW_TAG_structure_type, name: "$sx_qd__tD"
 // IR-DAG: ![[S]] = !DILocalVariable(name: "s", {{.*}} type: ![[LET_TAU_1_0:[0-9]+]]
@@ -110,7 +110,7 @@ public class C<R> {
 // IR-DAG: ![[GS_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GS_T:[0-9]+]], {{.*}} type: ![[LET_TAU_1_0]])
 // IR-DAG: ![[SP_GS_T]] = {{.*}}linkageName: "$s1A1gyyxlFqd___Ti5"
 // IR-DAG: ![[GS_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GS_U:[0-9]+]], {{.*}} type: ![[LET_TAU_1_0]])
-// IR-DAG: ![[SP_GS_U]] = {{.*}}linkageName: "$s1A1hyyxlFqd___Ti5"
+// IR-DAG: ![[SP_GS_U]] = {{.*}}linkageName: "$s1A1hyyxlFx_Ti5qd___Ti5"
 
 // Debug info for this variable is removed. See the note above the call to g(r).
 //   ![[GR_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GR_T:[0-9]+]], {{.*}}type: ![[LET_TAU_0_0]])
@@ -118,12 +118,12 @@ public class C<R> {
 //   ![[SP_GR_T]] = {{.*}}linkageName: "$s1A1gyyxlF"
 
 // IR-DAG: ![[GR_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GR_U:[0-9]+]], {{.*}}type: ![[LET_TAU_0_0]])
-// IR-DAG: ![[SP_GR_U]] = {{.*}}linkageName: "$s1A1hyyxlF"
+// IR-DAG: ![[SP_GR_U]] = {{.*}}linkageName: "$s1A1hyyxlFx_Ti5x_Ti5"
 // IR-DAG: ![[GI_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GI_G:[0-9]+]], {{.*}}type: ![[LET_INT]])
 // IR-DAG: ![[SP_GI_G]] = {{.*}}linkageName: "$s1A1gyyxlFSi_Tg5"
 // IR-DAG: ![[GI_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GI_U:[0-9]+]], {{.*}}type: ![[LET_INT]])
-// IR-DAG: ![[SP_GI_U]] = {{.*}}linkageName: "$s1A1hyyxlFSi_TG5"
+// IR-DAG: ![[SP_GI_U]] = {{.*}}linkageName: "$s1A1hyyxlFx_Ti5Si_TG5"
 // IR-DAG: ![[GB_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GB_G:[0-9]+]], {{.*}}type: ![[LET_BOOL]])
 // IR-DAG: ![[SP_GB_G]] = {{.*}}linkageName: "$s1A1gyyxlFSb_Tg5"
 // IR-DAG: ![[GB_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GB_U:[0-9]+]], {{.*}}type: ![[LET_BOOL]])
-// IR-DAG: ![[SP_GB_U]] = {{.*}}linkageName: "$s1A1hyyxlFSb_TG5"
+// IR-DAG: ![[SP_GB_U]] = {{.*}}linkageName: "$s1A1hyyxlFx_Ti5Sb_TG5"

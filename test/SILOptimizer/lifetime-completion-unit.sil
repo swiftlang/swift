@@ -1,0 +1,771 @@
+// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class C {}
+
+public enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
+public enum E<T> {
+  case a(T)
+  case b(T)
+  case c
+}
+
+sil @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+sil @getC : $@convention(thin) () -> (@owned C)
+
+protocol Error {}
+
+enum Optional<Wrapped> {
+case none
+case some(Wrapped)
+}
+
+typealias AnyObject = Builtin.AnyObject
+
+protocol P : AnyObject {}
+
+// CHECK-LABEL: sil [ossa] @lexicalOwnedArg :
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'lexicalOwnedArg'
+sil [ossa] @lexicalOwnedArg : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "lifetime_completion"
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  unreachable
+bb3:
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @enumTest_no_destroy : $@convention(method) (@guaranteed E<C>) -> () {
+// CHECK:       bb2(%{{[0-9]+}} : @guaranteed $C):
+// CHECK:         destroy_value [dead_end]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'enumTest_no_destroy'
+sil [ossa] @enumTest_no_destroy : $@convention(method) (@guaranteed E<C>) -> () {
+bb0(%0 : @guaranteed $E<C>):
+  specify_test "lifetime_completion"
+  %copy = copy_value %0
+  %borrow = begin_borrow %copy
+  switch_enum %borrow, case #E.a!enumelt: bb1, case #E.b!enumelt: bb2, case #E.c!enumelt: bb3
+
+bb1(%10 : @guaranteed $C):
+  end_borrow %borrow
+  destroy_value %copy
+  br bb4
+
+bb2(%15 : @guaranteed $C):
+  unreachable
+
+bb3:
+  end_borrow %borrow
+  destroy_value %copy
+  br bb4
+
+bb4:
+  %r = tuple ()
+  return %r
+}
+
+sil @use_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+
+sil [ossa] @argTest : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "lifetime_completion"
+  debug_value %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb4
+
+bb2:
+  br bb3
+
+bb3:
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  %r = tuple ()
+  return %r
+
+bb4:
+  unreachable
+}
+
+// Ensure no assert fires while inserting dead end blocks to the worklist
+sil [ossa] @testLexicalLifetimeCompletion : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "lifetime_completion"
+  debug_value %0 : $C, let, name "newElements", argno 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  cond_br undef, bb9, bb10
+
+bb3:
+  br bb8
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb7
+
+bb6:
+  br bb7
+
+bb7:
+  unreachable
+
+bb8:
+  %77 = apply undef(%0) : $@convention(method) (@guaranteed C) -> ()
+  destroy_value %0 : $C
+  %79 = tuple ()
+  return %79 : $()
+
+bb9:
+  br bb8
+
+bb10:
+  br bb8
+}
+
+sil @foo : $@convention(thin) (@guaranteed C) -> ()
+
+// Ensure no assert fires while handling lifetime end of partial_apply
+sil [ossa] @testPartialApplyStack1 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  specify_test "lifetime_completion"
+  %8 = copy_value %0 : $C
+  %9 = begin_borrow %8 : $C
+  %80 = function_ref @foo : $@convention(thin) (@guaranteed C) -> ()
+  %81 = partial_apply [callee_guaranteed] [on_stack] %80(%9) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %81 : $@noescape @callee_guaranteed () -> ()
+  br bb3
+
+bb2:
+  unreachable
+
+bb3:
+  end_borrow %9 : $C
+  destroy_value %8 : $C
+  %180 = tuple ()
+  return %180 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @project_box_deadend : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+// CHECK:         [[BOX:%[^,]+]] = alloc_box
+// CHECK:         [[BOX_BORROW:%[^,]+]] = begin_borrow [[BOX]]
+// CHECK:         [[ADDR:%[^,]+]] = project_box [[BOX_BORROW]]
+// CHECK:         store [[C]] to [init] [[ADDR]]
+// CHECK:         end_borrow [[BOX_BORROW]]
+// CHECK:         destroy_value [dead_end] [[BOX]]
+// CHECK:         unreachable                                     
+// CHECK-LABEL: } // end sil function 'project_box_deadend'
+sil [ossa] @project_box_deadend : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %2 = alloc_box ${ var C }
+  %3 = begin_borrow %2 : ${ var C }
+  specify_test "lifetime_completion"
+  %4 = project_box %3 : ${ var C }, 0
+  store %0 to [init] %4 : $*C
+  unreachable
+}
+
+indirect enum IndirectEnumNontrivialPayload {
+  case c(C)
+}
+
+// CHECK-LABEL: sil [ossa] @project_box_owned : {{.*}} {
+// CHECK:       bb0([[IE:%[^,]+]] :
+// CHECK:         switch_enum [[IE]], case #IndirectEnumNontrivialPayload.c!enumelt: bb1
+// CHECK:       bb1([[BOX:%[^,]+]] :
+// CHECK:         [[C_ADDR:%[^,]+]] = project_box [[BOX]]
+// CHECK:         [[C:%[^,]+]] = load_borrow [[C_ADDR]]
+// CHECK:         cond_br undef, bb2, bb4
+// CHECK:       bb4:
+// CHECK:         end_borrow [[C]]
+// CHECK:         destroy_value [dead_end] [[BOX]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'project_box_owned'
+sil [ossa] @project_box_owned : $@convention(thin) (@owned IndirectEnumNontrivialPayload) -> () {
+bb0(%ie : @owned $IndirectEnumNontrivialPayload):
+  switch_enum %ie : $IndirectEnumNontrivialPayload, case #IndirectEnumNontrivialPayload.c!enumelt: bb1
+
+bb1(%box : @owned ${ var C }):
+  specify_test "lifetime_completion"
+  %c_addr = project_box %box : ${ var C }, 0
+  %c = load_borrow %c_addr : $*C
+  cond_br undef, bb2, bb4
+
+bb2:
+  end_borrow %c : $C
+  destroy_value %box : ${ var C }
+  br bb3
+
+bb3:
+  %retval = tuple ()
+  return %retval : $()
+
+bb4:
+  end_borrow %c : $C
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @alloc_box : {{.*}} {
+// CHECK:         [[BOX:%[^,]+]] = alloc_box
+// CHECK:         destroy_value [dead_end] [[BOX]]
+// CHECK-LABEL: } // end sil function 'alloc_box'
+sil [ossa] @alloc_box : $@convention(thin) (@owned C) -> () {
+bb0(%instance : @owned $C):
+  %box = alloc_box ${ var C }
+  specify_test "lifetime_completion"
+  %addr = project_box %box, 0
+  store %instance to [init] %addr
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @begin_apply : {{.*}} {
+// CHECK:         ({{%[^,]+}}, [[TOKEN:%[^,]+]]) = begin_apply undef()
+// CHECK:         cond_br undef, bb1, bb2
+// CHECK:       bb1:
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:       bb2:
+// CHECK:         end_borrow [[TOKEN]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'begin_apply'
+sil [ossa] @begin_apply : $@convention(thin) () -> () {
+bb0:
+  (%_, %token) = begin_apply undef() : $@yield_once @convention(thin) () -> (@yields @in_guaranteed ())
+  specify_test "lifetime_completion"
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_apply %token as $()
+  %retval = tuple ()
+  return %retval
+
+bb2:
+  unreachable
+}
+
+// Verify that no instructions were inserted after bb5's terminator.  (In
+// fact, if they were, the test would crash.)
+// CHECK-LABEL: sil [ossa] @root_of_reborrow : {{.*}} {
+// CHECK:       bb1([[C0:%[^,]+]] : @owned $C, [[B0:%[^,]+]] : @reborrow $C):
+// CHECK-NEXT:    [[B0F:%[^,]+]] = borrowed [[B0]] from ([[C0]])
+// CHECK-NEXT:    end_borrow [[B0F]]
+// CHECK-NEXT:    destroy_value [[C0]]
+// CHECK-NEXT:    br
+// CHECK-LABEL: } // end sil function 'root_of_reborrow'
+sil [ossa] @root_of_reborrow : $@convention(thin) () -> () {
+bb0:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c = apply %getC() : $@convention(thin) () -> (@owned C)
+  %b = begin_borrow %c : $C
+  br bb1(%c, %b)
+
+bb1(%c0 : @owned $C, %b0 : @reborrow $C):
+  %b0f = borrowed %b0 from (%c0)
+  end_borrow %b0f
+  destroy_value %c0
+  br bb2
+
+bb2:
+  br bb3
+
+bb3:
+  cond_br undef, bb4, bb6
+
+bb4:
+  %c1 = apply %getC() : $@convention(thin) () -> (@owned C)
+  %b1 = begin_borrow %c1
+  br bb5(%c1, %b1)
+
+bb5(%c2 : @owned $C, %b2 : @reborrow $C):
+  %b2f = borrowed %b2 from (%c2)
+  specify_test "lifetime_completion"
+  br bb1(%c2, %b2f)
+
+bb6:
+  unreachable
+}
+
+
+// CHECK-LABEL: sil [ossa] @test_borrowed_from : {{.*}} {
+// CHECK:       bb1([[A:%.*]] : @reborrow $C):
+// CHECK:         [[BF:%.*]] = borrowed [[A]] from (%0)
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[BF]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'test_borrowed_from'
+sil [ossa] @test_borrowed_from : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  specify_test "lifetime_completion"
+  %1 = begin_borrow %0
+  br bb1(%1)
+
+bb1(%3 : @reborrow $C):
+  %4 = borrowed %3 from (%0)
+  cond_br undef, bb2, bb3
+
+bb2:
+  unreachable
+
+bb3:
+  end_borrow %4
+  return %0
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrowed_from2 : {{.*}} {
+// CHECK:       bb1([[A:%.*]] : @reborrow $C, [[O:%.*]] : @owned $C):
+// CHECK:         [[BF:%.*]] = borrowed [[A]] from ([[O]])
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[BF]]
+// CHECK-NEXT:    destroy_value [dead_end] [[O]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'test_borrowed_from2'
+sil [ossa] @test_borrowed_from2 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  specify_test "lifetime_completion"
+  %1 = begin_borrow %0
+  br bb1(%1, %0)
+
+bb1(%4 : @reborrow $C, %5 : @owned $C):
+  %6 = borrowed %4 from (%5)
+  cond_br undef, bb2, bb3
+
+bb2:
+  unreachable
+
+bb3:
+  end_borrow %6
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrowed_from3 : {{.*}} {
+// CHECK:       bb1([[O:%.*]] : @owned $C, [[A:%.*]] : @reborrow $C):
+// CHECK:         [[BF:%.*]] = borrowed [[A]] from ([[O]])
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[BF]]
+// CHECK-NEXT:    destroy_value [dead_end] [[O]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'test_borrowed_from3'
+sil [ossa] @test_borrowed_from3 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  specify_test "lifetime_completion"
+  %1 = begin_borrow %0
+  br bb1(%0, %1)
+
+bb1(%4 : @owned $C, %5 : @reborrow $C):
+  %6 = borrowed %5 from (%4)
+  cond_br undef, bb2, bb3
+
+bb2:
+  unreachable
+
+bb3:
+  end_borrow %6
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @store_borrow :
+// CHECK:         [[TOKEN:%[^,]+]] = store_borrow
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'store_borrow'
+sil [ossa] @store_borrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%instance : @guaranteed $C):
+  specify_test "lifetime_completion"
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %token
+  dealloc_stack %addr
+  %retval = tuple ()
+  return %retval
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @store_borrow2 :
+// CHECK:       bb2:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'store_borrow2'
+sil [ossa] @store_borrow2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%instance : @guaranteed $C):
+  specify_test "lifetime_completion"
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr
+  end_borrow %token
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %addr
+  %retval = tuple ()
+  return %retval
+
+bb2:
+  unreachable
+}
+// CHECK-LABEL: sil [ossa] @load_borrow_of_store_borrow_1 : {{.*}} {
+// CHECK:         [[TOKEN:%[^,]+]] = store_borrow
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow [[TOKEN]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[LOAD]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    end_borrow [[LOAD]]
+// CHECK-NEXT:    end_borrow [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'load_borrow_of_store_borrow_1'
+sil [ossa] @load_borrow_of_store_borrow_1 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%instance : @guaranteed $C):
+  specify_test "lifetime_completion"
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr
+  %load = load_borrow %token
+  %borrow = begin_borrow %load
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %borrow
+  end_borrow %load
+  end_borrow %token
+  dealloc_stack %addr
+  %retval = tuple ()
+  return %retval : $()
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_of_store_borrow_2 : {{.*}} {
+// CHECK:         [[TOKEN:%[^,]+]] = store_borrow
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow [[TOKEN]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[LOAD]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    end_borrow [[LOAD]]
+// CHECK-NEXT:    end_borrow [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'load_borrow_of_store_borrow_2'
+sil [ossa] @load_borrow_of_store_borrow_2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%instance : @guaranteed $C):
+  specify_test "lifetime_completion"
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr
+  %load = load_borrow %token
+  %borrow = begin_borrow %load
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %borrow
+  end_borrow %load
+  end_borrow %token
+  dealloc_stack %addr
+  %retval = tuple ()
+  return %retval : $()
+
+bb2:
+  end_borrow %borrow
+  end_borrow %load
+  unreachable
+}
+
+sil [ossa] @load_borrow_1 : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%addr : $*C):
+  specify_test "lifetime_completion"
+  %load = load_borrow %addr
+  %borrow = begin_borrow %load
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %borrow
+  end_borrow %load
+  %retval = tuple ()
+  return %retval : $()
+
+bb2:
+  unreachable
+}
+
+// TODO: begin_access is not handled, yet.
+// CHECK-LABEL: sil [ossa] @begin_access : {{.*}} {
+// CHECK:         [[TOKEN:%[^,]+]] = begin_access
+// CHECK:       bb2:
+// CHECK-NEXT:    end_access [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'begin_access'
+sil [ossa] @begin_access : $@convention(thin) (@guaranteed C) -> () {
+bb0(%instance : @guaranteed $C):
+  specify_test "lifetime_completion"
+  %addr = alloc_stack $C
+  %access = begin_access [static] [read] %addr : $*C
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_access %access : $*C
+  dealloc_stack %addr : $*C
+  %retval = tuple ()
+  return %retval : $()
+
+bb2:
+  unreachable
+}
+
+// TODO: begin_access is not handled, yet.
+// CHECK-LABEL: sil [ossa] @load_borrow_of_begin_access : {{.*}} {
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow [[ACCESS]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[LOAD]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    end_borrow [[LOAD]]
+// CHECK-NEXT:    end_access [[ACCESS]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'load_borrow_of_begin_access'
+sil [ossa] @load_borrow_of_begin_access : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%addr : $*C):
+  specify_test "lifetime_completion"
+  %access = begin_access [static] [read] %addr : $*C
+  %load = load_borrow %access
+  %borrow = begin_borrow %load
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %borrow
+  end_borrow %load
+  end_access %access : $*C
+  %retval = tuple ()
+  return %retval : $()
+
+bb2:
+  unreachable
+}
+
+class Klass {}
+
+struct Wrapper {
+  var c: Klass
+}
+
+// CHECK-LABEL: sil [ossa] @testInteriorMarkDepNonEscAddressValue : {{.*}} {
+// CHECK: mark_dependence [nonescaping]
+// CHECK: end_borrow
+// CHECK-LABEL: } // end sil function 'testInteriorMarkDepNonEscAddressValue'
+sil [ossa] @testInteriorMarkDepNonEscAddressValue : $@convention(thin) (@owned Wrapper, @inout Klass) -> () {
+bb0(%0 : @owned $Wrapper, %1 : $*Klass):
+  specify_test "lifetime_completion"
+  %2 = begin_borrow %0 : $Wrapper
+  %3 = struct_extract %2 : $Wrapper, #Wrapper.c
+  %4 = mark_dependence [nonescaping] %1 : $*Klass on %3 : $Klass
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @testOwnedMarkDepNonEscAddressValue : {{.*}} {
+// CHECK:         mark_dependence [nonescaping]
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-LABEL: } // end sil function 'testOwnedMarkDepNonEscAddressValue'
+sil [ossa] @testOwnedMarkDepNonEscAddressValue : $@convention(thin) (@owned Wrapper, @inout Klass) -> () {
+bb0(%0 : @owned $Wrapper, %1 : $*Klass):
+  specify_test "lifetime_completion"
+  %2 = begin_borrow %0 : $Wrapper
+  %3 = struct_extract %2 : $Wrapper, #Wrapper.c
+  %4 = mark_dependence [nonescaping] %1 : $*Klass on %0 : $Wrapper
+  unreachable
+}
+
+sil @get_wrapper : $@convention(thin) () -> @owned Wrapper
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+sil [ossa] [noinline] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : @guaranteed $Wrapper):
+  %2 = struct_extract %0, #Wrapper.c
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_accessor1 :
+// CHECK:  [[F:%.*]] = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  [[A:%.*]] = apply [[F]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  end_borrow {{.*}}
+// CHECK:  destroy_value {{.*}}
+// CHECK:  unreachable
+// CHECK-LABEL: } // end sil function 'test_borrow_accessor1'
+sil [ossa] @test_borrow_accessor1 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  specify_test "lifetime_completion"
+  %copy = copy_value %0
+  %1 = begin_borrow %copy
+  %2 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_accessor2 :
+// CHECK:  [[F:%.*]] = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  [[A:%.*]] = apply [[F]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  end_borrow {{.*}}
+// CHECK:  destroy_value {{.*}}
+// CHECK:  unreachable
+// CHECK-LABEL: } // end sil function 'test_borrow_accessor2'
+sil [ossa] @test_borrow_accessor2 : $@convention(thin) () -> () {
+bb0:
+  specify_test "lifetime_completion"
+  %1 = function_ref @get_wrapper : $@convention(thin) () -> @owned Wrapper
+  %2 = apply %1() : $@convention(thin) () -> @owned Wrapper
+  %3 = begin_borrow %2
+  %4 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %6 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_conversion :
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow %3
+// CHECK-LABEL: } // end sil function 'unchecked_ownership_conversion'
+sil [ossa] @unchecked_ownership_conversion : $@convention(thin) (Unmanaged<AnyObject>) -> () {
+bb0(%0 : $Unmanaged<AnyObject>):
+  specify_test "lifetime_completion"
+  %1 = struct_extract %0, #Unmanaged._value
+  %2 = unmanaged_to_ref %1 to $AnyObject
+  %3 = unchecked_ownership_conversion %2, @unowned to @guaranteed
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  end_borrow %3
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @trival_values :
+// CHECK:       bb2:
+// CHECK-NEXT:    extend_lifetime %1
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'trival_values'
+sil [ossa] @trival_values : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "lifetime_completion true"
+  %1 = move_value [var_decl] %0
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  unreachable
+bb3:
+  extend_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_trival_values :
+// CHECK:       bb2:
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'no_trival_values'
+sil [ossa] @no_trival_values : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "lifetime_completion"
+  %1 = move_value [var_decl] %0
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  unreachable
+bb3:
+  extend_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_trival_var :
+// CHECK:       bb2:
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'no_trival_var'
+sil [ossa] @no_trival_var : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "lifetime_completion true"
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  unreachable
+bb3:
+  extend_lifetime %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_conversion_with_ends :
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'unchecked_ownership_conversion_with_ends'
+sil [ossa] @unchecked_ownership_conversion_with_ends : $@convention(thin) (AnyObject) -> () {
+bb0(%0 : @unowned $AnyObject):
+  specify_test "lifetime_completion true"
+  %1 = unchecked_ownership_conversion %0, @unowned to @guaranteed
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %1
+  %3 = tuple ()
+  return %3
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_conversion_without_ends :
+// CHECK:       bb2:
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'unchecked_ownership_conversion_without_ends'
+sil [ossa] @unchecked_ownership_conversion_without_ends : $@convention(thin) (AnyObject) -> () {
+bb0(%0 : @unowned $AnyObject):
+  specify_test "lifetime_completion true"
+  %1 = unchecked_ownership_conversion %0, @unowned to @guaranteed
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = tuple ()
+  return %3
+
+bb2:
+  unreachable
+}
+

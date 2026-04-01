@@ -729,6 +729,20 @@ public:
   bool isWithinBoundary(SILInstruction *inst,
                         DeadEndBlocks *deadEndBlocks) const;
 
+  /// Whether all \p insts are between this def and the liveness boundary;
+  /// \p deadEndBlocks is optional.
+  template <typename Instructions>
+  bool areWithinBoundary(Instructions insts,
+                         DeadEndBlocks *deadEndBlocks) const {
+    assert(asImpl().isInitialized());
+
+    for (auto *inst : insts) {
+      if (!isWithinBoundary(inst, deadEndBlocks))
+        return false;
+    }
+    return true;
+  };
+
   /// Returns true when all \p uses are between this def and the liveness
   /// boundary \p deadEndBlocks is optional.
   bool areUsesWithinBoundary(ArrayRef<Operand *> uses,
@@ -976,8 +990,7 @@ public:
                      function_ref<SILBasicBlock *(const SILInstruction *&)>>;
   NonLifetimeEndingUsesInLiveOutBlocksRange
   getNonLifetimeEndingUsesInLiveOutBlocks() const {
-    function_ref<SILBasicBlock *(const SILInstruction *&)> op;
-    op = [](const SILInstruction *&ptr) -> SILBasicBlock * {
+    auto op = [](const SILInstruction *&ptr) -> SILBasicBlock * {
       return ptr->getParent();
     };
     return NonLifetimeEndingUsesInLiveOutBlocksRange(

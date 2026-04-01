@@ -44,6 +44,9 @@
 using namespace swift;
 using namespace ownership;
 
+STATISTIC(NumInstScansDuringLivenessQueries,
+          "# of instructions scanned while computing `getLivenessAtInst()`");
+
 llvm::cl::opt<bool> TriggerUnreachableOnFailure(
     "sil-di-assert-on-failure", llvm::cl::init(false),
     llvm::cl::desc("After emitting a DI error, assert instead of continuing. "
@@ -474,9 +477,6 @@ namespace {
 
     AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
                                       unsigned NumElts);
-    AvailabilitySet getLivenessAtNonTupleInst(SILInstruction *Inst,
-                                              SILBasicBlock *InstBB,
-                                              AvailabilitySet &CurrentSet);
     int getAnyUninitializedMemberAtInst(SILInstruction *Inst, unsigned FirstElt,
                                         unsigned NumElts);
 
@@ -625,7 +625,7 @@ bool LifetimeChecker::isBlockIsReachableFromEntry(const SILBasicBlock *BB) {
   // Lazily compute reachability, so we only have to do it in the case of an
   // error.
   if (BlocksReachableFromEntry.empty()) {
-    SmallVector<const SILBasicBlock*, 128> Worklist;
+    SmallVector<const SILBasicBlock*, 8> Worklist;
     Worklist.push_back(&BB->getParent()->front());
     BlocksReachableFromEntry.insert(Worklist.back());
     
@@ -688,8 +688,7 @@ bool LifetimeChecker::shouldEmitError(const SILInstruction *Inst) {
 
     if (auto *PAI = isOnlyUsedByPartialApply(load)) {
       if (std::find_if(PAI->use_begin(), PAI->use_end(), [](auto PAIUse) {
-            return isa<AssignByWrapperInst>(PAIUse->getUser()) ||
-                   isa<AssignOrInitInst>(PAIUse->getUser());
+            return isa<AssignOrInitInst>(PAIUse->getUser());
           }) != PAI->use_end()) {
         return false;
       }
@@ -1115,8 +1114,7 @@ void LifetimeChecker::injectActorHops() {
 
 void LifetimeChecker::doIt() {
   // With any escapes tallied up, we can work through all the uses, checking
-  // for definitive initialization, promoting loads, rewriting assigns, and
-  // performing other tasks.
+  // for definitive initialization and performing other tasks.
 
   // Note that this should not use a for-each loop, as the Uses list can grow
   // and reallocate as we iterate over it.
@@ -1186,7 +1184,7 @@ void LifetimeChecker::doIt() {
     }
   }
 
-  // If we emitted an error, there is no reason to proceed with load promotion.
+  // If we emitted an error, there is no reason to proceed.
   if (!EmittedErrorLocs.empty()) {
     // Since we failed DI, for now, turn off the move checker on the entire
     // function. With time, we should be able to allow for move checker checks
@@ -1199,13 +1197,14 @@ void LifetimeChecker::doIt() {
 
   // All of the indirect results marked as "out" have to be fully initialized
   // before their lifetime ends.
-  if (TheMemory.isOut()) {
+  if (TheMemory.isOut() &&
+      !TheMemory.getType().isEmptyTuple(TheMemory.getFunction())) {
     auto diagnoseMissingInit = [&]() {
       std::string propertyName;
-      auto *property = TheMemory.getPathStringToElement(0, propertyName);
+      TheMemory.getPathStringToElement(0, propertyName);
       diagnose(Module, F.getLocation(),
                diag::ivar_not_initialized_by_init_accessor,
-               property->getName());
+               StringRef("'" + propertyName + "'"));
       EmittedErrorLocs.push_back(TheMemory.getLoc());
     };
 
@@ -1579,8 +1578,6 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       addr = moveAddr->getDest();
     else if (auto *assign = dyn_cast<AssignInst>(inst))
       addr = assign->getDest();
-    else if (auto *assign = dyn_cast<AssignByWrapperInst>(inst))
-      addr = assign->getDest();
     else
       return false;
 
@@ -1637,13 +1634,6 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     } else {
       Use.Kind = DIUseKind::Initialization;
     }
-  } else if (isFullyInitialized && isa<AssignByWrapperInst>(Use.Inst)) {
-    // If some fields are uninitialized, re-write assign_by_wrapper to assignment
-    // of the backing wrapper. If all fields are initialized, assign to the wrapped
-    // value.
-    auto allFieldsInitialized =
-        getAnyUninitializedMemberAtInst(Use.Inst, 0, TheMemory.getNumElements()) == -1;
-    Use.Kind = allFieldsInitialized ? DIUseKind::Set : DIUseKind::Assign;
   } else if (isFullyInitialized && isa<AssignOrInitInst>(Use.Inst)) {
     auto allFieldsInitialized =
         getAnyUninitializedMemberAtInst(Use.Inst, 0,
@@ -1807,16 +1797,18 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         case AccessorKind::Get:
         case AccessorKind::DistributedGet:
         case AccessorKind::Read:
-        case AccessorKind::Read2:
+        case AccessorKind::YieldingBorrow:
         case AccessorKind::Address:
+        case AccessorKind::Borrow:
           return false;
         case AccessorKind::Set:
         case AccessorKind::Modify:
-        case AccessorKind::Modify2:
+        case AccessorKind::YieldingMutate:
         case AccessorKind::MutableAddress:
         case AccessorKind::DidSet:
         case AccessorKind::WillSet:
         case AccessorKind::Init:
+        case AccessorKind::Mutate:
           return true;
         }
         llvm_unreachable("bad kind");
@@ -2486,8 +2478,7 @@ void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
            "delegating inits have a single elt");
 
     // Lower Assign instructions if needed.
-    if (isa<AssignInst>(Use.Inst) || isa<AssignByWrapperInst>(Use.Inst) ||
-        isa<AssignOrInitInst>(Use.Inst))
+    if (isa<AssignInst>(Use.Inst) || isa<AssignOrInitInst>(Use.Inst))
       NeedsUpdateForInitState.push_back(UseID);
   } else {
     // super.init also requires that all ivars are initialized before the
@@ -2523,8 +2514,8 @@ static void setStaticInitAccess(SILValue memoryAddress) {
 
 /// updateInstructionForInitState - When an instruction being analyzed moves
 /// from being InitOrAssign to some concrete state, update it for that state.
-/// This includes rewriting them from assign instructions into their composite
-/// operations.
+/// This includes marking assign instructions so they will be appropriately
+/// handled during RawSILInstLowering.
 void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
   DIMemoryUse &Use = Uses[UseID];
   SILInstruction *Inst = Use.Inst;
@@ -2573,14 +2564,17 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     return; \
   }
 #include "swift/AST/ReferenceStorage.def"
-  
-  // If this is an assign, rewrite it based on whether it is an initialization
-  // or not.
-  if (auto *AI = dyn_cast<AssignInst>(Inst)) {
-    // Remove this instruction from our data structures, since we will be
-    // removing it.
+
+  // Helper to remove the instruction from our data structures.
+  auto eraseUseInst = [&] {
     Use.Inst = nullptr;
     llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
+  };
+
+  // If this is an assign, mark it so that RawSILInstLowering can handle it
+  // appropriately.
+  if (auto *AI = dyn_cast<AssignInst>(Inst)) {
+    eraseUseInst();
 
     if (TheMemory.isClassInitSelf() &&
         Use.Kind == DIUseKind::SelfInit) {
@@ -2614,10 +2608,7 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
   }
 
   if (auto *AI = dyn_cast<AssignOrInitInst>(Inst)) {
-    // Remove this instruction from our data structures, since we will be
-    // removing it.
-    Use.Inst = nullptr;
-    llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
+    eraseUseInst();
 
     switch (Use.Kind) {
     case DIUseKind::Assign:
@@ -2631,29 +2622,6 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
       break;
     default:
       llvm_unreachable("Wrong use kind for assign_or_init");
-    }
-
-    return;
-  }
-
-  if (auto *AI = dyn_cast<AssignByWrapperInst>(Inst)) {
-    // Remove this instruction from our data structures, since we will be
-    // removing it.
-    Use.Inst = nullptr;
-    llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
-
-    switch (Use.Kind) {
-    case DIUseKind::Initialization:
-      AI->setMode(AssignByWrapperInst::Initialization);
-      break;
-    case DIUseKind::Assign:
-      AI->setMode(AssignByWrapperInst::Assign);
-      break;
-    case DIUseKind::Set:
-      AI->setMode(AssignByWrapperInst::AssignWrappedValue);
-      break;
-    default:
-      llvm_unreachable("Wrong use kind for assign_by_wrapper");
     }
 
     return;
@@ -2976,7 +2944,8 @@ static SILValue testAllControlVariableBits(SILLocation Loc,
   if (IVType->getFixedWidth() == 1)
     return CondVal;
 
-  SILValue AllBitsSet = B.createIntegerLiteral(Loc, CondVal->getType(), -1);
+  SILValue AllBitsSet = B.createIntegerLiteral(Loc, CondVal->getType(), -1,
+                                               /*treatAsSigned=*/true);
   if (!CmpEqFn.get())
     CmpEqFn = getBinaryFunction("cmp_eq", CondVal->getType(),
                                 B.getASTContext());
@@ -3624,43 +3593,6 @@ void LifetimeChecker::getOutSelfInitialized(SILBasicBlock *BB,
     Result = mergeKinds(Result, getBlockInfo(Pred).OutSelfInitialized);
 }
 
-AvailabilitySet
-LifetimeChecker::getLivenessAtNonTupleInst(swift::SILInstruction *Inst,
-                                           swift::SILBasicBlock *InstBB,
-                                           AvailabilitySet &Result) {
-  // If there is a store in the current block, scan the block to see if the
-  // store is before or after the load.  If it is before, it produces the value
-  // we are looking for.
-  if (getBlockInfo(InstBB).HasNonLoadUse) {
-    for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
-      --BBI;
-      SILInstruction *TheInst = &*BBI;
-
-      if (TheInst == TheMemory.getUninitializedValue()) {
-        Result.set(0, DIKind::No);
-        return Result;
-      }
-
-      if (NonLoadUses.count(TheInst)) {
-        // We've found a definition, or something else that will require that
-        // the memory is initialized at this point.
-        Result.set(0, DIKind::Yes);
-        return Result;
-      }
-    }
-  }
-
-  getOutAvailability(InstBB, Result);
-
-  // If the result element wasn't computed, we must be analyzing code within
-  // an unreachable cycle that is not dominated by "TheMemory".  Just force
-  // the unset element to yes so that clients don't have to handle this.
-  if (!Result.getConditional(0))
-    Result.set(0, DIKind::Yes);
-
-  return Result;
-}
-
 /// getLivenessAtInst - Compute the liveness state for any number of tuple
 /// elements at the specified instruction.  The elements are returned as an
 /// AvailabilitySet.  Elements outside of the range specified may not be
@@ -3680,12 +3612,6 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
 
   SILBasicBlock *InstBB = Inst->getParent();
 
-  // The vastly most common case is memory allocations that are not tuples,
-  // so special case this with a more efficient algorithm.
-  if (TheMemory.getNumElements() == 1) {
-    return getLivenessAtNonTupleInst(Inst, InstBB, Result);
-  }
-
   // Check locally to see if any elements are satisfied within the block, and
   // keep track of which ones are still needed in the NeededElements set.
   SmallBitVector NeededElements(TheMemory.getNumElements());
@@ -3696,6 +3622,7 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
   // the elements we are looking for.
   if (getBlockInfo(InstBB).HasNonLoadUse) {
     for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
+      ++NumInstScansDuringLivenessQueries;
       --BBI;
       SILInstruction *TheInst = &*BBI;
 
@@ -3900,8 +3827,7 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
 
 namespace {
 
-/// Perform definitive initialization analysis and promote alloc_box uses into
-/// SSA registers for later SSA-based dataflow passes.
+/// Perform definitive initialization analysis.
 class DefiniteInitialization : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
@@ -3909,7 +3835,6 @@ class DefiniteInitialization : public SILFunctionTransform {
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    // Walk through and promote all of the alloc_box's that we can.
     if (checkDefiniteInitialization(*getFunction())) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }

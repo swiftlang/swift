@@ -41,12 +41,12 @@ module ClangModuleB {
 //--- empty.swift
 
 //--- client-non-resilient.swift
-@_implementationOnly import SwiftModuleA // expected-warning {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
-@_implementationOnly import SwiftModuleA // expected-warning {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
+@_implementationOnly import SwiftModuleA // expected-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
+@_implementationOnly import SwiftModuleA // expected-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
 import SwiftModuleB
 
-@_implementationOnly import ClangModuleA // expected-warning {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
-@_implementationOnly import ClangModuleA.Submodule // expected-warning {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
+@_implementationOnly import ClangModuleA // expected-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
+@_implementationOnly import ClangModuleA.Submodule // expected-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
 import ClangModuleB
 
 //--- client-resilient.swift
@@ -59,7 +59,7 @@ import SwiftModuleB
 import ClangModuleB
 
 //--- Crypto.swift
-@_implementationOnly import SwiftModuleA // expected-warning {{using '@_implementationOnly' without enabling library evolution for 'Crypto' may lead to instability during execution}}
+@_implementationOnly import SwiftModuleA // expected-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'Crypto'}}
 import SwiftModuleB
 @_implementationOnly import CCryptoBoringSSL
 import ClangModuleB

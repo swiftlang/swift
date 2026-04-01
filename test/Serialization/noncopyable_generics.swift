@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/ncgenerics.swift                      \
-// RUN:     -enable-experimental-feature SuppressedAssociatedTypes             \
+// RUN:     -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN:     -emit-module -module-name ncgenerics                               \
 // RUN:     -o %t
 
@@ -9,12 +9,12 @@
 // RUN: %target-typecheck-verify-swift -I %t
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk)                  \
-// RUN:     -enable-experimental-feature SuppressedAssociatedTypes             \
+// RUN:     -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN:    -print-module -module-to-print=ncgenerics                           \
 // RUN:    -I %t -source-filename=%s                                           \
 // RUN:    | %FileCheck -check-prefix=CHECK-PRINT %s
 
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 // CHECK-NOT: UnknownCode
 

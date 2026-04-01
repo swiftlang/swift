@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
@@ -126,7 +127,7 @@ class AvailabilityScopeBuilder : private ASTWalker {
   }
 
   const char *stackTraceAction() const {
-    return "building availabilty scope for";
+    return "building availability scope for";
   }
 
   friend class swift::ExpandChildAvailabilityScopesRequest;
@@ -415,7 +416,7 @@ private:
     // As a special case, extension decls are treated as effectively as
     // available as the nominal type they extend, up to the deployment target.
     // This rule is a convenience for library authors who have written
-    // extensions without specifying platform availabilty on the extension
+    // extensions without specifying platform availability on the extension
     // itself.
     if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
       auto extendedType = extension->getExtendedType();
@@ -461,9 +462,16 @@ private:
     // As a convenience, explicitly unavailable decls are constrained to the
     // deployment target. There's not much benefit to checking these decls at a
     // lower availability version floor since they can't be invoked by clients.
-    if (getCurrentScope()->getAvailabilityContext().isUnavailable() ||
-        decl->isUnavailable())
+    auto context = getCurrentScope()->getAvailabilityContext();
+    if (context.isUnavailable())
       return true;
+
+    // Check whether the decl is unavailable relative to the current context.
+    if (auto constraint = getAvailabilityConstraintsForDecl(decl, context)
+                              .getPrimaryConstraint()) {
+      if (constraint->isUnavailable())
+        return true;
+    }
 
     // To remain compatible with a lot of existing SPIs that are declared
     // without availability attributes, constrain them to the deployment target
@@ -471,7 +479,7 @@ private:
     if (decl->isSPI())
       return true;
 
-    return !isExported(decl);
+    return isExported(decl) != ExportedLevel::Exported;
   }
 
   /// Returns the source range which should be refined by declaration. This
@@ -584,8 +592,7 @@ private:
   }
 
   void buildContextsForBodyOfDecl(Decl *decl) {
-    // Are we already constrained by the deployment target and the declaration
-    // doesn't explicitly allow unsafe constructs in its definition, adding
+    // If we are already constrained by the deployment target then adding
     // new contexts won't change availability.
     if (isCurrentScopeContainedByDeploymentTarget())
       return;
@@ -599,8 +606,10 @@ private:
       // Apply deployment-target availability if appropriate for this body.
       if (!isCurrentScopeContainedByDeploymentTarget() &&
           bodyIsDeploymentTarget(decl)) {
-        availability.constrainWithPlatformRange(
-            AvailabilityRange::forDeploymentTarget(Context), Context);
+        // Also constrain availability with the decl itself to handle the case
+        // where the decl becomes obsolete at the deployment target.
+        availability.constrainWithDeclAndPlatformRange(
+            decl, AvailabilityRange::forDeploymentTarget(Context));
       }
 
       nodesAndScopes.push_back(
@@ -816,8 +825,7 @@ private:
 
   AvailabilityQuery buildAvailabilityQuery(
       const SemanticAvailabilitySpec spec,
-      const std::optional<SemanticAvailabilitySpec> &variantSpec,
-      bool isUnavailability) {
+      const std::optional<SemanticAvailabilitySpec> &variantSpec) {
     auto domain = spec.getDomain();
 
     // Variant availability specfications are only supported for platform
@@ -839,7 +847,7 @@ private:
 
     switch (domain.getKind()) {
     case AvailabilityDomain::Kind::Embedded:
-    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::SwiftLanguageMode:
     case AvailabilityDomain::Kind::PackageDescription:
       // These domains don't support queries.
       llvm::report_fatal_error("unsupported domain");
@@ -850,7 +858,7 @@ private:
       // If all of the specs that matched are '*', then the query trivially
       // evaluates to "true" at compile time.
       if (!variantRange)
-        return AvailabilityQuery::constant(domain, isUnavailability, true);
+        return AvailabilityQuery::constant(domain, true);
 
       // Otherwise, generate a dynamic query for the variant spec. For example,
       // when compiling zippered for macOS, this should generate a query that
@@ -858,29 +866,30 @@ private:
       //
       //    if #available(iOS 18, *) { ... }
       //
-      return AvailabilityQuery::dynamic(variantSpec->getDomain(),
-                                        isUnavailability, primaryRange,
+      return AvailabilityQuery::dynamic(variantSpec->getDomain(), primaryRange,
                                         variantRange);
 
+    case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+      return AvailabilityQuery::dynamic(domain, primaryRange, std::nullopt);
+
     case AvailabilityDomain::Kind::Platform:
-      // Platform checks are always dynamic. The SIL optimizer is responsible
-      // eliminating these checks when it can prove that they can never fail
-      // (due to the deployment target). We can't perform that analysis here
-      // because it may depend on inlining.
-      return AvailabilityQuery::dynamic(domain, isUnavailability, primaryRange,
-                                        variantRange);
+      // Platform and Swift runtime checks are always dynamic. The SIL optimizer
+      // is responsible eliminating these checks when it can prove that they can
+      // never fail (due to the deployment target). We can't perform that
+      // analysis here because it may depend on inlining.
+      return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
     case AvailabilityDomain::Kind::Custom:
       auto customDomain = domain.getCustomDomain();
       ASSERT(customDomain);
 
       switch (customDomain->getKind()) {
       case CustomAvailabilityDomain::Kind::Enabled:
-        return AvailabilityQuery::constant(domain, isUnavailability, true);
+      case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+        return AvailabilityQuery::constant(domain, true);
       case CustomAvailabilityDomain::Kind::Disabled:
-        return AvailabilityQuery::constant(domain, isUnavailability, false);
+        return AvailabilityQuery::constant(domain, false);
       case CustomAvailabilityDomain::Kind::Dynamic:
-        return AvailabilityQuery::dynamic(domain, isUnavailability,
-                                          primaryRange, variantRange);
+        return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
       }
     }
   }
@@ -1053,8 +1062,9 @@ private:
               ? bestActiveSpecForQuery(query, /*ForTargetVariant*/ true)
               : std::nullopt;
 
-      query->setAvailabilityQuery(buildAvailabilityQuery(
-          *spec, variantSpec, query->isUnavailability()));
+      query->setAvailabilityQuery(
+          buildAvailabilityQuery(*spec, variantSpec)
+              .asUnavailable(query->isUnavailability()));
 
       // Wildcards are expected to be "useless". There may be other specs in
       // this query that are useful when compiling for other platforms.
@@ -1086,15 +1096,28 @@ private:
           if (isUnavailability.value())
             continue;
 
-          DiagnosticEngine &diags = Context.Diags;
-          if (currentScope->getReason() != AvailabilityScope::Reason::Root) {
-            diags.diagnose(query->getLoc(),
-                           diag::availability_query_useless_enclosing_scope,
-                           domain.getNameForAttributePrinting());
-            diags.diagnose(
-                currentScope->getIntroductionLoc(),
-                diag::availability_query_useless_enclosing_scope_here);
+          if (currentScope->getReason() == AvailabilityScope::Reason::Root)
+            continue;
+
+          // Skip diagnosing useless availability in fragile functions with
+          // opaque result types since removing an availability check could
+          // change the ABI of the function and result in a miscompilation.
+          auto *dc = getCurrentDeclContext();
+          if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+            if (auto decl = dc->getInnermostDeclarationDeclContext()) {
+              if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+                if (afd->getOpaqueResultTypeDecl())
+                  continue;
+              }
+            }
           }
+
+          DiagnosticEngine &diags = Context.Diags;
+          diags.diagnose(query->getLoc(),
+                         diag::availability_query_useless_enclosing_scope,
+                         domain.getNameForAttributePrinting());
+          diags.diagnose(currentScope->getIntroductionLoc(),
+                         diag::availability_query_useless_enclosing_scope_here);
         }
 
         continue;

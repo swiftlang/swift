@@ -618,3 +618,37 @@ func testPassingOptionalChainAsWrongArgument() {
     test.fn(arr?.first) // expected-error {{cannot convert value of type 'Int?' to expected argument type 'String?'}}
   }
 }
+
+// Make sure that optimizer doesn't select ??(T?, T) -> T
+protocol Syntax {
+  init?(_: some Syntax)
+}
+
+protocol SubSyntax: Syntax {}
+
+extension SubSyntax {
+  init(_: String) throws { fatalError() }
+}
+
+extension Optional : Syntax where Wrapped == Int {
+  init?(_: some Syntax) { self = .some(42) }
+}
+
+do {
+  struct TestSyntax : SubSyntax {
+    init?(_: some Syntax) {
+    }
+  }
+
+  struct S {
+    var value: Int
+  }
+
+
+  func context(from: TestSyntax?, root: some Syntax) {
+  }
+
+  func test(v: some Syntax, other: [S]) {
+    context(from: TestSyntax(v) ?? TestSyntax(other.first?.value), root: v) // Ok (no warnings)
+  }
+}

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -cse | %FileCheck %s
 // REQUIRES: PTRSIZE=64
 
 sil_stage canonical
@@ -253,19 +253,6 @@ bb0(%0 : @owned $Klass):
   destroy_value %0 : $Klass
   %6 = tuple()
   return %6 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @cse_raw_pointer_to_ref :
-// CHECK: raw_pointer_to_ref
-// CHECK-NOT: raw_pointer_to_ref
-// CHECK: tuple
-// CHECK-LABEL: } // end sil function 'cse_raw_pointer_to_ref'
-sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> (Klass, Klass) {
-bb0(%0 : $Builtin.RawPointer):
-  %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $Klass
-  %2 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $Klass
-  %6 = tuple(%1: $Klass, %2: $Klass)
-  return %6 : $(Klass, Klass)
 }
 
 enum Enum1 {
@@ -624,22 +611,23 @@ struct RecurStruct {
 // CHECK-LABEL: } // end sil function 'test_useafterfreeinrauw'
 sil [ossa] @test_useafterfreeinrauw : $@convention(thin) (@guaranteed RecurStruct) -> @owned NonTrivialStruct {
 bb0(%0 : @guaranteed $RecurStruct):
-  %1 = struct_extract %0 : $RecurStruct, #RecurStruct.val
-  debug_value %1 : $NonTrivialStruct
-  %2 = struct_extract %0 : $RecurStruct, #RecurStruct.val
+  %1 = struct_extract %0, #RecurStruct.val
+  debug_value %1
+  %3 = struct_extract %0, #RecurStruct.val
   cond_br undef, bb1, bb2
 
 bb1:
-  %3 = struct_extract %2 : $NonTrivialStruct, #NonTrivialStruct.val
-  br bb3(%3 : $Klass)
+  %5 = struct_extract %3, #NonTrivialStruct.val
+  br bb3(%5)
 
 bb2:
-  %4 = struct_extract %2 : $NonTrivialStruct, #NonTrivialStruct.val
-  br bb3(%4 : $Klass)
+  %7 = struct_extract %3, #NonTrivialStruct.val
+  br bb3(%7)
 
-bb3(%borrow : @guaranteed $Klass):
-  %copy = copy_value %1 : $NonTrivialStruct
-  return %copy : $NonTrivialStruct
+bb3(%9 : @guaranteed $Klass):
+  %10 = borrowed %9 from (%0)
+  %11 = copy_value %1
+  return %11
 }
 
 // Test to make sure we clear the context if we fail while checking if ownership rauw is possible
@@ -747,7 +735,14 @@ bb1:
   %ele2 = ref_element_addr %borrow2 : $WrapperKlass, #WrapperKlass.val
   apply %func(%ele2) : $@convention(thin) (@inout Builtin.NativeObject) -> ()
   end_borrow %borrow2 : $WrapperKlass
-  br bb1 
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value [dead_end] %3
+  unreachable
 }
 
 sil [ossa] @use_word2 : $@convention(thin) (@inout Builtin.Word) -> ()
@@ -1125,4 +1120,77 @@ bb0:
   destroy_value %0 : $NonTrivialStruct
   %res = tuple ()
   return %res : $()
+}
+
+// testMoveEnumChangesOwnership requires HasOptC and HasOptC to declare
+// their properties with @_hasStorage.
+public struct HasOptKlass {
+  @_hasStorage let c: Klass? { get }
+}
+
+public struct HasOptKlassHolder {
+  @_hasStorage public var hasOptKlass: HasOptKlass { get set }
+}
+
+// CHECK-LABEL: sil [ossa] @testMoveEnumChangesOwnership : $@convention(thin) () -> () {
+// CHECK:   [[E1:%[0-9]+]] = enum $Optional<Klass>, #Optional.none!enumelt
+// CHECK:   [[MV1:%[0-9]+]] = move_value [lexical] [[E1]] : $Optional<Klass>
+// CHECK:   [[S:%[0-9]+]] = struct $HasOptKlass (%0 : $Optional<Klass>)
+// CHECK:   store [[S]] to [init]
+// CHECK:   destroy_value [[MV1]] : $Optional<Klass>
+// CHECK:   [[MV2:%[0-9]+]] = move_value [lexical] [[S]] : $HasOptKlass
+// CHECK:   store [[MV2]] to [assign]
+// CHECK: } // end sil function 'testMoveEnumChangesOwnership'
+sil [ossa] @testMoveEnumChangesOwnership : $@convention(thin) () -> () {
+bb0:
+  %0 = enum $Optional<Klass>, #Optional.none!enumelt
+  %1 = move_value [lexical] %0
+  %2 = alloc_stack [lexical] [var_decl] $HasOptKlassHolder
+  %3 = enum $Optional<Klass>, #Optional.none!enumelt
+  %4 = struct $HasOptKlass (%3)
+  %5 = struct_element_addr %2, #HasOptKlassHolder.hasOptKlass
+  store %4 to [init] %5
+  %7 = struct $HasOptKlass (%1)
+  %8 = move_value [lexical] %7
+  store %8 to [assign] %5
+  %10 = load [take] %2
+  dealloc_stack %2
+  destroy_value %10
+  %13 = tuple ()
+  return %13
+}
+
+/// A scenario where a borrow of a copy is introduced but the cfg is such that
+/// no end_borrows are inserted for the borrow.  The copy must still be
+/// destroyed.
+// CHECK-LABEL: sil [ossa] @no_boundary_for_end_borrows : {{.*}} {
+// TODO: There shouldn't actually be a copy_value here, but lifetime transfer
+//       APIs are written and OSSARAUWHelper is in use, there will be.
+//       Even then, this test case shouldn't crash.
+// CHECK:         copy_value
+// CHECK:         destroy_value
+// CHECK-LABEL: } // end sil function 'no_boundary_for_end_borrows'
+sil [ossa] @no_boundary_for_end_borrows : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
+entry(%s : @guaranteed $NonTrivialStruct):
+  %c1 = struct_extract %s : $NonTrivialStruct, #NonTrivialStruct.val
+  cond_br undef, loop_entry, exit
+
+exit:
+  apply undef(%c1) : $@convention(thin) (@guaranteed Klass) -> ()
+  return undef : $()
+
+loop_entry:
+  %c2 = struct_extract %s : $NonTrivialStruct, #NonTrivialStruct.val
+  apply undef(%c2) : $@convention(thin) (@guaranteed Klass) -> ()
+  br loop_header
+
+loop_header:
+  apply undef(%c2) : $@convention(thin) (@guaranteed Klass) -> ()
+  cond_br undef, die, loop_backedge
+
+loop_backedge:
+  br loop_header
+
+die:
+  unreachable
 }

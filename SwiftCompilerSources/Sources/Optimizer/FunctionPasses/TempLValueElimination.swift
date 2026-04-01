@@ -95,6 +95,17 @@ private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassCont
   // ```
   let needDestroyEarly = !copy.isInitializationOfDestination && !isTrivial
 
+  if needDestroyEarly && !copy.parentFunction.hasOwnership {
+    // In non-OSSA we cannot insert an early `destroy_addr`, because a loaded value could be retained later, e.g.
+    // ```
+    //   %1 = load %destination
+    //   ...                     // we cannot insert a `destroy_addr %destination` here!
+    //   stores to %temp
+    //   strong_retain %1
+    // ```
+    return
+  }
+
   let firstUseOfAllocStack = InstructionList(first: allocStack).first(where: { $0.isUsing(allocStack) }) ??
                                // The conservative default, if the fist use is not in the alloc_stack's block.
                                allocStack.parentBlock.terminator
@@ -110,6 +121,13 @@ private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassCont
 
   if aliasAnalysis.mayAlias(allocStack, copy.destinationAddress) {
     // Catch the very unusual corner case where the copy is writing back to it's source address - the alloc_stack.
+    return
+  }
+
+  // If exclusivity is checked for the alloc_stack we must not replace it with the copy-destination.
+  // If the copy-destination is also in an access-scope this would result in an exclusivity violation
+  // which was not there before.
+  guard allocStack.uses.users(ofType: BeginAccessInst.self).isEmpty else {
     return
   }
 
@@ -172,6 +190,12 @@ private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassCont
     default:
       use.set(to: copy.destinationAddress, context)
     }
+  }
+
+  // Salvage the debug variable attribute, if present.
+  if let debugVariable = allocStack.debugVariable {
+    let builder = Builder(before: firstUseOfAllocStack, location: allocStack.location, context)
+    builder.createDebugValue(value: copy.destinationAddress, debugVariable: debugVariable)
   }
   context.erase(instruction: allocStack)
   context.erase(instructionIncludingAllUsers: copy.loadingInstruction)

@@ -17,18 +17,16 @@
 #ifndef SWIFT_CLANG_IMPORT_ENUM_H
 #define SWIFT_CLANG_IMPORT_ENUM_H
 
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Sema.h"
-#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace clang {
 class EnumDecl;
 class Preprocessor;
 class MacroInfo;
-}
+} // namespace clang
 
 namespace swift {
 namespace importer {
@@ -169,12 +167,20 @@ const clang::Type *getUnderlyingType(const clang::EnumDecl *decl);
 inline bool isCFOptionsMacro(const clang::NamedDecl *decl,
                              clang::Preprocessor &preprocessor) {
   auto loc = decl->getEndLoc();
-  if (!loc.isMacroID())
-    return false;
-  return llvm::StringSwitch<bool>(preprocessor.getImmediateMacroName(loc))
-      .Case("CF_OPTIONS", true)
-      .Case("NS_OPTIONS", true)
-      .Default(false);
+  auto &sourceManager = preprocessor.getSourceManager();
+  while (loc.isMacroID()) {
+    auto macroName = preprocessor.getImmediateMacroName(loc);
+
+    bool isCFOptions = llvm::StringSwitch<bool>(macroName)
+                           .Case("CF_OPTIONS", true)
+                           .Case("NS_OPTIONS", true)
+                           .Default(false);
+    if (isCFOptions)
+      return true;
+
+    loc = sourceManager.getImmediateExpansionRange(loc).getBegin();
+  }
+  return false;
 }
 
 } // namespace importer

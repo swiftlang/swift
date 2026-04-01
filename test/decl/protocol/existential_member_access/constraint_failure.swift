@@ -76,7 +76,7 @@ do {
   let exist2: any UnfulfillableGenericRequirementsDerived2
 
   exist1.method4(false)
-  // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>}}
+  // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Bool>}}
   exist2.method4(false)
   // expected-error@-1 {{member 'method4' cannot be used on value of type 'any UnfulfillableGenericRequirementsDerived2'; consider using a generic constraint instead}}
   // expected-error@-2 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>'}}

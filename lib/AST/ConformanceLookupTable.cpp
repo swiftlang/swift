@@ -58,7 +58,7 @@ ProtocolDecl *ConformanceLookupTable::ConformanceEntry::getProtocol() const {
   if (auto protocol = Conformance.dyn_cast<ProtocolDecl *>())
     return protocol;
 
-  return Conformance.get<ProtocolConformance *>()->getProtocol();
+  return cast<ProtocolConformance *>(Conformance)->getProtocol();
 }
 
 void ConformanceLookupTable::ConformanceEntry::markSupersededBy(
@@ -193,10 +193,10 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     nominalFunc(nominal);
   }
 
-  // Protocol extensions do not contribute protocol conformances. This
-  // is enforced by semantic analysis, so the early exit here is a
-  // performance optimization and also prevents us from erroneously
-  // including those protocols before they get diagnosed.
+  // While protocol extensions can contribute protocol conformances via
+  // reparenting, they currently do so without using the ConformanceTable.
+  // So the early exit here is a performance optimization and also prevents us
+  // from erroneously including those protocols before they get diagnosed.
   if (isa<ProtocolDecl>(nominal))
     return;
 
@@ -1031,7 +1031,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     }
   }
 
-  return entry->Conformance.get<ProtocolConformance *>();
+  return cast<ProtocolConformance *>(entry->Conformance);
 }
 
 void ConformanceLookupTable::addSynthesizedConformance(

@@ -63,6 +63,18 @@ def emit_module_semantic_info_path
   : Separate<["-"], "emit-module-semantic-info-path">, MetaVarName<"<path>">,
     HelpText<"Output semantic info of current module to <path>">;
 
+def sil_output_path
+  : Separate<["-"], "sil-output-path">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+           SupplementaryOutput, CacheInvariant]>,
+    HelpText<"Output SIL to <path> as additional output during compilation">;
+
+def ir_output_path
+  : Separate<["-"], "ir-output-path">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+           SupplementaryOutput, CacheInvariant]>,
+    HelpText<"Output LLVM IR to <path> as additional output during compilation">;
+
 def diagnostic_documentation_path
   : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
   HelpText<"Path to diagnostic documentation resources">;
@@ -100,6 +112,11 @@ def block_list_file
   : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
     Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
     HelpText<"The path to a blocklist configuration file">;
+
+def const_gather_protocols_file
+  : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+    HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
 
 let Flags = [FrontendOption, NoDriverOption] in {
 
@@ -165,9 +182,16 @@ def verify_apply_fixes : Flag<["-"], "verify-apply-fixes">,
   HelpText<"Like -verify, but updates the original source file">;
 def verify_ignore_unknown: Flag<["-"], "verify-ignore-unknown">,
   HelpText<"Allow diagnostics for '<unknown>' location in verify mode">;
+def verify_ignore_unrelated: Flag<["-"], "verify-ignore-unrelated">,
+  HelpText<"Allow diagnostics in files outside those with expected diagnostics in verify mode">;
+def verify_ignore_macro_note: Flag<["-"], "verify-ignore-macro-note">,
+  HelpText<"Skip verifying notes about macro location">;
 def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
+
+def expansion_remarks:  Flag<["-"], "Rmacro-expansions">,
+  HelpText<"Show remarks for each line in macro expansions">;
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
@@ -254,10 +278,6 @@ def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
 
-def const_gather_protocols_file
-  : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
-    HelpText<"Specify a list of protocols for extraction of conformances' const values'">;
-
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only identify all imports of the main Swift module sources">;
 
@@ -266,7 +286,7 @@ def serialize_dependency_scan_cache : Flag<["-"], "serialize-dependency-scan-cac
 
 def reuse_dependency_scan_cache : Flag<["-"], "load-dependency-scan-cache">,
    HelpText<"For performing a dependency scan, deserialize the scanner's internal state from a prior scan.">;
-   
+
 def validate_prior_dependency_scan_cache : Flag<["-"], "validate-prior-dependency-scan-cache">,
    HelpText<"For performing a dependency scan with a prior scanner state, validate module dependencies.">;
 
@@ -276,18 +296,21 @@ def dependency_scan_cache_path : Separate<["-"], "dependency-scan-cache-path">,
 def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
   HelpText<"Emit remarks indicating use of the serialized module dependency scanning cache.">;
 
+def dependency_scan_remarks : Flag<["-"], "Rdependency-scan">,
+  HelpText<"Emit remarks for various steps taken by the dependency scanner.">;
+
 def parallel_scan : Flag<["-"], "parallel-scan">,
    HelpText<"Perform dependency scanning in-parallel.">;
 def no_parallel_scan : Flag<["-"], "no-parallel-scan">,
    HelpText<"Perform dependency scanning in a single-threaded fashion.">;
 
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
-  HelpText<"Run SIL copy propagation with lexical lifetimes to shorten object "
+  HelpText<"Always run SIL copy propagation with lexical lifetimes to shorten object "
            "lifetimes while preserving variable lifetimes.">;
 def copy_propagation_state_EQ :
   Joined<["-"], "enable-copy-propagation=">,
   HelpText<"Whether to enable copy propagation">,
-  MetaVarName<"true|requested-passes-only|false">;
+  MetaVarName<"always|optimizing|requested-passes-only|false">;
 
 def disable_infer_public_concurrent_value : Flag<["-"], "disable-infer-public-sendable">,
     HelpText<"Disable inference of Sendable conformances for public structs and enums">;
@@ -318,6 +341,12 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
     Joined<["-"], "formal-cxx-interoperability-mode=">,
     HelpText<"What version of C++ interoperability a textual interface was originally generated with">,
     MetaVarName<"<cxx-interop-version>|off">;
+  def enable_assembly_vision_all
+      : Flag<["-"], "enable-assembly-vision-all">,
+        HelpText<"Enable assembly vision for all functions">;
+  def disable_assembly_vision_all
+      : Flag<["-"], "disable-assembly-vision-all">,
+        HelpText<"Disable assembly vision for all functions">;
 }
 
 // Flags that are saved into module interfaces
@@ -387,10 +416,6 @@ def public_autolink_library :
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
 
-def enable_experimental_swift_based_closure_specialization :
-  Flag<["-"], "experimental-swift-based-closure-specialization">,
-  HelpText<"Use the experimental Swift based closure-specialization optimization pass instead of the existing C++ one">;
-
 def checked_async_objc_bridging : Joined<["-"], "checked-async-objc-bridging=">,
   HelpText<"Control whether checked continuations are used when bridging "
            "async calls from Swift to ObjC: 'on', 'off' ">;
@@ -407,8 +432,29 @@ def debug_constraints_on_line : Separate<["-"], "debug-constraints-on-line">,
 def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
   Alias<debug_constraints_on_line>;
 
-def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
-  HelpText<"Disable per-name lazy member loading (obsolete)">;
+def solver_shuffle_disjunctions_EQ : Joined<["-"], "solver-shuffle-disjunctions=">,
+  HelpText<"Random seed for shuffling disjunctions. For debugging solver performance">;
+
+def solver_shuffle_choices_EQ : Joined<["-"], "solver-shuffle-choices=">,
+  HelpText<"Random seed for shuffling disjunction choices. For debugging solver performance">;
+
+def solver_enable_crash_on_valid_salvage : Flag<["-"], "solver-enable-crash-on-valid-salvage">,
+  HelpText<"Reject valid solutions in diagnostic mode">;
+
+def solver_disable_crash_on_valid_salvage : Flag<["-"], "solver-disable-crash-on-valid-salvage">,
+  HelpText<"Accept valid solutions in diagnostic mode">;
+
+def solver_enable_transitive_conformance : Flag<["-"], "solver-enable-transitive-conformance">,
+  HelpText<"Enable transitive conformance constraint optimization">;
+
+def solver_disable_transitive_conformance : Flag<["-"], "solver-disable-transitive-conformance">,
+  HelpText<"Disable transitive conformance constraint optimization">;
+
+def solver_enable_binding_optimizations : Flag<["-"], "solver-enable-binding-optimizations">,
+  HelpText<"Enable experimental optimizations to speed up type variable binding">;
+
+def solver_disable_binding_optimizations : Flag<["-"], "solver-disable-binding-optimizations">,
+  HelpText<"Disable experimental optimizations to speed up type variable binding">;
 
 def disable_named_lazy_import_as_member_loading :
   Flag<["-"], "disable-named-lazy-import-as-member-loading">,
@@ -426,6 +472,9 @@ def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
   HelpText<"Dumps the results of each macro expansion">;
 def emit_macro_expansion_files : Separate<["-"], "emit-macro-expansion-files">,
   HelpText<"Specify when to emit macro expansion file: 'none', 'debug', or 'diagnostics'">;
+
+def dump_source_file_imports : Flag<["-"], "dump-source-file-imports">,
+  HelpText<"Dumps the list of imports for each source file">;
 
 def analyze_request_evaluator : Flag<["-"], "analyze-request-evaluator">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -559,7 +608,7 @@ def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
 
 def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
-  HelpText<"Enable speculative devirtualization pass.">;
+  HelpText<"Deprecated, has no effect">;
 
 def enable_async_demotion : Flag<["-"], "enable-experimental-async-demotion">,
   HelpText<"Enables an optimization pass to demote async functions.">;
@@ -673,11 +722,20 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
 
+def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
+                               HelpText<"Dump availability scopes to stderr">;
+
 def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
   HelpText<"Disable validating system headers in the Clang importer">;
 
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
+
+def verbose_asm : Flag<["-"], "verbose-asm">,
+  HelpText<"Generate verbose assembly output with comments">;
+
+def no_verbose_asm : Flag<["-"], "no-verbose-asm">,
+  HelpText<"Disable verbose assembly output (default is enabled)">;
 
 def emit_pch : Flag<["-"], "emit-pch">,
   HelpText<"Emit PCH for imported Objective-C header file">, ModeOpt;
@@ -732,9 +790,9 @@ def disable_deserialization_safety :
   Flag<["-"], "disable-deserialization-safety">,
   HelpText<"Don't avoid reading potentially unsafe decls in swiftmodules">;
 
-def force_workaround_broken_modules :
-  Flag<["-"], "experimental-force-workaround-broken-modules">,
-  HelpText<"Attempt unsafe recovery for imported modules with broken modularization">;
+def disable_workaround_broken_modules :
+  Flag<["-"], "disable-workaround-broken-modules">,
+  HelpText<"Disable recovery for imported modules with broken modularization">;
 
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
@@ -874,15 +932,34 @@ def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">,
 def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
   HelpText<"Expression type checking trail change limit">;
 
+def solver_disable_prepared_overloads : Flag<["-"], "solver-disable-prepared-overloads">,
+  HelpText<"Disable experimental prepared overloads optimization">;
+
+def solver_enable_prepared_overloads : Flag<["-"], "solver-enable-prepared-overloads">,
+  HelpText<"Enable experimental prepared overloads optimization">;
+
+def solver_disable_prune_disjunctions : Flag<["-"], "solver-disable-prune-disjunctions">,
+  HelpText<"Disable experimental disjunction pruning algorithm for lookahead in the solver">;
+
+def solver_enable_prune_disjunctions : Flag<["-"], "solver-enable-prune-disjunctions">,
+  HelpText<"Enable experimental disjunction pruning algorithm for lookahead in the solver">;
+
+def solver_disable_optimize_operator_defaults : Flag<["-"], "solver-disable-optimize-operator-defaults">,
+  HelpText<"Disable experimental optimization to sometimes skip operators in protocol extensions">;
+
+def solver_enable_optimize_operator_defaults : Flag<["-"], "solver-enable-optimize-operator-defaults">,
+  HelpText<"Enable experimental optimization to sometimes skip operators in protocol extensions">;
+
+def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-hacks">,
+  HelpText<"Disable various constraint solver performance optimizations that have been "
+           "subsumed by subsequent improvements">;
+
+def solver_enable_performance_hacks : Flag<["-"], "solver-enable-performance-hacks">,
+  HelpText<"Enble various constraint solver performance optimizations that have been "
+           "subsumed by subsequent improvements">;
+
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
-
-def enable_constraint_solver_performance_hacks : Flag<["-"], "enable-constraint-solver-performance-hacks">,
-  HelpText<"Enable all the old hacks in the constraint solver">;
-
-def enable_operator_designated_types :
-  Flag<["-"], "enable-operator-designated-types">,
-  HelpText<"Enable operator designated types">;
 
 def enable_invalid_ephemeralness_as_error :
   Flag<["-"], "enable-invalid-ephemeralness-as-error">,
@@ -894,6 +971,12 @@ def disable_invalid_ephemeralness_as_error :
 
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
+
+def dynamic_member_lookup_depth_limit_EQ
+    : Joined<["-"], "dynamic-member-lookup-depth-limit=">,
+      HelpText<
+          "The maximum number of dynamic member lookups that can be chained "
+          "to resolve a member reference">;
 
 def enable_new_operator_lookup :
   Flag<["-"], "enable-new-operator-lookup">,
@@ -917,6 +1000,9 @@ def import_module : Separate<["-"], "import-module">,
 
 def testable_import_module : Separate<["-"], "testable-import-module">,
   HelpText<"Implicitly import the specified module with @testable">;
+
+def dependency_only_import : Separate<["-"], "dependency-only-import">,
+                             HelpText<"Import the module as a dependency only">;
 
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
@@ -1205,7 +1291,7 @@ def disable_callee_allocated_coro_abi : Flag<["-"], "disable-callee-allocated-co
 def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-annotation">,
   HelpText<"Enable cond_fail message annotation. Will serialize a .o.yaml file per .o file.">;
 
-def disable_cond_fail_message_annotation : Flag<["-"], "dissable-cond-fail-message-annotation">,
+def disable_cond_fail_message_annotation : Flag<["-"], "disable-cond-fail-message-annotation">,
   HelpText<"Disable cond_fail message annotation.">;
 
 def min_valid_pointer_value : Joined<["-"], "min-valid-pointer-value=">,
@@ -1296,8 +1382,7 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
 
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
-    HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
-            "when optimizing ownership will be lowered before serializing SIL">;
+    HelpText<"Obsolete. This option is ignored">;
 }
 
 def enable_recompilation_to_ossa_module : Flag<["-"], "enable-recompilation-to-ossa-module">,
@@ -1436,6 +1521,13 @@ def mergeable_traps :
   Flag<["-"], "mergeable-traps">,
   HelpText<"Emit mergeable traps even in optimized builds">;
 
+def enable_direct_retain_release :
+  Flag<["-"], "enable-direct-retain-release">,
+  HelpText<"Enable use of swift_retain/releaseDirect functions">;
+def disable_direct_retain_release :
+  Flag<["-"], "disable-direct-retain-release">,
+  HelpText<"Disable use of swift_retain/releaseDirect functions">;
+
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
   HelpText<"Enable the new llvm pass manager">;
@@ -1488,20 +1580,6 @@ def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;
 
-def enable_ossa_complete_lifetimes :
-  Flag<["-"], "enable-ossa-complete-lifetimes">,
-  HelpText<"Require linear OSSA lifetimes after SILGen">;
-def disable_ossa_complete_lifetimes :
-  Flag<["-"], "disable-ossa-complete-lifetimes">,
-  HelpText<"Do not require linear OSSA lifetimes after SILGen">;
-
-def enable_ossa_verify_complete :
-  Flag<["-"], "enable-ossa-verify-complete">,
-  HelpText<"Verify linear OSSA lifetimes after SILGen">;
-def disable_ossa_verify_complete :
-  Flag<["-"], "disable-ossa-verify-complete">,
-  HelpText<"Do not verify linear OSSA lifetimes after SILGen">;
-
 def platform_c_calling_convention :
     Separate<["-"], "experimental-platform-c-calling-convention">,
     HelpText<"Which calling convention is used to perform non-swift calls. "
@@ -1529,10 +1607,6 @@ def scanner_output_dir: Separate<["-"], "scanner-output-dir">,
 def scanner_debug_write_output: Flag<["-"], "scanner-debug-write-output">,
   HelpText<"Write generated output from scanner for debugging purpose">,
   Flags<[HelpHidden]>;
-
-def platform_availability_inheritance_map_path
-  : Separate<["-"], "platform-availability-inheritance-map-path">, MetaVarName<"<path>">,
-    HelpText<"Path of the platform inheritance platform map">;
 
 def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
   HelpText<"Enable enforcement of lifetime dependencies on addressable values.">;

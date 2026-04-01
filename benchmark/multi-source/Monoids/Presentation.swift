@@ -49,16 +49,8 @@ extension Rule: ExpressibleByStringLiteral, CustomStringConvertible {
 }
 
 struct Presentation: Hashable {
+  var alphabet: Int
   var rules: [Rule]
-
-  var alphabet: Int {
-    var result: Int = 0
-    for rule in rules {
-      for s in rule.lhs { result = max(result, Int(s)) }
-      for s in rule.rhs { result = max(result, Int(s)) }
-    }
-    return result + 1
-  }
 
   var longestRule: Int {
     var result = 0
@@ -70,8 +62,13 @@ struct Presentation: Hashable {
   }
 }
 
+func printRules(_ rules: [Rule]) -> String {
+  return rules.map { $0.description }.joined(separator: ",")
+}
+
 extension Presentation: ExpressibleByStringLiteral, CustomStringConvertible {
   init(_ str: String) {
+    self.alphabet = 2
     self.rules = str.split(separator: ",").map { Rule(String($0)) }
   }
 
@@ -80,8 +77,7 @@ extension Presentation: ExpressibleByStringLiteral, CustomStringConvertible {
   }
 
   var description: String {
-    if rules.isEmpty { return "," }
-    return rules.map { $0.description }.joined(separator: ",")
+    return printRules(rules)
   }
 }
 
@@ -145,7 +141,8 @@ extension Rule {
 
 extension Presentation {
   func permuted(_ perm: Permutation) -> Presentation {
-    return Presentation(rules: rules.map { $0.permuted(perm) })
+    return Presentation(alphabet: alphabet,
+                        rules: rules.map { $0.permuted(perm) })
   }
 }
 
@@ -367,6 +364,6 @@ extension Presentation {
     let sortedRules =
       rules.map { $0.oriented(order: order)! }
            .sorted { compare($0, $1, order: order) == .lessThan }
-    return Presentation(rules: sortedRules)
+    return Presentation(alphabet: alphabet, rules: sortedRules)
   }
 }

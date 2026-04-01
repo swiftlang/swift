@@ -67,6 +67,7 @@
 // Definition of 'Foo' in the dependency graph
 // CHECK: "swiftPrebuiltExternal": "Foo"
 // CHECK: "modulePath": "{{.*}}Foo.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: "directDependencies": [
 // CHECK-DAG:    "swift": "Swift"
 // CHECK-DAG:    "swift": "SwiftOnoneSupport"

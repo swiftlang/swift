@@ -9,13 +9,22 @@ if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
   cmake_policy(SET CMP0157 OLD)
 endif()
 
-if($ENV{BUILD_NUMBER})
-  math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
-  set(BUILD_NUMBER ".${BUILD_NUMBER}")
-endif()
+list(APPEND CMAKE_MODULE_PATH
+  "${CMAKE_SOURCE_DIR}/../cmake/modules"
+  "${CMAKE_SOURCE_DIR}/../../cmake/modules")
+
+include(SwiftProjectVersion)
 project(SwiftDifferentiation
   LANGUAGES Swift C
-  VERSION 6.1.0${BUILD_NUMBER})
+  VERSION ${SWIFT_RUNTIME_VERSION})
+
+# FIXME(compnerd) add a compatibility shim for WASI on older CMake releases.
+if(CMAKE_VERSION VERSION_LESS 3.31)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Generic" AND CMAKE_SYSTEM_PROCESSOR MATCHES "wasm32")
+    set(CMAKE_SYSTEM_NAME WASI)
+    set(WASI 1)
+  endif()
+endif()
 
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Differentiation must build as a standalone project")
@@ -23,8 +32,6 @@ endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 set(CMAKE_Swift_LANGUAGE_VERSION 5)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../../"
@@ -38,11 +45,14 @@ set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vend
   CACHE FILEPATH "Location for private build system extension")
 
 find_package(SwiftCore REQUIRED)
+find_package(SwiftOverlay REQUIRED)
+
 include(GNUInstallDirs)
 
 include(AvailabilityMacros)
 include(EmitSwiftInterface)
 include(InstallSwiftInterface)
+include(PlatformInfo)
 include(gyb)
 include(ResourceEmbedding)
 include(CatalystSupport)
@@ -59,21 +69,33 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 option(${PROJECT_NAME}_ENABLE_VECTOR_TYPES "Enable vector support"
   ${SwiftCore_ENABLE_VECTOR_TYPES})
 
-
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-library-level api>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypesWithDefaults>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature MemberImportVisibility>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   $<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>)
+
+find_package(SwiftSwiftDirectRuntime)
+
+# LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
+# LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
+# LNK4217: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj' in function 'function'
+#
+# We cannot selectively filter the linker warnings as we do not use the MSVC
+# frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
+# a compromise, treat all linker warnings as errors.
+# FIXME(#83444) - enable this once we fix DLL storage for
+# `_fatalErrorForwardModeDifferentiationDisabled`
+# add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 if(SwiftDifferentiation_ENABLE_VECTOR_TYPES)
   gyb_expand(SIMDDifferentiation.swift.gyb SIMDDifferentiation.swift)
@@ -103,7 +125,11 @@ set_target_properties(swift_Differentiation PROPERTIES
   Swift_MODULE_NAME _Differentiation)
 
 target_link_libraries(swift_Differentiation PRIVATE
-  swiftCore)
+  swiftCore
+  $<$<PLATFORM_ID:Android>:swiftAndroid>
+  $<$<PLATFORM_ID:Windows>:swiftCRT>
+  $<$<PLATFORM_ID:WASI>:swiftWASILibc>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 
 install(TARGETS swift_Differentiation
@@ -116,7 +142,7 @@ emit_swift_interface(swift_Differentiation)
 install_swift_interface(swift_Differentiation)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swift_Differentiation)
+generate_plist(swift_Differentiation "${CMAKE_PROJECT_VERSION}" swift_Differentiation)
 embed_manifest(swift_Differentiation)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swift_Differentiation.cmake" OPTIONAL)

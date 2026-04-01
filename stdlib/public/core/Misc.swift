@@ -90,7 +90,7 @@ public func _getTypeName(_ type: Any.Type, qualified: Bool)
 @_unavailableInEmbedded
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
-  let (stringPtr, count) = _getTypeName(type, qualified: qualified)
+  let (stringPtr, count) = unsafe _getTypeName(type, qualified: qualified)
   return unsafe String._fromUTF8Repairing(
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
@@ -107,7 +107,7 @@ public func _getMangledTypeName(_ type: any (~Copyable & ~Escapable).Type)
 @_preInverseGenerics
 public // SPI
 func _mangledTypeName(_ type: any (~Copyable & ~Escapable).Type) -> String? {
-  let (stringPtr, count) = _getMangledTypeName(type)
+  let (stringPtr, count) = unsafe _getMangledTypeName(type)
   guard count > 0 else {
     return nil
   }
@@ -239,7 +239,20 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// Extensions to the `Copyable` protocol are not allowed.
 @_marker public protocol Copyable/*: ~Escapable*/ {}
 
-@_documentation(visibility: internal)
+/// A type whose values can persist beyond their immediate local scope.
+///
+/// Escapable values can be assigned to global or static variables, returned from functions, captured by escaping
+/// closures, and so on. All Swift types implicitly conform to this protocol by default, allowing them to be moved across
+/// scopes freely because they lack any lifetime dependencies.
+///
+/// In contrast, values of types that suppress their implicit conformance to `Escapable` (by writing `~Escapable`)
+/// carry a lifetime dependency. These dependencies ensure the `~Escapable` value does not live longer than the value it
+/// depends on. Explicit lifetime dependency annotations may be required when working with these types.
+///
+/// In generic contexts, `~Escapable` works much in the same way as `~Copyable`. It allows functions and types to work
+/// with values that may or may not be Escapable, and types can be conditionally `Escapable` based on their generic
+/// arguments. A conformance requirement for `Escapable` is automatically inferred in extensions and for generic type
+/// parameters, unless suppressed with `~Escapable`.
 @_marker public protocol Escapable/*: ~Copyable*/ {}
 
 @_marker public protocol BitwiseCopyable: ~Escapable { }

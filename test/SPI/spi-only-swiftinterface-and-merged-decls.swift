@@ -40,4 +40,4 @@ import B
 
 @_spi(_)
 public func foo(_ a: MovingType) {}
-// CHECK: A.MovingType
+// CHECK: A::MovingType

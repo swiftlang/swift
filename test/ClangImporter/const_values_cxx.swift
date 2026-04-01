@@ -55,9 +55,6 @@ func foo() {
 
   print(MyClass().class_const_int)
   print(MyClass.class_static_const_int)
-
-  // TODO: This seems to be incorrectly imported, this test here is just to check that the compiler doesn't crash.
-  print(template_gcd)
 }
 
 // Only imported as external declarations:

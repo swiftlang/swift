@@ -595,17 +595,6 @@ template <> struct CanTypeWrapperTraits<TYPE> {                     \
 BEGIN_CAN_TYPE_WRAPPER(TYPE, BASE)                                  \
 END_CAN_TYPE_WRAPPER(TYPE, BASE)
 
-// Disallow direct uses of isa/cast/dyn_cast on Type to eliminate a
-// certain class of bugs.
-template <class X> inline bool
-isa(const Type&) = delete; // Use TypeBase::is instead.
-template <class X> inline typename llvm::cast_retty<X, Type>::ret_type
-cast(const Type&) = delete; // Use TypeBase::castTo instead.
-template <class X> inline typename llvm::cast_retty<X, Type>::ret_type
-dyn_cast(const Type&) = delete; // Use TypeBase::getAs instead.
-template <class X> inline typename llvm::cast_retty<X, Type>::ret_type
-dyn_cast_or_null(const Type&) = delete;
-
 // Permit direct uses of isa/cast/dyn_cast on CanType and preserve
 // canonicality.
 template <class X> inline bool isa(CanType type) {
@@ -656,16 +645,6 @@ namespace llvm {
     return OS;
   }
 
-  // A Type casts like a TypeBase*.
-  template<> struct simplify_type<const ::swift::Type> {
-    typedef ::swift::TypeBase *SimpleType;
-    static SimpleType getSimplifiedValue(const ::swift::Type &Val) {
-      return Val.getPointer();
-    }
-  };
-  template<> struct simplify_type< ::swift::Type>
-    : public simplify_type<const ::swift::Type> {};
-  
   // Type hashes just like pointers.
   template<> struct DenseMapInfo<swift::Type> {
     static swift::Type getEmptyKey() {
@@ -715,5 +694,38 @@ namespace llvm {
     }
   };
 } // end namespace llvm
+
+/// Disallow uses of `isa`/`cast`/`dyn_cast` directly on `Type` to eliminate a
+/// certain class of bugs.
+namespace llvm {
+
+template <class To>
+struct CastInfo<To, const swift::Type> {
+  // FIXME: Without this 'false' indirection, clang from 5.9 toolchain
+  // triggers the static assert directly on the template. Try removing once
+  // Linux CI is updated to 6.0.
+  static constexpr bool False() { return false; }
+  static_assert(
+      False(), "don't use isa/cast/dyn_cast directly on a 'Type' value; "
+               "instead, use 'isa/cast/dyn_cast<X>(type.getPointer())' to "
+               "cast the exact type, or use 'type->is/getAs/castTo<X>()' "
+               "to cast the desugared type, which is usually the right choice");
+};
+template <class To>
+struct CastInfo<To, swift::Type> : public CastInfo<To, const swift::Type> {};
+
+/// These specializations exist to avoid unhelpful instantiation errors in
+/// addition to the above static assertion.
+template <>
+struct simplify_type<const swift::Type> {
+  typedef ::swift::TypeBase *SimpleType;
+  static SimpleType getSimplifiedValue(const swift::Type &Val) {
+    return Val.getPointer();
+  }
+};
+template <>
+struct simplify_type<swift::Type> : public simplify_type<const swift::Type> {};
+
+} // namespace llvm
 
 #endif

@@ -1,3 +1,0 @@
-// {"signature":"swift::TypeBase::computeInvertibleConformances()"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
-typealias a = FlattenCollection...

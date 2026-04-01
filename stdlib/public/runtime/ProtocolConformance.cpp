@@ -789,7 +789,13 @@ struct ConformanceState {
         envAllowCacheByDescriptors && allowSaveDescriptor &&
         typeDescriptor && result.witnessTable &&
         CanCacheTypeByDescriptor(*typeDescriptor)) {
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+      auto conformance = lookThroughOptionalConditionalWitnessTable(
+                         reinterpret_cast<const RelativeWitnessTable *>(result.witnessTable))
+                         ->getDescription();
+#else
       auto conformance = result.witnessTable->getDescription();
+#endif
       lockedCache.getOrInsert(ConformanceCacheKey(typeDescriptor, proto),
                               [&](ConformanceCacheEntry *entry, bool created) {
                                 if (!created)
@@ -2223,6 +2229,14 @@ checkInvertibleRequirementsStructural(const Metadata *type,
   case MetadataKind::ExtendedExistential: {
     auto existential = cast<ExtendedExistentialTypeMetadata>(type);
     auto &shape = *existential->Shape;
+
+    // If this is an extended existential metatype, then just allow it. Metatypes
+    // are always copyable and escapable so there can't possibly be a
+    // suppression issue.
+    if (shape.Flags.isMetatypeConstrained()) {
+      return std::nullopt;
+    }
+
     llvm::ArrayRef<GenericRequirementDescriptor> reqs(
         shape.getReqSigRequirements(), shape.getNumReqSigRequirements());
     // Look for any suppressed protocol requirements. If the existential
@@ -2256,6 +2270,16 @@ checkInvertibleRequirementsStructural(const Metadata *type,
     
   case MetadataKind::FixedArray:
     // Builtin.FixedArray has no conformances of its own.
+    return std::nullopt;
+
+  case MetadataKind::Borrow:
+    // All Builtin.Borrow are '~Escapable'.
+    if (!ignored.containsEscapable()) {
+      return TYPE_LOOKUP_ERROR_FMT(
+        "borrow type missing escapable invertible protocol %x",
+        ignored.rawBits());
+    }
+
     return std::nullopt;
 
   case MetadataKind::LastEnumerated:

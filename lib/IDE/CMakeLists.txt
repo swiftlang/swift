@@ -12,14 +12,16 @@ add_swift_host_library(swiftIDE STATIC
   CodeCompletionResultPrinter.cpp
   CodeCompletionResultType.cpp
   CodeCompletionString.cpp
+  CodeCompletionStringBuilder.cpp
   CodeCompletionStringPrinter.cpp
   CommentConversion.cpp
   CompletionLookup.cpp
   CompletionOverrideLookup.cpp
   ConformingMethodList.cpp
+  SignatureHelp.cpp
+  SignatureHelpFormatter.cpp
   CursorInfo.cpp
   ExprCompletion.cpp
-  ExprContextAnalysis.cpp
   Formatting.cpp
   FuzzyStringMatcher.cpp
   IDEBridging.cpp
@@ -45,6 +47,14 @@ target_link_libraries(swiftIDE PRIVATE
   swiftDriver
   swiftParse
   swiftSema)
+
+# Clang dependencies. These are private because IDE's public
+# interface does not use Clang symbols.
+target_link_libraries(swiftIDE PRIVATE
+  clangAST
+  clangBasic
+  clangIndex
+  clangLex)
 
 if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftIDE PRIVATE

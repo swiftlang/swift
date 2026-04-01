@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 //===--- Helper types used in this file.
 
@@ -550,7 +550,8 @@ func exprPostfix2() {
 
 class ExprSuper {
   init() {
-    super. // expected-error {{expected member name following '.'}} 
+    super. // expected-error {{expected member name following '.'}}
+    // expected-error@-1 {{'super' cannot be used in class 'ExprSuper' because it has no superclass}}
   }
 }
 

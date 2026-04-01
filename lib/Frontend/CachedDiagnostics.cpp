@@ -30,6 +30,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/CAS/CASFileSystem.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Debug.h"
@@ -472,13 +473,13 @@ DiagnosticSerializer::convertDiagnosticInfo(SourceManager &SM,
   };
 
   std::vector<std::string> educationalNotes;
-  if (!Info.CategoryDocumentationURL.empty())
-    educationalNotes.push_back(Info.CategoryDocumentationURL);
+  if (!Info.getCategoryDocumentationURL().empty())
+    educationalNotes.push_back(Info.getCategoryDocumentationURL().str());
   return {(uint32_t)Info.ID,
           convertSourceLoc(SM, Info.Loc),
           (uint8_t)Info.Kind,
           std::string(Text.data(), Text.size()),
-          Info.Category.str(),
+          Info.getCategoryName().str(),
           convertSourceLoc(SM, Info.BufferIndirectlyCausingDiagnostic),
           convertDiagnosticInfoArray(Info.ChildDiagnosticInfo),
           educationalNotes,
@@ -627,7 +628,7 @@ llvm::Error DiagnosticSerializer::deserializeDiagnosticInfo(
                                   FixIts,
                                   Info.IsChildNote};
   if (Info.EducationalNotePaths.size() == 1)
-    DeserializedInfo.CategoryDocumentationURL = Info.EducationalNotePaths[0];
+    DeserializedInfo.setCategoryDocumentationURL(Info.EducationalNotePaths[0]);
   return callback(DeserializedInfo);
 }
 
@@ -643,13 +644,13 @@ DiagnosticSerializer::serializeEmittedDiagnostics(llvm::raw_ostream &os) {
     if (!File.Content.empty() || !File.ContentCASID.empty())
       continue;
 
-    auto Ref =
-        SrcMgr.getFileSystem()->getObjectRefForFileContent(File.FileName);
-    if (!Ref)
-      return llvm::createFileError(File.FileName, Ref.getError());
+    if (auto CASFS =
+            dyn_cast<llvm::cas::CASBackedFileSystem>(SrcMgr.getFileSystem())) {
+      auto Ref = CASFS->getObjectRefForFileContent(File.FileName);
+      if (!Ref)
+        return Ref.takeError();
 
-    if (*Ref) {
-      File.ContentCASID = CAS.getID(**Ref).toString();
+      File.ContentCASID = CAS.getID(*Ref).toString();
       continue;
     }
 

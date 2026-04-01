@@ -9,8 +9,12 @@ func derive(_ ne: NE) -> NE { // expected-error{{a function cannot return a ~Esc
   ne
 }
 
-func f_inout_infer(a: inout MutableRawSpan) {}
+func f_inout_infer(a: inout MutableRawSpan) {} // DEFAULT OK
 
-func f_inout_no_infer(a: inout MutableRawSpan, b: RawSpan) {}
-// expected-error @-1{{a function cannot have a ~Escapable 'inout' parameter 'a' in addition to other ~Escapable parameters}}
+func f_inout_no_infer(a: inout MutableRawSpan, b: RawSpan) {} // DEFAULT OK
 
+typealias DeriveType = @_lifetime(copy ne) (_ ne: NE) -> NE // expected-error{{'@_lifetime' attribute is only valid when experimental feature Lifetimes is enabled}}
+
+typealias InoutInferType = (inout MutableRawSpan) -> Void // DEFAULT OK
+
+typealias InoutNoInferType = (inout MutableRawSpan, RawSpan) -> Void // DEFAULT OK

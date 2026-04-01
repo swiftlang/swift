@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/DependencyScan/DependencyScanJSON.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/StringUtils.h"
@@ -35,8 +34,6 @@ std::string quote(StringRef unquoted) {
   }
   return buffer.str().str();
 }
-} // namespace
-
 
 /// Write a string value as JSON.
 void writeJSONValue(llvm::raw_ostream &out, StringRef value,
@@ -228,9 +225,13 @@ void writeLinkLibraries(llvm::raw_ostream &out,
 
 void writeImportInfos(llvm::raw_ostream &out,
                       const swiftscan_import_info_set_t *imports,
-                      unsigned indentLevel, bool trailingComma) {
+                      bool optional, unsigned indentLevel,
+                      bool trailingComma) {
   out.indent(indentLevel * 2);
-  out << "\"imports\": ";
+  if (optional)
+    out << "\"optionalImports\": ";
+  else
+    out << "\"imports\": ";
   out << "[\n";
 
   for (size_t i = 0; i < imports->count; ++i) {
@@ -373,6 +374,7 @@ getAsClangDependencyModule(swiftscan_module_details_t details) {
     return &details->clang_details;
   return nullptr;
 }
+} // namespace
 
 namespace swift::dependencies {
 void writePrescanJSON(llvm::raw_ostream &out,
@@ -428,6 +430,27 @@ void writeJSON(llvm::raw_ostream &out,
     writeJSONSingleField(out, "modulePath", modulePath, /*indentLevel=*/3,
                          /*trailingComma=*/true);
 
+    // Library level.
+    {
+      StringRef levelStr;
+      switch (moduleInfo.library_level) {
+      case SWIFTSCAN_LIBRARY_LEVEL_OTHER:
+        levelStr = "other";
+        break;
+      case SWIFTSCAN_LIBRARY_LEVEL_IPI:
+        levelStr = "ipi";
+        break;
+      case SWIFTSCAN_LIBRARY_LEVEL_SPI:
+        levelStr = "spi";
+        break;
+      case SWIFTSCAN_LIBRARY_LEVEL_API:
+        levelStr = "api";
+        break;
+      }
+      writeJSONSingleField(out, "libraryLevel", levelStr, /*indentLevel=*/3,
+                           /*trailingComma=*/true);
+    }
+
     // Source files.
     if (swiftTextualDeps || clangDeps) {
       writeJSONSingleField(out, "sourceFiles", moduleInfo.source_files, 3,
@@ -441,7 +464,9 @@ void writeJSON(llvm::raw_ostream &out,
                         /*trailingComma=*/true);
       writeLinkLibraries(out, moduleInfo.link_libraries,
                          3, /*trailingComma=*/true);
-      writeImportInfos(out, moduleInfo.imports,
+      writeImportInfos(out, moduleInfo.imports, /*optional*/ false,
+                       3, /*trailingComma=*/true);
+      writeImportInfos(out, moduleInfo.optional_imports, /*optional*/ true,
                        3, /*trailingComma=*/true);
     }
     // Swift and Clang-specific details.
@@ -653,14 +678,9 @@ void writeJSON(llvm::raw_ostream &out,
 
       // Command line.
       writeJSONSingleField(out, "commandLine", clangDeps->command_line, 5,
-                           clangDeps->cas_fs_root_id.length != 0 ||
                            clangDeps->clang_include_tree.length != 0 ||
                            clangDeps->module_cache_key.length != 0);
 
-      if (clangDeps->cas_fs_root_id.length != 0)
-        writeJSONSingleField(out, "casFSRootID", clangDeps->cas_fs_root_id, 5,
-                             clangDeps->clang_include_tree.length != 0 ||
-                             clangDeps->module_cache_key.length != 0);
       if (clangDeps->clang_include_tree.length != 0)
         writeJSONSingleField(out, "clangIncludeTree",
                              clangDeps->clang_include_tree, 5,

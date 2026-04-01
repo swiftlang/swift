@@ -48,7 +48,6 @@ SimplifyCFG = Pass('SimplifyCFG')
 SpeculativeDevirtualizer = Pass('SpeculativeDevirtualizer')
 SplitAllCriticalEdges = Pass('SplitAllCriticalEdges')
 SplitNonCondBrCriticalEdges = Pass('SplitNonCondBrCriticalEdges')
-StripDebugInfo = Pass('StripDebugInfo')
 SwiftArrayOpts = Pass('SwiftArrayOpts')
 
 PASSES = [
@@ -97,6 +96,5 @@ PASSES = [
     SpeculativeDevirtualizer,
     SplitAllCriticalEdges,
     SplitNonCondBrCriticalEdges,
-    StripDebugInfo,
     SwiftArrayOpts,
 ]

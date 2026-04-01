@@ -128,7 +128,7 @@ suite.test("withUnsafeBytes()")
     view = MutableRawSpan(_unsafeBytes: empty)
     view.withUnsafeBytes {
       expectEqual($0.count, 0)
-      expectNil($0.baseAddress)
+      expectNotNil($0.baseAddress)
     }
   }
 }
@@ -157,7 +157,7 @@ suite.test("withUnsafeMutableBytes")
     view = MutableRawSpan(_unsafeBytes: empty)
     view.withUnsafeMutableBytes {
       expectEqual($0.count, 0)
-      expectNil($0.baseAddress)
+      expectNotNil($0.baseAddress)
     }
   }
   expectEqual(Int(a[i]), i+1)
@@ -553,4 +553,15 @@ suite.test("MutableRawSpan from UnsafeMutableRawBufferPointer")
 
   let v = b.load(fromByteOffset: 8, as: Int64.self)
   expectNotEqual(v, 1)
+}
+
+private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
+
+suite.test("MutableRawSpan Sendability")
+.require(.stdlib_6_2).code {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 1, alignment: 2)
+  defer { buffer.deallocate() }
+
+  let span = MutableRawSpan(_unsafeBytes: buffer)
+  send(span)
 }

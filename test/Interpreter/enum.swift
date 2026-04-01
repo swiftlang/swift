@@ -745,3 +745,45 @@ func reproduction<T: Init>(_ x: Int, _ y: Int, _ t: T) {
 
 // CHECK: there is no byte
 reproduction(2, 3, TrailingByte())
+
+do {
+  // regression test for https://github.com/swiftlang/swift-driver/pull/1987
+  @inline(never) func blackhole<T>(_ t: T) { }
+
+  final class Context {
+    func doSomething() {}
+    deinit {
+      print("Context deinit")
+    }
+  }
+
+  enum MyOptional<Value> {
+    case some(Value)
+    case none
+  }
+
+  final class _GenericStorage<Value> {
+    let value: MyOptional<Value>
+
+    init(value: Value) {
+      self.value = .some(value)
+    }
+
+    func unwrapAndCopy() {
+      if case .some(let value) = value {
+        blackhole(value)
+      }
+    }
+  }
+
+  let test = _GenericStorage(
+    value: Context().doSomething,
+  )
+  // CHECK: test.unwrapAndCopy
+  print("test.unwrapAndCopy")
+  test.unwrapAndCopy()
+  // CHECK: test.unwrapAndCopy
+  print("test.unwrapAndCopy")
+  test.unwrapAndCopy()
+  // CHECK: Context deinit
+}

@@ -187,6 +187,7 @@ void DiagnosticEmitter::emitMissingConsumeInDiscardingContext(
       case StmtKind::Case:
       case StmtKind::Fallthrough:
       case StmtKind::Discard:
+      case StmtKind::Opaque:
         return false;
       };
     }

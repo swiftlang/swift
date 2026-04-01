@@ -1,5 +1,5 @@
-// REQUIRES: OS=macosx || OS=iOS
-// RUN: %target-swift-frontend -emit-irgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-ptrsize-%target-ptrauth
+// REQUIRES: OS=macosx
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx15.0 -emit-irgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-ptrsize-%target-ptrauth
 
 import Builtin
 
@@ -44,6 +44,9 @@ unwind:
   // CHECK-NEXT:    unreachable
 }
 
+// CHECK-32:       declare extern_weak ptr @swift_coroFrameAlloc(i32, i64)
+// CHECK-64:       declare extern_weak ptr @swift_coroFrameAlloc(i64, i64)
+
 // CHECK-32:       define linkonce_odr hidden ptr @__swift_coroFrameAllocStub(i32 %0, i64 %1) #1{{( comdat)?}} {
 // CHECK-64:       define linkonce_odr hidden ptr @__swift_coroFrameAllocStub(i64 %0, i64 %1) #1{{( comdat)?}} {
 // CHECK:       [[T0:%.*]] = icmp ne ptr @swift_coroFrameAlloc, null
@@ -58,9 +61,6 @@ unwind:
 // CHECK-32:         [[T2:%.*]] = call ptr @malloc(i32 %0)
 // CHECK-64:         [[T2:%.*]] = call ptr @malloc(i64 %0)
 // CHECK:         ret ptr [[T2]]
-
-// CHECK-32:       declare extern_weak ptr @swift_coroFrameAlloc(i32, i64)
-// CHECK-64:       declare extern_weak ptr @swift_coroFrameAlloc(i64, i64)
 
 // CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc void @"$sIetA_TC"
 // CHECK-SAME:      (ptr noalias dereferenceable([[BUFFER_SIZE]]), i1)

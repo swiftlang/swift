@@ -23,6 +23,12 @@
 
 // UNSUPPORTED: OS=linux-android, OS=linux-androideabi
 
+// lld on FreeBSD relocates some of the metadata sections resulting in invalid
+// offsets in section headers, breaking the Swift reflection data ELF parser
+// resulting in missing metadata.
+// rdar://159139154
+// XFAIL: OS=freebsd
+
 // CHECK-32: FIELDS:
 // CHECK-32: =======
 // CHECK-32: TypesToReflect.HasCTypes

@@ -282,7 +282,7 @@ public class U {
 }
 
 func == (l: S?, r: S?) -> Bool {
-  if l == nil && r == nil { return true }
+  if l == nil && r == nil { return true } // expected-warning {{function call causes an infinite recursion}}
   guard let l = l, let r = r else { return false }
   return l === r
 }
@@ -352,3 +352,11 @@ func recursionMatchingTypeArgs2<T: P, V: P>(_ t: T.Type, _ v: V.Type) {
   recursionMatchingTypeArgs2(T.self, V.self) // expected-warning {{function call causes an infinite recursion}}
 }
 
+func testNoInfiniteRecursionWithOverloadingOnOptional() {
+  func test(handler: @escaping (Bool) -> Void) {
+  }
+
+  func test(handler: ((Bool) -> Void)?) {
+    test(handler: handler ?? { _ in }) // Ok
+  }
+}

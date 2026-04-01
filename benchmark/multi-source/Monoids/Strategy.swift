@@ -17,13 +17,11 @@ func getExhaustiveOrderMix(_ alphabet: Int, _ extraAlphabet: Int) -> [Order] {
 }
 
 /// Parameters for completion.
-struct Strategy: Sendable, Hashable {
+struct Strategy: Sendable {
   var extra: [Rule] = []
   var factorLength: Int? = nil
   var frequency: Int = 0
   var order: Order = .shortlex
-
-  var limits = RewritingSystem.Limits()
 
   func withOrder(_ order: Order) -> Self {
     var result = self
@@ -35,8 +33,7 @@ struct Strategy: Sendable, Hashable {
 extension Presentation {
   func collectFactors(order: Order, upToLength: Int) -> [Word] {
     let strategy = Strategy()
-    var rws = RewritingSystem(alphabet: alphabet,
-                              limits: strategy.limits)
+    var rws = RewritingSystem(alphabet: alphabet)
 
     do {
       try rws.addRules(rules, order: strategy.order)
@@ -81,33 +78,23 @@ extension RewritingSystem {
 }
 
 struct Solution {
-  /// Total number of generators.
-  let alphabet: Int
-
-  /// Extra generators added by morphocompletion.
   let extra: [Rule]
-
-  /// The cardinality of the presented monoid.
   let cardinality: Int?
-
-  /// A complete presentation.
   let presentation: Presentation
 }
 
 extension RewritingSystem {
   func formSolution(_ strategy: Strategy) -> Solution {
     let p = presentation.sorted(order: strategy.order)
-    let cardinality = p.cardinality(alphabet: alphabet)
-    return Solution(alphabet: alphabet, extra: strategy.extra,
-                    cardinality: cardinality, presentation: p)
+    return Solution(extra: strategy.extra,
+                    cardinality: cardinality,
+                    presentation: p)
   }
 }
 
 extension Presentation {
   func complete(_ strategy: Strategy) throws(RewritingError) -> Solution {
-    let alphabet = 2 + strategy.extra.count
-    var rws = RewritingSystem(alphabet: alphabet,
-                              limits: strategy.limits)
+    var rws = RewritingSystem(alphabet: alphabet + strategy.extra.count)
     try rws.addRules(rules, order: strategy.order)
     try rws.addRules(strategy.extra, order: strategy.order)
 

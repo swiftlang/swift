@@ -171,6 +171,16 @@ template <typename Runtime> struct TargetValueWitnessTable {
     return flags.isBitwiseTakable();
   }
 
+  /// Is this type bitwise-borrowable?
+  bool isBitwiseBorrowable() const {
+    return flags.isBitwiseBorrowable();
+  }
+
+  /// Is this type '@_addressableForDependencies'?
+  bool isAddressableForDependencies() const {
+    return flags.isAddressableForDependencies();
+  }
+
   /// Return the size of this type.  Unlike in C, this has not been
   /// padded up to the alignment; that value is maintained as
   /// 'stride'.

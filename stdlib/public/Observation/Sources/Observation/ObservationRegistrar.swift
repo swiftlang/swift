@@ -35,11 +35,12 @@ public struct ObservationRegistrar: Sendable {
       storage.cancel()
     }
   }
-  
+
   private struct State: @unchecked Sendable {
     private enum ObservationKind {
       case willSetTracking(@Sendable (AnyKeyPath) -> Void)
       case didSetTracking(@Sendable (AnyKeyPath) -> Void)
+      case deinitTracking(@Sendable () -> Void)
     }
     
     private struct Observation {
@@ -68,22 +69,40 @@ public struct ObservationRegistrar: Sendable {
           return nil
         }
       }
+
+      var deinitTracker: (@Sendable () -> Void)? {
+        switch kind {
+        case .deinitTracking(let tracker):
+          return tracker
+        default:
+          return nil
+        }
+      }
     }
     
+    private var used = UInt64(0)
     private var id = 0
     private var observations = [Int : Observation]()
     private var lookups = [AnyKeyPath : Set<Int>]()
+
+    var trackingLists = Set<UnsafeRawPointer>()
     
     internal mutating func generateId() -> Int {
-      defer { id &+= 1 }
-      return id
+      let available = (~used).trailingZeroBitCount
+      if available < 64 {
+        used |= 1 << available
+        return available
+      } else {
+        defer { id &+= 1 }
+        return id &+ 64
+      }
     }
     
     internal mutating func registerTracking(for properties: Set<AnyKeyPath>, willSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       let id = generateId()
       observations[id] = Observation(kind: .willSetTracking(observer), properties: properties)
-      for keyPath in properties {
-        lookups[keyPath, default: []].insert(id)
+      for property in properties {
+        lookups[property, default: []].insert(id)
       }
       return id
     }
@@ -91,16 +110,25 @@ public struct ObservationRegistrar: Sendable {
     internal mutating func registerTracking(for properties: Set<AnyKeyPath>, didSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       let id = generateId()
       observations[id] = Observation(kind: .didSetTracking(observer), properties: properties)
-      for keyPath in properties {
-        lookups[keyPath, default: []].insert(id)
+      for property in properties {
+        lookups[property, default: []].insert(id)
       }
+      return id
+    }
+
+    internal mutating func registerTracking(deinit observer: @Sendable @escaping () -> Void) -> Int {
+      let id = generateId()
+      observations[id] = Observation(kind: .deinitTracking(observer), properties: [])
       return id
     }
     
     internal mutating func cancel(_ id: Int) {
+      if id < 64 {
+        used &= ~(1 << id)
+      }
       if let observation = observations.removeValue(forKey: id) {
-        for keyPath in observation.properties {
-          if let index = lookups.index(forKey: keyPath) {
+        for property in observation.properties {
+          if let index = lookups.index(forKey: property) {
             lookups.values[index].remove(id)
             if lookups.values[index].isEmpty {
               lookups.remove(at: index)
@@ -112,17 +140,14 @@ public struct ObservationRegistrar: Sendable {
 
     internal mutating func deinitialize() -> [@Sendable () -> Void] {
       var trackers = [@Sendable () -> Void]()
-      for (keyPath, ids) in lookups {
-        for id in ids {
-          if let tracker = observations[id]?.willSetTracker {
-             trackers.append({
-               tracker(keyPath)
-             })
-          }
-        }
-      }
+      let values = observations
       observations.removeAll()
       lookups.removeAll()
+      for value in values.values {
+        if let tracker = value.deinitTracker {
+          trackers.append(tracker)
+        }
+      }
       return trackers
     }
     
@@ -163,15 +188,33 @@ public struct ObservationRegistrar: Sendable {
     internal func registerTracking(for properties: Set<AnyKeyPath>, didSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       state.withCriticalRegion { $0.registerTracking(for: properties, didSet: observer) }
     }
+
+    internal func registerTracking(deinit observer: @Sendable @escaping () -> Void) -> Int {
+      state.withCriticalRegion { $0.registerTracking(deinit: observer) }
+    }
     
     internal func cancel(_ id: Int) {
       state.withCriticalRegion { $0.cancel(id) }
     }
 
     internal func deinitialize() {
-      let tracking = state.withCriticalRegion { $0.deinitialize() }
+      let tracking = state.withCriticalRegion { 
+        return $0.deinitialize() 
+      }
       for action in tracking {
         action()
+      }
+    }
+
+    func startTrackingIfNeeded(_ tracking: UnsafeRawPointer) {
+      state.withCriticalRegion { state in
+        _ = state.trackingLists.insert(tracking)
+      }
+    }
+
+    func clearTracking(_ tracking: UnsafeRawPointer) {
+      state.withCriticalRegion { state in
+        state.trackingLists.remove(tracking)
       }
     }
     
@@ -179,7 +222,9 @@ public struct ObservationRegistrar: Sendable {
        _ subject: Subject,
        keyPath: KeyPath<Subject, Member>
     ) {
-      let tracking = state.withCriticalRegion { $0.willSet(keyPath: keyPath) }
+      let tracking = state.withCriticalRegion {
+        return $0.willSet(keyPath: keyPath) 
+      }
       for action in tracking {
         action(keyPath)
       }
@@ -189,7 +234,9 @@ public struct ObservationRegistrar: Sendable {
       _ subject: Subject,
       keyPath: KeyPath<Subject, Member>
     ) {
-      let tracking = state.withCriticalRegion { $0.didSet(keyPath: keyPath) }
+      let tracking = state.withCriticalRegion {
+        return $0.didSet(keyPath: keyPath) 
+      }
       for action in tracking {
         action(keyPath)
       }
@@ -217,7 +264,7 @@ public struct ObservationRegistrar: Sendable {
   ///
   /// You don't need to create an instance of
   /// ``Observation/ObservationRegistrar`` when using the
-  /// ``Observation/Observable()`` macro to indicate observably
+  /// ``Observation/Observable()`` macro to indicate observability
   /// of a type.
   public init() {
   }
@@ -235,6 +282,7 @@ public struct ObservationRegistrar: Sendable {
       .assumingMemoryBound(to: ObservationTracking._AccessList?.self) {
       if trackingPtr.pointee == nil {
         trackingPtr.pointee = ObservationTracking._AccessList()
+        context.startTrackingIfNeeded(trackingPtr)
       }
       trackingPtr.pointee?.addAccess(keyPath: keyPath, context: context)
     }

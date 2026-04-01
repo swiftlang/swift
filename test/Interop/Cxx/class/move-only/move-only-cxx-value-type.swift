@@ -70,4 +70,8 @@ MoveOnlyCxxValueType.test("Test move only field access in derived holder") {
   expectEqual(c.x.x, 5)
 }
 
+MoveOnlyCxxValueType.test("Test move only field in anonymous struct") {
+  let a = FieldInAnonStructNC()
+  let b = a
+}
 runAllTests()

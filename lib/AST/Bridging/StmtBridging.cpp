@@ -96,6 +96,10 @@ BridgedBraceStmt BridgedBraceStmt_createImplicit(BridgedASTContext cContext,
                            /*Implicit=*/true);
 }
 
+bool BridgedBraceStmt_hasAsyncNode(BridgedBraceStmt braceStmt) {
+  return (bool)braceStmt.unbridged()->findAsyncNode();
+}
+
 BridgedBreakStmt BridgedBreakStmt_createParsed(BridgedDeclContext cDeclContext,
                                                SourceLoc loc,
                                                Identifier targetName,
@@ -156,6 +160,11 @@ BridgedFuncDecl BridgedDeferStmt_getTempDecl(BridgedDeferStmt bridged) {
   return bridged.unbridged()->getTempDecl();
 }
 
+void BridgedDeferStmt_makeAsync(BridgedDeferStmt bridged,
+                                BridgedASTContext ctx) {
+  return bridged.unbridged()->makeAsync(ctx.unbridged());
+}
+
 BridgedDiscardStmt BridgedDiscardStmt_createParsed(BridgedASTContext cContext,
                                                    SourceLoc discardLoc,
                                                    BridgedExpr cSubExpr) {
@@ -190,12 +199,12 @@ BridgedForEachStmt BridgedForEachStmt_createParsed(
     BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
     SourceLoc forLoc, SourceLoc tryLoc, SourceLoc awaitLoc, SourceLoc unsafeLoc,
     BridgedPattern cPat, SourceLoc inLoc, BridgedExpr cSequence,
-    SourceLoc whereLoc, BridgedNullableExpr cWhereExpr,
-    BridgedBraceStmt cBody) {
-  return new (cContext.unbridged())
-      ForEachStmt(cLabelInfo.unbridged(), forLoc, tryLoc, awaitLoc, unsafeLoc,
-                  cPat.unbridged(), inLoc, cSequence.unbridged(), whereLoc,
-                  cWhereExpr.unbridged(), cBody.unbridged());
+    SourceLoc whereLoc, BridgedNullableExpr cWhereExpr, BridgedBraceStmt cBody,
+    BridgedDeclContext cDeclContext) {
+  return new (cContext.unbridged()) ForEachStmt(
+      cLabelInfo.unbridged(), forLoc, tryLoc, awaitLoc, unsafeLoc,
+      cPat.unbridged(), inLoc, cSequence.unbridged(), whereLoc,
+      cWhereExpr.unbridged(), cBody.unbridged(), cDeclContext.unbridged());
 }
 
 BridgedGuardStmt BridgedGuardStmt_createParsed(BridgedASTContext cContext,

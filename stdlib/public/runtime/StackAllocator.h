@@ -57,7 +57,15 @@ namespace swift {
 ///
 /// SlabMetadataPtr specifies a fake metadata pointer to place at the beginning
 /// of slab allocations, so analysis tools can identify them.
-template <size_t SlabCapacity, Metadata *SlabMetadataPtr>
+///
+/// SlabAllocatorConfiguration allows customizing behavior. It currently allows
+/// one customization point: bool enableSlabAllocator():
+///   returns false - the stack allocator directly calls malloc/free
+///   returns true - the slab allocator is used
+/// This function MUST return the same value throughout the lifetime the stack
+/// allocator.
+template <size_t SlabCapacity, Metadata *SlabMetadataPtr,
+          typename SlabAllocatorConfiguration>
 class StackAllocator {
 private:
 
@@ -77,6 +85,13 @@ private:
   /// Used for unit testing.
   uint32_t numAllocatedSlabs:31;
 
+  /// The configuration object.
+#if defined(_MSC_VER)
+  [[msvc::no_unique_address]]
+#elif defined(__clang__)
+  [[no_unique_address]]
+#endif
+  SlabAllocatorConfiguration configuration;
 
   /// The minimal alignment of allocated memory.
   static constexpr size_t alignment = MaximumAlignment;
@@ -227,9 +242,10 @@ private:
   };
 
   // Return a slab which is suitable to allocate \p size memory.
+  SWIFT_ALWAYS_INLINE
   Slab *getSlabForAllocation(size_t size) {
     Slab *slab = (lastAllocation ? lastAllocation->slab : firstSlab);
-    if (slab) {
+    if (SWIFT_LIKELY(slab)) {
       // Is there enough space in the current slab?
       if (slab->canAllocate(size))
         return slab;
@@ -249,6 +265,12 @@ private:
         size = std::max(size, alreadyAllocatedCapacity);
       }
     }
+
+    // This is only checked on the path that allocates a new slab, to minimize
+    // overhead when the slab allocator is enabled.
+    if (SWIFT_UNLIKELY(!configuration.enableSlabAllocator()))
+      return nullptr;
+
     size_t capacity = std::max(SlabCapacity,
                                Allocation::includingHeader(size));
     void *slabBuffer = malloc(Slab::includingHeader(capacity));
@@ -281,12 +303,14 @@ public:
   /// Construct a StackAllocator without a pre-allocated first slab.
   StackAllocator()
       : firstSlab(nullptr), firstSlabIsPreallocated(false),
-        numAllocatedSlabs(0) {}
+        numAllocatedSlabs(0), configuration() {}
 
   /// Construct a StackAllocator with a pre-allocated first slab.
   StackAllocator(void *firstSlabBuffer, size_t bufferCapacity) : StackAllocator() {
     // If the pre-allocated buffer can't hold a slab header, ignore it.
     if (bufferCapacity <= Slab::headerSize())
+      return;
+    if (SWIFT_UNLIKELY(!configuration.enableSlabAllocator()))
       return;
     char *start = (char *)llvm::alignAddr(firstSlabBuffer,
                                           llvm::Align(alignment));
@@ -317,6 +341,17 @@ public:
       size += sizeof(uintptr_t);
     size_t alignedSize = llvm::alignTo(size, llvm::Align(alignment));
     Slab *slab = getSlabForAllocation(alignedSize);
+
+    // If getSlabForAllocation returns null, that means that the slab allocator
+    // is disabled, and we should directly call malloc. We get this info
+    // indirectly rather than directly calling enableSlabAllocator() in order
+    // to minimize the overhead in the case where the slab allocator is enabled.
+    // When getSlabForAllocation gets inlined into this code, this ends up
+    // getting folded into its enableSlabAllocator() call, and the fast path
+    // where `slab` is non-null ends up with no extra conditionals at all.
+    if (SWIFT_UNLIKELY(!slab))
+      return malloc(size);
+
     Allocation *allocation = slab->allocate(alignedSize, lastAllocation);
     lastAllocation = allocation;
     assert(llvm::isAddrAligned(llvm::Align(alignment),
@@ -326,7 +361,10 @@ public:
 
   /// Deallocate memory \p ptr.
   void dealloc(void *ptr) {
-    if (!lastAllocation || lastAllocation->getAllocatedMemory() != ptr) {
+    if (SWIFT_UNLIKELY(!lastAllocation ||
+                       lastAllocation->getAllocatedMemory() != ptr)) {
+      if (!configuration.enableSlabAllocator())
+        return free(ptr);
       SWIFT_FATAL_ERROR(0, "freed pointer was not the last allocation");
     }
 

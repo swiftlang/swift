@@ -634,7 +634,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
     if (rhs.size() == 1 && rhs[0].getKind() == Symbol::Kind::Shape) {
       // We can have a rule like T.[shape] => [shape].
-      ASSERT_RULE(lhs.back().getKind() == Symbol::Kind::Shape);
+      ASSERT_RULE(lhs.hasShape());
     } else {
       // Otherwise, LHS and RHS must have the same domain.
       auto lhsDomain = lhs.getRootProtocol();

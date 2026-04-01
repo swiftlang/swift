@@ -84,10 +84,10 @@ extension ASTGenVisitor {
       ).asTypeRepr
     }
 
-    let id = self.generateIdentifier(node.name)
+    let nameRef = self.generateDeclNameRef(moduleSelector: node.moduleSelector, baseName: node.name)
 
     guard let generics = node.genericArgumentClause else {
-      return BridgedUnqualifiedIdentTypeRepr.createParsed(ctx, loc: loc, name: id).asTypeRepr
+      return BridgedUnqualifiedIdentTypeRepr.createParsed(ctx, name: nameRef.name, loc: nameRef.loc).asTypeRepr
     }
 
     let genericArguments = generics.arguments.lazy.map {
@@ -96,8 +96,8 @@ extension ASTGenVisitor {
 
     return BridgedUnqualifiedIdentTypeRepr.createParsed(
       self.ctx,
-      name: id,
-      nameLoc: loc,
+      name: nameRef.name,
+      nameLoc: nameRef.loc,
       genericArgs: genericArguments.bridgedArray(in: self),
       leftAngleLoc: self.generateSourceLoc(generics.leftAngle),
       rightAngleLoc: self.generateSourceLoc(generics.rightAngle)
@@ -117,7 +117,7 @@ extension ASTGenVisitor {
   }
 
   func generate(memberType node: MemberTypeSyntax) -> BridgedDeclRefTypeRepr {
-    let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
+    let nameRef = self.generateDeclNameRef(moduleSelector: node.moduleSelector, baseName: node.name)
 
     let genericArguments: BridgedArrayRef
     let angleRange: SourceRange
@@ -135,8 +135,8 @@ extension ASTGenVisitor {
     return BridgedDeclRefTypeRepr.createParsed(
       self.ctx,
       base: self.generate(type: node.baseType),
-      name: name,
-      nameLoc: nameLoc,
+      name: nameRef.name,
+      nameLoc: nameRef.loc,
       genericArguments: genericArguments,
       angleRange: angleRange
     )
@@ -318,8 +318,12 @@ extension ASTGenVisitor {
     // warning: using 'class' keyword to define a class-constrained protocol is deprecated; use 'AnyObject' instead
     return .createParsed(
       self.ctx,
-      loc: self.generateSourceLoc(node.classKeyword),
-      name: self.ctx.getIdentifier("AnyObject")
+      name: BridgedDeclNameRef.createParsed(
+        self.ctx,
+        moduleSelector: nil,
+        baseName: .init(self.ctx.getIdentifier("AnyObject"))
+      ),
+      loc: BridgedDeclNameLoc.createParsed(self.generateSourceLoc(node.classKeyword))
     )
   }
 
@@ -528,11 +532,11 @@ extension ASTGenVisitor {
         // 'Foo.bar(_:baz:)'
         break
       }
-      let name = self.generateIdentifierAndSourceLoc(node.baseName)
+      let nameRef = self.generateDeclNameRef(declReferenceExpr: node)
       return BridgedUnqualifiedIdentTypeRepr .createParsed(
         self.ctx,
-        name: name.identifier,
-        nameLoc: name.sourceLoc,
+        name: nameRef.name,
+        nameLoc: nameRef.loc,
         genericArgs: genericArgs.arguments,
         leftAngleLoc: genericArgs.range.start,
         rightAngleLoc: genericArgs.range.end
@@ -551,12 +555,12 @@ extension ASTGenVisitor {
         // Function name. E.g. 'Foo.bar(_:baz:)'
         break
       }
-      let name = self.generateIdentifierAndSourceLoc(node.declName.baseName)
+      let nameRef = self.generateDeclNameRef(declReferenceExpr: node.declName)
       return BridgedDeclRefTypeRepr.createParsed(
         self.ctx,
         base: base,
-        name: name.identifier,
-        nameLoc: name.sourceLoc,
+        name: nameRef.name,
+        nameLoc: nameRef.loc,
         genericArguments: genericArgs.arguments,
         angleRange: genericArgs.range
       ).asTypeRepr

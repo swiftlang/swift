@@ -25,7 +25,6 @@
 namespace swift {
 class ASTContext;
 class AvailabilityDomain;
-class BackDeployedAttr;
 class Decl;
 class SemanticAvailableAttr;
 
@@ -49,37 +48,8 @@ public:
   static std::optional<AvailabilityRange>
   annotatedAvailableRange(const Decl *D);
 
-  static AvailabilityRange
-  annotatedAvailableRangeForAttr(const Decl *D, const AbstractSpecializeAttr *attr,
-                                 ASTContext &ctx);
-
-  /// For the attribute's introduction version, update the platform and version
-  /// values to the re-mapped platform's, if using a fallback platform.
-  /// Returns `true` if a remap occured.
-  static bool updateIntroducedAvailabilityDomainForFallback(
-      const SemanticAvailableAttr &attr, const ASTContext &ctx,
-      AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
-
-  /// For the attribute's deprecation version, update the platform and version
-  /// values to the re-mapped platform's, if using a fallback platform.
-  /// Returns `true` if a remap occured.
-  static bool updateDeprecatedAvailabilityDomainForFallback(
-      const SemanticAvailableAttr &attr, const ASTContext &ctx,
-      AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
-
-  /// For the attribute's obsoletion version, update the platform and version
-  /// values to the re-mapped platform's, if using a fallback platform.
-  /// Returns `true` if a remap occured.
-  static bool updateObsoletedAvailabilityDomainForFallback(
-      const SemanticAvailableAttr &attr, const ASTContext &ctx,
-      AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
-
-  /// For the attribute's before version, update the platform and version
-  /// values to the re-mapped platform's, if using a fallback platform.
-  /// Returns `true` if a remap occured.
-  static bool updateBeforeAvailabilityDomainForFallback(
-      const BackDeployedAttr *attr, const ASTContext &ctx,
-      AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
+  static AvailabilityRange annotatedAvailableRangeForAttr(
+      const Decl *D, const AbstractSpecializeAttr *attr, ASTContext &ctx);
 };
 
 } // end namespace swift

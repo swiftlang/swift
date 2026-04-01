@@ -1,0 +1,86 @@
+// RUN: %target-sil-opt %s -test-runner -o /dev/null | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: run SILPrinter on function: testfunc
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    predecessors: []
+// CHECK-NEXT:    successors:   [bb1, bb2]
+// CHECK-NEXT:    arguments:
+// CHECK-NEXT:      arg: %0 = argument of bb0 : $*Int
+// CHECK-NEXT:        user:   %2 = begin_access [read] [dynamic] %0 : $*Int
+// CHECK-NEXT:      arg: %1 = argument of bb0 : $(String, String)
+// CHECK-NEXT:        user:   (%4, %5) = destructure_tuple %1 : $(String, String)
+// CHECK-NEXT:    instructions:
+// CHECK-NEXT:      %2 = begin_access [read] [dynamic] %0 : $*Int
+// CHECK-NEXT:        op: %0 = argument of bb0 : $*Int
+// CHECK-NEXT:        user of result 0:   end_access %2 : $*Int
+// CHECK-NEXT:      %3 = alloc_stack $String
+// CHECK-NEXT:        user of result 0:   dealloc_stack %3 : $*String
+// CHECK-NEXT:        user of result 0:   destroy_addr %3 : $*String
+// CHECK-NEXT:        user of result 0:   %8 = load [copy] %3 : $*String
+// CHECK-NEXT:        user of result 0:   store %4 to [init] %3 : $*String
+// CHECK-NEXT:      (%4, %5) = destructure_tuple %1 : $(String, String)
+// CHECK-NEXT:        op: %1 = argument of bb0 : $(String, String)
+// CHECK-NEXT:        user of result 0:   store %4 to [init] %3 : $*String
+// CHECK-NEXT:        user of result 1:   destroy_value %5 : $String
+// CHECK-NEXT:      store %4 to [init] %3 : $*String
+// CHECK-NEXT:        op: (**%4**, %5) = destructure_tuple %1 : $(String, String)
+// CHECK-NEXT:        op:   %3 = alloc_stack $String
+// CHECK-NEXT:      end_access %2 : $*Int
+// CHECK-NEXT:        op:   %2 = begin_access [read] [dynamic] %0 : $*Int
+// CHECK-NEXT:      %8 = load [copy] %3 : $*String
+// CHECK-NEXT:        op:   %3 = alloc_stack $String
+// CHECK-NEXT:        user of result 0:   return %8 : $String
+// CHECK-NEXT:      destroy_addr %3 : $*String
+// CHECK-NEXT:        op:   %3 = alloc_stack $String
+// CHECK-NEXT:      dealloc_stack %3 : $*String
+// CHECK-NEXT:        op:   %3 = alloc_stack $String
+// CHECK-NEXT:      destroy_value %5 : $String
+// CHECK-NEXT:        op: (%4, **%5**) = destructure_tuple %1 : $(String, String)
+// CHECK-NEXT:      cond_br undef, bb1, bb2
+// CHECK-NEXT:        op: undef<$Builtin.Int1>
+// CHECK-NEXT:  bb1:
+// CHECK-NEXT:    predecessors: [bb0]
+// CHECK-NEXT:    successors:   [bb3]
+// CHECK-NEXT:    arguments:
+// CHECK-NEXT:    instructions:
+// CHECK-NEXT:      br bb3
+// CHECK-NEXT:  bb2:
+// CHECK-NEXT:    predecessors: [bb0]
+// CHECK-NEXT:    successors:   [bb3]
+// CHECK-NEXT:    arguments:
+// CHECK-NEXT:    instructions:
+// CHECK-NEXT:      br bb3
+// CHECK-NEXT:  bb3:
+// CHECK-NEXT:    predecessors: [bb2, bb1]
+// CHECK-NEXT:    successors:   []
+// CHECK-NEXT:    arguments:
+// CHECK-NEXT:    instructions:
+// CHECK-NEXT:      return %8 : $String
+// CHECK-NEXT:        op:   %8 = load [copy] %3 : $*String
+
+sil [ossa] @testfunc : $@convention(thin) (@in_guaranteed Int, @owned (String, String)) -> @owned String {
+bb0(%0 : $*Int, %1 : @owned $(String, String)):
+  specify_test "basic_block"
+  %2 = begin_access [read] [dynamic] %0 : $*Int
+  %4 = alloc_stack $String
+  (%5, %6) = destructure_tuple %1 : $(String, String)
+  store %5 to [init] %4 : $*String
+  end_access %2 : $*Int
+  %7 = load [copy] %4 : $*String
+  destroy_addr %4 : $*String
+  dealloc_stack %4 : $*String
+  destroy_value %6 : $String
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  br bb3
+bb3:
+  return %7 : $String
+}
+

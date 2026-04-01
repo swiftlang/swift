@@ -414,7 +414,6 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
 
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
   NO_REFERENCE(DestructureTuple);
-  NO_REFERENCE(UnresolvedTypeConversion);
   PASS_THROUGH_REFERENCE(ABISafeConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(FunctionConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CovariantFunctionConversion, getSubExpr);
@@ -783,7 +782,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::Load:
   case ExprKind::ABISafeConversion:
   case ExprKind::DestructureTuple:
-  case ExprKind::UnresolvedTypeConversion:
   case ExprKind::FunctionConversion:
   case ExprKind::CovariantFunctionConversion:
   case ExprKind::CovariantReturnConversion:
@@ -993,7 +991,6 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Binary:
   case ExprKind::Load:
   case ExprKind::DestructureTuple:
-  case ExprKind::UnresolvedTypeConversion:
   case ExprKind::ABISafeConversion:
   case ExprKind::FunctionConversion:
   case ExprKind::CovariantFunctionConversion:
@@ -1373,12 +1370,15 @@ CaptureListEntry CaptureListEntry::createParsed(
     SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
     SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
 
+  bool forceVar = ownershipKind == ReferenceOwnership::Weak &&
+                  !Ctx.LangOpts.hasFeature(Feature::ImmutableWeakCaptures);
+  auto introducer = forceVar ? VarDecl::Introducer::Var : VarDecl::Introducer::Let;
   auto *VD =
-      new (Ctx) VarDecl(/*isStatic==*/false, VarDecl::Introducer::Let, nameLoc, name, DC);
+      new (Ctx) VarDecl(/*isStatic==*/false, introducer, nameLoc, name, DC);
 
   if (ownershipKind != ReferenceOwnership::Strong)
-    VD->getAttrs().add(
-        new (Ctx) ReferenceOwnershipAttr(ownershipRange, ownershipKind));
+    VD->addAttribute(new (Ctx)
+                         ReferenceOwnershipAttr(ownershipRange, ownershipKind));
 
   auto *pattern = NamedPattern::createImplicit(Ctx, VD);
 
@@ -2204,17 +2204,6 @@ void ClosureExpr::setExplicitResultType(Type ty) {
       ->setType(MetatypeType::get(ty));
 }
 
-MacroDecl *
-ClosureExpr::getResolvedMacro(CustomAttr *customAttr) {
-  auto &ctx = getASTContext();
-  auto declRef = evaluateOrDefault(
-      ctx.evaluator,
-      ResolveMacroRequest{customAttr, this},
-      ConcreteDeclRef());
-
-  return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
-}
-
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
 
 void AutoClosureExpr::setBody(Expr *E) {
@@ -2224,7 +2213,7 @@ void AutoClosureExpr::setBody(Expr *E) {
 }
 
 Expr *AutoClosureExpr::getSingleExpressionBody() const {
-  return cast<ReturnStmt>(Body->getLastElement().get<Stmt *>())->getResult();
+  return cast<ReturnStmt>(cast<Stmt *>(Body->getLastElement()))->getResult();
 }
 
 Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
@@ -2638,7 +2627,7 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
       continue;
 
     auto &result = BS->getElements().back();
-    assert(result.is<Expr *>() || result.is<Stmt *>());
+    assert(isa<Expr *>(result) || isa<Stmt *>(result));
 
     // Wrap a statement in a SingleValueStmtExpr.
     if (auto *S = result.dyn_cast<Stmt *>()) {
@@ -2711,7 +2700,7 @@ bool SingleValueStmtExpr::isLastElementImplicitResult(
   auto elt = BS->getLastElement();
 
   // Expressions are always valid.
-  if (elt.is<Expr *>())
+  if (isa<Expr *>(elt))
     return true;
 
   if (auto *S = elt.dyn_cast<Stmt *>()) {
@@ -2763,6 +2752,8 @@ SingleValueStmtExpr::Kind SingleValueStmtExpr::getStmtKind() const {
     return Kind::Do;
   case StmtKind::DoCatch:
     return Kind::DoCatch;
+  case StmtKind::ForEach:
+    return Kind::For;
   default:
     llvm_unreachable("Unhandled kind!");
   }
@@ -2781,6 +2772,9 @@ SingleValueStmtExpr::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
     return scratch;
   case Kind::DoCatch:
     return cast<DoCatchStmt>(getStmt())->getBranches(scratch);
+  case Kind::For:
+    scratch.push_back(cast<ForEachStmt>(getStmt())->getBody());
+    return scratch;
   }
   llvm_unreachable("Unhandled case in switch!");
 }
@@ -2907,7 +2901,7 @@ TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
     assert(varRef);
     Var = varRef;
   } else {
-    auto joinType = Type(result.get<TypeBase *>());
+    auto joinType = Type(cast<TypeBase *>(result));
     assert(joinType && "expected non-null type");
     setType(joinType);
   }
@@ -2915,7 +2909,7 @@ TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
   Bits.TypeJoinExpr.NumElements = elements.size();
   // Copy elements.
   std::uninitialized_copy(elements.begin(), elements.end(),
-                          getTrailingObjects<Expr *>());
+                          getTrailingObjects());
 }
 
 TypeJoinExpr *TypeJoinExpr::createImpl(
@@ -3093,7 +3087,7 @@ Type ThrownErrorDestination::getThrownErrorType() const {
   if (auto type = storage.dyn_cast<TypeBase *>())
     return Type(type);
 
-  auto conversion = storage.get<Conversion *>();
+  auto conversion = cast<Conversion *>(storage);
   return conversion->thrownError->getType();
 }
 
@@ -3104,7 +3098,7 @@ Type ThrownErrorDestination::getContextErrorType() const {
   if (auto type = storage.dyn_cast<TypeBase *>())
     return Type(type);
 
-  auto conversion = storage.get<Conversion *>();
+  auto conversion = cast<Conversion *>(storage);
   return conversion->conversion->getType();
 }
 

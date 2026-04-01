@@ -70,3 +70,16 @@ extension Optional.TangentVector: CustomReflectable {
     return value.customMirror
   }
 }
+
+@derivative(of: ??)
+@_transparent
+@_alwaysEmitIntoClient
+func _vjpNilCoalescing<T: Differentiable>(optional: T?, defaultValue: @autoclosure () throws -> T)
+ rethrows -> (value: T, pullback: (T.TangentVector) -> Optional<T>.TangentVector) {
+  let hasValue = optional != nil
+  let value = try optional ?? defaultValue()
+  func pullback(_ v: T.TangentVector) -> Optional<T>.TangentVector {
+    return hasValue ? .init(v) : .zero
+  }
+  return (value, pullback)
+}

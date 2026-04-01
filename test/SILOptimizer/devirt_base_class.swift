@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-spec-devirt -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
 public class Base1 { @inline(never) func f() -> Int { return 0 } }
 
@@ -24,11 +24,8 @@ private func foo(_ a: A) -> Int {
 //
 
 // CHECK-LABEL: sil private [noinline] @{{.*}}foo
-// CHECK-NOT: class_method
-// CHECK: checked_cast_br
-// CHECK: function_ref
-// CHECK: checked_cast_br
-// CHECK: function_ref
+// This used to check speculative-devirtualization, which we don't have anymore.
+// CHECK:         class_method
   return a.f()
 }
 

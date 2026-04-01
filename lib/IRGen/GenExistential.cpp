@@ -130,6 +130,7 @@ namespace {
   class ExistentialTypeInfoBase : public Base,
       private llvm::TrailingObjects<Derived, const ProtocolDecl *> {
     friend class llvm::TrailingObjects<Derived, const ProtocolDecl *>;
+    using Tail = llvm::TrailingObjects<Derived, const ProtocolDecl *>;
 
     /// The number of non-trivial protocols for this existential.
     unsigned NumStoredProtocols;
@@ -148,7 +149,7 @@ namespace {
         : Base(std::forward<As>(args)...),
           NumStoredProtocols(protocols.size()) {
       std::uninitialized_copy(protocols.begin(), protocols.end(),
-          this->template getTrailingObjects<const ProtocolDecl *>());
+                              this->getTrailingObjects());
     }
 
   public:
@@ -157,10 +158,17 @@ namespace {
     create(ArrayRef<const ProtocolDecl *> protocols, As &&...args)
     {
       void *buffer = operator new(
-          llvm::TrailingObjects<Derived, const ProtocolDecl *>::
-              template totalSizeToAlloc<const ProtocolDecl *>(
-                  protocols.size()));
+          Tail::template totalSizeToAlloc<const ProtocolDecl *>(
+              protocols.size()));
       return new (buffer) Derived(protocols, std::forward<As>(args)...);
+    }
+
+    void operator delete(void *ptr) {
+      const auto *pThis = static_cast<ExistentialTypeInfoBase *>(ptr);
+      const size_t count = pThis->NumStoredProtocols;
+      const size_t size =
+          Tail::template totalSizeToAlloc<const ProtocolDecl *>(count);
+      ::operator delete(ptr, size);
     }
 
     /// Returns the number of protocol witness tables directly carried
@@ -172,8 +180,7 @@ namespace {
     /// type are not know to implement any protocols, although we do
     /// still know how to manipulate them.
     ArrayRef<const ProtocolDecl *> getStoredProtocols() const {
-      return {this->template getTrailingObjects<const ProtocolDecl *>(),
-              NumStoredProtocols};
+      return this->getTrailingObjects(NumStoredProtocols);
     }
 
     /// Given the address of an existential object, find the witness
@@ -2307,7 +2314,21 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
     if (fixedTI->getFixedPacking(IGF.IGM) == FixedPacking::OffsetZero) {
       return valueTI.getAddressForPointer(IGF.Builder.CreateBitCast(
           existentialBuffer.getAddress(), IGF.IGM.PtrTy));
+    } else if (IGF.IGM.isEmbeddedWithExistentials()) {
+      llvm::Value *box, *address;
+      auto *metadata = existLayout.loadMetadataRef(IGF, existentialContainer);
+      IGF.emitAllocBoxCall(metadata, box, address);
+      llvm::Value *addressInBox =
+        IGF.Builder.CreateBitCast(address, IGF.IGM.OpaquePtrTy);
+      IGF.Builder.CreateStore(
+              box, Address(IGF.Builder.CreateBitCast(
+                               existentialBuffer.getAddress(), IGF.IGM.PtrTy),
+                           IGF.IGM.RefCountedPtrTy,
+                           existLayout.getAlignment(IGF.IGM)));
+
+      return valueTI.getAddressForPointer(addressInBox);
     }
+
     // Otherwise, allocate a box with enough storage.
     Address addr = emitAllocateExistentialBoxInBuffer(
         IGF, valueType, existentialBuffer, genericEnv, "exist.box.addr",
@@ -2687,7 +2708,10 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
                 Address(srcReferenceAddr, IGM.RefCountedPtrTy,
                         srcBuffer.getAlignment()));
             IGF.emitNativeStrongRetain(srcReference, IGF.getDefaultAtomicity());
-            IGF.emitNativeStrongRelease(destReference,
+            if (IGF.IGM.isEmbeddedWithExistentials()) {
+              IGF.emitReleaseBox(destReference);
+            } else
+              IGF.emitNativeStrongRelease(destReference,
                                         IGF.getDefaultAtomicity());
             IGF.Builder.CreateStore(
                 srcReference, Address(destReferenceAddr, IGM.RefCountedPtrTy,
@@ -2814,7 +2838,10 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
             {
               ConditionalDominanceScope domScope(IGF);
               // swift_release(tmpRef)
-              IGF.emitNativeStrongRelease(destReference,
+              if (IGF.IGM.isEmbeddedWithExistentials()) {
+                IGF.emitReleaseBox(destReference);
+              } else
+                IGF.emitNativeStrongRelease(destReference,
                                           IGF.getDefaultAtomicity());
               Builder.CreateBr(doneBB);
             }
@@ -2876,7 +2903,10 @@ static llvm::Function *getDestroyBoxedOpaqueExistentialBufferFunction(
               Builder.CreateBitCast(buffer.getAddress(), IGM.PtrTy);
           auto *reference = Builder.CreateLoad(Address(
               referenceAddr, IGM.RefCountedPtrTy, buffer.getAlignment()));
-          IGF.emitNativeStrongRelease(reference, IGF.getDefaultAtomicity());
+          if (IGF.IGM.isEmbeddedWithExistentials()) {
+            IGF.emitReleaseBox(reference);
+          } else
+            IGF.emitNativeStrongRelease(reference, IGF.getDefaultAtomicity());
 
           Builder.CreateRetVoid();
         }

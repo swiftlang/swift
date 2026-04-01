@@ -68,12 +68,11 @@ class C1 {
     func run(a: Int) {}
 }
 
-class C2: C1, P {
-    // expected-note@-1 2{{through reference here}}
+class C2: C1, P { // expected-note@:7 {{through reference here}}
     override func run(a: A) {}
-    // expected-error@-1 {{circular reference}}
-    // expected-note@-2 {{while resolving type 'A'}}
-    // expected-note@-3 2{{through reference here}}
+    // expected-error@-1:19 {{circular reference}}
+    // expected-note@-2:26 {{while resolving type 'A'}}
+    // expected-note@-3:23 {{through reference here}}
 }
 
 // Another crash to the above
@@ -84,12 +83,12 @@ open class G1<A> {
 class C3: G1<A>, P {
     // expected-error@-1 {{type 'C3' does not conform to protocol 'P'}}
     // expected-error@-2 {{cannot find type 'A' in scope}}
-    // expected-note@-3 2{{through reference here}}
+    // expected-note@-3:7 {{through reference here}}
     // expected-note@-4 {{add stubs for conformance}}
     override func run(a: A) {}
-    // expected-error@-1 {{circular reference}}
-    // expected-note@-2 2 {{through reference here}}
-    // expected-note@-3 {{while resolving type 'A'}}
+    // expected-error@-1:19 {{circular reference}}
+    // expected-note@-2:26 {{while resolving type 'A'}}
+    // expected-note@-3:23 {{through reference here}}
 }
 
 // Another case that triggers circular override checking.
@@ -99,21 +98,21 @@ protocol P1 {
 }
 
 class C4 {
-  required init(x: Int) {}
+  required init(x: Int) {} // expected-note {{'required' initializer is declared in superclass here}}
 }
 
-class D4 : C4, P1 { // expected-note 4 {{through reference here}}
-  required init(x: X) { // expected-error {{circular reference}}
-    // expected-note@-1 {{while resolving type 'X'}}
-    // expected-note@-2 2{{through reference here}}
+class D4 : C4, P1 { // expected-note@:7 {{through reference here}}
+  required init(x: X) { // expected-error@:12 {{circular reference}}
+    // expected-note@-1:20 {{while resolving type 'X'}}
+    // expected-note@-2:17 {{through reference here}}
     super.init(x: x)
   }
-}
+} // expected-error {{'required' initializer 'init(x:)' must be provided by subclass of 'C4'}}
 
 // https://github.com/apple/swift/issues/54662
 // N.B. This used to compile in 5.1.
 protocol P_54662 { }
 class C_54662 { // expected-note {{through reference here}}
-    typealias Nest = P_54662 // expected-error {{circular reference}} expected-note {{through reference here}}
+    typealias Nest = P_54662 // expected-error {{circular reference}}
 }
 extension C_54662: C_54662.Nest { }

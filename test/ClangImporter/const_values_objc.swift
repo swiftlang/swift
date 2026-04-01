@@ -31,6 +31,9 @@ static const MyFloatType MyFloatTypeValue1 = 10;
 static const MyFloatType MyFloatTypeValue2 = 20;
 static const MyFloatType MyFloatTypeValue3 = 30;
 
+static const BOOL MyBoolConstantValue1 = YES;
+static const BOOL MyBoolConstantValue2 = NO;
+
 //--- main.swift
 func foo() {
   print(MyClass.value)
@@ -38,6 +41,8 @@ func foo() {
   print(MyFloatType.value1)
   print(MyFloatType.value2)
   print(MyFloatType.value3)
+  print(MyBoolConstantValue1)
+  print(MyBoolConstantValue2)
 }
 
 // CHECK:      // static MyClass.value.getter
@@ -57,3 +62,8 @@ func foo() {
 // CHECK-NOT: // static MyFloatType.value1.getter
 // CHECK-NOT: // static MyFloatType.value2.getter
 // CHECK-NOT: // static MyFloatType.value3.getter
+
+// ObjCBools are not imported:
+
+// CHECK-NOT: // MyBoolConstantValue1.getter
+// CHECK-NOT: // MyBoolConstantValue2.getter

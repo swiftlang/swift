@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 956; // nonisolated(nonsending) isolation was moved
+const uint16_t SWIFTMODULE_VERSION_MINOR = 989; // cmo immutable ast fix
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -194,7 +194,8 @@ using FileHashField = BCVBR<16>;
 // the module version.
 enum class OpaqueReadOwnership : uint8_t {
   Owned,
-  Borrowed,
+  YieldingBorrow,
+  Borrow,
   OwnedOrBorrowed,
 };
 using OpaqueReadOwnershipField = BCFixed<2>;
@@ -207,8 +208,12 @@ enum class ReadImplKind : uint8_t {
   Inherited,
   Address,
   Read,
-  Read2,
+  YieldingBorrow,
+  Borrow,
+  LastReadImplKind = Borrow,
 };
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  ReadImplKind::LastReadImplKind)) <= 3);
 using ReadImplKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
@@ -221,9 +226,13 @@ enum class WriteImplKind : uint8_t {
   Set,
   MutableAddress,
   Modify,
-  Modify2,
+  YieldingMutate,
+  Mutate,
+  LastWriteImplKind = Mutate,
 };
-using WriteImplKindField = BCFixed<3>;
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  WriteImplKind::LastWriteImplKind)) <= 4);
+using WriteImplKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -233,11 +242,15 @@ enum class ReadWriteImplKind : uint8_t {
   MutableAddress,
   MaterializeToTemporary,
   Modify,
-  Modify2,
+  YieldingMutate,
   StoredWithDidSet,
   InheritedWithDidSet,
+  Mutate,
+  LastReadWriteImplKind = Mutate,
 };
-using ReadWriteImplKindField = BCFixed<3>;
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  ReadWriteImplKind::LastReadWriteImplKind)) <= 4);
+using ReadWriteImplKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -339,11 +352,13 @@ enum AccessorKind : uint8_t {
   Address,
   MutableAddress,
   Read,
-  Read2,
+  YieldingBorrow,
   Modify,
-  Modify2,
+  YieldingMutate,
   Init,
   DistributedGet,
+  Borrow,
+  Mutate,
 };
 using AccessorKindField = BCFixed<4>;
 
@@ -428,8 +443,11 @@ enum class ResultConvention : uint8_t {
   UnownedInnerPointer,
   Autoreleased,
   Pack,
+  GuaranteedAddress,
+  Guaranteed,
+  Inout
 };
-using ResultConventionField = BCFixed<3>;
+using ResultConventionField = BCFixed<4>;
 
 /// These IDs must \em not be renumbered or reordered without incrementing the
 /// module version.
@@ -707,7 +725,7 @@ enum class FunctionTypeIsolation : uint8_t {
   NonIsolated,
   Parameter,
   Erased,
-  NonIsolatedCaller,
+  NonIsolatedNonsending,
   // NOTE: All of the new kinds should be added above.
   GlobalActorOffset, // Add this to the global actor type ID
 };
@@ -764,11 +782,12 @@ using GenericParamKindField = BCFixed<2>;
 // the module version.
 enum class AvailabilityDomainKind : uint8_t {
   Universal = 0,
-  SwiftLanguage,
+  SwiftLanguageMode,
   PackageDescription,
   Embedded,
   Platform,
   Custom,
+  StandaloneSwiftRuntime,
 };
 using AvailabilityDomainKindField = BCFixed<3>;
 
@@ -898,7 +917,6 @@ namespace control_block {
     TARGET,
     SDK_NAME,
     REVISION,
-    IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
     CHANNEL,
     SDK_VERSION,
@@ -935,11 +953,6 @@ namespace control_block {
   using RevisionLayout = BCRecordLayout<
     REVISION,
     BCBlob
-  >;
-
-  using IsOSSALayout = BCRecordLayout<
-    IS_OSSA,
-    BCFixed<1>
   >;
 
   using AllowableClientLayout = BCRecordLayout<
@@ -987,7 +1000,10 @@ namespace options_block {
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
-    STRICT_MEMORY_SAFETY
+    STRICT_MEMORY_SAFETY,
+    DEFERRED_CODE_GEN,
+    OSLOG_STRING_SECTION_NAME,
+    AGGRESSIVE_CMO,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1088,8 +1104,21 @@ namespace options_block {
     STRICT_MEMORY_SAFETY
   >;
 
+  using DeferredCodeGenLayout = BCRecordLayout<
+    DEFERRED_CODE_GEN
+  >;
+
+  using AggressiveCMOEnabledLayout = BCRecordLayout<
+    AGGRESSIVE_CMO
+  >;
+
   using PublicModuleNameLayout = BCRecordLayout<
     PUBLIC_MODULE_NAME,
+    BCBlob
+  >;
+
+  using OSLogStringSectionNameLayout = BCRecordLayout<
+    OSLOG_STRING_SECTION_NAME,
     BCBlob
   >;
 
@@ -1103,90 +1132,100 @@ namespace options_block {
 ///
 /// \sa INPUT_BLOCK_ID
 namespace input_block {
-  enum {
-    IMPORTED_MODULE = 1,
-    LINK_LIBRARY,
-    IMPORTED_HEADER,
-    IMPORTED_HEADER_CONTENTS,
-    MODULE_FLAGS, // [unused]
-    SEARCH_PATH,
-    FILE_DEPENDENCY,
-    DEPENDENCY_DIRECTORY,
-    MODULE_INTERFACE_PATH,
-    IMPORTED_MODULE_SPIS,
-    EXTERNAL_MACRO,
-  };
+enum {
+  IMPORTED_MODULE = 1,
+  LINK_LIBRARY,
+  IMPORTED_HEADER,
+  IMPORTED_HEADER_CONTENTS,
+  MODULE_FLAGS, // [unused]
+  SEARCH_PATH,
+  FILE_DEPENDENCY,
+  DEPENDENCY_DIRECTORY,
+  MODULE_INTERFACE_PATH,
+  IMPORTED_MODULE_SPIS,
+  EXPLICIT_MODULE_MAP_ENTRY,
+  EXTERNAL_MACRO,
+};
 
-  using ImportedModuleLayout = BCRecordLayout<
-    IMPORTED_MODULE,
-    ImportControlField, // import kind
-    BCFixed<1>,         // scoped?
-    BCFixed<1>,         // has spis?
-    BCBlob // module name, with submodule path pieces separated by \0s.
-           // If the 'scoped' flag is set, the final path piece is an access
-           // path within the module.
-  >;
+using ImportedModuleLayout =
+    BCRecordLayout<IMPORTED_MODULE,
+                   ImportControlField, // import kind
+                   BCFixed<1>,         // scoped?
+                   BCFixed<1>,         // has spis?
+                   BCBlob //  module name, with submodule path pieces separated
+                          //  by \0s.  If the
+                          // 'scoped' flag is set, the final path piece is an
+                          // access path within the module.
+                   >;
 
-  using ImportedModuleLayoutSPI = BCRecordLayout<
-    IMPORTED_MODULE_SPIS,
-    BCBlob // SPI names, separated by \0s
-  >;
+using ImportedModuleSPILayout =
+    BCRecordLayout<IMPORTED_MODULE_SPIS,
+                   BCBlob // SPI names, separated by \0s
+                   >;
 
-  using ExternalMacroLayout = BCRecordLayout<
-    EXTERNAL_MACRO,
-    ImportControlField, // import kind
-    BCBlob // ModuleName, Library Path, Executable Path, separated by \0s
-  >;
+using ExplicitModuleMapEntryLayout =
+    BCRecordLayout<EXPLICIT_MODULE_MAP_ENTRY,
+                   BCFixed<1>, // framework
+                   BCFixed<1>, // system
+                   BCFixed<1>, // bridgedheader dependency
+                   BCVBR<16>,  // module directory
+                   BCVBR<16>,  // module doc directory
+                   BCVBR<16>,  // module source info directory
+                   BCVBR<16>,  // clang module map directory
+                   BCBlob // \0 separated: moduleName, modulePath, moduleAlias
+                          // moduleDocPath, moduleSourceInfoPath,
+                          // moduleCacheKey, clangModuleMapPath,
+                          // headerDependencyPaths
+                   >;
 
-  using LinkLibraryLayout = BCRecordLayout<
-    LINK_LIBRARY,
-    LibraryKindField, // kind
-    BCFixed<1>, // static
-    BCFixed<1>, // forced?
-    BCBlob // library name
-  >;
+using ExternalMacroLayout =
+    BCRecordLayout<EXTERNAL_MACRO,
+                   ImportControlField, // import kind
+                   BCBlob // ModuleName, Library Path, Executable Path,
+                          // separated by \0s
+                   >;
 
-  using ImportedHeaderLayout = BCRecordLayout<
-    IMPORTED_HEADER,
-    BCFixed<1>, // exported?
-    FileSizeField, // file size (for validation)
-    FileHashField, // file hash (for validation)
-    BCBlob // file path
-  >;
+using LinkLibraryLayout = BCRecordLayout<LINK_LIBRARY,
+                                         LibraryKindField, // kind
+                                         BCFixed<1>,       // static
+                                         BCFixed<1>,       // forced?
+                                         BCBlob            // library name
+                                         >;
 
-  using ImportedHeaderContentsLayout = BCRecordLayout<
-    IMPORTED_HEADER_CONTENTS,
-    BCBlob
-  >;
+using ImportedHeaderLayout =
+    BCRecordLayout<IMPORTED_HEADER,
+                   BCFixed<1>,    // exported?
+                   FileSizeField, // file size (for validation)
+                   FileHashField, // file hash (for validation)
+                   BCBlob         // file path
+                   >;
 
-  using SearchPathLayout = BCRecordLayout<
-    SEARCH_PATH,
-    BCFixed<1>, // framework?
-    BCFixed<1>, // system?
-    BCBlob      // path
-  >;
+using ImportedHeaderContentsLayout =
+    BCRecordLayout<IMPORTED_HEADER_CONTENTS, BCBlob>;
 
-  using FileDependencyLayout = BCRecordLayout<
-    FILE_DEPENDENCY,
-    FileSizeField,                 // file size (for validation)
-    FileModTimeOrContentHashField, // mtime or content hash (for validation)
-    BCFixed<1>,                    // are we reading mtime (0) or hash (1)?
-    BCFixed<1>,                    // SDK-relative?
-    BCVBR<8>,                      // subpath-relative index (0=none)
-    BCBlob                         // path
-  >;
+using SearchPathLayout = BCRecordLayout<SEARCH_PATH,
+                                        BCFixed<1>, // framework?
+                                        BCFixed<1>, // system?
+                                        BCBlob      // path
+                                        >;
 
-  using DependencyDirectoryLayout = BCRecordLayout<
-    DEPENDENCY_DIRECTORY,
-    BCBlob
-  >;
+using FileDependencyLayout =
+    BCRecordLayout<FILE_DEPENDENCY,
+                   FileSizeField,                 // file size (for validation)
+                   FileModTimeOrContentHashField, // mtime or content hash (for
+                                                  // validation)
+                   BCFixed<1>, // are we reading mtime (0) or hash (1)?
+                   BCFixed<1>, // SDK-relative?
+                   BCVBR<8>,   // subpath-relative index (0=none)
+                   BCBlob      // path
+                   >;
 
-  using ModuleInterfaceLayout = BCRecordLayout<
-    MODULE_INTERFACE_PATH,
-    BCFixed<1>, // SDK-relative?
-    BCBlob      // file path
-  >;
+using DependencyDirectoryLayout = BCRecordLayout<DEPENDENCY_DIRECTORY, BCBlob>;
 
+using ModuleInterfaceLayout = BCRecordLayout<MODULE_INTERFACE_PATH,
+                                             BCFixed<1>, // SDK-relative?
+                                             BCBlob      // file path
+                                             >;
 }
 
 /// The record types within the "decls-and-types" block.
@@ -1284,6 +1323,11 @@ namespace decls_block {
     BUILTIN_FIXED_ARRAY_TYPE,
     TypeIDField, // count
     TypeIDField  // element type
+  );
+
+  TYPE_LAYOUT(BuiltinBorrowTypeLayout,
+    BUILTIN_BORROW_TYPE,
+    TypeIDField // referent type
   );
 
   TYPE_LAYOUT(TypeAliasTypeLayout,
@@ -1706,7 +1750,6 @@ namespace decls_block {
     VarDeclIntroducerField,   // introducer
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
-    BCFixed<1>,   // is this the backing storage for a lazy property?
     BCFixed<1>,   // top level global?
     DeclIDField,  // if this is a lazy property, this is the backing storage
     OpaqueReadOwnershipField,   // opaque read ownership
@@ -1739,7 +1782,7 @@ namespace decls_block {
     BCFixed<1>,              // isCompileTimeLiteral?
     BCFixed<1>,              // isConst?
     BCFixed<1>,              // isSending?
-    BCFixed<1>,              // isCallerIsolated?
+    BCFixed<1>,              // isAddressable?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     ActorIsolationField,     // default argument isolation
@@ -1783,6 +1826,26 @@ namespace decls_block {
     // - inlinable body text, if any
   >;
 
+  using OpaqueTypeLayout = BCRecordLayout<
+    OPAQUE_TYPE_DECL,
+    DeclContextIDField, // decl context
+    DeclIDField, // naming decl
+    GenericSignatureIDField, // interface generic signature
+    TypeIDField, // interface type for opaque type
+    GenericSignatureIDField, // generic environment
+    AccessLevelField, // access level
+    BCFixed<1>, // has underlying substitutions?
+    BCFixed<1> // export underlying substitutions?
+    // trailed by generic parameters
+    // trailed by opaque type underlying substitutions (if has underlying substitutions)
+    // trailed by conditional substitutions (if has underlying substitutions)
+  >;
+
+  using UnderlyingSubstitutionLayout = BCRecordLayout<
+    UNDERLYING_SUBSTITUTION,
+    SubstitutionMapIDField // the substitution map
+  >;
+
   using ConditionalSubstitutionConditionLayout = BCRecordLayout<
     CONDITIONAL_SUBSTITUTION_COND,
     BCFixed<1>, // is unavailable?
@@ -1794,20 +1857,6 @@ namespace decls_block {
     SubstitutionMapIDField
     // Trailed by N conditions that include a version and
     // unavailability indicator.
-  >;
-
-  using OpaqueTypeLayout = BCRecordLayout<
-    OPAQUE_TYPE_DECL,
-    DeclContextIDField, // decl context
-    DeclIDField, // naming decl
-    GenericSignatureIDField, // interface generic signature
-    TypeIDField, // interface type for opaque type
-    GenericSignatureIDField, // generic environment
-    SubstitutionMapIDField, // optional substitution map for underlying type
-    AccessLevelField, // access level
-    BCFixed<1> // export underlying type details
-    // trailed by generic parameters
-    // trailed by conditional substitutions
   >;
 
   // TODO: remove the unnecessary FuncDecl components here
@@ -2312,6 +2361,11 @@ namespace decls_block {
     TypeIDField                       // result type
   >;
 
+  using WarnDeclAttrLayout = BCRecordLayout<
+    Warn_DECL_ATTR,
+    BCFixed<1> // implicit flag
+  >;
+
   using ForeignAsyncConventionLayout = BCRecordLayout<
     FOREIGN_ASYNC_CONVENTION,
     TypeIDField, // completion handler type
@@ -2326,6 +2380,7 @@ namespace decls_block {
                      BCVBR<4>,           // targetIndex
                      BCVBR<4>,           // paramIndicesLength
                      BCFixed<1>,         // isImmortal
+                     BCFixed<1>,         // isFromAnnotation
                      BCFixed<1>,         // hasInheritLifetimeParamIndices
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
                      BCFixed<1>,         // hasAddressableParamIndices
@@ -2385,6 +2440,11 @@ namespace decls_block {
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,
     BCFixed<2>  // inline value
+  >;
+
+  using ExportDeclAttrLayout = BCRecordLayout<
+    Export_DECL_ATTR,
+    BCFixed<1>  // export kind value
   >;
 
   using NonSendableDeclAttrLayout = BCRecordLayout<
@@ -2535,7 +2595,7 @@ namespace decls_block {
   >;
 
   using ExposeDeclAttrLayout = BCRecordLayout<Expose_DECL_ATTR,
-                                              BCFixed<1>, // exposure kind
+                                              BCFixed<2>, // exposure kind
                                               BCFixed<1>, // implicit flag
                                               BCBlob      // declaration name
                                               >;

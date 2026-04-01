@@ -277,6 +277,8 @@ void SILFunction::init(
   this->UseStackForPackMetadata = DoUseStackForPackMetadata;
   this->HasUnsafeNonEscapableResult = false;
   this->IsPerformanceConstraint = false;
+  this->NeedBreakInfiniteLoops = false;
+  this->NeedCompleteLifetimes = false;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -442,6 +444,15 @@ bool SILFunction::hasForeignBody() const {
   return SILDeclRef::isClangGenerated(getClangNode());
 }
 
+void SILFunction::setAsmName(StringRef value) {
+  AsmName = value;
+
+  if (!value.empty()) {
+    // Update the function-by-asm-name-table.
+    getModule().FunctionByAsmNameTable.insert({AsmName, this});
+  }
+}
+
 const SILFunction *SILFunction::getOriginOfSpecialization() const {
   if (!isSpecialization())
     return nullptr;
@@ -499,7 +510,7 @@ bool SILFunction::shouldOptimize() const {
   return getEffectiveOptimizationMode() != OptimizationMode::NoOptimization;
 }
 
-Type SILFunction::mapTypeIntoContext(Type type) const {
+Type SILFunction::mapTypeIntoEnvironment(Type type) const {
   assert(!type->hasPrimaryArchetype());
 
   if (GenericEnv) {
@@ -507,7 +518,7 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
     // type, which might contain element archetypes, if it was the interface type
     // of a closure or local variable.
     if (type->hasElementArchetype())
-      return GenericEnv->mapTypeIntoContext(type);
+      return GenericEnv->mapTypeIntoEnvironment(type);
 
     // Otherwise, assume we have an interface type for the "combined" captured
     // environment.
@@ -520,7 +531,7 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
   return type;
 }
 
-SILType SILFunction::mapTypeIntoContext(SILType type) const {
+SILType SILFunction::mapTypeIntoEnvironment(SILType type) const {
   assert(!type.hasPrimaryArchetype());
 
   if (GenericEnv) {
@@ -536,7 +547,7 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
   return type;
 }
 
-SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
+SILType GenericEnvironment::mapTypeIntoEnvironment(SILModule &M,
                                                SILType type) const {
   assert(!type.hasPrimaryArchetype());
 
@@ -553,6 +564,28 @@ bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {
       .isNoReturnFunction(getModule(), context);
 }
 
+bool SILFunction::hasNonUniqueDefinition() const {
+  // Non-uniqueness is a property of the Embedded linkage model.
+  if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  // If this function is the entrypoint, it is unique.
+  if (getName() == getASTContext().getEntryPointFunctionName())
+    return false;
+
+  // If this is for a declaration, ask it.
+  if (auto declRef = getDeclRef()) {
+    return declRef.hasNonUniqueDefinition();
+  }
+
+  // If this function is from a different module than the one we are emitting
+  // code for, then it must have a non-unique definition.
+  if (getParentModule() != getModule().getSwiftModule())
+    return true;
+
+  return false;
+}
+
 ResilienceExpansion SILFunction::getResilienceExpansion() const {
   // If a function definition is in another module, and
   // it was serialized due to package serialization opt,
@@ -566,8 +599,24 @@ ResilienceExpansion SILFunction::getResilienceExpansion() const {
           : ResilienceExpansion::Maximal);
 }
 
+SILTypeProperties
+SILFunction::getTypeProperties(AbstractionPattern orig, Type subst) const {
+  return getModule().Types.getTypeProperties(orig, subst,
+                                             TypeExpansionContext(*this));
+}
+
+SILTypeProperties SILFunction::getTypeProperties(Type subst) const {
+  return getModule().Types.getTypeProperties(subst,
+                                             TypeExpansionContext(*this));
+}
+
+SILTypeProperties SILFunction::getTypeProperties(SILType type) const {
+  return getModule().Types.getTypeProperties(type,
+                                             TypeExpansionContext(*this));
+}
+
 const TypeLowering &
-SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) {
+SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) const {
   return getModule().Types.getTypeLowering(orig, subst,
                                            TypeExpansionContext(*this));
 }
@@ -1000,6 +1049,21 @@ bool SILFunction::hasValidLinkageForFragileRef(SerializedKind_t callerSerialized
   return hasPublicOrPackageVisibility(getLinkage(), /*includePackage*/ true);
 }
 
+bool SILFunction::isSwiftRuntimeFunction(
+    StringRef name, const ModuleDecl *module) {
+  if (!name.starts_with("swift_") && !name.starts_with("_swift_"))
+    return false;
+
+  return !module ||
+      module->getName().str() == "Swift" ||
+      module->getName().str() == "_Concurrency";
+}
+
+bool SILFunction::isSwiftRuntimeFunction() const {
+  return isSwiftRuntimeFunction(asmName(), getParentModule()) ||
+    isSwiftRuntimeFunction(getName(), getParentModule());
+}
+
 bool
 SILFunction::isPossiblyUsedExternally() const {
   auto linkage = getLinkage();
@@ -1020,6 +1084,18 @@ SILFunction::isPossiblyUsedExternally() const {
   if (markedAsUsed())
     return true;
 
+  // If this function is exposed to a foreign language, it can be used
+  // externally (by that language).
+  if (auto decl = getDeclRef().getDecl()) {
+    if (SILDeclRef::declExposedToForeignLanguage(decl))
+      return true;
+  }
+
+  // If this function was explicitly placed in a section or given a WebAssembly
+  // export, it can be used externally.
+  if (!Section.empty() || !WasmExportName.empty())
+    return true;
+
   if (shouldBePreservedForDebugger())
     return true;
 
@@ -1028,6 +1104,11 @@ SILFunction::isPossiblyUsedExternally() const {
   // has to be kept alive to emit opaque type metadata descriptor.
   if (markedAsAlwaysEmitIntoClient() &&
       hasOpaqueResultTypeWithAvailabilityConditions())
+    return true;
+
+  // All Swift runtime functions can be used externally.
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      isSwiftRuntimeFunction())
     return true;
 
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());

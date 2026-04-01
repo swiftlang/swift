@@ -23,6 +23,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
+#include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -52,7 +53,7 @@ void ClangValueTypePrinter::printCxxImplClassName(raw_ostream &os,
 }
 
 void ClangValueTypePrinter::printMetadataAccessAsVariable(
-    const ASTContext &Context,
+    ASTContext &Context,
     raw_ostream &os, StringRef metadataFuncName,
     ArrayRef<GenericRequirement> genericRequirements, int indent,
     StringRef varName) {
@@ -65,7 +66,7 @@ void ClangValueTypePrinter::printMetadataAccessAsVariable(
 }
 
 void ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-    const ASTContext &Context,
+    ASTContext &Context,
     raw_ostream &os, StringRef metadataFuncName,
     ArrayRef<GenericRequirement> genericRequirements, int indent,
     StringRef metadataVarName, StringRef vwTableVarName) {
@@ -90,9 +91,9 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
 void ClangValueTypePrinter::forwardDeclType(
     raw_ostream &os, const NominalTypeDecl *typeDecl,
     DeclAndTypePrinter &declAndTypePrinter) {
-  ClangSyntaxPrinter(typeDecl->getASTContext(), os).printParentNamespaceForNestedTypes(
-      typeDecl, [&](raw_ostream &) {
-        if (typeDecl->isGeneric()) {
+  ClangSyntaxPrinter(typeDecl->getASTContext(), os)
+      .printParentNamespaceForNestedTypes(typeDecl, [&](raw_ostream &) {
+        if (typeDecl->hasGenericParamList()) {
           auto genericSignature =
               typeDecl->getGenericSignature().getCanonicalSignature();
           ClangSyntaxPrinter(typeDecl->getASTContext(), os).printGenericSignature(genericSignature);
@@ -200,7 +201,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
       return;
     ClangSyntaxPrinter(Context, os).printGenericSignatureParams(genericSignature);
   };
-  if (typeDecl->isGeneric()) {
+  if (typeDecl->hasGenericParamList()) {
     genericSignature = typeDecl->getGenericSignature();
     assert(cxx_translation::isExposableToCxx(genericSignature));
 
@@ -214,7 +215,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     if (typeSizeAlign && typeSizeAlign->size == 0) {
       // FIXME: How to represent 0 sized structs?
       declAndTypePrinter.getCxxDeclEmissionScope()
-          .additionalUnrepresentableDeclarations.push_back(typeDecl);
+          .additionalUnrepresentableDeclarations.insert({typeDecl, ""});
       return;
     }
   }
@@ -579,7 +580,7 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
   printer.printNominalTypeReference(typeDecl,
                                     /*moduleContext=*/nullptr);
   os << "> = ";
-  if (typeDecl->isGeneric()) {
+  if (typeDecl->hasGenericParamList()) {
     auto signature = typeDecl->getGenericSignature().getCanonicalSignature();
     llvm::interleave(
         signature.getInnermostGenericParams(), os,
@@ -628,8 +629,14 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "} // end namespace \n\n";
   os << "namespace swift SWIFT_PRIVATE_ATTR {\n";
   auto classDecl = dyn_cast<ClassDecl>(typeDecl);
+
+  bool isOSObject = false;
+  if (const auto nd =
+          dyn_cast_or_null<clang::NamedDecl>(typeDecl->getClangDecl()))
+    isOSObject = !DeclAndTypePrinter::maybeGetOSObjectBaseName(nd).empty();
   bool addPointer =
-      typeDecl->isObjC() || (classDecl && classDecl->isForeignReferenceType());
+      (typeDecl->isObjC() && !isOSObject && !isa<EnumDecl>(typeDecl)) ||
+      (classDecl && classDecl->isForeignReferenceType());
 
   if (objCxxOnly)
     os << "#if defined(__OBJC__)\n";
@@ -723,7 +730,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
       os << "::";
     os << cxx_synthesis::getCxxImplNamespaceName() << "::";
     printCxxImplClassName(os, NTD);
-    if (NTD->isGeneric())
+    if (NTD->hasGenericParamList())
       printer.printGenericSignatureParams(
           NTD->getGenericSignature().getCanonicalSignature());
     os << "; };\n";
@@ -731,7 +738,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "} // namespace\n";
   os << "#pragma clang diagnostic pop\n";
   if (objCxxOnly)
-    os << "#endif // #if defined(__OBJC__)\n";
+    os << "#endif // defined(__OBJC__)\n";
   os << "} // namespace swift\n";
   os << "\n";
   printer.printModuleNamespaceStart(*moduleContext);

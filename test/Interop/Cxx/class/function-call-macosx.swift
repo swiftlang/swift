@@ -6,9 +6,9 @@ import Closure
 
 // CHECK: sil [ossa] @$s4main11testARCWeakyyF : $@convention(thin) () -> () {
 // CHECK: %[[V0:.*]] = alloc_stack $ARCWeak
-// CHECK: %[[V2:.*]] = function_ref @_ZN7ARCWeakC1Ev : $@convention(c) () -> @out ARCWeak
+// CHECK: %[[V2:.*]] = function_ref @$sSo7ARCWeakVABycfCTo : $@convention(c) () -> @out ARCWeak
 // CHECK: %[[V3:.*]] = apply %[[V2]](%[[V0]]) : $@convention(c) () -> @out ARCWeak
-// CHECK: %[[V4:.*]] = function_ref @_Z12cfuncARCWeak7ARCWeak : $@convention(c) (@in ARCWeak) -> ()
+// CHECK: %[[V4:.*]] = function_ref @$sSo12cfuncARCWeakyySo0B0VFTo : $@convention(c) (@in ARCWeak) -> ()
 // CHECK: %[[V7:.*]] = apply %[[V4]](%[[V0]]) : $@convention(c) (@in ARCWeak) -> ()
 // CHECK-NOT: destroy_addr
 // CHECK: dealloc_stack %[[V0]] : $*ARCWeak
@@ -18,11 +18,11 @@ public func testARCWeak() {
 }
 
 // CHECK: sil [ossa] @$s4main26testARCWeakFunctionPointeryyF : $@convention(thin) () -> () {
-// CHECK: %[[V0:.*]] = function_ref @_Z9getFnPtr2v : $@convention(c) () -> @convention(c) (@in ARCWeak) -> ()
+// CHECK: %[[V0:.*]] = function_ref @$sSo9getFnPtr2ySo7ARCWeakVXCyFTo : $@convention(c) () -> @convention(c) (@in ARCWeak) -> ()
 // CHECK: %[[V1:.*]] = apply %[[V0]]() : $@convention(c) () -> @convention(c) (@in ARCWeak) -> ()
 // CHECK: %[[MV1:.*]] = move_value [var_decl] %[[V1]] : $@convention(c) (@in ARCWeak) -> ()
 // CHECK: %[[V3:.*]] = alloc_stack $ARCWeak
-// CHECK: %[[V6:.*]] = function_ref @_ZN7ARCWeakC1Ev : $@convention(c) () -> @out ARCWeak
+// CHECK: %[[V6:.*]] = function_ref @$sSo7ARCWeakVABycfCTo : $@convention(c) () -> @out ARCWeak
 // CHECK: apply %[[V6]](%[[V3]]) : $@convention(c) () -> @out ARCWeak
 // CHECK: apply %[[MV1]](%[[V3]]) : $@convention(c) (@in ARCWeak) -> ()
 // CHECK-NEXT: dealloc_stack %[[V3]] : $*ARCWeak

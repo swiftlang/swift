@@ -11,7 +11,9 @@
 // RUN: %target-run %t/opt.out
 
 // RUN: %target-swift-frontend -emit-sil %s -O -o %t/out.sil
+
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK4
+
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK5
 
 import DifferentiationUnittest

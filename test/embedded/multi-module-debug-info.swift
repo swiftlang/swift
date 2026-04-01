@@ -2,9 +2,9 @@
 // RUN: %{python} %utils/split_file.py -o %t %s
 
 // RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -enable-experimental-feature Embedded -parse-as-library
-// RUN: %target-swift-frontend -c -I %t %t/Main.swift -enable-experimental-feature Embedded -verify -o /dev/null
+// RUN: %target-swift-frontend -c -I %t %t/Main.swift -enable-experimental-feature Embedded -verify -verify-ignore-unrelated -o /dev/null
 
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 
 // BEGIN MyModule.swift

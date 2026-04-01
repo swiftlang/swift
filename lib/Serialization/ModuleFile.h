@@ -142,24 +142,20 @@ public:
   public:
     /*implicit*/ Serialized(serialization::BitOffset offset) : Value(offset) {}
 
-    bool isComplete() const {
-      return Value.template is<T>();
-    }
+    bool isComplete() const { return isa<T>(Value); }
 
-    T get() const {
-      return Value.template get<T>();
-    }
+    T get() const { return cast<T>(Value); }
 
     /*implicit*/ operator T() const {
       return get();
     }
 
     /*implicit*/ operator serialization::BitOffset() const {
-      return Value.template get<serialization::BitOffset>();
+      return cast<serialization::BitOffset>(Value);
     }
 
     /*implicit*/ operator RawBitOffset() const {
-      return Value.template get<serialization::BitOffset>();
+      return cast<serialization::BitOffset>(Value);
     }
 
     Serialized &operator=(T deserialized) {
@@ -597,6 +593,10 @@ public:
     return Core->PublicModuleName;
   }
 
+  StringRef getOSLogStringSectionName() const {
+    return Core->OSLogStringSectionName;
+  }
+
   /// The ABI name of the module.
   StringRef getModuleABIName() const {
     return Core->ModuleABIName;
@@ -713,6 +713,14 @@ public:
 
   /// \c true if this module was built with strict memory safety.
   bool strictMemorySafety() const { return Core->strictMemorySafety(); }
+
+  /// \c true if this module uses deferred code generation.
+  bool deferredCodeGen() const { return Core->deferredCodeGen(); }
+
+
+  /// \c true if this module was built with aggressive CMO
+  /// (the flag -cross-module-optimization).
+  bool isAggressiveCMOEnabled() const { return Core->isAggressiveCMOEnabled(); }
 
   /// Associates this module file with the AST node representing it.
   ///
@@ -922,8 +930,11 @@ public:
   /// Has no effect in NDEBUG builds.
   void verify() const;
 
-  virtual void loadAllMembers(Decl *D,
-                              uint64_t contextData) override;
+  // For now, loadStorageMembers() does the job of loading both storage and
+  // non-storage members. In the future, these responsibilities may be divided
+  // between the two methods so that we do not deserialize unneeded members.
+  virtual void loadStorageMembers(Decl *D, uint64_t contextData) override;
+  virtual void loadNonStorageMembers(Decl *D, uint64_t contextData) override {}
 
   virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
@@ -952,20 +963,30 @@ public:
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
-  void
+  virtual void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
                            SmallVectorImpl<Requirement> &requirements,
                            SmallVectorImpl<ProtocolTypeAlias> &typeAliases) override;
 
-  void
+  virtual void
   loadAssociatedTypes(
       const ProtocolDecl *proto, uint64_t contextData,
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
 
-  void
+  virtual void
   loadPrimaryAssociatedTypes(
       const ProtocolDecl *proto, uint64_t contextData,
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
+
+  virtual void
+  finishOpaqueTypeDecl(OpaqueTypeDecl *opaqueDecl,
+                       uint64_t contextData) override;
+
+  void deserializeConditionalSubstitutions(
+      SmallVectorImpl<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+          &limitedAvailability);
+  void deserializeConditionalSubstitutionAvailabilityQueries(
+      SmallVectorImpl<AvailabilityQuery> &queries);
 
   std::optional<StringRef> getGroupNameById(unsigned Id) const;
   std::optional<StringRef> getSourceFileNameById(unsigned Id) const;

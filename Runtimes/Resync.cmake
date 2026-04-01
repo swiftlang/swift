@@ -56,6 +56,8 @@ function(copy_library_sources name from_prefix to_prefix)
     "${ARG_ROOT}/${from_prefix}/${name}/*.c"
     "${ARG_ROOT}/${from_prefix}/${name}/*.mm"
     "${ARG_ROOT}/${from_prefix}/${name}/*.m"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.S"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.asm"
     "${ARG_ROOT}/${from_prefix}/${name}/*.def"
     "${ARG_ROOT}/${from_prefix}/${name}/*.gyb"
     "${ARG_ROOT}/${from_prefix}/${name}/*.apinotes"
@@ -84,8 +86,9 @@ set(CoreLibs
   CompatibilityOverride
   stubs
   CommandLineSupport
-  core
   SwiftOnoneSupport
+  RemoteInspection
+  SwiftRemoteMirror
   Concurrency
   Concurrency/InternalShims)
 
@@ -93,14 +96,33 @@ foreach(library ${CoreLibs})
   copy_library_sources(${library} "public" "Core")
 endforeach()
 
+# copying Core/core separately, so we can specify the case of the target folder
+# correctly on case sensitive file systems
+copy_library_sources("" "public/core" "Core/Core")
+
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Core/Info.plist.in")
 copy_files("" "Core" FILES "Info.plist.in")
+
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Distributed/Info.plist.in")
+copy_files("" "Supplemental/Distributed" FILES "Info.plist.in")
+
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Differentiation/Info.plist.in")
+copy_files("" "Supplemental/Differentiation" FILES "Info.plist.in")
+
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Observation/Info.plist.in")
+copy_files("" "Supplemental/Observation" FILES "Info.plist.in")
+
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/StringProcessing/Info.plist.in")
+copy_files("" "Supplemental/StringProcessing" FILES "Info.plist.in")
 
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Synchronization/Info.plist.in")
 copy_files("" "Supplemental/Synchronization" FILES "Info.plist.in")
 
-message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Distributed/Info.plist.in")
-copy_files("" "Supplemental/Distributed" FILES "Info.plist.in")
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Volatile/Info.plist.in")
+copy_files("" "Supplemental/Volatile" FILES "Info.plist.in")
+
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Runtime/Info.plist.in")
+copy_files("" "Supplemental/Runtime" FILES "Info.plist.in")
 
 # Platform Overlays
 
@@ -109,6 +131,8 @@ copy_library_sources("linker-support" "public/ClangOverlays" "Overlay")
 
 message(STATUS "Clang[${StdlibSources}/public/ClangOverlays] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/clang")
 copy_files(public/ClangOverlays Overlay/clang FILES float.swift.gyb)
+
+copy_library_sources("Cxx" "public" "Overlay")
 
 # Android Overlay
 message(STATUS "Android modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Android/clang")
@@ -134,6 +158,38 @@ copy_files(public/Platform Overlay/Android/Math
   FILES
     Math.swift)
 
+# Linux Glibc Overlay
+message(STATUS "Glibc modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Linux/glibc/clang")
+copy_files(public/Platform Overlay/Linux/glibc/clang
+  FILES
+    glibc.modulemap.gyb
+    SwiftGlibc.h.gyb)
+
+message(STATUS "Glibc [${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Linux/glibc")
+copy_files(public/Platform Overlay/Linux/glibc
+  FILES
+    Glibc.swift.gyb
+    POSIXError.swift
+    Platform.swift
+    TiocConstants.swift
+    tgmath.swift.gyb)
+
+# WASI Overlay
+message(STATUS "WASI[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/WASI/WASILibc")
+copy_files(public/Platform Overlay/WASI/WASILibc
+  FILES
+    Platform.swift
+    POSIXError.swift
+    tgmath.swift.gyb
+    TiocConstants.swift
+    WASILibc.swift.gyb)
+
+message(STATUS "WASI modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/WASI/clang")
+copy_files(public/Platform Overlay/WASI/clang
+  FILES
+    SwiftWASILibc.apinotes
+    wasi-libc.modulemap)
+
 # Windows Overlay
 message(STATUS "WinSDK[${StdlibSources}/public/Windows] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK")
 copy_files(public/Windows Overlay/Windows/WinSDK FILES WinSDK.swift)
@@ -142,7 +198,8 @@ message(STATUS "Windows modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT
 copy_files(public/Platform Overlay/Windows/clang
   FILES
     ucrt.modulemap
-    winsdk.modulemap
+    winsdk_um.modulemap
+    winsdk_shared.modulemap
     vcruntime.modulemap
     vcruntime.apinotes)
 
@@ -155,21 +212,22 @@ copy_files(public/Platform Overlay/Windows/CRT
     TiocConstants.swift
     tgmath.swift.gyb)
 
-# Supplemental Libraries
-copy_library_sources(Synchronization "public" "Supplemental")
-copy_library_sources(Observation "public" "Supplemental")
-
-# Copy Differentiation sources
-copy_library_sources("linker-support" "" "Supplemental/Differentiation")
-copy_library_sources("Differentiation" "public" "Supplemental")
-
-# Copy StringProcessing, RegexParser, RegexBuilder
 if(NOT DEFINED StringProcessing_ROOT_DIR)
   find_path(StringProcessing_ROOT_DIR
     "swift-experimental-string-processing/Package.swift"
     HINTS "${CMAKE_CURRENT_LIST_DIR}/../../")
 endif()
 message(STATUS "String Processing Root: ${StringProcessing_ROOT_DIR}")
+
+# Supplemental Libraries
+copy_library_sources(Differentiation "public" "Supplemental")
+copy_library_sources(Distributed "public" "Supplemental")
+copy_library_sources(Observation "public" "Supplemental")
+copy_library_sources(Synchronization "public" "Supplemental")
+copy_library_sources(Volatile "public" "Supplemental")
+
+copy_library_sources("" "public/RuntimeModule" "Supplemental/Runtime")
+copy_library_sources("" "public/libexec/swift-backtrace" "Supplemental/StackWalker")
 
 copy_library_sources(_RegexParser "Sources" "Supplemental/StringProcessing"
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
@@ -180,5 +238,5 @@ copy_library_sources(_CUnicode "Sources" "Supplemental/StringProcessing/_StringP
 copy_library_sources(RegexBuilder "Sources" "Supplemental/StringProcessing"
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
 
-copy_library_sources("Distributed" "public" "Supplemental")
+copy_library_sources("linker-support" "" "Supplemental/Differentiation")
 copy_library_sources(include "" "Supplemental/Distributed")

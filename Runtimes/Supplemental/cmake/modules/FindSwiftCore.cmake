@@ -287,8 +287,15 @@ endif()
 find_path(SwiftShims_INCLUDE_DIR "shims/module.modulemap" HINTS
   ${SwiftShims_INCLUDE_DIR_HINTS})
 add_library(swiftShims INTERFACE IMPORTED GLOBAL)
-set_target_properties(swiftShims PROPERTIES
-  INTERFACE_INCLUDE_DIRECTORIES "${SwiftShims_INCLUDE_DIR}/shims")
+target_include_directories(swiftShims INTERFACE
+# This is needed for targets that import headers from
+# include/swift (e.g. include/swift/ABI/HeapObject.h)
+# that assumes the shims are located in `swift/shims`
+# relative path
+  "${SwiftShims_INCLUDE_DIR}/.."
+  "${SwiftShims_INCLUDE_DIR}/shims")
+target_compile_options(swiftShims INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=\"${SwiftShims_INCLUDE_DIR}/shims/module.modulemap\">")
 
 find_package_handle_standard_args(SwiftCore DEFAULT_MSG
   SwiftCore_LIBRARY SwiftCore_INCLUDE_DIR

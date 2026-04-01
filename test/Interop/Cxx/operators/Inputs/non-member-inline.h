@@ -29,6 +29,10 @@ inline LoadableIntWrapper operator^(LoadableIntWrapper lhs, LoadableIntWrapper r
   return LoadableIntWrapper{.value = lhs.value ^ rhs.value};
 }
 
+inline LoadableIntWrapper operator~(LoadableIntWrapper lhs) {
+  return LoadableIntWrapper{.value = ~lhs.value};
+}
+
 inline LoadableIntWrapper operator&(LoadableIntWrapper lhs, LoadableIntWrapper rhs) {
   return LoadableIntWrapper{.value = lhs.value & rhs.value};
 }
@@ -115,6 +119,14 @@ LValueAndRValueArithmetic operator+(const LValueAndRValueArithmetic &lhs,
 LValueAndRValueArithmetic operator+(const LValueAndRValueArithmetic &lhs,
                                     LValueAndRValueArithmetic &&rhs) {
   return {lhs.value + rhs.value};
+}
+
+struct AllStar { long L = 111; };
+inline long &operator*(AllStar &a) { return a.L; }
+inline AllStar operator*(const AllStar &lhs, const AllStar &rhs) {
+  AllStar a;
+  a.L = lhs.L * rhs.L;
+  return a;
 }
 
 // Make sure that we don't crash on templated operators

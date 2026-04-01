@@ -183,8 +183,9 @@ extension StaticBigInt: CustomDebugStringConvertible {
     }
 
     // Overwrite leading zeros with the "±0x" indicator.
-    if let upToIndex = result.firstIndex(where: { $0 != "0" }) {
-      result.replaceSubrange(..<upToIndex, with: indicator)
+    let zero: UnicodeScalar = "0"
+    if let upToIndex = result.unicodeScalars.firstIndex(where: { $0 != zero }) {
+      result = indicator + String(result.unicodeScalars[upToIndex...])
     } else {
       result = "+0x0"
     }

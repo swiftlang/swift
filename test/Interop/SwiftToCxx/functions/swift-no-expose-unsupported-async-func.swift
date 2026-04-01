@@ -9,7 +9,7 @@
 // CHECK:       namespace Functions SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Functions") {
 // CHECK-EMPTY:
 // CHECK-EMPTY:
-// CHECK: // Unavailable in C++: Swift global function 'asyncFunc(_:)'.
+// CHECK: // Unavailable in C++: Swift global function 'asyncFunc(_:)'.{{.*}}can not be exposed to C++.
 // CHECK-EMPTY:
 // CHECK-NEXT:  } // namespace Functions
 

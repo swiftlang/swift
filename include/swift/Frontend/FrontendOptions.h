@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Version.h"
@@ -35,6 +36,21 @@ namespace llvm {
 namespace swift {
 enum class IntermoduleDepTrackingMode;
 
+/// Options for debugging the behavior of the frontend.
+struct CompilerDebuggingOptions {
+  /// Indicates whether or not the Clang importer should print statistics upon
+  /// termination.
+  bool PrintClangStats = false;
+
+  /// Indicates whether or not the availability scope trees built during
+  /// compilation should be dumped upon termination.
+  bool DumpAvailabilityScopes = false;
+
+  /// Indicates whether or not the Clang importer should dump lookup tables
+  /// upon termination.
+  bool DumpClangLookupTables = false;
+};
+
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
@@ -51,11 +67,15 @@ public:
 
   bool isOutputFileDirectory() const;
 
-  /// An Objective-C header to import and make implicitly visible.
+  /// A C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 
-  /// An Objective-C pch to import and make implicitly visible.
+  /// A C pch to import and make implicitly visible.
   std::string ImplicitObjCPCHPath;
+
+  /// Whether the imported C header or precompiled header is considered
+  /// an internal import (vs. the default, a public import).
+  bool ImportHeaderAsInternal = false;
 
   /// The map of aliases and real names of imported or referenced modules.
   llvm::StringMap<std::string> ModuleAliasMap;
@@ -92,9 +112,6 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
-  /// The path to load access notes from.
-  std::string AccessNotesPath;
-
   /// The path to look in when loading a module interface file, to see if a
   /// binary module has already been built for use by the compiler.
   std::string PrebuiltModuleCachePath;
@@ -124,6 +141,9 @@ public:
   /// A set of modules allowed to import this module.
   std::set<std::string> AllowableClients;
 
+  /// Options for debugging the compiler.
+  CompilerDebuggingOptions CompilerDebuggingOpts;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
@@ -135,6 +155,9 @@ public:
 
   /// Include local definitions/references in the index data.
   bool IndexIncludeLocals = false;
+  
+  /// Whether to compress the record and unit files in the index store.
+  bool IndexStoreCompress = false;
 
   bool SerializeDebugInfoSIL = false;
   /// If building a module from interface, ignore compiler flags
@@ -163,9 +186,6 @@ public:
 
     /// Parse and dump scope map.
     DumpScopeMaps,
-
-    /// Parse, type-check, and dump availability scopes
-    DumpAvailabilityScopes,
 
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH,             ///< Emit PCH of imported bridging header
@@ -198,6 +218,8 @@ public:
 
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
+
+    EmitPolyglotAST, ///< Emit polyglot AST as JSON
 
     ScanDependencies, ///< Scan dependencies of Swift source files
     PrintVersion,     ///< Print version information.
@@ -279,11 +301,6 @@ public:
   /// \see ModuleDecl::isImplicitDynamicEnabled
   bool EnableImplicitDynamic = false;
 
-  /// Enables the "fully resilient" resilience strategy.
-  ///
-  /// \see ResilienceStrategy::Resilient
-  bool EnableLibraryEvolution = false;
-
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.
   bool ImportUnderlyingModule = false;
@@ -302,14 +319,6 @@ public:
   /// termination.
   bool PrintStats = false;
 
-  /// Indicates whether or not the Clang importer should print statistics upon
-  /// termination.
-  bool PrintClangStats = false;
-
-  /// Indicates whether or not the Clang importer should dump lookup tables
-  /// upon termination.
-  bool DumpClangLookupTables = false;
-
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
 
@@ -319,6 +328,10 @@ public:
   /// Indicates that the frontend should print the target triple and then
   /// exit.
   bool PrintTargetInfo = false;
+
+  /// Indicates that the frontend should print the static build configuration
+  /// information as JSON.
+  bool PrintBuildConfig = false;
 
   /// Indicates that the frontend should print the supported features and then
   /// exit.
@@ -387,6 +400,9 @@ public:
 
   /// The path at which to either serialize or deserialize the dependency scanner cache.
   std::string SerializedDependencyScannerCachePath;
+
+  /// Emit dependency scanning related remarks.
+  bool EmitDependencyScannerRemarks = false;
 
   /// Emit remarks indicating use of the serialized module dependency scanning cache.
   bool EmitDependencyScannerCacheRemarks = false;
@@ -491,6 +507,10 @@ public:
   /// header.
   std::optional<ClangHeaderExposeBehavior> ClangHeaderExposedDecls;
 
+  // Include declarations that are at least as visible as the acces specified
+  // by -emit-clang-header-min-access
+  std::optional<AccessLevel> ClangHeaderMinAccess;
+
   struct ClangHeaderExposedImportedModule {
     std::string moduleName;
     std::string headerName;
@@ -526,12 +546,12 @@ public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Dependency Scanning hash.
   llvm::hash_code getModuleScanningHashComponents() const {
-    return hash_combine(ModuleName,
-                        ModuleABIName,
-                        ModuleLinkName,
-                        ImplicitObjCHeaderPath,
-                        PrebuiltModuleCachePath,
-                        UserModuleVersion);
+    return hash_combine(
+        ModuleName, ModuleABIName, ModuleLinkName, ImplicitObjCHeaderPath,
+        PrebuiltModuleCachePath,
+        llvm::hash_combine_range(ImplicitImportModuleNames.begin(),
+                                 ImplicitImportModuleNames.end()),
+        UserModuleVersion);
   }
 
   StringRef determineFallbackModuleName() const;
@@ -605,6 +625,8 @@ public:
   struct CustomAvailabilityDomains {
     /// Domains defined with `-define-enabled-availability-domain=`.
     llvm::SmallVector<std::string> EnabledDomains;
+    /// Domains defined with `-define-always-enabled-availability-domain=`.
+    llvm::SmallVector<std::string> AlwaysEnabledDomains;
     /// Domains defined with `-define-disabled-availability-domain=`.
     llvm::SmallVector<std::string> DisabledDomains;
     /// Domains defined with `-define-dynamic-availability-domain=`.

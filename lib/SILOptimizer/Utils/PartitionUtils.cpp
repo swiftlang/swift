@@ -102,6 +102,61 @@ void PartitionOpError::NonSendableIsolationCrossingResultError::print(
      << '\n';
 }
 
+void PartitionOpError::InOutSendingReturnedError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOutSendingReturnedError!\n"
+     << "        ID:  %%" << inoutSendingElement << '\n'
+     << "        Rep: " << valueMap.getRepresentativeValue(inoutSendingElement)
+     << "        Returned Value ID:  %%" << returnedValue << '\n'
+     << "        Rep: " << valueMap.getRepresentativeValue(returnedValue);
+}
+
+void PartitionOpError::InOutSendingParametersInSameRegionError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOutSendingParametersInSameRegion!\n"
+     << "        First ID:  %%" << firstInoutSendingParam
+     << "        First Rep: "
+     << valueMap.getRepresentativeValue(firstInoutSendingParam);
+  for (auto other : otherInOutSendingParams) {
+    os << "        Other ID:  %%" << other
+       << "        Other Rep: " << valueMap.getRepresentativeValue(other);
+  }
+}
+
+void PartitionOpError::IncompatibleRegionMergeError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: IncompatibleRegionMergeError!\n"
+     << "        Src ID:  %%" << srcRegionElt
+     << "        Src Rep: " << valueMap.getRepresentativeValue(srcRegionElt)
+     << "        Dst ID:  %%" << dstRegionElt
+     << "        Dst Rep: " << valueMap.getRepresentativeValue(dstRegionElt)
+     << "        Reason: ";
+  switch (reason) {
+  case Reason::Unknown:
+    os << "unknown\n";
+    return;
+  case Reason::Assign:
+    os << "assign\n";
+    return;
+  case Reason::ActorIntroducingInst:
+    os << "isolated_function\n";
+    return;
+  case Reason::NonisolatedClosure:
+    os << "nonisolated_closure\n";
+    return;
+  case Reason::Builtin:
+    os << "builtin\n";
+    return;
+  case Reason::NonisolatedFunction:
+    os << "nonisolated_function\n";
+    return;
+  case Reason::Cast:
+    os << "cast\n";
+    return;
+  }
+  llvm_unreachable("Unhandled case");
+}
+
 //===----------------------------------------------------------------------===//
 //                             MARK: PartitionOp
 //===----------------------------------------------------------------------===//
@@ -109,11 +164,19 @@ void PartitionOpError::NonSendableIsolationCrossingResultError::print(
 void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
   constexpr static char extraSpaceLiteral[10] = "     ";
   switch (opKind) {
-  case PartitionOpKind::Assign: {
-    os << "assign ";
+  case PartitionOpKind::AssignDirect: {
+    os << "assign_direct ";
     if (extraSpace)
       os << extraSpaceLiteral;
     os << "%%" << getOpArg1() << " = %%" << getOpArg2();
+    break;
+  }
+  case PartitionOpKind::AssignIndirect: {
+    os << "assign_indirect ";
+    if (extraSpace)
+      os << extraSpaceLiteral;
+    os << "%%" << getOpArg1() << " = %%" << getOpArg2()
+       << ". Overwritten Value: " << getOpArg3();
     break;
   }
   case PartitionOpKind::AssignFresh:
@@ -188,7 +251,7 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
     // region takes.
     Element repElement = *std::min_element(indices.begin(), indices.end());
     Region repElementRegion = Region(repElement);
-    p.freshLabel = Region(repElementRegion + 1);
+    p.nextAvailableRegionNum = Region(repElementRegion + 1);
 
     // Place all of the operations until end of scope into one history
     // sequence.
@@ -227,7 +290,7 @@ Partition Partition::separateRegions(SILLocation loc, ArrayRef<Element> indices,
     p.pushNewElementRegion(index);
     maxIndex = Element(std::max(maxIndex, index));
   }
-  p.freshLabel = Region(maxIndex + 1);
+  p.nextAvailableRegionNum = Region(maxIndex + 1);
   assert(p.is_canonical_correct());
   return p;
 }
@@ -236,13 +299,16 @@ void Partition::markSent(Element val, SendingOperandSet *sendingOperandSet) {
   // First see if our val is tracked. If it is not tracked, insert it and mark
   // its new region as sent.
   if (!isTrackingElement(val)) {
-    elementToRegionMap.insert_or_assign(val, freshLabel);
+    elementToRegionMap.insert_or_assign(val, nextAvailableRegionNum);
     pushNewElementRegion(val);
-    regionToSendingOpMap.insert({freshLabel, sendingOperandSet});
-    freshLabel = Region(freshLabel + 1);
+    regionToSendingOpMap.insert({nextAvailableRegionNum, sendingOperandSet});
+    nextAvailableRegionNum = Region(nextAvailableRegionNum + 1);
     canonical = false;
     return;
   }
+
+  // Canonicalize so that our elementToRegionMap.
+  canonicalize();
 
   // Otherwise, we already have this value in the map. Try to insert it.
   auto iter1 = elementToRegionMap.find(val);
@@ -258,11 +324,13 @@ void Partition::markSent(Element val, SendingOperandSet *sendingOperandSet) {
 }
 
 bool Partition::undoSend(Element val) {
+  canonicalize();
+
   // First see if our val is tracked. If it is not tracked, insert it.
   if (!isTrackingElement(val)) {
-    elementToRegionMap.insert_or_assign(val, freshLabel);
+    elementToRegionMap.insert_or_assign(val, nextAvailableRegionNum);
     pushNewElementRegion(val);
-    freshLabel = Region(freshLabel + 1);
+    nextAvailableRegionNum = Region(nextAvailableRegionNum + 1);
     canonical = false;
     return true;
   }
@@ -278,7 +346,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
   SWIFT_DEFER { validateRegionToSendingOpMapRegions(); };
 
   // First try to emplace newElt with fresh_label.
-  auto iter = elementToRegionMap.try_emplace(newElt, freshLabel);
+  auto iter = elementToRegionMap.try_emplace(newElt, nextAvailableRegionNum);
 
   // If we did insert, then we know that the value is completely new. We can
   // just update the fresh_label, set canonical to false, and return.
@@ -289,7 +357,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
       pushNewElementRegion(newElt);
 
     // Increment the fresh label so it remains fresh.
-    freshLabel = Region(freshLabel + 1);
+    nextAvailableRegionNum = Region(nextAvailableRegionNum + 1);
     canonical = false;
     return;
   }
@@ -305,7 +373,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
   // This is important to ensure that every region in the sendingOpMap is
   // also in elementToRegionMap.
   auto oldRegion = iter.first->second;
-  iter.first->second = freshLabel;
+  iter.first->second = nextAvailableRegionNum;
 
   auto getValueFromOtherRegion = [&]() -> std::optional<Element> {
     for (auto pair : elementToRegionMap) {
@@ -328,7 +396,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
     pushNewElementRegion(newElt);
 
   // Increment the fresh label so it remains fresh.
-  freshLabel = Region(freshLabel + 1);
+  nextAvailableRegionNum = Region(nextAvailableRegionNum + 1);
   canonical = false;
 }
 
@@ -472,8 +540,8 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
         result.pushMergeElementRegions(sndEltNumber, Element(sndRegionNumber));
         // We want fresh_label to always be one element larger than our
         // maximum element.
-        if (result.freshLabel <= Region(sndEltNumber))
-          result.freshLabel = Region(sndEltNumber + 1);
+        if (result.nextAvailableRegionNum <= Region(sndEltNumber))
+          result.nextAvailableRegionNum = Region(sndEltNumber + 1);
         continue;
       }
     }
@@ -493,8 +561,8 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
       if (!fstIter.second)
         fstIter.first->second = fstIter.first->second->merge(sndIter->second);
     }
-    if (result.freshLabel <= sndRegionNumber)
-      result.freshLabel = Region(sndEltNumber + 1);
+    if (result.nextAvailableRegionNum <= sndRegionNumber)
+      result.nextAvailableRegionNum = Region(sndEltNumber + 1);
   }
 
   // We should have preserved canonicality during the computation above. It
@@ -528,7 +596,23 @@ bool Partition::popHistory(
   return history.getHead();
 }
 
-void Partition::print(llvm::raw_ostream &os) const {
+void Partition::print(llvm::raw_ostream &os,
+                      std::function<bool(llvm::raw_ostream &, Region)>
+                          printRegionIsolation) const {
+  // If we are asked to printRegionIsolation, we need to canonicalize before we
+  // can get the correct regions. So, check if we are canonicalized. If we are
+  // not then we can continue printing below. Otherwise, we copy ourselves,
+  // canonicalize the copy, and then print that. We do this since the whole
+  // point of printing this type of information is to help us understand how the
+  // program flowed normally and if we canonicalize this partition to print, we
+  // would change the compiler state.
+  if (printRegionIsolation && !canonical) {
+    auto other = *this;
+    other.canonicalize();
+    other.print(os, printRegionIsolation);
+    return;
+  }
+
   SmallFrozenMultiMap<Region, Element, 8> multimap;
 
   for (auto [eltNo, regionNo] : elementToRegionMap)
@@ -544,6 +628,10 @@ void Partition::print(llvm::raw_ostream &os) const {
       os << '{';
     } else {
       os << '(';
+    }
+
+    if (printRegionIsolation && printRegionIsolation(os, regionNo)) {
+      os << ": ";
     }
 
     int j = 0;
@@ -644,7 +732,7 @@ void Partition::printHistory(llvm::raw_ostream &os) const {
   } while ((head = head->getParent()));
 }
 
-bool Partition::is_canonical_correct() const {
+bool Partition::is_canonical_correct() {
 #ifdef NDEBUG
   return true;
 #else
@@ -659,7 +747,7 @@ bool Partition::is_canonical_correct() const {
 
   for (auto &[eltNo, regionNo] : elementToRegionMap) {
     // Labels should not exceed fresh_label.
-    if (regionNo >= freshLabel)
+    if (regionNo >= nextAvailableRegionNum)
       return fail(eltNo, 0);
 
     // The label of a region should be at most as large as each index in it.
@@ -683,6 +771,8 @@ bool Partition::is_canonical_correct() const {
 }
 
 Region Partition::merge(Element fst, Element snd, bool updateHistory) {
+  canonicalize();
+
   assert(elementToRegionMap.count(fst) && elementToRegionMap.count(snd));
 
   // Remember: fstRegion and sndRegion are actually elements in
@@ -729,25 +819,37 @@ void Partition::canonicalize() {
   canonical = true;
 
   validateRegionToSendingOpMapRegions();
-  std::map<Region, Region> oldRegionToRelabeledMap;
+  SmallVector<std::pair<Region, Region>, 8> oldRegionToRelabeledRegionMap;
 
-  // We rely on in-order traversal of labels to ensure that we always take the
-  // lowest eltNumber.
+  // Walk over elementToRegionMap, mapping regionNo to region(eltNo). Since we
+  // are walking linearly in order, we know that lower eltNo should be before
+  // earlier.
   for (auto &[eltNo, regionNo] : elementToRegionMap) {
-    if (!oldRegionToRelabeledMap.count(regionNo)) {
-      // if this is the first time encountering this region label,
-      // then this region label should be relabelled to this index,
-      // so enter that into the map
-      oldRegionToRelabeledMap.insert_or_assign(regionNo, Region(eltNo));
-    }
+    oldRegionToRelabeledRegionMap.emplace_back(regionNo, Region(eltNo));
 
-    // Update this label with either its own index, or a prior index that
-    // shared a region with it.
-    regionNo = oldRegionToRelabeledMap.at(regionNo);
+    // After canonicalization, all region labels are element numbers, so the
+    // max region label in use is at most maxEltNo. Setting this to eltNo + 1
+    // (which after the loop equals maxEltNo + 1) is sufficient.
+    nextAvailableRegionNum = Region(eltNo + 1);
+  }
 
-    // The maximum index iterated over will be used here to appropriately
-    // set fresh_label.
-    freshLabel = Region(eltNo + 1);
+  // Sort the array by (oldRegion, newRegion). This ensures that for each
+  // oldRegion, the smallest newRegion (i.e., the smallest element) comes first.
+  llvm::sort(oldRegionToRelabeledRegionMap);
+
+  // Now walk our map again and update the eltRegionNo with the new element.
+  // Since we sorted by (oldRegion, newRegion), lower_bound finds the first
+  // entry for each oldRegion, which has the smallest newRegion.
+  for (auto &[eltNo, eltRegionNo] : elementToRegionMap) {
+    auto iter =
+        std::lower_bound(oldRegionToRelabeledRegionMap.begin(),
+                         oldRegionToRelabeledRegionMap.end(), eltRegionNo,
+                         [](const std::pair<Region, Region> &lhs, Region rhs) {
+                           return lhs.first < rhs;
+                         });
+    assert(iter != oldRegionToRelabeledRegionMap.end() &&
+           iter->first == eltRegionNo);
+    eltRegionNo = iter->second;
   }
 
   // Then relabel our regionToSendingOpMap map if we need to by swapping out the
@@ -757,8 +859,12 @@ void Partition::canonicalize() {
   // re-sort and not have to deal with potential allocations.
   decltype(regionToSendingOpMap) oldMap = std::move(regionToSendingOpMap);
   for (auto &[oldReg, op] : oldMap) {
-    auto iter = oldRegionToRelabeledMap.find(oldReg);
-    assert(iter != oldRegionToRelabeledMap.end());
+    auto iter = std::lower_bound(oldRegionToRelabeledRegionMap.begin(),
+                                 oldRegionToRelabeledRegionMap.end(), oldReg,
+                                 [](const std::pair<Region, Region> &lhs,
+                                    Region rhs) { return lhs.first < rhs; });
+    assert(iter != oldRegionToRelabeledRegionMap.end() &&
+           iter->first == oldReg);
     regionToSendingOpMap[iter->second] = op;
   }
 

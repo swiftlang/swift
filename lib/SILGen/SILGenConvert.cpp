@@ -649,10 +649,6 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                             SGFContext C,
                             llvm::function_ref<ManagedValue (SGFContext)> F,
                             bool allowEmbeddedNSError) {
-  // Mark the needed conformances as used.
-  for (auto conformance : conformances)
-    SGM.useConformance(conformance);
-
   // If we're erasing to the 'Error' type, we might be able to get an NSError
   // representation more efficiently.
   auto &ctx = getASTContext();
@@ -816,7 +812,6 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     assert(existentialTL.isLoadable());
 
     ManagedValue sub = F(SGFContext());
-    assert(concreteFormalType->isBridgeableObjectType());
     return B.createInitExistentialRef(loc, existentialTL.getLoweredType(),
                                       concreteFormalType, sub, conformances);
   }
@@ -853,10 +848,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // If the concrete value is a pseudogeneric archetype, first erase it to
     // its upper bound.
     auto anyObjectTy = getASTContext().getAnyObjectType();
-    auto eraseToAnyObject =
-    [&, concreteFormalType, F](SGFContext C) -> ManagedValue {
+    auto eraseToAnyObject = [&, concreteFormalType,
+                             F](SGFContext C) -> ManagedValue {
       auto concreteValue = F(SGFContext());
-      assert(concreteFormalType->isBridgeableObjectType());
       return B.createInitExistentialRef(
           loc, SILType::getPrimitiveObjectType(anyObjectTy), concreteFormalType,
           concreteValue, conformances);
@@ -1348,10 +1342,9 @@ Conversion::adjustForInitialOptionalInjection() const {
   case BridgeFromObjC:
   case BridgeResultFromObjC:
     return OptionalInjectionConversion::forInjection(
-      getBridging(getKind(), getSourceType().getOptionalObjectType(),
-                  getResultType(), getLoweredResultType(),
-                  isBridgingExplicit())
-    );
+        getBridging(getKind(), getSourceType().getOptionalObjectType(),
+                    getResultType(), getLoweredResultType(),
+                    getBridgingOriginalInputType(), isBridgingExplicit()));
   }
   llvm_unreachable("bad kind");
 }
@@ -1373,9 +1366,9 @@ Conversion::adjustForInitialOptionalConversions(CanType newSourceType) const {
   case BridgeToObjC:
   case BridgeFromObjC:
   case BridgeResultFromObjC:
-    return Conversion::getBridging(getKind(), newSourceType,
-                                   getResultType(), getLoweredResultType(),
-                                   isBridgingExplicit());
+    return Conversion::getBridging(
+        getKind(), newSourceType, getResultType(), getLoweredResultType(),
+        getBridgingOriginalInputType(), isBridgingExplicit());
   }
   llvm_unreachable("bad kind");
 }
@@ -1394,9 +1387,9 @@ std::optional<Conversion> Conversion::adjustForInitialForceValue() const {
 
   case BridgeToObjC: {
     auto sourceOptType = getSourceType().wrapInOptionalType();
-    return Conversion::getBridging(ForceAndBridgeToObjC,
-                                   sourceOptType, getResultType(),
-                                   getLoweredResultType(),
+    return Conversion::getBridging(ForceAndBridgeToObjC, sourceOptType,
+                                   getResultType(), getLoweredResultType(),
+                                   getBridgingOriginalInputType(),
                                    isBridgingExplicit());
   }
   }

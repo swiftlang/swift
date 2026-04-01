@@ -18,9 +18,15 @@
 #ifndef SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 #define SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringMap.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
+
+namespace {
+struct ExpectedDiagnosticInfo;
+}
 
 namespace swift {
 class DependencyTracker;
@@ -94,6 +100,8 @@ class DiagnosticVerifier : public DiagnosticConsumer {
   ArrayRef<std::string> AdditionalFilePaths;
   bool AutoApplyFixes;
   bool IgnoreUnknown;
+  bool IgnoreUnrelated;
+  bool IgnoreMacroLocationNote;
   bool UseColor;
   ArrayRef<std::string> AdditionalExpectedPrefixes;
 
@@ -101,11 +109,13 @@ public:
   explicit DiagnosticVerifier(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
                               ArrayRef<std::string> AdditionalFilePaths,
                               bool AutoApplyFixes, bool IgnoreUnknown,
-                              bool UseColor,
+                              bool IgnoreUnrelated,
+                              bool IgnoreMacroLocationNote, bool UseColor,
                               ArrayRef<std::string> AdditionalExpectedPrefixes)
       : SM(SM), BufferIDs(BufferIDs), AdditionalFilePaths(AdditionalFilePaths),
         AutoApplyFixes(AutoApplyFixes), IgnoreUnknown(IgnoreUnknown),
-        UseColor(UseColor),
+        IgnoreUnrelated(IgnoreUnrelated),
+        IgnoreMacroLocationNote(IgnoreMacroLocationNote), UseColor(UseColor),
         AdditionalExpectedPrefixes(AdditionalExpectedPrefixes) {}
 
   virtual void handleDiagnostic(SourceManager &SM,
@@ -126,13 +136,34 @@ private:
 
   void printDiagnostic(const llvm::SMDiagnostic &Diag) const;
 
+  /// Check whether there were any diagnostics in files without expected
+  /// diagnostics
+  bool verifyUnrelated(
+      std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
+
   bool
   verifyUnknown(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
+
+  std::vector<llvm::SMDiagnostic> Errors;
 
   /// verifyFile - After the file has been processed, check to see if we
   /// got all of the expected diagnostics and check to see if there were any
   /// unexpected ones.
   Result verifyFile(unsigned BufferID);
+  bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx);
+  unsigned parseExpectedDiagInfo(unsigned BufferID, StringRef MatchStart,
+                                 unsigned &PrevExpectedContinuationLine,
+                                 ExpectedDiagnosticInfo &Expected);
+  void
+  verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
+                    unsigned BufferID);
+  void verifyRemaining(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
+                       const char *FileStart);
+  void addError(const char *Loc, const Twine &message,
+                ArrayRef<llvm::SMFixIt> FixIts = {});
+
+  std::optional<LineColumnRange>
+  parseExpectedFixItRange(StringRef &Str, unsigned DiagnosticLineNo);
 
   bool checkForFixIt(const std::vector<ExpectedFixIt> &ExpectedAlts,
                      const CapturedDiagnosticInfo &D, unsigned BufferID) const;
@@ -140,6 +171,27 @@ private:
   // Render the verifier syntax for a given set of fix-its.
   std::string renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
                            unsigned BufferID, unsigned DiagnosticLineNo) const;
+
+  llvm::DenseMap<SourceLoc, unsigned> Expansions;
+
+  struct MarkerLocation {
+    unsigned BufferID;
+    unsigned Line;
+  };
+
+  /// Map from location marker names to their buffer and line number.
+  /// Populated by scanForMarkers() before parsing expected diagnostics.
+  llvm::StringMap<MarkerLocation> LocationMarkers;
+
+  /// Scan the buffer for location marker definitions (// #name).
+  void scanForMarkers(unsigned BufferID);
+
+  /// Check whether any location marker is defined at the given buffer and line.
+  bool hasMarkerAtLine(unsigned BufferID, unsigned Line) const;
+
+  /// Report any remaining diagnostics on lines with markers that were deferred
+  /// during per-file verification. Returns true if any were found.
+  bool verifyDeferredMarkerDiagnostics();
 
   void printRemainingDiagnostics() const;
 };

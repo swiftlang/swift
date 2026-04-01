@@ -52,12 +52,27 @@ set(SWIFTSTATICLIB_DIR
 set(SWIFTLIBEXEC_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/libexec/swift")
 
-function(_compute_lto_flag option out_var)
+function(_is_lto_enabled option out_var)
   string(TOLOWER "${option}" lowercase_option)
-  if (lowercase_option STREQUAL "full")
-    set(${out_var} "-flto=full" PARENT_SCOPE)
-  elseif (lowercase_option STREQUAL "thin")
-    set(${out_var} "-flto=thin" PARENT_SCOPE)
+  if (lowercase_option STREQUAL "full" OR lowercase_option STREQUAL "thin")
+    set(${out_var} TRUE PARENT_SCOPE)
+  else()
+    set(${out_var} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
+# Not every compiler supports -fno-lto (MSVC, for example).
+check_cxx_compiler_flag("-fno-lto" CXX_COMPILER_SUPPORTS_FNO_LTO)
+
+function(_compute_lto_flag option out_var)
+  _is_lto_enabled("${option}" _lto_enabled)
+  if (_lto_enabled)
+    string(TOLOWER "${option}" lowercase_option)
+    set(${out_var} "-flto=${lowercase_option}" PARENT_SCOPE)
+  elseif (CXX_COMPILER_SUPPORTS_FNO_LTO)
+    set(${out_var} "-fno-lto" PARENT_SCOPE)
+  else()
+    set(${out_var} "" PARENT_SCOPE)
   endif()
 endfunction()
 
@@ -148,10 +163,8 @@ function(_add_host_variant_c_compile_link_flags name)
   endif()
 
   _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
-  if (_lto_flag_out)
-    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${_lto_flag_out}>)
-    target_link_options(${name} PRIVATE ${_lto_flag_out})
-  endif()
+  target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${_lto_flag_out}>)
+  target_link_options(${name} PRIVATE ${_lto_flag_out})
 
   if(SWIFT_ANALYZE_CODE_COVERAGE)
      set(_cov_flags $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-fprofile-instr-generate -fcoverage-mapping>)
@@ -196,8 +209,8 @@ function(_add_host_variant_c_compile_flags target)
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debuginfo)
     if(debuginfo)
-      _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
-      if(_lto_flag_out)
+      _is_lto_enabled("${SWIFT_TOOLS_ENABLE_LTO}" _lto_enabled)
+      if(_lto_enabled)
         target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-gline-tables-only>)
       else()
         target_compile_options(${target} PRIVATE ${SWIFT_DEBUGINFO_NON_LTO_ARGS})
@@ -216,7 +229,22 @@ function(_add_host_variant_c_compile_flags target)
     endif()
 
     target_compile_definitions(${target} PRIVATE
-      $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:LLVM_ON_WIN32 _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS>)
+      $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:
+      # NOTE(compnerd) we are hosting on Windows, indicate that to LLVM
+      LLVM_ON_WIN32
+      # NOTE(compnerd) Ignore the warnings from Microsoft related to deprecation
+      # of C standard functions (primarily due to a combination of security and
+      # compliance). While ideally we would migrate to the safer variants, this
+      # is currently expedient.
+      _CRT_SECURE_NO_WARNINGS
+      _CRT_NONSTDC_NO_WARNINGS
+      # NOTE(compnerd) enable UTF-16 codepaths always on Windows. We do not want
+      # to use the ANSI codepaths by default as any filesystem access can cause
+      # problems. Additionally, the Unicode variant is required for extended
+      # paths. Enable Win32 Unicode paths (`UNICODE`) and the UCRT/STL unicode
+      # paths (`_UNICODE`).
+      UNICODE
+      _UNICODE>)
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
       target_compile_definitions(${target} PRIVATE
         $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:_CRT_USE_BUILTIN_OFFSETOF>)
@@ -249,11 +277,12 @@ function(_add_host_variant_c_compile_flags target)
     # TODO(compnerd) when moving up to VS 2017 15.3 and newer, we can disable
     # RTTI again
     if(SWIFT_COMPILER_IS_MSVC_LIKE)
-      target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:/GR->)
+      target_compile_options(${target} PRIVATE
+        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:/GR->)
     else()
       target_compile_options(${target} PRIVATE
         $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-frtti>
-        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>"SHELL:-Xclang -fno-rtti-data">)
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang -fno-rtti-data>")
     endif()
 
     # NOTE: VS 2017 15.3 introduced this to disable the static components of
@@ -261,14 +290,6 @@ function(_add_host_variant_c_compile_flags target)
     # guarantees on the SDK version currently.
     target_compile_definitions(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:_HAS_STATIC_RTTI=0>)
-
-    # NOTE(compnerd) workaround LLVM invoking `add_definitions(-D_DEBUG)` which
-    # causes failures for the runtime library when cross-compiling due to
-    # undefined symbols from the standard library.
-    if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-      target_compile_options(${target} PRIVATE
-        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-U_DEBUG>)
-    endif()
   endif()
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID")
@@ -550,6 +571,19 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
         else()
           get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
           get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+
+          # Detect and handle swiftly-managed hosts.
+          if(swift_bin_dir MATCHES ".*/swiftly/bin")
+            execute_process(COMMAND swiftly use --print-location
+              OUTPUT_VARIABLE swiftly_dir
+              ERROR_VARIABLE err)
+            if(err)
+              message(SEND_ERROR "Failed to find swiftly Swift compiler")
+            endif()
+            string(STRIP "${swiftly_dir}" swiftly_dir)
+            set(swift_dir "${swiftly_dir}/usr")
+          endif()
+
         endif()
         set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       else()
@@ -611,6 +645,19 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
         else()
           get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
           get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+
+          # Detect and handle swiftly-managed hosts.
+          if(swift_bin_dir MATCHES ".*/swiftly/bin")
+            execute_process(COMMAND swiftly use --print-location
+              OUTPUT_VARIABLE swiftly_dir
+              ERROR_VARIABLE err)
+            if(err)
+              message(SEND_ERROR "Failed to find swiftly Swift compiler")
+            endif()
+            string(STRIP "${swiftly_dir}" swiftly_dir)
+            set(swift_dir "${swiftly_dir}/usr")
+          endif()
+
           set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
           target_link_directories(${target} PRIVATE ${host_lib_dir})
 
@@ -771,18 +818,17 @@ function(add_swift_host_library name)
       # way to pass -Xclang arguments.
       if ("${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC")
         target_compile_options(${name} PRIVATE
-          $<$<COMPILE_LANGUAGE:C,CXX>:SHELL:/clang:-Xclang /clang:-ivfsoverlay /clang:-Xclang /clang:${ASHL_VFS_OVERLAY}>)
+          "$<$<COMPILE_LANGUAGE:C,CXX>:SHELL:/clang:-Xclang /clang:-ivfsoverlay /clang:-Xclang /clang:${ASHL_VFS_OVERLAY}>")
       else()
         target_compile_options(${name} PRIVATE
-          $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang -ivfsoverlay -Xclang ${ASHL_VFS_OVERLAY}">)
+          "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang -ivfsoverlay -Xclang ${ASHL_VFS_OVERLAY}>")
 
           # MSVC doesn't support -Xclang. We don't need to manually specify
           # the dependent libraries as `cl`/`clang-cl` does so.
           target_compile_options(${name} PRIVATE
-            $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=oldnames">
+            "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=oldnames>"
             # TODO(compnerd) handle /MT, /MTd
-            $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>">
-            )
+            "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>>")
       endif()
     endif()
 
@@ -961,15 +1007,14 @@ function(add_swift_host_tool executable)
       # MSVC doesn't support -Xclang. We don't need to manually specify
       # the dependent libraries as `cl`/`clang-cl` does so.
       target_compile_options(${executable} PRIVATE
-        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=oldnames">
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=oldnames>"
         # TODO(compnerd) handle /MT, /MTd
-        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>">
-        )
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>>")
     endif()
   endif()
 
   # Opt-out of OpenBSD BTCFI if instructed where it is enforced by default.
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL "OPENBSD" AND SWIFT_HOST_VARIANT_ARCH STREQUAL "aarch64" AND NOT SWIFT_OPENBSD_BTCFI)
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL "OPENBSD" AND SWIFT_HOST_VARIANT_ARCH MATCHES "aarch64|x86_64" AND NOT SWIFT_OPENBSD_BTCFI)
     target_link_options(${executable} PRIVATE "LINKER:-z,nobtcfi")
   endif()
 

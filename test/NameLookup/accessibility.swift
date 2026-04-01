@@ -2,7 +2,7 @@
 // RUN: cp %s %t/main.swift
 
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/has_accessibility.swift -D DEFINE_VAR_FOR_SCOPED_IMPORT -enable-testing
-// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -enable-access-control -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -enable-access-control -verify -verify-ignore-unrelated -verify-ignore-unknown
 // RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -disable-access-control -D ACCESS_DISABLED
 // RUN: not %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -D TESTABLE 2>&1 | %FileCheck -check-prefix=TESTABLE %s
 
@@ -37,7 +37,7 @@ markUsed(z) // expected-error {{cannot find 'z' in scope}}
 
 markUsed(a)
 markUsed(b)
-markUsed(c) // expected-error {{cannot find 'c' in scope}}
+markUsed(c) // expected-error {{'c' is inaccessible due to 'private' protection level}}
 
 Foo.x()
 Foo.y() // expected-error {{'y' is inaccessible due to 'internal' protection level}}
@@ -64,7 +64,7 @@ _ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible 
 // TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' initializer is inaccessible due to 'private' protection level
 
 var s = StructWithPrivateSetter()
-// expected-note@-1 3{{did you mean 's'?}}
+// expected-note@-1 2{{did you mean 's'?}}
 s.x = 42 // expected-error {{cannot assign to property: 'x' setter is inaccessible}}
 
 class Sub : Base {

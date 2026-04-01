@@ -46,7 +46,23 @@ public:
 private:
   // Flags stored in the low bits of the task pointer.
   enum {
+    /// Whether the result buffer (the `void*` passed to all the various
+    /// runtime functions) has already been initialized. This implies that
+    /// the async let task has completed (and without throwing).
+    ///
+    /// Note that the result buffer is currently a *copy* of the actual
+    /// return value: we currently set up the task so that it evaluates
+    /// into a future, then wait on that future the same way we would
+    /// wait for an unstructured task. This is wasteful, since async let
+    /// tasks always have a single waiter; there's no good reason not to
+    /// evaluate the task directly into the result buffer and avoid the
+    /// copy.
     HasResult = 1 << 0,
+
+    /// Whether the task was allocated with the parent task's stack
+    /// allocator. We normally try to use the allocation given to us by
+    /// the compiler, but if that's not big enough, the runtime must
+    /// allocate more memory.
     DidAllocateFromParentTask = 1 << 1,
   };
 
@@ -160,32 +176,7 @@ void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
 }
 
 // =============================================================================
-// ==== start ------------------------------------------------------------------
-
-SWIFT_CC(swift)
-void swift::swift_asyncLet_start(AsyncLet *alet,
-                                 TaskOptionRecord *options,
-                                 const Metadata *futureResultType,
-                                 void *closureEntryPoint,
-                                 HeapObject *closureContext) {
-  auto flags = TaskCreateFlags();
-#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
-  // In the task to thread model, we don't want tasks to start running on
-  // separate threads - they will run in the context of the parent
-  flags.setEnqueueJob(false);
-#else
-  flags.setEnqueueJob(true);
-#endif
-
-  AsyncLetTaskOptionRecord asyncLetOptionRecord(alet);
-  asyncLetOptionRecord.Parent = options;
-
-  swift_task_create(
-      flags.getOpaqueValue(),
-      &asyncLetOptionRecord,
-      futureResultType,
-      closureEntryPoint, closureContext);
-}
+// ==== begin ------------------------------------------------------------------
 
 SWIFT_CC(swift)
 void swift::swift_asyncLet_begin(AsyncLet *alet,
@@ -216,30 +207,6 @@ void swift::swift_asyncLet_begin(AsyncLet *alet,
       &asyncLetOptionRecord,
       futureResultType,
       closureEntryPoint, closureContext);
-}
-
-// =============================================================================
-// ==== wait -------------------------------------------------------------------
-
-SWIFT_CC(swiftasync)
-static void swift_asyncLet_waitImpl(
-    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-    AsyncLet *alet, TaskContinuationFunction *resumeFunction,
-    AsyncContext *callContext) {
-  auto task = alet->getTask();
-  swift_task_future_wait(result, callerContext, task, resumeFunction,
-                         callContext);
-}
-
-SWIFT_CC(swiftasync)
-static void swift_asyncLet_wait_throwingImpl(
-    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-    AsyncLet *alet,
-    ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
-    AsyncContext * callContext) {
-  auto task = alet->getTask();
-  swift_task_future_wait_throwing(result, callerContext, task, resumeFunction,
-                                  callerContext);
 }
 
 // =============================================================================
@@ -324,30 +291,6 @@ static void swift_asyncLet_get_throwingImpl(
 }
 
 // =============================================================================
-// ==== end --------------------------------------------------------------------
-
-SWIFT_CC(swift)
-static void swift_asyncLet_endImpl(AsyncLet *alet) {
-  auto task = alet->getTask();
-
-  // Cancel the task as we exit the scope
-  swift_task_cancel(task);
-
-  // Remove the child record from the parent task
-  auto record = asImpl(alet)->getTaskRecord();
-  removeStatusRecordFromSelf(record);
-
-  // TODO: we need to implicitly await either before the end or here somehow.
-
-  // and finally, release the task and free the async-let
-  AsyncTask *parent = swift_task_getCurrent();
-  assert(parent && "async-let must have a parent task");
-
-  SWIFT_TASK_DEBUG_LOG("async let end of task %p, parent: %p", task, parent);
-  _swift_task_dealloc_specific(parent, task);
-}
-
-// =============================================================================
 // ==== finish -----------------------------------------------------------------
 
 SWIFT_CC(swiftasync)
@@ -359,24 +302,27 @@ static void asyncLet_finish_after_task_completion(SWIFT_ASYNC_CONTEXT AsyncConte
                                                   TaskContinuationFunction *resumeFunction,
                                                   AsyncContext *callContext,
                                                   SWIFT_CONTEXT void *error) {
+  auto parentTask = swift_task_getCurrent();
+  assert(parentTask && "async-let must have a parent task");
+
   auto task = alet->getTask();
 
   // Remove the child record from the parent task
   auto record = asImpl(alet)->getTaskRecord();
   removeStatusRecordFromSelf(record);
 
-  // and finally, release the task and destroy the async-let
-  assert(swift_task_getCurrent() && "async-let must have a parent task");
-
-  SWIFT_TASK_DEBUG_LOG("async let end of task %p, parent: %p", task,
-                       swift_task_getCurrent());
-  // Destruct the task.
+  // Destroy the task. Note that this destroys the copy of the result
+  // (error or normal) in the task's future fragment.
+  SWIFT_TASK_DEBUG_LOG("async let end of task %p, parent: %p", task, parentTask);
   task->~AsyncTask();
-  // Deallocate it out of the parent, if it was allocated there.
+
+  // Deallocate the memory for the child task, if it was allocated with
+  // the parent's stack allocator.
   if (alet->didAllocateFromParentTask()) {
-    swift_task_dealloc(task);
+    _swift_task_dealloc_specific(parentTask, (void*) task);
   }
 
+  // Call the continuation function.
   return function_cast<ThrowingTaskFutureWaitContinuationFunction*>(resumeFunction)
     (callerContext, error);
 }
@@ -391,6 +337,11 @@ static void _asyncLet_finish_continuation(
     = reinterpret_cast<AsyncLetContinuationContext*>(callContext);
   auto alet = continuationContext->alet;
   auto resultBuffer = continuationContext->resultBuffer;
+
+  // We waited for the task using swift_task_future_wait_throwing,
+  // which means we've been passed a copy of the result in the future
+  // fragment (either an error, if the task threw, or the result
+  // in the result buffer). Destroy that copy now.
 
   // Destroy the error, or the result that was stored to the buffer.
   if (error) {

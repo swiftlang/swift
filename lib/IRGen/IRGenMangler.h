@@ -382,8 +382,12 @@ public:
       const ProtocolDecl *requirement) {
     beginMangling();
     appendAnyGenericType(proto);
-    bool isFirstAssociatedTypeIdentifier = true;
-    appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    if (isa<GenericTypeParamType>(subject)) {
+      appendType(subject, nullptr);
+    } else {
+      bool isFirstAssociatedTypeIdentifier = true;
+      appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    }
     appendProtocolName(requirement);
     appendOperator("TN");
     return finalize();
@@ -685,7 +689,8 @@ public:
   std::string mangleSymbolNameForMangledMetadataAccessorString(
                                            const char *kind,
                                            CanGenericSignature genericSig,
-                                           CanType type);
+                                           CanType type,
+                                           MangledTypeRefRole role);
 
   std::string mangleSymbolNameForMangledConformanceAccessorString(
                                            const char *kind,

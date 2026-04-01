@@ -155,4 +155,21 @@ TemporaryAllocationTestSuite.test("typedAllocationIsAligned") {
   }
 }
 
+// MARK: Typed throws
+enum HomeworkError: Error, Equatable {
+case dogAteIt
+case forgot
+}
+
+TemporaryAllocationTestSuite.test("typedAllocationWithThrow") {
+  do throws(HomeworkError) {
+    try withUnsafeTemporaryAllocation(of: Int.self, capacity: 1) { (buffer) throws(HomeworkError) -> Void in
+      throw HomeworkError.forgot
+    }
+    fatalError("did not throw!?!")
+  } catch {
+    expectEqual(error, .forgot)
+  }
+}
+
 runAllTests()

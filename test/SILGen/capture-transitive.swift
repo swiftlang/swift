@@ -1,4 +1,7 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-WEAK-LET
+// RUN: %target-swift-emit-silgen -enable-upcoming-feature ImmutableWeakCaptures %s | %FileCheck %s --check-prefixes=CHECK,CHECK-HAS-WEAK-LET
+
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 
 // https://github.com/apple/swift/issues/50924
 
@@ -31,7 +34,7 @@ class C {
 
     func returnsSelf1() -> Self {
         return { [weak self] in self?.f(); return .init() }()
-        // CHECK-LABEL: sil private [ossa] @{{.*}}returnsSelf{{.*}} : $@convention(thin) (@in_guaranteed @sil_weak Optional<C>, @thick @dynamic_self C.Type) -> @owned C {
+        // CHECK-LABEL: sil private [ossa] @{{.*}}returnsSelf{{.*}}  : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @thick @dynamic_self C.Type) -> @owned C
     }
 
     func returnsSelf2() -> Self {

@@ -85,7 +85,7 @@ public func passingVarAsInout() {
   modifyInout(&staticVar)
 }
 // CHECK: define {{.*}}void @"$s4main17passingVarAsInoutyyF"()
-// CHECK: call swiftcc void @"$s4main11modifyInoutyys5Int32VzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable(4) @{{_ZL9staticVar|staticVar}})
+// CHECK: call swiftcc void @"$s4main11modifyInoutyys5Int32VzF"(ptr captures(none) dereferenceable(4) @{{_ZL9staticVar|staticVar}})
 
 // CHECK: define internal void @_GLOBAL__sub_I__swift_imported_modules_()
 // CHECK: call void @{{__cxx_global_var_init|"\?\?__EstaticVarInit@@YAXXZ"}}()

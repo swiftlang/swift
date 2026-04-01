@@ -412,7 +412,7 @@ SWIFT_CLASS("_TtC8comments13UnorderedList")
 - (void)f0;
 @end
 
-#endif
+#endif // defined(__OBJC__)
 #if __has_attribute(external_source_symbol)
 # pragma clang attribute pop
 #endif

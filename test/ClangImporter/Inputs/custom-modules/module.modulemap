@@ -2,6 +2,11 @@ module script {
   header "script.h"
 }
 
+module AndroidVersioning {
+  header "AndroidVersioning.h"
+  export *
+}
+
 module AvailabilityExtras {
   header "AvailabilityExtras.h"
   export *
@@ -91,6 +96,10 @@ module LinkMusket {
 
 module MissingHeader {
   header "this-header-does-not-exist.h"
+}
+
+module SimpleSwiftNewtypes {
+  header "SimpleSwiftNewtypes.h"
 }
 
 module MoreSwiftNewtypes {
@@ -282,4 +291,14 @@ module Aliases {
 
 module RetroactiveVersioning {
   header "versioning.h"
+}
+
+module CVarArgs {
+  header "CVarArgs.h"
+  export *
+}
+
+module SystemModuleWithWarnings {
+  header "SystemModuleWithWarnings.h"
+  export *
 }

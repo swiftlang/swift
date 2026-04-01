@@ -1,17 +1,22 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature BorrowingForLoop)
 
 // Also test this with a bridging header instead of the StdMap module.
 // RUN: %empty-directory(%t2)
 // RUN: cp %S/Inputs/std-map.h %t2/std-map-bridging-header.h
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -Xfrontend -enable-experimental-cxx-interop)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=swift-6 -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature BorrowingForLoop)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_BorrowingForLoop
 //
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=freebsd
+
+// Undefined hidden symbol to C++ voidify in libcxx
+// rdar://121551667
+// XFAIL: OS=freebsd
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
@@ -300,6 +305,85 @@ StdMapTestSuite.test("UnorderedMap.subscript(:default:)") {
   expectEqual(m[-5, default: 555], 555)
 }
 
+StdMapTestSuite.test("Map.mapValues") {
+  let m = initMap()
+  let n = m.mapValues { v in v * 2 }
+  expectEqual(n[1], 6)
+  expectEqual(n[2], 4)
+  expectEqual(n[3], 6)
+
+  let n2: MapIntString = m.mapValues { v in std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("9"))
+  expectEqual(n2[2], std.string("6"))
+  expectEqual(n2[3], std.string("9"))
+
+  let n3: UnorderedMap = m.mapValues { v in v * 4 }
+  expectEqual(n3[1], 12)
+  expectEqual(n3[2], 8)
+  expectEqual(n3[3], 12)
+}
+
+StdMapTestSuite.test("UnorderedMap.mapValues") {
+  let m = initUnorderedMap()
+  let n = m.mapValues { v in v * 2 }
+  expectEqual(n[1], 6)
+  expectEqual(n[2], 4)
+  expectEqual(n[3], 6)
+
+  let n2: UnorderedIntString = m.mapValues { v in std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("9"))
+  expectEqual(n2[2], std.string("6"))
+  expectEqual(n2[3], std.string("9"))
+
+  let n3: Map = m.mapValues { v in v * 4 }
+  expectEqual(n3[1], 12)
+  expectEqual(n3[2], 8)
+  expectEqual(n3[3], 12)
+}
+
+StdMapTestSuite.test("Map.compactMapValues") {
+  let m = Map([1: 1, 2: 2, 3: 3, 4: 4])
+  let n = m.compactMapValues { v in v % 2 == 0 ? nil : v * 2 }
+  expectEqual(n[1], 2)
+  expectNil(n[2])
+  expectEqual(n[3], 6)
+  expectNil(n[4])
+
+  let n2: MapIntString = m.compactMapValues { v in v % 2 == 0 ? nil : std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("3"))
+  expectNil(n2[2])
+  expectEqual(n2[3], std.string("9"))
+  expectNil(n2[4])
+
+  let n3: UnorderedMap = m.compactMapValues { v in v % 2 == 0 ? nil : v * 4 }
+  expectEqual(n3[1], 4)
+  expectNil(n3[2])
+  expectEqual(n3[3], 12)
+  expectNil(n3[4])
+}
+
+StdMapTestSuite.test("UnorderedMap.compactMapValues") {
+  let m = UnorderedMap([1: 1, 2: 2, 3: 3, 4: 4])
+
+  let n = m.compactMapValues { v in v % 2 == 0 ? nil : v * 2 }
+  expectEqual(n[1], 2)
+  expectNil(n[2])
+  expectEqual(n[3], 6)
+  expectNil(n[4])
+
+  let n2: UnorderedIntString = m.compactMapValues { v in v % 2 == 0 ? nil : std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("3"))
+  expectNil(n2[2])
+  expectEqual(n2[3], std.string("9"))
+  expectNil(n2[4])
+
+  let n3: Map = m.compactMapValues { v in v % 2 == 0 ? nil : v * 4 }
+  expectEqual(n3[1], 4)
+  expectNil(n3[2])
+  expectEqual(n3[3], 12)
+  expectNil(n3[4])
+}
+
 StdMapTestSuite.test("Map.filter") {
   var m = initMap()
   var n = initEmptyMap()
@@ -556,6 +640,21 @@ StdMapTestSuite.test("UnorderedMap.merge(CxxDictionary)") {
   expectEqual(map[3], 6)
   expectEqual(map[4], 7)
 }
+
+// FIXME importing a move-only std::pair into Swift causes a crash in the MoveOnlyChecker, in Linux
+#if os(macOS) || os(Windows)
+StdMapTestSuite.test("MapNonCopyableValue Borrowing Iterators").require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let map = initMapNonCopyableValue()
+  var counter = 0
+  for el in map {
+    expectEqual(el.first, el.second.number)
+    counter += 1
+  }
+  expectEqual(counter, 3)
+}
+#endif
 
 // `merging` is implemented by calling `merge`, so we can skip this test
 

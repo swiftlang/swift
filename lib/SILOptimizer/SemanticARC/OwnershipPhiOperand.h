@@ -36,6 +36,7 @@ public:
 
 private:
   Operand *op;
+  SILValue original;
 
   OwnershipPhiOperand(Operand *op) : op(op) {}
 
@@ -70,10 +71,14 @@ public:
   Operand *getOperand() const { return op; }
   SILValue getValue() const { return op->get(); }
   SILType getType() const { return op->get()->getType(); }
+  SILValue getOriginal() const { return original; }
 
   unsigned getOperandNumber() const { return op->getOperandNumber(); }
 
-  void markUndef() & { op->set(SILUndef::get(getValue())); }
+  void markUndef() & {
+    original = op->get();
+    op->set(SILUndef::get(getValue()));
+  }
 
   SILInstruction *getInst() const { return op->getUser(); }
 

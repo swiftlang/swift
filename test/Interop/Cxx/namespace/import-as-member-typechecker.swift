@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
 
 import ImportAsMember
 
@@ -21,4 +21,4 @@ func takesDeepNestedStruct(_ s: MyNS.MyDeepNS.DeepNestedStruct) {
 }
 
 MyNS.method() // expected-error {{type 'MyNS' has no member 'method'}}
-MyNS.nestedMethod() // expected-error {{type of expression is ambiguous without a type annotation}}
+MyNS.nestedMethod() // expected-error {{failed to produce diagnostic for expression}}

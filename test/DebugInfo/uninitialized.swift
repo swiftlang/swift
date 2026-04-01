@@ -9,7 +9,7 @@ public func f() {
   // CHECK: %[[OBJ:.*]] = alloca ptr, align
   // CHECK: #dbg_declare(ptr %[[OBJ]],
   // CHECK: void @llvm.memset.{{.*}}(ptr align {{(4|8)}} %[[OBJ]], i8 0,
-  // CHECK-SAME:                    ){{$}}
+  // CHECK-SAME:                    ), !Swift.isSwiftLLDBpreinit
   // OPT-NOT: @llvm.memset
   // OPT: ret
 }
@@ -21,7 +21,7 @@ public func g() {
   // CHECK: %[[DICT:.*]] = alloca
   // CHECK: #dbg_declare(ptr %[[DICT]],
   // CHECK: void @llvm.memset.{{.*}}(ptr align {{(4|8)}} %[[DICT]], i8 0,
-  // CHECK-SAME:                    ){{$}}
+  // CHECK-SAME:                    ), !Swift.isSwiftLLDBpreinit
   // OPT-NOT: @llvm.memset
   // OPT: ret
 }

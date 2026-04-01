@@ -395,7 +395,10 @@ public:
     }
     case Kind::Closure: return getClosure()->getType();
     case Kind::Parameter:
-      return getParameter()->getInterfaceType()->lookThroughAllOptionalTypes();
+      auto *param = getParameter();
+      auto *dc = param->getDeclContext();
+      return dc->mapTypeIntoEnvironment(param->getInterfaceType())
+          ->lookThroughAllOptionalTypes();
     }
     llvm_unreachable("bad kind");
   }
@@ -1488,7 +1491,8 @@ public:
         module = var->getDeclContext()->getParentModule();
       }
       if (!isLetAccessibleAnywhere(module, var, options)) {
-        return options.contains(ActorReferenceResult::Flags::Preconcurrency);
+        return options.contains(
+            ActorReferenceResult::Flags::CompatibilityDowngrade);
       }
     }
 
@@ -1984,15 +1988,20 @@ public:
           classifier.AsyncKind, /*FIXME:*/PotentialEffectReason::forApply());
     }
 
-    case EffectKind::Unsafe:
-      llvm_unreachable("Unimplemented");
+    case EffectKind::Unsafe: {
+      FunctionUnsafeClassifier classifier(*this);
+      stmt->walk(classifier);
+      return classifier.classification;
     }
+    }
+    llvm_unreachable("Bad effect");
   }
 
   /// Check to see if the given for-each statement to determine if it
   /// throws or is async.
   Classification classifyForEach(ForEachStmt *stmt) {
-    if (!stmt->getNextCall())
+    auto *desugaredStmt = stmt->getDesugaredStmt();
+    if (!desugaredStmt)
       return Classification::forInvalidCode();
 
     // If there is an 'await', the for-each loop is always async.
@@ -2006,11 +2015,11 @@ public:
           PotentialEffectReason::forApply()));
     }
 
-    // Merge the thrown result from the next/nextElement call.
-    result.merge(classifyExpr(stmt->getNextCall(), EffectKind::Throws));
+    result.merge(classifyStmt(desugaredStmt, EffectKind::Async));
 
-    // Merge unsafe effect from the next/nextElement call.
-    result.merge(classifyExpr(stmt->getNextCall(), EffectKind::Unsafe));
+    result.merge(classifyStmt(desugaredStmt, EffectKind::Throws));
+
+    result.merge(classifyStmt(desugaredStmt, EffectKind::Unsafe));
 
     return result;
   }
@@ -2850,9 +2859,6 @@ public:
 
     /// The guard expression controlling a catch.
     CatchGuard,
-
-    /// A defer body
-    DeferBody,
   };
 
 private:
@@ -2969,6 +2975,21 @@ public:
     return isa<AutoClosureExpr>(closure);
   }
 
+  bool isDeferBody() const {
+    if (!Function)
+      return false;
+
+    if (ErrorHandlingIgnoresFunction)
+      return false;
+
+    auto fnDecl =
+        dyn_cast_or_null<FuncDecl>(Function->getAbstractFunctionDecl());
+    if (!fnDecl)
+      return false;
+
+    return fnDecl->isDeferBody();
+  }
+
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
     // Top-level code implicitly handles errors.
     return Context(/*handlesErrors=*/true,
@@ -2993,10 +3014,6 @@ public:
     }
 
     return Context(D->hasThrows(), D->isAsyncContext(), AnyFunctionRef(D), D);
-  }
-
-  static Context forDeferBody(DeclContext *dc) {
-    return Context(Kind::DeferBody, dc);
   }
 
   static Context forInitializer(Initializer *init) {
@@ -3042,10 +3059,6 @@ public:
 
   static Context forCatchGuard(CaseStmt *S, DeclContext *dc) {
     return Context(Kind::CatchGuard, dc);
-  }
-
-  static Context forPatternBinding(PatternBindingDecl *binding) {
-    return getContextForPatternBinding(binding);
   }
 
   Context withInterpolatedString(InterpolatedStringLiteralExpr *E) const {
@@ -3207,8 +3220,10 @@ public:
       }
     }
 
-    Diags.diagnose(loc, message).highlight(highlight)
-      .warnUntilSwiftVersionIf(classification.shouldDowngradeToWarning(), 6);
+    Diags.diagnose(loc, message)
+        .highlight(highlight)
+        .warnUntilLanguageModeIf(classification.shouldDowngradeToWarning(),
+                                 LanguageMode::v6);
     maybeAddRethrowsNote(Diags, loc, reason);
 
     // If this is a call without expected 'try[?|!]', like this:
@@ -3279,6 +3294,12 @@ public:
         return;
       }
 
+      if (isDeferBody()) {
+        Diags.diagnose(E.getStartLoc(), diag::throwing_op_in_defer_body,
+                       getEffectSourceName(reason));
+        return;
+      }
+
       if (hasPolymorphicEffect(EffectKind::Throws)) {
         diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                     diag::throwing_call_in_rethrows_function,
@@ -3299,7 +3320,6 @@ public:
     case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
-    case Kind::DeferBody:
       Diags.diagnose(E.getStartLoc(), diag::throwing_op_in_illegal_context,
                  static_cast<unsigned>(getKind()), getEffectSourceName(reason));
       return;
@@ -3320,6 +3340,11 @@ public:
         return;
       }
 
+      if (isDeferBody()) {
+        Diags.diagnose(S->getStartLoc(), diag::throw_in_defer_body);
+        return;
+      }
+
       if (hasPolymorphicEffect(EffectKind::Throws)) {
         Diags.diagnose(S->getStartLoc(), diag::throw_in_rethrows_function);
         return;
@@ -3336,7 +3361,6 @@ public:
     case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
-    case Kind::DeferBody:
       Diags.diagnose(S->getStartLoc(), diag::throw_in_illegal_context,
                      static_cast<unsigned>(getKind()));
       return;
@@ -3344,14 +3368,13 @@ public:
     llvm_unreachable("bad context kind");
   }
 
-  void diagnoseUnhandledTry(DiagnosticEngine &Diags, TryExpr *E) {
+  void diagnoseUnhandledTry(DiagnosticEngine &Diags, SourceLoc tryLoc) {
     switch (getKind()) {
     case Kind::PotentiallyHandled:
       if (DiagnoseErrorOnTry) {
-        Diags.diagnose(
-            E->getTryLoc(),
-            IsNonExhaustiveCatch ? diag::try_unhandled_in_nonexhaustive_catch
-                                 : diag::try_unhandled);
+        Diags.diagnose(tryLoc, IsNonExhaustiveCatch
+                                   ? diag::try_unhandled_in_nonexhaustive_catch
+                                   : diag::try_unhandled);
       }
       return;
 
@@ -3363,7 +3386,6 @@ public:
     case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
-    case Kind::DeferBody:
       assert(!DiagnoseErrorOnTry);
       // Diagnosed at the call sites.
       return;
@@ -3444,6 +3466,21 @@ public:
   void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node,
                              std::optional<PotentialEffectReason> maybeReason,
                              bool forAwait = false) {
+
+    // If this is an apply of a defer body, emit a special diagnostic. We must
+    // check this before we check `isImplicit` below since these are always
+    // implicit!
+    if (auto *applyExpr = dyn_cast_or_null<ApplyExpr>(node.dyn_cast<Expr*>())) {
+      auto *calledDecl = applyExpr->getCalledValue(/*skipConversions=*/true);
+      if (auto *fnDecl = dyn_cast_or_null<FuncDecl>(calledDecl)) {
+        if (fnDecl->isDeferBody()) {
+          Diags.diagnose(fnDecl->getStartLoc(),
+                         diag::async_defer_in_non_async_context);
+          return;
+        }
+      }
+    }
+
     if (node.isImplicit()) {
       // The reason we return early on implicit nodes is that sometimes we
       // inject implicit closures, e.g. in 'async let' and we'd end up
@@ -3473,7 +3510,6 @@ public:
     case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
-    case Kind::DeferBody:
       diagnoseAsyncInIllegalContext(Diags, node);
       return;
     }
@@ -3624,10 +3660,6 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   llvm::DenseMap<Expr *, std::vector<DiagnosticInfo>> uncoveredAsync;
   llvm::DenseMap<Expr *, Expr *> parentMap;
 
-  /// The next/nextElement call expressions within for-in statements we've
-  /// seen.
-  llvm::SmallDenseSet<const Expr *> forEachNextCallExprs;
-  
   /// Expressions that are assumed to be safe because they are being
   /// passed directly into an explicitly `@safe` function.
   llvm::DenseSet<const Expr *> assumedSafeArguments;
@@ -3756,6 +3788,12 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     void enterNonExecuting() {
       Self.Flags.set(ContextFlags::IsTryCovered);
       Self.Flags.set(ContextFlags::IsAsyncCovered);
+    }
+
+    void assumeEffectsCovered() {
+      Self.Flags.set(ContextFlags::IsTryCovered);
+      Self.Flags.set(ContextFlags::IsAsyncCovered);
+      Self.Flags.set(ContextFlags::IsUnsafeCovered);
     }
 
     void refineLocalContext(Context newContext) {
@@ -4032,6 +4070,12 @@ private:
     ContextScope scope(*this, /*newContext*/ std::nullopt);
     scope.setCoverageForSingleValueStmtExpr();
     SVE->getStmt()->walk(*this);
+
+    if (auto preamble = SVE->getForExpressionPreamble()) {
+      preamble->ForAccumulatorDecl->walk(*this);
+      preamble->ForAccumulatorBinding->walk(*this);
+    }
+
     scope.preserveCoverageFromSingleValueStmtExpr();
     return ShouldNotRecurse;
   }
@@ -4373,11 +4417,6 @@ private:
                                     /*stopAtAutoClosure=*/false,
                                     EffectKind::Unsafe);
 
-        // We don't diagnose uncovered unsafe uses within the next/nextElement
-        // call, because they're handled already by the for-in loop checking.
-        if (forEachNextCallExprs.contains(anchor))
-          break;
-
         // Figure out a location to use if the unsafe use didn't have one.
         SourceLoc replacementLoc;
         if (anchor)
@@ -4522,7 +4561,7 @@ private:
     // Diagnose all the call sites within a single unhandled 'try'
     // at the same time.
     } else if (!CurContext.handlesThrows(ConditionalEffectKind::Conditional)) {
-      CurContext.diagnoseUnhandledTry(Ctx.Diags, E);
+      CurContext.diagnoseUnhandledTry(Ctx.Diags, E->getTryLoc());
     }
 
     scope.preserveCoverageFromTryOperand();
@@ -4574,17 +4613,24 @@ private:
   ShouldRecurse_t checkForEach(ForEachStmt *S) {
     // Reparent the type-checked sequence on the parsed sequence, so we can
     // find an anchor.
-    if (auto typeCheckedExpr = S->getTypeCheckedSequence()) {
+    if (auto typeCheckedExpr = S->getSequence()) {
       parentMap = typeCheckedExpr->getParentMap();
-
-      if (auto parsedSequence = S->getParsedSequence()) {
-        parentMap[typeCheckedExpr] = parsedSequence;
-      }
     }
 
-    // Note the nextCall expression.
-    if (auto nextCall = S->getNextCall()) {
-      forEachNextCallExprs.insert(nextCall);
+    // Walk everything
+    S->getPattern()->walk(*this);
+    S->getSequence()->walk(*this);
+    if (S->getWhere())
+      S->getWhere()->walk(*this);
+      
+    S->getBody()->walk(*this);
+
+    if (auto *desugared = S->getDesugaredStmt()) {
+      ContextScope scope(*this, std::nullopt);
+      // We enforce effects handling for the desugared statement below so no
+      // need to handle that here.
+      scope.assumeEffectsCovered();
+      desugared->walk(*this);
     }
 
     auto classification = getApplyClassifier().classifyForEach(S);
@@ -4602,13 +4648,15 @@ private:
     // AsyncSequence conformance.
     if (classification.hasThrows()) {
       auto throwsKind = classification.getConditionalKind(EffectKind::Throws);
-
       if (throwsKind != ConditionalEffectKind::None)
         Flags.set(ContextFlags::HasAnyThrowSite);
 
-      // Note: we don't need to check whether the throw error is handled,
-      // because we will also be checking the generated next/nextElement
-      // call.
+      if (!CurContext.handlesThrows(throwsKind)) {
+        auto tryLoc = S->getTryLoc();
+        CurContext.diagnoseUnhandledThrowSite(Ctx.Diags, S, tryLoc.isValid(),
+                                              classification.getThrowReason());
+        CurContext.diagnoseUnhandledTry(Ctx.Diags, tryLoc);
+      }
     }
 
     // Unsafety in the next/nextElement call is covered by an "unsafe" effect.
@@ -4621,13 +4669,22 @@ private:
         Ctx.Diags.diagnose(S->getForLoc(), diag::for_unsafe_without_unsafe)
           .fixItInsert(insertionLoc, "unsafe ");
 
-        for (const auto &unsafeUse : classification.getUnsafeUses()) {
+        for (auto unsafeUse : classification.getUnsafeUses()) {
+          // If we don't have a source location for this use, use the
+          // location of the `for` instead.
+          if (unsafeUse.getLocation().isInvalid())
+            unsafeUse.replaceLocation(S->getForLoc());
           diagnoseUnsafeUse(unsafeUse);
         }
       }
     }
 
-    return ShouldRecurse;
+    if (S->getUnsafeLoc().isValid() && !classification.hasUnsafe()) {
+      Ctx.Diags.diagnose(S->getUnsafeLoc(), diag::no_unsafe_in_unsafe_for)
+          .fixItRemove(S->getUnsafeLoc());
+    }
+
+    return ShouldNotRecurse;
   }
 
   ShouldRecurse_t checkDefer(DeferStmt *S) {
@@ -4635,7 +4692,6 @@ private:
     ContextScope scope(*this, std::nullopt);
     scope.enterUnsafe(S->getDeferLoc());
 
-    // Walk the call expression. We don't care about the rest.
     S->getCallExpr()->walk(*this);
 
     return ShouldNotRecurse;
@@ -4656,13 +4712,15 @@ private:
   void diagnoseRedundantAwait(AwaitExpr *E) const {
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E)) {
       // For an if/switch expression, produce a tailored warning.
-      Ctx.Diags.diagnose(E->getAwaitLoc(),
-                         diag::effect_marker_on_single_value_stmt,
-                         "await", SVE->getStmt()->getKind())
-        .highlight(E->getAwaitLoc());
+      Ctx.Diags
+          .diagnose(E->getAwaitLoc(), diag::effect_marker_on_single_value_stmt,
+                    "await", SVE->getStmt()->getKind())
+          .highlight(E->getAwaitLoc())
+          .fixItRemove(E->getAwaitLoc());
       return;
     }
-    Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
+    Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await)
+        .fixItRemove(E->getAwaitLoc());
   }
 
   void diagnoseRedundantUnsafe(UnsafeExpr *E) const {
@@ -4691,48 +4749,15 @@ private:
       return;
     }
 
-    Ctx.Diags.diagnose(E->getUnsafeLoc(),
-                       forEachNextCallExprs.contains(E)
-                           ? diag::no_unsafe_in_unsafe_for
-                           : diag::no_unsafe_in_unsafe)
-      .fixItRemove(E->getUnsafeLoc());
+    Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe)
+        .fixItRemove(E->getUnsafeLoc());
   }
 
   void noteLabeledConditionalStmt(LabeledConditionalStmt *stmt) {
     // Make a note of any initializers that are the synthesized right-hand side
     // for an "if let x".
     for (const auto &condition: stmt->getCond()) {
-      switch (condition.getKind()) {
-      case StmtConditionElement::CK_Availability:
-      case StmtConditionElement::CK_Boolean:
-      case StmtConditionElement::CK_HasSymbol:
-        continue;
-
-      case StmtConditionElement::CK_PatternBinding:
-        break;
-      }
-
-      auto init = condition.getInitializer();
-      if (!init)
-        continue;
-
-      auto pattern = condition.getPattern();
-      if (!pattern)
-        continue;
-
-      auto optPattern = dyn_cast<OptionalSomePattern>(pattern);
-      if (!optPattern)
-        continue;
-
-      auto var = optPattern->getSubPattern()->getSingleVar();
-      if (!var)
-        continue;
-
-      // If the right-hand side has the same location as the variable, it was
-      // synthesized.
-      if (var->getLoc().isValid() &&
-          var->getLoc() == init->getStartLoc() &&
-          init->getStartLoc() == init->getEndLoc())
+      if (auto *init = condition.getSynthesizedShorthandInitOrNull())
         synthesizedIfLetInitializers.insert(init);
     }
   }
@@ -4796,9 +4821,9 @@ private:
       return;
 
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
-      .warnUntilSwiftVersionIf(downgradeToWarning, 6)
-      .fixItInsert(loc, insertText)
-      .highlight(anchor->getSourceRange());
+        .warnUntilLanguageModeIf(downgradeToWarning, LanguageMode::v6)
+        .fixItInsert(loc, insertText)
+        .highlight(anchor->getSourceRange());
 
     for (const DiagnosticInfo &diag: errors) {
       switch (diag.reason.getKind()) {
@@ -4899,7 +4924,8 @@ private:
       Ctx.Diags
           .diagnose(loc, diag::actor_isolated_access_outside_of_actor_context,
                     declIsolation, declRef.getDecl(), isCall)
-          .warnUntilSwiftVersionIf(errorInfo.downgradeToWarning, 6)
+          .warnUntilLanguageModeIf(errorInfo.downgradeToWarning,
+                                   LanguageMode::v6)
           .fixItInsert(fixItLoc, insertText)
           .highlight(anchor->getSourceRange());
       return true;
@@ -5000,9 +5026,7 @@ void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {
   PrettyStackTraceDecl debugStack("checking effects handling for", fn);
 #endif
 
-  auto isDeferBody = isa<FuncDecl>(fn) && cast<FuncDecl>(fn)->isDeferBody();
-  auto context =
-      isDeferBody ? Context::forDeferBody(fn) : Context::forFunction(fn);
+  auto context = Context::forFunction(fn);
   auto &ctx = fn->getASTContext();
   CheckEffectsCoverage checker(ctx, context);
 
@@ -5064,28 +5088,9 @@ void TypeChecker::checkEnumElementEffects(EnumElementDecl *elt, Expr *E) {
   E->walk(LocalFunctionEffectsChecker());
 }
 
-void TypeChecker::checkPropertyWrapperEffects(
-    PatternBindingDecl *binding, Expr *expr) {
-  auto &ctx = binding->getASTContext();
-  CheckEffectsCoverage checker(ctx, Context::forPatternBinding(binding));
-  expr->walk(checker);
-  expr->walk(LocalFunctionEffectsChecker());
-}
-
 std::optional<Type> TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
   ApplyClassifier classifier(ctx);
   auto classification = classifier.classifyExpr(expr, EffectKind::Throws);
-  if (classification.getConditionalKind(EffectKind::Throws) ==
-        ConditionalEffectKind::None)
-    return std::nullopt;
-
-  return classification.getThrownError();
-}
-
-std::optional<Type> TypeChecker::canThrow(ASTContext &ctx,
-                                          ForEachStmt *forEach) {
-  ApplyClassifier classifier(ctx);
-  auto classification = classifier.classifyForEach(forEach).onlyThrowing();
   if (classification.getConditionalKind(EffectKind::Throws) ==
         ConditionalEffectKind::None)
     return std::nullopt;

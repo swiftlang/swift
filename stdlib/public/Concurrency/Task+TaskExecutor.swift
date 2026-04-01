@@ -25,7 +25,7 @@ import Swift
 /// For an in depth discussion of this topic, see ``TaskExecutor``.
 ///
 /// ### Disabling task executor preference
-/// Passing `nil` as executor means disabling any preference preference (if it was set) and the task hierarchy
+/// Passing `nil` as executor means disabling any preference (if it was set) and the task hierarchy
 /// will execute without any executor preference until a different preference is set.
 ///
 /// ### Asynchronous function execution semantics in presence of task executor preferences
@@ -146,9 +146,9 @@ public func withTaskExecutorPreference<T, Failure>(
   }
 
   let taskExecutorBuiltin: Builtin.Executor =
-    taskExecutor.asUnownedTaskExecutor().executor
+    unsafe taskExecutor.asUnownedTaskExecutor().executor
 
-  let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
+  let record = unsafe _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
     unsafe _popTaskExecutorPreference(record: record)
   }
@@ -177,9 +177,9 @@ public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
   }
 
   let taskExecutorBuiltin: Builtin.Executor =
-    taskExecutor.asUnownedTaskExecutor().executor
+    unsafe taskExecutor.asUnownedTaskExecutor().executor
 
-  let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
+  let record = unsafe _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
     unsafe _popTaskExecutorPreference(record: record)
   }

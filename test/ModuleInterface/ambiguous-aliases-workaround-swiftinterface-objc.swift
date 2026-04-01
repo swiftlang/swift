@@ -9,7 +9,7 @@
 import Foundation
 
 public class C: NSObject {
-  // CHECK: @objc override dynamic public func observeValue(forKeyPath keyPath: Swift.String?, of object: Any?, change: [Foundation.NSKeyValueChangeKey : Any]?, context: Swift.UnsafeMutableRawPointer?)
+  // CHECK: @objc override dynamic public func observeValue(forKeyPath keyPath: Swift::String?, of object: Any?, change: [Foundation::NSKeyValueChangeKey : Any]?, context: Swift::UnsafeMutableRawPointer?)
   public override func observeValue(
     forKeyPath keyPath: String?,
     of object: Any?,

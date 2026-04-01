@@ -22,7 +22,7 @@
 // RUN: not %target-swift-frontend -scan-dependencies -module-cache-path %t/module-cache %t/test.swift -o %t/deps.json -I %t/inputs -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -module-name CycleKit  &> %t/out.txt
 // RUN: %FileCheck --check-prefix=CHECK-NONSDK %s < %t/out.txt
 
-// CHECK-NONSDK: note: source target 'CycleKit' shadowing a Swift module with the same name at: '{{.*}}{{/|\\}}diagnose_dependency_cycle_shadow.swift.tmp{{/|\\}}inputs'
+// CHECK-NONSDK: note: source target 'CycleKit' shadowing a Swift module with the same name at: 'TMP_DIR{{/|\\}}inputs'
 
 // SDK dependency shadowing
 // RUN: not %target-swift-frontend -scan-dependencies -module-cache-path %t/module-cache %t/test.swift -o %t/deps.json -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -module-name CycleKit -sdk %t/mock.sdk &> %t/out-sdk.txt

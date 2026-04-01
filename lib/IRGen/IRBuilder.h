@@ -42,7 +42,6 @@ private:
   /// point was last cleared.  Used only for preserving block
   /// ordering.
   llvm::BasicBlock *ClearedIP;
-  unsigned NumTrapBarriers = 0;
 
 #ifndef NDEBUG
   /// Whether debug information is requested. Only used in assertions.
@@ -139,11 +138,11 @@ public:
 
   using IRBuilderBase::CreateOr;
   llvm::Value *CreateOr(llvm::Value *LHS, llvm::Value *RHS,
-                        const Twine &Name = "") {
+                        const Twine &Name = "", bool IsDisjoint = false) {
     if (auto *RC = dyn_cast<llvm::Constant>(RHS))
       if (RC->isNullValue())
         return LHS;  // LHS | 0 -> LHS
-    return IRBuilderBase::CreateOr(LHS, RHS, Name);
+    return IRBuilderBase::CreateOr(LHS, RHS, Name, IsDisjoint);
   }
   llvm::Value *CreateOr(llvm::Value *LHS, const APInt &RHS,
                         const Twine &Name = "") {
@@ -296,14 +295,20 @@ public:
   
   using IRBuilderBase::CreateLifetimeStart;
   llvm::CallInst *CreateLifetimeStart(Address buf, Size size) {
-    return CreateLifetimeStart(buf.getAddress(),
+    return CreateLifetimeStart(buf,
                    llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+  }
+  llvm::CallInst *CreateLifetimeStart(Address buf, llvm::ConstantInt *size) {
+    return CreateLifetimeStart(buf.getAddress(), size);
   }
   
   using IRBuilderBase::CreateLifetimeEnd;
   llvm::CallInst *CreateLifetimeEnd(Address buf, Size size) {
-    return CreateLifetimeEnd(buf.getAddress(),
+    return CreateLifetimeEnd(buf,
                    llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+  }
+  llvm::CallInst *CreateLifetimeEnd(Address buf, llvm::ConstantInt *size) {
+    return CreateLifetimeEnd(buf.getAddress(), size);
   }
 
   // We're intentionally not allowing direct use of
@@ -311,8 +316,8 @@ public:
   // FunctionPointer.
 
   bool isTrapIntrinsic(llvm::Value *Callee) {
-    return Callee ==
-           llvm::Intrinsic::getDeclaration(getModule(), llvm::Intrinsic::trap);
+    return Callee == llvm::Intrinsic::getOrInsertDeclaration(
+                         getModule(), llvm::Intrinsic::trap);
   }
   bool isTrapIntrinsic(llvm::Intrinsic::ID intrinsicID) {
     return intrinsicID == llvm::Intrinsic::trap;
@@ -382,7 +387,7 @@ public:
                                       const Twine &name = "") {
     assert(!isTrapIntrinsic(intrinsicID) && "Use CreateNonMergeableTrap");
     auto intrinsicFn =
-      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID);
+        llvm::Intrinsic::getOrInsertDeclaration(getModule(), intrinsicID);
     return CreateCallWithoutDbgLoc(
         cast<llvm::FunctionType>(intrinsicFn->getValueType()), intrinsicFn,
         args, name);
@@ -394,8 +399,8 @@ public:
                                       ArrayRef<llvm::Value *> args,
                                       const Twine &name = "") {
     assert(!isTrapIntrinsic(intrinsicID) && "Use CreateNonMergeableTrap");
-    auto intrinsicFn =
-      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID, typeArgs);
+    auto intrinsicFn = llvm::Intrinsic::getOrInsertDeclaration(
+        getModule(), intrinsicID, typeArgs);
     return CreateCallWithoutDbgLoc(
         cast<llvm::FunctionType>(intrinsicFn->getValueType()), intrinsicFn,
         args, name);
@@ -416,9 +421,9 @@ public:
                                    llvm::Value *value,
                                    bool expectedValue, const Twine &name = "");
 
-  /// Call the trap intrinsic. If optimizations are enabled, an inline asm
-  /// gadget is emitted before the trap. The gadget inhibits transforms which
-  /// merge trap calls together, which makes debugging crashes easier.
+  /// Call the trap intrinsic. If optimizations are enabled, the nomerge
+  /// attribute is set on the trap call to inhibit transforms which merge
+  /// trap calls together, which makes debugging crashes easier.
   llvm::CallInst *CreateNonMergeableTrap(IRGenModule &IGM, StringRef failureMsg);
 
   /// Split a first-class aggregate value into its component pieces.
@@ -503,10 +508,10 @@ public:
   ~SavedInsertionPointRAII() {
     if (savedInsertionPoint.isNull()) {
       builder.ClearInsertionPoint();
-    } else if (savedInsertionPoint.is<llvm::Instruction *>()) {
-      builder.SetInsertPoint(savedInsertionPoint.get<llvm::Instruction *>());
+    } else if (isa<llvm::Instruction *>(savedInsertionPoint)) {
+      builder.SetInsertPoint(cast<llvm::Instruction *>(savedInsertionPoint));
     } else {
-      builder.SetInsertPoint(savedInsertionPoint.get<llvm::BasicBlock *>());
+      builder.SetInsertPoint(cast<llvm::BasicBlock *>(savedInsertionPoint));
     }
   }
 };

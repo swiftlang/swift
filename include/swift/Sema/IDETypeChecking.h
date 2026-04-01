@@ -23,6 +23,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include <memory>
 #include <tuple>
 
@@ -121,40 +122,9 @@ namespace swift {
   /// \returns True on applied, false on not applied.
   bool isMemberDeclApplied(const DeclContext *DC, Type Ty, const ValueDecl *VD);
 
-  /// The kind of type checking to perform for code completion.
-  enum class CompletionTypeCheckKind {
-    /// Type check the expression as normal.
-    Normal,
-
-    /// Type check the argument to an Objective-C #keyPath.
-    KeyPath,
-  };
-
-  /// Return the type of an expression parsed during code completion, or
-  /// None on error.
-  std::optional<Type> getTypeOfCompletionContextExpr(
-      ASTContext &Ctx, DeclContext *DC, CompletionTypeCheckKind kind,
-      Expr *&parsedExpr, ConcreteDeclRef &referencedDecl);
-
   /// Type check a function body element which is at \p TagetLoc.
   bool typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
                              SourceLoc TargetLoc);
-
-  /// Thunk around \c TypeChecker::typeCheckForCodeCompletion to make it
-  /// available to \c swift::ide.
-  /// Type check the given expression and provide results back to code
-  /// completion via specified callback.
-  ///
-  /// This method is designed to be used for code completion which means that
-  /// it doesn't mutate given expression, even if there is a single valid
-  /// solution, and constraint solver is allowed to produce partially correct
-  /// solutions. Such solutions can have any number of holes in them.
-  ///
-  /// \returns `true` if target was applicable and it was possible to infer
-  /// types for code completion, `false` otherwise.
-  bool typeCheckForCodeCompletion(
-      constraints::SyntacticElementTarget &target, bool needsPrecheck,
-      llvm::function_ref<void(const constraints::Solution &)> callback);
 
   /// Thunk around \c TypeChecker::resolveDeclRefExpr to make it available to
   /// \c swift::ide
@@ -363,6 +333,19 @@ namespace swift {
   SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
                                     CustomAttr *attr, bool passParentContext,
                                     MacroRole role, StringRef discriminator);
+
+  /// Find the Objective-C protocol requirements that the given declaration
+  /// satisfies, including requirements from inherited conformances.
+  llvm::TinyPtrVector<ValueDecl *>
+  findWitnessedObjCRequirements(const ValueDecl *witness,
+                                bool anySingleRequirement);
+  /// Returns true if the given subscript method is a valid implementation of
+  /// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
+  /// @dynamicMemberLookup.
+  /// The method is given to be defined as `subscript(dynamicMember:)` which
+  /// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
+  bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
+                                         bool ignoreLabel = false);
 }
 
 #endif

@@ -11,6 +11,7 @@
   #define NONSENDABLE __attribute__((__swift_attr__("@_nonSendable")))
   #define ASSUME_NONSENDABLE_BEGIN _Pragma("clang attribute ASSUME_NONSENDABLE.push (__attribute__((swift_attr(\"@_nonSendable(_assumed)\"))), apply_to = any(objc_interface, record, enum))")
   #define ASSUME_NONSENDABLE_END _Pragma("clang attribute ASSUME_NONSENDABLE.pop")
+  #define ASYNC_NAME(NAME) __attribute__((swift_async_name(#NAME)))
 #else
   // If we take this #else, we should see minor failures of some subtests,
   // but not systematic failures of everything that uses this header.
@@ -18,6 +19,7 @@
   #define NONSENDABLE
   #define ASSUME_NONSENDABLE_BEGIN
   #define ASSUME_NONSENDABLE_END
+  #define ASYNC_NAME(NAME)
 #endif
 
 #define NS_ENUM(_type, _name) enum _name : _type _name; \
@@ -71,13 +73,13 @@ typedef void (^NonsendableCompletionHandler)(NSString * _Nullable, NSString * _N
 
 -(void)customizedWithString:(NSString *)operation completionHandler:(void (^)(NSInteger))handler __attribute__((swift_name("customize(with:completionHandler:)"))) __attribute__((swift_async_name("customize(_:)")));
 
--(void)unavailableMethod __attribute__((__swift_attr__("@_unavailableFromAsync")));
--(void)unavailableMethodWithMessage __attribute__((__swift_attr__("@_unavailableFromAsync(message: \"Blarpy!\")")));
+-(void)unavailableMethod __attribute__((__swift_attr__("@_unavailableFromAsync"))); // expected-note {{'unavailableMethod()' declared here}}
+-(void)unavailableMethodWithMessage __attribute__((__swift_attr__("@_unavailableFromAsync(message: \"Blarpy!\")"))); // expected-note {{'unavailableMethodWithMessage()' declared here}}
 
 -(void)dance:(NSString *)step andThen:(void (^)(NSString *))doSomething __attribute__((swift_async(not_swift_private,2)));
 -(void)leap:(NSInteger)height andThen:(void (^)(NSString *))doSomething __attribute__((swift_async(swift_private,2)));
 
--(void)repeatTrick:(NSString *)trick completionHandler:(void (^)(NSInteger))handler __attribute__((swift_async(none)));
+-(void)repeatTrick:(NSString *)trick completionHandler:(void (^)(NSInteger))handler __attribute__((swift_async(none))); // expected-note {{'repeatTrick(_:completionHandler:)' declared here}}
 
 -(void)doSomethingSlowNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSInteger))handler;
 -(void)findAnswerNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *))handler;
@@ -206,7 +208,8 @@ __attribute__((__swift_attr__("@MainActor")))
 @end
 
 @interface NXButton: NXView
--(void)onButtonPress;
+-(void)onButtonPress; // expected-note {{calls to instance method 'onButtonPress()' from outside of its actor context are implicitly asynchronous}}
+                      // expected-note @-1 {{main actor isolation inferred from inheritance from class 'NXView'}}
 @end
 
 // Do something concurrently, but without escaping.
@@ -231,6 +234,9 @@ MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor"))) @protocol Tr
 
 SENDABLE @interface SendableClass : NSObject @end
 
+// expected-expansion@+3:13{{
+//   expected-note@1 5{{conformance of 'NonSendableClass' to 'Sendable' has been explicitly marked unavailable here}}
+// }}
 NONSENDABLE @interface NonSendableClass : NSObject @end // expected-note {{class 'NonSendableClass' does not conform to the 'Sendable' protocol}}
 
 ASSUME_NONSENDABLE_BEGIN
@@ -379,6 +385,15 @@ MAIN_ACTOR
 
 @protocol FailableFloatLoader
 - (void)loadFloatOrThrowWithCompletionHandler:(void (^)(float, NSError* __nullable)) completionHandler;
+@end
+
+NONSENDABLE
+@interface ImportObjCAsyncGetter : NSObject
+
+- (void)getSendableClassesWithCompletionHandler:
+    (void (^SENDABLE)(NSArray<SendableClass *> *myClasses))handler
+    ASYNC_NAME(getter:sendableClasses());
+
 @end
 
 #pragma clang assume_nonnull end

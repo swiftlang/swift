@@ -51,10 +51,10 @@ extension IOIImportedType {
 // CHECK-NOT: funcForAnotherOS
 
 extension NormalImportedType : PublicProto {}
-// CHECK: extension Lib.NormalImportedType
+// CHECK: extension Lib::NormalImportedType
 
 extension ExportedType : PublicProto {}
-// CHECK: extension IndirectLib.ExportedType
+// CHECK: extension IndirectLib::ExportedType
 
 extension NormalImportedType {
   #if os(macOS)

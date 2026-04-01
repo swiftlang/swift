@@ -66,15 +66,12 @@ struct Small {
 // CHECK: bb0:
 // CHECK:   %0 = alloc_stack $Optional<X>
 // CHECK:   %1 = alloc_stack $X
-// CHECK:   %2 = alloc_stack $X
-// CHECK:   %3 = alloc_stack $Optional<X>
-// CHECK:   copy_addr [take] %2 to [init] %1 : $*X
-// CHECK:   %5 = init_enum_data_addr %0 : $*Optional<X>, #Optional.some!enumelt
-// CHECK:   copy_addr [take] %1 to [init] %5 : $*X
+// CHECK:   %2 = alloc_stack $Optional<X>
+// CHECK:   %3 = init_enum_data_addr %0 : $*Optional<X>, #Optional.some!enumelt
+// CHECK:   copy_addr [take] %1 to [init] %3 : $*X
 // CHECK:   inject_enum_addr %0 : $*Optional<X>, #Optional.some!enumelt
-// CHECK:   copy_addr [take] %0 to [init] %3 : $*Optional<X>
-// CHECK:   dealloc_stack %3 : $*Optional<X>
-// CHECK:   dealloc_stack %2 : $*X
+// CHECK:   copy_addr [take] %0 to [init] %2 : $*Optional<X>
+// CHECK:   dealloc_stack %2 : $*Optional<X>
 // CHECK:   dealloc_stack %1 : $*X
 // CHECK:   dealloc_stack %0 : $*Optional<X>
 // CHECK: } // end sil function 'test1'
@@ -92,17 +89,21 @@ bb0:
   return %t : $()
 }
 
+sil @useX : $@convention(thin) (X) -> ()
+
 // CHECK: sil @test2 : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   %0 = alloc_stack $Optional<X>
-// CHECK:   %1 = alloc_stack $Optional<X>
+// CHECK:   %1 = alloc_stack $X
 // CHECK:   %2 = alloc_stack $Optional<X>
-// CHECK:   copy_addr [take] %2 to [init] %1 : $*Optional<X>
-// CHECK:   copy_addr [take] %1 to [init] %0 : $*Optional<X>
-// CHECK:   switch_enum_addr %0 : $*Optional<X>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+// CHECK:   copy_addr [take] %2 to [init] %0 : $*Optional<X>
+// CHECK:   switch_enum_addr %2 : $*Optional<X>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 // CHECK: bb1:
-// CHECK:   %6 = unchecked_take_enum_data_addr %0 : $*Optional<X>, #Optional.some!enumelt
+// CHECK:   %5 = unchecked_take_enum_data_addr %0 : $*Optional<X>, #Optional.some!enumelt
+// CHECK:   copy_addr [take] %5 to [init] %1 : $*X
+// CHECK:   %7 = function_ref @useX : $@convention(thin) (@in_guaranteed X) -> ()
+// CHECK:   %8 = apply %7(%1) : $@convention(thin) (@in_guaranteed X) -> ()
 // CHECK:   br bb3
 
 // CHECK: bb2:
@@ -110,7 +111,7 @@ bb0:
 
 // CHECK: bb3:
 // CHECK:   dealloc_stack %2 : $*Optional<X>
-// CHECK:   dealloc_stack %1 : $*Optional<X>
+// CHECK:   dealloc_stack %1 : $*X
 // CHECK:   dealloc_stack %0 : $*Optional<X>
 // CHECK: } // end sil function 'test2'
 
@@ -121,6 +122,8 @@ bb0:
   switch_enum %2 : $Optional<X>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3: $X):
+  %f = function_ref @useX : $@convention(thin) (X) -> ()
+  apply %f(%3) : $@convention(thin) (X) -> ()
   br bb3
 
 bb2:
@@ -184,11 +187,9 @@ bb0:
 
 // CHECK: sil @test5 : $@convention(thin) (@in (X, X)) -> () {
 // CHECK: bb0(%0 : $*(X, X)):
-// CHECK:   %1 = alloc_stack $(X, X)
-// CHECK:   %2 = alloc_stack $X
-// CHECK:   copy_addr [take] %0 to [init] %1 : $*(X, X)
-// CHECK:   %4 = tuple_element_addr %1 : $*(X, X), 1
-// CHECK:   copy_addr [take] %4 to [init] %2 : $*X
+// CHECK:   %1 = alloc_stack $X
+// CHECK:   %2 = tuple_element_addr %0 : $*(X, X), 1
+// CHECK:   copy_addr [take] %2 to [init] %1 : $*X
 // CHECK: } // end sil function 'test5'
 
 sil @test5 : $@convention(thin) (@in (X, X)) -> () {
@@ -231,11 +232,9 @@ bb0:
 
 // CHECK: sil @test7 : $@convention(thin) (@in Y) -> () {
 // CHECK: bb0(%0 : $*Y):
-// CHECK:   %1 = alloc_stack $Y
-// CHECK:   %2 = alloc_stack $X
-// CHECK:   copy_addr [take] %0 to [init] %1 : $*Y
-// CHECK:   %4 = struct_element_addr %1 : $*Y, #Y.y1
-// CHECK:   copy_addr [take] %4 to [init] %2 : $*X
+// CHECK:  %1 = alloc_stack $X
+// CHECK:  %2 = struct_element_addr %0 : $*Y, #Y.y1
+// CHECK:  copy_addr [take] %2 to [init] %1 : $*X
 // CHECK: } // end sil function 'test7'
 
 sil @test7 : $@convention(thin) (@in Y) -> () {
@@ -339,8 +338,8 @@ bb0:
 }
 
 // CHECK: sil @test13
-// CHECK:  [[ADDR:%.*]] = unchecked_addr_cast %1 : $*X to $*Y
-// CHECK:  copy_addr [take] [[ADDR]] to [init] %2 : $*Y
+// CHECK:  [[ADDR:%.*]] = unchecked_addr_cast %2 : $*X to $*Y
+// CHECK:  copy_addr [take] [[ADDR]] to [init] %1 : $*Y
 // CHECK: } // end sil function 'test13'
 sil @test13 : $@convention(thin) (@in X) -> () {
 bb0(%0 : $*X):
@@ -440,6 +439,27 @@ sil @test17: $@convention(thin) (@owned String) -> () {
 bb0(%0 : $String):
   %1 = unchecked_bitwise_cast %0 : $String to $Z
   release_value %1 : $Z
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil_global private @global : $Optional<X>
+
+sil @test18: $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @global : $*Optional<X>
+  %1 = begin_access [modify] [static] [no_nested_conflict] %0
+  %2 = load %1
+  switch_enum %2, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  %4 = integer_literal $Builtin.Int1, -1
+  cond_fail %4, "Unexpectedly found nil while unwrapping an Optional value"
+  unreachable
+
+bb2(%7 : $X):
+  %8 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  end_access %1
   %13 = tuple ()
   return %13 : $()
 }

@@ -28,6 +28,7 @@ class raw_ostream;
 
 namespace swift {
 class DeclContext;
+class Initializer;
 class ModuleDecl;
 class VarDecl;
 class NominalTypeDecl;
@@ -207,22 +208,9 @@ public:
     return ActorIsolation(Erased);
   }
 
-  static std::optional<ActorIsolation> forSILString(StringRef string) {
-    auto kind =
-        llvm::StringSwitch<std::optional<ActorIsolation::Kind>>(string)
-            .Case("unspecified", ActorIsolation::Unspecified)
-            .Case("actor_instance", ActorIsolation::ActorInstance)
-            .Case("nonisolated", ActorIsolation::Nonisolated)
-            .Case("nonisolated_unsafe", ActorIsolation::NonisolatedUnsafe)
-            .Case("global_actor", ActorIsolation::GlobalActor)
-            .Case("global_actor_unsafe", ActorIsolation::GlobalActor)
-            .Case("caller_isolation_inheriting",
-                  ActorIsolation::CallerIsolationInheriting)
-            .Default(std::nullopt);
-    if (kind == std::nullopt)
-      return std::nullopt;
-    return ActorIsolation(*kind, true /*is sil parsed*/);
-  }
+  /// Defined in lib/SIL/IR/ActorIsolation.cpp
+  static std::optional<ActorIsolation> forSILString(SILModule &mod,
+                                                    StringRef string);
 
   Kind getKind() const { return (Kind)kind; }
 
@@ -434,6 +422,10 @@ InferredActorIsolation getInferredActorIsolation(ValueDecl *value);
 ActorIsolation
 __AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE);
 
+/// Determine how the given initialization context is isolated.
+ActorIsolation getActorIsolation(Initializer *init,
+                                 bool ignoreDefaultArguments = false);
+
 /// Determine how the given declaration context is isolated.
 /// \p getClosureActorIsolation allows the specification of actor isolation for
 /// closures that haven't been saved been saved to the AST yet. This is useful
@@ -448,7 +440,7 @@ ActorIsolation getActorIsolationOfContext(
 bool isSameActorIsolated(ValueDecl *value, DeclContext *dc);
 
 /// Determines whether this function's body uses flow-sensitive isolation.
-bool usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn);
+bool usesFlowSensitiveIsolation(AbstractFunctionDecl *fn);
 
 void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 

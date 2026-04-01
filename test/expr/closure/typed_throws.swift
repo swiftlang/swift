@@ -8,6 +8,19 @@ enum MyBadError {
   case fail
 }
 
+struct GenericError<T>: Error {}
+
+func testThrowsOverloadedOnNever() {
+  func foo(_ fn: () throws -> Void) {}
+  func foo(_ fn: () throws(Never) -> Void) {}
+
+  func bar() throws {}
+
+  foo {
+    try bar() // Ok
+  }
+}
+
 func testClosures() {
   let c1 = { () throws(MyError) in
     throw .fail
@@ -17,12 +30,23 @@ func testClosures() {
   // expected-error@-1{{invalid conversion from throwing function of type '() throws(MyError) -> ()'}}
 
   let _: () throws(MyError) -> Void = {
-    // NOTE: under full typed throws, this should succeed
-    throw MyError.fail // expected-error{{thrown expression type 'any Error' cannot be converted to error type 'MyError'}}
+    throw MyError.fail // Ok
   }
 
   let _: () throws(MyError) -> Void = {
-    throw .fail // expected-error{{type 'any Error' has no member 'fail'}}
+    throw .fail // Ok
+  }
+
+  let _: () throws(Never) -> Void = { () throws in } // Ok
+  // expected-error@-1 {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() throws(Never) -> Void'}}
+
+  let _: () throws(Never) -> Void = {
+    throw MyError.fail // expected-error {{thrown expression type 'MyError' cannot be converted to error type 'Never'}}
+  }
+
+  let _: () throws(Never) -> Void = { () throws in
+    // expected-error@-1 {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() throws(Never) -> Void'}}
+    throw MyError.fail
   }
 
   // FIXME: Terrible diagnostic.
@@ -36,5 +60,34 @@ func testClosures() {
   let c2 = { throw MyError.fail }
   let _: Int = c2
   // expected-error@-1{{cannot convert value of type '() throws -> ()'}}
+
+  _ = { () throws(_) in } // expected-error {{type placeholder not allowed here}}
+  _ = { () throws(GenericError<_>) in } // expected-error {{type placeholder not allowed here}}
 }
 
+func testThrowsMismatch(fn: () throws -> Void) {
+  func test(_: () throws(Never) -> Void) {}
+
+  test(fn)
+  // expected-error@-1 {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() throws(Never) -> Void'}}
+}
+
+func testOverloadingWithConcreteErrorType() throws {
+  func test<E>(_: () throws(E) -> Void) throws(E) {
+  }
+
+  struct S<T> {
+    init(_: () throws -> T) throws {}
+    init(_: () throws(MyError) -> T) throws(MyError) {}
+  }
+
+  struct Q {
+    init() throws {}
+  }
+
+  try test {
+    _ = try S {
+      try Q() // Ok
+    }
+  }
+}

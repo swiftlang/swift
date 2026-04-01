@@ -2,36 +2,36 @@
 
 // CHECK: class DeletedDtor {
 // CHECK: init
+// CHECK:   var value: Int32
 // CHECK:   func test() -> Int32
 // CHECK:   func testMutable() -> Int32
 // CHECK:   class func create() -> DeletedDtor
-// CHECK:   var value: Int32
 // CHECK: }
 // CHECK: func mutateIt(_ x: DeletedDtor)
 
 // CHECK: class PrivateDtor {
 // CHECK: init
+// CHECK:   var value: Int32
 // CHECK:   func test() -> Int32
 // CHECK:   func testMutable() -> Int32
 // CHECK:   class func create() -> PrivateDtor
-// CHECK:   var value: Int32
 // CHECK: }
 // CHECK: func mutateIt(_ x: PrivateDtor)
 
 // CHECK: class DeletedSpecialMembers {
 // CHECK: init
+// CHECK:   var value: Int32
 // CHECK:   func test() -> Int32
 // CHECK:   func testMutable() -> Int32
 // CHECK:   class func create() -> DeletedSpecialMembers
-// CHECK:   var value: Int32
 // CHECK: }
 // CHECK: func mutateIt(_ x: DeletedSpecialMembers)
 
 // CHECK: class PrivateSpecialMembers {
 // CHECK: init
+// CHECK:   var value: Int32
 // CHECK:   func test() -> Int32
 // CHECK:   func testMutable() -> Int32
 // CHECK:   class func create() -> PrivateSpecialMembers
-// CHECK:   var value: Int32
 // CHECK: }
 // CHECK: func mutateIt(_ x: PrivateSpecialMembers)

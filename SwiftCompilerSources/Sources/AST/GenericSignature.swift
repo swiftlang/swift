@@ -30,7 +30,27 @@ public struct GenericSignature: CustomStringConvertible, NoReflectionChildren {
     TypeArray(bridged: bridged.getGenericParams())
   }
 
-  public func mapTypeIntoContext(_ type: Type) -> Type {
-    Type(bridged: bridged.mapTypeIntoContext(type.bridged))
+  public func mapTypeIntoEnvironment(_ type: Type) -> Type {
+    Type(bridged: bridged.mapTypeIntoEnvironment(type.bridged))
+  }
+
+  public var isEmpty: Bool { bridged.impl == nil }
+
+  public var canonicalSignature: CanonicalGenericSignature {
+    CanonicalGenericSignature(bridged: bridged.getCanonicalSignature())
+  }
+}
+
+public struct CanonicalGenericSignature {
+  public let bridged: BridgedCanGenericSignature
+
+  public init(bridged: BridgedCanGenericSignature) {
+    self.bridged = bridged
+  }
+
+  public var isEmpty: Bool { bridged.impl == nil }
+
+  public var genericSignature: GenericSignature {
+    GenericSignature(bridged: bridged.getGenericSignature())
   }
 }

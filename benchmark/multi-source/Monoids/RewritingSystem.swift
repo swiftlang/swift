@@ -17,7 +17,7 @@ func log(_ str: @autoclosure () -> String) {
     }
 }
 
-struct RewritingSystem {
+struct RewritingSystem: ~Copyable {
   var state: State = .initial
 
   enum State {
@@ -33,13 +33,13 @@ struct RewritingSystem {
   // Limits for completion
   struct Limits: Hashable {
     var maxRounds = 100
-    var maxRules = 180
+    var maxRules = 200
     var maxLength = 100
     var maxReductionLength = 100
     var maxReductionSteps = 1 << 24
   }
 
-  var limits: Limits
+  var limits = Limits()
 
   var checkedRulesUpTo = 0  // Completion progress
   var reducedRules: [UInt32] = []  // Bitmap of reduced rules
@@ -55,10 +55,9 @@ struct RewritingSystem {
     var numReductionSteps = 0
   }
 
-  init(alphabet: Int, limits: Limits) {
+  init(alphabet: Int) {
     self.alphabet = alphabet
     self.trie = Trie(alphabet: self.alphabet)
-    self.limits = limits
 
     criticalPairs.reserveCapacity(128)
   }
@@ -84,7 +83,8 @@ struct RewritingSystem {
     return nil
   }
 
-  func reduce(_ word: inout Word, stats: inout Stats) throws(RewritingError) {
+  func reduce(_ word: inout Word, numReductionSteps: inout Int)
+      throws(RewritingError) {
     var count = 0
 
     repeat {
@@ -93,8 +93,8 @@ struct RewritingSystem {
       let index = word.startIndex + from
       word.replaceSubrange(index ..< index + rules[n].lhs.count,
                            with: rules[n].rhs)
-      stats.numReductionSteps += (from + rules[n].lhs.count)
-      if stats.numReductionSteps > limits.maxReductionSteps { throw .tooManySteps }
+      numReductionSteps += (from + rules[n].lhs.count)
+      if numReductionSteps > limits.maxReductionSteps { throw .tooManySteps }
 
       if count > limits.maxReductionLength { throw .tooManySteps }
 
@@ -120,8 +120,10 @@ struct RewritingSystem {
 
   mutating func addRule(_ rule: inout Rule, order: Order)
       throws(RewritingError) -> Bool {
-    try reduce(&rule.lhs, stats: &stats)
-    try reduce(&rule.rhs, stats: &stats)
+    var numReductionSteps = stats.numReductionSteps
+    try reduce(&rule.lhs, numReductionSteps: &numReductionSteps)
+    try reduce(&rule.rhs, numReductionSteps: &numReductionSteps)
+    stats.numReductionSteps = numReductionSteps
 
     switch compare(rule.lhs, rule.rhs, order: order) {
     case .equal:
@@ -273,11 +275,15 @@ struct RewritingSystem {
   }
 
   mutating func reduceRight() throws(RewritingError) {
+    var numReductionSteps = stats.numReductionSteps
     for n in rules.indices {
       if !isReduced(n) {
-        try reduce(&rules[n].rhs, stats: &stats)
+        var rhs = rules[n].rhs
+        try reduce(&rhs, numReductionSteps: &numReductionSteps)
+        rules[n].rhs = rhs
       }
     }
+    stats.numReductionSteps = numReductionSteps
   }
 
   /// Returns a complete presentation once the rewriting system is complete.
@@ -288,6 +294,6 @@ struct RewritingSystem {
         result.append(rule)
       }
     }
-    return Presentation(rules: result)
+    return Presentation(alphabet: alphabet, rules: result)
   }
 }

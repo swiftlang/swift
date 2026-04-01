@@ -113,6 +113,7 @@ struct ActiveTaskStatusFlags {
   static const uint32_t IsRunning = 0x800;
   static const uint32_t IsEnqueued = 0x1000;
   static const uint32_t IsComplete = 0x2000;
+  static const uint32_t HasTaskDependency = 0x4000;
 };
 
 template <typename Runtime, typename ActiveTaskStatus>
@@ -197,6 +198,18 @@ template <typename Runtime>
 struct ChildFragment {
   typename Runtime::StoredPointer Parent;
   typename Runtime::StoredPointer NextChild;
+};
+
+template <typename Runtime>
+struct GroupChildFragment {
+  typename Runtime::StoredPointer Group;
+};
+
+template <typename Runtime>
+struct FutureFragment {
+  // The low 2 bits are the status, the rest is a pointer to the first
+  // waiting AsyncTask.
+  typename Runtime::StoredPointer WaitQueue;
 };
 
 } // end namespace reflection

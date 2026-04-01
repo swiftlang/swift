@@ -19,6 +19,7 @@
 // RUN:     -emit-module-interface-path %t/Client.swiftinterface \
 // RUN:     -emit-private-module-interface-path %t/Client.private.swiftinterface \
 // RUN:     %t/Client.swift -I %t -experimental-spi-only-imports \
+// RUN:     -disable-module-selectors-in-module-interface \
 // RUN:     -alias-module-names-in-module-interface -parse-stdlib
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I%t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) -module-name Client -I%t

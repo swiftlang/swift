@@ -92,3 +92,25 @@ extension FakeOptional where Wrapped: ~Escapable {
   }
 }
 
+// Static methods (rdar://171315715)
+public struct GCM {
+  @inlinable
+  @_lifetime(message: copy message)
+  public static func open(
+    inPlace message: inout MutableRawSpan,
+    tag: RawSpan
+  ) {}
+  public
+    var x: RawSpan {
+    @inlinable
+    @_lifetime(borrow self)
+    get {
+      fatalError()
+    }
+  }
+  @inlinable
+  @_lifetime(copy message)
+  public static func propagate(message: consuming MutableRawSpan) -> MutableRawSpan {
+    return message
+  }
+}

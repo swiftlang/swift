@@ -66,12 +66,12 @@ static bool isSwiftTestingTestFunction(ValueDecl *decl) {
   if (!isa<FuncDecl>(decl))
     return false;
 
-  return llvm::any_of(decl->getAttrs(), [&decl](DeclAttribute *attr) {
+  return llvm::any_of(decl->getAttrs(), [](DeclAttribute *attr) {
     auto customAttr = dyn_cast<CustomAttr>(attr);
     if (!customAttr)
       return false;
 
-    auto *macro = decl->getResolvedMacro(customAttr);
+    auto *macro = customAttr->getResolvedMacro();
     return macro && macro->getBaseIdentifier().is("Test") &&
            macro->getParentModule()->getName().is("Testing");
   });
@@ -133,7 +133,7 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
     // The only subclass that can be explicit is this one.
     closure = cast<ClosureExpr>(anyClosure);
   } else {
-    functionRepr = node.get<FunctionTypeRepr *>();
+    functionRepr = cast<FunctionTypeRepr *>(node);
   }
 
   // The execution behavior changes only for nonisolated functions.

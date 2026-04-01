@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !$Embedded && (os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS))
+#if !$Embedded && os(anyAppleOS)
 
 import Swift
 
@@ -47,8 +47,9 @@ enum CoreFoundation {
 
 // .. Main Executor ............................................................
 
-@available(StdlibDeploymentTarget 6.2, *)
-public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
+/// A CFRunLoop-based main executor (Apple platforms only)
+@available(StdlibDeploymentTarget 6.3, *)
+final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 
   override public func run() throws {
     CoreFoundation.CFRunLoopRun()
@@ -62,9 +63,10 @@ public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 
 // .. Task Executor ............................................................
 
-@available(StdlibDeploymentTarget 6.2, *)
-public final class CFTaskExecutor: DispatchGlobalTaskExecutor,
-                                   @unchecked Sendable {
+/// A `TaskExecutor` to match `CFMainExecutor` (Apple platforms only)
+@available(StdlibDeploymentTarget 6.3, *)
+final class CFTaskExecutor: DispatchGlobalTaskExecutor,
+                            @unchecked Sendable {
 
 }
 

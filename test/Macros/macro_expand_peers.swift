@@ -317,9 +317,15 @@ struct ABIAttrWithAttachedMacro {
   // expected-error@+1 {{macro 'addCompletionHandler()' cannot be expanded in '@abi' attribute}}
   @abi(@addCompletionHandler func fn1() async)
   @addCompletionHandler func fn1() async {}
-  // From diagnostics in the expansion:
-  // expected-note@-2 3{{in expansion of macro 'addCompletionHandler' on instance method 'fn1()' here}}
-  // expected-note@-4 {{'fn1()' previously declared here}}
+  /*
+    expected-expansion@-2:44{{
+      expected-error@2:8{{macro 'addCompletionHandler()' cannot be expanded in '@abi' attribute}}
+      expected-error@2:35{{invalid redeclaration of 'fn1()'}}
+      expected-error@4:23{{argument passed to call that takes no arguments}}
+    }}
+    expected-note@-7 3{{in expansion of macro 'addCompletionHandler' on instance method 'fn1()' here}}
+    expected-note@-9 {{'fn1()' previously declared here}}
+  */
 
   // expected-error@+1 {{macro 'addCompletionHandler()' cannot be expanded in '@abi' attribute}}
   @abi(@addCompletionHandler func fn2() async)
@@ -327,8 +333,13 @@ struct ABIAttrWithAttachedMacro {
 
   @abi(func fn3() async)
   @addCompletionHandler func fn3() async {}
-  // From diagnostics in the expansion:
-  // expected-note@-2 2{{in expansion of macro 'addCompletionHandler' on instance method 'fn3()' here}}
-  // expected-note@-4 {{'fn3()' previously declared here}}
+  /*
+    expected-expansion@-2:44{{
+      expected-error@1:11{{invalid redeclaration of 'fn3()'}}
+      expected-error@3:23{{argument passed to call that takes no arguments}}
+    }}
+    expected-note@-6 2{{in expansion of macro 'addCompletionHandler' on instance method 'fn3()' here}}
+    expected-note@-8 {{'fn3()' previously declared here}}
+  */
 }
 #endif

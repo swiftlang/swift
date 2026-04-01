@@ -1,5 +1,12 @@
 // RUN: %target-run-simple-swift(-parse-as-library -target %target-swift-5.1-abi-triple) | %FileCheck %s
 
+// Enable this for nonisolated nonsending by default rdar://157226022 is
+// fixed. The test will fail otherwise since we hit an error due to inferring
+// nonisolated(nonsending) on the non-async property name.
+
+// XUN: %target-run-simple-swift(-parse-as-library -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault) | %FileCheck %s
+// XEQUIRES: swift_feature_NonisolatedNonsendingByDefault
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // UNSUPPORTED: freestanding

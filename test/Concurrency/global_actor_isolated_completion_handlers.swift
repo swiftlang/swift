@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/src/main.swift \
 // RUN:   -import-objc-header %t/src/Test.h \
 // RUN:   -swift-version 6 \
-// RUN:   -module-name main -I %t -verify
+// RUN:   -module-name main -I %t -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 
@@ -61,7 +61,7 @@ func testFromSuperclass(v: TestSubclass) {
 
 func testFromMethod(v: TestFromMethod, t: TestFromMethod.Type) {
   let _: Int = v.compute
-  // expected-error@-1 {{cannot convert value of type '@MainActor (@escaping () -> Void) -> Void' to specified type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type '@MainActor @Sendable (@escaping () -> Void) -> Void' to specified type 'Int'}}
 
   let _: Int = t.computeStatic
   // expected-error@-1 {{cannot convert value of type '@MainActor @Sendable (@escaping () -> Void) -> Void' to specified type 'Int'}}

@@ -71,7 +71,7 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
 #define SVE_TYPE(Name, Id, SingletonId)                                        \
   case clang::BuiltinType::Id:                                                 \
     return context.SingletonId;
-#include "clang/Basic/AArch64SVEACLETypes.def"
+#include "clang/Basic/AArch64ACLETypes.def"
 #define PPC_VECTOR_TYPE(Name, Id, Size)                                        \
   case clang::BuiltinType::Id:                                                 \
     return context.Id##Ty;
@@ -84,10 +84,14 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.SingletonId;
 #include "clang/Basic/WebAssemblyReferenceTypes.def"
-#define AMDGPU_TYPE(Name, Id, SingletonId)                                     \
+#define AMDGPU_TYPE(Name, Id, SingletonId, Width, Align)                       \
   case clang::BuiltinType::Id:                                                 \
     return context.SingletonId;
 #include "clang/Basic/AMDGPUTypes.def"
+#define HLSL_INTANGIBLE_TYPE(Name, Id, SingletonId)                            \
+  case clang::BuiltinType::Id:                                                 \
+    return context.SingletonId;
+#include "clang/Basic/HLSLIntangibleTypes.def"
   }
 
   // Not a valid BuiltinType.
@@ -654,8 +658,8 @@ clang::QualType ClangTypeConverter::visitEnumType(EnumType *type) {
     return convert(Context.TheEmptyTupleType);
 
   auto ED = type->getDecl();
-  if (!ED->isObjC() && !ED->getAttrs().hasAttribute<CDeclAttr>())
-    // Can't translate something not marked with @objc or @cdecl.
+  if (!ED->isCCompatibleEnum())
+    // Can't translate something not marked with @objc or @c.
     return clang::QualType();
 
   // @objc enums lower to their raw types.

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -mandatory-redundant-load-elimination -predictable-deadalloc-elim  | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-redundant-load-elimination -predictable-deadalloc-elim  | %FileCheck %s
 
 sil_stage raw
 
@@ -763,52 +763,6 @@ bb9:
   return %14 : $NativeObjectPair
 }
 
-///////////////////////
-// Unreachable Tests //
-///////////////////////
-
-// Make sure that we can handle a dead allocation with a destroy_addr in an
-// unreachable block.
-//
-// TODO: We can support this with trivial changes to canPromoteDestroyAddr. We
-// just need to distinguish a promotion failure around lack of availability vs
-// promotion failure for other reasons.
-//
-//
-// CHECK-LABEL: sil [ossa] @dead_allocation_with_unreachable_destroy_addr : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: bb0([[ARG:%.*]] : @owned $Builtin.NativeObject):
-// CHECK-NEXT: alloc_stack
-// CHECK-NEXT: store
-// CHECK-NEXT: br bb1
-//
-// CHECK: bb1:
-// CHECK-NEXT: destroy_addr
-// CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-//
-// CHECK: bb2:
-// CHECK-NEXT: destroy_addr
-// CHECK-NEXT: unreachable
-// CHECK: } // end sil function 'dead_allocation_with_unreachable_destroy_addr'
-sil [ossa] @dead_allocation_with_unreachable_destroy_addr : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $Builtin.NativeObject):
-  %1 = alloc_stack $Builtin.NativeObject
-  store %0 to [init] %1 : $*Builtin.NativeObject
-  br bb1
-
-bb1:
-  destroy_addr %1 : $*Builtin.NativeObject
-  dealloc_stack %1 : $*Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
-
-bb2:
-  destroy_addr %1 : $*Builtin.NativeObject
-  unreachable
-}
-
-
 class K {
   init()
 }
@@ -926,7 +880,13 @@ bb2:
   %4 = function_ref @guaranteed_object_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %3 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
   br bb2
+
+bb4:
+  unreachable
 }
 
 // TODO: this is currently not optimized
@@ -1240,16 +1200,17 @@ bbEnd(%8 : @owned $Optional<Builtin.NativeObject>):
 sil [ossa] @dont_promote_load_borrow_with_reborrows : $@convention(thin) (@owned SomeClass) -> () {
 bb0(%0 : @owned $SomeClass):
   %1 = alloc_stack $SomeClass
-  store %0 to [init] %1 : $*SomeClass
-  %3 = load_borrow %1 : $*SomeClass
-  br bb1(%3 : $SomeClass)
+  store %0 to [init] %1
+  %3 = load_borrow %1
+  br bb1(%3)
 
 bb1(%5 : @reborrow $SomeClass):
-  end_borrow %5 : $SomeClass
-  destroy_addr %1 : $*SomeClass
-  dealloc_stack %1 : $*SomeClass
-  %9 = tuple ()
-  return %9 : $()
+  %6 = borrowed %5 from ()
+  end_borrow %6
+  destroy_addr %1
+  dealloc_stack %1
+  %10 = tuple ()
+  return %10
 }
 
 

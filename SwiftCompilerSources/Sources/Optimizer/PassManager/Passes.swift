@@ -39,7 +39,7 @@ struct ModulePass {
     self.runFunction = runFunction
   }
 
-  func run(_ bridgedCtxt: BridgedPassContext) {
+  func run(_ bridgedCtxt: BridgedContext) {
     let context = ModulePassContext(_bridged: bridgedCtxt)
     runFunction(context)
   }

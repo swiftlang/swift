@@ -8,16 +8,6 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
-@_unsafeNonescapableResult
-@_lifetime(copy source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, copying source: borrowing U
-) -> T {
-  dependent
-}
-
 // Some container-ish thing.
 struct CN: ~Copyable {
   let p: UnsafeRawPointer

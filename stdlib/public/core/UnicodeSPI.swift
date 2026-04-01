@@ -207,35 +207,3 @@ extension Unicode.Scalar.Properties {
     return result
   }
 }
-
-//===----------------------------------------------------------------------===//
-// String Word Breaking
-//===----------------------------------------------------------------------===//
-
-extension String {
-  @_spi(_Unicode)
-  @available(SwiftStdlib 5.7, *)
-  public func _wordIndex(after i: String.Index) -> String.Index {
-    let i = _guts.validateWordIndex(i)
-
-    let next = _guts.nextWordIndex(startingAt: i._encodedOffset)
-    return String.Index(_encodedOffset: next)
-  }
-
-  @_spi(_Unicode)
-  @available(SwiftStdlib 5.7, *)
-  public func _wordIndex(before i: String.Index) -> String.Index {
-    let i = _guts.validateInclusiveWordIndex(i)
-
-    _precondition(i > startIndex, "String index is out of bounds")
-
-    let previous = _guts.previousWordIndex(endingAt: i._encodedOffset)
-    return String.Index(_encodedOffset: previous)
-  }
-
-  @_spi(_Unicode)
-  @available(SwiftStdlib 5.7, *)
-  public func _nearestWordIndex(atOrBelow i: String.Index) -> String.Index {
-    _guts.validateInclusiveWordIndex(i)
-  }
-}

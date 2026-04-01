@@ -104,7 +104,9 @@ function(get_test_dependencies SDK result_var_name)
     endif()
 
     if(SWIFT_BUILD_SWIFT_SYNTAX)
-      list(APPEND deps_binaries swift-plugin-server)
+      list(APPEND deps_binaries
+        swift-plugin-server
+        swift-function-caller-generator)
     endif()
   endif()
 
@@ -135,7 +137,8 @@ function(get_test_dependencies SDK result_var_name)
       llvm-strings
       llvm-readtapi
       not
-      split-file)
+      split-file
+      yaml2obj)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR
@@ -348,6 +351,7 @@ set(profdata_merge_worker
 
 set(TEST_MODES
     optimize_none optimize optimize_unchecked optimize_size
+    optimize_none_with_opaque_values
     optimize_none_with_implicit_dynamic
     optimize_with_implicit_dynamic
     only_executable only_non_executable
@@ -382,6 +386,7 @@ foreach(SDK ${SWIFT_SDKS})
       get_swift_test_variant_suffix(VARIANT_SUFFIX "${SDK}" "${ARCH}" "${BUILD_FLAVOR}")
       get_swift_test_variant_suffix(DEFAULT_OSX_VARIANT_SUFFIX "${SDK}" "${ARCH}" "default")
       get_swift_test_versioned_target_triple(VARIANT_TRIPLE "${SDK}" "${ARCH}" "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}" "${BUILD_FLAVOR}")
+      set(VARIANT_MODULE_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_MODULE}")
 
       # A directory where to put the xUnit-style XML test results.
       set(SWIFT_TEST_RESULTS_DIR
@@ -395,19 +400,13 @@ foreach(SDK ${SWIFT_SDKS})
       set(validation_test_bin_dir
           "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
 
-      if(LLVM_ENABLE_LIBXML2)
-        set(SWIFT_HAVE_LIBXML2 TRUE)
-      else()
-        set(SWIFT_HAVE_LIBXML2 FALSE)
-      endif()
-
       set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
       set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
 
       # Reset these values for WASI, as Embedded Swift for WASI requires separate lit configs.
       set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_old ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB})
       set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING_old ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING})
-      if(${SDK} STREQUAL "WASI")
+      if("${SDK}" STREQUAL "WASI")
         set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB OFF)
         set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING OFF)
       endif()
@@ -469,9 +468,11 @@ foreach(SDK ${SWIFT_SDKS})
         list(APPEND test_dependencies "touch-covering-tests")
       endif()
 
-      list(APPEND test_dependencies
-        "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-        "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+      if(SWIFT_BUILD_STDLIB)
+        list(APPEND test_dependencies
+          "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
+          "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+      endif()
 
       set(validation_test_dependencies)
 

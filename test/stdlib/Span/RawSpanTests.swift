@@ -290,7 +290,8 @@ suite.test("withUnsafeBytes()")
 
     let emptySpan = RawSpan(_unsafeElements: emptyBuffer)
     emptySpan.withUnsafeBytes {
-      expectNil($0.baseAddress)
+      expectTrue($0.isEmpty)
+      expectNotNil($0.baseAddress)
     }
   }
 }
@@ -330,4 +331,15 @@ suite.test("byteOffsets(of:)")
   expectNil(bounds)
   bounds = nilSpan.byteOffsets(of: nilSpan)
   expectEqual(bounds, 0..<0)
+}
+
+private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
+
+suite.test("RawSpan Sendability")
+.require(.stdlib_6_2).code {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 1, alignment: 2)
+  defer { buffer.deallocate() }
+
+  let span = RawSpan(_unsafeBytes: buffer)
+  send(span)
 }

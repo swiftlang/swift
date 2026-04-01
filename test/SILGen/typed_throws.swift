@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -sil-verify-all %s
 
 enum MyError: Error {
   case fail
@@ -296,6 +297,142 @@ func formerReabstractionCrash() {
   let _: MyResult<String, Error>? = {
     return MyResult{"hello"}
   }()
+}
+
+// https://github.com/swiftlang/swift/issues/74273
+
+// Accessors & subscripts with typed throws getters where the error type is
+// substituted with Never should have unreachable error paths when called.
+
+struct GenericErrorAccessors<E: Error> {
+  var prop: Int {
+    get throws(E) { 42 }
+  }
+
+  subscript(key: Int) -> Int {
+    get throws(E) { key }
+  }
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}accessNeverThrowingProp{{[^:]*}}F :
+// CHECK:         try_apply {{%.*}}<Never>{{.*}}, error [[ERROR:bb[0-9]+]]
+// CHECK:       [[ERROR]]:
+// CHECK-NEXT:    unreachable
+func accessNeverThrowingProp(_ s: GenericErrorAccessors<Never>) {
+  _ = s.prop
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}accessNeverThrowingSubscript{{[^:]*}}F :
+// CHECK:         try_apply {{%.*}}<Never>{{.*}}, error [[ERROR:bb[0-9]+]]
+// CHECK:       [[ERROR]]:
+// CHECK-NEXT:    unreachable
+func accessNeverThrowingSubscript(_ s: GenericErrorAccessors<Never>) {
+  _ = s[0]
+}
+
+extension GenericErrorAccessors where E == Never {
+  // CHECK-LABEL: sil {{.*}} @{{.*}}Never{{.*}}readProp{{.*}}F :
+  // CHECK:         try_apply {{%.*}}<Never>{{.*}}, error [[ERROR:bb[0-9]+]]
+  // CHECK:       [[ERROR]]:
+  // CHECK-NEXT:    unreachable
+  func readProp() {
+    _ = self.prop
+  }
+
+  // CHECK-LABEL: sil {{.*}} @{{.*}}Never{{.*}}readSubscript{{.*}}F :
+  // CHECK:         try_apply {{%.*}}<Never>{{.*}}, error [[ERROR:bb[0-9]+]]
+  // CHECK:       [[ERROR]]:
+  // CHECK-NEXT:    unreachable
+  func readSubscript() {
+    _ = self[0]
+  }
+}
+
+protocol TypedThrowsProto {
+  associatedtype Err: Error
+
+  var throwingProp: Int { get throws(Err) }
+
+  subscript (key: Int) -> Int {
+    get throws(Err)
+  }
+}
+
+extension TypedThrowsProto where Err == Never {
+  // CHECK-LABEL: sil {{.*}} @{{.*}}TypedThrowsProto{{.*}}Never{{.*}}testProp{{.*}}F :
+  // CHECK:         try_apply {{.*}}, error [[ERROR:bb[0-9]+]]
+  // CHECK:       [[ERROR]]:
+  // CHECK-NEXT:    unreachable
+  func testProp() {
+    _ = self.throwingProp
+  }
+
+  // CHECK-LABEL: sil {{.*}} @{{.*}}TypedThrowsProto{{.*}}Never{{.*}}testSubscript{{.*}}F :
+  // CHECK:         try_apply {{.*}}, error [[ERROR:bb[0-9]+]]
+  // CHECK:       [[ERROR]]:
+  // CHECK-NEXT:    unreachable
+  func testSubscript() {
+    _ = self[0]
+  }
+}
+
+func testErasureWithOverloading() {
+  func simple(_: () throws -> Void) {}
+  func simple<E>(_: () throws(E) -> Void) {}
+
+  // CHECK-LABEL: sil private [ossa] @$s12typed_throws26testErasureWithOverloadingyyF0C0L_2fnyyyxYKXE_ts5ErrorRzlF
+  // CHECK: [[SIMPLE_WITH_TYPED_THROWS:%.*]] = function_ref @$s12typed_throws26testErasureWithOverloadingyyF6simpleL0_yyyyxYKXEs5ErrorRzlF
+  // CHECK: apply [[SIMPLE_WITH_TYPED_THROWS]]<E>(%0)
+  // CHECK: } // end sil function '$s12typed_throws26testErasureWithOverloadingyyF0C0L_2fnyyyxYKXE_ts5ErrorRzlF'
+  func test<E>(fn: () throws(E) -> Void) {
+    simple(fn)
+  }
+}
+
+// More complicated overloading scenario where typed throws overload should be preferred when argument is also typed throws.
+struct Data { 
+  var _storage: ArraySlice<UInt8>
+
+  // CHECK-LABEL: sil hidden [ossa] @$s12typed_throws4DataV15withUnsafeBytesyxxSWq_YKXEq_YKs5ErrorR_r0_lF
+  // CHECK: bb0([[RESULT:%.*]] : $*R, [[E:%.*]] : $*E, [[BODY:%.*]] : @guaranteed $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (UnsafeRawBufferPointer) -> (@out τ_0_1, @error_indirect τ_0_0) for <E, R>, [[SELF:%.*]] : @guaranteed $Data):
+  // CHECK: [[ARRAY_SLICE:%.*]] = copy_value {{.*}} : $ArraySlice<UInt8>
+  // CHECK: [[ARRAYSLICE_WITH_UNSAFE_BYTES:%.*]] = function_ref @$ss10ArraySliceV12typed_throwss5UInt8VRszlE15withUnsafeBytesyqd__qd__SWqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lF
+  // CHECK: [[ERROR:%.*]] = alloc_stack $E
+  // CHECK: try_apply [[ARRAYSLICE_WITH_UNSAFE_BYTES]]<UInt8, R, E>([[RESULT]], [[ERROR]], %2, [[ARRAY_SLICE]])
+  // CHECK: } // end sil function '$s12typed_throws4DataV15withUnsafeBytesyxxSWq_YKXEq_YKs5ErrorR_r0_lF'
+  func withUnsafeBytes<R, E: Error>(
+    _ body: (UnsafeRawBufferPointer) throws(E) -> R
+  ) throws(E) -> R {
+    try _storage.withUnsafeBytes(body)
+  }
+}
+
+extension ArraySlice where Element == UInt8 {
+  func withUnsafeBytes<R, E: Error>(
+    _ body: (UnsafeRawBufferPointer) throws(E) -> R
+  ) throws(E) -> R { fatalError() }
+}
+
+func testOverloadingWithConcreteErrorType() throws {
+  func test<E>(_: () throws(E) -> Void) throws(E) {
+  }
+
+  struct S<T> {
+    init(_: () throws -> T) throws {}
+    init(_: () throws(MyError) -> T) throws(MyError) {}
+  }
+
+  struct Q {
+    init() throws {}
+  }
+
+  // CHECK-LABEL: sil private [ossa] @$s12typed_throws36testOverloadingWithConcreteErrorTypeyyKFyyKXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <any Error>
+  try test {
+    // CHECK-LABEL: sil private [ossa] @$s12typed_throws36testOverloadingWithConcreteErrorTypeyyKFyyKXEfU_AaByyKF1QL_VyKXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Q>
+    _ = try S {
+      try Q() // Ok
+    }
+  }
 }
 
 // CHECK-LABEL:      sil_vtable MySubclass {

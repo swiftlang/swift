@@ -246,15 +246,20 @@ class LLVM(cmake_product.CMakeProduct):
                 platform, arch,
                 crosscompiling=self.is_cross_compile_target(host_target))
             llvm_cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
-            if not self.is_release():
-                # On Linux build LLVM and subprojects with -gsplit-dwarf which is more
-                # space/time efficient than -g on that platform.
-                llvm_cmake_options.define('LLVM_USE_SPLIT_DWARF:BOOL', 'YES')
 
-        if not self.args._build_llvm:
+        target_supports_split_dwarf = host_target.startswith(('linux', 'freebsd'))
+        if target_supports_split_dwarf and self.is_debug_info():
+            # On platforms that support split-dwarf, build LLVM and subprojects with
+            #  -gsplit-dwarf which is more space/time efficient than -g on that platform.
+            llvm_cmake_options.define('LLVM_USE_SPLIT_DWARF:BOOL', 'YES')
+
+        build = True
+        if not self.args._build_llvm or (not self.args.cross_compile_build_swift_tools
+                                         and self.is_cross_compile_target(host_target)):
             # Indicating we don't want to build LLVM at all should
             # override everything.
             build_targets = []
+            build = False
         elif self.args.skip_build or not self.args.build_llvm:
             # We can't skip the build completely because the standalone
             # build of Swift depends on these.
@@ -443,8 +448,6 @@ class LLVM(cmake_product.CMakeProduct):
                                                 'clang-tidy-confusable-chars-gen')
             llvm_cmake_options.define('CLANG_TIDY_CONFUSABLE_CHARS_GEN',
                                       confusable_chars_gen)
-            pseudo_gen = os.path.join(host_build_dir, 'bin', 'clang-pseudo-gen')
-            llvm_cmake_options.define('CLANG_PSEUDO_GEN', pseudo_gen)
             llvm = os.path.join(host_build_dir, 'llvm')
             llvm_cmake_options.define('LLVM_NATIVE_BUILD', llvm)
 
@@ -456,7 +459,8 @@ class LLVM(cmake_product.CMakeProduct):
 
         self._handle_cxx_headers(host_target, platform)
 
-        self.build_with_cmake(build_targets, self.args.llvm_build_variant, [])
+        self.build_with_cmake(build_targets, self.args.llvm_build_variant, [],
+                              build_llvm=build)
 
         # copy over the compiler-rt builtins for iOS/tvOS/watchOS to ensure
         # that Swift's stdlib can use compiler-rt builtins when targeting
@@ -541,7 +545,9 @@ class LLVM(cmake_product.CMakeProduct):
         Whether or not this product should be installed with the given
         arguments.
         """
-        return self.args.install_llvm
+        return self.args.install_llvm and (
+            self.args.cross_compile_build_swift_tools or
+            not self.is_cross_compile_target(host_target))
 
     def install(self, host_target):
         """

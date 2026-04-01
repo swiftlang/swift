@@ -53,6 +53,7 @@ class ConcreteDeclRef;
 class PackConformance;
 class ProtocolConformance;
 class Requirement;
+class AvailabilityConstraint;
 enum class EffectKind : uint8_t;
 
 /// A ProtocolConformanceRef is a handle to a protocol conformance which
@@ -120,28 +121,26 @@ public:
                                             ProtocolDecl *protocol);
 
   bool isConcrete() const {
-    return !isInvalid() && Union.is<ProtocolConformance*>();
+    return !isInvalid() && isa<ProtocolConformance *>(Union);
   }
   ProtocolConformance *getConcrete() const {
     ASSERT(isConcrete());
-    return Union.get<ProtocolConformance*>();
+    return cast<ProtocolConformance *>(Union);
   }
 
-  bool isPack() const {
-    return !isInvalid() && Union.is<PackConformance*>();
-  }
+  bool isPack() const { return !isInvalid() && isa<PackConformance *>(Union); }
   PackConformance *getPack() const {
     ASSERT(isPack());
-    return Union.get<PackConformance*>();
+    return cast<PackConformance *>(Union);
   }
 
   bool isAbstract() const {
-    return !isInvalid() && Union.is<AbstractConformance*>();
+    return !isInvalid() && isa<AbstractConformance *>(Union);
   }
 
   AbstractConformance *getAbstract() const {
     ASSERT(isAbstract());
-    return Union.get<AbstractConformance *>();
+    return cast<AbstractConformance *>(Union);
   }
 
   /// Determine whether this conformance (or a conformance it depends on)
@@ -173,6 +172,11 @@ public:
       llvm::function_ref<bool(ProtocolConformanceRef)> body
   ) const;
 
+  /// Returns the availability constraint that restricts use of this conformance
+  /// in the given context, or \c nullopt if the conformance is available.
+  std::optional<AvailabilityConstraint>
+  getAvailabilityConstraint(DeclContext *dc, SourceLoc loc) const;
+
   using OpaqueValue = void*;
   OpaqueValue getOpaqueValue() const { return Union.getOpaqueValue(); }
   static ProtocolConformanceRef getFromOpaqueValue(OpaqueValue value) {
@@ -201,7 +205,7 @@ public:
   ProtocolConformanceRef subst(InFlightSubstitution &IFS) const;
 
   /// Map contextual types to interface types in the conformance.
-  ProtocolConformanceRef mapConformanceOutOfContext() const;
+  ProtocolConformanceRef mapConformanceOutOfEnvironment() const;
 
   /// Look up the type witness for an associated type declaration in this
   /// conformance.
@@ -219,7 +223,7 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0,
-            bool details = true) const;
+            bool details = true) const LLVM_ATTRIBUTE_USED;
 
   void print(llvm::raw_ostream &out) const;
 

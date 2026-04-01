@@ -1,5 +1,9 @@
 // RUN: %target-build-swift %s
 
+// On linux this test sometimes fails with a linker crash
+// rdar://147769717
+// REQUIRES: OS=macosx
+
 import _Differentiation
 
 public protocol Layer: Differentiable {

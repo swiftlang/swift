@@ -125,6 +125,9 @@ VARIABLE(SWIFT_BACKTRACE, string, "",
          "crash catching and backtracing support in the runtime. "
          "See docs/Backtracing.rst in the Swift repository for details.")
 
+VARIABLE(SWIFT_IS_BACKTRACING, bool, false,
+         "Set to `true` if we are running the backtracer.")
+
 VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
          "Allows for suppressing 'is current executor' equality check crashes. "
          "As since Swift 6.0 checking for current executor equality, may crash "
@@ -146,5 +149,16 @@ VARIABLE(SWIFT_DUMP_ACCESSIBLE_FUNCTIONS, bool, false,
          "These are used to obtain function pointers from accessible function "
          "record names, e.g. by the Distributed runtime to invoke distributed "
          "functions.")
+
+VARIABLE(SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR, bool, true,
+         "Use a slab allocator for the async stack. If not enabled, directly "
+         "call malloc/free. Direct use of malloc/free enables use of memory "
+         "debugging tools for async stack allocations.")
+
+VARIABLE(SWIFT_CONCURRENCY_TRACING_SUBSYSTEM, string, "",
+         "Override the os_signpost subsystem used for concurrency tracing. "
+         "When set, signposts are emitted under this subsystem instead of "
+         "com.apple.swift.concurrency. Useful for testing, since the default "
+         "subsystem has signposts disabled by system logging preferences.")
 
 #undef VARIABLE

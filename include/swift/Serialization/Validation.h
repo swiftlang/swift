@@ -28,6 +28,8 @@
 namespace swift {
 
 class ModuleFile;
+struct ExplicitSwiftModuleMap;
+struct ExplicitClangModuleMap;
 enum class ResilienceStrategy : unsigned;
 
 namespace serialization {
@@ -50,9 +52,6 @@ enum class Status {
 
   /// The distribution channel doesn't match.
   ChannelIncompatible,
-
-  /// The module is required to be in OSSA, but is not.
-  NotInOSSA,
 
   /// The module file depends on another module that can't be loaded.
   MissingDependency,
@@ -129,6 +128,7 @@ class ExtendedValidationInfo {
   StringRef ModulePackageName;
   StringRef ExportAsName;
   StringRef PublicModuleName;
+  StringRef OSLogStringSectionName;
   CXXStdlibKind CXXStdlib;
   version::Version SwiftInterfaceCompilerVersion;
   struct {
@@ -147,6 +147,8 @@ class ExtendedValidationInfo {
     unsigned AllowNonResilientAccess: 1;
     unsigned SerializePackageEnabled: 1;
     unsigned StrictMemorySafety: 1;
+    unsigned DeferredCodeGen: 1;
+    unsigned AggressiveCMOEnabled : 1;
   } Bits;
 
 public:
@@ -236,6 +238,11 @@ public:
   StringRef getPublicModuleName() const { return PublicModuleName; }
   void setPublicModuleName(StringRef name) { PublicModuleName = name; }
 
+  StringRef getOSLogStringSectionName() const { return OSLogStringSectionName; }
+  void setOSLogStringSectionName(StringRef name) {
+    OSLogStringSectionName = name;
+  }
+
   StringRef getExportAsName() const { return ExportAsName; }
   void setExportAsName(StringRef name) { ExportAsName = name; }
 
@@ -251,7 +258,21 @@ public:
   void setStrictMemorySafety(bool val = true) {
     Bits.StrictMemorySafety = val;
   }
-  
+
+  bool deferredCodeGen() const {
+    return Bits.DeferredCodeGen;
+  }
+  void setDeferredCodeGen(bool val = true) {
+    Bits.DeferredCodeGen = val;
+  }
+
+  bool isAggressiveCMOEnabled() const {
+    return Bits.AggressiveCMOEnabled;
+  }
+  void setAggressiveCMOEnabled(bool val = true) {
+    Bits.AggressiveCMOEnabled = val;
+  }
+
   bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
   void setHasCxxInteroperability(bool val) {
     Bits.HasCxxInteroperability = val;
@@ -289,8 +310,6 @@ struct SearchPath {
 ///
 /// \param data A buffer containing the serialized AST. Result information
 /// refers directly into this buffer.
-/// \param requiresOSSAModules If true, necessitates the module to be
-/// compiled with -enable-ossa-modules.
 /// \param requiredSDK If not empty, only accept modules built with
 /// a compatible SDK. The StringRef represents the canonical SDK name.
 /// \param target The target triple of the current compilation for
@@ -301,12 +320,13 @@ struct SearchPath {
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data, bool requiresOSSAModules,
-    StringRef requiredSDK,
+    StringRef data, StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr,
     SmallVectorImpl<SearchPath> *searchPaths = nullptr,
+    ExplicitSwiftModuleMap *explicitSwiftModuleMap = nullptr,
+    ExplicitClangModuleMap *explicitClangModuleMa = nullptr,
     std::optional<llvm::Triple> target = std::nullopt);
 
 /// Emit diagnostics explaining a failure to load a serialized AST.

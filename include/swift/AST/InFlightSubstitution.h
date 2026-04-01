@@ -35,9 +35,9 @@ class InFlightSubstitution {
   LookupConformanceFn BaselineLookupConformance;
   SubstOptions Options;
   RecursiveTypeProperties Props;
-  unsigned RemainingCount : 15;
+  unsigned RemainingCount : 31;
   unsigned InitLimit : 1;
-  unsigned RemainingDepth : 15;
+  unsigned RemainingDepth : 31;
   unsigned LimitReached : 1;
 
   struct ActivePackExpansion {

@@ -27,20 +27,20 @@ class Foo {
   // x86_64-macosx: define internal { <2 x float>, <2 x float> } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1) {{[#0-9]*}} {
   // x86_64-ios: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
   // x86_64-ios: define internal { <2 x float>, <2 x float> } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1) {{[#0-9]*}} {
-  // i386-ios: define hidden swiftcc void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr swiftself %1) {{.*}} {
-  // i386-ios: define internal void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2) {{[#0-9]*}} {
+  // i386-ios: define hidden swiftcc void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr noalias sret({{.*}}) captures(none) %0, ptr swiftself %1) {{.*}} {
+  // i386-ios: define internal void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr noalias sret({{.*}}) captures(none) %0, ptr %1, ptr %2) {{[#0-9]*}} {
   // armv7-ios: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
-  // armv7-ios: define internal void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2) {{[#0-9]*}} {
+  // armv7-ios: define internal void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr noalias sret({{.*}}) captures(none) %0, ptr %1, ptr %2) {{[#0-9]*}} {
   // armv7s-ios: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
-  // armv7s-ios: define internal void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2) {{[#0-9]*}} {
+  // armv7s-ios: define internal void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr noalias sret({{.*}}) captures(none) %0, ptr %1, ptr %2) {{[#0-9]*}} {
   // arm64-ios: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
   // arm64-ios: define internal [[ARM64_MYRECT]] @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1) {{[#0-9]*}} {
   // x86_64-tvos: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
   // x86_64-tvos: define internal { <2 x float>, <2 x float> } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1) {{[#0-9]*}} {
   // arm64-tvos: define hidden swiftcc { float, float, float, float }  @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
   // arm64-tvos: define internal [[ARM64_MYRECT]] @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1) {{[#0-9]*}} {
-  // i386-watchos: define hidden swiftcc void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr swiftself %1) {{.*}} {
-  // i386-watchos: define internal void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2) {{[#0-9]*}} {
+  // i386-watchos: define hidden swiftcc void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr noalias sret({{.*}}) captures(none) %0, ptr swiftself %1) {{.*}} {
+  // i386-watchos: define internal void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr noalias sret({{.*}}) captures(none) %0, ptr %1, ptr %2) {{[#0-9]*}} {
   // armv7k-watchos: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
   // armv7k-watchos: define internal [[ARMV7K_MYRECT]] @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1) {{[#0-9]*}} {
   // armv64_32-watchos: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
@@ -157,7 +157,7 @@ class Foo {
   // armv7-ios: define hidden swiftcc float @"$s8abitypes3FooC4barc{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr swiftself %1) {{.*}} {
   // armv7-ios: [[RESULT:%.*]] = alloca [[RECTTYPE:%.*MyRect.*]], align 4
   // armv7-ios: load ptr, ptr @"\01L_selector(newRect)", align 4
-  // armv7-ios: call void @objc_msgSend_stret(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %call.aggresult
+  // armv7-ios: call void @objc_msgSend_stret(ptr noalias sret({{.*}}) captures(none) %call.aggresult
   // armv7-ios: [[GEP1:%.*]] = getelementptr inbounds [[RECTTYPE]], ptr [[RESULT]], i32 0, i32 1
   // armv7-ios: [[GEP2:%.*]] = getelementptr inbounds {{.*}}, ptr [[GEP1]], i32 0, i32 0
   // armv7-ios: [[RETVAL:%.*]] = load float, ptr [[GEP2]], align 4
@@ -167,7 +167,7 @@ class Foo {
   // armv7s-ios: define hidden swiftcc float @"$s8abitypes3FooC4barc{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr swiftself %1) {{.*}} {
   // armv7s-ios: [[RESULT:%.*]] = alloca [[RECTTYPE:%.*MyRect.*]], align 4
   // armv7s-ios: load ptr, ptr @"\01L_selector(newRect)", align 4
-  // armv7s-ios: call void @objc_msgSend_stret(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %call.aggresult
+  // armv7s-ios: call void @objc_msgSend_stret(ptr noalias sret({{.*}}) captures(none) %call.aggresult
   // armv7s-ios: [[GEP1:%.*]] = getelementptr inbounds [[RECTTYPE]], ptr [[RESULT]], i32 0, i32 1
   // armv7s-ios: [[GEP2:%.*]] = getelementptr inbounds {{.*}}, ptr [[GEP1]], i32 0, i32 0
   // armv7s-ios: [[RETVAL:%.*]] = load float, ptr [[GEP2]], align 4
@@ -185,7 +185,7 @@ class Foo {
   }
 
   // x86_64-macosx: define hidden swiftcc { double, double, double } @"$s8abitypes3FooC3baz{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
-  // x86_64-macosx: define internal void @"$s8abitypes3FooC3baz{{[_0-9a-zA-Z]*}}FTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2) {{[#0-9]*}} {
+  // x86_64-macosx: define internal void @"$s8abitypes3FooC3baz{{[_0-9a-zA-Z]*}}FTo"(ptr noalias sret({{.*}}) captures(none) %0, ptr %1, ptr %2) {{[#0-9]*}} {
   @objc dynamic func baz() -> Trio {
     return Trio(i: 1.0, j: 2.0, k: 3.0)
   }
@@ -480,17 +480,17 @@ class Foo {
     return g.invert(b)
   }
 
-  // x86_64-macosx: define hidden swiftcc void @"$s8abitypes3FooC10throwsTestyySbKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2) {{.*}} {
+  // x86_64-macosx: define hidden swiftcc void @"$s8abitypes3FooC10throwsTestyySbKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2) {{.*}} {
   // x86_64-macosx: [[SEL:%[0-9]+]] = load ptr, ptr @"\01L_selector(negateThrowing:error:)", align 8
   // x86_64-macosx: call signext i8 @objc_msgSend(ptr {{%[0-9]+}}, ptr [[SEL]], i8 signext {{%[0-9]+}}, ptr {{%[0-9]+}})
   // x86_64-macosx: }
 
-  // x86_64-ios: define hidden swiftcc void @"$s8abitypes3FooC10throwsTestyySbKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2) {{.*}} {
+  // x86_64-ios: define hidden swiftcc void @"$s8abitypes3FooC10throwsTestyySbKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2) {{.*}} {
   // x86_64-ios: [[SEL:%[0-9]+]] = load ptr, ptr @"\01L_selector(negateThrowing:error:)", align 8
   // x86_64-ios: call zeroext i1 @objc_msgSend(ptr {{%[0-9]+}}, ptr [[SEL]], i1 zeroext {{%[0-9]+}}, ptr {{%[0-9]+}})
   // x86_64-ios: }
 
-  // i386-ios: define hidden swiftcc void @"$s8abitypes3FooC10throwsTestyySbKF"(i1 %0, ptr swiftself %1, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable(4) %2) {{.*}} {
+  // i386-ios: define hidden swiftcc void @"$s8abitypes3FooC10throwsTestyySbKF"(i1 %0, ptr swiftself %1, ptr noalias captures(none) dereferenceable(4) %2) {{.*}} {
   // i386-ios: [[SEL:%[0-9]+]] = load ptr, ptr @"\01L_selector(negateThrowing:error:)", align 4
   // i386-ios: call signext i8 @objc_msgSend(ptr {{%[0-9]+}}, ptr [[SEL]], i8 signext {{%[0-9]+}}, ptr {{%[0-9]+}})
   // i386-ios: }
@@ -547,18 +547,18 @@ class Foo {
   }
 
   // arm64-ios: define hidden swiftcc { i64, i64, i64, i64 } @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F"(ptr %0, i64 %1, i64 %2, i64 %3, i64 %4, ptr swiftself %5) {{.*}} {
-  // arm64-ios: define internal void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2, ptr %3, ptr %4) {{[#0-9]*}} {
+  // arm64-ios: define internal void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(ptr noalias sret({{.*}}) captures(none) %0, ptr %1, ptr %2, ptr %3, ptr %4) {{[#0-9]*}} {
   //
   // arm64e-ios: define hidden swiftcc { i64, i64, i64, i64 } @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F"(ptr %0, i64 %1, i64 %2, i64 %3, i64 %4, ptr swiftself %5) {{.*}} {
-  // arm64e-ios: define internal void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2, ptr %3, ptr %4) {{.*}} {
+  // arm64e-ios: define internal void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(ptr noalias sret({{.*}}) captures(none) %0, ptr %1, ptr %2, ptr %3, ptr %4) {{.*}} {
   //
   // arm64-tvos: define hidden swiftcc { i64, i64, i64, i64 } @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F"(ptr %0, i64 %1, i64 %2, i64 %3, i64 %4, ptr swiftself %5) {{.*}} {
-  // arm64-tvos: define internal void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2, ptr %3, ptr %4) {{[#0-9]*}} {
+  // arm64-tvos: define internal void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(ptr noalias sret({{.*}}) captures(none) %0, ptr %1, ptr %2, ptr %3, ptr %4) {{[#0-9]*}} {
   // arm64-macosx: define hidden swiftcc { i64, i64, i64, i64 } @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F"(ptr %0, i64 %1, i64 %2, i64 %3, i64 %4, ptr swiftself %5) {{.*}} {
-  // arm64-macosx: define internal void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2, ptr %3, ptr %4) {{.*}} {
+  // arm64-macosx: define internal void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(ptr noalias sret({{.*}}) captures(none) %0, ptr %1, ptr %2, ptr %3, ptr %4) {{.*}} {
   //
   // arm64-watchos: define hidden swiftcc { i64, i64, i64, i64 } @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F"(ptr %0, i64 %1, i64 %2, i64 %3, i64 %4, ptr swiftself %5) {{.*}} {
-  // arm64-watchos: define internal void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2, ptr %3, ptr %4) {{[#0-9]*}} {
+  // arm64-watchos: define internal void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(ptr noalias sret({{.*}}) captures(none) %0, ptr %1, ptr %2, ptr %3, ptr %4) {{[#0-9]*}} {
   @objc dynamic func callJustReturn(_ r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
   }

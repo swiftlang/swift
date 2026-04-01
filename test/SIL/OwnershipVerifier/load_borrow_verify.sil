@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s | %FileCheck %s
 
 // Test that the LoadBorrowImmutabilityChecker accepts these cases.
 // The verification should not bail-out on these, but there's no way
@@ -117,7 +117,8 @@ bb0(%0 : @owned $K, %1 : @owned $K):
   %ld1 = load_borrow %stk : $*K
   br bb2(%ld1 : $K)
 
-bb2(%ld : @guaranteed $K):
+bb2(%16 : @guaranteed $K):
+  %ld = borrowed %16 from ()
   %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed K) -> ()
   %4 = apply %3(%ld) : $@convention(thin) (@guaranteed K) -> ()
   end_borrow %ld : $K
@@ -154,7 +155,8 @@ sil [ossa] @test_multiple_loadborrows : $@convention(thin) (@owned K, @owned K) 
    %ld2 = load_borrow %stk : $*K
    br bb6(%ld2 : $K)
 
- bb6(%ld : @guaranteed $K):
+ bb6(%15 : @guaranteed $K):
+   %ld = borrowed %15 from ()
    %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed K) -> ()
    %4 = apply %3(%ld) : $@convention(thin) (@guaranteed K) -> ()
    end_borrow %ld : $K
@@ -178,6 +180,7 @@ bb1(%6 : @owned $K):
   br bb3
 
 bb2:
+  end_borrow %2
   unreachable
 
 bb3:
@@ -192,7 +195,8 @@ bb0(%0 : @owned $K):
   %ld1 = load_borrow %stk : $*K
   br bb1(%ld1 : $K)
 
-bb1(%ld2 : @guaranteed $K):
+bb1(%5 : @guaranteed $K):
+  %ld2 = borrowed %5 from ()
   cond_br undef, bb2, bb3
 
 bb2:
