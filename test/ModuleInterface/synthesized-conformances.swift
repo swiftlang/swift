@@ -70,6 +70,19 @@ public struct HasNestedTypesAndAvailability {
   }
 }
 
+// CHECK-LABEL: @available(visionOS, unavailable)
+// CHECK-NEXT: public struct UnavailableOnVisionOS {
+@available(visionOS, unavailable)
+public struct UnavailableOnVisionOS {
+  // CHECK-LABEL: @available(iOS 18, *)
+  // CHECK-NEXT: public enum HasRawValueAndRefinediOSAvailability : Swift::Int {
+  @available(iOS 18, *)
+  public enum HasRawValueAndRefinediOSAvailability: Int {
+    // CHECK-NEXT: case a
+    case a
+  }
+}
+
 @objc public enum ObjCEnum: Int32 {
   case a, b = 5, c
 }
@@ -150,6 +163,15 @@ extension NoRawValueWithExplicitHashable : Hashable {
 // CHECK-NEXT: @available(*, deprecated, message: "Use something else")
 // CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueUniversallyDeprecated : Swift::RawRepresentable {}
 
+// CHECK: @available(iOS 18, *)
+// CHECK-NEXT: @available(visionOS, unavailable)
+// CHECK-NEXT: extension synthesized::UnavailableOnVisionOS.synthesized::HasRawValueAndRefinediOSAvailability : Swift::Equatable {}
+// CHECK: @available(iOS 18, *)
+// CHECK-NEXT: @available(visionOS, unavailable)
+// CHECK-NEXT: extension synthesized::UnavailableOnVisionOS.synthesized::HasRawValueAndRefinediOSAvailability : Swift::Hashable {}
+// CHECK: @available(iOS 18, *)
+// CHECK-NEXT: @available(visionOS, unavailable)
+// CHECK-NEXT: extension synthesized::UnavailableOnVisionOS.synthesized::HasRawValueAndRefinediOSAvailability : Swift::RawRepresentable {}
 
 // CHECK: extension synthesized::ObjCEnum : Swift::Equatable {}
 // CHECK: extension synthesized::ObjCEnum : Swift::Hashable {}

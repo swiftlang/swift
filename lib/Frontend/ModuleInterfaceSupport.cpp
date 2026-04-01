@@ -458,11 +458,14 @@ class InheritedProtocolCollector {
       for (auto nextAttr : D->getSemanticAvailableAttrs()) {
         // FIXME: This is just approximating the effects of nested availability
         // attributes for the same platform; formally they'd need to be merged.
-        bool alreadyHasMoreSpecificAttrForThisPlatform = llvm::any_of(
+        bool alreadyHasActiveAttrForDomain = llvm::any_of(
             *cache, [nextAttr](SemanticAvailableAttr existingAttr) {
+              if (nextAttr.getParsedAttr()->getKind() !=
+                  existingAttr.getParsedAttr()->getKind())
+                return false;
               return existingAttr.getDomain().contains(nextAttr.getDomain());
             });
-        if (alreadyHasMoreSpecificAttrForThisPlatform)
+        if (alreadyHasActiveAttrForDomain)
           continue;
         pendingAttrs.push_back(nextAttr);
       }
