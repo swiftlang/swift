@@ -52,29 +52,29 @@ func _lock(_ ptr: UnsafeRawPointer)
 func _unlock(_ ptr: UnsafeRawPointer)
 #endif
 
-/// The state-machine backing `Async{Throwing}Stream`.
+/// The state machine backing `Async{Throwing}Stream`.
 ///
 /// - States:
 ///   - `idle`:  The stream is active with no consumers present
 ///   and may be accepting new elements.
 ///   - `waiting`: The stream is active with consumers present;
-///   new elements are delivered directly to consumers.
+///   new elements are delivered directly to next consumer.
 ///   - `draining`: The stream no longer accepts new elements;
-///   consumers drain the buffered elements.
+///   future consumers drain the buffered elements.
 ///   - `terminated`: The stream is in a terminal state;
 ///   no new elements are accepted, and consumers return immediately.
 ///
 /// - Transitions:
 ///
 /// ```text
-/// Current State   Possible Next States
+/// Current State   Possible Next State
 /// -------------   -------------------
 /// idle          ->  idle, waiting, terminated
 /// waiting       ->  idle, waiting, draining
 /// draining      ->  draining, terminated
 /// terminated    ->  terminated
 /// ```
-///
+/// TODO: Expand this section.
 /// - Transition-Actions:
 ///   - `YieldAction`: The action to take after the `yield(_:)`
 ///   method exits its critical section.
