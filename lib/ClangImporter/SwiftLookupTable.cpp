@@ -1987,9 +1987,23 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
           clang::ObjCProtocolDecl, clang::ObjCCategoryDecl>(named)) {
     clang::DeclContext *dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
-      if (auto friendDecl = dyn_cast<clang::FriendDecl>(member))
-        if (auto underlyingDecl = friendDecl->getFriendDecl())
+      if (auto friendDecl = dyn_cast<clang::FriendDecl>(member)) {
+        if (auto underlyingDecl = friendDecl->getFriendDecl()) {
+          // Skip non-member friend function declarations that were introduced
+          // solely by the friend declaration and don't have an inline body.
+          // In C++, these are only visible through argument-dependent lookup,
+          // and should not be imported as members of the enclosing namespace
+          // in Swift. However, friend functions with inline definitions must
+          // still be imported, since they are the only declaration of the
+          // function and Swift does not have ADL.
+          if (auto *funcDecl = dyn_cast<clang::FunctionDecl>(underlyingDecl))
+            if (funcDecl->getFriendObjectKind() ==
+                    clang::Decl::FriendObjectKind::FOK_Undeclared &&
+                !funcDecl->doesThisDeclarationHaveABody())
+              continue;
           member = underlyingDecl;
+        }
+      }
 
       if (auto namedMember = dyn_cast<clang::NamedDecl>(member))
         addEntryToLookupTable(table, namedMember, nameImporter);
