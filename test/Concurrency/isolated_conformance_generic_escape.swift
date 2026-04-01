@@ -102,6 +102,20 @@ nonisolated(nonsending) func nonsendingForwardSendableGeneric(caller: Caller, _ 
   await caller.call(first: p, second: "this is fine")
 }
 
+// Sendable superclass — a generic parameter constrained to a Sendable
+// superclass is itself Sendable, so its conformances cannot be isolated.
+class SendableBase: @unchecked Sendable {}
+class SendableMiddle: SendableBase, @unchecked Sendable {}
+
+@concurrent
+func callSendableSuperclass<T: SendableMiddle & MyProtocol>(_ p: T) async {
+  p.doSomething()
+}
+
+nonisolated(nonsending) func nonsendingForwardSendableSuperclass<T: SendableMiddle & MyProtocol>(_ p: T) async {
+  await callSendableSuperclass(p) // ok, Sendable superclass means no isolated conformances
+}
+
 // Callee with explicit generic parameter — the name appears in the diagnostic.
 @concurrent
 func callDoSomethingConcurrentExplicit<ItsMe: MyProtocol>(_ p: ItsMe) async {

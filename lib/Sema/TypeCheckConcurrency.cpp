@@ -9126,15 +9126,8 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
       // If the conforming type is Sendable, its conformances cannot be
       // isolated — isolated conformances require non-Sendable types.
       if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
-        if (auto *sendableProto =
-                ctx.getProtocol(KnownProtocolKind::Sendable)) {
-          bool isSendable =
-              llvm::any_of(archetype->getConformsTo(), [&](ProtocolDecl *p) {
-                return p == sendableProto || p->inheritsFrom(sendableProto);
-              });
-
-          if (isSendable)
-            continue;
+        if (archetype->isSendableType()) {
+          continue;
         }
       }
 
