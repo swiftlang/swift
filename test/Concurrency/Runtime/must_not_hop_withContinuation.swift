@@ -31,10 +31,6 @@ if #available(SwiftStdlib 6.0, *) {
 // After each continuation resumes, hop_to_executor targets the generic executor.
 // Since the task has a preferred task executor whose identity matches the current
 // serial executor, mustSwitchToRun elides the hop — no enqueue needed.
-// Similarly, the hop inside withTaskExecutorPreference (after the body returns
-// but before the defer clears the preference) is also elided. The eventual hop
-// back to the generic executor (after the preference is cleared) goes through
-// libdispatch, not our custom executor, so it produces no visible enqueue here.
 
 // CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedContinuation
 // CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedContinuation done

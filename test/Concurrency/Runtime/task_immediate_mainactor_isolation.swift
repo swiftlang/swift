@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -swift-version 6 -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -swift-version 6 -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,7 +8,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: freestanding
 
-// rdar://173181913 — Task.immediate closure must preserve @MainActor isolation
+// Task.immediate closure must preserve @MainActor isolation
 // across await suspension points. Regression: after await withCheckedContinuation,
 // the task resumes on the cooperative pool instead of @MainActor.
 

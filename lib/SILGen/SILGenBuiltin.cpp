@@ -1869,7 +1869,7 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
     // This is critical for CallerIsolationInheriting (nonisolated(nonsending))
     // functions: without this hop, the function may return on whichever thread
     // resumed the continuation, violating the contract that the function
-    // maintains the caller's isolation. (rdar://173371163)
+    // maintains the caller's isolation.
     ExecutorBreadcrumb(/*mustReturnToExecutor=*/true).emit(SGF, loc);
 
     Scope errorScope(SGF, loc);

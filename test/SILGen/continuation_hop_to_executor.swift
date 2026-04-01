@@ -4,15 +4,10 @@
 import Swift
 import _Concurrency
 
-// rdar://173371163 — Verify that hop_to_executor is emitted after
+// Verify that hop_to_executor is emitted after
 // await_async_continuation in the resume (and error) blocks.
 // Without this hop, nonisolated(nonsending) functions that use continuation
 // builtins would incorrectly just continue on whichever thread resumed the continuation.
-
-// All functions must hop back to their right executor once the continuation was resumed.
-
-// The CHECK lines verify the hops survive the mandatory
-// OptimizeHopToExecutor pass (canonical SIL), not just SILGen.
 
 // === Nonisolated free function (Swift 5 default) — hops to generic executor ===
 

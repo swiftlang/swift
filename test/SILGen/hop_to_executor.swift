@@ -565,7 +565,7 @@ func validateHopToExecutorLifetimeShortEnough() async {
 // ==== -----------------------------------------------------------------------
 // MARK: withCheckedContinuation (nonisolated(nonsending)) hop patterns
 //
-// rdar://173371163 — withCheckedContinuation is now nonisolated(nonsending)
+// withCheckedContinuation is now nonisolated(nonsending)
 // (CallerIsolationInheriting). At SILGen level the caller still emits a
 // hop_to_executor breadcrumb after the call. The optimizer later recognises
 // CallerIsolationInheriting calls as non-suspension-points and removes the
