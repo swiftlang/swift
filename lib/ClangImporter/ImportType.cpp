@@ -2803,7 +2803,6 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // (https://github.com/apple/swift/issues/70124)
   // TODO: support params with template parameters
   if (param->hasDefaultArg() && !isInOut &&
-      !isa<clang::CXXConstructorDecl>(param->getDeclContext()) &&
       impl->isDefaultArgSafeToImport(param) &&
       !param->isTemplated()) {
     SwiftDeclSynthesizer synthesizer(*impl);

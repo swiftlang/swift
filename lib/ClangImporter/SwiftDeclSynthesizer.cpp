@@ -2768,10 +2768,6 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
   ASTContext &ctx = ImporterImpl.SwiftContext;
   auto clangFunc =
       cast<clang::FunctionDecl>(param->getParentFunctionOrMethod());
-  if (isa<clang::CXXConstructorDecl>(clangFunc))
-    // TODO: support default arguments of constructors
-    // (https://github.com/apple/swift/issues/70124)
-    return nullptr;
 
   std::string s;
   llvm::raw_string_ostream os(s);
