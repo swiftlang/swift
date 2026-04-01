@@ -770,9 +770,6 @@ RequirementMatch swift::matchWitness(
         std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type>(void)>
         setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
-    llvm::function_ref<std::optional<RequirementMatch>(
-        const LifetimeDependentInterface &, const LifetimeDependentInterface &)>
-        matchLifetimes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
         finalize) {
   bool decomposeFunctionType = false;
@@ -911,13 +908,6 @@ RequirementMatch swift::matchWitness(
       if (!witnessFnType->getExtInfo().isAsync() &&
             (req->isObjC() && reqFnType->getExtInfo().isAsync())) {
         return RequirementMatch(witness, MatchKind::AsyncConflict);
-      }
-
-      // Check that lifetime dependencies match
-      if (auto result = matchLifetimes(
-              LifetimeDependentInterface::fromValueDecl(witness, witnessFnType),
-              LifetimeDependentInterface::fromValueDecl(req, reqFnType))) {
-        return std::move(result.value());
       }
 
       if (!reqThrownError) {
@@ -1331,17 +1321,6 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
                            reqThrownError, witnessThrownError);
   };
 
-  // Attempt to add constraints to make the supplied function types match.
-  auto matchLifetimes = [&](const LifetimeDependentInterface &witnessInterface,
-                            const LifetimeDependentInterface &reqInterface)
-      -> std::optional<RequirementMatch> {
-    if (!cs->matchFunctionLifetimes(witnessInterface, reqInterface,
-                                    witnessLocator)) {
-      return RequirementMatch(witness, MatchKind::LifetimeConflict);
-    }
-    return std::nullopt;
-  };
-
   // Match a type in the requirement to a type in the witness.
   auto matchTypes = [&](Type reqType,
                         Type witnessType) -> std::optional<RequirementMatch> {
@@ -1432,8 +1411,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     return result;
   };
 
-  return matchWitness(dc, req, witness, setup, matchTypes, matchLifetimes,
-                      finalize);
+  return matchWitness(dc, req, witness, setup, matchTypes, finalize);
 }
 
 bool
@@ -3368,10 +3346,6 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
       diags.diagnose(witness, diag::protocol_witness_borrow_mutate_conflict,
                      diagMsg);
     }
-    break;
-  }
-  case MatchKind::LifetimeConflict: {
-    diags.diagnose(match.Witness, diag::protocol_witness_lifetime_conflict);
     break;
   }
   }

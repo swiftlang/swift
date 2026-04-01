@@ -2528,21 +2528,11 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
 
   };
 
-  const auto matchLifetimes =
-      [&](const LifetimeDependentInterface &witnessInterface,
-          const LifetimeDependentInterface &reqInterface)
-      -> std::optional<RequirementMatch> {
-    if (!witnessInterface.canConvertTo(reqInterface))
-      return RequirementMatch(witness, MatchKind::LifetimeConflict);
-    return std::nullopt;
-  };
-
   // Match the witness. If we don't succeed, throw away the inference
   // information.
   // FIXME: A renamed match might be useful to retain for the failure case.
-  if (!matchWitness(dc, req, witness, setup, matchTypes, matchLifetimes,
-                    finalize)
-           .isWellFormed()) {
+  if (!matchWitness(dc, req, witness, setup, matchTypes, finalize)
+          .isWellFormed()) {
     inferred.Inferred.clear();
   }
 
