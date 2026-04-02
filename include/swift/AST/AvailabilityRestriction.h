@@ -213,6 +213,19 @@ public:
   /// from diagnostics describing the restriction.
   bool shouldHideDomainNameInDiagnostics() const;
 
+  /// Formats a human-readable description of the restriction for use in
+  /// diagnostics. Writes the description to \p scratch and returns a
+  /// `StringRef` into it. The description is one of:
+  ///   - "is unavailable"
+  ///   - "is unavailable in <domain>"
+  ///   - "is only available in <domain>"
+  ///   - "is only available in <domain> <version> or newer"
+  ///
+  /// If there is a `message:` on the attribute that creates the restriction
+  /// then that message's body is appended to the result.
+  StringRef getDiagnosticDescription(llvm::SmallString<64> &scratch,
+                                     const ASTContext &ctx) const;
+
   void print(raw_ostream &os) const;
 };
 

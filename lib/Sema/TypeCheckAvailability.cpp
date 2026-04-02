@@ -1227,27 +1227,26 @@ behaviorLimitForExplicitUnavailability(
 
 /// Emits a diagnostic for a protocol conformance that is potentially
 /// unavailable at the given source location.
-static bool diagnosePotentialUnavailability(
-    const RootProtocolConformance *rootConf, const ExtensionDecl *ext,
-    SourceLoc loc, const DeclContext *dc,
-    const AvailabilityDomainAndRange &domainAndRange,
-    const AvailabilityDomainAndRange &fixItDomainAndRange) {
+static bool
+diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
+                                const ExtensionDecl *ext, SourceLoc loc,
+                                const DeclContext *dc,
+                                const AvailabilityRestriction &restriction) {
   ASTContext &ctx = dc->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return false;
 
+  auto domainAndRange = restriction.getDomainAndRange(ctx);
   AvailabilityDomain domain = domainAndRange.getDomain();
   const AvailabilityRange &availability = domainAndRange.getRange();
+
   {
     auto type = rootConf->getType();
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-    auto err = availability.hasMinimumVersion()
-        ? ctx.Diags.diagnose(
-            loc, diag::conformance_availability_only_version_newer, type, proto,
-            domain, availability)
-        : ctx.Diags.diagnose(
-            loc, diag::conformance_availability_not_available, type, proto,
-            domain);
+    llvm::SmallString<64> scratch;
+    auto err = ctx.Diags.diagnose(
+        loc, diag::conformance_availability_unavailable, type, proto,
+        restriction.getDiagnosticDescription(scratch, ctx));
 
     auto behaviorLimit = behaviorLimitForExplicitUnavailability(rootConf, dc);
     if (!availability.hasMinimumVersion()) {
@@ -1264,7 +1263,7 @@ static bool diagnosePotentialUnavailability(
       return true;
   }
 
-  fixAvailability(loc, dc, fixItDomainAndRange, ctx);
+  fixAvailability(loc, dc, restriction.getFixItDomainAndRange(ctx), ctx);
   return true;
 }
 
@@ -1884,19 +1883,16 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
 
   auto type = rootConf->getType();
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-  auto domainAndRange = restriction.getDomainAndRange(ctx);
-  auto attr = restriction.getAttr();
 
   // Downgrade unavailable Sendable conformance diagnostics where
   // appropriate.
   auto behavior =
       behaviorLimitForExplicitUnavailability(rootConf, where.getDeclContext());
 
-  EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
+  llvm::SmallString<64> scratch;
   diags
       .diagnose(loc, diag::conformance_availability_unavailable, type, proto,
-                restriction.shouldHideDomainNameInDiagnostics(),
-                domainAndRange.getDomain(), EncodedMessage.Message)
+                restriction.getDiagnosticDescription(scratch, ctx))
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6,
                                LanguageMode::v6);
@@ -3396,7 +3392,6 @@ static bool diagnoseConformanceAvailabilityRestriction(
     bool warnIfConformanceUnavailablePreSwift6, bool preconcurrency,
     std::function<void(void)> maybeEmitAssociatedTypeNote) {
   auto *DC = where.getDeclContext();
-  auto &ctx = DC->getASTContext();
 
   if (restriction.isUnavailable()) {
     if (diagnoseExplicitUnavailability(loc, restriction, rootConf, ext, where,
@@ -3414,10 +3409,7 @@ static bool diagnoseConformanceAvailabilityRestriction(
   }
 
   // Diagnose (and possibly signal) for potential unavailability
-  auto domainAndRange = restriction.getDomainAndRange(ctx);
-  auto fixItDomainAndRange = restriction.getFixItDomainAndRange(ctx);
-  if (diagnosePotentialUnavailability(rootConf, ext, loc, DC, domainAndRange,
-                                      fixItDomainAndRange)) {
+  if (diagnosePotentialUnavailability(rootConf, ext, loc, DC, restriction)) {
     maybeEmitAssociatedTypeNote();
     return true;
   }
