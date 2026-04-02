@@ -197,10 +197,12 @@ set(EMBEDDED_STDLIB_TARGET_TRIPLES)
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
   if(SWIFT_WASI_SYSROOT_PATH)
-    # Don't attempt to build any other Embedded Swift stdlib triples
-    # when building for WASI.
+    # Also include none-wasm triples, which don't require a sysroot.
+    # Skip non-Wasm targets.
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "wasm32    wasm32-unknown-wasip1  wasm32-unknown-wasip1"
+      "wasm32    wasm32-unknown-wasip1    wasm32-unknown-wasip1"
+      "wasm32    wasm32-unknown-none-wasm  wasm32-unknown-none-wasm"
+      "wasm64    wasm64-unknown-none-wasm  wasm64-unknown-none-wasm"
     )
   else()
     if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
