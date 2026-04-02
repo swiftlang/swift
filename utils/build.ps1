@@ -106,6 +106,9 @@ Default: @("Windows", "WindowsExperimental")
 An array of architectures for which the Windows Swift SDK should be built.
 Default: @("X64","X86","ARM64")
 
+.PARAMETER Toolchain
+Build the Swift toolchain (compilers and their runtime dependencies).
+
 .PARAMETER Clean
 Clean non-compiler builds while building. Use this for a fresh build when
 experiencing issues.
@@ -207,6 +210,7 @@ param
 
   # Incremental Build Support
   [switch] $Clean,
+  [switch] $Toolchain = $false,
   [switch] $SkipBuild = $false,
   [switch] $SkipPackaging = $false,
   [string[]] $Test = @(),
@@ -4313,56 +4317,58 @@ if ($Clean) {
 }
 
 if (-not $SkipBuild) {
-  Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
+  if ($Toolchain) {
+    Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
 
-  Invoke-BuildStep Build-CMark $BuildPlatform
-  Invoke-BuildStep Build-BuildTools $BuildPlatform
-  Invoke-BuildStep Build-SQLite $BuildPlatform
-  Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
-  if ($IsCrossCompiling) {
-    Invoke-BuildStep Build-XML2 $BuildPlatform
-    Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts"
-  }
-  if ($IncludeDS2) {
-    Invoke-BuildStep Build-RegsGen2 $BuildPlatform
-  }
-
-  Invoke-BuildStep Build-CMark $HostPlatform
-  Invoke-BuildStep Build-XML2 $HostPlatform
-  Invoke-BuildStep Build-CDispatch $HostPlatform
-  Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts"
-  $KnownPlatforms.Values | Where-Object {
-    switch ($_.OS) {
-      Windows { $Windows }
-      Android { $Android }
-      default { $false }
+    Invoke-BuildStep Build-CMark $BuildPlatform
+    Invoke-BuildStep Build-BuildTools $BuildPlatform
+    Invoke-BuildStep Build-SQLite $BuildPlatform
+    Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
+    if ($IsCrossCompiling) {
+      Invoke-BuildStep Build-XML2 $BuildPlatform
+      Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts"
     }
-  } | ForEach-Object {
-    Invoke-BuildStep Build-CompilerRuntime $_
-  }
-
-  # Build Macros
-  Build-CMakeProject `
-    -Src $SourceCache\swift-foundation\Sources\FoundationMacros `
-    -Bin (Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros) `
-    -BuildTargets default `
-    -Platform $BuildPlatform `
-    -UsePinnedCompilers Swift `
-    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS) `
-    -Defines @{
-      SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
+    if ($IncludeDS2) {
+      Invoke-BuildStep Build-RegsGen2 $BuildPlatform
     }
 
-  Build-CMakeProject `
-    -Src $SourceCache\swift-testing\Sources\TestingMacros `
-    -Bin (Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros) `
-    -BuildTargets default `
-    -Platform $BuildPlatform `
-    -UsePinnedCompilers Swift `
-    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS) `
-    -Defines @{
-      SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
+    Invoke-BuildStep Build-CMark $HostPlatform
+    Invoke-BuildStep Build-XML2 $HostPlatform
+    Invoke-BuildStep Build-CDispatch $HostPlatform
+    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts"
+    $KnownPlatforms.Values | Where-Object {
+      switch ($_.OS) {
+        Windows { $Windows }
+        Android { $Android }
+        default { $false }
+      }
+    } | ForEach-Object {
+      Invoke-BuildStep Build-CompilerRuntime $_
     }
+
+    # Build Macros
+    Build-CMakeProject `
+      -Src $SourceCache\swift-foundation\Sources\FoundationMacros `
+      -Bin (Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros) `
+      -BuildTargets default `
+      -Platform $BuildPlatform `
+      -UsePinnedCompilers Swift `
+      -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS) `
+      -Defines @{
+        SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift-testing\Sources\TestingMacros `
+      -Bin (Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros) `
+      -BuildTargets default `
+      -Platform $BuildPlatform `
+      -UsePinnedCompilers Swift `
+      -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS) `
+      -Defines @{
+        SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
+      }
+  }
 
   if ($Windows) {
     foreach ($Build in $WindowsSDKBuilds) {
@@ -4522,47 +4528,49 @@ if (-not $SkipBuild) {
     }
   }
 
-  # Build Macros for distribution
-  Invoke-BuildStep Build-FoundationMacros $HostPlatform
-  Invoke-BuildStep Build-TestingMacros $HostPlatform
+  if ($Toolchain) {
+    # Build Macros for distribution
+    Invoke-BuildStep Build-FoundationMacros $HostPlatform
+    Invoke-BuildStep Build-TestingMacros $HostPlatform
 
-  Invoke-BuildStep Build-SQLite $HostPlatform
-  Invoke-BuildStep Build-ToolsSupportCore $HostPlatform
-  Invoke-BuildStep Build-LLBuild $HostPlatform
-  Invoke-BuildStep Build-ArgumentParser $HostPlatform
-  Invoke-BuildStep Build-Driver $HostPlatform
-  Invoke-BuildStep Build-ASN1 $HostPlatform
-  Invoke-BuildStep Build-Crypto $HostPlatform
-  Invoke-BuildStep Build-Collections $HostPlatform
-  Invoke-BuildStep Build-Certificates $HostPlatform
-  Invoke-BuildStep Build-System $HostPlatform
-  Invoke-BuildStep Build-Subprocess $HostPlatform
-  Invoke-BuildStep Build-ToolsProtocols $HostPlatform
-  Invoke-BuildStep Build-Build $HostPlatform
-  Invoke-BuildStep Build-PackageManager $HostPlatform
-  Invoke-BuildStep Build-Markdown $HostPlatform
-  Invoke-BuildStep Build-Format $HostPlatform
-  Invoke-BuildStep Build-LMDB $HostPlatform
-  Invoke-BuildStep Build-IndexStoreDB $HostPlatform
-  Invoke-BuildStep Build-SourceKitLSP $HostPlatform
-  Invoke-BuildStep Build-Inspect $HostPlatform
+    Invoke-BuildStep Build-SQLite $HostPlatform
+    Invoke-BuildStep Build-ToolsSupportCore $HostPlatform
+    Invoke-BuildStep Build-LLBuild $HostPlatform
+    Invoke-BuildStep Build-ArgumentParser $HostPlatform
+    Invoke-BuildStep Build-Driver $HostPlatform
+    Invoke-BuildStep Build-ASN1 $HostPlatform
+    Invoke-BuildStep Build-Crypto $HostPlatform
+    Invoke-BuildStep Build-Collections $HostPlatform
+    Invoke-BuildStep Build-Certificates $HostPlatform
+    Invoke-BuildStep Build-System $HostPlatform
+    Invoke-BuildStep Build-Subprocess $HostPlatform
+    Invoke-BuildStep Build-ToolsProtocols $HostPlatform
+    Invoke-BuildStep Build-Build $HostPlatform
+    Invoke-BuildStep Build-PackageManager $HostPlatform
+    Invoke-BuildStep Build-Markdown $HostPlatform
+    Invoke-BuildStep Build-Format $HostPlatform
+    Invoke-BuildStep Build-LMDB $HostPlatform
+    Invoke-BuildStep Build-IndexStoreDB $HostPlatform
+    Invoke-BuildStep Build-SourceKitLSP $HostPlatform
+    Invoke-BuildStep Build-Inspect $HostPlatform
+  }
 }
 
 Install-HostToolchain
 
-if (-not $SkipBuild -and -not $IsCrossCompiling) {
+if (-not $SkipBuild -and $Toolchain -and -not $IsCrossCompiling) {
   Invoke-BuildStep Build-DocC $HostPlatform
 }
 
-if (-not $SkipBuild) {
+if (-not $SkipBuild -and $Toolchain) {
   Invoke-BuildStep Build-mimalloc $HostPlatform
 }
 
-if (-not $SkipBuild -and $IncludeNoAsserts) {
+if (-not $SkipBuild -and $Toolchain -and $IncludeNoAsserts) {
   Build-NoAssertsToolchain
 }
 
-if (-not $SkipBuild) {
+if (-not $SkipBuild -and $Toolchain) {
   Invoke-BuildStep Patch-mimalloc $HostPlatform
 }
 
