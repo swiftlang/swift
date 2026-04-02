@@ -3426,6 +3426,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        bool preconcurrency) {
   assert(!where.isImplicit());
 
+  // FIXME: Shares a lot with
+  // AvailabilityContext::enumerateUnsatisfiedRestrictionsForConformance().
   if (conformance.isInvalid() || conformance.isAbstract())
     return false;
 

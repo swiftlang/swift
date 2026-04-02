@@ -403,31 +403,6 @@ bool ProtocolConformanceRef::forEachIsolatedConformance(
   return false;
 }
 
-std::optional<AvailabilityRestriction>
-ProtocolConformanceRef::getAvailabilityRestriction(DeclContext *dc,
-                                                   SourceLoc loc) const {
-  // FIXME: Missing logic for pack conformances which is not currently needed.
-  // See diagnoseConformanceAvailability for implementation guidance.
-  if (!isConcrete())
-    return std::nullopt;
-
-  auto availability = AvailabilityContext::forLocation(loc, dc);
-  // Conformance declarations can be more available than the protocols they
-  // involve due to source compatibility exceptions. Thus, it is important to
-  // verify that neither pose a restriction in the given context when checking
-  // for availability of a conformance.
-  if (auto restriction =
-          availability.unsatisfiedRestrictionForDecl(getProtocol()))
-    return restriction;
-
-  auto *conformanceDC = getConcrete()->getRootConformance()->getDeclContext();
-  if (auto restriction = availability.unsatisfiedRestrictionForDecl(
-          conformanceDC->getAsDecl()))
-    return restriction;
-
-  return std::nullopt;
-}
-
 void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) {
     simple_display(out, conformanceRef.getProtocol());
