@@ -1032,8 +1032,11 @@ scoreCandidateMatch(ConstraintSystem &cs,
 
   // Conversion from a concrete type to its existential value.
   if (paramType->isExistentialType()) {
-    if (isSubtypeOfExistentialType(candidateType, paramType))
-      return 100;
+    if (isSubtypeOfExistentialType(candidateType, paramType)) {
+      // Operators always prefer exact and subtype matches. Erasure should
+      // shouldn't be scored higher than a match on a generic parameter.
+      return choice->isOperator() ? 90 : 100;
+    }
   }
 
   // Candidate could be converted to a superclass.
@@ -1066,8 +1069,11 @@ scoreCandidateMatch(ConstraintSystem &cs,
       // metatypes.
       if (candidateType->is<ExistentialMetatypeType>() ||
           !instanceType->isExistentialType()) {
-        if (isSubtypeOfExistentialType(instanceType, EMT->getInstanceType()))
-          return 100;
+        if (isSubtypeOfExistentialType(instanceType, EMT->getInstanceType())) {
+          // See other use of \c isSubtypeOfExistentialType as to why the score
+          // is lower.
+          return choice->isOperator() ? 90 : 100;
+        }
       }
     }
   }
