@@ -1,0 +1,49 @@
+// RUN: %target-sil-opt %s -cond-fail-optimization | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+
+// CHECK-LABEL: sil [ossa] @remove_dead_code_after_cond_fail :
+// CHECK:         %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    cond_fail %1
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK-NEXT:  } // end sil function 'remove_dead_code_after_cond_fail'
+sil [ossa] @remove_dead_code_after_cond_fail : $@convention(thin) (@owned AnyObject) -> @owned AnyObject {
+bb0(%0 : @owned $AnyObject):
+  %1 = integer_literal $Builtin.Int1, -1
+  cond_fail %1, "message"
+  br bb1
+
+bb1:
+  return %0
+}
+
+// CHECK-LABEL: sil @cond_fail_end_scope : $@convention(thin) (@inout Builtin.Int32, Builtin.Int1) -> () {
+// CHECK:         cond_fail
+// CHECK-NEXT:    unreachable
+// CHECK-NEXT:  } // end sil function 'cond_fail_end_scope'
+sil @cond_fail_end_scope : $@convention(thin) (@inout Builtin.Int32, Builtin.Int1) -> () {
+entry(%0 : $*Builtin.Int32, %1 : $Builtin.Int1):
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_fail %2, "message"
+  %4 = begin_access [read] [static] %0
+  cond_br %1, bb1, bb2
+
+bb1:
+  end_access %4
+  br bb3
+
+bb2:
+  end_access %4
+  br bb3
+
+bb3:
+  %99 = tuple ()
+  return %99
+}
+
+

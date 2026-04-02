@@ -16,21 +16,6 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @failing
-// CHECK:         cond_fail
-// CHECK-NEXT:    unreachable
-// CHECK:       } // end sil function 'failing'
-sil @failing : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Int1, -1
-  cond_fail %0 : $Builtin.Int1, "failing"
-  br bb1
-
-bb1:
-  %r = tuple ()
-  return %r : $()
-}
-
 // CHECK-LABEL: sil [ossa] @dont_remove_lifetime_ending_instructions :
 // CHECK:         cond_fail
 // CHECK-NEXT:    end_borrow %1
