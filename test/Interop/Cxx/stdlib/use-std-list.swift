@@ -1,7 +1,7 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// Test iterating through a list using the borrowing iterators (currently behind a feature flag).
 
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_BorrowingForLoop
 
 import StdlibUnittest
 import StdList
@@ -51,54 +51,6 @@ StdListTestSuite.test("ListOfNonCopyable conforms to CxxBorrowingSequence") {
         }
     }
     expectEqual(counter, lst.size())
-}
-
-StdListTestSuite.test("ListOfInt borrowing for loop") {
-    guard #available(SwiftStdlib 6.4, *) else { return }
-    let arr : [Int32] = [1, 2, 3]
-    let constLst = makeListInt()
-    expectEqual(constLst.size(), 3)
-    expectFalse(constLst.empty())
-    var counter = 0
-    for el in constLst {
-        expectEqual(el, arr[counter])
-        counter += 1
-    }
-    expectEqual(counter, constLst.size())
-
-    var mutLst = makeListInt()
-    expectEqual(mutLst.size(), 3)
-    expectFalse(mutLst.empty())
-    counter = 0
-    for el in mutLst {
-        expectEqual(el, arr[counter])
-        counter += 1
-    }
-    expectEqual(counter, mutLst.size())
-}
-
-StdListTestSuite.test("ListOfNonCopyable borrowing for loop") {
-    guard #available(SwiftStdlib 6.4, *) else { return }
-    let arr : [Int32] = [1, 2, 3]
-    var constLst = makeListOfNonCopyable()
-    expectEqual(constLst.size(), 3)
-    expectFalse(constLst.empty())
-    var counter = 0
-    for el in constLst {
-        expectEqual(getNumber(el), arr[counter])
-        counter += 1
-    }
-    expectEqual(counter, constLst.size())
-
-    var mutLst = makeListOfNonCopyable()
-    expectEqual(mutLst.size(), 3)
-    expectFalse(mutLst.empty())
-    counter = 0
-    for el in mutLst {
-        expectEqual(getNumber(el), arr[counter])
-        counter += 1
-    }
-    expectEqual(counter, mutLst.size())
 }
 
 runAllTests()
