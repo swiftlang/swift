@@ -714,66 +714,91 @@ internal func utf8Length(
   var count = 0
   var isASCII = true
 
+  // For each UTF-16 code unit:
+  //   U+0000..U+007F  → 1 UTF-8 byte  (ASCII)
+  //   U+0080..U+07FF  → 2 UTF-8 bytes
+  //   U+0800..U+D7FF  → 3 UTF-8 bytes  (BMP, non-surrogate)
+  //   U+D800..U+DBFF  → high surrogate (4 UTF-8 bytes for the pair)
+  //   U+DC00..U+DFFF  → low surrogate  (consumed by high surrogate)
+  //   U+E000..U+FFFF  → 3 UTF-8 bytes  (BMP, non-surrogate)
+
   while unsafe input < (inputEnd - blockSize) {
     if let _ = unsafe allASCIIBlock(at: input) {
       unsafe input += blockSize
       count += blockSize
     } else {
       isASCII = false
-      let chunkCount = unsafe withUnsafeTemporaryAllocation(
-        of: UInt8.self, capacity: blockSize * 4 /*max 4 bytes per UTF8 element*/
-      ) { outputBuf -> Int? in
-        var output = unsafe outputBuf.baseAddress.unsafelyUnwrapped
-        let outputStart = unsafe output
-        let outputEnd = unsafe output + outputBuf.count
-        if unsafe !processNonASCIIChunk(
-          input: &input,
-          inputEnd: inputEnd,
-          output: &output,
-          outputEnd: outputEnd,
-          repairing: repairing
-        ).0 {
-          return nil
+      // Process one block's worth of non-ASCII code units by classification
+      let blockEnd = unsafe Swift.min(input + blockSize, inputEnd)
+      while unsafe input < blockEnd {
+        let cu = unsafe input.pointee
+        if cu < 0x80 {
+          count &+= 1
+          unsafe input += 1
+        } else if cu < 0x800 {
+          count &+= 2
+          unsafe input += 1
+        } else if UTF16.isLeadSurrogate(cu) {
+          // Check for a valid surrogate pair
+          let next = unsafe input + 1
+          if unsafe next < inputEnd && UTF16.isTrailSurrogate(next.pointee) {
+            count += 4
+            unsafe input += 2
+          } else if repairing {
+            count &+= 3 // U+FFFD replacement character
+            unsafe input += 1
+          } else {
+            return nil
+          }
+        } else if UTF16.isTrailSurrogate(cu) {
+          // Unpaired low surrogate
+          if repairing {
+            count &+= 3 // U+FFFD replacement character
+            unsafe input += 1
+          } else {
+            return nil
+          }
+        } else {
+          count &+= 3 // BMP non-surrogate
+          unsafe input += 1
         }
-        return unsafe output - outputStart
-      }
-      if let chunkCount {
-        count += chunkCount
-      } else {
-        return nil
       }
     }
   }
-  // Finish any remaining input that didn't fit in a SIMD chunk
+  // Finish any remaining code units that didn't fill a full block
   while unsafe input < inputEnd {
-    let trailingCount = unsafe withUnsafeTemporaryAllocation(
-      of: UInt8.self, capacity: 4 /*max 4 bytes per UTF8 element*/
-    ) { outputBuf -> Int? in
-      var output = unsafe outputBuf.baseAddress.unsafelyUnwrapped
-      let outputStart = unsafe output
-      let outputEnd = unsafe output + outputBuf.count
-      let (scalarFallBackResult, _) = unsafe processScalarFallback(
-        input: &input,
-        inputEnd: inputEnd,
-        output: &output,
-        outputEnd: outputEnd,
-        repairing: repairing
-      )
-      switch scalarFallBackResult {
-      case .singleByte:
-        break
-      case .multiByte:
-        isASCII = false
-        break
-      case .invalid:
+    let cu = unsafe input.pointee
+    if cu < 0x80 {
+      count &+= 1
+      unsafe input += 1
+    } else if cu < 0x800 {
+      isASCII = false
+      count &+= 2
+      unsafe input += 1
+    } else if UTF16.isLeadSurrogate(cu) {
+      isASCII = false
+      let next = unsafe input + 1
+      if unsafe next < inputEnd && UTF16.isTrailSurrogate(next.pointee) {
+        count &+= 4
+        unsafe input += 2
+      } else if repairing {
+        count &+= 3
+        unsafe input += 1
+      } else {
         return nil
       }
-      return unsafe output - outputStart
-    }
-    if let trailingCount {
-      count += trailingCount
+    } else if UTF16.isTrailSurrogate(cu) {
+      isASCII = false
+      if repairing {
+        count &+= 3
+        unsafe input += 1
+      } else {
+        return nil
+      }
     } else {
-      return nil
+      isASCII = false
+      count &+= 3
+      unsafe input += 1
     }
   }
   return (count, isASCII: isASCII)
