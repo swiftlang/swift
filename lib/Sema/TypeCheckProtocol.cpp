@@ -34,6 +34,7 @@
 #include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -43,6 +44,7 @@
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookup.h"
@@ -53,6 +55,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RequirementMatch.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDeclFinder.h"
@@ -3167,6 +3170,56 @@ static void addOptionalityFixIts(
 
 }
 
+/// Check whether the witness body contains any throwing operations ('try'
+/// expressions or 'throw' statements) that removing the 'throws' clause from
+/// its signature would break. Effects inside nested closures and local
+/// functions do not propagate to the enclosing signature, so they are
+/// skipped. Returns true conservatively when the body is unavailable.
+static bool witnessBodyHasThrowingOperation(AbstractFunctionDecl *witness) {
+  auto *body = witness->getBody(/*canSynthesize=*/false);
+  if (!body)
+    return true;
+
+  class Walker : public ASTWalker {
+  public:
+    bool FoundThrowingOperation = false;
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (isa<AbstractClosureExpr>(E))
+        return Action::SkipNode(E);
+
+      // 'try?' and 'try!' do not require the enclosing function to throw.
+      if (isa<TryExpr>(E)) {
+        FoundThrowingOperation = true;
+        return Action::Stop();
+      }
+
+      return Action::Continue(E);
+    }
+
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      if (isa<ThrowStmt>(S)) {
+        FoundThrowingOperation = true;
+        return Action::Stop();
+      }
+
+      return Action::Continue(S);
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::SkipNodeIf(isa<AbstractFunctionDecl>(D) ||
+                                isa<NominalTypeDecl>(D));
+    }
+  } walker;
+
+  body->walk(walker);
+  return walker.FoundThrowingOperation;
+}
+
 /// Diagnose a requirement match, describing what went wrong (or not).
 static void
 diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
@@ -3268,9 +3321,23 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
                    req->isObjC());
     break;
 
-  case MatchKind::ThrowsConflict:
-    diags.diagnose(match.Witness, diag::protocol_witness_throws_conflict);
+  case MatchKind::ThrowsConflict: {
+    auto witness = match.Witness;
+    auto diag = diags.diagnose(witness, diag::protocol_witness_throws_conflict);
+    auto FD = dyn_cast<AbstractFunctionDecl>(witness);
+    // Only suggest removing 'throws' when the body has no throwing
+    // operations; otherwise the fix-it would break the body.
+    if (FD && !witnessBodyHasThrowingOperation(FD)) {
+      if (auto thrownTypeRepr = FD->getThrownTypeRepr()) {
+        auto &SM = module->getASTContext().SourceMgr;
+        SourceLoc rParenLoc = Lexer::getLocForEndOfToken(SM, thrownTypeRepr->getEndLoc());
+        diag.fixItRemove(SourceRange(FD->getThrowsLoc(), rParenLoc));
+      } else {
+        diag.fixItRemove(FD->getThrowsLoc());
+      }
+    }
     break;
+  }
 
   case MatchKind::OptionalityConflict: {
     auto &adjustments = match.OptionalAdjustments;
