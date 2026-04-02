@@ -538,6 +538,50 @@ extension AsyncThrowingStream {
   }
 }
 
+// MARK: init(unfolding:) Support
+
+internal struct _AsyncStreamUnfoldingState<Element, Failure: Error> {
+  var produce: @Sendable () async throws(Failure) -> Element?
+  var onCancel: (@Sendable () -> Void)?
+}
+
+extension AsyncStream {
+  internal typealias _UnfoldingState = _AsyncStreamUnfoldingState<Element, Never>
+}
+
+extension AsyncThrowingStream where Failure == any Error {
+  internal typealias _UnfoldingState = _AsyncStreamUnfoldingState<Element, Failure>
+}
+
+nonisolated(nonsending)
+internal func _asyncStreamUnfold<Element, Failure: Error>(
+  from storage: _AsyncStreamCriticalStorage<_AsyncStreamUnfoldingState<Element, Failure>?>
+) async throws(Failure) -> Element? {
+  try await withTaskCancellationHandler { () async throws(Failure) -> Element? in
+    do throws(Failure) {
+      // TODO: why can't we return { $0?.produce } here?
+      // currently produces an error about runtime typed throws support...
+      guard let produce = storage.withLock({ $0 })?.produce else {
+        // Stream already finished.
+        return nil
+      }
+
+      guard let next = try await produce() else {
+        // Stream ended. Drop storage outside the lock.
+        _ = storage.withLock { $0.take() }
+        return nil
+      }
+      return next
+    } catch {
+      _ = storage.withLock { $0.take() }
+      throw error
+    }
+  } onCancel: {
+    let state = storage.withLock { $0.take() }
+    state?.onCancel?()
+  }
+}
+
 // this is used to store closures; which are two words
 final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
   var _value: Contents
@@ -557,21 +601,10 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     unsafe _unlock(ptr)
   }
 
-  var value: Contents {
-    get {
-      lock()
-      let contents = _value
-      unlock()
-      return contents
-    }
-
-    set {
-      lock()
-      withExtendedLifetime(_value) {
-        _value = newValue
-        unlock()
-      }
-    }
+  internal func withLock<T>(_ body: (inout Contents) -> T) -> T {
+    self.lock()
+    defer { self.unlock() }
+    return body(&_value)
   }
 
   static func create(_ initial: Contents) -> _AsyncStreamCriticalStorage {
