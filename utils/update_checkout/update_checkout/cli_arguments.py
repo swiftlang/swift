@@ -144,7 +144,7 @@ repositories.
             " cloning of any repository failed. 0 for no retries, -1 for"
             " unlimited retries.",
             type=int,
-            default=0,
+            default=3,
         )
         parser.add_argument(
             "-j",
