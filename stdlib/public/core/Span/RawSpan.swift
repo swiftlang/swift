@@ -309,7 +309,25 @@ extension RawSpan {
     )
   }
 
-  /// Create a `RawSpan` over the memory represented by a `Span<Element>`
+  /// Unsafely view a typed span as a raw span.
+  ///
+  /// Creates a `RawSpan` over the memory represented by a `Span<Element>`
+  ///
+  /// - Parameters:
+  ///   - span: An existing `Span<Element>`, from which this `RawSpan` will
+  ///     inherit its lifetime.
+  @available(*, deprecated, renamed: "init(unsafeElements:)")
+  @_alwaysEmitIntoClient
+  @unsafe
+  @lifetime(copy span)
+  public init<Element>(_elements span: Span<Element>) {
+    unsafe self = Self.init(unsafeElements: span)
+  }
+
+  /// Unsafely view a typed span as a raw span.
+  ///
+  /// Creates a `RawSpan` over the memory represented by a `Span<Element>`
+  ///
   ///
   /// - Parameters:
   ///   - span: An existing `Span<Element>`, from which this `RawSpan` will
@@ -317,7 +335,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @unsafe
   @lifetime(copy span)
-  public init<Element>(_elements span: Span<Element>) {
+  public init<Element>(unsafeElements span: Span<Element>) {
     let rawSpan = unsafe RawSpan(
       _unchecked: unsafe span._pointer,
       byteCount: span.count == 1 ? MemoryLayout<Element>.size
@@ -326,15 +344,17 @@ extension RawSpan {
     self = unsafe _overrideLifetime(rawSpan, copying: span)
   }
 
-  /// Create a `RawSpan` over the memory represented by a `Span<Element>`
+  /// View a typed span as a raw span.
+  ///
+  /// Creates a `RawSpan` over the memory represented by a `Span<Element>`.
   ///
   /// - Parameters:
-  ///   - span: An existing `Span<ELement>`, from which this `RawSpan` will
+  ///   - elements: An existing `Span<ELement>`, from which this `RawSpan` will
   ///     inherit its lifetime.
   @_alwaysEmitIntoClient
   @_lifetime(copy span)
-  init<Element: ConvertibleToBytes>(_ span: Span<Element>) {
-    unsafe self = Self.init(_elements: span)
+  init<Element: ConvertibleToBytes>(elements span: Span<Element>) {
+    unsafe self = Self.init(unsafeElements: span)
   }
 }
 
@@ -384,7 +404,7 @@ extension RawSpan {
   ///
   /// - Parameter byteOffset: The offset of the byte to access. `byteOffset`
   ///     must be greater or equal to zero, and less than `byteCount`.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @inline(__always)
   subscript(_ byteOffset: Int) -> UInt8 {
     _checkIndex(byteOffset)
     return unsafe self[unchecked: byteOffset]
@@ -771,11 +791,10 @@ extension RawSpan {
     as: T.Type = T.self,
     _ byteOrder: ByteOrder
   ) -> T {
-    switch byteOrder {
-    case .bigEndian:
-      load(fromByteOffset: offset, as: T.self).bigEndian
-    case .littleEndian:
-      load(fromByteOffset: offset, as: T.self).littleEndian
+    let rawValue = load(fromByteOffset: offset, as: T.self)
+    return switch byteOrder {
+    case .bigEndian: rawValue.bigEndian
+    case .littleEndian: rawValue.littleEndian
     }
   }
 }
