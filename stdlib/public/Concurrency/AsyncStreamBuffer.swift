@@ -103,6 +103,30 @@ fileprivate struct UnsafeSendable<Value: ~Copyable>: ~Copyable, @unchecked Senda
 ///
 @safe
 final class _Storage<Element, Failure: Error>: @unchecked Sendable {
+  struct Continuation {
+    enum BufferingPolicy {
+      case unbounded
+
+      case bufferingOldest(Int)
+
+      case bufferingNewest(Int)
+    }
+
+    enum YieldResult {
+      case enqueued(remaining: Int)
+
+      case dropped(Element)
+
+      case terminated
+    }
+
+    enum Termination {
+      case finished(Failure?)
+
+      case cancelled
+    }
+  }
+
   @unsafe
   struct _StateMachine: ~Copyable {
     typealias Buffer = _Deque<Element>
@@ -555,32 +579,6 @@ extension _Storage {
     defer { unsafe _unlock(self.lock) }
 
     return unsafe action(&self._stateMachine)
-  }
-}
-
-extension _Storage {
-  internal struct Continuation {
-    internal enum BufferingPolicy {
-      case unbounded
-
-      case bufferingOldest(Int)
-
-      case bufferingNewest(Int)
-    }
-
-    internal enum YieldResult {
-      case enqueued(remaining: Int)
-
-      case dropped(Element)
-
-      case terminated
-    }
-
-    internal enum Termination {
-      case finished(Failure?)
-
-      case cancelled
-    }
   }
 }
 
