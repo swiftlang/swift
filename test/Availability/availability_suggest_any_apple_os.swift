@@ -7,28 +7,28 @@
 // expected-note@-2 {{'allFourOSesAligned()' is available in iOS 26 or newer}}
 // expected-note@-3 {{'allFourOSesAligned()' is available in tvOS 26 or newer}}
 // expected-note@-4 {{'allFourOSesAligned()' is available in watchOS 26 or newer}}
-func allFourOSesAligned() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:39-53=anyAppleOS 26, *}}
+func allFourOSesAligned() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:12-52=anyAppleOS 26, *}}
 
 @available(macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0, *)
 // expected-note@-1 {{'allFourOSesAlignedTrailingZeroes()' is available in macOS 26.0 or newer}}
 // expected-note@-2 {{'allFourOSesAlignedTrailingZeroes()' is available in iOS 26.0 or newer}}
 // expected-note@-3 {{'allFourOSesAlignedTrailingZeroes()' is available in tvOS 26.0 or newer}}
 // expected-note@-4 {{'allFourOSesAlignedTrailingZeroes()' is available in watchOS 26.0 or newer}}
-func allFourOSesAlignedTrailingZeroes() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:45-61=anyAppleOS 26, *}}
+func allFourOSesAlignedTrailingZeroes() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:12-60=anyAppleOS 26, *}}
 
 @available(watchOS 26, tvOS 26, iOS 26, macOS 26, *)
 // expected-note@-1 {{'allFourOSesAlignedReversed()' is available in macOS 26 or newer}}
 // expected-note@-2 {{'allFourOSesAlignedReversed()' is available in iOS 26 or newer}}
 // expected-note@-3 {{'allFourOSesAlignedReversed()' is available in tvOS 26 or newer}}
 // expected-note@-4 {{'allFourOSesAlignedReversed()' is available in watchOS 26 or newer}}
-func allFourOSesAlignedReversed() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:41-53=anyAppleOS 26, *}}
+func allFourOSesAlignedReversed() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:12-52=anyAppleOS 26, *}}
 
 @available(macOS 26, iOS 26.0, tvOS 26, watchOS 26.0, *)
 // expected-note@-1 {{'allFourOSesAlignedSomeTrailingZeroes()' is available in macOS 26 or newer}}
 // expected-note@-2 {{'allFourOSesAlignedSomeTrailingZeroes()' is available in iOS 26.0 or newer}}
 // expected-note@-3 {{'allFourOSesAlignedSomeTrailingZeroes()' is available in tvOS 26 or newer}}
 // expected-note@-4 {{'allFourOSesAlignedSomeTrailingZeroes()' is available in watchOS 26.0 or newer}}
-func allFourOSesAlignedSomeTrailingZeroes() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:41-57=anyAppleOS 26, *}}
+func allFourOSesAlignedSomeTrailingZeroes() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:12-56=anyAppleOS 26, *}}
 
 @available(FourOSesAligned 26, *)
 func allFourOSesAlignedMacro() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}
@@ -40,48 +40,65 @@ func allFourOSesAlignedMacro() { } // expected-warning {{use '@available(anyAppl
 // expected-note@-4 {{'allSixOSesAligned()' is available in watchOS 26 or newer}}
 // expected-note@-5 {{'allSixOSesAligned()' is available in visionOS 26 or newer}}
 // expected-note@-6 {{'allSixOSesAligned()' is available in Mac Catalyst 26 or newer}}
-func allSixOSesAligned() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-7:64-82=anyAppleOS 26, *}}
+func allSixOSesAligned() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-7:12-81=anyAppleOS 26, *}}
 
 @available(macOS 26.4, iOS 26.4, tvOS 26.4, watchOS 26.4, *)
 // expected-note@-1 {{'allFourOSesAlignedMinorVersion()' is available in macOS 26.4 or newer}}
 // expected-note@-2 {{'allFourOSesAlignedMinorVersion()' is available in iOS 26.4 or newer}}
 // expected-note@-3 {{'allFourOSesAlignedMinorVersion()' is available in tvOS 26.4 or newer}}
 // expected-note@-4 {{'allFourOSesAlignedMinorVersion()' is available in watchOS 26.4 or newer}}
-func allFourOSesAlignedMinorVersion() { } // expected-warning {{use '@available(anyAppleOS 26.4, *)' instead of platform specific '@available' attributes with the same version}}{{-5:45-61=anyAppleOS 26.4, *}}
+func allFourOSesAlignedMinorVersion() { } // expected-warning {{use '@available(anyAppleOS 26.4, *)' instead of platform specific '@available' attributes with the same version}}{{-5:12-60=anyAppleOS 26.4, *}}
 
 @available(macOS 26, iOS 26, tvOS 26, *)
 // expected-note@-1 {{'onlyThreeOSes()' is available in macOS 26 or newer}}
 // expected-note@-2 {{'onlyThreeOSes()' is available in iOS 26 or newer}}
 // expected-note@-3 {{'onlyThreeOSes()' is available in tvOS 26 or newer}}
-func onlyThreeOSes() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-4:30-41=anyAppleOS 26, *}}
+func onlyThreeOSes() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-4:12-40=anyAppleOS 26, *}}
 
 @available(macOS 26, iOS 26, *)
 // expected-note@-1 {{'onlyTwoOSes()' is available in macOS 26 or newer}}
 // expected-note@-2 {{'onlyTwoOSes()' is available in iOS 26 or newer}}
-func onlyTwoOSes() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-3:22-32=anyAppleOS 26, *}}
+func onlyTwoOSes() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-3:12-31=anyAppleOS 26, *}}
+
+@available(macOS 26, *, iOS 26)
+// expected-note@-1 {{'onlyTwoOSesWeirdOrder()' is available in macOS 26 or newer}}
+// expected-note@-2 {{'onlyTwoOSesWeirdOrder()' is available in iOS 26 or newer}}
+func onlyTwoOSesWeirdOrder() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-3:12-31=anyAppleOS 26, *}}
+
+@available( macOS 26, iOS 26, * )
+// expected-note@-1 {{'onlyTwoOSesWeirdWhitespace()' is available in macOS 26 or newer}}
+// expected-note@-2 {{'onlyTwoOSesWeirdWhitespace()' is available in iOS 26 or newer}}
+func onlyTwoOSesWeirdWhitespace() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-3:13-33=anyAppleOS 26, *}}
 
 @available(macOS 26, iOS 26, tvOS 26, watchOS 26.4, *)
 // expected-note@-1 {{'threeOSesAlignedOneUnaligned()' is available in macOS 26 or newer}}
 // expected-note@-2 {{'threeOSesAlignedOneUnaligned()' is available in iOS 26 or newer}}
 // expected-note@-3 {{'threeOSesAlignedOneUnaligned()' is available in tvOS 26 or newer}}
-func threeOSesAlignedOneUnaligned() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-4:39-55=anyAppleOS 26, watchOS 26.4, *}}
+func threeOSesAlignedOneUnaligned() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-4:12-54=anyAppleOS 26, watchOS 26.4, *}}
 
 @available(macOS 26, iOS 26, tvOS 26, watchOS 26, visionOS 26.4, *)
 // expected-note@-1 {{'fourOSesAlignedOneUnaligned()' is available in macOS 26 or newer}}
 // expected-note@-2 {{'fourOSesAlignedOneUnaligned()' is available in iOS 26 or newer}}
 // expected-note@-3 {{'fourOSesAlignedOneUnaligned()' is available in tvOS 26 or newer}}
 // expected-note@-4 {{'fourOSesAlignedOneUnaligned()' is available in watchOS 26 or newer}}
-func fourOSesAlignedOneUnaligned() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:51-68=anyAppleOS 26, visionOS 26.4, *}}
+func fourOSesAlignedOneUnaligned() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:12-67=anyAppleOS 26, visionOS 26.4, *}}
+
+@available(visionOS 26.4, macOS 26, iOS 26, *, tvOS 26, watchOS 26)
+// expected-note@-1 {{'fourOSesAlignedOneUnalignedWeirdOrder()' is available in macOS 26 or newer}}
+// expected-note@-2 {{'fourOSesAlignedOneUnalignedWeirdOrder()' is available in iOS 26 or newer}}
+// expected-note@-3 {{'fourOSesAlignedOneUnalignedWeirdOrder()' is available in tvOS 26 or newer}}
+// expected-note@-4 {{'fourOSesAlignedOneUnalignedWeirdOrder()' is available in watchOS 26 or newer}}
+func fourOSesAlignedOneUnalignedWeirdOrder() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:12-67=anyAppleOS 26, visionOS 26.4, *}}
 
 @available(macOS 26, iOS 26, tvOS 26.4, watchOS 26.4, *)
 // expected-note@-1 {{'twoAlignedVersions()' is available in macOS 26 or newer}}
 // expected-note@-2 {{'twoAlignedVersions()' is available in iOS 26 or newer}}
-func twoAlignedVersions() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-3:41-57=anyAppleOS 26, watchOS 26.4, tvOS 26.4, *}}
+func twoAlignedVersions() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-3:12-56=anyAppleOS 26, watchOS 26.4, tvOS 26.4, *}}
 
 @available(macOS 26.4, iOS 26.4, tvOS 26, watchOS 26, *)
 // expected-note@-1 {{'twoAlignedVersionsSwapped()' is available in tvOS 26 or newer}}
 // expected-note@-2 {{'twoAlignedVersionsSwapped()' is available in watchOS 26 or newer}}
-func twoAlignedVersionsSwapped() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-3:43-57=anyAppleOS 26, iOS 26.4, macOS 26.4, *}}
+func twoAlignedVersionsSwapped() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-3:12-56=anyAppleOS 26, iOS 26.4, macOS 26.4, *}}
 
 @available(macOS 26, iOS 26, *)
 // expected-note@-1 {{'alignedVersionsSplitIntoMultipleGropus()' is available in macOS 26 or newer}}
