@@ -12,7 +12,7 @@
 // RUN: %target-swift-frontend %s -c -cxx-interoperability-mode=default -Xcc -std=c++17 -Xcc -fmodules-cache-path=%t -DADD_CXXSTDLIB
 // RUN: %target-swift-frontend %s -c -cxx-interoperability-mode=default -Xcc -std=c++20 -Xcc -fmodules-cache-path=%t -DADD_CXXSTDLIB
 
-// REQUIRES: OS=linux-android
+// REQUIRES: OS=linux-android-stat
 
 import Android
 import Bionic
