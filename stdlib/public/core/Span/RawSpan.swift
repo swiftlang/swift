@@ -333,7 +333,7 @@ extension RawSpan {
   ///     inherit its lifetime.
   @_alwaysEmitIntoClient
   @_lifetime(copy span)
-  init<Element: ConvertibleToRawBytes>(_ span: Span<Element>) {
+  init<Element: ConvertibleToBytes>(_ span: Span<Element>) {
     unsafe self = Self.init(_elements: span)
   }
 }
@@ -746,7 +746,7 @@ extension RawSpan {
   ///   - type: The type of the instance to create.
   /// - Returns: A new value of type `T`, read from `offset`.
   @_alwaysEmitIntoClient
-  func load<T: ConvertibleFromRawBytes>(
+  func load<T: ConvertibleFromBytes>(
     fromByteOffset offset: Int = 0,
     as: T.Type = T.self
   ) -> T {
@@ -766,7 +766,7 @@ extension RawSpan {
   ///   - byteOrder: The order in which the bytes should be decoded.
   /// - Returns: A new value of type `T`, read from `offset`.
   @_alwaysEmitIntoClient
-  func load<T: ConvertibleFromRawBytes & FixedWidthInteger>(
+  func load<T: ConvertibleFromBytes & FixedWidthInteger>(
     fromByteOffset offset: Int = 0,
     as: T.Type = T.self,
     _ byteOrder: ByteOrder
