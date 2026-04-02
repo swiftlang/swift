@@ -503,9 +503,9 @@ StdSpanTestSuite.test("Span inside C++ struct") {
   }
 
   var scount = 0
-  for e in spb.sspan {
-    scount += e.length();
-  }
+    for e in spb.sspan {
+      scount += e.length();
+    }
 
   let imapResult = spb.ispan.map { $0 + 5 }
   expectEqual(imapResult, [6, 7, 8])
