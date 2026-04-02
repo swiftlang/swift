@@ -464,14 +464,16 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T : BitwiseCopyable>(
+  @lifetime(borrow self)
+  public func loadUnaligned<T : BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
     _debugPrecondition(offset >= 0, "${Self}.load with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
       "${Self}.load out of bounds")
-    return unsafe baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
+    let value = unsafe baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
+    return unsafe _overrideLifetime(value, borrowing: self)
   }
 
   @_alwaysEmitIntoClient
