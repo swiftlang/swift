@@ -443,6 +443,8 @@ extension UnsafeRawPointer {
   ///   with the value in the memory referenced by this pointer.
   @inlinable
   @lifetime(borrow self)
+  // This custom silgen name is chosen to preserve the old ABI
+  @_silgen_name("$sSV4load14fromByteOffset2asxSi_xmtlF")
   public func load<T: ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -1284,6 +1286,8 @@ extension UnsafeMutableRawPointer {
   ///   with the value in the memory referenced by this pointer.
   @inlinable
   @lifetime(borrow self)
+  // This custom silgen name is chosen to preserve the old ABI
+  @_silgen_name("$sSv4load14fromByteOffset2asxSi_xmtlF")
   public func load<T: ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
