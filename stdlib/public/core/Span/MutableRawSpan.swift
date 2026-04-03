@@ -125,29 +125,50 @@ extension MutableRawSpan {
     let (start, count) = unsafe (elements._pointer, elements._count)
     let span = unsafe MutableRawSpan(
       _unchecked: start,
-      byteCount: count == 1 ? MemoryLayout<Element>.size
+      byteCount: (count == 1) ? MemoryLayout<Element>.size
                  : count &* MemoryLayout<Element>.stride
     )
     self = unsafe _overrideLifetime(span, mutating: &elements)
   }
 
-  /// Mutate the elements of a typed span as raw bytes.
-  @_lifetime(&mutableSpan)
-  init<Element: ConvertibleFromBytes & ConvertibleToBytes>(
-    mutating mutableSpan: inout MutableSpan<Element>
+  /// Mutate the elements of a typed span as bytes.
+  @_lifetime(&elements)
+  public init<Element: ConvertibleFromBytes & ConvertibleToBytes>(
+    mutating elements: inout MutableSpan<Element>
   ) {
-    unsafe self = Self.init(_elements: &mutableSpan)
+    let (start, count) = unsafe (elements._pointer, elements._count)
+    unsafe self = _overrideLifetime(
+      Self.init(
+        _unchecked: start,
+        byteCount: (count == 1) ? MemoryLayout<Element>.size
+                   : count &* MemoryLayout<Element>.stride
+      ),
+      mutating: &elements
+    )
   }
 
   /// Convert a typed span to a raw span.
-  @_lifetime(copy span)
-  init<Element: ConvertibleToBytes>(_ span: consuming MutableSpan<Element>) {
+  @_lifetime(copy elements)
+  public init<Element: ConvertibleToBytes>(
+    elements: consuming MutableSpan<Element>
+  ) {
+    self = unsafe Self.init(unsafeElements: elements)
+  }
+
+  /// Unsafely convert a typed span to a raw span.
+  @unsafe
+  @_lifetime(copy elements)
+  public init<Element>(
+    unsafeElements elements: consuming MutableSpan<Element>
+  ) {
+    let (start, count) = unsafe (elements._pointer, elements._count)
     unsafe self = _overrideLifetime(
       Self.init(
-        _unchecked: span._pointer,
-        byteCount: span._count &* MemoryLayout<Element>.stride
+        _unchecked: start,
+        byteCount: (count == 1) ? MemoryLayout<Element>.size
+                   : count &* MemoryLayout<Element>.stride
       ),
-      copying: span
+      copying: elements
     )
   }
 }
@@ -439,11 +460,10 @@ extension MutableRawSpan {
     as: T.Type = T.self,
     _ byteOrder: ByteOrder
   ) -> T {
-    switch byteOrder {
-    case .bigEndian:
-      load(fromByteOffset: offset, as: T.self).bigEndian
-    case .littleEndian:
-      load(fromByteOffset: offset, as: T.self).littleEndian
+    let rawValue = load(fromByteOffset: offset, as: T.self)
+    return switch byteOrder {
+    case .bigEndian: rawValue.bigEndian
+    case .littleEndian: rawValue.littleEndian
     }
   }
 
@@ -505,7 +525,7 @@ extension MutableRawSpan {
   ///   - type: The type of the instance to store.
   ///   - byteOrder: The order in which the bytes will be encoded to the span.
   @_alwaysEmitIntoClient
-  mutating func storeBytes<
+  public mutating func storeBytes<
     T: ConvertibleToBytes & BitwiseCopyable & FixedWidthInteger
   >(
     of value: T,
@@ -530,7 +550,8 @@ extension MutableRawSpan {
   ///   - repeatedValue: The value to store as raw bytes.
   ///   - count: The number of copies of `value` to append to this span.
   ///   - type: The type of the instance to store.
-  mutating func storeBytes<T: BitwiseCopyable>(
+  @_alwaysEmitIntoClient
+  public mutating func storeBytes<T: BitwiseCopyable>(
     repeating repeatedValue: T, count: Int, as type: T.Type
   ) {
     _precondition(
@@ -540,6 +561,32 @@ extension MutableRawSpan {
     unsafe _start().withMemoryRebound(to: T.self, capacity: count) {
       unsafe $0.update(repeating: repeatedValue, count: count)
     }
+  }
+
+  /// Stores a value's bytes to the specified offset into the span's memory.
+  ///
+  /// The range of bytes required to store a value of `T` starting at
+  /// byte offset `offset` must be completely within the span.
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The value to store as raw bytes.
+  ///   - count: The number of copies of `value` to append to this span.
+  ///   - type: The type of the instance to store.
+  ///   - byteOrder: The order in which the bytes will be encoded to the span.
+  @_alwaysEmitIntoClient
+  public mutating func storeBytes<
+    T: ConvertibleToBytes & BitwiseCopyable & FixedWidthInteger
+  >(
+    repeating repeatedValue: T,
+    count: Int,
+    as type: T.Type,
+    _ byteOrder: ByteOrder
+  ) {
+    let value = switch byteOrder {
+    case .bigEndian: repeatedValue.bigEndian
+    case .littleEndian: repeatedValue.littleEndian
+    }
+    storeBytes(repeating: value, count: count, as: T.self)
   }
 }
 
