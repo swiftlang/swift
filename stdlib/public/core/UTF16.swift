@@ -629,6 +629,7 @@ func processNonASCIIChunk(
   outputEnd: UnsafePointer<UInt8>,
   repairing: Bool
 ) -> (Bool, repairsMade: Bool) {
+  var repaired = false
   for _ in 0 ..< blockSize {
     switch unsafe processScalarFallback(
       input: &input,
@@ -638,14 +639,15 @@ func processNonASCIIChunk(
       repairing: repairing
     ) {
     case (.invalid, let repairsMade):
-      return (false, repairsMade: repairsMade)
+      return (false, repairsMade: repaired || repairsMade)
     case (.multiByte, let repairsMade):
-      return (true, repairsMade: repairsMade) //found the non-ASCII, try starting a new SIMD batch
+      repaired = repaired || repairsMade
+      continue
     case (.singleByte, _):
       continue
     }
   }
-  Builtin.unreachable()
+  return (true, repairsMade: repaired)
 }
 
 internal func transcodeUTF16ToUTF8(
@@ -679,7 +681,7 @@ internal func transcodeUTF16ToUTF8(
         outputEnd: outputEnd,
         repairing: repairing
       )
-      repairsMade = repairsMade && tmpRepairsMade
+      repairsMade = repairsMade || tmpRepairsMade
       if !success {
         return unsafe (output - outputStart, repairsMade: repairsMade)
       }
@@ -695,9 +697,9 @@ internal func transcodeUTF16ToUTF8(
       repairing: repairing
     ) {
     case (.invalid, let tmpRepairsMade):
-      return unsafe (output - outputStart, repairsMade: repairsMade && tmpRepairsMade)
+      return unsafe (output - outputStart, repairsMade: repairsMade || tmpRepairsMade)
     case (_, let tmpRepairsMade):
-      repairsMade = repairsMade && tmpRepairsMade
+      repairsMade = repairsMade || tmpRepairsMade
     }
   }
   return unsafe (output - outputStart, repairsMade: repairsMade)
