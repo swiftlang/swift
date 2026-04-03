@@ -294,7 +294,7 @@ extension String {
       let smol = unsafe _SmallString(initializingUTF8With: {
         let (count, tmpRepairsMade) = unsafe transcodeUTF16ToUTF8(
           UTF16CodeUnits: input,
-          into: $0,
+          intoKnownSufficientlyLarge: $0,
           repairing: repairing
         )
         repairsMade = tmpRepairsMade
@@ -308,7 +308,7 @@ extension String {
       initializingUncheckedUTF8With: { buffer -> Int in
         let (count, tmpRepairsMade) = unsafe transcodeUTF16ToUTF8(
           UTF16CodeUnits: input,
-          into: buffer,
+          intoKnownSufficientlyLarge: buffer,
           repairing: repairing
         )
         repairsMade = tmpRepairsMade

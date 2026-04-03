@@ -498,13 +498,11 @@ func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>?
 @inline(__always)
 private func encodeScalarAsUTF8(
   _ scalar: UInt32,
-  output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
-  outputEnd: UnsafePointer<Unicode.UTF8.CodeUnit>,
+  output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>
 ) -> ScalarFallbackResult {
   _debugPrecondition(scalar >= 0x80)
   _debugPrecondition(scalar <= utf16ScalarMax)
   if scalar <= utf8TwoByteMax {
-    if unsafe output + 2 > outputEnd { return .invalid }
     // Scalar fits in 11 bits
     // 2 byte UTF8 is 0b110[top 5 bits] 0b10[bottom 6 bits]
     unsafe output.pointee = 0b1100_0000 | UInt8((scalar >> 6) & 0b01_1111)
@@ -513,7 +511,6 @@ private func encodeScalarAsUTF8(
   } else if scalar <= utf16BasicMultilingualPlaneMax {
     // Scalar fits in 16 bits
     // 3 byte UTF8 is 0b1110[top 4 bits] 0b10[middle 6 bits] 0b10[bottom 6 bits]
-    if unsafe output + 3 > outputEnd { return .invalid }
     unsafe output.pointee = 0b1110_0000 | UInt8((scalar >> 12) & 0b1111)
     unsafe (output + 1).pointee = 0b1000_0000 | UInt8((scalar >> 6) & 0b11_1111)
     unsafe (output + 2).pointee = 0b1000_0000 | UInt8(scalar & 0b11_1111)
@@ -521,7 +518,6 @@ private func encodeScalarAsUTF8(
   } else if scalar <= utf16ScalarMax {
     // Scalar fits in 21 bits.
     // 0b11110[top 3] 0b10[upper middle 6] 0b10[lower middle 6] 0b10[bottom 6]
-    if unsafe output + 4 > outputEnd { return .invalid }
     unsafe output.pointee = 0b1111_0000 | UInt8((scalar >> 18) & 0b0111)
     unsafe (output + 1).pointee = 0b1000_0000 | UInt8((scalar >> 12) & 0b11_1111)
     unsafe (output + 2).pointee = 0b1000_0000 | UInt8((scalar >> 6) & 0b11_1111)
@@ -539,7 +535,6 @@ private func processNonASCIIScalarFallback(
   input: inout UnsafePointer<UInt16>,
   inputEnd: UnsafePointer<UInt16>,
   output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
-  outputEnd: UnsafePointer<Unicode.UTF8.CodeUnit>,
   repairing: Bool
 ) -> (ScalarFallbackResult, repairsMade: Bool) {
   var scalar: UInt32 = 0
@@ -579,14 +574,12 @@ private func processNonASCIIScalarFallback(
   if _slowPath(invalid || scalar > utf16ScalarMax) {
     guard repairing else { return (.invalid, repairsMade: false) }
     return (
-      unsafe encodeScalarAsUTF8(utf16ReplacementCharacter,
-                                output: &output,
-                                outputEnd: outputEnd),
+      unsafe encodeScalarAsUTF8(utf16ReplacementCharacter, output: &output),
       repairsMade: true
     )
   }
   return (
-    unsafe encodeScalarAsUTF8(scalar, output: &output, outputEnd: outputEnd),
+    unsafe encodeScalarAsUTF8(scalar, output: &output),
     repairsMade: false
   )
 }
@@ -596,18 +589,13 @@ private func processScalarFallback(
   input: inout UnsafePointer<Unicode.UTF16.CodeUnit>,
   inputEnd: UnsafePointer<Unicode.UTF16.CodeUnit>,
   output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
-  outputEnd: UnsafePointer<Unicode.UTF8.CodeUnit>,
   repairing: Bool
 ) -> (ScalarFallbackResult, repairsMade: Bool) {
   let cu = unsafe input.pointee
   if Unicode.UTF16.isASCII(cu) {
-    if unsafe output < outputEnd {
-      unsafe output.initialize(to: UInt8(truncatingIfNeeded: cu))
-      unsafe input += 1
-      unsafe output += 1
-    } else {
-      Builtin.unreachable()
-    }
+    unsafe output.initialize(to: UInt8(truncatingIfNeeded: cu))
+    unsafe input += 1
+    unsafe output += 1
   } else {
     // Scalar fallback for this code unit
     return unsafe processNonASCIIScalarFallback(
@@ -615,7 +603,6 @@ private func processScalarFallback(
       input: &input,
       inputEnd: inputEnd,
       output: &output,
-      outputEnd: outputEnd,
       repairing: repairing
     )
   }
@@ -626,7 +613,6 @@ func processNonASCIIChunk(
   input: inout UnsafePointer<UInt16>,
   inputEnd: UnsafePointer<UInt16>,
   output: inout UnsafeMutablePointer<UInt8>,
-  outputEnd: UnsafePointer<UInt8>,
   repairing: Bool
 ) -> (Bool, repairsMade: Bool) {
   var repaired = false
@@ -635,7 +621,6 @@ func processNonASCIIChunk(
       input: &input,
       inputEnd: inputEnd,
       output: &output,
-      outputEnd: outputEnd,
       repairing: repairing
     ) {
     case (.invalid, let repairsMade):
@@ -650,9 +635,14 @@ func processNonASCIIChunk(
   return (true, repairsMade: repaired)
 }
 
+/*
+ This is only ever called after validating the buffer size with
+ utf8Length(of:repairing:), so it does not check for end of buffer. Don't call
+ it if you haven't done that first!
+ */
 internal func transcodeUTF16ToUTF8(
   UTF16CodeUnits: UnsafeBufferPointer<Unicode.UTF16.CodeUnit>,
-  into outputBuffer: UnsafeMutableBufferPointer<Unicode.UTF8.CodeUnit>,
+  intoKnownSufficientlyLarge outputBuffer: UnsafeMutableBufferPointer<Unicode.UTF8.CodeUnit>,
   repairing: Bool = true
 ) -> (Int, repairsMade: Bool) {
   let inCount = UTF16CodeUnits.count
@@ -662,10 +652,9 @@ internal func transcodeUTF16ToUTF8(
   let inputEnd = unsafe input + inCount
   var output = unsafe outputBuffer.baseAddress.unsafelyUnwrapped
   let outputStart = unsafe output
-  let outputEnd = unsafe output + outCount
   var repairsMade = false
   
-  while unsafe input <= (inputEnd - blockSize) && output <= (outputEnd - (blockSize / 2)) {
+  while unsafe input <= (inputEnd - blockSize) {
     if let asciiBlock = unsafe allASCIIBlock(at: input) {
       // All ASCII: transcode directly
       for i in 0 ..< blockSize {
@@ -678,7 +667,6 @@ internal func transcodeUTF16ToUTF8(
         input: &input,
         inputEnd: inputEnd,
         output: &output,
-        outputEnd: outputEnd,
         repairing: repairing
       )
       repairsMade = repairsMade || tmpRepairsMade
@@ -688,12 +676,11 @@ internal func transcodeUTF16ToUTF8(
     }
   }
   // Finish any remaining code units using fallback scalar loop
-  while unsafe input < inputEnd && output < outputEnd {
+  while unsafe input < inputEnd {
     switch unsafe processScalarFallback(
       input: &input,
       inputEnd: inputEnd,
       output: &output,
-      outputEnd: outputEnd,
       repairing: repairing
     ) {
     case (.invalid, let tmpRepairsMade):
