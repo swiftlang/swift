@@ -173,6 +173,28 @@ extension MutableSpan where Element: BitwiseCopyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
+  @_alwaysEmitIntoClient
+  @lifetime(&mutableBytes)
+  public init(mutating mutableBytes: inout MutableRawSpan) {
+    _precondition(
+      unsafe ((Int(bitPattern: mutableBytes._pointer) &
+        (MemoryLayout<Element>.alignment &- 1)) == 0),
+      "baseAddress must be properly aligned to access Element"
+    )
+    let byteCount = mutableBytes.byteCount
+    let stride = MemoryLayout<Element>.stride
+    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
+    _precondition(remainder == 0, "Span must contain a whole number of elements")
+    unsafe self = _overrideLifetime(
+      MutableSpan(_unchecked: mutableBytes._pointer, count: count),
+      mutating: &mutableBytes
+    )
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -290,6 +312,42 @@ extension MutableSpan where Element: BitwiseCopyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan where Element: ConvertibleToBytes {
+  /// Construct a raw span over the memory represented by this span.
+  ///
+  /// - Returns: a RawSpan over the memory represented by this span
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var bytes: RawSpan {
+    @lifetime(borrow self)
+    borrowing get {
+      RawSpan(elements: self.span)
+    }
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan where Element: ConvertibleToBytes & ConvertibleFromBytes {
+  /// Construct a mutable raw span over the memory represented by this span.
+  ///
+  /// Mutating `self` through this property is unsafe because
+  /// it is possible to mutate a byte so as to produce an invalid
+  /// bit pattern in the corresponding instance of `Element`.
+  ///
+  /// - Returns: a MutableRawSpan over the memory represented by this span
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var mutableBytes: MutableRawSpan {
+    @lifetime(&self)
+    mutating get {
+      MutableRawSpan(mutating: &self)
+    }
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableSpan where Element: ~Copyable {
   // SILOptimizer looks for fixed_storage.check_index semantics for bounds check optimizations.
   @_semantics("fixed_storage.check_index")
@@ -315,7 +373,7 @@ extension MutableSpan where Element: ~Copyable {
     @lifetime(self: copy self)
     unsafeMutableAddress {
       _checkIndex(position)
-       return unsafe _unsafeAddressOfElement(unchecked: position)
+      return unsafe _unsafeAddressOfElement(unchecked: position)
     }
   }
 
