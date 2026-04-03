@@ -703,6 +703,49 @@ internal func transcodeUTF16ToUTF8(
   return unsafe (output - outputStart, repairsMade: repairsMade)
 }
 
+@inline(__always)
+private func utf8Length(
+  input: inout UnsafePointer<Unicode.UTF16.CodeUnit>,
+  end: UnsafePointer<Unicode.UTF16.CodeUnit>,
+  repairing: Bool
+) -> Int? {
+  var count = 0
+  while input < end {
+    let cu = unsafe input.pointee
+    if cu < 0x80 {
+      count &+= 1
+      unsafe input += 1
+    } else if cu < 0x800 {
+      count &+= 2
+      unsafe input += 1
+    } else if UTF16.isLeadSurrogate(cu) {
+      // Check for a valid surrogate pair
+      let next = unsafe input + 1
+      if unsafe next < end && UTF16.isTrailSurrogate(next.pointee) {
+        count &+= 4
+        unsafe input += 2
+      } else if repairing {
+        count &+= 3 // U+FFFD replacement character
+        unsafe input += 1
+      } else {
+        return nil
+      }
+    } else if UTF16.isTrailSurrogate(cu) {
+      // Unpaired low surrogate
+      if repairing {
+        count &+= 3 // U+FFFD replacement character
+        unsafe input += 1
+      } else {
+        return nil
+      }
+    } else {
+      count &+= 3 // BMP non-surrogate
+      unsafe input += 1
+    }
+  }
+  return count
+}
+
 internal func utf8Length(
   of UTF16CodeUnits: UnsafeBufferPointer<Unicode.UTF16.CodeUnit>,
   repairing: Bool = true
@@ -728,78 +771,26 @@ internal func utf8Length(
       count += blockSize
     } else {
       isASCII = false
-      // Process one block's worth of non-ASCII code units by classification
       let blockEnd = unsafe Swift.min(input + blockSize, inputEnd)
-      while unsafe input < blockEnd {
-        let cu = unsafe input.pointee
-        if cu < 0x80 {
-          count &+= 1
-          unsafe input += 1
-        } else if cu < 0x800 {
-          count &+= 2
-          unsafe input += 1
-        } else if UTF16.isLeadSurrogate(cu) {
-          // Check for a valid surrogate pair
-          let next = unsafe input + 1
-          if unsafe next < inputEnd && UTF16.isTrailSurrogate(next.pointee) {
-            count += 4
-            unsafe input += 2
-          } else if repairing {
-            count &+= 3 // U+FFFD replacement character
-            unsafe input += 1
-          } else {
-            return nil
-          }
-        } else if UTF16.isTrailSurrogate(cu) {
-          // Unpaired low surrogate
-          if repairing {
-            count &+= 3 // U+FFFD replacement character
-            unsafe input += 1
-          } else {
-            return nil
-          }
-        } else {
-          count &+= 3 // BMP non-surrogate
-          unsafe input += 1
-        }
+      guard let addedCount = utf8Length(
+        input: &input,
+        end: blockEnd,
+        repairing: repairing
+      ) else {
+        return nil
       }
+      count &+= addedCount
     }
   }
   // Finish any remaining code units that didn't fill a full block
-  while unsafe input < inputEnd {
-    let cu = unsafe input.pointee
-    if cu < 0x80 {
-      count &+= 1
-      unsafe input += 1
-    } else if cu < 0x800 {
-      isASCII = false
-      count &+= 2
-      unsafe input += 1
-    } else if UTF16.isLeadSurrogate(cu) {
-      isASCII = false
-      let next = unsafe input + 1
-      if unsafe next < inputEnd && UTF16.isTrailSurrogate(next.pointee) {
-        count &+= 4
-        unsafe input += 2
-      } else if repairing {
-        count &+= 3
-        unsafe input += 1
-      } else {
-        return nil
-      }
-    } else if UTF16.isTrailSurrogate(cu) {
-      isASCII = false
-      if repairing {
-        count &+= 3
-        unsafe input += 1
-      } else {
-        return nil
-      }
-    } else {
-      isASCII = false
-      count &+= 3
-      unsafe input += 1
-    }
+  let remainingCodeUnitCount = input.distance(to: inputEnd)
+  guard let addedByteCount = utf8Length(
+    input: &input,
+    end: inputEnd,
+    repairing: repairing
+  ) else {
+    return nil
   }
-  return (count, isASCII: isASCII)
+  isASCII = isASCII && (addedByteCount == remainingCodeUnitCount)
+  return (count &+ addedByteCount, isASCII: isASCII)
 }
