@@ -41,15 +41,15 @@ extension Container: Copyable where Element: Copyable {}
 // CHECK:   [[REG4:%.*]] = begin_borrow [[REG2]]
 // CHECK:   [[REG5:%.*]] = struct_extract [[REG0]], #Container._storage
 // CHECK:   [[REG6:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
-// CHECK:   [[REG7:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK:   [[REG8:%.*]] = apply [[REG7]]<Element>([[REG5]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG7:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG8:%.*]] = apply [[REG7]]<Element>([[REG5]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK:   store [[REG8]] to [trivial] [[REG6]]
 // CHECK:   [[REG10:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
 // CHECK:   [[REG11:%.*]] = function_ref @$sSq17unsafelyUnwrappedxvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK:   [[REG12:%.*]] = apply [[REG11]]<UnsafeMutablePointer<Element>>([[REG10]], [[REG6]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK:   [[REG13:%.*]] = load [trivial] [[REG10]]
-// CHECK:   [[REG14:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
-// CHECK:   [[REG15:%.*]] = apply [[REG14]]<Element>([[REG13]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG14:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG15:%.*]] = apply [[REG14]]<Element>([[REG13]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK:   [[REG16:%.*]] = struct_extract [[REG15]], #UnsafePointer._rawValue
 // CHECK:   [[REG17:%.*]] = pointer_to_address [[REG16]] to [strict] $*Element
 // CHECK:   [[REG18:%.*]] = mark_dependence [unresolved] [[REG17]] on [[REG13]]
@@ -70,15 +70,15 @@ extension Container: Copyable where Element: Copyable {}
 // CHECK:   [[REG3:%.*]] = struct_element_addr [[REG2]], #Container._storage
 // CHECK:   [[REG4:%.*]] = load [trivial] [[REG3]]
 // CHECK:   [[REG5:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
-// CHECK:   [[REG6:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK:   [[REG7:%.*]] = apply [[REG6]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG6:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG7:%.*]] = apply [[REG6]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK:   store [[REG7]] to [trivial] [[REG5]]
 // CHECK:   [[REG9:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
 // CHECK:   [[REG10:%.*]] = function_ref @$sSq17unsafelyUnwrappedxvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK:   [[REG11:%.*]] = apply [[REG10]]<UnsafeMutablePointer<Element>>([[REG9]], [[REG5]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK:   [[REG12:%.*]] = load [trivial] [[REG9]]
-// CHECK:   [[REG13:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvau : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
-// CHECK:   [[REG14:%.*]] = apply [[REG13]]<Element>([[REG12]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:   [[REG13:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvau : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:   [[REG14:%.*]] = apply [[REG13]]<Element>([[REG12]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK:   [[REG15:%.*]] = struct_extract [[REG14]], #UnsafeMutablePointer._rawValue
 // CHECK:   [[REG16:%.*]] = pointer_to_address [[REG15]] to [strict] $*Element
 // CHECK:   [[REG17:%.*]] = mark_dependence [unresolved] [[REG16]] on [[REG12]]
@@ -97,8 +97,8 @@ extension Container: Copyable where Element: Copyable {}
 // CHECK:   [[REG6:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
 // CHECK:   [[REG7:%.*]] = begin_borrow [[REG4]]
 // CHECK:   [[REG8:%.*]] = struct_extract [[REG7]], #Container._storage
-// CHECK:   [[REG9:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK:   [[REG10:%.*]] = apply [[REG9]]<Element>([[REG8]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG9:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG10:%.*]] = apply [[REG9]]<Element>([[REG8]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK:   [[REG11:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
 // CHECK:   store [[REG10]] to [trivial] [[REG11]]
 // CHECK:   [[REG13:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
@@ -114,8 +114,8 @@ extension Container: Copyable where Element: Copyable {}
 // CHECK:   dealloc_stack [[REG11]]
 // CHECK:   end_borrow [[REG7]]
 // CHECK:   [[REG25:%.*]] = load [trivial] [[REG6]]
-// CHECK:   [[REG26:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
-// CHECK:   [[REG27:%.*]] = apply [[REG26]]<Element>([[REG25]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG26:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG27:%.*]] = apply [[REG26]]<Element>([[REG25]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK:   [[REG28:%.*]] = struct_extract [[REG27]], #UnsafePointer._rawValue
 // CHECK:   [[REG29:%.*]] = pointer_to_address [[REG28]] to [strict] $*Element
 // CHECK:   [[REG30:%.*]] = mark_dependence [unresolved] [[REG29]] on [[REG25]]
@@ -137,8 +137,8 @@ extension Container: Copyable where Element: Copyable {}
 // CHECK:   [[REG7:%.*]] = struct_element_addr [[REG6]], #Container._storage
 // CHECK:   [[REG8:%.*]] = load [trivial] [[REG7]]
 // CHECK:   end_access [[REG6]]
-// CHECK:   [[REG10:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK:   [[REG11:%.*]] = apply [[REG10]]<Element>([[REG8]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG10:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG11:%.*]] = apply [[REG10]]<Element>([[REG8]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK:   [[REG12:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
 // CHECK:   store [[REG11]] to [trivial] [[REG12]]
 // CHECK:   [[REG14:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
@@ -153,8 +153,8 @@ extension Container: Copyable where Element: Copyable {}
 // CHECK:   dealloc_stack [[REG14]]
 // CHECK:   dealloc_stack [[REG12]]
 // CHECK:   [[REG25:%.*]] = load [trivial] [[REG5]]
-// CHECK:   [[REG26:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvau : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
-// CHECK:   [[REG27:%.*]] = apply [[REG26]]<Element>([[REG25]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:   [[REG26:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvau : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:   [[REG27:%.*]] = apply [[REG26]]<Element>([[REG25]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK:   [[REG28:%.*]] = struct_extract [[REG27]], #UnsafeMutablePointer._rawValue
 // CHECK:   [[REG29:%.*]] = pointer_to_address [[REG28]] to [strict] $*Element
 // CHECK:   [[REG30:%.*]] = mark_dependence [unresolved] [[REG29]] on [[REG25]]
@@ -201,8 +201,8 @@ public struct CopyableContainer {
 // CHECK: bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $CopyableContainer):
 // CHECK:   [[REG4:%.*]] = alloc_stack $UnsafeMutablePointer<S>
 // CHECK:   [[REG5:%.*]] = struct_extract [[REG1]], #CopyableContainer._storage
-// CHECK:   [[REG6:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK:   [[REG7:%.*]] = apply [[REG6]]<S>([[REG5]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG6:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG7:%.*]] = apply [[REG6]]<S>([[REG5]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK:   [[REG8:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<S>>
 // CHECK:   store [[REG7]] to [trivial] [[REG8]]
 // CHECK:   [[REG10:%.*]] = alloc_stack $UnsafeMutablePointer<S>
@@ -217,8 +217,8 @@ public struct CopyableContainer {
 // CHECK:   dealloc_stack [[REG10]]
 // CHECK:   dealloc_stack [[REG8]]
 // CHECK:   [[REG21:%.*]] = load [trivial] [[REG4]]
-// CHECK:   [[REG22:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
-// CHECK:   [[REG23:%.*]] = apply [[REG22]]<S>([[REG21]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG22:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG23:%.*]] = apply [[REG22]]<S>([[REG21]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK:   [[REG24:%.*]] = struct_extract [[REG23]], #UnsafePointer._rawValue
 // CHECK:   [[REG25:%.*]] = pointer_to_address [[REG24]] to [strict] $*S
 // CHECK:   [[REG26:%.*]] = mark_dependence [unresolved] [[REG25]] on [[REG21]]
@@ -241,8 +241,8 @@ public struct CopyableContainer {
 // CHECK:   [[REG6:%.*]] = struct_element_addr [[REG5]], #CopyableContainer._storage
 // CHECK:   [[REG7:%.*]] = load [trivial] [[REG6]]
 // CHECK:   end_access [[REG5]]
-// CHECK:   [[REG9:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK:   [[REG10:%.*]] = apply [[REG9]]<S>([[REG7]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG9:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG10:%.*]] = apply [[REG9]]<S>([[REG7]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK:   [[REG11:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<S>>
 // CHECK:   store [[REG10]] to [trivial] [[REG11]]
 // CHECK:   [[REG13:%.*]] = alloc_stack $UnsafeMutablePointer<S>
@@ -257,8 +257,8 @@ public struct CopyableContainer {
 // CHECK:   dealloc_stack [[REG13]]
 // CHECK:   dealloc_stack [[REG11]]
 // CHECK:   [[REG24:%.*]] = load [trivial] [[REG4]]
-// CHECK:   [[REG25:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvau : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
-// CHECK:   [[REG26:%.*]] = apply [[REG25]]<S>([[REG24]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:   [[REG25:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvau : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:   [[REG26:%.*]] = apply [[REG25]]<S>([[REG24]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK:   [[REG27:%.*]] = struct_extract [[REG26]], #UnsafeMutablePointer._rawValue
 // CHECK:   [[REG28:%.*]] = pointer_to_address [[REG27]] to [strict] $*S
 // CHECK:   [[REG29:%.*]] = mark_dependence [unresolved] [[REG28]] on [[REG24]]
@@ -305,8 +305,8 @@ public struct NonCopyableContainer : ~Copyable {
 // CHECK:   [[REG6:%.*]] = alloc_stack $UnsafeMutablePointer<NC>
 // CHECK:   [[REG7:%.*]] = begin_borrow [[REG4]]
 // CHECK:   [[REG8:%.*]] = struct_extract [[REG7]], #NonCopyableContainer._storage
-// CHECK:   [[REG9:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK:   [[REG10:%.*]] = apply [[REG9]]<NC>([[REG8]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG9:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG10:%.*]] = apply [[REG9]]<NC>([[REG8]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK:   [[REG11:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<NC>>
 // CHECK:   store [[REG10]] to [trivial] [[REG11]]
 // CHECK:   [[REG13:%.*]] = alloc_stack $UnsafeMutablePointer<NC>
@@ -322,8 +322,8 @@ public struct NonCopyableContainer : ~Copyable {
 // CHECK:   dealloc_stack [[REG11]]
 // CHECK:   end_borrow [[REG7]]
 // CHECK:   [[REG25:%.*]] = load [trivial] [[REG6]]
-// CHECK:   [[REG26:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
-// CHECK:   [[REG27:%.*]] = apply [[REG26]]<NC>([[REG25]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG26:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG27:%.*]] = apply [[REG26]]<NC>([[REG25]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK:   [[REG28:%.*]] = struct_extract [[REG27]], #UnsafePointer._rawValue
 // CHECK:   [[REG29:%.*]] = pointer_to_address [[REG28]] to [strict] $*NC
 // CHECK:   [[REG30:%.*]] = mark_dependence [unresolved] [[REG29]] on [[REG25]]
@@ -348,8 +348,8 @@ public struct NonCopyableContainer : ~Copyable {
 // CHECK:   [[REG7:%.*]] = struct_element_addr [[REG6]], #NonCopyableContainer._storage
 // CHECK:   [[REG8:%.*]] = load [trivial] [[REG7]]
 // CHECK:   end_access [[REG6]]
-// CHECK:   [[REG10:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK:   [[REG11:%.*]] = apply [[REG10]]<NC>([[REG8]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG10:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG11:%.*]] = apply [[REG10]]<NC>([[REG8]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK:   [[REG12:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<NC>>
 // CHECK:   store [[REG11]] to [trivial] [[REG12]]
 // CHECK:   [[REG14:%.*]] = alloc_stack $UnsafeMutablePointer<NC>
@@ -364,8 +364,8 @@ public struct NonCopyableContainer : ~Copyable {
 // CHECK:   dealloc_stack [[REG14]]
 // CHECK:   dealloc_stack [[REG12]]
 // CHECK:   [[REG25:%.*]] = load [trivial] [[REG5]]
-// CHECK:   [[REG26:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvau : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
-// CHECK:   [[REG27:%.*]] = apply [[REG26]]<NC>([[REG25]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:   [[REG26:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvau : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:   [[REG27:%.*]] = apply [[REG26]]<NC>([[REG25]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK:   [[REG28:%.*]] = struct_extract [[REG27]], #UnsafeMutablePointer._rawValue
 // CHECK:   [[REG29:%.*]] = pointer_to_address [[REG28]] to [strict] $*NC
 // CHECK:   [[REG30:%.*]] = mark_dependence [unresolved] [[REG29]] on [[REG25]]
