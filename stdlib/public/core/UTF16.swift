@@ -755,7 +755,6 @@ internal func utf8Length(
   var input = unsafe UTF16CodeUnits.baseAddress.unsafelyUnwrapped
   let inputEnd = unsafe input + inCount
   var count = 0
-  var isASCII = true
 
   // For each UTF-16 code unit:
   //   U+0000..U+007F  → 1 UTF-8 byte  (ASCII)
@@ -770,7 +769,6 @@ internal func utf8Length(
       unsafe input += blockSize
       count += blockSize
     } else {
-      isASCII = false
       let blockEnd = unsafe Swift.min(input + blockSize, inputEnd)
       guard let addedCount = utf8Length(
         input: &input,
@@ -791,6 +789,5 @@ internal func utf8Length(
   ) else {
     return nil
   }
-  isASCII = isASCII && (addedByteCount == remainingCodeUnitCount)
-  return (count &+ addedByteCount, isASCII: isASCII)
+  return (count &+ addedByteCount, isASCII: count == inCount)
 }
