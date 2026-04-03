@@ -151,7 +151,12 @@ extension DestroyValueInst : DevirtualizableDestroy {
 
   fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
     let builder = Builder(before: self, context)
-    let subs = context.getContextSubstitutionMap(for: type)
+    // For types nested in constrained extensions where all generic parameters
+    // are concrete (e.g. `extension E where T == UInt8`), the deinit has no
+    // invocation generic signature, so the substitution map must be empty.
+    let subs = deinitializer.isGeneric
+      ? context.getContextSubstitutionMap(for: type)
+      : SubstitutionMap()
     let deinitRef = builder.createFunctionRef(deinitializer)
     if deinitializer.argumentConventions[deinitializer.selfArgumentIndex!].isIndirect {
       let allocStack = builder.createAllocStack(type)
@@ -224,7 +229,12 @@ extension DestroyAddrInst : DevirtualizableDestroy {
 
   fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
     let builder = Builder(before: self, context)
-    let subs = context.getContextSubstitutionMap(for: destroyedAddress.type)
+    // For types nested in constrained extensions where all generic parameters
+    // are concrete (e.g. `extension E where T == UInt8`), the deinit has no
+    // invocation generic signature, so the substitution map must be empty.
+    let subs = deinitializer.isGeneric
+      ? context.getContextSubstitutionMap(for: destroyedAddress.type)
+      : SubstitutionMap()
     let deinitRef = builder.createFunctionRef(deinitializer)
     if !deinitializer.argumentConventions[deinitializer.selfArgumentIndex!].isIndirect {
       let value = builder.createLoad(fromAddress: destroyedAddress, ownership: .take)
