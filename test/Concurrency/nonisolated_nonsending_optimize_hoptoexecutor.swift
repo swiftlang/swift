@@ -28,3 +28,30 @@ public func caller() async {
   await test2()
   await test3()
 }
+
+// TODO: make these better...
+actor A {
+  // CHECK-LABEL: sil hidden [noinline] @$s4test1AC11ninsClosureyyyyYaYCXEYaF : $@convention(method) @async (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @sil_isolated @guaranteed A) -> () {
+  // CHECK: hop_to_executor
+  // CHECK: {{.*}} = apply %0({{.*}})
+  // CHECK: } // end sil function '$s4test1AC11ninsClosureyyyyYaYCXEYaF'
+  @inline(never)
+  func ninsClosure(
+    _ doit: nonisolated(nonsending) () async -> Void
+  ) async {
+    await doit()
+  }
+}
+
+// CHECK-LABEL: sil hidden @$s4test3bugyyYaF : $@convention(thin) @async () -> () {
+// CHECK: hop_to_executor
+// CHECK: {{.*}} = function_ref {{.*}}ninsClosure{{.*}}
+// CHECK: {{.*}} = apply
+// CHECK: hop_to_executor
+// CHECK: } // end sil function '$s4test3bugyyYaF'
+nonisolated func bug() async {
+  let a = A()
+  await a.ninsClosure {
+    a.assertIsolated()
+  }
+}

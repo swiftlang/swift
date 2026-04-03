@@ -196,20 +196,18 @@ void OptimizeHopToExecutor::solveDataflowBackward() {
   } while (changed);
 }
 
-bool fixme_isCallerIsoInheriting(FullApplySite FAS) {
-  if (FAS.isCallerIsolationInheriting())
+bool fixme_isCallerIsoInheriting(FullApplySite applySite) {
+//  return applySite.isCallerIsolationInheriting();
+
+  if (applySite.isCallerIsolationInheriting())
     return true;
 
-  auto actorIsolation = FAS.getActorIsolation();
-  //  llvm::dbgs() << "JQ: FAS actor iso:\n";
-  //  actorIsolation->dump();
-  if (actorIsolation->getKind() == ActorIsolation::Unspecified) {
-    // FIXME: handle closures that inherit the caller's isolation correctly
-    auto calleSubsTy = FAS.getSubstCalleeType();
-    auto implicitIsoParam = calleSubsTy->maybeGetIsolatedParameter();
-    //    llvm::dbgs() << "JQ: FAS imp iso param:\n";
-    //    implicitIsoParam->dump();
-    return implicitIsoParam.has_value();
+  // FIXME: why would we need to fall back to this check?
+  // Is it even correct?
+  auto substFnType = applySite.getSubstCalleeType();
+  if (auto isolated = substFnType->maybeGetIsolatedParameter()) {
+    if (isolated->hasOption(SILParameterInfo::ImplicitLeading))
+      return true;
   }
 
   return false;
@@ -218,7 +216,6 @@ bool fixme_isCallerIsoInheriting(FullApplySite FAS) {
 /// Returns true if \p inst is a suspension point or an async call.
 static bool isSuspensionPoint(SILInstruction *inst) {
   if (auto applySite = FullApplySite::isa(inst)) {
-    //    if (applySite.isAsync() && !applySite.isCallerIsolationInheriting())
     if (applySite.isAsync() && !fixme_isCallerIsoInheriting(applySite))
       return true;
     return false;
@@ -412,10 +409,7 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
   // executors since caller isolation inheriting functions do not hop in their
   // prologue.
   if (auto fas = FullApplySite::isa(inst);
-      fas && fas.isAsync() &&
-      fixme_isCallerIsoInheriting(fas)
-//      fas.isCallerIsolationInheriting()
-      ) {
+      fas && fas.isAsync() && fixme_isCallerIsoInheriting(fas)) {
     return true;
   }
 
