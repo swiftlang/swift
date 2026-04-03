@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -time-trace -time-trace-granularity=0 \
+// RUN: %target-swift-frontend -time-trace-granularity=0 \
 // RUN:   -time-trace-path %t/trace.json \
 // RUN:   -c %t/A.swift %t/B.swift -num-threads 2 -wmo \
 // RUN:   -module-name TestModule -o %t/A.o -o %t/B.o

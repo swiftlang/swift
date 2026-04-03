@@ -445,9 +445,6 @@ def profile_stats_entities: Flag<["-"], "profile-stats-entities">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Profile changes to stats in -stats-output-dir, subdivided by source entity">;
 
-def time_trace : Flag<["-"], "time-trace">,
-  Flags<[FrontendOption, NoInteractiveOption, CacheInvariant]>,
-  HelpText<"Turn on time profiler, emit trace output as JSON">;
 def time_trace_path : Separate<["-"], "time-trace-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Emit time trace output to <path>">,

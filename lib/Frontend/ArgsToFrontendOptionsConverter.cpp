@@ -527,14 +527,6 @@ void ArgsToFrontendOptionsConverter::computeTimeTraceOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArg(OPT_time_trace_path)) {
     Opts.TimeTracePath = A->getValue();
-  } else if (Args.hasArg(OPT_time_trace)) {
-    // Derive from primary output (-o), or from input file if no -o.
-    std::string Base = Opts.InputsAndOutputs.getSingleOutputFilename();
-    if (Base.empty())
-      Base = Opts.InputsAndOutputs.getFilenameOfFirstInput();
-    SmallString<128> Path(Base);
-    llvm::sys::path::replace_extension(Path, "time-trace.json");
-    Opts.TimeTracePath = Path.str().str();
   }
 
   if (const Arg *A = Args.getLastArg(OPT_time_trace_granularity)) {
