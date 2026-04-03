@@ -58,7 +58,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       EmbeddedPlatformPOSIX.swift
 
       C_COMPILE_FLAGS ${extra_c_compile_flags}
-      SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded "-import-bridging-header" ${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h -enable-experimental-feature Extern -enable-experimental-feature AllowRuntimeSymbolDeclarations
+      SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded "-import-bridging-header" ${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h -enable-experimental-feature Extern -enable-experimental-feature AllowRuntimeSymbolDeclarations "-disable-bridging-pch"
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${mod}"

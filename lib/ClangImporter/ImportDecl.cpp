@@ -9039,7 +9039,12 @@ bool importer::isSpecialAppKitFunctionKeyProperty(
   auto rawName = ident->getName();
 
   return rawName.starts_with("NS") &&
-         (rawName.ends_with("FunctionKey") || rawName.ends_with("Character"));
+         (rawName.ends_with("FunctionKey") || rawName.ends_with("Character")) &&
+         llvm::any_of(decl->specific_attrs<clang::SwiftNameAttr>(),
+                      [](const auto *attr) {
+                        return attr->getName().starts_with(
+                            "NSEvent.SpecialKey");
+                      });
 }
 
 bool importer::hasSameUnderlyingType(const clang::Type *a,
