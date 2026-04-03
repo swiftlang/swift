@@ -186,6 +186,9 @@ private:
   /// Path for time trace output. Empty if time tracing is not requested.
   std::string TimeTracePath;
 
+  /// Minimum time granularity (in microseconds) for time trace events.
+  unsigned TimeTraceGranularity;
+
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(raw_ostream &OS);
 
@@ -221,6 +224,7 @@ public:
   ~UnifiedStatsReporter();
 
   bool fineGrainedTimers() const { return FineGrainedTimers; }
+  unsigned getTimeTraceGranularity() const { return TimeTraceGranularity; }
 
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();

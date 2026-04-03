@@ -1656,7 +1656,7 @@ struct LLVMCodeGenThreads {
       bool initTimeTrace = threadIndex != 0 && parent.timeTraceEnabled;
       if (initTimeTrace)
         llvm::timeTraceProfilerInitialize(
-            /*TimeTraceGranularity=*/0, "swift-frontend-worker");
+            parent.timeTraceGranularity, "swift-frontend-worker");
 
       auto *diagMutex = parent.diagMutex;
       while (IRGenModule *IGM = parent.irgen->fetchFromQueue()) {
@@ -1689,12 +1689,14 @@ struct LLVMCodeGenThreads {
   IRGenerator *irgen;
   llvm::sys::Mutex *diagMutex;
   bool timeTraceEnabled;
+  unsigned timeTraceGranularity;
   std::vector<Thread> threads;
 
   LLVMCodeGenThreads(IRGenerator *irgen, llvm::sys::Mutex *diagMutex,
-                     unsigned numThreads)
+                     unsigned numThreads, unsigned timeTraceGranularity)
       : irgen(irgen), diagMutex(diagMutex),
-        timeTraceEnabled(llvm::timeTraceProfilerEnabled()) {
+        timeTraceEnabled(llvm::timeTraceProfilerEnabled()),
+        timeTraceGranularity(timeTraceGranularity) {
     threads.reserve(numThreads);
     for (unsigned idx = 0; idx < numThreads; ++idx) {
       // the 0-th thread is executed by the main thread.
@@ -2003,7 +2005,10 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
   // Start all the threads and do the LLVM compilation.
 
-  LLVMCodeGenThreads codeGenThreads(&irgen, &DiagMutex, Opts.NumThreads - 1);
+  unsigned timeTraceGranularity =
+      Ctx.Stats ? Ctx.Stats->getTimeTraceGranularity() : 0;
+  LLVMCodeGenThreads codeGenThreads(&irgen, &DiagMutex, Opts.NumThreads - 1,
+                                     timeTraceGranularity);
   codeGenThreads.startThreads();
 
   // Free the memory occupied by the SILModule.

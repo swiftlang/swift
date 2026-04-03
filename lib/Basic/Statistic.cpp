@@ -359,7 +359,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     IsFlushingTracesAndProfiles(false),
     IsPrintingZeroStats(PrintZeroStats),
     HasStatsOutputDir(!Directory.empty()),
-    TimeTracePath(TimeTracePath.str())
+    TimeTracePath(TimeTracePath.str()),
+    TimeTraceGranularity(TimeTraceGranularity)
 {
   if (HasStatsOutputDir) {
     RecursiveTimers = std::make_unique<RecursionSafeTimers>();
