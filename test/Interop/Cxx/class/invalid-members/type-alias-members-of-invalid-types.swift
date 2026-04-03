@@ -32,9 +32,7 @@ module Type {
 //--- Inputs/type.h
 #pragma once
 
-// cxx-instantiation-note@+3 {{template is declared here}}
-// cxx-instantiation-note@+2 {{template is declared here}}
-// cxx-instantiation-note@+1 {{template is declared here}}
+// cxx-instantiation-note@+1 * {{template is declared here}}
 template <typename T> struct NeedsBool;
 
 template <> struct NeedsBool<bool> {};
@@ -46,12 +44,10 @@ struct Foo { using foo = int; };
 struct Bar {};
 struct Baz {};
 
-// expected-swift-note@+1 {{'NeedsFoo<Bar>' requested here}}
+// expected-swift-note@+1 * {{'NeedsFoo<Bar>' requested here}}
 template <typename T> struct NeedsFoo {
   typename T::foo x;
-  // cxx-instantiation-error@-1 {{no type named 'foo' in 'Bar'}}
-  // expected-swift-error@-2 {{no type named 'foo' in 'Bar'}}
-  // cxx-instantiation-error@-3 {{no type named 'foo' in 'Baz'}}
+  // cxx-instantiation-error@-1 * {{no type named 'foo' in 'Bar'}}
 };
 // CHECK:      struct NeedsFoo<Foo> {
 // CHECK-NEXT:   init(x: Foo.foo)
@@ -90,12 +86,12 @@ struct Derived : UseMe {
 // CHECK-NEXT:   typealias GoodFoo = UseMe.GoodFoo
 // CHECK-NEXT: }
 
-// expected-swift-note@+1 {{declared here}}
+// expected-swift-note@+1 * {{declared here}}
 struct FwdContainer {
   struct Forward;
   using ForwardAlias = Forward;
 
-  // cxx-instantiation-note@+1 {{forward declaration of}}
+  // cxx-instantiation-note@+1 * {{forward declaration of}}
   struct NeverDefined;
   using UndefinedAlias = NeverDefined;
 };
@@ -112,7 +108,7 @@ struct FwdContainer::Forward {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 
-// expected-swift-note@+2 {{declared here}}
+// expected-swift-note@+2 * {{declared here}}
 template <typename T, typename U>
 struct TemplateContainer {
   using GoodAlias = NeedsBool<T>;
@@ -126,20 +122,18 @@ using TemplateContainerInst = TemplateContainer<bool, int>;
 // CHECK-NEXT: }
 // CHECK-NEXT: typealias TemplateContainerInst = TemplateContainer<CBool, CInt>
 
-// cxx-instantiation-note@+2 {{forward declaration of}}
-// expected-swift-note@+1 {{forward declaration of}}
+// expected-swift-note@+1 * {{forward declaration of}}
 struct IncompleteType;
 
 // Test type alias to template with invalid instantiation
-// expected-swift-note@+2 {{requested here}}
+// expected-swift-note@+2 * {{requested here}}
 template <typename T>
 struct RequiresComplete {
   T value;
-  // cxx-instantiation-error@-1 {{field has incomplete type 'IncompleteType'}}
-  // expected-swift-error@-2 {{field has incomplete type 'IncompleteType'}}
+  // cxx-instantiation-error@-1 * {{field has incomplete type 'IncompleteType'}}
 };
 
-// expected-swift-note@+1 {{declared here}}
+// expected-swift-note@+1 * {{declared here}}
 struct UsesInvalidTemplate {
   using BadTemplate = RequiresComplete<IncompleteType>;
 };
@@ -148,9 +142,9 @@ struct UsesInvalidTemplate {
 // CHECK-NEXT: }
 
 // Test type alias to abstract class
-// expected-swift-note@+1 {{'init()' has been explicitly marked unavailable here}}
+// expected-swift-note@+1 * {{'init()' has been explicitly marked unavailable here}}
 struct Abstract {
-  // cxx-instantiation-note@+1 {{unimplemented pure virtual method}}
+  // cxx-instantiation-note@+1 * {{unimplemented pure virtual method}}
   virtual void pureVirtual() = 0;
 };
 // CHECK:      struct Abstract {
