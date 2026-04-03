@@ -10,7 +10,7 @@ how these triples interact during cross-compilation. It is essential to take
 the perspective of the Swift compiler rather than the Swift package or
 application level described in [docs/BuildManifesto.md](https://github.com/swiftlang/swift/blob/main/docs/BuildManifesto.md)
 
-The triple `host` describes the machine where the executable(here: compiler) is
+The triple `host` describes the machine where the executable (here: compiler) is
 running on, which is the development environment. The triple `target` describes the
 machine, which output is generated for. The compiler running on `host` generates
 output (here: cross-compiled Swift core libraries) for a `target`, which can be used
