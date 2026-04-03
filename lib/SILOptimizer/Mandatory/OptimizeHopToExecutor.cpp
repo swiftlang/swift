@@ -116,12 +116,29 @@ public:
   void dump();
 };
 
+static bool
+isEffectiveCallerIsolationInheritingFunction(SILFunction *function) {
+  if (auto isolation = function->getActorIsolation();
+      isolation && isolation->isCallerIsolationInheriting())
+    return true;
+
+  // Reabstraction thunks may not have the isolation attribute set,
+  // but their function type still carries the implicit leading
+  // isolated parameter.
+  auto fnType = function->getLoweredFunctionType();
+  if (auto isolated = fnType->maybeGetIsolatedParameter()) {
+    if (isolated->hasOption(SILParameterInfo::ImplicitLeading))
+      return true;
+  }
+
+  return false;
+}
+
 /// Search for hop_to_executor instructions and add their operands to \p actors.
 void OptimizeHopToExecutor::collectActors(Actors &actors) {
   int uniqueActorID = 0;
 
-  if (auto isolation = function->getActorIsolation();
-      isolation && isolation->isCallerIsolationInheriting()) {
+  if (isEffectiveCallerIsolationInheritingFunction(function)) {
     actors[function->maybeGetIsolatedArgument()] = uniqueActorID++;
   }
 
@@ -240,8 +257,7 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
         return BlockState::NotSet;
       }
 
-      if (auto isolation = function->getActorIsolation();
-          isolation && isolation->isCallerIsolationInheriting()) {
+      if (isEffectiveCallerIsolationInheritingFunction(function)) {
         auto *fArg =
             cast<SILFunctionArgument>(function->maybeGetIsolatedArgument());
         return actors.lookup(SILValue(fArg));
@@ -421,8 +437,7 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
   // the callee function... so we have no guarantee that there isn't code in the
   // caller that needs this hop to executor to run on the correct actor.
   if (isa<ReturnInst>(inst)) {
-    if (auto isolation = inst->getFunction()->getActorIsolation();
-        isolation && isolation->isCallerIsolationInheriting()) {
+    if (isEffectiveCallerIsolationInheritingFunction(inst->getFunction())) {
       return true;
     }
   }
