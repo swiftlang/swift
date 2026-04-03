@@ -206,15 +206,33 @@ extension OutputRawSpan {
   }
 }
 
-//MARK: bulk-append functions
+//MARK: generic single-element append functions
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
-  /// Appends the given value's bytes to this span's bytes.
+  /// Appends a value's bytes to this span's bytes.
+  ///
+  /// There must be at least `MemoryLayout<T>.size` bytes available
+  /// in the span.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - type: The type of the instance to create.
   @_alwaysEmitIntoClient
   @unsafe
   @lifetime(self: copy self)
   public mutating func append<T: BitwiseCopyable>(_ value: T, as type: T.Type) {
+    unsafe _append(value, as: T.self)
+  }
+
+  /// Appends the given value's bytes to this span's bytes.
+  @_alwaysEmitIntoClient
+  @_transparent
+  @unsafe
+  @lifetime(self: copy self)
+  internal mutating func _append<T>(
+    _ value: T, as type: T.Type
+  ) where T: BitwiseCopyable {
     _precondition(
       MemoryLayout<T>.size <= freeCapacity, "OutputRawSpan capacity overflow"
     )
@@ -222,11 +240,72 @@ extension OutputRawSpan {
     _count &+= MemoryLayout<T>.size
   }
 
+  /// Appends a value's bytes to this span's bytes.
+  ///
+  /// There must be at least `MemoryLayout<T>.size` bytes available
+  /// in the span.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - type: The type of the instance to create.
+  @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
+  public mutating func append<T>(
+    _ value: T, as type: T.Type
+  ) where T: ConvertibleToBytes & BitwiseCopyable {
+    unsafe _append(value, as: T.self)
+  }
+
+  /// Appends a value's bytes to the span's memory.
+  ///
+  /// There must be at least `MemoryLayout<T>.size` bytes available
+  /// in the span.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - type: The type of the instance to create.
+  ///   - byteOrder: The order in which the bytes will be encoded to the span.
+  @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
+  public mutating func append<T>(
+    _ value: T, as type: T.Type, byteOrder: ByteOrder
+  ) where T: ConvertibleToBytes & BitwiseCopyable & FixedWidthInteger {
+    let rawValue = switch byteOrder {
+    case .bigEndian: value.bigEndian
+    case .littleEndian: value.littleEndian
+    }
+    unsafe _append(rawValue, as: T.self)
+  }
+}
+
+//MARK: bulk-append functions
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension OutputRawSpan {
   /// Appends the given value's bytes repeatedly to this span's bytes.
+  ///
+  /// There must be at least `count * MemoryLayout<T>.stride` bytes
+  /// available in the span.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - count: The number of copies of `value` to append to this span.
+  ///   - type: The type of the instance to create.
   @_alwaysEmitIntoClient
   @unsafe
   @lifetime(self: copy self)
   public mutating func append<T: BitwiseCopyable>(
+    repeating repeatedValue: T,
+    count: Int,
+    as type: T.Type
+  ) {
+    unsafe _append(repeating: repeatedValue, count: count, as: T.self)
+  }
+
+  @_alwaysEmitIntoClient
+  @unsafe
+  @lifetime(self: copy self)
+  mutating func _append<T: BitwiseCopyable>(
     repeating repeatedValue: T, count: Int, as type: T.Type
   ) {
     let total = count * MemoryLayout<T>.stride
@@ -235,6 +314,102 @@ extension OutputRawSpan {
       as: T.self, repeating: repeatedValue, count: count
     )
     _count &+= total
+  }
+
+  /// Appends the given value's bytes repeatedly to this span's bytes.
+  ///
+  /// There must be at least `count * MemoryLayout<T>.stride` bytes
+  /// available in the span.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - count: The number of copies of `value` to append to this span.
+  ///   - type: The type of the instance to create.
+  @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
+  public mutating func append<T>(
+    repeating repeatedValue: T,
+    count: Int,
+    as type: T.Type
+  ) where T: ConvertibleToBytes & BitwiseCopyable {
+    unsafe _append(repeating: repeatedValue, count: count, as: T.self)
+  }
+
+  /// Appends the given value's bytes repeatedly to this span's bytes.
+  ///
+  /// There must be at least `count * MemoryLayout<T>.stride` bytes
+  /// available in the span.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - count: The number of copies of `value` to append to this span.
+  ///   - type: The type of the instance to create.
+  @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
+  public mutating func append<T>(
+    repeating repeatedValue: T,
+    count: Int,
+    as type: T.Type,
+    _ byteOrder: ByteOrder
+  ) where T: ConvertibleToBytes & BitwiseCopyable & FixedWidthInteger {
+    let rawValue = switch byteOrder {
+    case .bigEndian: repeatedValue.bigEndian
+    case .littleEndian: repeatedValue.littleEndian
+    }
+    unsafe _append(repeating: rawValue, count: count, as: T.self)
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension OutputRawSpan {
+  /// Append to the span as elements of a specific type.
+  ///
+  /// There must be at least `n * MemoryLayout<T>.stride` bytes
+  /// available in the span. The address of the next uninitialized byte
+  /// must be well-aligned for instances of type `type`.
+  ///
+  /// Inside the closure, initialize elements by appending to `typedSpan`.
+  /// After the closure returns, the number of bytes initialized will be
+  /// correctly updated.
+  ///
+  /// If the closure throws an error, the bytes for the elements appended
+  /// until that point will remain initialized.
+  ///
+  /// - Parameters:
+  ///   - n: The number of `T` elements to initialize
+  ///   - type: The type of the instance to create.
+  ///   - initializer: A closure that initializes new elements.
+  ///     - Parameters:
+  ///       - typedSpan: An `OutputSpan` over enough bytes to initialize
+  ///         the specified number of additional elements.
+  @_alwaysEmitIntoClient
+  @_lifetime(self: copy self)
+  mutating func append<T, E: Error>(
+    elements n: Int,
+    as type: T.Type,
+    initializingWith initializer:
+      (_ typedSpan: inout OutputSpan<T>) throws(E) -> Void
+  ) throws(E) where T: ConvertibleToBytes & BitwiseCopyable {
+    let total = n * MemoryLayout<T>.stride
+    _precondition(total <= freeCapacity, "OutputRawSpan capacity overflow")
+    let tail = unsafe _tail()
+    _precondition(
+      Int(bitPattern: tail) & (MemoryLayout<T>.alignment &- 1) == 0,
+    )
+    var initialized = 0
+    defer {
+      _count += initialized &* MemoryLayout<T>.stride
+    }
+    try unsafe tail.withMemoryRebound(to: T.self, capacity: n) { p throws(E) in
+      let buffer = unsafe UnsafeMutableBufferPointer<T>(start: p, count: n)
+      var typedSpan = unsafe OutputSpan<T>(buffer: buffer, initializedCount: 0)
+      defer {
+        initialized = unsafe typedSpan.finalize(for: buffer)
+        typedSpan = .init()
+      }
+      try initializer(&typedSpan)
+    }
   }
 }
 
