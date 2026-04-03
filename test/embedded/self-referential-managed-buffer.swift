@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -typecheck %s -enable-experimental-feature Embedded -verify
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 // Self-referential generic superclass should be diagnosed in Embedded Swift
 // because it creates a circular metadata dependency.
