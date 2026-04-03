@@ -4,8 +4,8 @@
 // RUN: %target-swift-frontend %s -c -cxx-interoperability-mode=default -Xcc -std=c++20 -Xcc -fmodules-cache-path=%t
 
 // Ensure that the pre-compiled modules are emitted.
-// RUN: stat %t/Android*.pcm
-// RUN: stat %t/std*.pcm
+// RUN: ls %t/Android*.pcm
+// RUN: ls %t/std*.pcm
 
 // RUN: %empty-directory(%t)
 
