@@ -40,6 +40,37 @@
 /// raw bytes.
 public typealias FullyInhabited = ConvertibleToBytes & ConvertibleFromBytes
 
+/// Returns the bits of the given instance, interpreted as having the specified
+/// type.
+///
+/// Use this function only to convert the instance passed as `x` to a
+/// layout-compatible type when conversion through other means is not
+/// possible. Common conversions supported by the Swift standard library
+/// include the following:
+///
+/// - Value conversion from one integer type to another. Use the destination
+///   type's initializer or the `numericCast(_:)` function.
+/// - Bitwise conversion from one integer type to another. Use the destination
+///   type's `init(truncatingIfNeeded:)` or `init(bitPattern:)` initializer.
+/// - Conversion from a pointer to an integer value with the bit pattern of the
+///   pointer's address in memory, or vice versa. Use the `init(bitPattern:)`
+///   initializer for the destination type.
+///
+/// Parameters:
+///   - x: The instance to cast to `type`.
+///   - type: The type to cast `x` to. `type` and the type of `x` must have the
+///     same size of memory representation and compatible memory layout.
+/// Returns: A new instance of type `U`, cast from `x`.
+@_alwaysEmitIntoClient
+@_transparent
+public func bitCast<T, U>(
+  _ x: T, to type: U.Type
+) -> U where T: ConvertibleToBytes, U: ConvertibleFromBytes {
+  _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
+    "Can't bitCast between types of different sizes")
+  return Builtin.reinterpretCast(x)
+}
+
 extension UInt8:   ConvertibleToBytes, ConvertibleFromBytes {}
 extension Int8:    ConvertibleToBytes, ConvertibleFromBytes {}
 extension UInt16:  ConvertibleToBytes, ConvertibleFromBytes {}
