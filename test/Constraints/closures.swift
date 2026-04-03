@@ -1430,3 +1430,16 @@ do {
       .reduce([:], { x, y in x.merging(y, uniquingKeysWith: +) })
       .mapValues { Set($0) }
 }
+
+// Fix-it: value of type T passed where () -> T closure is expected.
+// The fix-it wraps the argument in '{ <expr> }', preserving the expression.
+do {
+  struct AStruct {}
+  func iExpectAReturningClosure(_ aClosure: () -> AStruct) {}
+
+  iExpectAReturningClosure(AStruct()) // expected-error {{cannot convert value of type 'AStruct' to expected argument type '() -> AStruct'}}
+
+  // Guard: type mismatch — arg type does not match closure result type, no fix-it.
+  struct BStruct {}
+  iExpectAReturningClosure(BStruct()) // expected-error {{cannot convert value of type 'BStruct' to expected argument type '() -> AStruct'}}
+}
