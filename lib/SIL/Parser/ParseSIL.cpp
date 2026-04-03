@@ -7819,6 +7819,27 @@ bool SILParserState::parseSILProperty(Parser &P) {
   return false;
 }
 
+static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
+  Identifier DeclName;
+  SourceLoc DeclLoc;
+  if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
+    return nullptr;
+
+  // Find the protocol decl. The protocol can be imported.
+  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res =
+    lookupTopDecl(P, DeclName, /*typeLookup=*/true);
+  assert(isa<ValueDecl *>(Res) && "Protocol look-up should return a Decl");
+  ValueDecl *VD = cast<ValueDecl *>(Res);
+  if (!VD) {
+    P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
+    return nullptr;
+  }
+  auto *proto = dyn_cast<ProtocolDecl>(VD);
+  if (!proto)
+    P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
+  return proto;
+}
+
 /// decl-sil-vtable: [[only in SIL mode]]
 ///   'sil_vtable' ClassName decl-sil-vtable-body
 /// decl-sil-vtable-body:
@@ -7881,8 +7902,28 @@ bool SILParserState::parseSILVTable(Parser &P) {
   Lexer::SILBodyRAII Tmp(*P.L);
   // Parse the entry list.
   std::vector<SILVTable::Entry> vtableEntries;
+  std::vector<SILVTable::ConformanceEntry> conformances;
   if (P.Tok.isNot(tok::r_brace)) {
     do {
+      if (P.Tok.is(tok::identifier)) {
+        SILParser witnessState(P);
+        if (P.Tok.getText() == "no_conformance") {
+          P.consumeToken();
+          ProtocolDecl *proto = parseProtocolDecl(P, witnessState);
+          if (!proto)
+            return true;
+          conformances.push_back(proto);
+          continue;
+        } else if (P.Tok.getText() == "conformance") {
+          P.consumeToken();
+          auto conf = witnessState.parseProtocolConformance();
+          if (conf.isInvalid() || !conf.isConcrete())
+            return true;
+          conformances.push_back(conf.getConcrete());
+          continue;
+        }
+      }
+
       SILDeclRef Ref;
       Identifier FuncName;
       SourceLoc FuncLoc;
@@ -7939,7 +7980,10 @@ bool SILParserState::parseSILVTable(Parser &P) {
   P.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                        LBraceLoc);
 
-  SILVTable::create(M, theClass, specializedClassTy, Serialized, vtableEntries);
+  auto *vT = SILVTable::create(M, theClass, specializedClassTy, Serialized, vtableEntries);
+  for (auto cEntry : conformances) {
+    vT->appendConformance(cEntry);
+  }
   return false;
 }
 
@@ -8039,27 +8083,6 @@ static ClassDecl *parseClassDecl(Parser &P, SILParser &SP) {
   if (!decl)
     P.diagnose(DeclLoc, diag::sil_default_override_decl_not_class, DeclName);
   return decl;
-}
-
-static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
-  Identifier DeclName;
-  SourceLoc DeclLoc;
-  if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
-    return nullptr;
-
-  // Find the protocol decl. The protocol can be imported.
-  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res =
-    lookupTopDecl(P, DeclName, /*typeLookup=*/true);
-  assert(isa<ValueDecl *>(Res) && "Protocol look-up should return a Decl");
-  ValueDecl *VD = cast<ValueDecl *>(Res);
-  if (!VD) {
-    P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
-    return nullptr;
-  }
-  auto *proto = dyn_cast<ProtocolDecl>(VD);
-  if (!proto)
-    P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
-  return proto;
 }
 
 static AssociatedTypeDecl *parseAssociatedTypeDecl(Parser &P, SILParser &SP,

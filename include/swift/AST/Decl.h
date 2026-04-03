@@ -5758,6 +5758,14 @@ public:
   /// list of function decls.
   ObjCRequirementMap getObjCRequiremenMap() const;
 
+  /// True if this protocol is marked for fast casting, i.e. fast conformance
+  /// lookup via the vtable of a conforming class.
+  /// See also SILVTable::ConformanceEntry
+  bool isEligibleForFastCasting() const {
+    // TODO: make this a real attribute
+    return hasSemanticsAttr("fast_cast");
+  }
+
 private:
   void computeKnownProtocolKind() const;
 

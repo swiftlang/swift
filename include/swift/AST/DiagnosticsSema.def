@@ -2841,6 +2841,10 @@ NOTE(invalid_extension_rewrite,none,
 ERROR(cannot_extend_nominal,none,
       "cannot extend %kind0", (const NominalTypeDecl *))
 
+ERROR(retroactive_fast_cast,none,
+      "cannot add retroactive conformance for a fast-cast protocol %0",
+      (const ValueDecl *))
+
 ERROR(retroactive_attr_does_not_apply,none,
       "'retroactive' attribute does not apply; %0 is declared in "
       "%select{the same package|this module}1",

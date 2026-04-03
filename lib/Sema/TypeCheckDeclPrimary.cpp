@@ -1830,9 +1830,15 @@ static void diagnoseRetroactiveConformances(
 
   for (auto *conformance : ext->getLocalConformances()) {
     auto *proto = conformance->getProtocol();
+    bool isRetroactive = conformance->isRetroactive();
     bool inserted = protocols.insert(std::make_pair(
-        proto, conformance->isRetroactive())).second;
+        proto, isRetroactive)).second;
     ASSERT(inserted);
+
+    if (isRetroactive && proto->isEligibleForFastCasting()) {
+      ext->diagnose(diag::retroactive_fast_cast, proto);
+      return;
+    }
 
     if (proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype)) {
       protocolsWithRetroactiveAttr.insert(proto);

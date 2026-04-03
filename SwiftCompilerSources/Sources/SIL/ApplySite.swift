@@ -114,6 +114,7 @@ public struct ApplyOperandConventions : Collection {
   }
 }
 
+@_semantics("fast_cast")
 public protocol ApplySite : Instruction {
   var operands: OperandArray { get }
   var numArguments: Int { get }
@@ -372,6 +373,7 @@ extension ApplySite {
   }
 }
 
+@_semantics("fast_cast")
 public protocol FullApplySite : ApplySite {
   var singleDirectResult: Value? { get }
   var singleDirectErrorResult: Value? { get }

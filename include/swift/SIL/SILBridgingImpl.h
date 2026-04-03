@@ -2213,6 +2213,25 @@ BridgedVTableEntry BridgedVTable::getEntry(SwiftInt index) const {
   return BridgedVTableEntry(vTable->getEntries()[index]);
 }
 
+SwiftInt BridgedVTable::getNumConformanceEntries() const {
+  return SwiftInt(vTable->getConformances().size());
+}
+
+bool BridgedVTable::hasConformance(SwiftInt index) const {
+  auto confEntry = vTable->getConformances()[index];
+  return confEntry.hasConformance();
+}
+
+BridgedDeclObj BridgedVTable::getProtocol(SwiftInt index) const {
+  auto confEntry = vTable->getConformances()[index];
+  return {confEntry.getProtocol()};
+}
+
+BridgedConformance BridgedVTable::getConformance(SwiftInt index) const {
+  auto confEntry = vTable->getConformances()[index];
+  return BridgedConformance(swift::ProtocolConformanceRef(confEntry.getConformance()));
+}
+
 BridgedDeclObj BridgedVTable::getClass() const {
   return vTable->getClass();
 }
@@ -2239,6 +2258,14 @@ void BridgedVTable::replaceEntries(BridgedArrayRef bridgedEntries) const {
     entries.push_back(e.unbridged());
   }
   vTable->replaceEntries(entries);
+}
+
+void BridgedVTable::appendConformance(BridgedDeclObj protocolDecl) const {
+  vTable->appendConformance(protocolDecl.getAs<swift::ProtocolDecl>());
+}
+
+void BridgedVTable::appendConformance(BridgedConformance conformance) const {
+  vTable->appendConformance(conformance.unbridged().getConcrete());
 }
 
 //===----------------------------------------------------------------------===//

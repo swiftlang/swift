@@ -4493,6 +4493,20 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   }
   OS << " {\n";
 
+  PrintOptions options = PrintOptions::printSIL();
+
+  for (auto confEntry : getConformances()) {
+    if (confEntry.hasConformance()) {
+      OS << "  conformance ";
+      confEntry.getConformance()->printName(OS, options);
+      OS << '\n';
+    } else {
+      OS << "  no_conformance ";
+      printValueDecl(confEntry.getProtocol(), OS);
+      OS << '\n';
+    }
+  }
+
   for (auto &entry : getEntries()) {
     OS << "  ";
     entry.print(OS);

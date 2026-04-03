@@ -1137,10 +1137,16 @@ struct BridgedVTable {
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE SwiftInt getNumEntries() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTableEntry getEntry(SwiftInt index) const;
+  BRIDGED_INLINE SwiftInt getNumConformanceEntries() const;
+  BRIDGED_INLINE bool hasConformance(SwiftInt index) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getProtocol(SwiftInt index) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getConformance(SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVTableEntry lookupMethod(BridgedDeclRef member) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getSpecializedClassType() const;
   BRIDGED_INLINE void replaceEntries(BridgedArrayRef bridgedEntries) const;
+  BRIDGED_INLINE void appendConformance(BridgedDeclObj protocolDecl) const;
+  BRIDGED_INLINE void appendConformance(BridgedConformance conformance) const;
 };
 
 struct OptionalBridgedVTable {

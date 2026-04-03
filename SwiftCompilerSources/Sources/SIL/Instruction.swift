@@ -297,6 +297,7 @@ public class MultipleValueInstruction : Instruction {
 }
 
 /// Instructions, which have a single operand (not including type-dependent operands).
+@_semantics("fast_cast")
 public protocol UnaryInstruction : Instruction {
   var operand: Operand { get }
 }
@@ -310,6 +311,7 @@ extension UnaryInstruction {
 //===----------------------------------------------------------------------===//
 
 /// Only one of the operands may have an address type.
+@_semantics("fast_cast")
 public protocol StoringInstruction : Instruction {
   var operands: OperandArray { get }
 }
@@ -371,6 +373,7 @@ final public class AssignInst : Instruction, StoringInstruction {
 final public class AssignOrInitInst : Instruction, StoringInstruction {}
 
 /// Instruction that copy or move from a source to destination address.
+@_semantics("fast_cast")
 public protocol SourceDestAddrInstruction : Instruction {
   var sourceOperand: Operand { get }
   var destinationOperand: Operand { get }
@@ -472,7 +475,8 @@ final public class HopToExecutorInst : Instruction, UnaryInstruction {}
 final public class FixLifetimeInst : Instruction, UnaryInstruction {}
 
 // See C++ VarDeclCarryingInst
-public protocol VarDeclInstruction {
+@_semantics("fast_cast")
+public protocol VarDeclInstruction : Instruction {
   var varDecl: VarDecl? { get }
 }
 
@@ -574,6 +578,7 @@ extension Value {
   }
 }
 
+@_semantics("fast_cast")
 public protocol DebugVariableInstruction : VarDeclInstruction {
   typealias DebugVariable = BridgedSILDebugVariable
 
@@ -587,6 +592,7 @@ public protocol DebugVariableInstruction : VarDeclInstruction {
 /// (`alloc_stack`).
 /// When we are moving code onto an unknown instruction (such as the start of a
 /// basic block), we want to ignore any meta instruction that might be there.
+@_semantics("fast_cast")
 public protocol MetaInstruction: Instruction {}
 
 final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariableInstruction, MetaInstruction {
@@ -718,6 +724,7 @@ final public class InjectEnumAddrInst : Instruction, UnaryInstruction, EnumInstr
 //                      no-value deallocation instructions
 //===----------------------------------------------------------------------===//
 
+@_semantics("fast_cast")
 public protocol Deallocation : Instruction {
   var allocatedValue: Value { get }
 }
@@ -747,6 +754,7 @@ final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, De
 //                           single-value instructions
 //===----------------------------------------------------------------------===//
 
+@_semantics("fast_cast")
 public protocol LoadInstruction: SingleValueInstruction, UnaryInstruction {}
 
 extension LoadInstruction {
@@ -872,6 +880,7 @@ class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {
   }
 }
 
+@_semantics("fast_cast")
 public protocol IndexingInstruction: SingleValueInstruction {
   var base: Value { get }
   var index: Value { get }
@@ -1105,7 +1114,8 @@ class StructElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { bridged.StructElementAddrInst_fieldIndex() }
 }
 
-public protocol EnumInstruction : AnyObject {
+@_semantics("fast_cast")
+public protocol EnumInstruction : Instruction {
   var caseIndex: Int { get }
 }
 
@@ -1267,6 +1277,7 @@ public enum MarkDependenceKind: Int32 {
   case NonEscaping = 2
 }
 
+@_semantics("fast_cast")
 public protocol MarkDependenceInstruction: Instruction {
   var dependenceKind: MarkDependenceKind { get }
 }
@@ -1344,6 +1355,7 @@ final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
 
 final public class ProjectExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
 
+@_semantics("fast_cast")
 public protocol CopyingInstruction : SingleValueInstruction, UnaryInstruction, OwnershipTransitionInstruction {}
 
 final public class CopyValueInst : SingleValueInstruction, CopyingInstruction {
@@ -1572,6 +1584,7 @@ final public class InitBlockStorageHeaderInst: SingleValueInstruction {}
 //                      single-value allocation instructions
 //===----------------------------------------------------------------------===//
 
+@_semantics("fast_cast")
 public protocol Allocation : SingleValueInstruction { }
 
 final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVariableInstruction, MetaInstruction {
@@ -1671,6 +1684,7 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 /// An instruction whose side effects extend across a scope including other instructions. These are always paired with a
 /// scope ending instruction such as `begin_access` (ending with `end_access`) and `begin_borrow` (ending with
 /// `end_borrow`).
+@_semantics("fast_cast")
 public protocol ScopedInstruction: Instruction {
   var scopeEndingOperands: LazyFilterSequence<UseList> { get }
 
@@ -1689,6 +1703,7 @@ extension Instruction {
 
 /// Single-value instructions beginning a borrow-scope which end with an `end_borrow` or a branch to a re-borrow phi.
 /// See also `BeginBorrowValue` which represents all kind of `Value`s which begin a borrow scope.
+@_semantics("fast_cast")
 public protocol BeginBorrowInstruction : SingleValueInstruction, ScopedInstruction {
 }
 
@@ -1930,6 +1945,7 @@ final public class PackLengthInst : SingleValueInstruction {
   }
 }
 
+@_semantics("fast_cast")
 public protocol AnyPackIndexInst : SingleValueInstruction {
   var indexedPackType: CanonicalType { get }
 }
@@ -1983,7 +1999,10 @@ public class TermInst : Instruction {
 final public class UnreachableInst : TermInst {
 }
 
-public protocol ReturnInstruction: TermInst {
+// Note: Constraining `ReturnInstruction` on `Instruction` rather than on `TermInst` allows fast casting
+//       from `Instruction` to `ReturnInstruction`. This has a significant impact on compile time.
+@_semantics("fast_cast")
+public protocol ReturnInstruction: Instruction {
   var returnedValue: Value { get }
 }
 
@@ -2225,6 +2244,7 @@ final public class IgnoredUseInst : Instruction, UnaryInstruction {
 final public class ImplicitActorToOpaqueIsolationCastInst
   : SingleValueInstruction, UnaryInstruction {}
 
+@_semantics("fast_cast")
 public protocol MakeBorrowInstruction
   : SingleValueInstruction, UnaryInstruction {
   var referent: Value { get }

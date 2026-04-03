@@ -4515,6 +4515,11 @@ namespace {
       return emitLayoutString();
     }
 
+    void addConformanceTable() {
+      ASSERT(VTable->getConformances().empty() &&
+             "conformance tables unsupport for this kind of class metadata");
+    }
+
     void addLayoutStringPointer() {
       assert(!isPureObjC());
       if (auto *layoutString = getLayoutString()) {
@@ -4819,6 +4824,23 @@ namespace {
                               const ClassLayout &fieldLayout,
                               SILVTable *vtable)
       : super(IGM, theClass, builder, fieldLayout, vtable) {}
+
+    void addConformanceTable() {
+      // Add conformance entries at negative offsets (i.e. at the very beginning) for fast
+      // existential casts.
+      auto conformances = VTable->getConformances();
+      for (auto iter = conformances.rbegin(); iter != conformances.rend(); ++iter) {
+        auto confEntry = *iter;
+        if (confEntry.hasConformance()) {
+          auto *wtable = IGM.getAddrOfWitnessTable(confEntry.getConformance()->getRootConformance());
+          ASSERT(isa<llvm::Constant>(wtable) &&
+                 "need a constant witness table in the vtable's conformance table");
+          B.add(wtable);
+        } else {
+          B.addNullPointer(IGM.Int8PtrTy);
+        }
+      }
+    }
 
     void addFieldOffset(VarDecl *var) {
       assert(!isPureObjC());
@@ -5525,6 +5547,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   auto strategy = IGM.getClassMetadataStrategy(classDecl);
   SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries;
 
+  unsigned numConformanceEntries = 0;
+
   switch (strategy) {
   case ClassMetadataStrategy::Resilient: {
     if (classDecl->isGenericContext()) {
@@ -5568,6 +5592,9 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     if (IGM.getOptions().VirtualFunctionElimination) {
       vtableEntries = builder.getVTableEntriesForVFE();
     }
+    if (builder.getVTable()) {
+      numConformanceEntries = builder.getVTable()->getConformances().size();
+    }
     break;
   }
   }
@@ -5582,7 +5609,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   bool isPattern = (strategy == ClassMetadataStrategy::Resilient);
   auto var = IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
                                     init.finishAndCreateFuture(), section,
-                                    vtableEntries);
+                                    vtableEntries, numConformanceEntries);
 
   // If the class does not require dynamic initialization, or if it only
   // requires dynamic initialization on a newer Objective-C runtime, add it

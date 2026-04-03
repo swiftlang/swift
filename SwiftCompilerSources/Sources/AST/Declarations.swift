@@ -68,6 +68,13 @@ public class ValueDecl: Decl {
   final public func setAccess(_ accessLevel : AccessLevel) {
     bridged.ValueDecl_setAccess(accessLevel)
   }
+  final public func hasOpenAccess(in declContext: DeclContext?) -> Bool {
+    if let declContext {
+      bridged.ValueDecl_hasOpenAccess(declContext.bridgedDeclContext)
+    } else {
+      bridged.ValueDecl_hasOpenAccess()
+    }
+  }
 }
 
 public class TypeDecl: ValueDecl {
@@ -85,12 +92,25 @@ public class NominalTypeDecl: GenericTypeDecl {
     bridged.NominalType_getValueTypeDestructor().getAs(DestructorDecl.self)
   }
 
-  public var declaredInterfaceType: Type {
+  final public var declaredInterfaceType: Type {
     Type(bridged: bridged.NominalType_getDeclaredInterfaceType())
   }
 
-  public var selfInterfaceType: Type {
+  final public var selfInterfaceType: Type {
     Type(bridged: bridged.NominalType_getSelfInterfaceType())
+  }
+
+  /// All the protocols that this nominal type conforms to.
+  final public var allProtocols: [ProtocolDecl] {
+    var result = [ProtocolDecl]()
+    withUnsafeMutablePointer(to: &result) { resultPtr in
+      let resultRawPtr = UnsafeMutableRawPointer(resultPtr)
+      bridged.NominalType_getAllProtocols(resultRawPtr, { resultRawPtr, bridgedProto in
+        let resultPtr = resultRawPtr.assumingMemoryBound(to: [ProtocolDecl].self)
+        resultPtr.pointee.append(bridgedProto.getAs(ProtocolDecl.self))
+      })
+    }
+    return result
   }
 
   public func add(member: Decl) {
@@ -128,17 +148,62 @@ final public class StructDecl: NominalTypeDecl {
 
 final public class ClassDecl: NominalTypeDecl {
   public var superClass: Type? { Type(bridgedOrNil: bridged.Class_getSuperclass()) }
+  public var superClassDecl: ClassDecl? { bridged.Class_getSuperclassDecl().getAs(ClassDecl.self) }
 
   final public var destructor: DestructorDecl {
     bridged.Class_getDestructor().getAs(DestructorDecl.self)
   }
 
   public var isForeign: Bool { bridged.Class_isForeign() }
+
+  /// A sequence that iterates through this class and all its superclasses in order.
+  /// Starts with this class and proceeds up the inheritance hierarchy.
+  public var selfAndSuperClasses: SuperClassSequence { SuperClassSequence(classDecl: self) }
+
+  public struct SuperClassSequence: Sequence, IteratorProtocol {
+    private var currentClass: ClassDecl?
+
+    public init(classDecl: ClassDecl) { currentClass = classDecl}
+
+    public mutating func next() -> ClassDecl? {
+      if let c = currentClass {
+        currentClass = c.superClassDecl
+        return c
+      }
+      return nil
+    }
+  }
 }
 
 final public class ProtocolDecl: NominalTypeDecl {
   public var requiresClass: Bool { bridged.ProtocolDecl_requiresClass() }
   public var isMarkerProtocol: Bool { bridged.ProtocolDecl_isMarkerProtocol() }
+
+  /// The class declaration if this protocol is constraint on a class, or nil if there is no superclass.
+  public var superClassDecl: ClassDecl? { bridged.ProtocolDecl_getSuperClassDecl().getAs(ClassDecl.self) }
+
+  /// The transitive closure of the inherited protocols, not including this protocol itself.
+  public var allInheritedProtocols: InheritedProtocolsArray { InheritedProtocolsArray(protocol: self) }
+
+  public struct InheritedProtocolsArray: BridgedRandomAccessCollection {
+    private let proto: ProtocolDecl
+
+    public init(protocol: ProtocolDecl) {
+      self.proto = `protocol`
+    }
+
+    public var startIndex: Int { 0 }
+    public var endIndex: Int { proto.bridged.ProtocolDecl_getNumInheritedProtocols() }
+
+    public subscript(index: Int) -> ProtocolDecl {
+      proto.bridged.ProtocolDecl_getInheritedProtocols(index).getAs(ProtocolDecl.self)
+    }
+  }
+
+  /// True if this protocol is marked for fast casting, i.e. fast conformance
+  /// lookup via the vtable of a conforming class.
+  /// See also `VTable.ConformanceEntry`
+  public var isEligibleForFastCasting: Bool { bridged.ProtocolDecl_isEligibleForFastCasting() }
 }
 
 final public class BuiltinTupleDecl: NominalTypeDecl {}
