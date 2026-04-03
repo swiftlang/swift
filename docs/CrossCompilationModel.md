@@ -102,21 +102,3 @@ This allows the driver to make the most appropriate choice for the host that is
 being compiled for without loss of generality. A platform may opt to ignore one
 or more of these flags (e.g. Windows does not use `-sysroot` as the system
 headers are not organised like the traditional unix layout).
-
-# Cross-Compilation Triples
-
-[Swift SDKs for
-    Cross-Compilation](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0387-cross-compilation-destinations.md)
-touches on the topic of triples: `host, build and target`. This clarifies
-how these triples interact during cross-compilation. It is essential to take 
-the perspective of the Swift compiler rather than the Swift package or
-application level described in [docs/BuildManifesto.md](https://github.com/swiftlang/swift/blob/main/docs/BuildManifesto.md)
-
-The triple `host` describes the machine where the executable(here: compiler) is
-running on, which is the the developer PC/CI. The triple `target` describes the
-machine, which output is generated for. The compiler running on `host` generates
-output(here: cross-compiled Swift core libraries) for a `target`, which can be used
-to put together `Swift SDKs` and cross-compile applications. The triple
-`build`, which is the machine the compiler is built on, is not relevant for this
-build and a precondition, as it would address building the Swift toolchain.
-
