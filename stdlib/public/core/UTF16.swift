@@ -499,7 +499,7 @@ func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>?
 private func encodeScalarAsUTF8(
   _ scalar: UInt32,
   output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>
-) -> ScalarFallbackResult {
+) {
   _debugPrecondition(scalar >= 0x80)
   _debugPrecondition(scalar <= utf16ScalarMax)
   if scalar <= utf8TwoByteMax {
@@ -526,7 +526,6 @@ private func encodeScalarAsUTF8(
   } else {
     Builtin.unreachable()
   }
-  return .multiByte
 }
 
 @inline(__always)
@@ -539,7 +538,7 @@ private func processNonASCIIScalarFallback(
 ) -> (ScalarFallbackResult, repairsMade: Bool) {
   var scalar: UInt32 = 0
   var invalid = false
-  if UTF16.isLeadSurrogate(cu) {
+  if _slowPath(UTF16.isLeadSurrogate(cu)) {
     if unsafe input + 1 >= inputEnd {
       //Leading with no room for trailing
       invalid = true
@@ -563,7 +562,7 @@ private func processNonASCIIScalarFallback(
         unsafe input += 2
       }
     }
-  } else if UTF16.isTrailSurrogate(cu) {
+  } else if _slowPath(UTF16.isTrailSurrogate(cu)) {
     //Trailing with no leading
     invalid = true
     unsafe input += 1
@@ -573,15 +572,11 @@ private func processNonASCIIScalarFallback(
   }
   if _slowPath(invalid || scalar > utf16ScalarMax) {
     guard repairing else { return (.invalid, repairsMade: false) }
-    return (
-      unsafe encodeScalarAsUTF8(utf16ReplacementCharacter, output: &output),
-      repairsMade: true
-    )
+    unsafe encodeScalarAsUTF8(utf16ReplacementCharacter, output: &output)
+    return (.multiByte, repairsMade: true)
   }
-  return (
-    unsafe encodeScalarAsUTF8(scalar, output: &output),
-    repairsMade: false
-  )
+  unsafe encodeScalarAsUTF8(scalar, output: &output)
+  return (.multiByte, repairsMade: false)
 }
 
 @inline(__always)
@@ -656,6 +651,7 @@ internal func transcodeUTF16ToUTF8(
   
   while unsafe input <= (inputEnd - blockSize) {
     if let asciiBlock = unsafe allASCIIBlock(at: input) {
+      _onFastPath()
       // All ASCII: transcode directly
       for i in 0 ..< blockSize {
         unsafe (output + i).initialize(to: asciiBlock[i])
@@ -699,7 +695,7 @@ private func utf8Length(
   repairing: Bool
 ) -> Int? {
   var count = 0
-  while input < end {
+  while unsafe input < end {
     let cu = unsafe input.pointee
     if cu < 0x80 {
       count &+= 1
@@ -755,11 +751,12 @@ internal func utf8Length(
 
   while unsafe input < (inputEnd - blockSize) {
     if let _ = unsafe allASCIIBlock(at: input) {
+      _onFastPath()
       unsafe input += blockSize
       count += blockSize
     } else {
       let blockEnd = unsafe Swift.min(input + blockSize, inputEnd)
-      guard let addedCount = utf8Length(
+      guard let addedCount = unsafe utf8Length(
         input: &input,
         end: blockEnd,
         repairing: repairing
@@ -770,8 +767,7 @@ internal func utf8Length(
     }
   }
   // Finish any remaining code units that didn't fill a full block
-  let remainingCodeUnitCount = input.distance(to: inputEnd)
-  guard let addedByteCount = utf8Length(
+  guard let addedByteCount = unsafe utf8Length(
     input: &input,
     end: inputEnd,
     repairing: repairing
