@@ -49,6 +49,7 @@ add_library(swiftCore
   BridgingBuffer.swift
   Builtin.swift
   BuiltinMath.swift
+  ByteOrder.swift
   Character.swift
   CocoaArray.swift
   Codable.swift
@@ -85,6 +86,7 @@ add_library(swiftCore
   FloatingPoint.swift
   FloatingPointFromString.swift
   FloatingPointToString.swift
+  FullyInhabited.swift
   Hashable.swift
   AnyHashable.swift # ORDER DEPENDENCY
   Hasher.swift
