@@ -970,6 +970,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 
   if ((!Context.hadError() || opts.AllowModuleWithCompilerErrors) &&
       opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
+    FrontendStatsTracer tracer(Instance.getStatsReporter(), "EmitObjCHeader");
     std::string BridgingHeaderPathForPrint = Instance.getBridgingHeaderPath();
     if (!BridgingHeaderPathForPrint.empty()) {
       if (opts.BridgingHeaderDirForPrint.has_value()) {
@@ -1030,6 +1031,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   }
 
   {
+    FrontendStatsTracer tracer(Instance.getStatsReporter(), "EmitTBD");
     hadAnyError |= writeTBDIfNeeded(Instance);
   }
 
@@ -1176,10 +1178,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
 
   // Contains the hadError checks internally, we still want to output the
   // Objective-C header when there's errors and currently allowing them
-  {
-    FrontendStatsTracer tracer(Instance.getStatsReporter(), "EmitObjCHeader");
-    emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
-  }
+  emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
 
   // Verify reference dependencies of the current compilation job. Note this
   // must be run *before* verifying diagnostics so that the former can be tested
