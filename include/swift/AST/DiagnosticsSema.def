@@ -8861,6 +8861,13 @@ GROUPED_WARNING(dynamic_cast_involving_protocol_in_embedded_swift,
                 "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
                 (const Decl *))
 
+GROUPED_ERROR(self_referential_superclass_in_embedded_swift,
+              EmbeddedRestrictions, none,
+              "class %0 cannot inherit from %1 in Embedded Swift because "
+              "a generic argument of the superclass refers to the subclass itself, "
+              "creating a circular metadata dependency",
+              (Type, Type))
+
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
 //===----------------------------------------------------------------------===//

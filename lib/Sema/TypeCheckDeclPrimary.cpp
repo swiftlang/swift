@@ -476,6 +476,29 @@ static void checkInheritanceClause(
       }
 
       if (canHaveSuperclass) {
+        // Check for self-referential generic superclass in Embedded Swift.
+        // A class like `class Tree: ManagedBuffer<Int, Tree>` creates a
+        // circular metadata dependency that cannot be resolved statically.
+        if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+          if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+                  classDecl, inherited.getSourceRange().Start,
+                  /*wasAlwaysEmbeddedError=*/true)) {
+            if (auto superBGT = inheritedTy->getAs<BoundGenericClassType>()) {
+              for (auto arg : superBGT->getGenericArgs()) {
+                if (auto *nominal = arg->getAnyNominal()) {
+                  if (nominal == classDecl) {
+                    diags.diagnose(
+                        inherited.getSourceRange().Start,
+                        diag::self_referential_superclass_in_embedded_swift,
+                        classDecl->getDeclaredInterfaceType(), inheritedTy)
+                      .limitBehavior(*behavior);
+                  }
+                }
+              }
+            }
+          }
+        }
+
         // Record the superclass.
         superclassTy = inheritedTy;
         superclassRange = inherited.getSourceRange();
