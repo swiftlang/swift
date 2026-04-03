@@ -55,7 +55,7 @@ bb2:
 // CHECK-NEXT:   %[[RESUME:.*]] = extractvalue { ptr, float } %[[YIELD_PAIR]], 0
 // CHECK-NEXT:   %[[YIELD:.*]] = extractvalue { ptr, float } %[[YIELD_PAIR]], 1
 // CHECK-arm64e: %[[CTXVAL:.*]] = ptrtoint ptr %[[CTXPTR]] to i64
-// CHECK-arm64e-NEXT: %[[DISCR:.*]] call i64 @llvm.ptrauth.blend(i64 %[[CTXVAL]], i64 36124)
+// CHECK-arm64e-NEXT: %[[DISCR:.*]] call i64 @llvm.ptrauth.blend(i64 %[[CTXVAL]], i64 27838)
 // CHECK-NEXT:   call swiftcc void %[[RESUME]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], i1 false)
 // CHECK-NEXT:   call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr %[[CTXPTR]])
 // CHECK-NEXT:   call void @swift_release(ptr %[[PA_CTX_BOX]])
