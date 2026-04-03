@@ -115,7 +115,7 @@ application level described in [docs/BuildManifesto.md](https://github.com/swift
 The triple `host` describes the machine where the executable(here: compiler) is
 running on, which is the the developer PC/CI. The triple `target` describes the
 machine, which output is generated for. The compiler running on `host` generates
-output(eg. cross-compiled Swift core libraries) for a `target`, which can be used
+output(here: cross-compiled Swift core libraries) for a `target`, which can be used
 to put together `Swift SDKs` and cross-compile applications. The triple
 `build`, which is the machine the compiler is built on, is not relevant for this
 build and a precondition, as it would address building the Swift toolchain.
