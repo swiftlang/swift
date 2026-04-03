@@ -1,6 +1,6 @@
 # Swift Cross-Compiler Build
 
-Opposed to Swift native compilation, this cross-compiles Swift core libraries to a specific target, which makes Swift a Cross-Compiler. It enables building a custom Swift `Cross-Compiler` for specific targets.
+Opposed to Swift native compilation, this cross-compiles Swift core libraries to a specific target, which makes Swift a Cross-Compiler. It allows building a custom Swift `Cross-Compiler` for specific targets.
 
 ## Cross-Compilation Triples
 
