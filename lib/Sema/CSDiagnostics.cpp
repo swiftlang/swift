@@ -8016,6 +8016,18 @@ bool ArgumentMismatchFailure::diagnoseValuePassedAsClosure() const {
     return true;
   }
 
+  // '(T) -> Void' where arg type == T: replace the argument with '{ _ in }'.
+  // Only the single-argument case is handled; multi-argument closures would
+  // require a different fix-it string and are excluded from scope.
+  if (paramFnType->getNumParams() == 1 && paramFnType->getResult()->isVoid()) {
+    auto closureParamType = paramFnType->getParams().front().getPlainType();
+    if (argType->isEqual(closureParamType)) {
+      emitDiagnostic(diag::cannot_convert_argument_value, argType, getToType())
+          .fixItReplace(getSourceRange(), "{ _ in }");
+      return true;
+    }
+  }
+
   return false;
 }
 
