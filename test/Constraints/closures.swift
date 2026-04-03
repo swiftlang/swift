@@ -1443,3 +1443,21 @@ do {
   struct BStruct {}
   iExpectAReturningClosure(BStruct()) // expected-error {{cannot convert value of type 'BStruct' to expected argument type '() -> AStruct'}}
 }
+
+// Fix-it: value of type T passed where (T) -> Void closure is expected.
+// The fix-it replaces the argument with '{ _ in }'; only single-argument Void
+// closures are handled.
+do {
+  struct AStruct {}
+  func iExpectAClosure(_ aClosure: (AStruct) -> Void) {}
+
+  iExpectAClosure(AStruct()) // expected-error {{cannot convert value of type 'AStruct' to expected argument type '(AStruct) -> Void'}}
+
+  // Guard: multi-argument closure — no fix-it.
+  func expectsTwoArgs(_ f: (AStruct, AStruct) -> Void) {}
+  expectsTwoArgs(AStruct()) // expected-error {{cannot convert value of type 'AStruct' to expected argument type '(AStruct, AStruct) -> Void'}}
+
+  // Guard: non-Void return — no fix-it (falls through both branches).
+  func expectsTransform(_ f: (AStruct) -> AStruct) {}
+  expectsTransform(AStruct()) // expected-error {{cannot convert value of type 'AStruct' to expected argument type '(AStruct) -> AStruct'}}
+}
