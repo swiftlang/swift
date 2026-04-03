@@ -328,6 +328,11 @@ namespace swift {
     /// configuration options.
     bool EnableObjCInterop = true;
 
+    /// Tracks whether GNUstep Objective-C interop was explicitly requested.
+    /// This stays separate from EnableObjCInterop so importer decisions can
+    /// distinguish GNUstep-backed Linux from generic Objective-C interop.
+    bool EnableGNUstepObjCInterop = false;
+
     /// Enable C++ interop code generation and build configuration
     /// options. Disabled by default because there is no way to control the
     /// language mode of clang on a per-header or even per-module basis. Also
