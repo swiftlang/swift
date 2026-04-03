@@ -52,12 +52,16 @@ class Vector<T> {
         .bindMemory(to: T.self, capacity: newcapacity))
       for i in 0..<length {
         (newbase + i).initialize(to: (base+i).move())
+        // expected-warning@-1{{'initialize(to:count:)' is deprecated: renamed to 'initialize(repeating:count:)'}}
+        // expected-note@-2{{use 'initialize(repeating:count:)' instead}}
       }
       c_free(base)
       base = newbase
       capacity = newcapacity
     }
     (base+length).initialize(to: elem)
+    // expected-warning@-1{{'initialize(to:count:)' is deprecated: renamed to 'initialize(repeating:count:)'}}
+    // expected-note@-2{{use 'initialize(repeating:count:)' instead}}
     length += 1
   }
 
