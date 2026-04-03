@@ -275,6 +275,15 @@ struct EscapeUtilityTypes {
       return Self(projectionPath: self.projectionPath, followStores: self.followStores,
                   addressIsStored: self.addressIsStored, knownType: knownType)
     }
+
+    func forPointerToAddress(_ pta: PointerToAddressInst) -> Self {
+      // When `originatingAddress` is nil, the pointer_to_address may reinterpret the type, the accumulated projection path is no longer meaningful.
+      // Use anyValueFields to be conservative.
+      if pta.originatingAddress == nil {
+        return self.with(projectionPath: SmallProjectionPath(.anyValueFields)).with(knownType: nil)
+      }
+      return self.with(knownType: nil)
+    }
     
     func merge(with other: EscapePath) -> EscapePath {
       let mergedPath = self.projectionPath.merge(with: other.projectionPath)
@@ -403,7 +412,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       // 2. something can escape in a destructor when the context is destroyed
       return walkDownUses(ofValue: pai, path: path.with(knownType: nil))
     case let pta as PointerToAddressInst:
-      return walkDownUses(ofAddress: pta, path: path.with(knownType: nil))
+      return walkDownUses(ofAddress: pta, path: path.forPointerToAddress(pta))
     case let cv as ConvertFunctionInst:
       return walkDownUses(ofValue: cv, path: path.with(knownType: nil))
     case let bi as BuiltinInst:
@@ -844,8 +853,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       } else {
         return isEscaping
       }
-    case is PointerToAddressInst:
-      return walkUp(value: (def as! SingleValueInstruction).operands[0].value, path: path.with(knownType: nil))
+    case let pta as PointerToAddressInst:
+      return walkUp(value: pta.operands[0].value, path: path.forPointerToAddress(pta))
     case let rta as RefTailAddrInst:
       return walkUp(value: rta.instance, path: path.push(.tailElements, index: 0).with(knownType: nil))
     case let rea as RefElementAddrInst:
