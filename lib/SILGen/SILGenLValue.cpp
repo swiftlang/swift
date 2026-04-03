@@ -4291,13 +4291,24 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   CanType substFormalRValueType = getSubstFormalRValueType(e);
   CanType baseTy = getBaseFormalType(e->getBase());
   AbstractionPattern orig = AbstractionPattern::getInvalid();
+
+  AccessorDecl *calleeAccessor = strategy.hasAccessor()
+    ? var->getAccessor(strategy.getAccessor())
+    : nullptr;
+  ParamDecl *calleeAccessorSelfParam = calleeAccessor
+    ? calleeAccessor->getImplicitSelfDecl()
+    : nullptr;
+  
   bool addressable = false;
-  // If the access produces a dependent value, and the base is addressable-for-
-  // dependencies, then request an addressable base.
-  if (!substFormalRValueType->isEscapable()
-      && SGF.getTypeProperties(baseTy).isAddressableForDependencies()) {
-    addressable = true;
-    orig = AbstractionPattern::getOpaque();
+  // If the access produces a dependent value, and the base is addressable,
+  // then request an addressable base.
+  if (!substFormalRValueType->isEscapable()) {
+    addressable = SGF.getTypeProperties(baseTy).isAddressableForDependencies()
+      || (calleeAccessorSelfParam && calleeAccessorSelfParam->isAddressable());
+      
+    if (addressable) {
+      orig = AbstractionPattern::getOpaque();
+    }
   }
   
   LValue lv = visitRec(e->getBase(),
