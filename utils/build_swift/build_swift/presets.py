@@ -121,7 +121,7 @@ class DuplicatePresetError(PresetError):
 
     def __init__(self, preset_name):
         super(DuplicatePresetError, self).__init__(
-            '{} already exists'.format(preset_name))
+            f'{preset_name} already exists')
 
         self.preset_name = preset_name
 
@@ -132,7 +132,7 @@ class DuplicateOptionError(PresetError):
 
     def __init__(self, preset_name, option):
         super(DuplicateOptionError, self).__init__(
-            '{} already exists in preset {}'.format(option, preset_name))
+            f'{option} already exists in preset {preset_name}')
 
         self.preset_name = preset_name
         self.option = option
@@ -145,7 +145,7 @@ class InterpolationError(PresetError):
 
     def __init__(self, preset_name, option, rawval, reference):
         super(InterpolationError, self).__init__(
-            'no value found for {} in "{}"'.format(reference, rawval))
+            f'no value found for {reference} in "{rawval}"')
 
         self.preset_name = preset_name
         self.option = option
@@ -159,7 +159,7 @@ class PresetNotFoundError(PresetError):
 
     def __init__(self, preset_name):
         super(PresetNotFoundError, self).__init__(
-            '{} not found'.format(preset_name))
+            f'{preset_name} not found')
 
         self.preset_name = preset_name
 
@@ -170,7 +170,7 @@ class UnparsedFilesError(PresetError):
 
     def __init__(self, unparsed_files):
         super(UnparsedFilesError, self).__init__(
-            'unable to parse files: {}'.format(unparsed_files))
+            f'unable to parse files: {unparsed_files}')
 
         self.unparsed_files = unparsed_files
 
@@ -199,9 +199,9 @@ class Preset(object):
         args = []
         for (name, value) in self.options:
             if value is None:
-                args.append('--{}'.format(name))
+                args.append(f'--{name}')
             else:
-                args.append('--{}={}'.format(name, value))
+                args.append(f'--{name}={value}')
 
         return args
 
