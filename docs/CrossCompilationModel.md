@@ -103,7 +103,7 @@ being compiled for without loss of generality. A platform may opt to ignore one
 or more of these flags (e.g. Windows does not use `-sysroot` as the system
 headers are not organised like the traditional unix layout).
 
-# Cross-Compilation Targets
+# Cross-Compilation Triples
 
 [Swift SDKs for
     Cross-Compilation](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0387-cross-compilation-destinations.md)
