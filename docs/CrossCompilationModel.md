@@ -110,7 +110,7 @@ headers are not organised like the traditional unix layout).
 touches on the topic of triples: `host, build and target`. This clarifies
 how these triples interact during cross-compilation. It is essential to take 
 the perspective of the Swift compiler rather than the Swift package or
-application level.
+application level described in [docs/BuildManifesto.md](https://github.com/swiftlang/swift/blob/main/docs/BuildManifesto.md)
 
 The triple `host` describes the machine where the executable(here: compiler) is
 running on, which is the the developer PC/CI. The triple `target` describes the
