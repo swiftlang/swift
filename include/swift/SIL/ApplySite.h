@@ -956,7 +956,18 @@ public:
 
   bool isCallerIsolationInheriting() const {
     auto isolation = getActorIsolation();
-    return isolation && isolation->isCallerIsolationInheriting();
+    if (isolation)
+      return isolation->isCallerIsolationInheriting();
+
+    // For indirect callees, look at the callee's type to see if it has an
+    // implicit isolated parameter. If it does, that indicates that it's
+    // effectively "caller isolation inheriting".
+    auto substCalleeType = getSubstCalleeType();
+    if (auto isolatedParam = substCalleeType->maybeGetIsolatedParameter()) {
+      return isolatedParam->hasOption(SILParameterInfo::ImplicitLeading);
+    }
+
+    return false;
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

@@ -105,6 +105,7 @@ private:
   static void updateNeedExecutor(int &needExecutor, SILInstruction *inst);
   static bool needsExecutor(SILInstruction *inst);
   static bool isGlobalMemory(SILValue addr);
+  static bool isEffectiveCallerIsolationInheritingFunction(SILFunction *);
 
 public:
 
@@ -115,24 +116,6 @@ public:
 
   void dump();
 };
-
-static bool
-isEffectiveCallerIsolationInheritingFunction(SILFunction *function) {
-  if (auto isolation = function->getActorIsolation();
-      isolation && isolation->isCallerIsolationInheriting())
-    return true;
-
-  // Reabstraction thunks may not have the isolation attribute set,
-  // but their function type still carries the implicit leading
-  // isolated parameter.
-  auto fnType = function->getLoweredFunctionType();
-  if (auto isolated = fnType->maybeGetIsolatedParameter()) {
-    if (isolated->hasOption(SILParameterInfo::ImplicitLeading))
-      return true;
-  }
-
-  return false;
-}
 
 /// Search for hop_to_executor instructions and add their operands to \p actors.
 void OptimizeHopToExecutor::collectActors(Actors &actors) {
@@ -213,27 +196,10 @@ void OptimizeHopToExecutor::solveDataflowBackward() {
   } while (changed);
 }
 
-bool fixme_isCallerIsoInheriting(FullApplySite applySite) {
-//  return applySite.isCallerIsolationInheriting();
-
-  if (applySite.isCallerIsolationInheriting())
-    return true;
-
-  // FIXME: why would we need to fall back to this check?
-  // Is it even correct?
-  auto substFnType = applySite.getSubstCalleeType();
-  if (auto isolated = substFnType->maybeGetIsolatedParameter()) {
-    if (isolated->hasOption(SILParameterInfo::ImplicitLeading))
-      return true;
-  }
-
-  return false;
-}
-
 /// Returns true if \p inst is a suspension point or an async call.
 static bool isSuspensionPoint(SILInstruction *inst) {
   if (auto applySite = FullApplySite::isa(inst)) {
-    if (applySite.isAsync() && !fixme_isCallerIsoInheriting(applySite))
+    if (applySite.isAsync() && !applySite.isCallerIsolationInheriting())
       return true;
     return false;
   }
@@ -425,7 +391,7 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
   // executors since caller isolation inheriting functions do not hop in their
   // prologue.
   if (auto fas = FullApplySite::isa(inst);
-      fas && fas.isAsync() && fixme_isCallerIsoInheriting(fas)) {
+      fas && fas.isAsync() && fas.isCallerIsolationInheriting()) {
     return true;
   }
 
@@ -449,6 +415,25 @@ bool OptimizeHopToExecutor::isGlobalMemory(SILValue addr) {
   // TODO: use escape analysis to rule out locally allocated non-stack objects.
   SILValue base = getAccessBase(addr);
   return !isa<AllocStackInst>(base);
+}
+
+bool OptimizeHopToExecutor::isEffectiveCallerIsolationInheritingFunction(
+    SILFunction *function) {
+  if (auto isolation = function->getActorIsolation();
+      isolation && isolation->isCallerIsolationInheriting())
+    return true;
+
+  // Reabstraction thunks are one case in which the isolation attribute is not
+  // set, but the function type still carries the information about whether the
+  // call they're reabstracting has nonisolated(nonsending) semantics.
+  auto fnType = function->getLoweredFunctionType();
+  if (auto isolated = fnType->maybeGetIsolatedParameter()) {
+    if (isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 bool OptimizeHopToExecutor::run() {
