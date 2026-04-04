@@ -74,6 +74,13 @@ static llvm::cl::opt<bool> ForceTypedErrors(
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
 
+/// SIL may omit actor isolation (e.g. parsed SIL without `[isolation ...]`, or
+/// functions that never had \c setActorIsolation). Never dereference an empty
+/// optional from \c SILFunction::getActorIsolation().
+static ActorIsolation getActorIsolationForDiagnostics(SILFunction *fn) {
+  return fn->getActorIsolation().value_or(ActorIsolation::forUnspecified());
+}
+
 static SILValue stripFunctionConversions(SILValue val) {
   while (true) {
     if (auto ti = dyn_cast<ThinToThickFunctionInst>(val)) {
@@ -1162,8 +1169,8 @@ bool UseAfterSendDiagnosticInferrer::initForIsolatedPartialApply(
   auto *diagnosticOp = diagnosticPair->first;
 
   ApplyIsolationCrossing crossing(
-      *op->getFunction()->getActorIsolation(),
-      *diagnosticOp->getFunction()->getActorIsolation());
+      getActorIsolationForDiagnostics(op->getFunction()),
+      getActorIsolationForDiagnostics(diagnosticOp->getFunction()));
 
   auto &state = sendingOpToStateMap.get(sendingOp);
   if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
@@ -2078,8 +2085,8 @@ bool SentNeverSendableDiagnosticEmitter::initForIsolatedPartialApply(
   auto *diagnosticOp = diagnosticPair->first;
 
   ApplyIsolationCrossing crossing(
-      *op->getFunction()->getActorIsolation(),
-      *diagnosticOp->getFunction()->getActorIsolation());
+      getActorIsolationForDiagnostics(op->getFunction()),
+      getActorIsolationForDiagnostics(diagnosticOp->getFunction()));
 
   // We do not need to worry about failing to infer a name here since we are
   // going to be returning some form of a SILFunctionArgument which is always

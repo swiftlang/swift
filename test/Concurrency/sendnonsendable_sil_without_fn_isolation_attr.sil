@@ -1,0 +1,74 @@
+// RUN: %target-sil-opt -send-non-sendable -strict-concurrency=complete -swift-version 5 %s -verify -verify-additional-prefix complete-
+// RUN: %target-sil-opt -send-non-sendable -swift-version 6 %s -verify -verify-additional-prefix tns-
+
+// REQUIRES: asserts
+// REQUIRES: concurrency
+
+// Parsed SIL omits `SILFunction::actorIsolation` unless `[isolation "..."]` is
+// present (see ParseSIL.cpp). `SILFunction::getActorIsolation()` is then
+// `std::nullopt`. SendNonSendable must treat that as unspecified isolation when
+// building `ApplyIsolationCrossing` for diagnostics (e.g.
+// `initForIsolatedPartialApply`), not dereference the optional (undefined
+// behavior).
+//
+// The `-verify` lines mirror test/sil-opt/swift-version.sil: isolation crossing
+// on `apply` is diagnosed even when callee/caller SIL functions carry no stored
+// isolation attribute.
+//
+// Source-level coverage for isolated partial-apply / closure diagnostics lives
+// in transfernonsendable_isolationcrossing_partialapply.swift (normal SILGen
+// always sets `SILFunction` isolation; this `.sil` file is the nullopt case).
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+class NonSendableKlass {}
+
+sil @transfer_to_main : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+// No `[isolation ...]` — SILFunction::getActorIsolation() is nullopt.
+
+sil [ossa] @fn_without_stored_isolation : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass):
+  %1 = function_ref @transfer_to_main : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %1(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-complete-warning @-1 {{}}
+  // expected-complete-note @-2 {{}}
+  // expected-tns-error @-3 {{}}
+  // expected-tns-note @-4 {{}}
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Second entry point: another function body without `[isolation ...]` so the
+// pass runs region analysis again with nullopt function isolation.
+
+sil [ossa] @second_fn_without_stored_isolation : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass):
+  %1 = function_ref @transfer_to_main : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %1(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-complete-warning @-1 {{}}
+  // expected-complete-note @-2 {{}}
+  // expected-tns-error @-3 {{}}
+  // expected-tns-note @-4 {{}}
+  %r = tuple ()
+  return %r : $()
+}
+
+// Explicit `[isolation "..."]` sets `SILFunction::actorIsolation` (contrast with
+// the functions above). Diagnostics should still be emitted and must not crash.
+
+sil [isolation "nonisolated"] [ossa] @fn_with_explicit_sil_isolation_attr : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass):
+  %1 = function_ref @transfer_to_main : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %1(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-complete-warning @-1 {{}}
+  // expected-complete-note @-2 {{}}
+  // expected-tns-error @-3 {{}}
+  // expected-tns-note @-4 {{}}
+  %t = tuple ()
+  return %t : $()
+}
