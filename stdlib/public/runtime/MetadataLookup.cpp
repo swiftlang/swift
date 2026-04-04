@@ -1098,13 +1098,28 @@ static bool _isSubclassDescriptor(const ClassDescriptor *classDesc,
 SWIFT_CC(swift)
 const Metadata *_Nonnull const *_Nonnull swift::_swift_copyNongenericSubclasses(
     const Metadata *superclass) {
+  // Stack canary to detect corruption during scan.
+  volatile uint64_t canary1 = 0xDEADBEEFCAFEBABEULL;
+
   auto *targetDesc = superclass->getTypeContextDescriptor();
 
-  fprintf(stderr, "[copySubclasses] enter, superclass=%p targetDesc=%p\n",
-          superclass, targetDesc);
+  fprintf(stderr, "[copySubclasses] enter, superclass=%p targetDesc=%p "
+          "canary@%p\n", superclass, targetDesc, &canary1);
 
   // Collect matching descriptors first, then instantiate metadata.
   llvm::SmallVector<const TypeContextDescriptor *, 16> matchingDescs;
+
+  volatile uint64_t canary2 = 0x1234567890ABCDEFULL;
+
+  #define CHECK_CANARIES(where) do { \
+    if (canary1 != 0xDEADBEEFCAFEBABEULL || \
+        canary2 != 0x1234567890ABCDEFULL) { \
+      fprintf(stderr, "[copySubclasses] CANARY CORRUPTED at %s! " \
+              "canary1=%llx canary2=%llx\n", where, \
+              (unsigned long long)canary1, (unsigned long long)canary2); \
+      abort(); \
+    } \
+  } while (0)
 
   // Don't attempt to find subclasses of generic classes. We don't implement
   // checking of the specialization, so a concrete subclass of Foo<Int> would
@@ -1121,17 +1136,11 @@ const Metadata *_Nonnull const *_Nonnull swift::_swift_copyNongenericSubclasses(
         recordIndex = 0;
         for (const auto &record : section) {
           auto *context = record.getContextDescriptor();
-          fprintf(stderr, "[copySubclasses] %s section %zu record %zu "
-                  "context=%p\n", label, sectionIndex, recordIndex, context);
           auto *classDesc = dyn_cast_or_null<ClassDescriptor>(context);
           if (!classDesc) {
-            fprintf(stderr, "[copySubclasses]   not a class, skipping\n");
             recordIndex++;
             continue;
           }
-
-          fprintf(stderr, "[copySubclasses]   classDesc=%p isGeneric=%d\n",
-                  classDesc, classDesc->isGeneric());
 
           // Skip generic classes. We can't meaningfully return them.
           if (classDesc->isGeneric()) {
@@ -1139,19 +1148,23 @@ const Metadata *_Nonnull const *_Nonnull swift::_swift_copyNongenericSubclasses(
             continue;
           }
 
+          CHECK_CANARIES("before equalContexts");
+
           // Skip the target class itself.
           if (equalContexts(classDesc, targetDesc)) {
-            fprintf(stderr, "[copySubclasses]   is target class, skipping\n");
+            CHECK_CANARIES("after equalContexts (matched)");
             recordIndex++;
             continue;
           }
 
+          CHECK_CANARIES("after equalContexts");
+
           // If it's a subclass, add it.
-          fprintf(stderr, "[copySubclasses]   checking _isSubclassDescriptor\n");
           if (_isSubclassDescriptor(classDesc, targetDesc)) {
-            fprintf(stderr, "[copySubclasses]   match! adding descriptor\n");
+            CHECK_CANARIES("after _isSubclassDescriptor (matched)");
             matchingDescs.push_back(cast<TypeContextDescriptor>(classDesc));
           }
+          CHECK_CANARIES("after _isSubclassDescriptor");
           recordIndex++;
         }
         sectionIndex++;
@@ -1164,39 +1177,35 @@ const Metadata *_Nonnull const *_Nonnull swift::_swift_copyNongenericSubclasses(
 #endif
   }
 
-  fprintf(stderr, "[copySubclasses] scan done, %zu matches\n",
-          matchingDescs.size());
+  CHECK_CANARIES("after scan");
 
   // Allocate the result array (matching classes + NULL terminator).
   size_t allocSize = matchingDescs.size_in_bytes() + sizeof(const Metadata *);
-  fprintf(stderr, "[copySubclasses] allocating %zu bytes\n", allocSize);
   auto **result = static_cast<const Metadata **>(
       swift_slowAlloc(allocSize, alignof(const Metadata *) - 1));
-  fprintf(stderr, "[copySubclasses] result buffer=%p\n", result);
 
   // Instantiate metadata for each matching class.
   size_t i = 0;
   for (size_t descIdx = 0; descIdx < matchingDescs.size(); descIdx++) {
     auto *desc = matchingDescs[descIdx];
-    fprintf(stderr, "[copySubclasses] instantiating %zu/%zu desc=%p\n",
-            descIdx, matchingDescs.size(), desc);
     auto accessFn = desc->getAccessFunction();
-    if (!accessFn) {
-      fprintf(stderr, "[copySubclasses]   no access function, skipping\n");
+    if (!accessFn)
       continue;
-    }
-    fprintf(stderr, "[copySubclasses]   calling accessFn=%p\n", accessFn);
     auto response = accessFn(MetadataRequest(MetadataState::Complete));
-    fprintf(stderr, "[copySubclasses]   response.Value=%p\n", response.Value);
     if (response.Value)
       result[i++] = response.Value;
+    CHECK_CANARIES("after accessFn");
   }
 
   // Terminating nullptr.
   result[i] = nullptr;
 
-  fprintf(stderr, "[copySubclasses] done, returning %zu results\n", i);
+  CHECK_CANARIES("before return");
+  fprintf(stderr, "[copySubclasses] done, returning %zu results, "
+          "canaries OK\n", i);
   return result;
+
+  #undef CHECK_CANARIES
 }
 
 /// Function to check whether we're currently running on the given global
