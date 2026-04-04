@@ -228,7 +228,9 @@ final class _Storage<Element, Failure: Error>: @unchecked Sendable {
     )
     unsafe _lockInit(self.lock)
 
-    unsafe self._stateMachine = unsafe _StateMachine(bufferingPolicy: bufferingPolicy)
+    unsafe self._stateMachine = unsafe _StateMachine(
+      bufferingPolicy: bufferingPolicy
+    )
   }
 
   deinit {
@@ -287,9 +289,9 @@ extension _Storage._StateMachine {
         switch idle.buffer.count < limit {
         case true:
           idle.buffer.append(value)
-          let bufferCount = idle.buffer.count
+          let count = idle.buffer.count
           unsafe self = unsafe .init(state: .idle(idle))
-          return unsafe .none(yieldResult: .enqueued(remaining: limit - bufferCount))
+          return unsafe .none(yieldResult: .enqueued(remaining: limit - count))
 
         case false:
           unsafe self = unsafe .init(state: .idle(idle))
@@ -300,9 +302,9 @@ extension _Storage._StateMachine {
         switch limit {
         case _ where idle.buffer.count < limit && limit > .zero:
           idle.buffer.append(value)
-          let bufferCount = idle.buffer.count
+          let count = idle.buffer.count
           unsafe self = unsafe .init(state: .idle(idle))
-          return unsafe .none(yieldResult: .enqueued(remaining: limit - bufferCount))
+          return unsafe .none(yieldResult: .enqueued(remaining: limit - count))
 
         case _ where idle.buffer.count >= limit && limit > .zero:
           let droppedValue = idle.buffer.removeFirst()
@@ -365,12 +367,25 @@ extension _Storage._StateMachine {
     case .idle(var idle):
       switch idle.buffer.isEmpty {
       case true:
-        unsafe self = unsafe .init(state: .terminated(.init(failure: failure)))
-        return unsafe .callHandler(terminationHandler: idle.terminationHandler.take())
+        unsafe self = unsafe .init(state: .terminated(.init(
+              failure: failure
+            )
+          )
+        )
+        return unsafe .callHandler(
+          terminationHandler: idle.terminationHandler.take()
+        )
 
       case false:
-        unsafe self = unsafe .init(state: .draining(.init(failure: failure, buffer: idle.buffer)))
-        return unsafe .callHandler(terminationHandler: idle.terminationHandler.take())
+        unsafe self = unsafe .init(state: .draining(.init(
+              failure: failure,
+              buffer: idle.buffer
+            )
+          )
+        )
+        return unsafe .callHandler(
+          terminationHandler: idle.terminationHandler.take()
+        )
       }
 
     case .waiting(var waiting):
@@ -493,7 +508,9 @@ extension _Storage {
 
     switch unsafe action {
     case .resume(let consumer, let element, let yieldResult):
-      unsafe consumer.resume(returning: .success(UnsafeSendable(value: element).take()))
+      unsafe consumer.resume(
+        returning: .success(UnsafeSendable(value: element).take())
+      )
       return yieldResult
 
     case .none(let yieldResult):
