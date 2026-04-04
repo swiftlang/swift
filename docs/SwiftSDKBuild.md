@@ -1,12 +1,12 @@
-# Swift Cross-Compiler Build
+# Swift SDK Build
 
-Opposed to Swift native compilation, this cross-compiles Swift core libraries to a specific target, which makes Swift a Cross-Compiler. It allows building a custom Swift `Cross-Compiler` for specific targets.
+Building a `Swift SDK` involves cross-compiling [Swift Core libraries](https://www.swift.org/documentation/core-libraries/) and `Swift standard library`. It allows building and maintaining custom Swift SDKs for a specific target and Swift SDK distribution to Swift application developers.
 
 ## Cross-Compilation Triples
 
 [Swift SDKs](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0387-cross-compilation-destinations.md)
 touch on the topic of triples: `host, build and target`. This clarifies
-how these triples interact during cross-compilation. It is essential to take 
+how these triples interact during cross-compilation. For this build, it is essential to take 
 the perspective of the Swift compiler rather than the Swift package or
 application level described in [docs/BuildManifesto.md](https://github.com/swiftlang/swift/blob/main/docs/BuildManifesto.md)
 
@@ -18,11 +18,11 @@ to put together `Swift SDKs` and cross-compile applications. The triple
 `build`, which is the machine the compiler is built on, is not relevant for this
 build and a precondition, as it would address building the Swift toolchain.
 
-## Distribute Cross-Compiled Swift as SDK
-Upon finishing the `Cross-Compiler` build, the [Swift SDK
-Generator](https://github.com/swiftlang/swift-sdk-generator) is
-executed to install the `Cross-Compiler` to be used with the Swift
-Toolchain. With this approach the Cross-Compiler only needs to be built
-once and can then be distributed as a `SDK`.
-The Swift application developer consumes the `SDK` and does not need to know about Cross-Compiler Build and Swift `SDK` generation.
+## Distribute and use the SDK
+Upon finishing the cross-compile build of `Swift Core Libraries` and `Swift
+standard library`, the [Swift SDK
+Generator](https://github.com/swiftlang/swift-sdk-generator) is executed to
+install them in Swift SDK format to be used with the Swift Toolchain. The Swift
+application developer consumes the `Swift SDK` and does not need to know abou its 
+ build process and generation.
 
