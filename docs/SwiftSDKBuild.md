@@ -5,8 +5,8 @@ Building a `Swift SDK` involves cross-compiling [Swift Core libraries](https://w
 ## Cross-Compilation Triples
 
 [Swift SDKs](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0387-cross-compilation-destinations.md)
-touch on the topic of triples: `host, build and target`. This clarifies
-how these triples interact during cross-compilation. For this build, it is essential to take 
+touch on the topic of triples: `host, build and target`. In order to understand
+the triples used during this cross-compilation, it is essential to take 
 the perspective of the Swift compiler rather than the Swift package or
 application level described in [docs/BuildManifesto.md](https://github.com/swiftlang/swift/blob/main/docs/BuildManifesto.md)
 
