@@ -52,24 +52,6 @@ func _lock(_ ptr: UnsafeRawPointer)
 func _unlock(_ ptr: UnsafeRawPointer)
 #endif
 
-fileprivate struct UnsafeSendable<Value: ~Copyable>: ~Copyable, @unchecked Sendable {
-  private var value: Value?
-
-  init(value: consuming Value) {
-    self.value = .some(value)
-  }
-
-  consuming func take() -> sending Value {
-    return self.value.take()!
-  }
-
-  mutating func swap(newValue: consuming sending Value) -> sending Value {
-    let value = self.value.take()!
-    self.value = consume newValue
-    return value
-  }
-}
-
 /// The state machine backing `Async{Throwing}Stream`.
 ///
 /// - States:
@@ -499,18 +481,13 @@ extension _Storage {
   }
 
   func yield(_ value: consuming sending Element) -> Continuation.YieldResult {
-    var disconnectedValue = UnsafeSendable(value: Optional(value))
-
-    let action = withLock { state in
-      let value = disconnectedValue.swap(newValue: nil)!
+    let action = withLock { [value] state in
       return unsafe state.yield(value)
     }
 
     switch unsafe action {
     case .resume(let consumer, let element, let yieldResult):
-      unsafe consumer.resume(
-        returning: .success(UnsafeSendable(value: element).take())
-      )
+      unsafe consumer.resume(returning: .success(element))
       return yieldResult
 
     case .none(let yieldResult):
