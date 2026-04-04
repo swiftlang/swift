@@ -228,16 +228,14 @@ extension MutableSpan where Element: ~Copyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension RawSpan {
 
+  @available(*, deprecated, renamed: "RawSpan.init(unsafeElements:)")
+  @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow mutableSpan)
   public init<Element: BitwiseCopyable>(
     _mutableSpan mutableSpan: borrowing MutableSpan<Element>
   ) {
-    let pointer = unsafe mutableSpan._pointer
-    let byteCount = mutableSpan.count &* MemoryLayout<Element>.stride
-    let buffer = unsafe UnsafeRawBufferPointer(start: pointer, count: byteCount)
-    let rawSpan = unsafe RawSpan(_unsafeBytes: buffer)
-    self = unsafe _overrideLifetime(rawSpan, borrowing: mutableSpan)
+    self = unsafe RawSpan(unsafeElements: mutableSpan.span)
   }
 }
 
@@ -277,8 +275,7 @@ extension MutableSpan where Element: ~Copyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension MutableSpan where Element: BitwiseCopyable {
-
+extension MutableSpan {
   /// Construct a raw span over the memory represented by this span.
   ///
   /// - Returns: a RawSpan over the memory represented by this span
@@ -288,10 +285,14 @@ extension MutableSpan where Element: BitwiseCopyable {
   public var bytes: RawSpan {
     @lifetime(borrow self)
     borrowing get {
-      RawSpan(_mutableSpan: self)
+      unsafe RawSpan(unsafeElements: span)
     }
   }
+}
 
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan where Element: BitwiseCopyable {
   /// Construct a mutable raw span over the memory represented by this span.
   ///
   /// Mutating `self` through this property is unsafe because
@@ -476,7 +477,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    try unsafe RawSpan(_mutableSpan: self).withUnsafeBytes(body)
+    try unsafe RawSpan(unsafeElements: span).withUnsafeBytes(body)
   }
 
   //FIXME: mark closure parameter as non-escaping
