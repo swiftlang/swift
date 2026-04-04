@@ -1098,6 +1098,9 @@ static bool _isSubclassDescriptor(const ClassDescriptor *classDesc,
 SWIFT_CC(swift)
 const Metadata *_Nonnull const *_Nonnull swift::_swift_copyNongenericSubclasses(
     const Metadata *superclass) {
+  // Force unbuffered stderr so output survives a crash.
+  setvbuf(stderr, nullptr, _IONBF, 0);
+
   // Stack canary to detect corruption during scan.
   volatile uint64_t canary1 = 0xDEADBEEFCAFEBABEULL;
 
