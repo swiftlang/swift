@@ -6273,6 +6273,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Copyable",
         key.usr: "s:s8CopyableP"
+      },
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "Escapable",
+        key.usr: "s:s9EscapableP"
       }
     ]
   },
