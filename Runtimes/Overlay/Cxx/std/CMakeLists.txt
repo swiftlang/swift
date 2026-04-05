@@ -19,11 +19,8 @@ target_compile_options(swiftCxxStdlib PRIVATE
   "SHELL:-disable-upcoming-feature MemberImportVisibility"
   "SHELL:-Xfrontend -module-interface-preserve-types-as-written"
   "SHELL:-Xfrontend -disable-module-selectors-in-module-interface")
-# NOTE: We need to setup the sysroot here as we need to ensure that we pick up
-# the module.map from the C++ runtime for the `std` (spelt `CxxStdlib`) import.
-target_compile_options(swiftCxxStdlib PRIVATE
-  "$<$<PLATFORM_ID:Android>:SHELL:-Xcc --sysroot -Xcc ${CMAKE_ANDROID_NDK_TOOLCHAIN_UNIFIED}/sysroot>")
-target_link_libraries(swiftCxxStdlib PRIVATE
+
+target_link_libraries(swiftCxxStdlib PUBLIC
   $<$<BOOL:${HAVE___GLIBCXX__}>:libstdcxx>
   $<$<NOT:$<PLATFORM_ID:Darwin>>:cxxshim>
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
@@ -32,6 +29,10 @@ target_link_libraries(swiftCxxStdlib PRIVATE
   swift_Builtin_float
   $<$<PLATFORM_ID:Android>:SwiftAndroid>
   $<$<PLATFORM_ID:Windows>:ClangModules>)
+
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(swiftCxxStdlib INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 
 install(FILES std.apinotes
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/apinotes)

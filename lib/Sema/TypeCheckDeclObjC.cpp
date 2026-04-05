@@ -558,6 +558,8 @@ static AvailabilityRange getObjCClassStubAvailability(ASTContext &ctx) {
     return AvailabilityRange(llvm::VersionTuple(6, 0, 0));
   if (target.isXROS())
     return AvailabilityRange(llvm::VersionTuple(1, 0, 0));
+  if (target.isAppleFirmware())
+    return AvailabilityRange(llvm::VersionTuple(1, 0, 0));
   return AvailabilityRange::alwaysAvailable();
 }
 
@@ -2880,11 +2882,11 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
       // conflict checking and have to be diagnosed as warnings in Swift 5:
 
       // * Selectors for imported methods with async variants.
-      bool breakingInSwift5 = originalIsImportedAsync;
-      
+      bool breakingPreSwift6 = originalIsImportedAsync;
+
       // * Protocol requirements
       if (!isa<ClassDecl>(conflict.typeDecl))
-        breakingInSwift5 = true;
+        breakingPreSwift6 = true;
 
       bool redeclSame = (diagInfo == origDiagInfo);
       auto diag = Ctx.Diags.diagnose(conflictingDecl,
@@ -2893,7 +2895,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      diagInfo.first, diagInfo.second,
                                      origDiagInfo.first, origDiagInfo.second,
                                      conflict.selector);
-      diag.warnUntilLanguageModeIf(breakingInSwift5, 6);
+      diag.warnUntilLanguageModeIf(breakingPreSwift6, LanguageMode::v6);
 
       // Temporarily soften selector conflicts in objcImpl extensions; we're
       // seeing some that are caused by ObjCImplementationChecker improvements.
@@ -3056,7 +3058,7 @@ bool swift::diagnoseObjCCategoryConflicts(SourceFile &sf) {
             .diagnose(catToCheck, diag::objc_redecl_category_name,
                       catToCheck->hasClangNode(), bestCat->hasClangNode(),
                       catName)
-            .warnUntilLanguageMode(6);
+            .warnUntilLanguageMode(LanguageMode::v6);
 
         Ctx.Diags.diagnose(bestCat, diag::invalid_redecl_prev_name, catName);
       }
@@ -3563,6 +3565,7 @@ private:
     WrongWritability,
     WrongRequiredAttr,
     WrongForeignErrorConvention,
+    WrongParameterOwnership,
     WrongSendability,
 
     Match,
@@ -3895,10 +3898,20 @@ private:
       if (reqCtor->isRequired() != cast<ConstructorDecl>(cand)->isRequired())
         return MatchOutcome::WrongRequiredAttr;
 
-    if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req))
+    if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req)) {
+      auto candAFD = cast<AbstractFunctionDecl>(cand);
       if (reqAFD->getForeignErrorConvention() !=
-              cast<AbstractFunctionDecl>(cand)->getForeignErrorConvention())
+          candAFD->getForeignErrorConvention())
         return MatchOutcome::WrongForeignErrorConvention;
+      for (auto [reqParam, candParam] :
+           llvm::zip(*reqAFD->getParameters(), *candAFD->getParameters())) {
+        // In case the ObjC owership is unowned and the swift is owned, the ObjC
+        // thunk will make the necessary adjustment.
+        if (reqParam->getValueOwnership() != candParam->getValueOwnership() &&
+            reqParam->getValueOwnership() != ValueOwnership::Default)
+          return MatchOutcome::WrongParameterOwnership;
+      }
+    }
 
     // If we got here, everything matched. But at what quality?
     if (explicitObjCName)
@@ -4015,6 +4028,10 @@ private:
     case MatchOutcome::WrongType:
       diagnose(cand, diag::objc_implementation_type_mismatch,
                cand, getMemberType(cand), getMemberType(req));
+      return;
+
+    case MatchOutcome::WrongParameterOwnership:
+      diagnose(cand, diag::objc_implementation_ownership_mismatch, cand);
       return;
 
     case MatchOutcome::WrongWritability:

@@ -33,6 +33,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
@@ -71,6 +72,165 @@ static bool mergeRepresentativeEquivalenceClasses(ConstraintSystem &CS,
   }
 
   return false;
+}
+
+/// Add a "join" constraint between a set of types, producing the common
+/// supertype.
+///
+/// Currently, a "join" is modeled by a set of conversion constraints to
+/// a new type variable or a specified supertype. At some point, we may want
+/// a new constraint kind to cover the join.
+///
+/// \note This method will merge any input type variables for atomic literal
+/// expressions of the same kind. It assumes that if same-kind literal type
+/// variables are joined, there will be no differing constraints on those
+/// type variables.
+///
+/// \returns the joined type, which is generally a new type variable, unless there are
+/// fewer than 2 input types or the \c supertype parameter is specified.
+template <typename Iterator>
+static Type addJoinConstraint(
+    ConstraintSystem &cs, ConstraintLocator *locator, Iterator begin, Iterator end,
+    std::optional<Type> supertype,
+    std::function<std::pair<Type, ConstraintLocator *>(Iterator)> getType) {
+  if (begin == end)
+    return Type();
+
+  // No need to generate a new type variable if there's only one type to join
+  if ((begin + 1 == end) && !supertype.has_value())
+    return getType(begin).first;
+
+  // The type to capture the result of the join, which is either the specified supertype,
+  // or a new type variable.
+  Type resultTy = supertype.has_value() ? supertype.value() :
+                  cs.createTypeVariable(locator, (TVO_PrefersSubtypeBinding | TVO_CanBindToNoEscape));
+
+  using RawExprKind = uint8_t;
+  llvm::SmallDenseMap<RawExprKind, TypeVariableType *> representativeForKind;
+
+  // Join the input types.
+  while (begin != end) {
+    Type type;
+    ConstraintLocator *locator;
+    std::tie(type, locator) = getType(begin++);
+
+    // We can merge the type variables of same-kind atomic literal expressions because they
+    // will all have the same set of constraints and therefore can never resolve to anything
+    // different.
+    if (auto *typeVar = type->getAs<TypeVariableType>()) {
+      if (auto literalKind = typeVar->getImpl().getAtomicLiteralKind()) {
+        auto *&originalRep = representativeForKind[RawExprKind(*literalKind)];
+        auto *currentRep = cs.getRepresentative(typeVar);
+
+        if (originalRep) {
+          if (originalRep != currentRep)
+            cs.mergeEquivalenceClasses(currentRep, originalRep, /*updateWorkList=*/false);
+          continue;
+        }
+
+        originalRep = currentRep;
+      }
+    }
+
+    // Introduce conversions from each input type to the supertype.
+    cs.addConstraint(ConstraintKind::Conversion, type, resultTy, locator);
+  }
+
+  return resultTy;
+}
+
+/// Convenience function to pass an \c ArrayRef to \c addJoinConstraint
+static Type addJoinConstraint(ConstraintSystem &cs,
+                              ConstraintLocator *locator,
+                              ArrayRef<std::pair<Type, ConstraintLocator *>> inputs,
+                              std::optional<Type> supertype = std::nullopt) {
+  return addJoinConstraint<decltype(inputs)::iterator>(
+      cs, locator, inputs.begin(), inputs.end(), supertype, [](auto it) { return *it; });
+}
+
+namespace {
+
+class HandlePlaceholderType {
+  ConstraintSystem &cs;
+  ConstraintLocator *locator;
+
+public:
+  explicit HandlePlaceholderType(ConstraintSystem &cs,
+                                 const ConstraintLocatorBuilder &locator)
+      : cs(cs) {
+    this->locator = cs.getConstraintLocator(locator);
+  }
+
+  Type operator()(ASTContext &ctx, PlaceholderTypeRepr *placeholderRepr) const {
+    return cs.createTypeVariable(
+        cs.getConstraintLocator(
+            locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
+        TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
+            TVO_CanBindToHole);
+  }
+};
+
+/// A function object that opens a given pack type by generating a
+/// \c PackElementOf constraint.
+class OpenPackElementType {
+  ConstraintSystem &cs;
+  ConstraintLocator *locator;
+  PackExpansionExpr *elementEnv;
+
+public:
+  explicit OpenPackElementType(ConstraintSystem &cs,
+                               const ConstraintLocatorBuilder &locator,
+                               PackExpansionExpr *elementEnv)
+      : cs(cs), elementEnv(elementEnv) {
+    this->locator = cs.getConstraintLocator(locator);
+  }
+
+  Type operator()(Type packType, PackElementTypeRepr *packRepr) const {
+    // Only assert we have an element environment when invoking the function
+    // object. In cases where pack elements are referenced outside of a
+    // pack expansion, type resolution will error before opening the pack
+    // element.
+    assert(elementEnv);
+
+    auto *elementType = cs.createTypeVariable(locator,
+                                              TVO_CanBindToHole |
+                                              TVO_CanBindToNoEscape);
+
+    // If we're opening a pack element from an explicit type repr,
+    // set the type repr types in the constraint system for generating
+    // ShapeOf constraints when visiting the PackExpansionExpr.
+    if (packRepr) {
+      cs.setType(packRepr->getPackType(), packType);
+      cs.setType(packRepr, elementType);
+    }
+
+    cs.addConstraint(ConstraintKind::PackElementOf, elementType,
+                     packType->getRValueType(),
+                     cs.getConstraintLocator(elementEnv));
+    return elementType;
+  }
+};
+
+/// A function object suitable for use as an \c OpenUnboundGenericTypeFn that
+/// "opens" the given unbound type by introducing fresh type variables for
+/// generic parameters and constructing a bound generic type from these
+/// type variables.
+class OpenUnboundGenericType {
+  ConstraintSystem &cs;
+  const ConstraintLocatorBuilder &locator;
+
+public:
+  explicit OpenUnboundGenericType(ConstraintSystem &cs,
+                                  const ConstraintLocatorBuilder &locator)
+      : cs(cs), locator(locator) {}
+
+  Type operator()(UnboundGenericType *unboundTy) const {
+    return cs.openUnboundGenericType(unboundTy->getDecl(),
+                                     unboundTy->getParent(), locator,
+                                     /*isTypeResolution=*/true);
+  }
+};
+
 }
 
 /// If \p expr is a call and that call contains the code completion token,
@@ -1182,7 +1342,7 @@ namespace {
         // rdar://85263844, as it can affect the prioritization of bindings,
         // which can affect behavior for tuple matching as tuple subtyping is
         // currently a *weaker* constraint than tuple conversion.
-        if (!CS.getASTContext().isLanguageModeAtLeast(6)) {
+        if (!CS.getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
           auto paramTypeVar = CS.createTypeVariable(
               CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument),
               TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape |
@@ -1367,7 +1527,7 @@ namespace {
       // NB Keep adding the additional layer in Swift 5 and on if this 'try?'
       // applies to a delegation to an 'Optional' initializer, or else we won't
       // discern the difference between a failure and a constructed value.
-      if (CS.getASTContext().isLanguageModeAtLeast(5) &&
+      if (CS.getASTContext().isLanguageModeAtLeast(LanguageMode::v5) &&
           !isDelegationToOptionalInit) {
         CS.addConstraint(ConstraintKind::Conversion,
                          CS.getType(expr->getSubExpr()), optTy,
@@ -1446,8 +1606,8 @@ namespace {
         unsigned index = 0;
 
         using Iterator = decltype(elements)::iterator;
-        CS.addJoinConstraint<Iterator>(
-            locator, elements.begin(), elements.end(), elementType,
+        addJoinConstraint<Iterator>(
+            CS, locator, elements.begin(), elements.end(), elementType,
             [&](const auto it) {
               auto *locator = CS.getConstraintLocator(
                   expr, LocatorPathElt::TupleElement(index++));
@@ -1820,8 +1980,8 @@ namespace {
           return Type();
 
         // Thrown type inferred from context.
-        if (auto contextualType = CS.getContextualType(
-                closure, /*forConstraint=*/false)) {
+        if (auto contextualType =
+                CS.getContextualType(closure, /*forConstraint=*/false)) {
           if (auto fnType = contextualType->getAs<AnyFunctionType>()) {
             if (Type thrownErrorTy = fnType->getThrownError())
               return thrownErrorTy;
@@ -1892,12 +2052,9 @@ namespace {
         if (hasIsolatedParameter(closureParams))
           return FunctionTypeIsolation::forParameter();
 
-        // Honor an explicit global actor.  This is suppressed if the
-        // closure is async (but should it be?).
-        if (!extInfo.isAsync()) {
-          if (auto actorType = getExplicitGlobalActor(closure))
-            return FunctionTypeIsolation::forGlobalActor(actorType);
-        }
+        // Honor an explicit global actor.
+        if (auto actorType = getExplicitGlobalActor(closure))
+          return FunctionTypeIsolation::forGlobalActor(actorType);
 
         if (closure->getAttrs().hasAttribute<ConcurrentAttr>()) {
           return FunctionTypeIsolation::forNonIsolated();
@@ -2291,7 +2448,8 @@ namespace {
         // so we need to set a non-compound reference to make sure that e.g.
         // `case test(x: Int, y: Int)` gets the labels preserved when matched
         // with `case let .test(tuple)`.
-        auto functionRefInfo = FunctionRefInfo::unappliedBaseName();
+        auto functionRefInfo = FunctionRefInfo::unappliedBaseName(
+                                    enumPattern->getName().hasModuleSelector());
         if (enumPattern->hasSubPattern())
           functionRefInfo = functionRefInfo.addingApplicationLevel();
 
@@ -2301,7 +2459,8 @@ namespace {
         // arguments (tuple-to-tuple conversion).
         // FIXME: We ought to be preserving labels and matching in the solver.
         if (dyn_cast_or_null<TuplePattern>(enumPattern->getSubPattern()))
-          functionRefInfo = FunctionRefInfo::singleCompoundNameApply();
+          functionRefInfo = FunctionRefInfo::singleCompoundNameApply(
+                                    enumPattern->getName().hasModuleSelector());
 
         auto patternLocator =
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern));
@@ -2712,8 +2871,8 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::Condition));
 
       // The branches must be convertible to a common type.
-      return CS.addJoinConstraint(
-          CS.getConstraintLocator(expr),
+      return addJoinConstraint(
+          CS, CS.getConstraintLocator(expr),
           {{CS.getType(expr->getThenExpr()),
             CS.getConstraintLocator(expr, LocatorPathElt::TernaryBranch(true))},
            {CS.getType(expr->getElseExpr()),
@@ -3370,7 +3529,7 @@ namespace {
       // The type of a join expression is obtained by performing
       // a "join-meet" operation on deduced types of its elements
       // and the underlying variable.
-      auto joinedTy = CS.addJoinConstraint(locator, elements);
+      auto joinedTy = addJoinConstraint(CS, locator, elements);
 
       CS.addConstraint(ConstraintKind::Equal, resultTy, joinedTy, locator);
       return resultTy;
@@ -3411,7 +3570,8 @@ namespace {
       // Look up the macros with this name.
       auto moduleIdent = expr->getModuleName().getBaseName();
       auto macroIdent = expr->getMacroName().withoutArgumentLabels(ctx);
-      FunctionRefInfo functionRefInfo = FunctionRefInfo::singleBaseNameApply();
+      FunctionRefInfo functionRefInfo =
+          FunctionRefInfo::singleBaseNameApply(macroIdent.hasModuleSelector());
       auto macros = lookupMacros(moduleIdent, macroIdent, functionRefInfo,
                                  expr->getMacroRoles());
       if (macros.empty()) {
@@ -3419,7 +3579,8 @@ namespace {
         if (macroIdent.hasModuleSelector()) {
           auto anyMacroIdent = DeclNameRef(macroIdent.getFullName());
           ModuleSelectorCorrection correction(
-            lookupMacros(moduleIdent, anyMacroIdent, functionRefInfo,
+            lookupMacros(moduleIdent, anyMacroIdent,
+                         FunctionRefInfo::singleBaseNameApply(),
                          expr->getMacroRoles()));
           if (correction.diagnose(ctx, expr->getMacroNameLoc(), macroIdent))
             return Type();
@@ -3475,12 +3636,7 @@ namespace {
       return member == "trigger_fallback_diagnostic";
     }
 
-    enum class TypeOperation { None,
-                               Join,
-                               JoinInout,
-                               JoinMeta,
-                               JoinNonexistent,
-    };
+    enum class TypeOperation { None, Join };
 
     static TypeOperation getTypeOperation(UnresolvedDotExpr *UDE,
                                           ASTContext &Context) {
@@ -3494,9 +3650,6 @@ namespace {
       return llvm::StringSwitch<TypeOperation>(
                  UDE->getName().getBaseIdentifier().str())
           .Case("type_join", TypeOperation::Join)
-          .Case("type_join_inout", TypeOperation::JoinInout)
-          .Case("type_join_meta", TypeOperation::JoinMeta)
-          .Case("type_join_nonexistent", TypeOperation::JoinNonexistent)
           .Default(TypeOperation::None);
     }
 
@@ -3504,81 +3657,23 @@ namespace {
       auto *lhs = Args->getExpr(0);
       auto *rhs = Args->getExpr(1);
 
-      switch (op) {
-      case TypeOperation::None:
-        llvm_unreachable(
-            "We should have a valid type operation at this point!");
+      ASSERT(op == TypeOperation::Join &&
+             "We should have a valid type operation at this point!");
 
-      case TypeOperation::Join: {
-        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsMeta || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
+      auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
+      auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
+      if (!lhsMeta || !rhsMeta)
+        ABORT("Unexpected argument types for Builtin.type_join!");
 
-        auto &ctx = lhsMeta->getASTContext();
+      auto &ctx = CS.getASTContext();
 
-        auto join =
-            Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
+      auto join =
+          Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
 
-        if (!join)
-          return ErrorType::get(ctx);
+      if (!join)
+        return ErrorType::get(ctx);
 
-        return MetatypeType::get(*join, ctx)->getCanonicalType();
-      }
-
-      case TypeOperation::JoinInout: {
-        auto lhsInOut = CS.getType(lhs)->getAs<InOutType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsInOut || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
-
-        auto &ctx = lhsInOut->getASTContext();
-
-        auto join =
-            Type::join(lhsInOut, rhsMeta->getInstanceType());
-
-        if (!join)
-          return ErrorType::get(ctx);
-
-        return MetatypeType::get(*join, ctx)->getCanonicalType();
-      }
-
-      case TypeOperation::JoinMeta: {
-        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsMeta || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
-
-        auto &ctx = lhsMeta->getASTContext();
-
-        auto join = Type::join(lhsMeta, rhsMeta);
-
-        if (!join)
-          return ErrorType::get(ctx);
-
-        return *join;
-      }
-
-      case TypeOperation::JoinNonexistent: {
-        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsMeta || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join_nonexistent!");
-
-        auto &ctx = lhsMeta->getASTContext();
-
-        auto join =
-            Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
-
-        // Verify that we could not compute a join.
-        if (join)
-          llvm_unreachable("Unexpected result from join - it should not have been computable!");
-
-        // The return value is unimportant.
-        return MetatypeType::get(ctx.getAnyExistentialType())->getCanonicalType();
-      }
-      }
-      llvm_unreachable("unhandled operation");
+      return MetatypeType::get(*join, ctx)->getCanonicalType();
     }
 
     /// Assuming that we are solving for code completion, assign \p expr a fresh
@@ -3643,7 +3738,8 @@ namespace {
       if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
         if (keyPath->isObjC()) {
           auto &cs = CG.getConstraintSystem();
-          (void)TypeChecker::checkObjCKeyPathExpr(cs.DC, keyPath);
+          ObjCKeyPathStringRequest req{keyPath, cs.DC};
+          (void)evaluateOrDefault(cs.getASTContext().evaluator, req, nullptr);
         }
       }
 
@@ -3868,6 +3964,7 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
                                            DeclContext *dc, ForEachStmt *stmt,
                                            Pattern *typeCheckedPattern,
                                            bool shouldBindPatternVarsOneWay) {
+  auto &ctx = cs.getASTContext();
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getSequence();
 
@@ -3875,7 +3972,7 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
   // constraint for this as part of ForEachElement, and we rely on querying the
   // contextual type for diagnostics.
   auto *sequenceProto = TypeChecker::getProtocol(
-      cs.getASTContext(), stmt->getForLoc(),
+      ctx, stmt->getForLoc(),
       isAsync ? KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
   if (!sequenceProto)
     return true;
@@ -3886,12 +3983,6 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
 
   auto seqExprTarget =
       SyntacticElementTarget(sequenceExpr, dc, contextInfo, false);
-
-  // Pretend the sequence expression still has a depth that matches when it
-  // was previously within a 'makeIterator()' call.
-  // FIXME: Remove this
-  if (!cs.getASTContext().isAtLeastFutureMajorLanguageMode())
-    cs.InputExprSimulatedDepths[sequenceExpr] = 2;
 
   if (cs.generateConstraints(seqExprTarget))
     return true;

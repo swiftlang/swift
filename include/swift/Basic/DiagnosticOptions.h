@@ -75,8 +75,15 @@ public:
   /// Suppress all remarks
   bool SuppressRemarks = false;
 
+  /// Check for `@warn` diagnostic group behavior controls
+  bool CheckSyntacticControls = false;
+
   /// Rules for escalating warnings to errors
   llvm::SmallVector<WarningGroupBehaviorRule, 4> WarningGroupControlRules;
+
+  /// Unknown warning group names specified via -Werror or -Wwarning.
+  /// These will be diagnosed when the DiagnosticEngine is configured.
+  llvm::SmallVector<std::string, 1> UnknownWarningGroups;
 
   /// When printing diagnostics, include either the diagnostic name
   /// (diag::whatever) at the end or the associated diagnostic group.

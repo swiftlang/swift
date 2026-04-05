@@ -110,6 +110,8 @@ private:
   // instructions, which we will periodically move to our worklist.
   llvm::SmallVector<SILInstruction *, 64> TrackingList;
 
+  unsigned initialWorklistSize = 0;
+
 public:
   /// Builder used to insert instructions.
   SILBuilder Builder;
@@ -279,8 +281,6 @@ public:
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
-  SILInstruction *
-  visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
       

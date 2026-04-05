@@ -433,7 +433,13 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
   return true;
 }
 
-// TODO: refactor this with SSAPrunedLiveness::computeLiveness.
+// TODO: Replace all calls to this with SSAPrunedLiveness::computeLiveness()
+// after extending that utility to handle unowned values and extending
+// PrunedLiveRange::recursivelyUpdateForDef to handle
+// OperandOwnership::ForwardingUnowned.
+//
+// findPointerEscape normally considers unowned values to be an escape, but the
+// RAUW utility relies on them being handled here.
 bool swift::findUsesOfSimpleValue(SILValue value,
                                   SmallVectorImpl<Operand *> *usePoints) {
   for (auto *use : value->getUses()) {
@@ -451,8 +457,17 @@ bool swift::findUsesOfSimpleValue(SILValue value,
         return false;
       }
       break;
-    case OperandOwnership::ForwardingUnowned:
+    case OperandOwnership::ForwardingUnowned: {
+      auto *forwardInst = dyn_cast<SingleValueInstruction>(use->getUser());
+      if (forwardInst) {
+        // only handle a single use so we don't need a visited set.
+        auto *use = forwardInst->getSingleUse();
+        if (use && use->get()->getOwnershipKind() == OwnershipKind::Unowned) {
+          return findUsesOfSimpleValue(forwardInst, usePoints);
+        }
+      }
       return false;
+    }
     default:
       break;
     }
@@ -611,9 +626,6 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   case Kind::BeginAsyncLet:
     os << "BeginAsyncLet";
     return;
-  case Kind::MakeBorrow:
-    os << "MakeBorrow";
-    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -646,7 +658,6 @@ bool BorrowingOperand::hasEmptyRequiredEndingUses() const {
   case BorrowingOperandKind::StoreBorrow:
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::BeginAsyncLet:
-  case BorrowingOperandKind::MakeBorrow:
   case BorrowingOperandKind::PartialApplyStack:
   case BorrowingOperandKind::MarkDependenceNonEscaping: {
     return op->getUser()->hasUsesOfAnyResult();
@@ -755,10 +766,6 @@ bool BorrowingOperand::visitScopeEndingUses(
     }
     return true;
   }
-  case BorrowingOperandKind::MakeBorrow: {
-    // TODO: Conservatively bail out for now.
-    return true;
-  }
   // These are instantaneous borrow scopes so there aren't any special end
   // scope instructions.
   case BorrowingOperandKind::Apply:
@@ -812,7 +819,6 @@ SILValue BorrowingOperand::getBorrowIntroducingUserResult() const {
     return SILValue();
 
   case BorrowingOperandKind::BeginBorrow:
-  case BorrowingOperandKind::MakeBorrow:
     return cast<SingleValueInstruction>(op->getUser());
 
   case BorrowingOperandKind::BorrowedFrom: {
@@ -873,7 +879,6 @@ SILValue BorrowingOperand::getDependentUserResult() const {
     return SILValue();
   }
   case BorrowingOperandKind::Invalid:
-  case BorrowingOperandKind::MakeBorrow:
   case BorrowingOperandKind::BeginBorrow:
   case BorrowingOperandKind::StoreBorrow:
   case BorrowingOperandKind::BeginApply:

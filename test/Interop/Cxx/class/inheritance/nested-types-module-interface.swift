@@ -17,23 +17,23 @@
 // CHECK-NEXT:     typealias RawValue = {{UInt32|Int32}}
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct Struct {
-// CHECK-NEXT:     init()
 // CHECK-NEXT:     init(sa: Int32, sb: Int32)
+// CHECK-NEXT:     init()
 // CHECK-NEXT:     var sa: Int32
 // CHECK-NEXT:     var sb: Int32
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct Parent {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:     struct Child {
-// CHECK-NEXT:       init()
 // CHECK-NEXT:       init(pca: Int32)
+// CHECK-NEXT:       init()
 // CHECK-NEXT:       var pca: Int32
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct Union {
-// CHECK-NEXT:     init()
 // CHECK-NEXT:     init(ua: Int32)
 // CHECK-NEXT:     init(ub: Base.Struct)
+// CHECK-NEXT:     init()
 // CHECK-NEXT:     var ua: Int32
 // CHECK-NEXT:     var ub: Base.Struct
 // CHECK-NEXT:   }

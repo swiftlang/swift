@@ -12,12 +12,12 @@
 
 import ASTBridging
 import BasicBridging
-@_spi(PluginMessage) @_spi(ExperimentalLanguageFeature) import SwiftCompilerPluginMessageHandling
+@_spi(PluginMessage) @_spi(ExperimentalLanguageFeatures) import SwiftCompilerPluginMessageHandling
 import SwiftDiagnostics
 import SwiftIfConfig
 import SwiftParser
 import SwiftSyntax
-@_spi(ExperimentalLanguageFeature) @_spi(Compiler) import SwiftSyntaxMacroExpansion
+@_spi(ExperimentalLanguageFeatures) @_spi(Compiler) import SwiftSyntaxMacroExpansion
 import swiftASTGen
 
 struct ExportedExternalMacro {

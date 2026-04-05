@@ -132,3 +132,18 @@ func callMainActorIsolatedFunction() async {
   await useValueAsync(x)
   useValueSync(x)
 }
+
+public final class LoggingScope {
+  fileprivate static let _subsystem: TaskLocal<String?>! = nil
+  fileprivate static let _scope: TaskLocal<String?>! = nil
+}
+
+public func withLoggingSubsystemAndScope<Result>(
+  subsystem: String,
+  scope: String?,
+  @_inheritActorContext _ operation: @Sendable @concurrent () async throws -> Result
+) async rethrows -> Result {
+  return try await LoggingScope._subsystem.withValue(subsystem) {
+    return try await LoggingScope._scope.withValue(scope, operation: operation)
+  }
+}

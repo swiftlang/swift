@@ -36,6 +36,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/TypeVariableType.h"
 
 using namespace swift;
 using namespace constraints;
@@ -444,8 +445,9 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
   auto *expansionLoc = getConstraintLocator(locator.withPathElement(
       LocatorPathElt::PackExpansionType(openedPackExpansion)));
 
-  auto *expansionVar = createTypeVariable(expansionLoc, TVO_PackExpansion,
-                                          preparedOverload);
+  auto *expansionVar = createTypeVariable(
+      expansionLoc, TVO_PackExpansion | TVO_CanBindToNoEscape,
+      preparedOverload);
 
   // This constraint is important to make sure that pack expansion always
   // has a binding and connect pack expansion var to any type variables
@@ -1031,6 +1033,13 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
           // For example, `(C) -> () -> Void` where `C` should be Sendable
           // for the inner function type to be Sendable as well.
           sendableDepTy = sendableDepTy->getMetatypeInstanceType();
+
+          // Partially applied actor instance methods cannot cross isolation
+          // boundary unless they are asynchronous otherwise it would be
+          // possible to escape the actor context and access actor-isolated
+          // storage from different isolation.
+          if (sendableDepTy->isAnyActorType() && !decl->isAsync())
+            sendableDepTy = Type();
         }
 
         auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
@@ -1040,7 +1049,7 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
           if (sendableDepTy->hasTypeVariable()) {
             extInfo = extInfo.withSendableDependentType(sendableDepTy);
           } else {
-            extInfo = extInfo.withSendable(sendableDepTy->isSendableType());
+            extInfo = extInfo.withSendable(isSendableCapture(sendableDepTy));
           }
           referenceTy =
               referenceTy->withExtInfo(extInfo)->castTo<FunctionType>();
@@ -1157,9 +1166,11 @@ ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
+    TypeResolutionOptions opts = TypeResolverContext::InExpression;
+    if (choice.getFunctionRefInfo().hasModuleSelector())
+      opts |= TypeResolutionFlags::HasModuleSelector;
     auto type =
-        TypeResolution::forInterface(useDC, TypeResolverContext::InExpression,
-                                     /*unboundTyOpener*/ nullptr,
+        TypeResolution::forInterface(useDC, opts, /*unboundTyOpener*/ nullptr,
                                      /*placeholderHandler*/ nullptr,
                                      /*packElementOpener*/ nullptr)
             .resolveTypeInContext(typeDecl, /*foundDC*/ nullptr,
@@ -1501,38 +1512,28 @@ void ConstraintSystem::openGenericRequirements(
 }
 
 void ConstraintSystem::openGenericRequirement(
-    DeclContext *outerDC, GenericSignature signature,
-    unsigned index, Requirement req,
-    ConstraintLocatorBuilder locator,
+    DeclContext *outerDC, GenericSignature signature, unsigned index,
+    Requirement req, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn,
     PreparedOverloadBuilder *preparedOverload) {
-  std::optional<Requirement> openedReq;
-  auto openedFirst = substFn(req.getFirstType());
 
   bool prohibitIsolatedConformance = false;
   auto kind = req.getKind();
-  switch (kind) {
-  case RequirementKind::Conformance: {
+  if (kind == RequirementKind::Conformance && signature) {
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
-    if (signature &&
-        signature->prohibitsIsolatedConformance(req.getFirstType()))
-      prohibitIsolatedConformance = true;
-
-    openedReq = Requirement(kind, openedFirst, req.getSecondType());
-    break;
-  }
-  case RequirementKind::Superclass:
-  case RequirementKind::SameType:
-  case RequirementKind::SameShape:
-    openedReq = Requirement(kind, openedFirst, substFn(req.getSecondType()));
-    break;
-  case RequirementKind::Layout:
-    openedReq = Requirement(kind, openedFirst, req.getLayoutConstraint());
-    break;
+    prohibitIsolatedConformance =
+        signature->prohibitsIsolatedConformance(req.getFirstType()).has_value();
   }
 
-  addConstraint(*openedReq,
+  // Open the requirement's subject type, replacing ErrorTypes with holes if
+  // needed in case of substitution failure.
+  auto openedReq = req.tranformSubjectTypes([&](Type ty) {
+    return replaceInferableTypesWithTypeVars(substFn(ty), locator,
+                                             preparedOverload);
+  });
+
+  addConstraint(openedReq,
                 locator.withPathElement(
                     LocatorPathElt::TypeParameterRequirement(index, kind)),
                 /*isFavored=*/false, prohibitIsolatedConformance,
@@ -2165,7 +2166,6 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                                 const OverloadChoice &overload,
-                                                bool allowMembers,
                                                 DeclContext *useDC) {
   switch (overload.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -2222,23 +2222,17 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   // If this declaration is within a type context, we might not be able
   // to handle it.
   if (decl->getDeclContext()->isTypeContext()) {
-    if (!allowMembers)
-      return Type();
-
-    auto getBaseObjectType = [&] () -> Type {
-      return overload.getBaseType()
+    auto withDynamicSelfResultReplaced = [&](Type type) {
+      auto baseObjectType = overload.getBaseType()
           ->getRValueType()
           ->getMetatypeInstanceType()
           ->lookThroughAllOptionalTypes();
-    };
 
-    auto withDynamicSelfResultReplaced = [&](Type type) {
       return type->replaceDynamicSelfType(
         getDynamicSelfReplacementType(
-          getBaseObjectType(), decl, locator));
+          baseObjectType, decl, locator));
     };
 
-    SmallVector<OpenedType, 4> emptyReplacements;
     if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
       auto elementTy = subscript->getElementInterfaceType();
 
@@ -2286,16 +2280,19 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           return Type();
       }
 
+      // Insert a dynamic 'Self' if this is a class constructor, to work around
+      // the fact that the interface type doesn't have one, which sadly is a
+      // difficult assumption to unwind right now.
       if (isa<ConstructorDecl>(decl) &&
           decl->getDeclContext()->getSelfClassDecl()) {
         type = type->withCovariantResultType();
       }
 
-      // Cope with 'Self' returns.
+      // Replace any occurrences of dynamic 'Self' with the actual base type
+      // for the call. This handles constructors too, as per the above.
       if (type->hasDynamicSelfType()) {
         if (!overload.getBaseType())
           return Type();
-
         type = withDynamicSelfResultReplaced(type);
       }
 
@@ -2316,6 +2313,16 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   if (decl->getAttrs().hasAttribute<OptionalAttr>() &&
       !isa<SubscriptDecl>(decl))
     type = OptionalType::get(type->getRValueType());
+
+  GenericSignature genericSig;
+  if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
+    genericSig = GF->getGenericSignature();
+  } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+    genericSig = SD->getGenericSignature();
+  }
+
+  if (genericSig)
+    type = type->getReducedType(genericSig);
 
   return type;
 }
@@ -3142,7 +3149,8 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
           // method without any applications at all, which would get
           // miscompiled into a function with undefined behavior. Warn for
           // source compatibility.
-          bool isWarning = !getASTContext().isLanguageModeAtLeast(5);
+          bool isWarning =
+              !getASTContext().isLanguageModeAtLeast(LanguageMode::v5);
           (void)recordFix(
               AllowInvalidPartialApplication::create(isWarning, *this, locator));
         } else if (level == 1) {

@@ -102,19 +102,34 @@ public:
   /// Emits a diagnostic if there is no availability specified for the given
   /// platform, as required by the given attribute. Returns true if a diagnostic
   /// was emitted.
-  bool diagnoseMissingAvailability(DeclAttribute *attr, PlatformKind platform) {
+  bool diagnoseMissingAvailability(OriginallyDefinedInAttr *attr, PlatformKind platform) {
     auto IntroVer = D->getIntroducedOSVersion(platform);
-    if (IntroVer.has_value())
-      return false;
-
-    if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
-               attr, VD->getName(), prettyPlatformString(platform));
+    if (IntroVer.has_value()) {
+      if (IntroVer.value() > attr->getMovedVersion()) {
+        diagnose(attr->AtLoc,
+                 diag::originally_definedin_must_not_before_available_version);
+        return true;
+      }
     } else {
-      diagnose(attr->AtLoc, diag::attr_requires_availability_for_platform, attr,
-               prettyPlatformString(platform));
+      // Also accept explicit unconditional unavailability as sufficient
+      // availability annotation. This handles the case where @_spi_available is
+      // rewritten to @available(platform, unavailable) in the public
+      // swiftinterface. Only apply this relaxation when parsing a textual
+      // interface file, since meaningful introductory version is necessary for us
+      // to emit linker directives while compiling source code.
+      if (D->getDeclContext()->isInSwiftinterface()) {
+        for (auto semanticAttr :
+             D->getSemanticAvailableAttrs(/*includeInactive=*/true)) {
+          if (semanticAttr.getPlatform() == platform &&
+              semanticAttr.isUnconditionallyUnavailable())
+            return false;
+        }
+      }
+      diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
+               attr, D, prettyPlatformString(platform));
+      return true;
     }
-    return true;
+    return false;
   }
 
   void checkIsolatedDeinitAttr(DeclAttribute *attr) {
@@ -405,6 +420,7 @@ public:
   void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
   void visitRethrowsAttr(RethrowsAttr *attr);
+  void visitReparentableAttr(ReparentableAttr *attr);
 
   void checkApplicationMainAttribute(DeclAttribute *attr,
                                      Identifier Id_ApplicationDelegate,
@@ -738,13 +754,23 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
     diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
 
   auto *accessor = dyn_cast<AccessorDecl>(FD);
-  if (accessor &&
-      (accessor->isBorrowAccessor() || accessor->isMutateAccessor())) {
-    if (attrModifier == SelfAccessKind::Consuming ||
-        attrModifier == SelfAccessKind::LegacyConsuming) {
-      diagnoseAndRemoveAttr(
-          attr, diag::consuming_invalid_borrow_mutate_accessor,
-          getAccessorNameForDiagnostic(accessor, /*article*/ true));
+  if (accessor) {
+    if (accessor->isBorrowAccessor() || accessor->isMutateAccessor()) {
+      if (attrModifier == SelfAccessKind::Consuming ||
+          attrModifier == SelfAccessKind::LegacyConsuming) {
+        diagnoseAndRemoveAttr(
+            attr, diag::modifier_invalid_borrow_mutate_accessor,
+            getAccessorNameForDiagnostic(accessor, /*article*/ true),
+            "consuming");
+      }
+    }
+    if (accessor->isMutateAccessor()) {
+      if (attrModifier == SelfAccessKind::Borrowing) {
+        diagnoseAndRemoveAttr(
+            attr, diag::modifier_invalid_borrow_mutate_accessor,
+            getAccessorNameForDiagnostic(accessor, /*article*/ true),
+            "borrowing");
+      }
     }
   }
 }
@@ -1323,7 +1349,7 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
             diagnose(attr->getLocation(),
                      diag::access_control_non_objc_open_member, VD)
                 .fixItReplace(attr->getRange(), "public")
-                .warnUntilFutureLanguageMode();
+                .warnUntilLanguageMode(LanguageMode::future);
           }
         }
       }
@@ -2214,8 +2240,8 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     });
 
     if (candidates.empty()) {
-      auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      bool shouldError = ctx.isLanguageModeAtLeast(futureVersion);
+      const auto languageModeForError = LanguageMode::future;
+      bool shouldError = ctx.isLanguageModeAtLeast(languageModeForError);
 
       // Diagnose as an error in resilient modules regardless of language
       // version since this will break the swiftinterface. Don't diagnose
@@ -2230,7 +2256,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
                   requiredAccessScope.requiredAccessForDiagnostics(),
                   /*isForSetter=*/false, /*useDefaultAccess=*/false,
                   /*updateAttr=*/false);
-      diag.warnUntilLanguageModeIf(!shouldError, futureVersion);
+      diag.warnUntilLanguageModeIf(!shouldError, languageModeForError);
 
       if (shouldError) {
         attr->setInvalid();
@@ -2409,7 +2435,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
     if (auto enclosingAvailable =
             getSemanticAvailableRangeDeclAndAttr(parent, attr->getDomain())) {
       SemanticAvailableAttr enclosingAttr = enclosingAvailable->first;
-      const Decl *enclosingDecl = enclosingAvailable->second;
+      const Decl *enclosingAvailabilityDecl = enclosingAvailable->second;
       enclosingIntroducedRange = enclosingAttr.getIntroducedRange(Ctx);
       if (enclosingIntroducedRange &&
           !introducedRange->isContainedIn(*enclosingIntroducedRange)) {
@@ -2418,21 +2444,29 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           // Incorrect availability for an implicit declaration is likely a
           // compiler bug so make the diagnostic a warning.
           limit = DiagnosticBehavior::Warning;
-        } else if (enclosingDecl != parent) {
+        } else if (enclosingAvailabilityDecl != parent) {
           // Members of extensions of nominal types with available ranges were
           // not diagnosed previously, so only emit a warning in that case.
           if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
             limit = DiagnosticBehavior::Warning;
         }
-        diagnose(D->isImplicit() ? enclosingDecl->getLoc()
-                                 : parsedAttr->getLocation(),
-                 diag::availability_decl_more_than_enclosing, D)
+        auto diagLoc = parsedAttr->getLocation();
+        if (D->isImplicit()) {
+          // Walk up until we find a non-implicit decl to diagnose.
+          const auto *diagDecl = D;
+          while (diagDecl && diagDecl->isImplicit())
+            diagDecl = diagDecl->parentDeclForAvailability();
+
+          diagLoc = diagDecl ? diagDecl->getLoc()
+                             : enclosingAvailabilityDecl->getLoc();
+        }
+        diagnose(diagLoc, diag::availability_decl_more_than_enclosing, D)
             .limitBehavior(limit);
-        if (D->isImplicit())
-          diagnose(enclosingDecl->getLoc(),
-                   diag::availability_implicit_decl_here, D,
+        if (D->isImplicit()) {
+          diagnose(diagLoc, diag::availability_implicit_decl_here, D,
                    Ctx.getTargetAvailabilityDomain(), *introducedRange);
-        diagnose(enclosingDecl->getLoc(),
+        }
+        diagnose(enclosingAvailabilityDecl->getLoc(),
                  diag::availability_decl_more_than_enclosing_here,
                  Ctx.getTargetAvailabilityDomain(), *enclosingIntroducedRange);
       }
@@ -2452,6 +2486,10 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // experimental feature is enabled.
   auto &ctx = fromModule->getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::AllowRuntimeSymbolDeclarations))
+    return true;
+
+  // Only consider "swift_"-containing symbols.
+  if (!symbol.contains("swift_"))
     return true;
 
   // Swift runtime functions are a private contract between the compiler and
@@ -3048,7 +3086,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_deprecated,
              applicationMainKind)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
 
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_deprecated_use_attr_main)
@@ -3125,8 +3163,8 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     auto *concurrencyModule = context.getLoadedModule(context.Id_Concurrency);
     if (!concurrencyModule) {
       context.Diags.diagnose(mainFunction->getAsyncLoc(),
-                             diag::async_main_no_concurrency);
-      auto result = new (context) ErrorExpr(mainFunction->getSourceRange());
+                             diag::no_concurrency_module, "async main");
+      auto result = new (context) ErrorExpr(mainFunction->getSourceRange(), ErrorType::get(context));
       ASTNode stmts[] = {result};
       auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc(),
                                     /*Implicit*/ true);
@@ -3270,9 +3308,13 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
 
     Type mainActor = context.getMainActorType();
     if (mainActor) {
-      auto extInfo = ASTExtInfoBuilder().withIsolation(
-          FunctionTypeIsolation::forGlobalActor(mainActor))
-        .withThrows(true, throwsTypeVar);
+      auto extInfo =
+          ASTExtInfoBuilder()
+              .withIsolation(FunctionTypeIsolation::forGlobalActor(mainActor))
+              .withThrows(true, throwsTypeVar)
+              .withSendable(context.LangOpts.hasFeature(
+                  Feature::GlobalActorIsolatedTypesUsability));
+
       mainTypes.push_back(FunctionType::get(
           /*params*/ {}, context.TheEmptyTupleType,
           extInfo.build()));
@@ -3482,6 +3524,14 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 
   diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);
   attr->setInvalid();
+}
+
+void AttributeChecker::visitReparentableAttr(ReparentableAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::Reparenting)) {
+    Ctx.Diags.diagnose(attr->getLocation(),
+                       diag::attribute_requires_experimental_feature, attr,
+                       "Reparenting");
+  }
 }
 
 /// Ensure that the requirements provided by the @_specialize attribute
@@ -3721,7 +3771,7 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
 
   // On internal declarations, @inlinable implies @usableFromInline.
   if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
-    if (Ctx.isLanguageModeAtLeast(4, 2))
+    if (Ctx.isLanguageModeAtLeast(LanguageMode::v4_2))
       diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline,
                             VD);
     return;
@@ -5224,13 +5274,6 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
 
     if (diagnoseMissingAvailability(Attr, Platform))
       return;
-
-    auto IntroVer = D->getIntroducedOSVersion(Platform);
-    if (IntroVer.value() > Attr->getMovedVersion()) {
-      diagnose(AtLoc,
-               diag::originally_definedin_must_not_before_available_version);
-      return;
-    }
   }
 }
 
@@ -5260,6 +5303,162 @@ getAvailableAttrGroups(ArrayRef<const AvailableAttr *> attrs) {
   }
 
   return results;
+}
+
+/// Check for platform availability attributes that could be consolidated using
+/// a single `@available(anyAppleOS ...)` attribute.
+void suggestAnyAppleOSAvailability(const Decl *D,
+                                   ArrayRef<AvailableAttr *> attrs,
+                                   ASTContext &ctx) {
+  auto &diags = ctx.Diags;
+  SourceFile *sf = D->getDeclContext()->getParentSourceFile();
+  if (!sf)
+    return;
+
+  if (!diags.isDiagnosticGroupEnabled(sf,
+                                      DiagGroupID::UseAnyAppleOSAvailability))
+    return;
+
+  // Collect the attributes that could be replaced with an anyAppleOS attribute.
+  llvm::SmallDenseMap<llvm::VersionTuple,
+                      llvm::SmallVector<const AvailableAttr *, 6>>
+      attrsByIntroVersion;
+
+  for (const AvailableAttr *attr : attrs) {
+    auto semAttr = D->getSemanticAvailableAttr(attr);
+    if (!semAttr || !semAttr->isPlatformSpecific())
+      continue;
+
+    if (attr->getKind() != AvailableAttr::Kind::Default)
+      continue;
+
+    auto platform = semAttr->getPlatform();
+
+    // Don't diagnose any declaration that already has an anyAppleOS attribute.
+    if (platform == PlatformKind::anyAppleOS)
+      return;
+
+    if (!inheritsAvailabilityFromPlatform(platform, PlatformKind::anyAppleOS))
+      continue;
+
+    if (isApplicationExtensionPlatform(platform))
+      continue;
+
+    // anyAppleOS only supports versions 26 and later.
+    auto rawIntroduced = attr->getRawIntroduced();
+    if (!rawIntroduced || rawIntroduced->getMajor() < 26)
+      continue;
+
+    attrsByIntroVersion[rawIntroduced->normalize()].push_back(attr);
+  }
+
+  if (attrsByIntroVersion.empty())
+    return;
+
+  llvm::VersionTuple commonVersion;
+  llvm::SmallVector<const AvailableAttr *, 6> attrsToReplace;
+  for (auto &[version, attrList] : attrsByIntroVersion) {
+    // Prefer replacing the longest list of attributes.
+    if (attrList.size() < attrsToReplace.size())
+      continue;
+
+    // If the lists have the same length, prefer the earlier version.
+    if (attrList.size() == attrsToReplace.size()) {
+      if (version > commonVersion)
+        continue;
+    }
+
+    commonVersion = version;
+    attrsToReplace = attrList;
+  }
+
+  if (attrsToReplace.size() < 2)
+    return;
+
+  // Check whether the attributes have any fields besides 'introduced:' and skip
+  // if they do since we don't attempt to judge whether those fields match and
+  // could be consolidated.
+  // FIXME: This is conservative; attrs with matching fields could be merged.
+  for (auto *attr : attrsToReplace) {
+    if (attr->getRawDeprecated() || attr->getRawObsoleted() ||
+        !attr->getMessage().empty() || !attr->getRename().empty())
+      return;
+  }
+
+  auto diag = diags.diagnose(D->getLoc(), diag::availability_use_any_apple_os,
+                             commonVersion);
+
+  // Note each introduced version that could be replaced.
+  for (auto *attr : attrsToReplace) {
+    auto semAttr = D->getSemanticAvailableAttr(attr);
+    if (!semAttr)
+      continue;
+
+    diags.diagnose(semAttr->getIntroducedSourceRange().Start,
+                   diag::availability_decl_is_available_in, D,
+                   semAttr->getDomain(), *semAttr->getIntroduced());
+  }
+
+  auto attrGroups = getAvailableAttrGroups(attrs);
+  if (attrGroups.empty()) {
+    // The attributes are all written in long-form.
+    // FIXME: Generate fix-its for this pattern if it is common enough.
+    return;
+  }
+
+  if (attrGroups.size() > 1) {
+    // The attributes are written in multiple short-form groups.
+    return;
+  }
+
+  // The attributes include a single short-form. If they all belong
+  // to the same group we can emit a fix-it to update it.
+  llvm::SmallSet<const AvailableAttr *, 8> remainingAttrsToSkip;
+  for (auto *attr : attrsToReplace)
+    remainingAttrsToSkip.insert(attr);
+
+  llvm::SmallString<128> replacement;
+  llvm::raw_svector_ostream os(replacement);
+  os << "anyAppleOS " << commonVersion;
+
+  auto groupHead = attrGroups.front();
+
+  // Get the location of the @available attr's right paren.
+  SourceLoc groupEndLoc = groupHead->getEndLoc();
+
+  // Build up the fix-it contents and find the starting source loc for the
+  // availability specs.
+  SourceLoc groupStartLoc = groupHead->getDomainLoc();
+  for (auto *member = groupHead; member != nullptr;
+       member = member->getNextGroupedAvailableAttr()) {
+    // The attributes are enumerated in reverse, so the group's starting loc
+    // is the last domain loc we see.
+    groupStartLoc = member->getDomainLoc();
+    if (remainingAttrsToSkip.erase(member))
+      continue;
+    if (auto semAttr = D->getSemanticAvailableAttr(member)) {
+      os << ", " << platformString(semAttr->getPlatform());
+      if (auto v = member->getRawIntroduced())
+        os << " " << *v;
+    }
+  }
+  os << ", *";
+
+  // Only emit the fix-it if all of the attributes to replace were found in
+  // the group.
+  if (remainingAttrsToSkip.empty()) {
+    // Make sure we have a valid source range in a single buffer. We might not
+    // if some attributes were expanded from an availability macro.
+    if (groupStartLoc.isInvalid() || groupEndLoc.isInvalid())
+      return;
+
+    auto startBuffer = ctx.SourceMgr.findBufferContainingLoc(groupStartLoc);
+    auto endBuffer = ctx.SourceMgr.findBufferContainingLoc(groupEndLoc);
+    if (startBuffer != endBuffer)
+      return;
+
+    diag.fixItReplaceChars(groupStartLoc, groupEndLoc, replacement);
+  }
 }
 
 void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
@@ -5330,6 +5529,8 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
           .fixItInsert(groupEndLoc, ", *");
     }
   }
+
+  suggestAnyAppleOSAvailability(D, attrs, Ctx);
 
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
@@ -5499,7 +5700,7 @@ void AttributeChecker::checkBackDeployedAttrs(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    if (availability.containsUnavailableDomain(Domain)) {
+    if (availability.isUnavailableForDomain(Domain)) {
       diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
                Domain.getRemappedDomain(Ctx));
 
@@ -5643,7 +5844,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     // properties of Objective-C protocols.
     auto D = diag::ownership_invalid_in_protocols;
     Diags.diagnose(attr->getLocation(), D, ownershipKind)
-        .warnUntilLanguageMode(5)
+        .warnUntilLanguageMode(LanguageMode::v5)
         .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
@@ -6414,6 +6615,14 @@ static bool checkFunctionSignature(
     return false;
   // Check that the requirements are satisfied.
   if (!candidateGenSig.requirementsNotSatisfiedBy(requiredGenSig).empty())
+    return false;
+
+  // Check that both functions throws same error type (if any)
+  if (required->isThrowing() != candidateFnTy->isThrowing())
+    return false;
+  if (required->hasThrownError() != candidateFnTy->hasThrownError() ||
+      (required->hasThrownError() &&
+       !required->getThrownError()->isEqual(candidateFnTy->getThrownError())))
     return false;
 
   // Check that parameter types match, disregarding labels.
@@ -7927,7 +8136,7 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
     if (isolation.isActorIsolated()) {
       diagnoseAndRemoveAttr(attr, diag::sendable_isolated_sync_function,
                             isolation, value)
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
     }
   }
   // Prevent Sendable Attr from being added to methods of non-sendable types
@@ -8011,12 +8220,12 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
           if (var->hasAttachedPropertyWrapper()) {
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-                .warnUntilLanguageModeIf(attr->isImplicit(), 6)
+                .warnUntilLanguageModeIf(attr->isImplicit(), LanguageMode::v6)
                 .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else if (var->getAttrs().hasAttribute<LazyAttr>()) {
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-                .warnUntilLanguageMode(6)
+                .warnUntilLanguageMode(LanguageMode::v6)
                 .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else {
@@ -8097,7 +8306,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         if (!ctor->hasAsync()) {
           // the isolation for a synchronous init cannot be `nonisolated`.
           diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_sync_init)
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
           return;
         }
       }
@@ -8121,7 +8330,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       ctx.Diags
           .diagnose(attr->getStartLoc(),
                     diag::nonisolated_unsafe_uneffective_on_funcs, VD)
-          .fixItReplace(attr->getStartLoc(), "nonisolated");
+          .fixItReplace(attr->getRange(), "nonisolated");
     }
 
     (void)getActorIsolation(VD);
@@ -8223,7 +8432,7 @@ void AttributeChecker::visitInheritActorContextAttr(
     diagnose(attr->getLocation(),
              diag::inherit_actor_context_only_on_sending_or_Sendable_params,
              attr)
-        .warnUntilFutureLanguageMode();
+        .warnUntilLanguageMode(LanguageMode::future);
   }
 
   // Either `async` or `@isolated(any)`.
@@ -8232,7 +8441,7 @@ void AttributeChecker::visitInheritActorContextAttr(
         attr,
         diag::inherit_actor_context_only_on_async_or_isolation_erased_params,
         attr)
-        .warnUntilFutureLanguageMode();
+        .warnUntilLanguageMode(LanguageMode::future);
   }
 }
 
@@ -8316,7 +8525,7 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
     bool inConcurrencyModule = D->getDeclContext()->getParentModule()->getName()
         .str() == "_Concurrency";
     auto diag = fn->diagnose(diag::unsafe_inherits_executor_deprecated);
-    diag.warnUntilLanguageMode(6);
+    diag.warnUntilLanguageMode(LanguageMode::v6);
     diag.limitBehaviorIf(inConcurrencyModule, DiagnosticBehavior::Warning);
     replaceUnsafeInheritExecutorWithDefaultedIsolationParam(fn, diag);
   }
@@ -8699,7 +8908,7 @@ public:
                    diag::isolated_parameter_closure_combined_global_actor_attr,
                    param->getName())
               .fixItRemove(attr->getRangeWithAt())
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
           attr->setInvalid();
           break; // don't need to complain about this more than once.
         }

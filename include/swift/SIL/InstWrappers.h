@@ -396,10 +396,19 @@ struct FixedStorageSemanticsCall {
     }
   }
 
+  bool hasSelf() const { return apply->hasSelfArgument(); }
+
+  SILValue getSelf() const { return apply->getSelfArgument(); }
+
+  SILValue getIndex() const { return apply->getArgument(0); }
+
+  Operand &getIndexOperand() const { return apply->getArgumentRef(0); }
+
   FixedStorageSemanticsCallKind getKind() const { return kind; }
   explicit operator bool() const { return apply != nullptr; }
-  const ApplyInst *operator->() const { return apply; }
-  ApplyInst *operator->() { return apply; }
+  const ApplyInst* operator->() const { return apply; }
+  ApplyInst* operator->() { return apply; }
+  ApplyInst* operator*() const { return apply; }
 };
 
 bool isFixedStorageSemanticsCallKind(SILFunction *function);

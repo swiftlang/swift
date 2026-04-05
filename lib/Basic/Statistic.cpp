@@ -532,7 +532,11 @@ FrontendStatsTracer::~FrontendStatsTracer()
 // Copy any interesting process-wide resource accounting stats to
 // associated fields in the provided AlwaysOnFrontendCounters.
 void updateProcessWideFrontendCounters(
-    UnifiedStatsReporter::AlwaysOnFrontendCounters &C) {
+    UnifiedStatsReporter::AlwaysOnFrontendCounters &C,
+    llvm::TimeRecord &StartTime,
+    llvm::TimeRecord &Now) {
+  C.WallClockMicroseconds = uint64_t(1000000.0 * (Now.getWallTime() - StartTime.getWallTime()));
+
 #if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
   struct rusage_info_v4 ru;
   if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru) == 0) {
@@ -540,9 +544,21 @@ void updateProcessWideFrontendCounters(
     C.MaxMallocUsage = ru.ri_lifetime_max_phys_footprint;
     return;
   }
+#elif defined(_WIN32)
+  ULONG64 CycleTime;
+  if (QueryProcessCycleTime(GetCurrentProcess(), &CycleTime))
+    C.NumCyclesExecuted = CycleTime;
+
+  PROCESS_MEMORY_COUNTERS_EX PMC;
+  PMC.cb = sizeof(PMC);
+  if (GetProcessMemoryInfo(GetCurrentProcess(),
+                           reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&PMC),
+                           sizeof(PMC)))
+    C.MaxMallocUsage = PMC.PeakWorkingSetSize;
+  return;
 #endif
 
-  // FIXME: Do something useful when the above API is not available.
+  // FIXME: Do something useful when the above APIs are not available.
 }
 
 static inline void
@@ -588,7 +604,7 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
   auto Now = llvm::TimeRecord::getCurrentTime();
   auto &Curr = getFrontendCounters();
   auto &Last = *LastTracedFrontendCounters;
-  updateProcessWideFrontendCounters(Curr);
+  updateProcessWideFrontendCounters(Curr, StartedTime, Now);
   if (EventProfilers) {
     auto TimeDelta = Now;
     TimeDelta -= EventProfilers->LastUpdated;
@@ -666,8 +682,10 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
     }
   }
 
+  auto Now = llvm::TimeRecord::getCurrentTime();
+
   if (FrontendCounters)
-    updateProcessWideFrontendCounters(getFrontendCounters());
+    updateProcessWideFrontendCounters(getFrontendCounters(), StartedTime, Now);
 
   // NB: Timer needs to be Optional<> because it needs to be destructed early;
   // LLVM will complain about double-stopping a timer if you tear down a
@@ -678,7 +696,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 
   // We currently do this by manual TimeRecord keeping because LLVM has decided
   // not to allow access to the Timers inside NamedRegionTimers.
-  auto ElapsedTime = llvm::TimeRecord::getCurrentTime();
+  auto ElapsedTime = Now;
   ElapsedTime -= StartedTime;
 
   if (DriverCounters) {

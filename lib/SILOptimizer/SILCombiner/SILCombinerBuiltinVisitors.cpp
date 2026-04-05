@@ -172,7 +172,8 @@ SILCombiner::optimizeBuiltinCOWBufferForReadingOSSA(BuiltinInst *bi) {
         });
   }
 
-  OwnershipRAUWHelper helper(ownershipFixupContext, bi, bi->getOperand(0));
+  OwnershipRAUWHelper helper(ownershipFixupContext, bi, bi->getOperand(0),
+                             /*respectLexicalFlags=*/ false);
   assert(helper && "COWBufferForReading always has an owned arg/owned result");
   helper.perform();
   return nullptr;

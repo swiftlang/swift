@@ -252,7 +252,6 @@ GuaranteedOwnershipExtension::checkLifetimeExtension(
     auto *user = use->getUser();
     if (use->isConsuming()) {
       ownedLifetime.updateForUse(user, true);
-      ownedConsumeBlocks.push_back(user->getParent());
     }
   }
   if (ownedLifetime.areUsesWithinBoundary(newUses, &deBlocks))
@@ -268,17 +267,17 @@ void GuaranteedOwnershipExtension::transform(Status status) {
     return;
   case ExtendBorrow: {
     PrunedLivenessBoundary guaranteedBoundary;
-    guaranteedLiveness.computeBoundary(guaranteedBoundary, ownedConsumeBlocks);
+    guaranteedLiveness.computeBoundary(guaranteedBoundary);
     extendLocalBorrow(beginBorrow, guaranteedBoundary, deleter);
     break;
   }
   case ExtendLifetime: {
     ownedLifetime.extendAcrossLiveness(guaranteedLiveness);
     PrunedLivenessBoundary ownedBoundary;
-    ownedLifetime.computeBoundary(ownedBoundary, ownedConsumeBlocks);
+    ownedLifetime.computeBoundary(ownedBoundary);
     extendOwnedLifetime(beginBorrow->getOperand(), ownedBoundary, deleter);
     PrunedLivenessBoundary guaranteedBoundary;
-    guaranteedLiveness.computeBoundary(guaranteedBoundary, ownedConsumeBlocks);
+    guaranteedLiveness.computeBoundary(guaranteedBoundary);
     extendLocalBorrow(beginBorrow, guaranteedBoundary, deleter);
     break;
   }
@@ -329,7 +328,8 @@ static void cleanupOperandsBeforeDeletion(SILInstruction *oldValue,
 // scope of the newValue can be fully extended.
 bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
                                                 SILValue newValue,
-                                                ArrayRef<Operand *> oldUses) {
+                                                ArrayRef<Operand *> oldUses,
+                                                bool respectLexicalFlags) {
   auto newOwnershipKind = newValue->getOwnershipKind();
 
   // If the either value is lexical, replacing its uses may result in
@@ -347,10 +347,12 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
   // +--------+--------+
   // |   *    |lexical | legal so long as it doesn't extend newValue's lifetime
   // +--------+--------+
-  if ((oldValue->isLexical() && !newValue->isLexical()) ||
-      (newValue->isLexical() &&
-       !areUsesWithinLexicalValueLifetime(newValue, oldUses)))
-    return false;
+  if (respectLexicalFlags) {
+    if ((oldValue->isLexical() && !newValue->isLexical()) ||
+        (newValue->isLexical() &&
+         !areUsesWithinLexicalValueLifetime(newValue, oldUses)))
+      return false;
+  }
 
   // If our new kind is ValueOwnershipKind::None, then we are fine. We
   // trivially support that. This check also ensures that we can always
@@ -400,13 +402,47 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
   return true;
 }
 
+// When an unowned value is replaced with 'newValue', does the fixup require
+// finding all uses of the original unowned value?
+static bool doesUnownedFixupRequireUses(SILValue newValue) {
+  switch (newValue->getOwnershipKind()) {
+  case OwnershipKind::None:
+    return false;
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid for values");
+  case OwnershipKind::Unowned:
+    return false;
+  case OwnershipKind::Guaranteed: {
+    return !isa<SILFunctionArgument>(newValue);
+  }
+  case OwnershipKind::Owned: {
+    return true;
+  }
+  }
+}
+
 // Determine whether it is valid to replace \p oldValue with \p newValue and
 // extend the lifetime of \p oldValue to cover the new uses.
 static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
-                                     OwnershipFixupContext &context) {
+                                     OwnershipFixupContext &context,
+                                     bool respectLexicalFlags) {
   // Owned or unowned use points.
   SmallVector<Operand *, 8> ownedUsePoints;
   switch (oldValue->getOwnershipKind()) {
+  case OwnershipKind::None:
+    break;
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid for values");
+  case OwnershipKind::Unowned: {
+    if (doesUnownedFixupRequireUses(newValue)) {
+      // Check that a copy can be extended across all unowned uses.
+      // Required by OwnershipRAUWPrepare::prepareUnowned for either
+      // borrowCopyOverGuaranteedUses or createPlusZeroCopy.
+      if (!findUsesOfSimpleValue(oldValue, &ownedUsePoints))
+        return false;
+    }
+    break;
+  }
   case OwnershipKind::Guaranteed: {
     // Check that the old lifetime can be extended and record the necessary
     // book-keeping in the OwnershipFixupContext.
@@ -426,23 +462,13 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
       return false;
     }
     return OwnershipRAUWHelper::hasValidRAUWOwnership(
-        oldValue, newValue, context.guaranteedUsePoints);
+        oldValue, newValue, context.guaranteedUsePoints, respectLexicalFlags);
   }
-  case OwnershipKind::Unowned: {
-    if (newValue->getOwnershipKind() == OwnershipKind::Owned) {
-      // Check that a copy can be extended across all unowned uses.
-      // Required by OwnershipRAUWPrepare::prepareUnowned.
-      if (!findUsesOfSimpleValue(oldValue, &ownedUsePoints))
-        return false;
-    }
-    // Ignore the uses of lexical unowned values when the new value is unowned
-    // or guaranteed.
-    break;
-  }
-  default: {
+  case OwnershipKind::Owned: {
     // If newValue is lexical, find the uses of oldValue so that it can be
     // determined whether the replacement would illegally extend the lifetime
-    // of newValue.
+    // of newValue. Only relevant when oldValue is Owned because the code above
+    // already checks for uses when oldValue is unowned or guaranteed.
     if (newValue->isLexical() &&
         !findUsesOfSimpleValue(oldValue, &ownedUsePoints)) {
       return false;
@@ -450,7 +476,7 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
   }
   }
   return OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue,
-                                                    ownedUsePoints);
+                                                    ownedUsePoints, respectLexicalFlags);
 }
 
 bool OwnershipRAUWHelper::mayIntroduceUnoptimizableCopies() {
@@ -1235,7 +1261,7 @@ SILValue OwnershipRAUWPrepare::prepareReplacement(SILValue newValue) {
 
   assert(
       OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue,
-                                                 ctx.guaranteedUsePoints) &&
+                              ctx.guaranteedUsePoints, /*respectLexicalFlags=*/ false) &&
       "Should have checked if can perform this operation before calling it?!");
   // If our new value is just none, we can pass it to anything so just RAUW
   // and return.
@@ -1334,7 +1360,8 @@ OwnershipRAUWHelper::getReplacementAddress() {
 
 OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
                                          SILValue inputOldValue,
-                                         SILValue inputNewValue)
+                                         SILValue inputNewValue,
+                                         bool respectLexicalFlags)
     : ctx(&inputCtx), oldValue(inputOldValue), newValue(inputNewValue) {
   // If we are already not valid, just bail.
   if (!isValid())
@@ -1382,7 +1409,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
 
   // Otherwise, lets check if we can perform this RAUW operation. If we can't,
   // set ctx to nullptr to invalidate the helper and return.
-  if (!canFixUpOwnershipForRAUW(oldValue, newValue, inputCtx)) {
+  if (!canFixUpOwnershipForRAUW(oldValue, newValue, inputCtx, respectLexicalFlags)) {
     invalidate();
     return;
   }
@@ -1686,7 +1713,8 @@ SILBasicBlock::iterator SingleUseReplacementUtility::perform() {
 //===----------------------------------------------------------------------===//
 
 OwnershipReplaceSingleUseHelper::OwnershipReplaceSingleUseHelper(
-    OwnershipFixupContext &inputCtx, Operand *inputUse, SILValue inputNewValue)
+    OwnershipFixupContext &inputCtx, Operand *inputUse, SILValue inputNewValue,
+    bool respectLexicalFlags)
     : ctx(&inputCtx), use(inputUse), newValue(inputNewValue) {
   // If we are already not valid, just bail.
   if (!isValid())
@@ -1707,7 +1735,7 @@ OwnershipReplaceSingleUseHelper::OwnershipReplaceSingleUseHelper(
   SmallVector<Operand *, 1> oldUses;
   oldUses.push_back(use);
   if (!OwnershipRAUWHelper::hasValidRAUWOwnership(use->get(), newValue,
-                                                  oldUses)) {
+                                                  oldUses, respectLexicalFlags)) {
     invalidate();
     return;
   }

@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
@@ -162,3 +163,7 @@ def is_any_repository_locked(pool_args: List[RunnerArguments]) -> Set[str]:
             if file.suffix == ".lock":
                 locked_repositories.add(repo_name)
     return locked_repositories
+
+def is_commit_hash(ref: str):
+    """Check if ref looks like a commit hash"""
+    return bool(re.match(r'^[0-9a-f]{7,40}$', ref, re.IGNORECASE))

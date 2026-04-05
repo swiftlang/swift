@@ -1,0 +1,7 @@
+// {"kind":"complete","original":"cd83a4da","signature":"swift::constraints::ConstraintSystem::getType(swift::ASTNode) const","signatureAssert":"Assertion failed: (found != NodeTypes.end() && \"Expected type to have been set!\"), function getType","signatureNext":"ConstraintGenerator::visitTypeJoinExpr"}
+// RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
+{
+  switch {
+  case where
+  #^^#== .write
+    ""

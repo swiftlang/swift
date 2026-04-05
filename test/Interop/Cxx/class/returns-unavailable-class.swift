@@ -38,11 +38,11 @@ public:
 };
 
 // CHECK: struct Struct {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   init(x: Int32, y: Int32)
-// CHECK-NEXT:   func returnsClassInTypesModules() -> Never
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   var x: Int32
 // CHECK-NEXT:   var y: Int32
+// CHECK-NEXT:   func returnsClassInTypesModules() -> Never
 // CHECK-NEXT: }
 
 TemplateInTypesModule<int> funcWithClassInTypesModules();

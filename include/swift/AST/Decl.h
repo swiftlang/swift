@@ -778,7 +778,7 @@ protected:
     HasLazyUnderlyingSubstitutions : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -850,7 +850,11 @@ protected:
     StrictMemorySafety : 1,
 
     /// Whether this module uses deferred code generation in Embedded Swift.
-    DeferredCodeGen : 1
+    DeferredCodeGen : 1,
+
+    /// Whether this module was compile with "aggressive" CMO i.e
+    /// the flag: -cross-module-optimization.
+    AggressiveCMOEnabled : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1223,6 +1227,9 @@ public:
   /// It is an error to call this on a type that does not have either an
   /// *ApplicationMain or an main attribute.
   ArtificialMainKind getArtificialMainKind() const;
+
+  /// Returns true if this can support borrow/mutate accessors.
+  bool canSupportBorrowAccessors() const;
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(const char *filename));
@@ -1936,6 +1943,9 @@ public:
   bool isNonisolated() const {
     return getOptions().contains(ProtocolConformanceFlags::Nonisolated);
   }
+  bool isReparented() const {
+    return getOptions().contains(ProtocolConformanceFlags::Reparented);
+  }
 
   TypeExpr *getGlobalActorIsolationType() const {
     return globalActorIsolationType;
@@ -2251,6 +2261,8 @@ public:
   /// conformed to otherwise.
   std::optional<InvertibleProtocolKind>
   isAddingConformanceToInvertible() const;
+
+  bool isForReparenting() const;
 
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.
@@ -2704,9 +2716,8 @@ public:
   Expr *getInit(unsigned i) const {
     return getPatternList()[i].getInit();
   }
-  Expr *getExecutableInit(unsigned i) const {
-    return getPatternList()[i].getExecutableInit();
-  }
+  bool hasSingleVarConstantFoldedInit() const;
+  Expr *getExecutableInit(unsigned i) const;
   Expr *getOriginalInit(unsigned i) const {
     return getPatternList()[i].getOriginalInit();
   }
@@ -3188,7 +3199,8 @@ public:
   /// \sa hasOpenAccess
   AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr,
-                       bool treatUsableFromInlineAsPublic = false) const;
+                       bool treatUsableFromInlineAsPublic = false,
+                       bool ignoreImportAccessLevel = false) const;
 
 
   /// Copy the formal access level and @usableFromInline attribute from
@@ -3411,8 +3423,12 @@ public:
   }
 
   /// Returns the protocol requirements that this decl conforms to.
+  ///
+  /// \param NTD If specified, the nominal to use for conformance lookup. This
+  /// is useful if you want to query for a subclass.
   ArrayRef<ValueDecl *>
-  getSatisfiedProtocolRequirements(bool Sorted = false) const;
+  getSatisfiedProtocolRequirements(bool Sorted = false,
+                                   NominalTypeDecl *NTD = nullptr) const;
 
   /// Determines the kind of access that should be performed by a
   /// DeclRefExpr or MemberRefExpr use of this value in the specified
@@ -4425,7 +4441,8 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class DirectLookupRequest;
   friend class LookupAllConformancesInContextRequest;
   friend ArrayRef<ValueDecl *>
-  ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
+  ValueDecl::getSatisfiedProtocolRequirements(bool Sorted,
+                                              NominalTypeDecl *) const;
 
 protected:
   Type DeclaredTy;
@@ -5631,6 +5648,12 @@ public:
   /// this protocol itself.
   ArrayRef<ProtocolDecl *> getAllInheritedProtocols() const;
 
+  /// Retrieve the set of protocols that are reparenting this protocol,
+  /// plus the extension defining the relationship and the index into that
+  /// extension's InheritedTypes where it occurs.
+  ArrayRef<std::tuple<ProtocolDecl *, ExtensionDecl *, unsigned>>
+  getReparentingProtocols() const;
+
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
@@ -5734,6 +5757,14 @@ public:
   /// Returns a dictionary that maps Obj-C protocol requirement selectors to a
   /// list of function decls.
   ObjCRequirementMap getObjCRequiremenMap() const;
+
+  /// True if this protocol is marked for fast casting, i.e. fast conformance
+  /// lookup via the vtable of a conforming class.
+  /// See also SILVTable::ConformanceEntry
+  bool isEligibleForFastCasting() const {
+    // TODO: make this a real attribute
+    return hasSemanticsAttr("fast_cast");
+  }
 
 private:
   void computeKnownProtocolKind() const;
@@ -6770,12 +6801,19 @@ public:
   /// @frozen and resides in a resilient module.
   bool isInitExposedToClients() const;
 
+  /// Returns the export level of this var initializer expression.
+  ExportedLevel getInitExposedLevel() const;
+
   /// Determines if this var is exposed as part of the layout of a
-  /// @frozen struct.
+  /// @frozen struct or implicitly in non-library-evolution mode.
   ///
   /// From the standpoint of access control and exportability checking, this
   /// var will behave as if it was public, even if it is internal or private.
-  ExportedLevel isLayoutExposedToClients() const;
+  ///
+  /// If \p forceCheckClasses, don't exclude non-open classes. We use this
+  /// to look at properties with a default value in embedded mode, otherwise
+  /// we can mostly ignore stored properties in classes.
+  ExportedLevel isLayoutExposedToClients(bool forceCheckClasses = false) const;
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
@@ -7977,6 +8015,8 @@ public:
   /// type of the function will be `async` as well.
   bool hasAsync() const { return Bits.AbstractFunctionDecl.Async; }
 
+  void setHasAsync(bool async) { Bits.AbstractFunctionDecl.Async = async; }
+
   /// Determine whether the given function is concurrent.
   ///
   /// A function is concurrent if it has the @Sendable attribute.
@@ -8346,6 +8386,9 @@ public:
         ->getImplicitSelfDecl(createIfNeeded);
   }
   ParamDecl *getImplicitSelfDecl(bool createIfNeeded=true);
+
+  /// Whether the function is a non-static method.
+  bool isInstanceMethod() const { return hasImplicitSelfDecl() && !isStatic(); }
 
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const {
@@ -8944,9 +8987,9 @@ class EnumElementDecl : public DeclContext, public ValueDecl {
   ParameterList *Params;
   
   SourceLoc EqualsLoc;
-  
-  /// The raw value literal for the enum element, or null.
-  LiteralExpr *RawValueExpr;
+
+  /// The raw value expression for the enum element, or null.
+  Expr *RawValueExpr;
 
 protected:
   struct {
@@ -8957,7 +9000,7 @@ public:
   EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
                   ParameterList *Params,
                   SourceLoc EqualsLoc,
-                  LiteralExpr *RawValueExpr,
+                  Expr *RawValueExpr,
                   DeclContext *DC);
 
   /// Returns the string for the base name, or "_" if this is unnamed.
@@ -8977,20 +9020,17 @@ public:
   void setParameterList(ParameterList *params);
   ParameterList *getParameterList() const { return Params; }
 
-  /// Retrieves a fully typechecked raw value expression associated
-  /// with this enum element, if it exists.
+  /// Retrieves a raw value expression associated with this enum element, if it
+  /// exists, as it was written in the source.
+  Expr *getOriginalRawValueExpr() const;
+
+  /// Retrieves a fully-typechecked and (if LiteralExpressions experimental
+  /// feature is enabled) constant-folded raw value expression associated with
+  /// this enum element, if it exists.
   LiteralExpr *getRawValueExpr() const;
-  
-  /// Retrieves a "structurally" checked raw value expression associated
-  /// with this enum element, if it exists.
-  ///
-  /// The structural raw value may or may not have a type set, but it is
-  /// guaranteed to be suitable for retrieving any non-semantic information
-  /// like digit text for an integral raw value or user text for a string raw value.
-  LiteralExpr *getStructuralRawValueExpr() const;
-  
+
   /// Reset the raw value expression.
-  void setRawValueExpr(LiteralExpr *e);
+  void setRawValueExpr(Expr *e);
 
   /// Return the containing EnumDecl.
   EnumDecl *getParentEnum() const {
@@ -9016,7 +9056,7 @@ public:
 
   /// Do not call this!
   /// It exists to let the AST walkers get the raw value without forcing a request.
-  LiteralExpr *getRawValueUnchecked() const { return RawValueExpr; }
+  Expr *getRawValueUnchecked() const { return RawValueExpr; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::EnumElement;

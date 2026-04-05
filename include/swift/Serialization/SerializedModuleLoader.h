@@ -27,9 +27,11 @@ namespace swift {
 class ModuleFile;
 class PathObfuscator;
 class ModuleFileSharedCore;
+struct ExplicitSwiftModuleMap;
+struct ExplicitClangModuleMap;
 enum class ModuleLoadingBehavior;
 namespace file_types {
-  enum ID : uint8_t;
+enum ID : uint8_t;
 }
 
 /// How a dependency should be loaded.
@@ -269,7 +271,12 @@ public:
   /// attempt with a given status, to be used for diagnostic output.
   static std::optional<std::string> invalidModuleReason(serialization::Status status);
 
-  virtual void addExplicitModulePath(StringRef name, std::string path) {};
+  virtual ExplicitSwiftModuleMap *getExplicitSwiftModuleMap() {
+    return nullptr;
+  }
+  virtual ExplicitClangModuleMap *getExplicitClangModuleMap() {
+    return nullptr;
+  }
 };
 
 /// Imports serialized Swift modules into an ASTContext.

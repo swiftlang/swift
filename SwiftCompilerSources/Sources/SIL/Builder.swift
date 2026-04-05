@@ -224,10 +224,10 @@ public struct Builder {
     return createIntegerLiteral(integerValue, type: boolType)
   }
 
-  public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false,
+  public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false, isNested: Bool = false,
                              tailAllocatedTypes: TypeArray, tailAllocatedCounts: [Value]) -> AllocRefInst {
     return tailAllocatedCounts.withBridgedValues { countsRef in
-      let dr = bridged.createAllocRef(type.bridged, isObjC, canAllocOnStack, isBare, tailAllocatedTypes.bridged, countsRef)
+      let dr = bridged.createAllocRef(type.bridged, isObjC, canAllocOnStack, isBare, isNested, tailAllocatedTypes.bridged, countsRef)
       return notifyNew(dr.getAs(AllocRefInst.self))
     }
   }
@@ -600,10 +600,13 @@ public struct Builder {
     capturedArguments: [Value], 
     calleeConvention: ArgumentConvention, 
     hasUnknownResultIsolation: Bool, 
-    isOnStack: Bool
+    isOnStack: Bool,
+    /// If true this `partial_apply [on_stack]` must follow proper stack allocation nesting rules.
+    isNested: Bool
   ) -> PartialApplyInst {
     return capturedArguments.withBridgedValues { capturedArgsRef in
-      let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged, substitutionMap.bridged, hasUnknownResultIsolation, isOnStack)
+      let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged,
+                                           substitutionMap.bridged, hasUnknownResultIsolation, isOnStack, isNested)
       return notifyNew(pai.getAs(PartialApplyInst.self))
     }
   }
@@ -857,8 +860,13 @@ public struct Builder {
     let makeAddrBorrow = bridged.createMakeAddrBorrow(referent.bridged)
     return notifyNew(makeAddrBorrow.getAs(MakeAddrBorrowInst.self))
   }
-}
 
+  @discardableResult
+  public func createFixLifetime(operand: Value) -> FixLifetimeInst {
+    let fixLifetime = bridged.createFixLifetime(operand.bridged)
+    return notifyNew(fixLifetime.getAs(FixLifetimeInst.self))
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //                                  Utilities

@@ -26,6 +26,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
@@ -174,6 +175,7 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
         // Add explicit Swift dependency compilation flags
         Args.push_back("-explicit-interface-module-build");
         Args.push_back("-disable-implicit-swift-modules");
+        Args.push_back("-disable-cross-import-overlay-search");
 
         // Handle clang arguments. For caching build, all arguments are passed
         // with `-direct-clang-cc1-module-build`.
@@ -217,10 +219,13 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
                /*static=*/false, /*force_load=*/true});
         }
         bool isStatic = llvm::find(ArgsRefs, "-static") != ArgsRefs.end();
+        bool isStrictMemorySafety =
+            llvm::find(ArgsRefs, "-strict-memory-safety") != ArgsRefs.end();
 
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
             InPath, compiledCandidatesRefs, ArgsRefs, {}, {}, linkLibraries,
-            isFramework, isStatic, {}, /*module-cache-key*/ "", UserModVer);
+            isFramework, isStatic, isStrictMemorySafety, {},
+            /*module-cache-key*/ "", UserModVer);
 
         // Walk the source file to find the import declarations.
         llvm::StringSet<> alreadyAddedModules;
@@ -275,6 +280,13 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
 
   if (code) {
     return code;
+  }
+  // Compute library level based on the interface file path.
+  {
+    SmallString<256> modulePathBuf;
+    StringRef modulePath = moduleInterfacePath.toStringRef(modulePathBuf);
+    Result->setLibraryLevel(libraryLevelFromPath(
+        modulePath, Ctx.SearchPathOpts.getSDKPath(), Ctx.LangOpts.Target));
   }
   return *Result;
 }
@@ -356,6 +368,9 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
       serializedSearchPaths, binaryModuleImports->headerImport,
       definingModulePath, isFramework, loadedModuleFile->isStaticLibrary(),
       loadedModuleFile->isBuiltWithCxxInterop(),
+      loadedModuleFile->getResilienceStrategy() ==
+          ResilienceStrategy::Resilient,
+      loadedModuleFile->strictMemorySafety(),
       /*module-cache-key*/ "", userModuleVer);
 
   for (auto &macro : loadedModuleFile->getExternalMacros()) {
@@ -365,6 +380,13 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
       continue;
     dependencies.addMacroDependency(macro.ModuleName, deps->LibraryPath,
                                     deps->ExecutablePath);
+  }
+
+  // Compute library level based on the binary module path.
+  {
+    dependencies.setLibraryLevel(libraryLevelFromPath(
+        definingModulePath, Ctx.SearchPathOpts.getSDKPath(),
+        Ctx.LangOpts.Target));
   }
 
   return std::move(dependencies);

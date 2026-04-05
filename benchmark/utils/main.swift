@@ -95,6 +95,7 @@ import DropLast
 import DropWhile
 import ErrorHandling
 import Exclusivity
+import ExecutorEnqueue
 import ExistentialPerformance
 import Fibonacci
 import FindStringNaive
@@ -193,6 +194,7 @@ import SortIntPyramids
 import SortLargeExistentials
 import SortLettersInPlace
 import SortStrings
+import SpanTests
 import StaticArray
 import StrComplexWalk
 import StrToInt
@@ -213,6 +215,7 @@ import StringWalk
 import SubstringTest
 import Suffix
 import SuperChars
+import TaskGroups
 import TwoSum
 import TypeFlood
 import UTF8Decode
@@ -302,6 +305,7 @@ register(DropLast.benchmarks)
 register(DropWhile.benchmarks)
 register(ErrorHandling.benchmarks)
 register(Exclusivity.benchmarks)
+register(ExecutorEnqueue.benchmarks)
 register(ExistentialPerformance.benchmarks)
 register(Fibonacci.benchmarks)
 register(FindStringNaive.benchmarks)
@@ -401,6 +405,7 @@ register(SortIntPyramids.benchmarks)
 register(SortLargeExistentials.benchmarks)
 register(SortLettersInPlace.benchmarks)
 register(SortStrings.benchmarks)
+register(SpanTests.benchmarks)
 register(StaticArray.benchmarks)
 register(StrComplexWalk.benchmarks)
 register(StrToInt.benchmarks)
@@ -425,6 +430,7 @@ register(StringWalk.benchmarks)
 register(SubstringTest.benchmarks)
 register(Suffix.benchmarks)
 register(SuperChars.benchmarks)
+register(TaskGroups.benchmarks)
 register(TwoSum.benchmarks)
 register(TypeFlood.benchmarks)
 register(UTF8Decode.benchmarks)

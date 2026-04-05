@@ -876,12 +876,18 @@ SILFunction *SILGenModule::emitProtocolWitness(
     return f;
   ASSERT(!f);
 
+  // Distributed: Carry the distributed thunk kind from the requirement.
+  // Distributed accessors dispatch through the witness table at runtime,
+  // so `DeadFunctionElimination` must keep these entries alive even though
+  // they have no SIL callers.
+  auto thunkKind = requirement.isDistributedThunk() ? IsDistributedThunk : IsThunk;
+
   SILGenFunctionBuilder builder(*this);
   f = builder.createFunction(
       linkage, nameBuffer, witnessSILFnType, genericEnv,
       SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent,
       serializedKind, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-      ProfileCounter(), IsThunk, SubclassScope::NotApplicable, InlineStrategy);
+      ProfileCounter(), thunkKind, SubclassScope::NotApplicable, InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
@@ -1084,6 +1090,25 @@ public:
   void addProtocolConformanceDescriptor() { }
 
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
+    // Check if there is a reparented base protocol conformance.
+    auto local = Proto->getLocalConformances();
+    for (auto conf : local) {
+      if (conf->getProtocol() != baseProto)
+        continue;
+
+      if (isa<SelfProtocolConformance>(conf))
+        continue;
+
+      ASSERT(conf->isReparented());
+      DefaultWitnesses.push_back(
+          SILWitnessTable::BaseProtocolWitness{baseProto, conf});
+
+      // Ensure the witness table is emitted for this conformance.
+      SGM.useConformance(/*inst=*/nullptr, ProtocolConformanceRef(conf));
+      return;
+    }
+
+    // Otherwise, there is no default conformance for this base protocol.
     addMissingDefault();
   }
 

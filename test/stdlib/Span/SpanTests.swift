@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 import StdlibUnittest
 

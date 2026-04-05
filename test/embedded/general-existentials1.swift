@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -enable-experimental-feature EmbeddedExistentials -parse-as-library -wmo) | %FileCheck %s
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -enable-experimental-feature EmbeddedExistentials -parse-as-library -wmo -O) | %FileCheck %s
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -enable-experimental-feature EmbeddedExistentials -parse-as-library -wmo -Osize) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -enable-experimental-feature EmbeddedExistentials -parse-as-library -wmo %target-embedded-posix-shim) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -enable-experimental-feature EmbeddedExistentials -parse-as-library -wmo -O %target-embedded-posix-shim) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -enable-experimental-feature EmbeddedExistentials -parse-as-library -wmo -Osize %target-embedded-posix-shim) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
@@ -248,6 +248,22 @@ func testP4() -> any P4 {
   return C4(t: K4(x: 437))
 }
 
+protocol QD: Q {
+}
+
+class MyGenericClass<T>: QD {
+  func bar() {
+    print("MyGenericClass.bar")
+  }
+}
+
+final class Derived: MyGenericClass<Int> {
+}
+
+func testInheritedSpecialized(e: QD) {
+  e.bar()
+}
+
 @main
 struct Main {
   static func main() {
@@ -292,6 +308,9 @@ struct Main {
 
     testP4().foo()
     // CHECK: 437
+
+    testInheritedSpecialized(e: Derived())
+    // CHECK: MyGenericClass.bar
   }
 }
 

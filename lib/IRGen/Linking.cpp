@@ -1480,12 +1480,24 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
       return true;
 
     auto assocConformance = getAssociatedConformance();
+
+    auto &ctx = getDecl()->getASTContext();
+    if (assocConformance.first->isEqual(ctx.TheSelfType))
+      return cast<ProtocolDecl>(assocConformance.second)->isWeakImported(module);
+
     auto *depMemTy = assocConformance.first->castTo<DependentMemberType>();
     return depMemTy->getAssocType()->isWeakImported(module);
   }
 
-  case Kind::BaseConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor: {
+    auto baseProto = getAssociatedConformance().second;
+
+    // The base protocol might be reparented and less available.
+    if (baseProto->isWeakImported(module))
+      return true;
+
     return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
+  }
 
   case Kind::TypeMetadata:
   case Kind::TypeMetadataAccessFunction: {

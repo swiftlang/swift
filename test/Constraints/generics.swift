@@ -571,22 +571,6 @@ func rdar35541153() {
   bar(y, "ultimate question", 42) // Ok
 }
 
-// rdar://problem/38159133
-// https://github.com/apple/swift/issues/49673
-// Swift 4.1 Xcode 9.3b4 regression
-
-protocol P_38159133 {}
-
-do {
-  class Super {}
-  class A: Super, P_38159133 {}
-  class B: Super, P_38159133 {}
-
-  func rdar38159133(_ a: A?, _ b: B?) {
-    let _: [P_38159133] = [a, b].compactMap { $0 } // Ok
-  }
-}
-
 func rdar35890334(_ arr: inout [Int]) {
   _ = arr.popFirst() // expected-error {{referencing instance method 'popFirst()' on 'Collection' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent}}
 }
@@ -900,7 +884,7 @@ func rdar78623338() {
 // rdar://78781552 - crash in `getFunctionArgApplyInfo`
 func rdar78781552() {
   struct Test<Data, Content> where Data : RandomAccessCollection {
-    // expected-note@-1 {{where 'Data' = '(((Int) throws -> Bool) throws -> [Int])?'}}
+    // expected-note@-1 {{where 'Data' = '(((Int) throws(E) -> Bool) throws(E) -> [Int])?'}}
     // expected-note@-2 {{'init(data:filter:)' declared here}}
     // expected-note@-3 {{'Content' declared as parameter to type 'Test'}}
     var data: [Data]
@@ -909,11 +893,12 @@ func rdar78781552() {
 
   func test(data: [Int]?) {
     Test(data?.filter)
-    // expected-error@-1 {{generic struct 'Test' requires that '(((Int) throws -> Bool) throws -> [Int])?' conform to 'RandomAccessCollection'}}
+    // expected-error@-1 {{generic struct 'Test' requires that '(((Int) throws(E) -> Bool) throws(E) -> [Int])?' conform to 'RandomAccessCollection'}}
     // expected-error@-2 {{generic parameter 'Content' could not be inferred}} expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
-    // expected-error@-3 {{cannot convert value of type '(((Int) throws -> Bool) throws -> [Int])?' to expected argument type '[(((Int) throws -> Bool) throws -> [Int])?]'}}
+    // expected-error@-3 {{cannot convert value of type '(((Int) throws(E) -> Bool) throws(E) -> [Int])?' to expected argument type '[(((Int) throws(E) -> Bool) throws(E) -> [Int])?]'}}
     // expected-error@-4 {{missing argument label 'data:' in call}}
     // expected-error@-5 {{missing argument for parameter 'filter' in call}}
+    // expected-error@-6 {{generic parameter 'E' could not be inferred}}
   }
 }
 
@@ -1073,21 +1058,6 @@ do {
   func test_existential_mismatch(s: S) {
     s.test.compute()
     // expected-error@-1 {{referencing instance method 'compute()' on 'Dictionary' requires the types 'any P' and 'Any' be equivalent}}
-  }
-}
-
-// https://github.com/swiftlang/swift/issues/77003
-do {
-  func f<T, U>(_: T.Type, _ fn: (T) -> U?, _: (U) -> ()) {}
-
-  struct Task<E> {
-    init(_: () -> ()) where E == Never {}
-    init(_: () throws -> ()) where E == Error {}
-  }
-
-  func test(x: Int?.Type) {
-      // Note that it's important that Task stays unused, using `_ = ` changes constraint generation behavior.
-      f(x, { $0 }, { _ in Task {} }) // expected-warning {{result of 'Task<E>' initializer is unused}}
   }
 }
 

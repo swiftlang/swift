@@ -118,6 +118,8 @@ getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
     return "xros";
   case DarwinPlatformKind::VisionOSSimulator:
     return "xrossim";
+  default:
+    break;
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -554,6 +556,8 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
       case DarwinPlatformKind::VisionOSSimulator:
         platformName = "xros-simulator";
         break;
+      case DarwinPlatformKind::Firmware:
+        return;
       }
     }
 
@@ -614,6 +618,13 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
         }
 
         break;
+      case DarwinPlatformKind::Firmware:
+        osVersion = triple.getOSVersion();
+        // Firmware is not versioned; (always version 1.0.0).
+        if (osVersion.getMajor() == 0) {
+          osVersion = llvm::VersionTuple(/*Major=*/1, /*Minor=*/0);
+        }
+        break;
       }
     }
 
@@ -669,6 +680,8 @@ static unsigned getDWARFVersionForTriple(const llvm::Triple &triple) {
     osVersion = triple.getOSVersion();
     if (osVersion < llvm::VersionTuple(2))
       return 4;
+    return 5;
+  case DarwinPlatformKind::Firmware:
     return 5;
   }
   llvm_unreachable("unsupported platform kind");
@@ -1010,7 +1023,7 @@ toolchains::Darwin::validateOutputInfo(DiagnosticEngine &diags,
   // If we have been provided with an SDK, go read the SDK information.
   if (!outputInfo.SDKPath.empty()) {
     auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
-        *llvm::vfs::getRealFileSystem(), outputInfo.SDKPath);
+        *llvm::vfs::createPhysicalFileSystem(), outputInfo.SDKPath);
     if (SDKInfoOrErr) {
       SDKInfo = *SDKInfoOrErr;
     } else {

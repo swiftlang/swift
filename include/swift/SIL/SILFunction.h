@@ -59,6 +59,7 @@ enum IsThunk_t {
   IsReabstractionThunk,
   IsSignatureOptimizedThunk,
   IsBackDeployedThunk,
+  IsDistributedThunk,
 };
 enum IsDynamicallyReplaceable_t {
   IsNotDynamic,
@@ -498,6 +499,7 @@ private:
     case IsThunk:
     case IsReabstractionThunk:
     case IsBackDeployedThunk:
+    case IsDistributedThunk:
       thunkCanHaveSubclassScope = false;
       break;
     }
@@ -790,6 +792,8 @@ public:
   bool isCalleeAllocatedCoroutine() const {
     return LoweredType->isCalleeAllocatedCoroutine();
   }
+
+  bool isCoroutine() const { return LoweredType->isCoroutine(); }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {

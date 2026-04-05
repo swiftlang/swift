@@ -92,8 +92,7 @@ public:
     return Components.empty();
   }
 
-  /// Convert to a (maximum-4-element) llvm::VersionTuple, truncating
-  /// away any 5th component that might be in this version.
+  /// Convert to an llvm::VersionTuple.
   operator llvm::VersionTuple() const;
 
   /// Returns the concrete version to use when \e this version is provided as
@@ -137,12 +136,6 @@ public:
   static constexpr unsigned getFutureMajorLanguageVersion() {
     return 7;
   }
-
-  // List of backward-compatibility versions that we permit passing as
-  // -swift-version <vers>
-  static std::array<StringRef, 4> getValidEffectiveVersions() {
-    return {{"4", "4.2", "5", "6"}};
-  };
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);

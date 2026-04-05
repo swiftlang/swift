@@ -366,6 +366,8 @@ $S1T19protocol_resilience17ResilientProtocolPTl ---> associated type descriptor 
 $S18resilient_protocol21ResilientBaseProtocolTL ---> protocol requirements base descriptor for resilient_protocol.ResilientBaseProtocol
 $S1t1PP10AssocType2_AA1QTn ---> associated conformance descriptor for t.P.AssocType2: t.Q
 $S1t1PP10AssocType2_AA1QTN ---> default associated conformance accessor for t.P.AssocType2: t.Q
+$s4mini3SeqPxAA06BorrowB0TN ---> default associated conformance accessor for mini.Seq.A: mini.BorrowSeq
+$s4mini3SeqPxAA06BorrowB0Tn ---> associated conformance descriptor for mini.Seq.A: mini.BorrowSeq
 $s4Test6testityyxlFAA8MystructV_TB5 ---> generic specialization <Test.Mystruct> of Test.testit<A>(A) -> ()
 $sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufCSu_SiTg5 ---> generic specialization <Swift.UInt, Swift.Int> of (extension in Swift):Swift.UnsignedInteger< where A: Swift.FixedWidthInteger>.init<A where A1: Swift.BinaryInteger>(A1) -> A
 $s4test7genFuncyyx_q_tr0_lFSi_SbTtt1g5 ---> generic specialization <Swift.Int, Swift.Bool> of test.genFunc<A, B>(A, B) -> ()
@@ -480,6 +482,14 @@ $s4null16NonSendableKlassCIegHo_ACs5Error_pIegHTrzo_TR ---> {T:} reabstraction t
 $sSRyxG15Synchronization19AtomicRepresentableABRi_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
 $sSRyxG15Synchronization19AtomicRepresentableABRi0_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Escapable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
 $sSRyxG15Synchronization19AtomicRepresentableABRi1_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.<bit 2>> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
+
+$s5assoc9ncElementyyxAA1PRz0C0Rj_zlF ---> assoc.ncElement<A where A: assoc.P, A.Element: ~Swift.Copyable>(A) -> ()
+$s5assoc6ncIteryyxAA1PRzlF ---> assoc.ncIter<A where A: assoc.P>(A) -> ()
+$s5assoc6ncBothyyxAA1PRz7ElementRj_zlF ---> assoc.ncBoth<A where A: assoc.P, A.Element: ~Swift.Copyable>(A) -> ()
+$s5assoc12bothCopyableyyxAA1PRzs0C08IteratorRpzlF ---> assoc.bothCopyable<A where A: assoc.P, A.Iterator: Swift.Copyable>(A) -> ()
+$s5assoc6HolderVAARi_z7ElementRj_zrlE02ncC0yyqd__AA1PRd__ADRj_d__lF ---> (extension in assoc):assoc.Holder< where A: ~Swift.Copyable, A.Element: ~Swift.Copyable>.ncElement<A where A1: assoc.P, A1.Element: ~Swift.Copyable>(A1) -> ()
+$s5assoc6HolderVAA7ElementRj_zrlE19forceIntoInterface5yyF ---> (extension in assoc):assoc.Holder< where A.Element: ~Swift.Copyable>.forceIntoInterface5() -> ()
+$s5assoc6HolderVAARi_z7ElementRj_zrlE12copyableIteryyqd__AA1PRd__s8Copyable8IteratorRpd__lF ---> (extension in assoc):assoc.Holder< where A: ~Swift.Copyable, A.Element: ~Swift.Copyable>.copyableIter<A where A1: assoc.P, A1.Iterator: Swift.Copyable>(A1) -> ()
 
 $s23variadic_generic_opaque2G2VyAA2S1V_AA2S2VQPGAA1PHPAeA1QHPyHC_AgaJHPyHCHX_HC ---> concrete protocol conformance variadic_generic_opaque.G2<Pack{variadic_generic_opaque.S1, variadic_generic_opaque.S2}> to protocol conformance ref (type's module) variadic_generic_opaque.P with conditional requirements: (pack protocol conformance (concrete protocol conformance variadic_generic_opaque.S1 to protocol conformance ref (type's module) variadic_generic_opaque.Q, concrete protocol conformance variadic_generic_opaque.S2 to protocol conformance ref (type's module) variadic_generic_opaque.Q))
 

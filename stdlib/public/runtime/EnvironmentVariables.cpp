@@ -323,3 +323,7 @@ SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverr
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableTaskSlabAllocator() {
   return runtime::environment::SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR();
 }
+
+SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyTracingSubsystem() {
+  return runtime::environment::SWIFT_CONCURRENCY_TRACING_SUBSYSTEM();
+}

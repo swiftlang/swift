@@ -260,7 +260,8 @@ extension ApplySite {
                                                 capturedArguments: newArguments,
                                                 calleeConvention: partialAp.calleeConvention,
                                                 hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
-                                                isOnStack: partialAp.isOnStack)
+                                                isOnStack: partialAp.isOnStack,
+                                                isNested:  partialAp.isNested)
       partialAp.replace(with: newApply, context)
 
     case let tryApply as TryApplyInst:
@@ -441,6 +442,14 @@ extension Instruction {
       // An extend_lifetime can only be removed if the operand is also removed.
       // If its operand is trivial, it will be removed by MandatorySimplification.
       return false
+    case let dsi as DestructureStructInst:
+      // A dead `destructure_struct` with an owned argument can appear for a non-copyable or
+      // non-escapable struct which has only trivial elements. The instruction is not trivially
+      // dead because it ends the lifetime of its operand.
+      if dsi.struct.ownership == .owned {
+        return false
+      }
+      return true
     default:
       break
     }

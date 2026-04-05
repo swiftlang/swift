@@ -25,6 +25,7 @@ swift_compiler_sources(Optimizer
   SimplifyDebugStep.swift
   SimplifyDestroyValue.swift
   SimplifyDestructure.swift
+  SimplifyDifferentiableFunction.swift
   SimplifyEndCOWMutationAddr.swift
   SimplifyExplicitCopy.swift
   SimplifyFixLifetime.swift
@@ -34,6 +35,7 @@ swift_compiler_sources(Optimizer
   SimplifyLoad.swift
   SimplifyLoadBorrow.swift
   SimplifyMarkDependence.swift
+  SimplifyMoveValue.swift
   SimplifyPartialApply.swift
   SimplifyPointerToAddress.swift
   SimplifyRefCasts.swift

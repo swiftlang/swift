@@ -34,7 +34,7 @@ using namespace swift;
 namespace {
 
 std::string getFileContents(llvm::StringRef path) {
-  auto fs = llvm::vfs::getRealFileSystem();
+  auto fs = llvm::vfs::createPhysicalFileSystem();
   auto file = fs->openFileForRead(path);
   if (!file)
     return "";

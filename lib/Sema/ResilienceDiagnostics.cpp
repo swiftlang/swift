@@ -93,8 +93,9 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
           Context.Diags
               .diagnose(loc, diagID, D, accessor->getFormalAccess(),
                         fragileKind.getSelector())
-              .warnUntilFutureLanguageModeIf(
-                  !Context.LangOpts.hasFeature(Feature::StrictAccessControl));
+              .warnUntilLanguageModeIf(
+                  !Context.LangOpts.hasFeature(Feature::StrictAccessControl),
+                  LanguageMode::future);
           Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
         }
       }
@@ -108,7 +109,8 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   // Dynamic declarations were mistakenly not checked in Swift 4.2.
   // Do enforce the restriction even in pre-Swift-5 modes if the module we're
   // building is resilient, though.
-  if (D->shouldUseObjCDispatch() && !Context.isLanguageModeAtLeast(5) &&
+  if (D->shouldUseObjCDispatch() &&
+      !Context.isLanguageModeAtLeast(LanguageMode::v5) &&
       !DC->getParentModule()->isResilient()) {
     return false;
   }
@@ -122,22 +124,23 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   // Swift 4.2 did not perform any checks for type aliases.
   if (isa<TypeAliasDecl>(D)) {
-    if (!Context.isLanguageModeAtLeast(4, 2))
+    if (!Context.isLanguageModeAtLeast(LanguageMode::v4_2))
       return false;
-    if (!Context.isLanguageModeAtLeast(5))
+    if (!Context.isLanguageModeAtLeast(LanguageMode::v5))
       downgradeToWarning = DowngradeToWarning::Yes;
   }
 
   // Swift 4.2 did not check accessor accessibility.
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
-    if (!accessor->isInitAccessor() && !Context.isLanguageModeAtLeast(5))
+    if (!accessor->isInitAccessor() &&
+        !Context.isLanguageModeAtLeast(LanguageMode::v5))
       downgradeToWarning = DowngradeToWarning::Yes;
   }
 
   // Swift 5.0 did not check the underlying types of local typealiases.
   if (isa<TypeAliasDecl>(DC) &&
       !Context.LangOpts.hasFeature(Feature::StrictAccessControl) &&
-      !Context.isLanguageModeAtLeast(6))
+      !Context.isLanguageModeAtLeast(LanguageMode::v6))
     downgradeToWarning = DowngradeToWarning::Yes;
 
   auto diagID = diag::resilience_decl_unavailable;
@@ -214,7 +217,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   static_cast<unsigned>(*reason), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilLanguageModeIf(warnPreSwift6, 6)
+        .warnUntilLanguageModeIf(warnPreSwift6, LanguageMode::v6)
         .limitBehaviorIfMorePermissive(commonBehavior);
   } else {
     ctx.Diags
@@ -223,14 +226,14 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   fragileKind.getSelector(), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilLanguageModeIf(warnPreSwift6, 6)
+        .warnUntilLanguageModeIf(warnPreSwift6, LanguageMode::v6)
         .limitBehaviorIfMorePermissive(commonBehavior);
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
   if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
       originKind == DisallowedOriginKind::MissingImport &&
-      !ctx.isLanguageModeAtLeast(6))
+      !ctx.isLanguageModeAtLeast(LanguageMode::v6))
     addMissingImport(loc, D, where);
 
   // If limited by an import, note which one.
@@ -294,6 +297,8 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   case ExportabilityReason::ResultBuilder:
   case ExportabilityReason::PropertyWrapper:
   case ExportabilityReason::ImplicitlyPublicVarDecl:
+  case ExportabilityReason::ImplicitlyPublicVarDeclOpenClass:
+  case ExportabilityReason::ImplicitlyPublicVarDeclClassDeinit:
   case ExportabilityReason::ImplicitlyPublicAssociatedValue:
     return isInternalBridgingHeader &&
            where.getExportedLevel() == ExportedLevel::ImplicitlyExported;
@@ -394,12 +399,28 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
         .limitBehavior(limit.merge(commonBehavior));
 
     D->diagnose(diag::kind_declared_here, D->getDescriptiveKind());
+
+    // Suggest a fix for references from class properties in embedded mode.
+    if (reason == ExportabilityReason::ImplicitlyPublicVarDeclClassDeinit) {
+      auto *parentClass = dyn_cast_or_null<ClassDecl>(DC->getAsDecl());
+      if (parentClass) {
+        auto inFlight = parentClass->diagnose(
+            diag::embedded_classes_require_export_interface_deinit);
+
+        auto insertLoc = parentClass->getBraces().End;
+        StringRef insertIndent =
+          Lexer::getIndentationForLine(ctx.SourceMgr, insertLoc);
+        std::string fixit = (insertIndent + "@export(interface)\n" +
+                             insertIndent + "deinit {}\n").str();
+        inFlight.fixItInsert(insertLoc, fixit);
+      }
+    }
   } else {
     ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module, D,
                        fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind))
         .warnUntilLanguageModeIf(downgradeToWarning == DowngradeToWarning::Yes,
-                                 6)
+                                 LanguageMode::v6)
         .limitBehaviorIfMorePermissive(commonBehavior);
 
     if (originKind == DisallowedOriginKind::MissingImport &&
@@ -489,13 +510,13 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
           (warnIfConformanceUnavailablePreSwift6 &&
            originKind != DisallowedOriginKind::SPIOnly &&
            originKind != DisallowedOriginKind::NonPublicImport) ||
-          originKind == DisallowedOriginKind::MissingImport,
-          6)
+              originKind == DisallowedOriginKind::MissingImport,
+          LanguageMode::v6)
       .limitBehaviorIfMorePermissive(commonBehavior);
 
   if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
       originKind == DisallowedOriginKind::MissingImport &&
-      !ctx.isLanguageModeAtLeast(6))
+      !ctx.isLanguageModeAtLeast(LanguageMode::v6))
     addMissingImport(loc, ext, where);
 
   // If limited by an import, note which one.

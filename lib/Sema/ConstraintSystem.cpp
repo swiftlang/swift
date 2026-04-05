@@ -17,10 +17,10 @@
 //===----------------------------------------------------------------------===//
 #include "swift/Sema/ConstraintSystem.h"
 #include "CSDiagnostics.h"
+#include "MiscDiagnostics.h"
 #include "OpenedExistentials.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
-#include "TypeCheckEmbedded.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -33,14 +33,17 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeTransform.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -183,11 +186,12 @@ void ConstraintSystem::startExpressionTimer() {
   const auto &opts = getASTContext().TypeCheckerOpts;
   unsigned timeout = opts.ExpressionTimeoutThreshold;
 
-  // If either the timeout is set, or we're asked to emit warnings,
-  // start the timer. Otherwise, don't start the timer, it's needless
-  // overhead.
+  // If either the timeout is set, we're asked to emit warnings, or we're
+  // asked to debug expression type-checking times, start the timer.
+  // Otherwise, don't start the timer, it's needless overhead.
   if (timeout == 0) {
-    if (opts.WarnLongExpressionTypeChecking == 0)
+    if (opts.WarnLongExpressionTypeChecking == 0 &&
+        !opts.DebugTimeExpressions)
       return;
 
     timeout = ExpressionTimer::NoLimit;
@@ -214,37 +218,6 @@ bool ConstraintSystem::hasFreeTypeVariables() {
   });
 }
 
-void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
-  ASSERT(!PreparingOverload);
-
-  TypeVariables.insert(typeVar);
-
-  // Notify the constraint graph.
-  CG.addTypeVariable(typeVar);
-}
-
-void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
-                                               TypeVariableType *typeVar2,
-                                               bool updateWorkList) {
-  assert(typeVar1 == getRepresentative(typeVar1) &&
-         "typeVar1 is not the representative");
-  assert(typeVar2 == getRepresentative(typeVar2) &&
-         "typeVar2 is not the representative");
-  assert(typeVar1 != typeVar2 && "cannot merge type with itself");
-
-  // Always merge 'up' the constraint stack, because it is simpler.
-  if (typeVar1->getImpl().getID() > typeVar2->getImpl().getID())
-    std::swap(typeVar1, typeVar2);
-
-  CG.mergeNodesPre(typeVar2);
-  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
-  CG.mergeNodes(typeVar1, typeVar2);
-
-  if (updateWorkList) {
-    addTypeVariableConstraintsToWorkList(typeVar1);
-  }
-}
-
 /// Determine whether the given type variables occurs in the given type.
 bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
                                            Type type,
@@ -259,73 +232,6 @@ bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
   }
 
   return occurs;
-}
-
-void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
-                                       bool updateState,
-                                       bool notifyBindingInference) {
-  assert(!type->hasError() &&
-         "Should not be assigning a type involving ErrorType!");
-
-  CG.retractFromInference(typeVar);
-  typeVar->getImpl().assignFixedType(type, getTrail());
-
-  if (!updateState)
-    return;
-
-  if (!type->isTypeVariableOrMember()) {
-    // If this type variable represents a literal, check whether we picked the
-    // default literal type. First, find the corresponding protocol.
-    //
-    // If we have the constraint graph, we can check all type variables in
-    // the equivalence class. This is the More Correct path.
-    // FIXME: Eliminate the less-correct path.
-    auto typeVarRep = getRepresentative(typeVar);
-    for (auto *tv : CG[typeVarRep].getEquivalenceClass()) {
-      auto locator = tv->getImpl().getLocator();
-      if (!(locator && (locator->directlyAt<CollectionExpr>() ||
-                        locator->directlyAt<LiteralExpr>())))
-          continue;
-
-      auto *literalProtocol = TypeChecker::getLiteralProtocol(
-          getASTContext(), castToExpr(locator->getAnchor()));
-      if (!literalProtocol)
-        continue;
-
-      // If the protocol has a default type, check it.
-      if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
-        auto isDefaultType = [&defaultType](Type type) {
-          // Check whether the nominal types match. This makes sure that we
-          // properly handle Array vs. Array<T>.
-          return defaultType->getAnyNominal() == type->getAnyNominal();
-        };
-
-        if (!isDefaultType(type)) {
-          // Treat `std.string` as a default type just like we do
-          // Swift standard library `String`. This helps to disambiguate
-          // operator overloads that use `std.string` vs. a custom C++
-          // type that conforms to `ExpressibleByStringLiteral` as well.
-          bool isCxxDefaultType =
-              literalProtocol->isSpecificProtocol(
-                  KnownProtocolKind::ExpressibleByStringLiteral) &&
-              type->isCxxString();
-
-          increaseScore(SK_NonDefaultLiteral, locator,
-                        isCxxDefaultType ? 1 : 2);
-        }
-      }
-
-      break;
-    }
-  }
-
-  // Notify the constraint graph.
-  CG.bindTypeVariable(typeVar, type);
-
-  addTypeVariableConstraintsToWorkList(typeVar);
-
-  if (notifyBindingInference)
-    CG.introduceToInference(typeVar, type);
 }
 
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
@@ -602,7 +508,8 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
   // FIXME: This will need to change when we do inference of thrown error
   // types in closures.
   if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
-    return getClosureType(closure)->getEffectiveThrownErrorTypeOrNever();
+    auto closureTy = simplifyType(getType(closure))->castTo<FunctionType>();
+    return closureTy->getEffectiveThrownErrorTypeOrNever();
   }
 
   if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows))
@@ -1046,9 +953,9 @@ void ConstraintSystem::recordPackElementExpansion(
 
 /// Extend the given depth map by adding depths for all of the subexpressions
 /// of the given expression.
-static void
-extendDepthMap(Expr *expr, unsigned initialDepth,
-               llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
+static void extendDepthMap(
+   Expr *expr,
+   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
   // If we already have an entry in the map, we don't need to update it. This
   // avoids invalidating previous entries when solving a smaller component of a
   // larger AST node, e.g during conjunction solving.
@@ -1063,9 +970,8 @@ extendDepthMap(Expr *expr, unsigned initialDepth,
     unsigned Depth = 0;
 
     explicit RecordingTraversal(
-        unsigned initialDepth,
         llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap)
-        : DepthMap(depthMap), Depth(initialDepth) {}
+        : DepthMap(depthMap) {}
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::ArgumentsAndExpansion;
@@ -1123,7 +1029,7 @@ extendDepthMap(Expr *expr, unsigned initialDepth,
     }
   };
 
-  RecordingTraversal traversal(initialDepth, depthMap);
+  RecordingTraversal traversal(depthMap);
   expr->walk(traversal);
 }
 
@@ -1131,12 +1037,7 @@ std::optional<std::pair<unsigned, Expr *>>
 ConstraintSystem::getExprDepthAndParent(Expr *expr) {
   // Bring the set of expression weights up to date.
   while (NumInputExprsInWeights < InputExprs.size()) {
-    auto *E = InputExprs[NumInputExprsInWeights];
-    unsigned initialDepth = 0;
-    auto depthIter = InputExprSimulatedDepths.find(E);
-    if (depthIter != InputExprSimulatedDepths.end())
-      initialDepth = depthIter->second;
-    extendDepthMap(E, initialDepth, ExprWeights);
+    extendDepthMap(InputExprs[NumInputExprsInWeights], ExprWeights);
     ++NumInputExprsInWeights;
   }
 
@@ -1177,7 +1078,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
 
   if (auto depMemType = type->getAs<DependentMemberType>()) {
     auto baseTy = depMemType->getBase();
-    if (!baseTy->hasTypeVariable() && !baseTy->hasDependentMember())
+    if (!baseTy->hasTypeVariable())
       return type;
 
     // FIXME: Perform a more limited simplification?
@@ -1515,7 +1416,16 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
 
   if (throws || async) {
     if (expr->getThrowsLoc().isValid() && !expr->getExplicitThrownTypeRepr())
-      diagnoseUntypedThrowsInEmbedded(expr, expr->getThrowsLoc());
+      diagnoseUntypedThrows(expr, expr->getThrowsLoc());
+
+    // If we don't have the concurrency library, reject the use of 'async'.
+    ASTContext &ctx = expr->getASTContext();
+    if (async &&
+        !ctx.getLoadedModule(ctx.Id_Concurrency) &&
+        !ctx.SILOpts.ParseStdlib) {
+      ctx.Diags.diagnose(expr->getAsyncLoc(),
+                         diag::no_concurrency_module, "async");
+    }
 
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
@@ -1826,7 +1736,7 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
       return std::pair(ty, false);
 
     // Otherwise we've flattened the dependence, evaluate Sendable.
-    return std::make_pair(Type(), ty->isSendableType());
+    return std::make_pair(Type(), isSendableCapture(ty));
   }
 };
 
@@ -2027,7 +1937,7 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(resultBuilderTransformed) +
          size_in_bytes(appliedPropertyWrappers) +
          size_in_bytes(argumentLists) +
-         size_in_bytes(ImplicitCallAsFunctionRoots) +
+         size_in_bytes(ImplicitCallAsFunctions) +
          size_in_bytes(SynthesizedConformances);
   // clang-format on
 
@@ -2131,6 +2041,22 @@ SolutionResult ConstraintSystem::salvage() {
       if (*best != 0)
         viable[0] = std::move(viable[*best]);
       viable.erase(viable.begin() + 1, viable.end());
+
+      if (getASTContext().TypeCheckerOpts.CrashOnValidSalvage) {
+        auto &solution = viable[0];
+        if (solution.Fixes.empty() &&
+            diagnosticTransaction == nullptr &&
+            !getASTContext().LangOpts.DisableAvailabilityChecking &&
+            solution.getFixedScore().Data[SK_Unavailable] == 0 &&
+            solution.getFixedScore().Data[SK_Hole] == 0 &&
+            solution.getFixedScore().Data[SK_Fix] == 0) {
+          ABORT([&](auto &out) {
+            out << "Found valid solution in salvage()\n\n";
+            solution.dump(out, 0);
+          });
+        }
+      }
+
       return SolutionResult::forSolved(std::move(viable[0]));
     }
 
@@ -2770,7 +2696,7 @@ static bool diagnoseAmbiguity(
 
       auto emitGeneralFoundCandidateNote = [&]() {
         // Emit a general "found candidate" note
-        if (decl->getLoc().isInvalid()) {
+        if (decl->getLoc(/*SerializedOK=*/false).isInvalid()) {
           if (candidateTypes.insert(type->getCanonicalType()).second)
             DE.diagnose(getLoc(commonAnchor), diag::found_candidate_type, type);
         } else {
@@ -3932,7 +3858,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
     case ConstraintLocator::FallbackType:
     case ConstraintLocator::KeyPathSubscriptIndex:
-    case ConstraintLocator::ImplicitForEachCompatMember:
     case ConstraintLocator::ExistentialMemberAccessConversion:
       break;
     }
@@ -4037,6 +3962,20 @@ void ConstraintSystem::generateOverloadConstraints(
     ConstraintLocator *locator, bool requiresFix,
     llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
         getFix) {
+  SmallVector<ValueDecl *, 1> requirements;
+
+  if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
+    for (auto choice : choices) {
+      if (auto *decl = choice.getDeclOrNull()) {
+        if (decl->isOperator() &&
+            isa<ProtocolDecl>(decl->getDeclContext()) &&
+            !isDeclUnavailable(decl, locator)) {
+          requirements.push_back(decl);
+        }
+      }
+    }
+  }
+
   for (auto index : indices(choices)) {
     auto *fix = getFix(index, choices[index]);
     // If fix is required but it couldn't be determined, this
@@ -4044,9 +3983,26 @@ void ConstraintSystem::generateOverloadConstraints(
     if (requiresFix && !fix)
       continue;
 
-    auto *choice = Constraint::createBindOverload(*this, type, choices[index],
-                                                  useDC, fix, locator);
-    constraints.push_back(choice);
+    const auto &choice = choices[index];
+
+    // Skip protocol extension operators that are refinements of a protocol
+    // requirement operator, because they never participate in a valid
+    // solution.
+    if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
+      if (auto *decl = choice.getDeclOrNull()) {
+        if (decl->getDeclContext()->getExtendedProtocolDecl()) {
+          if (llvm::any_of(requirements, [&](ValueDecl *req) {
+            return TypeChecker::isDeclRefinementOf(decl, req);
+          })) {
+            continue;
+          }
+        }
+      }
+    }
+
+    auto *constraint = Constraint::createBindOverload(*this, type, choice,
+                                                      useDC, fix, locator);
+    constraints.push_back(constraint);
   }
 
   if (unsigned seed = getASTContext().TypeCheckerOpts.ShuffleDisjunctionChoicesSeed) {
@@ -4738,22 +4694,6 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
       ctx, TypeExpr::createImplicit(typeEraser, ctx), argList);
 }
 
-/// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
-/// constraint system, return the decl that it references.
-ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
-  // See if we have a resolution for this member.
-  auto overload = findSelectedOverloadFor(locator);
-  if (!overload)
-    return nullptr;
-
-  // We only want to handle the simplest decl binding.
-  auto choice = overload->choice;
-  if (choice.getKind() != OverloadChoiceKind::Decl)
-    return nullptr;
-
-  return choice.getDecl();
-}
-
 void SyntacticElementTargetKey::dump() const { dump(llvm::errs()); }
 
 void SyntacticElementTargetKey::dump(raw_ostream &OS) const {
@@ -5049,7 +4989,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // get any special power from being formed in certain contexts, such
   // as the ability to assign to `let`s in initialization contexts, so
   // we pass null for the DC to `isSettable` here.)
-  if (!getASTContext().isLanguageModeAtLeast(5)) {
+  if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v5)) {
     // As a source-compatibility measure, continue to allow
     // WritableKeyPaths to be formed in the same conditions we did
     // in previous releases even if we should not be able to set
@@ -5328,156 +5268,6 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   return success(mutability, isSendable);
 }
 
-TypeVarBindingProducer::TypeVarBindingProducer(
-    ConstraintSystem &cs,
-    TypeVariableType *typeVar,
-    const BindingSet &bindings)
-    : BindingProducer(cs, typeVar->getImpl().getLocator()),
-      TypeVar(typeVar), CanBeNil(bindings.canBeNil()) {
-  if (bindings.isDirectHole()) {
-    auto *locator = getLocator();
-    // If this type variable is associated with a code completion token
-    // and it failed to infer any bindings let's adjust holes's locator
-    // to point to a code completion token to avoid attempting to "fix"
-    // this problem since its rooted in the fact that constraint system
-    // is under-constrained.
-    if (bindings.getAssociatedCodeCompletionToken()) {
-      locator =
-          CS.getConstraintLocator(bindings.getAssociatedCodeCompletionToken());
-    }
-
-    Bindings.push_back(Binding::forHole(TypeVar, locator));
-    return;
-  }
-
-  // A binding to `Any` which should always be considered as a last resort.
-  std::optional<Binding> Any;
-
-  auto addBinding = [&](const Binding &binding) {
-    // Adjust optionality of existing bindings based on presence of
-    // `ExpressibleByNilLiteral` requirement.
-    if (requiresOptionalAdjustment(binding)) {
-      Bindings.push_back(
-          binding.withType(OptionalType::get(binding.BindingType)));
-    } else if (binding.BindingType->isAny()) {
-      Any.emplace(binding);
-    } else {
-      Bindings.push_back(binding);
-    }
-  };
-
-  if (TypeVar->getImpl().isPackExpansion()) {
-    SmallVector<Binding> viableBindings;
-
-    // Collect possible contextual types (keep in mind that pack
-    // expansion type variable gets bound to its "opened" type
-    // regardless). To be viable the binding has to come from `bind`
-    // or `equal` constraint (i.e. same-type constraint or explicit
-    // generic argument) and be fully resolved.
-    llvm::copy_if(bindings.Bindings, std::back_inserter(viableBindings),
-                  [&](const Binding &binding) {
-                    auto *source = binding.getSource();
-                    if (source->getKind() == ConstraintKind::Bind ||
-                        source->getKind() == ConstraintKind::Equal) {
-                      auto type = binding.BindingType;
-                      return type->is<PackExpansionType>() &&
-                             !type->hasTypeVariable();
-                    }
-                    return false;
-                  });
-
-    // If there is a single fully resolved contextual type, let's
-    // use it as a binding to help with performance and diagnostics.
-    if (viableBindings.size() == 1) {
-      addBinding(viableBindings.front());
-    } else {
-      for (auto *constraint : bindings.Defaults) {
-        Bindings.push_back(getDefaultBinding(constraint));
-      }
-    }
-
-    return;
-  }
-
-  for (const auto &binding : bindings.Bindings) {
-    addBinding(binding);
-  }
-
-  // Infer defaults based on "uncovered" literal protocol requirements.
-  for (const auto &literal : bindings.Literals) {
-    if (!literal.viableAsBinding())
-      continue;
-
-    // We need to figure out whether this is a direct conformance
-    // requirement or inferred transitive one to identify binding
-    // kind correctly.
-    addBinding({literal.getDefaultType(),
-                literal.isDirectRequirement() ? BindingKind::Subtypes
-                                              : BindingKind::Supertypes,
-                literal.getSource()});
-  }
-
-  // Let's always consider `Any` to be a last resort binding because
-  // it's always better to infer concrete type and erase it if required
-  // by the context.
-  if (Any) {
-    Bindings.push_back(*Any);
-  }
-
-  {
-    bool noBindings = Bindings.empty();
-
-    for (auto *constraint : bindings.Defaults) {
-      if (noBindings) {
-        // If there are no direct or transitive bindings to attempt
-        // let's add defaults to the list right away.
-        Bindings.push_back(getDefaultBinding(constraint));
-      } else {
-        // Otherwise let's delay attempting default bindings
-        // until all of the direct & transitive bindings and
-        // their derivatives have been attempted.
-        DelayedDefaults.push_back(constraint);
-      }
-    }
-  }
-}
-
-bool TypeVarBindingProducer::requiresOptionalAdjustment(
-    const Binding &binding) const {
-  // If type variable can't be `nil` then adjustment is
-  // not required.
-  if (!CanBeNil)
-    return false;
-
-  if (binding.Kind == BindingKind::Supertypes) {
-    auto type = binding.BindingType->getRValueType();
-    // If the type doesn't conform to ExpressibleByNilLiteral,
-    // produce an optional of that type as a potential binding. We
-    // overwrite the binding in place because the non-optional type
-    // will fail to type-check against the nil-literal conformance.
-    auto *proto = CS.getASTContext().getProtocol(
-         KnownProtocolKind::ExpressibleByNilLiteral);
-
-    return !CS.lookupConformance(type, proto);
-  } else if (binding.isDefaultableBinding() && binding.BindingType->isAny()) {
-    return true;
-  }
-
-  return false;
-}
-
-PotentialBinding
-TypeVarBindingProducer::getDefaultBinding(Constraint *constraint) const {
-  assert(constraint->getKind() == ConstraintKind::Defaultable ||
-         constraint->getKind() == ConstraintKind::FallbackType);
-
-  auto type = constraint->getSecondType();
-  Binding binding{type, BindingKind::Exact, constraint};
-  return requiresOptionalAdjustment(binding)
-             ? binding.withType(OptionalType::get(type))
-             : binding;
-}
-
 ValueDecl *constraints::getOverloadChoiceDecl(Constraint *choice) {
   if (choice->getKind() != ConstraintKind::BindOverload)
     return nullptr;
@@ -5492,6 +5282,23 @@ bool constraints::isOperatorDisjunction(Constraint *disjunction) {
 
   auto *decl = getOverloadChoiceDecl(choices.front());
   return decl ? decl->isOperator() : false;
+}
+
+bool constraints::isSendableCapture(Type type) {
+  ASSERT(!type->hasTypeVariable());
+
+  if (!type->isSendableType())
+    return false;
+
+  // All of the type parameters involved in the type that may have isolated
+  // conformances have to conform to `SendableMetatype`.
+  return !type.findIf([&](Type innerTy) {
+    if (auto *archetypeTy = innerTy->getAs<ArchetypeType>()) {
+      if (archetypeTy->mayHaveIsolatedConformance())
+        return !MetatypeType::get(archetypeTy)->isSendableType();
+    }
+    return false;
+  });
 }
 
 ASTNode constraints::findAsyncNode(ClosureExpr *closure) {

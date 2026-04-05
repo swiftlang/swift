@@ -149,6 +149,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *const
   case SILInstructionKind::ConvertFunctionInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::MoveValueInst:
     mangleConstantProp(cast<SingleValueInstruction>(constInst->getOperand(0)));
     break;
   case SILInstructionKind::PreviousDynamicFunctionRefInst:

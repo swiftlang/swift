@@ -232,13 +232,8 @@ bool MemoryLifetimeVerifier::isTrivialEnumSuccessor(SILBasicBlock *block,
   } else if (auto *switchEnumAddr = dyn_cast<SwitchEnumAddrInst>(term)) {
     elem = switchEnumAddr->getUniqueCaseForDestination(succ);
     enumTy = switchEnumAddr->getOperand()->getType();
-  } else if (auto *switchValue = dyn_cast<SwitchValueInst>(term)) {
-    auto destCase = switchValue->getUniqueCaseForDestination(succ);
-    assert(destCase.has_value());
-    auto caseValue =
-        cast<IntegerLiteralInst>(switchValue->getCase(*destCase).first);
-    auto testValue = dyn_cast<IntegerLiteralInst>(switchValue->getOperand());
-    return testValue ? testValue->getValue() != caseValue->getValue() : true;
+  } else if (isa<SwitchValueInst>(term)) {
+    return true;
   } else {
     return false;
   }
@@ -335,16 +330,16 @@ bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
     return false;
   }
 
+  if (!addr)
+    return false;
+
   for (SILFunction *callee : callees) {
-    if (addr) {
-      if (callee->argumentMayRead(argOp, addr))
-        return true;
-    } else {
-      // We don't know which unknown sub-fields the argument effects refer to.
-      // Only if there are no argument effects at all, we know that the function
-      // may read from an unknown sub-field.
-      if (!callee->hasArgumentEffects())
-        return true;
+    // If the callee has no side-effects computed, yet, ignore it.
+    // This can happen if a store to an unused inout has been eliminated at a call site
+    // and afterwards the callee is specialized and therefore doesn't have the required
+    // side-effects computed, yet.
+    if (callee->hasArgumentEffects() && callee->argumentMayRead(argOp, addr)) {
+      return true;
     }
   }
   return false;
@@ -719,6 +714,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
             break;
           case StoreOwnershipQualifier::Assign:
             requireBitsSet(bits | ~nonTrivialLocations, SI->getDest(), &I);
+            locations.setBits(bits, SI->getDest());
             break;
           case StoreOwnershipQualifier::Trivial:
             locations.setBits(bits, SI->getDest());

@@ -17,6 +17,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "llvm/ADT/PostOrderIterator.h"
 
 #define DEBUG_TYPE "cold-block-info"
@@ -493,4 +494,17 @@ void ColdBlockInfo::setExpectedCondition(CondBranchInst *CBI, ExpectedValue valu
                             << " | _slowPath = " << toString(CBI->getTrueBB())
                             << "\n");
   }
+}
+
+void ColdBlockAnalysis::initialize(SILPassManager *PM) {
+  DA = PM->getAnalysis<DominanceAnalysis>();
+  PDA = PM->getAnalysis<PostDominanceAnalysis>();
+}
+
+std::unique_ptr<ColdBlockInfo>
+ColdBlockAnalysis::newFunctionAnalysis(SILFunction *F) {
+  assert(DA && PDA && "ColdBlockAnalysis not initialized");
+  auto info = std::make_unique<ColdBlockInfo>(DA, PDA);
+  info->analyze(F);
+  return info;
 }

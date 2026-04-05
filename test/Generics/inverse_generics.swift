@@ -1,9 +1,9 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN: -enable-experimental-feature Lifetimes \
-// RUN: -enable-experimental-feature SuppressedAssociatedTypes
+// RUN: -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
 
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 // expected-note@+1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
 struct AttemptImplicitConditionalConformance<T: ~Copyable>: ~Copyable {

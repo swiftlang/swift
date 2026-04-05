@@ -213,7 +213,9 @@ public:
     uint64_t Id;
     StoredPointer RunJob;
     StoredPointer AllocatorSlabPtr;
+    StoredPointer ParentTask;
     std::vector<StoredPointer> ChildTasks;
+    std::vector<StoredPointer> WaitingTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
     StoredPointer ResumeAsyncContext;
   };
@@ -2123,6 +2125,16 @@ private:
     Info.AllocatorSlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
     Info.RunJob = getRunJob(AsyncTaskObj.get());
 
+    Info.ParentTask = 0;
+    if (Info.IsChildTask && asyncTaskSize != 0) {
+      // Parent information ("child fragment") is right after the task itself.
+      RemoteAddress ChildFragmentAddr = AsyncTaskPtr + asyncTaskSize;
+      auto ChildFragmentObj =
+          readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
+      if (ChildFragmentObj)
+        Info.ParentTask = ChildFragmentObj->Parent;
+    }
+
     // Find all child tasks.
     unsigned ChildTaskLoopCount = 0;
     auto RecordPtr = RemoteAddress(AsyncTaskObj->PrivateStorage.Status.Record,
@@ -2181,6 +2193,47 @@ private:
 
       RecordPtr =
           RemoteAddress(RecordObj->Parent, RemoteAddress::DefaultAddressSpace);
+    }
+
+    // Read the wait queue from the FutureFragment, if this is a future task.
+    if (Info.IsFuture && asyncTaskSize != 0) {
+      // The FutureFragment is located after AsyncTask, ChildFragment (if
+      // child), and GroupChildFragment (if group child).
+      // See AsyncTask::futureFragment() in include/swift/ABI/Task.h.
+      auto FutureFragmentAddr = AsyncTaskPtr + asyncTaskSize;
+      if (Info.IsChildTask)
+        FutureFragmentAddr =
+            FutureFragmentAddr + sizeof(ChildFragment<Runtime>);
+      if (Info.IsGroupChildTask)
+        FutureFragmentAddr =
+            FutureFragmentAddr + sizeof(GroupChildFragment<Runtime>);
+
+      auto FutureFragmentObj =
+          readObj<FutureFragment<Runtime>>(FutureFragmentAddr);
+      if (FutureFragmentObj) {
+        // The low 2 bits of WaitQueue are the status; the rest is the first
+        // waiting task pointer.
+        // See FutureFragment::WaitQueueItem in include/swift/ABI/Task.h.
+        const StoredPointer statusMask = 0x03;
+        StoredPointer WaitingTaskPtr =
+            FutureFragmentObj->WaitQueue & ~statusMask;
+
+        // Walk the singly linked list of waiting tasks.
+        unsigned WaitQueueLoopCount = 0;
+        while (WaitingTaskPtr && WaitQueueLoopCount++ < ChildTaskLimit) {
+          Info.WaitingTasks.push_back(WaitingTaskPtr);
+          // The next waiting task is stored in SchedulerPrivate[0] of the
+          // waiting task.
+          // See Job::NextWaitingTaskIndex and AsyncTask::getNextWaitingTask()
+          // in include/swift/ABI/Task.h.
+          RemoteAddress WaitingTaskAddress =
+              RemoteAddress(WaitingTaskPtr, RemoteAddress::DefaultAddressSpace);
+          auto WaitingTaskObj = readObj<AsyncTaskType>(WaitingTaskAddress);
+          if (!WaitingTaskObj)
+            break;
+          WaitingTaskPtr = WaitingTaskObj->SchedulerPrivate[0];
+        }
+      }
     }
 
     const auto TaskResumeContext = stripSignedPointer(
@@ -2347,14 +2400,16 @@ private:
     Builder.addField(*OffsetToFirstCapture,
                      /*alignment=*/sizeof(StoredPointer),
                      /*numExtraInhabitants=*/0,
-                     /*bitwiseTakable=*/true);
+                     /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
+                     /*afd*/ false);
 
     // Skip the closure's necessary bindings struct, if it's present.
     auto SizeOfNecessaryBindings = Info.NumBindings * sizeof(StoredPointer);
     Builder.addField(/*size=*/SizeOfNecessaryBindings,
                      /*alignment=*/sizeof(StoredPointer),
                      /*numExtraInhabitants=*/0,
-                     /*bitwiseTakable=*/true);
+                     /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
+                     /*afd*/ false);
 
     // FIXME: should be unordered_set but I'm too lazy to write a hash
     // functor

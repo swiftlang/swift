@@ -151,7 +151,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
   Invocation.setDefaultPrebuiltCacheIfNecessary();
 
-  if (auto *A = ParsedArgs.getLastArg(OPT_swift_version)) {
+  if (auto *A = ParsedArgs.getLastArg(OPT_language_mode)) {
     using version::Version;
     auto SwiftVersion = A->getValue();
     bool isValid = false;

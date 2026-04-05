@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_CSSTEP_H
 
 #include "swift/AST/Types.h"
+#include "swift/Sema/BindingProducer.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -455,11 +456,15 @@ public:
       return done(/*isSuccess=*/false);
 
     while (auto choice = Producer()) {
-      if (shouldSkip(*choice))
-        continue;
-
+      // Note: we must check if we need to stop before we check if we need to
+      // skip, because shouldStopAt() needs to consider every index. Otherwise,
+      // if the first element of a partition is skipped, we don't stop, even if
+      // we could.
       if (shouldStopAt(*choice))
         break;
+
+      if (shouldSkip(*choice))
+        continue;
 
       if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
@@ -613,7 +618,7 @@ class DisjunctionStep final : public BindingStep<DisjunctionChoiceProducer> {
 public:
   DisjunctionStep(
       ConstraintSystem &cs,
-      std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>> &disjunction,
+      std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>> disjunction,
       SmallVectorImpl<Solution> &solutions)
       : DisjunctionStep(cs, disjunction.first, disjunction.second, solutions) {}
 

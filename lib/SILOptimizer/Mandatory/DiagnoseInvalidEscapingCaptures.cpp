@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/LayoutConstraint.h"
+#include "swift/SIL/SILValue.h"
 #define DEBUG_TYPE "sil-diagnose-invalid-escaping-captures"
 
 #include "swift/AST/ASTContext.h"
@@ -25,6 +27,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
@@ -155,17 +158,234 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
   return true;
 }
 
+/// Given an \p instruction try to find the argument pack that is allocated
+/// to it as a best effort. If no appropriate value can be found, return
+/// an empty \c SILValue.
+/// 
+/// While any instruction *could* be passed, this pattern matching was only written
+/// with the following patterns in mind, which start with alloc_stack and load.
+/// 
+/// Given an escaping use of a pack:
+/// 
+/// ```swift
+/// func foo<each T>(_ fn: repeat () -> each T) {
+///   escapes {
+///     let _ = (repeat each fn)
+///   }
+/// }
+/// ```
+/// 
+/// We start at
+/// 
+/// ```
+/// %3 = alloc_stack $(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>) // users: %20, %18, %14
+/// ```
+/// 
+/// And need to navigate
+/// 
+/// ```
+/// // %0 "fn"                                        // users: %13, %1
+/// bb0(%0 : $*Pack{repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>}):
+/// // ...
+///   %3 = alloc_stack $(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>) // users: %20, %18, %14
+/// // ...
+///   %13 = pack_element_get %11 of %0 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %15
+///   %14 = tuple_pack_element_addr %11 of %3 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %15
+///   copy_addr %13 to [init] %14                     // id: %15
+/// // ...
+/// ```
+/// 
+/// Taking a path like
+/// 
+/// ```
+///     %3 alloc_stack             [get users]
+/// -> %14 tuple_pack_element_addr [get users] (since tuple isn't an arg!)
+/// -> %15 copy_addr               [get src inst]
+/// -> %13 pack_element_get        [get pack arg]
+/// ->  %0 "fn"
+/// ```
+/// 
+/// We can follow use to user, until we hit copy_addr and need to find the
+/// source of the copy. When we hit pack_element_get, the pack operand is the
+/// argument "fn" and we are done. Defer within an escaping function and pack
+/// iteration follows this pattern. The arg check on tuple_pack_element_addr exists
+/// for the next case, the use of a pack inside defer:
+/// 
+/// ```swift
+/// func foo<each T>(_ fn: repeat () -> each T) {
+///   defer {
+///     escapes {
+///       let _ = (repeat each fn)
+///     }
+///   }
+///   _ = 42
+/// }
+/// ```
+/// 
+/// We start at
+/// 
+/// ```
+/// %17 = alloc_stack $(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>) // users: %34, %32, %28
+/// ```
+/// 
+/// And need to navigate
+/// 
+/// ```
+/// // %0 "fn"                                        // user: %11
+/// bb0(%0 : @closureCapture $*(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>)):
+///   %1 = alloc_pack $Pack{repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>} // users: %38, %27, %15, %12
+/// // ...
+///   %11 = tuple_pack_element_addr %9 of %0 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %12
+///   pack_element_set %11 into %9 of %1              // id: %12
+/// // ...
+///   %17 = alloc_stack $(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>) // users: %34, %32, %28
+/// // ...
+///   %25 = dynamic_pack_index %22 of $Pack{repeat () -> each T} // users: %28, %27, %26
+///   %26 = open_pack_element %25 of <each T> at <Pack{repeat each T}>, shape $each T // users: %28, %27
+///   %27 = pack_element_get %25 of %1 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %29
+///   %28 = tuple_pack_element_addr %25 of %17 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %29
+///   copy_addr %27 to [init] %28                     // id: %29
+/// // ...
+/// ```
+/// 
+/// Taking a path like
+/// 
+/// ```
+///    %17 alloc_stack             [get users]
+/// -> %28 tuple_pack_element_addr [get users]      (since tuple isn't an arg!)
+/// -> %29 copy_addr               [get src inst]
+/// -> %27 pack_element_get        [get pack users] (since pack isn't an arg!)
+/// ->  %1 alloc_pack              [get users]
+/// -> %12 pack_element_set        [get value users]
+/// -> %11 tuple_pack_element_addr [get tuple arg]
+/// ->  %0 "fn"
+/// ```
+/// 
+/// The same logic applies, until we hit pack_element_get, where defer introduces
+/// additional indirection. We need to find the allocation of the pack it is
+/// accessing, then find it's users to discover the addr instruction, which
+/// will have the argument "fn" as the tuple operand. We need to support this
+/// indirection. You can see that we hit two different pack instructions, and finish
+/// on a tuple_pack_element_addr instruction, not a pack_element_get instruction.
+/// 
+/// One more case (that I'm aware of) exists, where an escaping capture is repeated:
+/// 
+/// ```swift
+/// repeat escapes {
+///   (each fn)()
+/// }
+/// ```
+/// 
+/// ```
+/// %13 = load [copy] %12 : $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %14
+/// ```
+/// 
+/// ```
+/// // %0 "fn"                                        // users: %12, %1
+/// bb0(%0 : $*Pack{repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>}):
+/// // ...
+///   %12 = pack_element_get %9 of %0 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %13
+///   %13 = load [copy] %12                           // user: %14
+/// ```
+/// 
+/// With a nice and simple path:
+/// 
+/// ```
+///    %13 load [get src inst]
+/// -> %12 pack_element_get [get pack arg]
+/// -> %0 "fn"
+/// ```
+/// 
+/// We follow the src of the load, like copy_addr, although load is single operand.
+static const SILValue tryGetPackFromIntermediaryInstruction(SILInstruction *instruction) {
+  InstructionWorklist worklist(instruction);
+  while (SILInstruction *inst = worklist.pop()) {
+    // Follow the users of the stack allocation.
+    if (auto *allocStack = dyn_cast<AllocStackInst>(inst)) {
+      worklist.pushInstructionsIfNotVisited(allocStack->getUsers());
+      continue;
+    }
+
+    // Follow the users of the pack allocation.
+    if (auto *allocPack = dyn_cast<AllocPackInst>(inst)) {
+      worklist.pushInstructionsIfNotVisited(allocPack->getUsers());
+      continue;
+    }
+
+    // Follow the source of copy addr.
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
+      if (auto *src = copyAddr->getSrc()->getDefiningInstruction())
+        worklist.pushIfNotVisited(src);
+      continue;
+    }
+
+    // Follow the source of load inst.
+    if (auto *load = dyn_cast<LoadInst>(inst)) {
+      if (auto *src = load->getOperand()->getDefiningInstruction())
+        worklist.pushIfNotVisited(src);
+      continue;
+    }
+
+    // Follow the value of a pack set, ideally to a tuple pack element addr
+    // inst.
+    if (auto *packElemSet = dyn_cast<PackElementSetInst>(inst)) {
+      if (auto *valueDef = packElemSet->getValue()->getDefiningInstruction())
+        worklist.pushIfNotVisited(valueDef);
+      continue;
+    }
+
+    // TuplePackElementAddrInst may have a function argument as its tuple
+    // operand's definition. Otherwise, follow the users of the address.
+    if (auto *tuplePackElemAddr = dyn_cast<TuplePackElementAddrInst>(inst)) {
+      if (auto *arg = dyn_cast<SILArgument>(tuplePackElemAddr->getTuple())) {
+        return arg;
+      }
+      worklist.pushInstructionsIfNotVisited(tuplePackElemAddr->getUsers());
+      continue;
+    }
+
+    // PackElementGetInst may have a function argument as its pack operand's
+    // definition. Otherwise, follow to the definition of the pack.
+    if (auto *packElemGet = dyn_cast<PackElementGetInst>(inst)) {
+      if (auto *arg = dyn_cast<SILArgument>(packElemGet->getPack())) {
+        return arg;
+      }
+      if (auto *packDef = packElemGet->getPack()->getDefiningInstruction())
+        worklist.pushIfNotVisited(packDef);
+      continue;
+    }
+  }
+
+  return SILValue();
+}
+
 const ParamDecl *getParamDeclFromOperand(SILValue value) {
   while (true) {
     // Look through mark must check.
     if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(value)) {
       value = mmci->getOperand();
-    // Look through copies.
-    } else if (auto *ci = dyn_cast<CopyValueInst>(value)) {
-      value = ci->getOperand();
-    } else {
-      break;
+      continue;
     }
+
+    // Look through copies.
+    if (auto *ci = dyn_cast<CopyValueInst>(value)) {
+      value = ci->getOperand();
+      continue;
+    }
+
+    // Try to find the pack that is stored in a temporary stack allocation or
+    // accessed in a load.
+    if (isa<AllocStackInst>(value) || isa<LoadInst>(value)) {
+      value = tryGetPackFromIntermediaryInstruction(
+          value->getDefiningInstruction());
+      if (value) // Only continue if we got a non-empty SILValue.
+        continue;
+      // If we weren't able to find a pack, return early; we won't be able to
+      // find the param declaration.
+      return nullptr;
+    }
+
+    break;
   }
 
   if (auto *arg = dyn_cast<SILArgument>(value))
@@ -297,7 +517,8 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
       continue;
     }
 
-    if (isIncidentalUse(user) || onlyAffectsRefCount(user))
+    if (isIncidentalUse(user) || onlyAffectsRefCount(user) ||
+        isa<DeallocationInst>(user) || isa<DestroyAddrInst>(user))
       continue;
 
     // Look through mark must check inst.
@@ -325,6 +546,62 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
         diagnose(Context, site.getLoc(), diag::value_captured_transitively);
         continue;
       }
+    }
+
+    // Look through indirect pack references. A function with a pack parameter
+    // will get the address, set the pack, and later get and load the pack. We
+    // want to follow this indirection until the load, so we can diagnose where
+    // the pack is used, like `repeat each x`.
+    //
+    // %12 = tuple_pack_element_addr %10 of %1 // user: %13
+    // pack_element_set %12 into %10 of %2 // id: %13
+    // ^ find the users of that pack
+    // %26 = pack_element_get %24 of %2 // user: %27
+    // %27 = load [copy] %26 // users: %29, %28
+    // ^ diagnose at this instruction
+    if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
+      if (isa<TuplePackElementAddrInst>(user) ||
+          isa<PackElementGetInst>(user)) {
+        for (auto *use : svi->getUses())
+          uselistInsert(use);
+        continue;
+      }
+    }
+
+    // Follow the uses of the pack that is set, to discover get/load
+    // instructions
+    if (auto *packElemSetInst = dyn_cast<PackElementSetInst>(user)) {
+      for (auto *use : packElemSetInst->getPack()->getUses()) {
+        uselistInsert(use);
+      }
+      continue;
+    }
+
+    // Follow indirection for defer.
+    if (auto *copyAddrInst = dyn_cast<CopyAddrInst>(user)) {
+      // We came from the source, follow it to where its copied to
+      if (oper->getOperandNumber() == CopyAddrInst::Src) {
+        SILValue dest = copyAddrInst->getDest();
+
+        // Walk through address projections to find the base.
+        while (true) {
+          if (auto *tuplePackInst = dyn_cast<TuplePackElementAddrInst>(dest)) {
+            dest = tuplePackInst->getTuple();
+            continue;
+          }
+
+          if (auto *packInst = dyn_cast<PackElementGetInst>(dest)) {
+            dest = packInst->getPack();
+            continue;
+          }
+
+          break;
+        }
+
+        for (auto *use : dest->getUses())
+          uselistInsert(use);
+      }
+      continue;
     }
 
     // Otherwise, we might have found one of the "real" usages of the capture.

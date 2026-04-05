@@ -399,3 +399,25 @@ do {
     overloaded(s.y) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
   }
 }
+
+// Reduced from GRDB open source project -- optional injection followed by
+// existential erasure must be considered better than AnyHashable conversion for this
+// to type check.
+do {
+  protocol DatabaseValueConvertible {}
+
+  struct DatabaseValue: DatabaseValueConvertible {}
+
+  class Row {
+    init(_ dictionary: [String: (any DatabaseValueConvertible)?]) { fatalError() }
+    init?(_ dictionary: [AnyHashable: Any]) { fatalError() }
+  }
+
+  func f(key: [String: DatabaseValue]) -> Row {
+    let row = Row(key)
+
+    // We have to pick the non-failable init above, otherwise this will have
+    // the wrong type.
+    return row
+  }
+}

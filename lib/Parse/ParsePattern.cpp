@@ -180,7 +180,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     // Per SE-0155, enum elements may not have empty parameter lists.
     if (paramContext == ParameterContextKind::EnumElement) {
       decltype(diag::enum_element_empty_arglist) diagnostic;
-      if (Context.isLanguageModeAtLeast(5)) {
+      if (Context.isLanguageModeAtLeast(LanguageMode::v5)) {
         diagnostic = diag::enum_element_empty_arglist;
       } else {
         diagnostic = diag::enum_element_empty_arglist_swift4;
@@ -249,7 +249,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         if (Tok.isContextualKeyword("isolated")) {
           diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
                    Tok.getText())
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
           // did we already find an 'isolated' type modifier?
           if (param.IsolatedLoc.isValid()) {
             diagnose(Tok, diag::parameter_specifier_repeated)
@@ -266,7 +266,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         if (Tok.isContextualKeyword("_const")) {
           diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
                    Tok.getText())
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
           param.CompileConstLoc = consumeToken();
           continue;
         }
@@ -275,7 +275,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             Tok.isContextualKeyword("sending")) {
           diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
                    Tok.getText())
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
           if (param.SendingLoc.isValid()) {
             diagnose(Tok, diag::parameter_specifier_repeated)
                 .fixItRemove(Tok.getLoc());
@@ -459,7 +459,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                     .fixItInsert(typeStartLoc, "_: ");
             } else {
               diagnose(typeStartLoc, diag::parameter_unnamed)
-                  .warnUntilLanguageMode(6)
+                  .warnUntilLanguageMode(LanguageMode::v6)
                   .fixItInsert(typeStartLoc, "_: ");
             }
           }

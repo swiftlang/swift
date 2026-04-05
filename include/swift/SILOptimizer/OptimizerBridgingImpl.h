@@ -247,6 +247,16 @@ BridgedDiagnosticEngine BridgedPassContext::getDiagnosticEngine() const {
   return {&mod->getASTContext().Diags};
 }
 
+bool BridgedPassContext::isWholeModule() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->isWholeModule();
+}
+
+BridgedDeclObj BridgedPassContext::getModuleDecl() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->getSwiftModule()};
+}
+
 // SIL modifications
 
 bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) const {

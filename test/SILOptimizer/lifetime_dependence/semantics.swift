@@ -17,6 +17,8 @@ import Builtin
 
 struct NotEscapable: ~Escapable {}
 
+public struct NE: ~Escapable {}
+
 // Lifetime dependence semantics by example.
 public struct Span<T>: ~Escapable {
   private var base: UnsafePointer<T>?
@@ -216,8 +218,6 @@ func inheritSpan<T>(_ arg: Span<T>) -> Span<T> { arg }
 
 @_lifetime(copy arg)
 func inheritGeneric<T: ~Escapable>(_ arg: consuming T) -> T { arg }
-
-public struct NE: ~Escapable {}
 
 @_lifetime(&ne)
 func borrowNE<T: ~Escapable>(ne: inout T) -> T {
@@ -520,6 +520,41 @@ func testReassignToBorrowBad(span: inout Span<Int>, array: [Int]) { // expected-
   reassign(dest: &span, source: array.span())
 } // expected-note{{this use causes the lifetime-dependent value to escape}}
 
+// 'dest' does not depend on the function input.
+@_lifetime(dest: immortal)
+func noMutation<T: ~Escapable>(dest: inout T) {
+  dest = _overrideLifetime(dest, copying: ())
+}
+
+// OK
+@_lifetime(immortal)
+func testNoMutation(calleeArray: consuming [Int]) -> Span<Int> {
+  var span = calleeArray.span()
+  noMutation(dest: &span)
+  return span
+}
+
+// 'dest' does not depend on itself.
+@_lifetime(dest: immortal, copy source)
+func fullReassign<T: ~Escapable>(dest: inout T, source: T) {
+  dest = source
+}
+
+@_lifetime(borrow callerArray)
+func testFullReassignGood(callerArray: borrowing [Int], calleeArray: consuming [Int]) -> Span<Int> {
+  var span = calleeArray.span()
+  fullReassign(dest: &span, source: callerArray.span())
+  return span
+}
+
+@_lifetime(immortal)
+func testFullReassignBad(callerArray: borrowing [Int], calleeArray: consuming [Int]) -> Span<Int> {
+  var span = calleeArray.span() // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  fullReassign(dest: &span, source: callerArray.span())
+  return span // expected-note{{this use causes the lifetime-dependent value to escape}}
+  // expected-note@-4{{it depends on the lifetime of argument 'callerArray'}}
+}
+
 // =============================================================================
 // Copied dependence on mutable captures
 // =============================================================================
@@ -738,3 +773,15 @@ func testBorrowedAddressableIntReturn(arg: Holder) -> Span<Int> {
   // expected-error @-1{{lifetime-dependent value escapes its scope}}
   // expected-note  @-2{{it depends on the lifetime of this parent value}}
 } // expected-note  {{this use causes the lifetime-dependent value to escape}}
+
+// =============================================================================
+// Closures
+// =============================================================================
+
+// Implicit dependence on a nonescaping closure context.
+//
+// TODO: remove the _overrideLifetime
+@_lifetime(borrow value)
+func testBasicClosureDependency(value: AnyObject, body: () -> NE) -> NE {
+    return _overrideLifetime(body(), borrowing: value)
+}

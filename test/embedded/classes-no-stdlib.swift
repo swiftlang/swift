@@ -32,7 +32,7 @@ public func bar() -> MyClass {
 // CHECK-DAG: define {{.*}}ptr @"$e4main3barAA7MyClassCyF"
 
 
-// EXIST-DAG: @"$e4main10MySubClassCMf" = {{.*}} <{ ptr @"$eBoWV", ptr getelementptr inbounds (<{ ptr, ptr, ptr, ptr, ptr }>, ptr @"$e4main7MyClassCMf", i32 0, i32 1), ptr @"$e4main10MySubClassCfD", ptr null, ptr @"$e4main10MySubClassCACycfC" }>
+// EXIST-DAG: @"$e4main10MySubClassCMf" = {{.*}} <{ ptr @"$eBoWV", ptr getelementptr inbounds ({{.*}}, ptr @"$e4main7MyClassCMf", i32 0, i32 1), ptr @"$e4main10MySubClassCfD", ptr null, ptr @"$e4main10MySubClassCACycfC" }>
 // EXIST-DAG: @"$e4main7MyClassCMf" = {{.*}} <{ ptr @"$eBoWV", ptr null, ptr @"$e4main7MyClassCfD", ptr null, ptr @"$e4main7MyClassCACycfC" }>
 
 // EXIST-DAG: @"$e4main10MySubClassCN" = {{.*}} ptr @"$e4main10MySubClassCMf", i32 0, i32 1)

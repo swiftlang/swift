@@ -17,12 +17,25 @@
 
 /// The swiftinterface is broken by the missing import without the workaround.
 // RUN: %target-swift-emit-module-interface(%t/UsesAliasesNoImport.swiftinterface) %t/UsesAliasesNoImport.swift -I %t \
+// RUN:   -disable-module-selectors-in-module-interface \
 // RUN:   -disable-print-missing-imports-in-module-interface
 // RUN: not %target-swift-typecheck-module-from-interface(%t/UsesAliasesNoImport.swiftinterface) -I %t
 
+/// Also with module selectors
+// RUN: %target-swift-emit-module-interface(%t/UsesAliasesNoImport2.swiftinterface) %t/UsesAliasesNoImport.swift -I %t \
+// RUN:   -enable-module-selectors-in-module-interface \
+// RUN:   -disable-print-missing-imports-in-module-interface
+// RUN: not %target-swift-typecheck-module-from-interface(%t/UsesAliasesNoImport2.swiftinterface) -I %t
+
 /// The swiftinterface parses fine with the workaround adding the missing imports.
-// RUN: %target-swift-emit-module-interface(%t/UsesAliasesNoImportFixed.swiftinterface) %t/UsesAliasesNoImport.swift -I %t
+// RUN: %target-swift-emit-module-interface(%t/UsesAliasesNoImportFixed.swiftinterface) %t/UsesAliasesNoImport.swift -I %t \
+// RUN:   -disable-module-selectors-in-module-interface
 // RUN: %target-swift-typecheck-module-from-interface(%t/UsesAliasesNoImportFixed.swiftinterface) -I %t
+
+/// Also with module selectors.
+// RUN: %target-swift-emit-module-interface(%t/UsesAliasesNoImport2Fixed.swiftinterface) %t/UsesAliasesNoImport.swift -I %t \
+// RUN:   -enable-module-selectors-in-module-interface
+// RUN: %target-swift-typecheck-module-from-interface(%t/UsesAliasesNoImport2Fixed.swiftinterface) -I %t
 
 /// The module with an implementation-only import is not affected by the workaround and remains broken.
 // RUN: %target-swift-emit-module-interface(%t/UsesAliasesImplementationOnlyImport.swiftinterface) %t/UsesAliasesImplementationOnlyImport.swift -I %t \

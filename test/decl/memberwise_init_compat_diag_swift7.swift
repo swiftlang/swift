@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -swift-version 7 -enable-experimental-feature ExcludePrivateFromMemberwiseInit %s
+// RUN: %target-typecheck-verify-swift -swift-version 7 -enable-experimental-feature DeprecateCompatMemberwiseInit
 
-// REQUIRES: swift_feature_ExcludePrivateFromMemberwiseInit
+// REQUIRES: swift_feature_DeprecateCompatMemberwiseInit
 // REQUIRES: swift7
 
 struct A {

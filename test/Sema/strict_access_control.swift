@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/Other.swiftmodule %S/Inputs/strict_access_control_other.swift -module-name Other -swift-version 5
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature StrictAccessControl -swift-version 5 -enable-library-evolution -I %t -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature StrictAccessControl -swift-version 5 -enable-library-evolution -I %t -verify-ignore-unrelated
 
 // REQUIRES: swift_feature_StrictAccessControl
 

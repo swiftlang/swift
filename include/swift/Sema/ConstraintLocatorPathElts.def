@@ -287,9 +287,6 @@ SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)
 /// A fallback type for some AST location (i.e. key path literal).
 SIMPLE_LOCATOR_PATH_ELT(FallbackType)
 
-/// Locator for a fake 'makeIterator' or 'next' for a 'for' loop.
-SIMPLE_LOCATOR_PATH_ELT(ImplicitForEachCompatMember)
-
 /// An implicit conversion (upcast) associated with an existential member access
 /// performed to abstract the member reference type away from context-specific
 /// types like `Self` that are not well-formed in the access context.

@@ -86,6 +86,15 @@ enum class ExtraStringFlavor : uint8_t {
   AsmName,
   /// section attribute
   Section,
+  /// wasm import module name for @_extern(wasm)
+  WasmImportModule,
+  /// wasm import field/name for @_extern(wasm)
+  WasmImportName,
+};
+
+enum class IsNestedEncoding : uint8_t {
+  IsNotNested,
+  IsNested,
 };
 
 /// The record types within the "sil-index" block.
@@ -155,6 +164,8 @@ namespace sil_block {
     SIL_INST_NO_OPERAND,
     SIL_VTABLE,
     SIL_VTABLE_ENTRY,
+    SIL_VTABLE_CONFORMANCE_ENTRY,
+    SIL_VTABLE_NO_CONFORMANCE_ENTRY,
     SIL_GLOBALVAR,
     SIL_INIT_EXISTENTIAL,
     SIL_WITNESS_TABLE,
@@ -214,6 +225,16 @@ namespace sil_block {
     SILVTableEntryKindField,  // Kind
     BCFixed<1>, // NonOverridden
     BCArray<ValueIDField> // SILDeclRef
+  >;
+
+  using VTableConformanceEntry = BCRecordLayout<
+    SIL_VTABLE_CONFORMANCE_ENTRY,
+    ProtocolConformanceIDField // ID of conformance
+  >;
+
+  using VTableNoConformanceEntry = BCRecordLayout<
+    SIL_VTABLE_NO_CONFORMANCE_ENTRY,
+    DeclIDField  // ProtocolDecl
   >;
 
   using MoveOnlyDeinitLayout = BCRecordLayout<

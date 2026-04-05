@@ -59,7 +59,7 @@ func testInOut() {
 typealias FnType<T> = (T) -> Void
 
 func consumingA(fn: (P) -> Void) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}
-func consumingB(fn: FnType<P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}
+func consumingB(fn: FnType<P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type 'FnType<P>' (aka '(P) -> ()')}}
 
 
 func takePrimaryCollections(

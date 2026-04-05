@@ -112,7 +112,7 @@ swift::getCxxShimModuleMapPath(SearchPathOptions &opts,
                                const llvm::Triple &triple) {
   return getActualModuleMapPath("libcxxshim.modulemap", opts, langOpts, triple,
                                 /*isArchSpecific*/ false,
-                                llvm::vfs::getRealFileSystem());
+                                llvm::vfs::createPhysicalFileSystem());
 }
 
 static llvm::opt::InputArgList
@@ -129,7 +129,7 @@ ClangImporter::createClangDriver(
     const LangOptions &LangOpts, const ClangImporterOptions &ClangImporterOpts,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs) {
 
-  auto diagVFS = vfs ? vfs : llvm::vfs::getRealFileSystem();
+  auto diagVFS = vfs ? vfs : llvm::vfs::createPhysicalFileSystem();
 
   auto diagOpts = std::make_unique<clang::DiagnosticOptions>();
   auto *silentDiagConsumer = new clang::DiagnosticConsumer();
@@ -186,6 +186,7 @@ ClangImporter::createClangArgs(const ClangImporterOptions &ClangImporterOpts,
                                clang::driver::Driver &clangDriver) {
   // Flags passed to Swift with `-Xcc` might affect include paths.
   std::vector<const char *> clangArgs;
+  clangArgs.reserve(ClangImporterOpts.ExtraArgs.size());
   for (const auto &each : ClangImporterOpts.ExtraArgs) {
     clangArgs.push_back(each.c_str());
   }
@@ -374,7 +375,7 @@ static void getLibStdCxxFileMapping(
     return;
   }
 
-  StringRef additionalFiles[] = {
+  constexpr StringRef additionalFiles[] = {
       // libstdc++ 4.8.5 bundled with CentOS 7 does not include corecvt.
       "codecvt",
       // C++17 and newer:
@@ -618,7 +619,7 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     bool suppressDiagnostic) {
   ClangInvocationFileMapping result;
   if (!vfs)
-    vfs = llvm::vfs::getRealFileSystem();
+    vfs = llvm::vfs::createPhysicalFileSystem();
 
   const llvm::Triple &triple = ctx.LangOpts.Target;
   llvm::SmallString<256> sysroot;

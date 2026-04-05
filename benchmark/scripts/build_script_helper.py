@@ -39,7 +39,12 @@ def perform_build(args, swiftbuild_path, config, binary_name, opt_flag):
     subprocess.call(swiftbuild_args)
 
     # Copy the benchmark file into the final ./bin directory.
-    binpath = os.path.join(inner_build_dir, config, "SwiftBench")
+    bindir = subprocess.check_output(
+        swiftbuild_args + ["--show-bin-path"],
+        stderr=False,
+        universal_newlines=True,
+    ).strip()
+    binpath = os.path.join(bindir, "SwiftBench")
     finalpath = os.path.join(args.build_path, "bin", binary_name)
     shutil.copy(binpath, finalpath)
 

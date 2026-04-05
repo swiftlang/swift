@@ -77,10 +77,16 @@ public actor ProcessReproducers {
   }
 
   func getCrash(for reproFile: ReproducerFile) async throws -> CrashInfo? {
-    if let crashLog = reproFile.reproducer.crashInfo {
-      return crashLog
+    let repro = reproFile.reproducer
+    if let crashInfo = repro.crashInfo {
+      return crashInfo
     }
-    return try await checkCrash(of: PotentialCrasher(reproFile))?.crashInfo
+    // If we have multiple signatures, run multiple times to gather them all.
+    let crasher = PotentialCrasher(reproFile)
+    if !repro.signatures.secondaries.isEmpty && repro.options.isDeterministic {
+      return try await checkDeterministicCrash(of: crasher)?.crashInfo
+    }
+    return try await checkCrash(of: crasher)?.crashInfo
   }
 
   func firstNewSignature(_ sigs: KnownSignatures) -> Signature? {
@@ -164,6 +170,7 @@ public actor ProcessReproducers {
                 log.info(logMsg)
               }
               if oldSigs.primary != crash.signatures.primary ||
+                  oldSigs != crash.signatures ||
                   oldIsStackOverflow != crash.primary.isStackOverflow {
                 repro.checkFilename(warn: false)
                 try repro.write()

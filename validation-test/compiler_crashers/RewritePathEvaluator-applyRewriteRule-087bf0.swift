@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::rewriting::RewritePathEvaluator::applyRewriteRule(swift::rewriting::RewriteStep const&, swift::rewriting::RewriteSystem const&)"}
+// {"kind":"typecheck","signature":"swift::rewriting::RewritePathEvaluator::applyRewriteRule(swift::rewriting::RewriteStep const&, swift::rewriting::RewriteSystem const&)","signatureNext":"RewritePathEvaluator::apply"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b : a where b.b == c

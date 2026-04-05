@@ -4,8 +4,6 @@
 
 // REQUIRES: swift_in_compiler
 
-// UNSUPPORTED: OS=wasip1
-
 sil_stage canonical
 
 import Builtin

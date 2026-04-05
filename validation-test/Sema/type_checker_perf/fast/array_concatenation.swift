@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=300
 
 // Self-contained test case
 protocol P1 {}; func f<T: P1>(_: T, _: T) -> T { fatalError() }

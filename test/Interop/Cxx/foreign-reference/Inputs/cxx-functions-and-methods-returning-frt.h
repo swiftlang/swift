@@ -401,12 +401,16 @@ __attribute__((swift_attr("returned_as_unretained_by_default"))) BaseType {};
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:derivedRetain")))
-__attribute__((swift_attr("release:derivedRelease"))) DerivedType
+__attribute__((swift_attr("release:derivedRelease")))
+__attribute__((swift_attr("returned_as_unretained_by_default")))
+DerivedType
     : public BaseType {};
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:derivedRetain2")))
-__attribute__((swift_attr("release:derivedRelease2"))) DerivedType2
+__attribute__((swift_attr("release:derivedRelease2"))) 
+__attribute__((swift_attr("returned_as_unretained_by_default")))
+DerivedType2
     : public DerivedType {};
 
 BaseType *createBaseType() { return new BaseType(); }

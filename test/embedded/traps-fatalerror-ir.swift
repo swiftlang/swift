@@ -25,8 +25,7 @@ public func test() {
 
 // CHECK-NOMESSAGE:      define {{.*}}void @"$e4main4testyyF"(){{.*}} {
 // CHECK-NOMESSAGE-NEXT: entry:
-// CHECK-NOMESSAGE-NEXT:   tail call void asm sideeffect "", "n"(i32 0)
-// CHECK-NOMESSAGE-NEXT:   tail call void @llvm.trap()
+// CHECK-NOMESSAGE-NEXT:   tail call void @llvm.trap() [[NOMERGE:#[0-9]+]]
 // CHECK-NOMESSAGE-NEXT:   unreachable
 // CHECK-NOMESSAGE-NEXT: }
 
@@ -45,7 +44,7 @@ public func testWithInterpolation(i: Int) {
 
 // CHECK-NOMESSAGE:      define {{.*}}void @"$e4main21testWithInterpolation1iySi_tF"(i64 %0){{.*}} {
 // CHECK-NOMESSAGE-NEXT: entry:
-// CHECK-NOMESSAGE-NEXT:   tail call void asm sideeffect "", "n"(i32 0)
-// CHECK-NOMESSAGE-NEXT:   tail call void @llvm.trap()
+// CHECK-NOMESSAGE-NEXT:   tail call void @llvm.trap() [[NOMERGE]]
 // CHECK-NOMESSAGE-NEXT:   unreachable
 // CHECK-NOMESSAGE-NEXT: }
+// CHECK-NOMESSAGE: attributes [[NOMERGE]] = {{{.*}}nomerge{{.*}}}

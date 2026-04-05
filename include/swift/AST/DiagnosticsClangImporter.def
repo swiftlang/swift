@@ -236,6 +236,15 @@ ERROR(private_fileid_attr_repeated, none,
  NOTE(private_fileid_attr_format_suggestion, none,
      "did you mean '%0'?", (StringRef))
 
+// TODO: In the upcoming Swift version, convert this warning into an error and
+// stop importing C++ types that inherit from SWIFT_SHARED_REFERENCE if the
+// Swift compiler cannot find unique retain/release functions.
+// rdar://145194375
+GROUPED_WARNING(cant_infer_frt_in_cxx_inheritance, ClangDeclarationImport, none,
+        "unable to infer SWIFT_SHARED_REFERENCE for %0, although one of its "
+        "transitive base types is marked as SWIFT_SHARED_REFERENCE",
+        (const clang::NamedDecl *))
+
 ERROR(reference_type_must_have_retain_release_attr, none,
       "reference type '%1' must have %select{'retain:'|'release:'}0 Swift "
       "attribute",
@@ -273,6 +282,32 @@ ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
 ERROR(foreign_reference_types_retain_release_not_an_instance_function, none,
       "specified %select{retain|release}0 function '%1' is a static function; expected an instance function",
       (bool, StringRef))
+
+GROUPED_WARNING(unannotated_cxx_func_returning_frt, ForeignReferenceType, none,
+        "cannot infer ownership of foreign reference value returned by %0",
+        (const ValueDecl *))
+NOTE(unannotated_cxx_func_returning_frt_suggestion, none,
+        "annotate %0 with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
+        (const ValueDecl *))
+
+ERROR(both_returns_retained_returns_unretained, none,
+      "%0 cannot be annotated with both SWIFT_RETURNS_RETAINED and "
+      "SWIFT_RETURNS_UNRETAINED",
+      (const clang::NamedDecl *))
+
+WARNING(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
+      "%0 should not be annotated with SWIFT_RETURNS_RETAINED or "
+      "SWIFT_RETURNS_UNRETAINED because it is not returning "
+      "a SWIFT_SHARED_REFERENCE type",
+      (const clang::NamedDecl *))
+
+GROUPED_WARNING(returns_retained_returns_unretained_on_overloaded_operator,  ClangDeclarationImport, none,
+        "SWIFT_RETURNS_RETAINED and SWIFT_RETURNS_UNRETAINED is not supported "
+        "yet for overloaded C++ %0. Overloaded C++ operators always "
+        "return "
+        "SWIFT_SHARED_REFERENCE types as owned ",
+        (const clang::NamedDecl *))
+
 ERROR(conforms_to_missing_dot, none,
       "expected module name and protocol name separated by '.' in protocol "
       "conformance; '%0' is invalid",
@@ -294,35 +329,8 @@ ERROR(failed_base_method_call_synthesis,none,
       "failed to synthesize call to the base method %0 of type %0",
       (ValueDecl *, ValueDecl *))
 
-ERROR(both_returns_retained_returns_unretained, none,
-      "%0 cannot be annotated with both SWIFT_RETURNS_RETAINED and "
-      "SWIFT_RETURNS_UNRETAINED",
-      (const clang::NamedDecl *))
-
 ERROR(redundant_conformance_protocol,none,
      "redundant conformance of %0 to protocol '%1'", (Type, StringRef))
-
-WARNING(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
-      "%0 should not be annotated with SWIFT_RETURNS_RETAINED or "
-      "SWIFT_RETURNS_UNRETAINED because it is not returning "
-      "a SWIFT_SHARED_REFERENCE type",
-      (const clang::NamedDecl *))
-
-GROUPED_WARNING(returns_retained_returns_unretained_on_overloaded_operator,  ClangDeclarationImport, none,
-        "SWIFT_RETURNS_RETAINED and SWIFT_RETURNS_UNRETAINED is not supported "
-        "yet for overloaded C++ %0. Overloaded C++ operators always "
-        "return "
-        "SWIFT_SHARED_REFERENCE types as owned ",
-        (const clang::NamedDecl *))
-
-// TODO: In the next C++ interop version, convert this warning into an error and
-// stop importing C++ types that inherit from SWIFT_SHARED_REFERENCE if the
-// Swift compiler cannot find unique retain/release functions.
-// rdar://145194375
-GROUPED_WARNING(cant_infer_frt_in_cxx_inheritance, ClangDeclarationImport, none,
-        "unable to infer SWIFT_SHARED_REFERENCE for %0, although one of its "
-        "transitive base types is marked as SWIFT_SHARED_REFERENCE",
-        (const clang::NamedDecl *))
 
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
 NOTE(record_field_not_imported, none, "field %0 unavailable (cannot import)", (const clang::NamedDecl*))

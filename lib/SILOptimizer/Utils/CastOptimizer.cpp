@@ -1356,17 +1356,9 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
-    auto *Trap = Builder.createUnconditionalFail(Loc, "failed cast");
-    Inst->replaceAllUsesWithUndef();
-    eraseInstAction(Inst);
-    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
-    auto *UnreachableInst =
-        Builder.createUnreachable(ArtificialUnreachableLocation());
-
-    // Delete everything after the unreachable except for dealloc_stack which we
-    // move before the trap.
-    deleteInstructionsAfterUnreachable(UnreachableInst, Trap);
-
+    // The CondFailOptimization will eventually insert an `unreachable` here
+    // and remove the following dead code (including the cast instruction).
+    Builder.createUnconditionalFail(Loc, "failed cast");
     willFailAction();
     return nullptr;
   }
@@ -1554,16 +1546,9 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
-    auto *TrapI = Builder.createUnconditionalFail(Loc, "failed cast");
-    eraseInstAction(Inst);
-    Builder.setInsertionPoint(std::next(TrapI->getIterator()));
-    auto *UnreachableInst =
-        Builder.createUnreachable(ArtificialUnreachableLocation());
-
-    // Delete everything after the unreachable except for dealloc_stack which we
-    // move before the trap.
-    deleteInstructionsAfterUnreachable(UnreachableInst, TrapI);
-
+    // The CondFailOptimization will eventually insert an `unreachable` here
+    // and remove the following dead code (including the cast instruction).
+    Builder.createUnconditionalFail(Loc, "failed cast");
     willFailAction();
   }
 

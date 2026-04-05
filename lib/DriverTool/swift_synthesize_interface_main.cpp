@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -135,6 +136,9 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
                                                     Invocation.getFrontendOptions());
 
+  if (ParsedArgs.hasArg(OPT_disable_safe_interop_wrappers))
+    Invocation.getLangOptions().DisableSafeInteropWrappers = true;
+
   std::string ModuleCachePath = "";
   if (auto *A = ParsedArgs.getLastArg(OPT_module_cache_path)) {
     ModuleCachePath = A->getValue();
@@ -144,7 +148,7 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
   Invocation.setDefaultPrebuiltCacheIfNecessary();
 
-  if (auto *A = ParsedArgs.getLastArg(OPT_swift_version)) {
+  if (auto *A = ParsedArgs.getLastArg(OPT_language_mode)) {
     using version::Version;
     auto SwiftVersion = A->getValue();
     bool isValid = false;

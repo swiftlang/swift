@@ -17,7 +17,7 @@ static int finalLocalRefCount = 100;
 
 namespace NS {
 
-struct __attribute__((swift_attr("import_as_ref")))
+struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:LCRetain")))
 __attribute__((swift_attr("release:LCRelease"))) LocalCount final {
   int value = 0;
@@ -43,7 +43,7 @@ inline void LCRelease(NS::LocalCount *x) {
 
 static int globalCount = 0;
 
-struct __attribute__((swift_attr("import_as_ref")))
+struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:GCRetain")))
 __attribute__((swift_attr("release:GCRelease"))) GlobalCount {
   static GlobalCount *create() {
@@ -54,7 +54,7 @@ __attribute__((swift_attr("release:GCRelease"))) GlobalCount {
 inline void GCRetain(GlobalCount *x) { globalCount++; }
 inline void GCRelease(GlobalCount *x) { globalCount--; }
 
-struct __attribute__((swift_attr("import_as_ref")))
+struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:GCRetainNullableInit")))
 __attribute__((swift_attr("release:GCReleaseNullableInit")))
 GlobalCountNullableInit {
@@ -69,7 +69,7 @@ GlobalCountNullableInit {
 inline void GCRetainNullableInit(GlobalCountNullableInit *x) { globalCount++; }
 inline void GCReleaseNullableInit(GlobalCountNullableInit *x) { globalCount--; }
 
-struct __attribute__((swift_attr("import_as_ref")))
+struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:RCRetain")))
 __attribute__((swift_attr("release:RCRelease"))) HasOpsReturningRefCount final {
   int refCount = 0;
@@ -85,7 +85,7 @@ inline unsigned RCRelease(HasOpsReturningRefCount *x) { return --x->refCount; }
 
 #endif
 
-typedef struct __attribute__((swift_attr("import_as_ref")))
+typedef struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:INRetain")))
 __attribute__((swift_attr("release:INRelease"))) IncompleteImpl *Incomplete;
 

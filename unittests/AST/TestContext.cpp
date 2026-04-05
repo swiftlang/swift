@@ -38,7 +38,7 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals,
     : TestContextBase(target),
       Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
                            ClangImporterOpts, SymbolGraphOpts, CASOpts,
-                           SerializationOpts, SourceMgr, Diags, SDKInfo)) {
+                           SerializationOpts, SourceMgr, Diags)) {
   registerParseRequestFunctions(Ctx.evaluator);
   registerTypeCheckerRequestFunctions(Ctx.evaluator);
   registerClangImporterRequestFunctions(Ctx.evaluator);

@@ -19,7 +19,7 @@ import traceback
 from typing import Any, Dict, Hashable, Optional, List, Tuple, Union
 
 from .cli_arguments import CliArguments
-from .git_command import Git, GitException, is_any_repository_locked
+from .git_command import Git, GitException, is_any_repository_locked, is_commit_hash
 from .retry import exponential_retry
 from .runner_arguments import AdditionalSwiftSourcesArguments, UpdateArguments
 from .parallel_runner import ParallelRunner
@@ -160,6 +160,12 @@ def update_single_repository(pool_args: UpdateArguments):
         if verbose:
             print(f"{prefix}Updating '{repo_path}'")
 
+        fetch_extra_args = []
+        if pool_args.skip_history:
+            fetch_extra_args.extend(["--depth", "1"])
+        if pool_args.partial_clone:
+            fetch_extra_args.extend(["--filter", "blob:none"])
+
         cross_repo = False
         checkout_target = None
         if pool_args.tag:
@@ -223,12 +229,70 @@ def update_single_repository(pool_args: UpdateArguments):
                     repo_path, ["rev-parse", "--verify", checkout_target], echo=verbose
                 )
             except Exception:
-                Git.run(
+                # The target isn't known locally. This can happen when the
+                # repo was cloned with --single-branch (e.g. via
+                # --skip-history) and we now need a different branch or tag.
+                # Fetch the ref explicitly.
+                is_tag, _, _ = Git.run(
                     repo_path,
-                    ["fetch", "--recurse-submodules=yes", "--tags"],
-                    echo=verbose,
-                    prefix=prefix,
+                    ["ls-remote", "--tags", "origin", checkout_target],
                 )
+                if is_tag:
+                    Git.run(
+                        repo_path,
+                        [
+                            "fetch",
+                            "--recurse-submodules=yes",
+                            "origin",
+                            f"+refs/tags/{checkout_target}"
+                            f":refs/tags/{checkout_target}",
+                        ]
+                        + fetch_extra_args,
+                        echo=verbose,
+                        prefix=prefix,
+                    )
+                elif not is_commit_hash(checkout_target):
+                    Git.run(
+                        repo_path,
+                        [
+                            "fetch",
+                            "--recurse-submodules=yes",
+                            "--tags",
+                            "origin",
+                            f"+refs/heads/{checkout_target}"
+                            f":refs/remotes/origin/{checkout_target}",
+                        ]
+                        + fetch_extra_args,
+                        echo=verbose,
+                        prefix=prefix,
+                    )
+                    # Shallow clones do not auto-create a local tracking branch
+                    # on checkout. Check if it exists if not set up tracking.
+                    # --list output is empty string if the branch doesn't exist,
+                    # non-empty if it does.
+                    existing_branch, _, _ = Git.run(
+                        repo_path,
+                        ["branch", "--list", checkout_target],
+                    )
+                    if not existing_branch:
+                        Git.run(
+                            repo_path,
+                            [
+                                "branch",
+                                checkout_target,
+                                f"refs/remotes/origin/{checkout_target}",
+                            ],
+                            echo=verbose,
+                            prefix=prefix,
+                        )
+                else:
+                    Git.run(
+                        repo_path,
+                        ["fetch", "--recurse-submodules=yes", "--tags"]
+                        + fetch_extra_args,
+                        echo=verbose,
+                        prefix=prefix,
+                    )
 
             try:
                 Git.run(
@@ -251,7 +315,7 @@ def update_single_repository(pool_args: UpdateArguments):
         # which branch was checked out during the fetch.
         Git.run(
             repo_path,
-            ["fetch", "--recurse-submodules=yes", "--tags"],
+            ["fetch", "--recurse-submodules=yes", "--tags"] + fetch_extra_args,
             echo=verbose,
             prefix=prefix,
         )
@@ -495,6 +559,8 @@ def update_all_repositories(
             clean=args.clean,
             stash=args.stash,
             cross_repos_pr=cross_repos_pr,
+            skip_history=args.skip_history,
+            partial_clone=args.partial_clone,
             output_prefix="Updating",
             verbose=args.verbose,
         )
@@ -528,26 +594,57 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
         print("Cloning '" + pool_args.repo_name + "'")
 
     if args.skip_history:
-        Git.run(
-            args.source_root,
-            [
-                "clone",
-                "--config",
-                "core.symlinks=true",
-                "--config",
-                "core.autocrlf=false",
-                "--recursive",
-                "--depth",
-                "1",
-                "--branch",
-                repo_branch,
-                remote,
-                repo_name,
-            ]
-            + (["--no-tags"] if skip_tags else []),
-            env=env,
-            echo=verbose,
-        )
+        filter_args = ["--filter", "blob:none"] if args.partial_clone else []
+        if is_commit_hash(repo_branch):
+            Git.run(
+                args.source_root,
+                [
+                    "clone",
+                    "--config",
+                    "core.symlinks=true",
+                    "--config",
+                    "core.autocrlf=false",
+                    "--depth",
+                    "1",
+                    remote,
+                    repo_name,
+                ]
+                + filter_args
+                + (["--no-tags"] if skip_tags else []),
+                env=env,
+                echo=verbose,
+            )
+            repo_path = args.source_root.joinpath(repo_name)
+            Git.run(
+                repo_path,
+                ["fetch", "--depth", "1", "origin", repo_branch] + filter_args,
+                env=env,
+                echo=verbose,
+            )
+            Git.run(repo_path, ["checkout", repo_branch], env=env, echo=verbose)
+        else:
+            Git.run(
+                args.source_root,
+                [
+                    "clone",
+                    "--config",
+                    "core.symlinks=true",
+                    "--config",
+                    "core.autocrlf=false",
+                    "--recursive",
+                    "--depth",
+                    "1",
+                    "--single-branch",
+                    "--branch",
+                    repo_branch,
+                    remote,
+                    repo_name,
+                ]
+                + filter_args
+                + (["--no-tags"] if skip_tags else []),
+                env=env,
+                echo=verbose,
+            )
     elif args.use_submodules:
         Git.run(
             args.source_root,
@@ -557,6 +654,7 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
             echo=verbose,
         )
     else:
+        filter_args = ["--filter", "blob:none"] if args.partial_clone else []
         Git.run(
             args.source_root,
             [
@@ -569,6 +667,7 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
                 remote,
                 repo_name,
             ]
+            + filter_args
             + (["--no-tags"] if skip_tags else []),
             env=env,
             echo=verbose,
@@ -798,18 +897,15 @@ def validate_config(config: Dict[str, Any]):
                 seen[alias] = scheme_name
 
 
-def full_target_name(repo_path: Path, repository: str, target: str) -> str:
-    tag, _, _ = Git.run(repo_path, ["tag", "-l", target], fatal=True)
-    if tag == target:
-        return tag
-
+def full_target_name(repo_path: Path, remote: str, target: str) -> str:
     branch, _, _ = Git.run(repo_path, ["branch", "--list", target], fatal=True)
     branch = branch.replace("* ", "")
     if branch == target:
-        name = "%s/%s" % (repository, target)
+        name = "%s/%s" % (remote, target)
         return name
 
-    raise RuntimeError("Cannot determine if %s is a branch or a tag" % target)
+    # This is either a tag or commit hash -- we can use it as is
+    return target
 
 
 def skip_list_for_platform(config: Dict[str, Any], all_repos: bool) -> List[str]:

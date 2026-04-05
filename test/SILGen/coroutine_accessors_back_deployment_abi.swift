@@ -19,6 +19,7 @@
 // REQUIRES: swift_feature_CoroutineAccessors
 
 // UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: OS=freebsd
 
 // When CoroutineAccessors are enabled we want to generate
 

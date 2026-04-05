@@ -225,10 +225,17 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     opaqueDecl->setGenericSignature(GenericSignature());
   }
 
+  TypeResolverContext resolverContext = TypeResolverContext::FunctionResult;
+  if (isa<VarDecl>(originatingDecl)) {
+    // Non-opaque result types are resolved against this context, so
+    // replicate that logic here.
+    resolverContext = TypeResolverContext::PatternBindingDecl;
+  }
+
   // Resolving in the context of `opaqueDecl` allows type resolution to create
   // opaque archetypes where needed
   auto interfaceType =
-      TypeResolution::forInterface(opaqueDecl, TypeResolverContext::None,
+      TypeResolution::forInterface(opaqueDecl, resolverContext,
                                    /*unboundTyOpener*/ nullptr,
                                    /*placeholderHandler*/ nullptr,
                                    /*packElementOpener*/ nullptr)
@@ -375,7 +382,7 @@ static bool checkProtocolSelfRequirementsImpl(
                        secondType.getString())
         // FIXME: This should become an unconditional error since violating
         // this invariant can introduce compiler and run time crashes.
-        .warnUntilFutureLanguageModeIf(downgrade);
+        .warnUntilLanguageModeIf(downgrade, LanguageMode::future);
     return true;
   }
 
@@ -717,7 +724,7 @@ void TypeChecker::checkShadowedGenericParams(GenericContext *dc) {
       } else {
         genericParamDecl
             ->diagnose(diag::shadowed_generic_param, genericParamDecl)
-            .warnUntilLanguageMode(6);
+            .warnUntilLanguageMode(LanguageMode::v6);
       }
 
       if (existingParamDecl->getLoc()) {

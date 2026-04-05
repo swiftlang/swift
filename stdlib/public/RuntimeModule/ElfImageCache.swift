@@ -17,20 +17,10 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-internal import Darwin
-#elseif os(Windows)
-internal import ucrt
-#elseif canImport(Glibc)
-internal import Glibc
-#elseif canImport(Musl)
-internal import Musl
-#endif
-
 /// Provides a per-thread image cache for ELF image processing.  This means
 /// if you take multiple backtraces from a thread, you won't load the same
 /// image multiple times.
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 final class ElfImageCache {
   var elf32: [String: Elf32Image] = [:]
   var elf64: [String: Elf64Image] = [:]
@@ -67,30 +57,7 @@ final class ElfImageCache {
     return nil
   }
 
-  private static var key: pthread_key_t = {
-    var theKey = pthread_key_t()
-    let err = pthread_key_create(
-      &theKey,
-      { rawPtr in
-        let ptr = Unmanaged<ElfImageCache>.fromOpaque(
-          notMutable(notOptional(rawPtr))
-        )
-        ptr.release()
-      }
-    )
-    if err != 0 {
-      fatalError("Unable to create TSD key for ElfImageCache")
-    }
-    return theKey
-  }()
-
   static var threadLocal: ElfImageCache {
-    guard let rawPtr = pthread_getspecific(key) else {
-      let cache = Unmanaged<ElfImageCache>.passRetained(ElfImageCache())
-      pthread_setspecific(key, cache.toOpaque())
-      return cache.takeUnretainedValue()
-    }
-    let cache = Unmanaged<ElfImageCache>.fromOpaque(rawPtr)
-    return cache.takeUnretainedValue()
+    return BacktracerThreadLocals.threadLocal.elfImageCache
   }
 }

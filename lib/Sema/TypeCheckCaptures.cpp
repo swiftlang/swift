@@ -413,6 +413,19 @@ public:
       Flags |= CapturedValue::IsNoEscape;
 
     addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
+
+    // Check is the local function captures and isolated parameter, and if so
+    // propagate it up.
+    if (auto *F = dyn_cast<FuncDecl>(D)) {
+      auto isolation = getActorIsolation(F);
+
+      if (isolation.isActorInstanceIsolated() &&
+          isolation.isActorInstanceForCapture()) {
+        addCapture(CapturedValue(isolation.getActorInstance(), Flags,
+                                 DRE->getStartLoc()));
+      }
+    }
+
     return Action::SkipNode(DRE);
   }
 
@@ -798,7 +811,7 @@ static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
   // bodies, where it is both unnecessary and likely to lead to bad diagnostics.
   // We already suppress the executor check in defer bodies.
   if (auto FD = dyn_cast<FuncDecl>(AFD))
-    if (FD->isDeferBody())
+    if (FD->isDeferBody() && !FD->isAsync())
       return false;
 
   return true;

@@ -265,13 +265,32 @@ const {
     }
   }
 
+  // Allow references to hidden dependencies from `@c/objc @implementation`
+  // decl signatures.
+  if (getDeclContext()->isInObjCImplementationContext()) {
+    switch (originKind) {
+    case DisallowedOriginKind::None:
+    case DisallowedOriginKind::NonPublicImport:
+    case DisallowedOriginKind::InternalBridgingHeaderImport:
+    case DisallowedOriginKind::ImplementationOnly:
+    case DisallowedOriginKind::SPIOnly:
+      return DiagnosticBehavior::Ignore;
+    case DisallowedOriginKind::SPIImported:
+    case DisallowedOriginKind::SPILocal:
+    case DisallowedOriginKind::MissingImport:
+    case DisallowedOriginKind::FragileCxxAPI:
+    case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
+      break;
+    }
+  }
+
   // Exportability checking for non-library-evolution was introduced late,
   // downgrade errors to warnings by default.
   auto &ctx = DC->getASTContext();
   if (getExportedLevel() == ExportedLevel::ImplicitlyExported &&
       originKind != DisallowedOriginKind::ImplementationOnlyMemoryLayout &&
       !ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
-      !ctx.isLanguageModeAtLeast(7))
+      !ctx.isLanguageModeAtLeast(LanguageMode::future))
     return DiagnosticBehavior::Warning;
 
   return DiagnosticBehavior::Error;
@@ -852,9 +871,7 @@ static void fixAvailabilityByAddingVersionCheck(
       .fixItReplace(RangeToWrap, IfText);
 }
 
-/// Emit suggested Fix-Its for a reference with to an unavailable symbol
-/// requiting the given OS version range.
-static void fixAvailability(SourceRange ReferenceRange,
+void swift::fixAvailability(SourceRange ReferenceRange,
                             const DeclContext *ReferenceDC,
                             AvailabilityDomain Domain,
                             const AvailabilityRange &RequiredAvailability,
@@ -1098,7 +1115,7 @@ static bool diagnosePotentialUnavailability(
     } else if (behaviorLimit >= DiagnosticBehavior::Warning) {
       err.limitBehavior(behaviorLimit);
     } else if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
-      err.warnUntilLanguageMode(6);
+      err.warnUntilLanguageMode(LanguageMode::v6);
     }
 
     // Direct a fixit to the error if an existing guard is nearly-correct
@@ -1797,7 +1814,8 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
                 shouldHideDomainNameForConstraintDiagnostic(constraint),
                 domainAndRange.getDomain(), EncodedMessage.Message)
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
-      .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6, 6);
+      .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6,
+                               LanguageMode::v6);
 
   switch (constraint.getReason()) {
   case AvailabilityConstraint::Reason::UnavailableUnconditionally:
@@ -2319,13 +2337,8 @@ class ExprAvailabilityWalker : public BaseDiagnosticWalker {
   }
 
 public:
-  explicit ExprAvailabilityWalker(const ExportContext &Where,
-                                  bool preconcurrency = false)
-      : Context(Where.getDeclContext()->getASTContext()), Where(Where) {
-    if (preconcurrency) {
-      PreconcurrencyCalleeStack.push_back(true);
-    }
-  }
+  explicit ExprAvailabilityWalker(const ExportContext &Where)
+    : Context(Where.getDeclContext()->getASTContext()), Where(Where) {}
 
   PreWalkAction walkToArgumentPre(const Argument &Arg) override {
     // Arguments should be walked in their own member access context which
@@ -2480,11 +2493,15 @@ public:
                                               EE->getLoc(),
                                               Where.getDeclContext());
 
+      bool preconcurrency = false;
+      if (!PreconcurrencyCalleeStack.empty()) {
+        preconcurrency = PreconcurrencyCalleeStack.back();
+      }
+
       for (ProtocolConformanceRef C : EE->getConformances()) {
-        diagnoseConformanceAvailability(
-            E->getLoc(), C, Where, Type(), Type(),
-            /*useConformanceAvailabilityErrorsOpt=*/true,
-            /*preconcurrency=*/preconcurrency());
+        diagnoseConformanceAvailability(E->getLoc(), C, Where, Type(), Type(),
+                                        /*useConformanceAvailabilityErrorsOpt=*/true,
+                                        /*preconcurrency=*/preconcurrency);
       }
     }
 
@@ -2523,25 +2540,18 @@ public:
     // differ, e.g for things like `guard #available(...)`.
     class StmtRecurseWalker : public BaseDiagnosticWalker {
       DeclContext *DC;
-      bool preconcurrency;
 
     public:
-      StmtRecurseWalker(DeclContext *DC, bool inPreconcurrency)
-          : DC(DC), preconcurrency(inPreconcurrency) {}
+      StmtRecurseWalker(DeclContext *DC) : DC(DC) {}
 
       PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-        diagnoseExprAvailability(E, DC, preconcurrency);
+        diagnoseExprAvailability(E, DC);
         return Action::SkipNode(E);
       }
     };
-    StmtRecurseWalker W(Where.getDeclContext(), preconcurrency());
+    StmtRecurseWalker W(Where.getDeclContext());
     S->walk(W);
     return Action::SkipNode(S);
-  }
-
-  bool preconcurrency() const {
-    return PreconcurrencyCalleeStack.empty() ? false
-                                             : PreconcurrencyCalleeStack.back();
   }
 
   bool
@@ -2748,15 +2758,7 @@ private:
     auto where = ExportContext::forFunctionBody(closure, closure->getStartLoc());
     if (where.isImplicit())
       return;
-
-    bool preconcurrency = false;
-    if (auto closureExpr = dyn_cast<ClosureExpr>(closure)) {
-      if (closureExpr->isConversionClosure()) {
-        preconcurrency = this->preconcurrency();
-      }
-    }
-
-    ExprAvailabilityWalker walker(where, preconcurrency);
+    ExprAvailabilityWalker walker(where);
 
     // Manually dive into the body
     closure->getBody()->walk(walker);
@@ -2997,9 +2999,9 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
       diag.limitBehavior(DiagnosticBehavior::Warning);
     } else if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
       if (shouldWarnUntilFutureVersion()) {
-        diag.warnUntilFutureLanguageMode();
+        diag.warnUntilLanguageMode(LanguageMode::future);
       } else {
-        diag.warnUntilLanguageMode(6);
+        diag.warnUntilLanguageMode(LanguageMode::v6);
       }
     }
 
@@ -3023,9 +3025,9 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
                                    attr->Message);
     if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
       if (shouldWarnUntilFutureVersion()) {
-        diag.warnUntilFutureLanguageMode();
+        diag.warnUntilLanguageMode(LanguageMode::future);
       } else {
-        diag.warnUntilLanguageMode(6);
+        diag.warnUntilLanguageMode(LanguageMode::v6);
       }
     }
   }
@@ -3089,10 +3091,12 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     diagnoseIfDeprecated(R, Where, D, call);
 
   // A reference to a compatibility memberwise initializer should be diagnosed
-  // as if it were deprecated.
-  if (auto *init = dyn_cast<ConstructorDecl>(D)) {
-    if (init->isMemberwiseInitializer() == MemberwiseInitKind::Compatibility)
-      TypeChecker::diagnoseCompatMemberwiseInitIfNeeded(init, R.Start);
+  // as if it were deprecated if DeprecateCompatMemberwiseInit is enabled.
+  if (ctx.LangOpts.hasFeature(Feature::DeprecateCompatMemberwiseInit)) {
+    if (auto *init = dyn_cast<ConstructorDecl>(D)) {
+      if (init->isMemberwiseInitializer() == MemberwiseInitKind::Compatibility)
+        TypeChecker::diagnoseCompatMemberwiseInitIfNeeded(init, R.Start);
+    }
   }
 
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
@@ -3263,12 +3267,11 @@ ExprAvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
 }
 
 /// Diagnose uses of unavailable declarations.
-void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC,
-                                     bool preconcurrency) {
+void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
   auto where = ExportContext::forFunctionBody(DC, E->getStartLoc());
   if (where.isImplicit())
     return;
-  ExprAvailabilityWalker walker(where, preconcurrency);
+  ExprAvailabilityWalker walker(where);
   const_cast<Expr*>(E)->walk(walker);
 }
 

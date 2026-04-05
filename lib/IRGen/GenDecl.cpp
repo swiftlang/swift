@@ -4898,7 +4898,8 @@ void IRGenModule::emitAccessibleFunctions() {
     llvm_unreachable("Don't know how to emit accessible functions for "
                      "the selected object format.");
   case llvm::Triple::MachO:
-    fnsSectionName = "__TEXT, __swift5_acfuncs, regular";
+    // no_dead_strip - accessible functions must never be stripped
+    fnsSectionName = "__TEXT, __swift5_acfuncs, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
@@ -5298,7 +5299,8 @@ llvm::GlobalValue *IRGenModule::defineAlias(LinkEntity entity,
 llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     CanType concreteType, bool isPattern, bool isConstant,
     ConstantInitFuture init, llvm::StringRef section,
-    SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries) {
+    SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries,
+    unsigned numConformanceEntries) {
   assert(init);
 
   auto concreteTypeDecl = concreteType->getAnyGeneric();
@@ -5354,10 +5356,12 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
   markGlobalAsUsedBasedOnLinkage(*this, link, var);
-  
-  if (Context.LangOpts.hasFeature(Feature::Embedded) &&
-      !hasEmbeddedExistentials) {
-    return var;
+
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    ASSERT(numConformanceEntries == 0 &&
+           "conformance lookup currently not supported in Embedded Swift");
+    if (!hasEmbeddedExistentials)
+      return var;
   }
 
   /// For concrete metadata, we want to use the initializer on the
@@ -5393,12 +5397,28 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
   llvm::Constant *indices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
-      llvm::ConstantInt::get(Int32Ty, adjustmentIndex)};
+      // As conformance entries are stored at negative offsets we have to compensate
+      // with `numConformanceEntries` to get to the base address.
+      llvm::ConstantInt::get(Int32Ty, adjustmentIndex + numConformanceEntries)};
   auto addr = llvm::ConstantExpr::getInBoundsGetElementPtr(var->getValueType(),
                                                            var, indices);
   addr = llvm::ConstantExpr::getBitCast(addr, TypeMetadataPtrTy);
 
   // For concrete metadata, declare the alias to its address point.
+
+  if (hasEmbeddedExistentials) {
+    auto isFromOtherModule = [] (NominalTypeDecl *d) -> bool {
+      auto module = d->getModuleContext();
+      auto &ctx = module->getASTContext();
+      return module != ctx.MainModule && ctx.MainModule;
+    };
+    auto nom = concreteType->getAnyNominal();
+    if (!nom || isFromOtherModule(nom)) {
+      // We don't actually use the defined type medata in the non-home module
+      // but rather reference the full metadata at an offset.
+      return nullptr;
+    }
+  }
   auto directEntity = LinkEntity::forTypeMetadata(
       concreteType, TypeMetadataAddress::AddressPoint);
   return defineAlias(directEntity, addr, TypeMetadataStructTy);
@@ -5532,6 +5552,30 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
                                  /*overrideDeclType=*/nullptr);
     typeOfValue = entity->getDefaultDeclarationType(*this);
+  } else if (hasEmbeddedExistentials) {
+    // We want to avoid generating any local uses of metadata address point
+    // definitions. Instead any local use should be to the offset full metadata
+    // symbol, that is "(gep <full metadata symbol> <offset>)".
+    auto fullMetadataEntity = LinkEntity::forTypeMetadata(
+      concreteType, TypeMetadataAddress::FullMetadata);
+    auto fullMetadata = getAddrOfLLVMVariable(fullMetadataEntity,
+                                              ConstantInit(), DbgTy, refKind,
+                                              /*overrideDeclType=*/nullptr);
+
+    if (auto *GV = dyn_cast<llvm::GlobalVariable>(fullMetadata.getValue()))
+      if (GV->isDeclaration())
+        GV->setComdat(nullptr);
+
+    llvm::Constant *indices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty,
+                             MetadataAdjustmentIndex::EmbeddedWithExistentials)
+    };
+    addr = ConstantReference(
+      llvm::ConstantExpr::getInBoundsGetElementPtr(defaultVarTy,
+                                                   fullMetadata.getValue(),
+                                                   indices),
+      fullMetadata.isIndirect());
   } else {
     addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
                                  /*overrideDeclType=*/defaultVarTy);
@@ -6115,7 +6159,7 @@ IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
     sectionName = ObjCMethodTypeSectionName;
     break;
   case CStringSectionType::OSLogString:
-    sectionName = OSLogStringSectionName;
+    sectionName = Context.LangOpts.OSLogStringSectionName;
     break;
   case CStringSectionType::NumTypes:
     llvm_unreachable("invalid type");

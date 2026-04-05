@@ -153,4 +153,46 @@ PointeeOverloadTestSuite.test("Pointee_LNonConst_RNonConst") {
   expectEqual(a.y, 6060)
 }
 
+PointeeOverloadTestSuite.test("FRT_Const_NonConst") {
+  let a = new_FRT_Const_NonConst(8888)
+  expectEqual(a.pointee, 8888)
+
+  let b = a
+  a.pointee = 8866
+  expectEqual(a.pointee, 8866)
+  expectEqual(b.pointee, 8866)
+
+  b.pointee = 6688
+  expectEqual(a.pointee, 6688)
+  expectEqual(b.pointee, 6688)
+}
+
+PointeeOverloadTestSuite.test("Int_Template_FRT_Const_NonConst") {
+  let a = Int_Template_FRT_Const_NonConst(8888)
+  expectEqual(a.pointee, 8888)
+
+  let b = a
+  a.pointee = 8866
+  expectEqual(a.pointee, 8866)
+  expectEqual(b.pointee, 8866)
+
+  b.pointee = 6688
+  expectEqual(a.pointee, 6688)
+  expectEqual(b.pointee, 6688)
+}
+
+PointeeOverloadTestSuite.test("Double_Template_FRT_Const_NonConst") {
+  let a = Double_Template_FRT_Const_NonConst(88.88)
+  expectEqual(a.pointee, 88.88)
+
+  let b = a
+  a.pointee = 88.66
+  expectEqual(a.pointee, 88.66)
+  expectEqual(b.pointee, 88.66)
+
+  b.pointee = 66.88
+  expectEqual(a.pointee, 66.88)
+  expectEqual(b.pointee, 66.88)
+}
+
 runAllTests()

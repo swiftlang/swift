@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mem2reg | %FileCheck %s
 
 import Builtin
+import Swift
 
 //////////////////
 // Declarations //
@@ -852,5 +853,46 @@ sil [ossa] @dead_end_only_store_non_lexical : $@convention(thin) (@owned C) -> (
 bb0(%0 : @owned $C):
   %1 = alloc_stack $C
   store %0 to [init] %1
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @write_only_in_dead_end :
+// CHECK:       bb2:
+// CHECK-NEXT:    [[L:%.*]] = load [take] %0
+// CHECK-NEXT:    destroy_value [dead_end] [[L]]
+// CHECK-LABEL: } // end sil function 'write_only_in_dead_end'
+sil [ossa] @write_only_in_dead_end : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $any Error
+  %1 = alloc_stack $any Error
+  try_apply undef(%1) : $@noescape @callee_guaranteed () -> ((), @error_indirect any Error), normal bb1, error bb2
+
+bb1(%3 : $()):
+  dealloc_stack %1
+  dealloc_stack %0
+  return %3
+
+bb2:
+  %7 = load [take] %1
+  dealloc_stack %1
+  store %7 to [init] %0
+  dealloc_stack %0
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @write_only_in_single_block_dead_end :
+// CHECK:         apply
+// CHECK-NEXT:    [[L:%.*]] = load [take] %0
+// CHECK-NEXT:    destroy_value [dead_end] [[L]]
+// CHECK-LABEL: } // end sil function 'write_only_in_single_block_dead_end'
+sil [ossa] @write_only_in_single_block_dead_end : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $AnyObject
+  %1 = alloc_stack $AnyObject
+  %2 = apply undef(%1) : $@noescape @callee_guaranteed () -> @out AnyObject
+  %7 = load [take] %1
+  dealloc_stack %1
+  store %7 to [init] %0
+  dealloc_stack %0
   unreachable
 }

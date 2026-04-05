@@ -8,21 +8,28 @@
 // CHECK-NEXT:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
 // CHECK-NEXT:   mutating func foo()
 // CHECK-NEXT:   func swiftVirtualRename()
-// CHECK: }
+// CHECK-NEXT: }
 
 // CHECK: struct Base3 {
 // CHECK-NEXT:   init()
-// CHECK: }
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   @_addressableSelf mutating func f() -> Int32
+// CHECK-NEXT: }
 
 // CHECK: struct Derived2 {
 // CHECK-NEXT:   init()
-// CHECK: }
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   @_addressableSelf mutating func f() -> Int32
+// CHECK-NEXT: }
 
 // CHECK: struct Derived<CInt> {
 // CHECK-NEXT:  init()
 // CHECK-NEXT:  mutating func foo()
-// CHECK: }
+// CHECK-NEXT:  mutating func callMe()
+// CHECK-NEXT:  func swiftVirtualRename()
+// CHECK-NEXT: }
 
 // CHECK: struct VirtualNonAbstractBase {
 // CHECK-NEXT:  init()
 // CHECK-NEXT:  func nonAbstractMethod()
+// CHECK-NEXT: }

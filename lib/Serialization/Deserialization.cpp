@@ -222,7 +222,7 @@ SourceLoc ModularizationError::getSourceLoc() const {
   // so try to print a simple representation of the reference.
   std::string S;
   llvm::raw_string_ostream OS(S);
-  OS << expectedModule->getName() << "." << name;
+  OS << expectedModule->getName() << "." << path.getFullName();
 
   // If we enable these remarks by default we may want to reuse these buffers.
   auto bufferID = SourceMgr.addMemBufferCopy(S, filename);
@@ -234,25 +234,26 @@ ModularizationError::diagnose(const ModuleFile *MF,
                               DiagnosticBehavior limit) const {
   auto &ctx = MF->getContext();
   auto loc = getSourceLoc();
+  std::string fullName = path.getFullName();
 
   auto diagnoseError = [&](Kind errorKind) {
     switch (errorKind) {
     case Kind::DeclMoved:
       return ctx.Diags.diagnose(loc,
                                 diag::modularization_issue_decl_moved,
-                                declIsType, name, expectedModule,
+                                declIsType, fullName, expectedModule,
                                 foundModule);
     case Kind::DeclKindChanged:
       return
         ctx.Diags.diagnose(loc,
                            diag::modularization_issue_decl_type_changed,
-                           declIsType, name, expectedModule,
+                           declIsType, fullName, expectedModule,
                            referenceModule->getName(), foundModule,
-                           foundModule != expectedModule);
+                           foundModule != expectedModule && foundModule);
     case Kind::DeclNotFound:
       return ctx.Diags.diagnose(loc,
                                 diag::modularization_issue_decl_not_found,
-                                declIsType, name, expectedModule);
+                                declIsType, fullName, expectedModule);
     }
     llvm_unreachable("Unhandled ModularizationError::Kind in switch.");
   };
@@ -360,6 +361,7 @@ ModularizationError::diagnose(const ModuleFile *MF,
          expectedModuleName.starts_with(foundModuleName)) &&
         (expectedUnderlying ||
          expectedModule->findUnderlyingClangModule())) {
+      std::string name = path.getFullName();
       ctx.Diags.diagnose(loc,
                          diag::modularization_issue_related_modules,
                          declIsType, name);
@@ -1070,14 +1072,14 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
       ProtocolConformanceState::Incomplete,
       ProtocolConformanceOptions(rawOptions, globalActorTypeExpr));
 
-  if (conformance->isConformanceOfProtocol()) {
+  if (conformance->isConformanceOfProtocol() && !conformance->isReparented()) {
     auto &C = dc->getASTContext();
 
     // Currently this should only be happening for the
     // "DistributedActor as Actor" SILGen generated conformance.
     // See `isConformanceOfProtocol` for details, if adding more such
     // conformances, consider changing the way we structure their construction.
-    assert(conformance->getProtocol()->getInterfaceType()->isEqual(
+    ASSERT(conformance->getProtocol()->getInterfaceType()->isEqual(
                C.getProtocol(KnownProtocolKind::Actor)->getInterfaceType()) &&
            "Only expected to 'skip' finishNormalConformance for manually "
            "created DistributedActor-as-Actor conformance.");
@@ -2473,9 +2475,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       }
     }
 
-    auto declName = getXRefDeclNameForError();
-    auto error = llvm::make_error<ModularizationError>(declName,
-                                                       isType,
+    auto error = llvm::make_error<ModularizationError>(isType,
                                                        errorKind,
                                                        baseModule,
                                                        this,
@@ -2701,8 +2701,33 @@ giveUpFastPath:
         auto members = nominal->lookupDirect(memberName);
         values.append(members.begin(), members.end());
       }
+
+      std::optional<ValueDecl*> matchBeforeFiltering = std::nullopt;
+      if (!values.empty())
+        matchBeforeFiltering = values[0];
+
       filterValues(filterTy, M, genericSig, isType, inProtocolExt,
                    importedFromClang, isStatic, ctorInit, values);
+
+      // Pass up modularization issue.
+      if (values.empty()) {
+        auto errorKind = matchBeforeFiltering.has_value() ?
+          ModularizationError::Kind::DeclKindChanged :
+          ModularizationError::Kind::DeclNotFound;
+
+        std::optional<std::pair<Type, Type>> mismatchingTypes;
+        if (matchBeforeFiltering.has_value() && filterTy) {
+          auto expectedTy = filterTy->getCanonicalType();
+          auto foundTy = (*matchBeforeFiltering)->getInterfaceType();
+          if (expectedTy && foundTy && !expectedTy->isEqual(foundTy))
+            mismatchingTypes = std::make_pair(expectedTy, foundTy);
+        }
+
+        return llvm::make_error<ModularizationError>(
+            isType, errorKind, baseModule, this,
+            /*foundIn*/nullptr, pathTrace, mismatchingTypes);
+      }
+
       break;
     }
 
@@ -3482,8 +3507,8 @@ class DeclDeserializer {
 
       // The next bits are the protocol conformance options.
       // Update the mask below whenever this changes.
-      static_assert(NumProtocolConformanceOptions == 6);
-      ProtocolConformanceOptions options(rawID & 0x3F, /*global actor*/nullptr);
+      static_assert(NumProtocolConformanceOptions == 7);
+      ProtocolConformanceOptions options(rawID & 0x7F, /*global actor*/nullptr);
       rawID = rawID >> NumProtocolConformanceOptions;
 
       TypeID typeID = rawID;
@@ -8638,7 +8663,7 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
   return handleErrorAndSupplyMissingMiscMember(std::move(error));
 }
 
-void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
+void ModuleFile::loadStorageMembers(Decl *container, uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", container);
   ++NumMemberListsLoaded;
 
@@ -9563,12 +9588,13 @@ ModuleFile::maybeReadLifetimeDependence() {
   unsigned targetIndex;
   unsigned paramIndicesLength;
   bool isImmortal;
+  bool isFromAnnotation;
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
   bool hasAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
-      scratch, targetIndex, paramIndicesLength, isImmortal,
+      scratch, targetIndex, paramIndicesLength, isImmortal, isFromAnnotation,
       hasInheritLifetimeParamIndices, hasScopeLifetimeParamIndices,
       hasAddressableParamIndices, lifetimeDependenceData);
 
@@ -9604,8 +9630,9 @@ ModuleFile::maybeReadLifetimeDependence() {
       hasScopeLifetimeParamIndices
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
           : nullptr,
-      targetIndex, isImmortal,
+      targetIndex, isImmortal, isFromAnnotation,
       hasAddressableParamIndices
           ? IndexSubset::get(ctx, addressableParamIndices)
-          : nullptr);
+          : nullptr,
+      nullptr);
 }

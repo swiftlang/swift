@@ -260,7 +260,6 @@ public:
     PartialApplyStack,
     MarkDependenceNonEscaping,
     BeginAsyncLet,
-    MakeBorrow,
   };
 
 private:
@@ -295,8 +294,6 @@ public:
       return Kind::PartialApplyStack;
     case SILInstructionKind::MarkDependenceInst:
       return Kind::MarkDependenceNonEscaping;
-    case SILInstructionKind::MakeBorrowInst:
-      return Kind::MakeBorrow;
     case SILInstructionKind::BuiltinInst: {
       auto bi = cast<BuiltinInst>(i);
       if (bi->getBuiltinKind() == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
@@ -418,7 +415,6 @@ struct BorrowingOperand {
     case BorrowingOperandKind::PartialApplyStack:
     case BorrowingOperandKind::MarkDependenceNonEscaping:
     case BorrowingOperandKind::BeginAsyncLet:
-    case BorrowingOperandKind::MakeBorrow:
       return false;
     case BorrowingOperandKind::Branch:
       return true;

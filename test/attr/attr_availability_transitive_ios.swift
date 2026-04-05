@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift
-// REQUIRES: OS=ios
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target arm64-apple-ios13.0
 
 // Allow referencing unavailable API in situations where the caller is marked unavailable in the same circumstances.
 

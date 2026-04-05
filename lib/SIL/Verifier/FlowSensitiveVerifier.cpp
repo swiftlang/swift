@@ -15,6 +15,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/StackAllocation.h"
 
 using namespace swift;
 using namespace swift::silverifier;
@@ -326,14 +327,14 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
         }
       }
 
-      if (i.isAllocatingStack()) {
+      if (auto allocation = i.getStackAllocation()) {
         // Nested stack allocations are pushed on the stack. Non-nested stack
         // allocations are treated as active ops so that we can at least
         // verify their joint post-dominance.
         if (i.isStackAllocationNested()) {
-          state.Stack.push_back(i.getStackAllocation());
+          state.Stack.push_back(allocation->getValue());
         } else {
-          state.handleScopeInst(i.getStackAllocation());
+          state.handleScopeInst(allocation->getValue());
         }
 
         // Also track begin_apply's token as an ActiveOp so we can also verify
@@ -421,9 +422,18 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
         continue;
 
       if (term->isFunctionExiting()) {
-        require(state.Stack.empty(),
-                "return with stack allocs that haven't been deallocated");
-        require(state.ActiveOps.empty(), "return with operations still active");
+        if (!state.Stack.empty()) {
+          verificationFailure("return with stack allocs that haven't been deallocated",
+                              term, [&](SILPrintContext &ctx) {
+            state.printStack(ctx, "current stack");
+          });
+        }
+        if (!state.ActiveOps.empty()) {
+          verificationFailure("return with operations still active",
+                              term, [&](SILPrintContext &ctx) {
+            state.printActiveOps(ctx, "current active operation set");
+          });
+        }
         require(!state.GotAsyncContinuation,
                 "return with unawaited async continuation");
 

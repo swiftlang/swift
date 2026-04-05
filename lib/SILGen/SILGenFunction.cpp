@@ -125,6 +125,14 @@ SILGenFunction::~SILGenFunction() {
 // Function emission
 //===----------------------------------------------------------------------===//
 
+void SILGenFunction::finalizeEmission() {
+  mergeCleanupBlocks();
+
+  for (auto &finalizer : EmissionFinalizers) {
+    finalizer(*this);
+  }
+}
+
 // Get the #function name for a declaration.
 DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
   // For closures, use the parent name.
@@ -1149,7 +1157,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     emitEpilog(fd);
   }
 
-  mergeCleanupBlocks();
+  finalizeEmission();
 }
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
@@ -1159,9 +1167,26 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   TypeContext = closureInfo;
 
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfEnvironment();
+
+  // Sometimes, as an optimization, we fulfill a function conversion
+  // expression that wraps a closure literal by adjusting the emission of the
+  // closure function instead of emitting a thunk. For example, the following
+  // closure is emitted as an untyped throws function, and the errors thrown
+  // in its body are type-erased:
+  //
+  // func foo<E: Error>(e: E) {
+  //   let _: () throws -> Void = { () throws(E) -> Void in
+  //     throw e
+  //   }
+  // }
+  //
+  // Be careful not to rely on the thrown error type stored in the AST node,
+  // since it may differ from the effective thrown error type tracked by SILGen.
   std::optional<Type> errorIfaceTy;
-  if (auto optErrorTy = ace->getEffectiveThrownType())
+  if (auto optErrorTy = closureInfo.FormalType->getEffectiveThrownErrorType()) {
     errorIfaceTy = (*optErrorTy)->mapTypeOutOfEnvironment();
+  }
+
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
     SILDeclRef(ace));
   emitProlog(ace, captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
@@ -1656,7 +1681,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   }
 
   emitEpilog(Loc);
-  mergeCleanupBlocks();
+  finalizeEmission();
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
@@ -1749,7 +1774,7 @@ void SILGenFunction::emitGeneratorFunction(
   emitStmt(body);
 
   emitEpilog(loc);
-  mergeCleanupBlocks();
+  finalizeEmission();
 }
 
 InitializationPtr SILGenFunction::getSingleValueStmtInit(Expr *E) {

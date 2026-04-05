@@ -379,7 +379,7 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
 
   // Previously we didn't perform the lookup of 'self' for anything outside
   // of a '[weak self]' closure, maintain that behavior until Swift 6 mode.
-  if (!Ctx.isLanguageModeAtLeast(6) && !capturesSelfWeakly)
+  if (!Ctx.isLanguageModeAtLeast(LanguageMode::v6) && !capturesSelfWeakly)
     return nullptr;
 
   auto selfDecl = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
@@ -413,7 +413,7 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
   // In these cases, using the Swift 6 lookup behavior doesn't affect
   // how the body is type-checked, so it can be used in Swift 5 mode
   // without breaking source compatibility for non-escaping closures.
-  if (!Ctx.isLanguageModeAtLeast(6) &&
+  if (!Ctx.isLanguageModeAtLeast(LanguageMode::v6) &&
       !implicitSelfReferenceIsUnwrapped(selfDecl)) {
     return nullptr;
   }
@@ -482,12 +482,17 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
                       : ResolutionKind::Overloadable;
   auto moduleToLookIn = dc;
   if (Name.hasModuleSelector()) {
-    // FIXME: Should we look this up relative to dc?
-    // We'd need a new ResolutionKind.
-    auto moduleName = Name.getModuleSelector();
-    moduleToLookIn = dc->getASTContext().getLoadedModule(moduleName);
-    if (!moduleToLookIn && moduleName == Ctx.TheBuiltinModule->getName())
-      moduleToLookIn = Ctx.TheBuiltinModule;
+    // Perform a second lookup for the module in the module selector.
+    auto moduleOpts = options | Options(Flags::ModuleLookup) -
+      Options({ Flags::TypeLookup, Flags::MacroLookup, Flags::ABIProviding,
+                Flags::IncludeOuterResults });
+    UnqualifiedLookupDescriptor moduleDesc(
+       DeclNameRef(Name.getModuleSelector()), const_cast<DeclContext *>(dc),
+       Loc, moduleOpts);
+
+    auto modules = evaluateOrFatal(dc->getASTContext().evaluator,
+                                   UnqualifiedLookupRequest(moduleDesc));
+    moduleToLookIn = cast_or_null<ModuleDecl>(modules.getSingleTypeResult());
   }
 
   // If we didn't find the module, it obviously can't have any results.

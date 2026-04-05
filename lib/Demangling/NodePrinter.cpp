@@ -463,7 +463,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::PeerAttachedMacroExpansion:
   case Node::Kind::PostfixOperator:
   case Node::Kind::PreambleAttachedMacroExpansion:
-  case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
+  case Node::Kind::CheckedObjCAsyncCompletionHandlerImpl:
   case Node::Kind::PrefixOperator:
   case Node::Kind::PrivateDeclName:
   case Node::Kind::PropertyDescriptor:
@@ -3411,8 +3411,8 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << ')';
     }
     return nullptr;
-  case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
-    Printer << "predefined ";
+  case Node::Kind::CheckedObjCAsyncCompletionHandlerImpl:
+    Printer << "checked ";
     LLVM_FALLTHROUGH;
   case Node::Kind::ObjCAsyncCompletionHandlerImpl:
     Printer << "@objc completion handler block implementation for ";

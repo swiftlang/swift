@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature CoroutineAccessors
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature CoroutineAccessors
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 // REQUIRES: swift_feature_CoroutineAccessors
 
 public class Klass {
@@ -28,15 +27,13 @@ struct Struct {
       return &_k
     }
   }
-}
 
-extension Klass {
-  var i: Int {
-    borrow { // expected-error{{a 'borrow' accessor is supported only on a struct}}
-      return 0
+  var k3: Klass {
+    borrowing borrow {
+      return _k
     }
-    mutate { // expected-error{{a 'mutate' accessor is supported only on a struct}}
-      return &_i
+    borrowing mutate { // expected-error{{a 'mutate' accessor cannot be declared borrowing}}
+      return &_k // expected-error{{}}
     }
   }
 }
@@ -52,30 +49,29 @@ extension Struct {
   }
 }
 
+let global_klass = Klass()
+
+enum E {
+
+}
+
+extension E {
+  var global_k: Klass {
+    borrow {
+      return global_klass
+    }
+  }
+}
+
 protocol P {
   var name: String { borrow }
   var phone: String { borrow mutate }
   var address: String { mutate } // expected-error{{variable with a 'mutate' accessor must also have a 'borrow' accessor}}
 }
 
-enum OrderStatus: ~Copyable {
-  case processing(trackingNumber: String)
-  case cancelled(reason: String)
-  
-  var description: String {
-    borrow { // expected-error{{a 'borrow' accessor is supported only on a struct}}
-      switch self {
-        case .processing(let trackingNumber):
-          return trackingNumber
-        case .cancelled(let reason):
-          return reason
-      }
-    }
-  }
-}
-
 public protocol Q {
   var id: NonTrivial { borrow mutate } // expected-note{{protocol requires property 'id' with type 'NonTrivial'}} // expected-note{{}} // expected-note{{}} // expected-note{{}}
+
 }
 
 public struct NonTrivial {

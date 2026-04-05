@@ -67,7 +67,7 @@ getPluginLoadingFS(ASTContext &Ctx) {
   // If there is an immutable file system, using real file system to load plugin
   // as the FS in SourceMgr doesn't support directory iterator.
   if (Ctx.CASOpts.HasImmutableFileSystem)
-    return llvm::vfs::getRealFileSystem();
+    return llvm::vfs::createPhysicalFileSystem();
   return Ctx.SourceMgr.getFileSystem();
 }
 
@@ -120,10 +120,16 @@ PluginLoader::getPluginMap() {
       return remappedPath;
 
     auto currentStat = fs->status(remappedPath);
+    auto goldStat = Ctx.SourceMgr.getFileSystem()->status(path);
+    // If both scanner and compiler cannot find the plugin, ignore the error and
+    // let plugin loader to diagnose since missing the plugin is just a warning
+    // from swift-frontend.
+    if (!goldStat && !currentStat)
+      return remappedPath;
+
     if (!currentStat)
       return llvm::createFileError(remappedPath, currentStat.getError());
 
-    auto goldStat = Ctx.SourceMgr.getFileSystem()->status(path);
     if (!goldStat)
       return llvm::createStringError(
           "cannot open gold reference library to compare");

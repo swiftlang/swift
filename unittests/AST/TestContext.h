@@ -18,7 +18,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 
-#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/TargetParser/Host.h"
 
 namespace swift {
@@ -40,7 +39,6 @@ public:
   SerializationOptions SerializationOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
-  std::optional<clang::DarwinSDKInfo> SDKInfo;
 
   TestContextBase(llvm::Triple target) : Diags(SourceMgr) {
     LangOpts.Target = target;

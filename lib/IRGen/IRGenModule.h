@@ -716,6 +716,7 @@ public:
   llvm::StringMap<ModuleDecl*> OriginalModules;
   llvm::SmallString<128> OutputFilename;
   llvm::SmallString<128> MainInputFilenameForDebugInfo;
+  llvm::SmallString<128> CacheKeyForJob;
 
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
@@ -1573,8 +1574,6 @@ public:
       "__TEXT,__objc_methname,cstring_literals";
   static constexpr const char ObjCMethodTypeSectionName[] =
       "__TEXT,__objc_methtype,cstring_literals";
-  static constexpr const char OSLogStringSectionName[] =
-      "__TEXT,__oslogstring,cstring_literals";
 
   /// Returns the special builtin types that should be emitted in the stdlib
   /// module.
@@ -1643,13 +1642,14 @@ public:
               SourceFile *SF,
               StringRef ModuleName, StringRef OutputFilename,
               StringRef MainInputFilenameForDebugInfo,
-              StringRef PrivateDiscriminator);
+              StringRef PrivateDiscriminator,
+              StringRef CacheKeyForJob);
 
   /// The constructor used when we just need an IRGenModule for type lowering.
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target)
     : IRGenModule(irgen, std::move(target), /*SF=*/nullptr,
                   "<fake module name>", "<fake output filename>",
-                  "<fake main input filename>", "") {}
+                  "<fake main input filename>", "", "") {}
 
   ~IRGenModule();
 
@@ -1795,7 +1795,8 @@ public:
   llvm::GlobalValue *defineTypeMetadata(
       CanType concreteType, bool isPattern, bool isConstant,
       ConstantInitFuture init, llvm::StringRef section = {},
-      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {},
+      unsigned numConformanceEntries = 0);
 
   TypeEntityReference
   getContextDescriptorEntityReference(const LinkEntity &entity);
@@ -2091,6 +2092,7 @@ private:
   void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
   bool isConcurrencyAvailable();
+  bool isTypedAllocationAvailable();
   void noteSwiftAsyncFunctionDef() {
     hasSwiftAsyncFunctionDef = true;
   }

@@ -23,11 +23,11 @@
 
 //--- Library.swift
 
-// LIBRARY-IR: @"$e7Library10PointClassCN" = linkonce_odr {{.*}}global
-// LIBRARY-EXIST-IR: @"$e7Library10PointClassCMf" = {{.*}}linkonce_odr {{.*}}global
+// LIBRARY-IR: @"$e7Library10PointClassCN" = linkonce_odr {{.*}}constant
+// LIBRARY-EXIST-IR: @"$e7Library10PointClassCMf" = {{.*}}linkonce_odr {{.*}}constant
 
 // Never referenced.
-// LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = linkonce_odr {{(protected |dllexport )?}}global
+// LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = linkonce_odr {{(protected |dllexport )?}}constant
 
 // LIBRARY-IR-NOT: define {{.*}}@"$e7Library5helloSaySiGyF"()
 public func hello() -> [Int] {

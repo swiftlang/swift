@@ -34,7 +34,7 @@ extension InitBorrowAddrInst: OnoneSimplifiable, SILCombineSimplifiable {
 
     let builder = Builder(before: self, context)
 
-    let newBorrow: Value
+    let newBorrow: MakeBorrowInstruction
 
     // If our referent is loadable, then rewrite:
     //
@@ -43,6 +43,7 @@ extension InitBorrowAddrInst: OnoneSimplifiable, SILCombineSimplifiable {
     //   %referent = load_borrow %referent_addr
     //   %borrow = make_borrow %referent
     //   store %borrow to %borrow_addr
+    //   end_borrow %referent
     //
     // Otherwise, our referent is address only for borrows, so rewrite uses into
     // the address form:
@@ -52,9 +53,13 @@ extension InitBorrowAddrInst: OnoneSimplifiable, SILCombineSimplifiable {
     //   %borrow = make_addr_borrow %referent_addr
     //   store %borrow to %borrow_addr
     //
+    var emittedLoadBorrow = false
+
     if loadable {
       let loadedReferent = builder.emitLoadBorrow(fromAddress: referent)
       newBorrow = builder.createMakeBorrow(referent: loadedReferent)
+
+      emittedLoadBorrow = loadedReferent is LoadBorrowInst
     } else {
       newBorrow = builder.createMakeAddrBorrow(referent: referent)
     }
@@ -70,6 +75,10 @@ extension InitBorrowAddrInst: OnoneSimplifiable, SILCombineSimplifiable {
       destination: borrow,
       ownership: storeOwnership
     )
+
+    if emittedLoadBorrow {
+      builder.createEndBorrow(of: newBorrow.referent)
+    }
 
     context.erase(instruction: self)
   }

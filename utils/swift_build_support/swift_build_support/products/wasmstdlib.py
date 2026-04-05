@@ -44,11 +44,11 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self._build(host_target, 'wasm32-wasip1', 'wasip1-wasm32')
 
     def _build(self, host_target, target_triple, short_triple):
-        llvm_build_dir = self._configure_llvm(target_triple, short_triple)
+        llvm_build_dir = self._configure_llvm(host_target, target_triple, short_triple)
         llvm_cmake_dir = os.path.join(llvm_build_dir, 'lib', 'cmake', 'llvm')
         self._build_stdlib(host_target, target_triple, llvm_cmake_dir)
 
-    def _configure_llvm(self, target_triple, short_triple):
+    def _configure_llvm(self, host_target, target_triple, short_triple):
         # Configure LLVM for WebAssembly target independently
         # from the native LLVM build to turn off zlib and libxml2
         build_root = os.path.dirname(self.build_dir)
@@ -56,7 +56,8 @@ class WasmStdlib(cmake_product.CMakeProduct):
             build_root, 'llvm-%s' % short_triple)
         llvm_source_dir = os.path.join(
             os.path.dirname(self.source_dir), 'llvm-project', 'llvm')
-        cmake_options = cmake.CMakeOptions()
+
+        cmake_options, _, relevant_options = self.host_cmake_options(host_target)
         cmake_options.define('CMAKE_BUILD_TYPE:STRING', self._build_variant)
         # compiler-rt for WebAssembly target is not installed in the host toolchain
         # so skip compiler health checks here.
@@ -270,11 +271,11 @@ class WasmStdlib(cmake_product.CMakeProduct):
 
     def _wasi_sysroot_path(self, target_triple):
         build_root = os.path.dirname(self.build_dir)
-        return wasisysroot.WASILibc.sysroot_install_path(build_root, target_triple)
+        return wasisysroot.WASISysroot.sysroot_install_path(build_root, target_triple)
 
     def _wasi_resource_dir_path(self, target_triple):
         build_root = os.path.dirname(self.build_dir)
-        return wasisysroot.WASILibc.resource_dir_install_path(build_root, target_triple)
+        return wasisysroot.WASISysroot.resource_dir_install_path(build_root, target_triple)
 
     def should_install(self, host_target):
         return False
@@ -282,8 +283,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
     @classmethod
     def get_dependencies(cls):
         return [llvm.LLVM,
-                wasisysroot.WASILibc,
-                wasisysroot.WasmLLVMRuntimeLibs,
+                wasisysroot.WASISysroot,
                 wasmkit.WasmKit,
                 swift.Swift]
 

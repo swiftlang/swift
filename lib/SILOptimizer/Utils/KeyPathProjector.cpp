@@ -674,6 +674,7 @@ private:
 
 KeyPathInst *
 KeyPathProjector::getLiteralKeyPath(SILValue keyPath) {
+  keyPath = lookThroughOwnershipInsts(keyPath);
   while (isa<UpcastInst>(keyPath) || isa<OpenExistentialRefInst>(keyPath)) {
     keyPath = lookThroughOwnershipInsts(cast<SingleValueInstruction>(keyPath)->getOperand(0));
   }

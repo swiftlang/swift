@@ -16,3 +16,21 @@ module CustomSequence {
   requires cplusplus
   export *
 }
+
+module CustomBorrowingSequence {
+  header "custom-borrowing-sequence.h"
+  requires cplusplus
+  export *
+}
+
+module NoCxxRequirement {
+  header "no-cxx-requirement.h"
+  // NO requires cplusplus
+  export *
+}
+
+module CxxRequirementSpecificStandardVersion {
+  header "cxx-requirement-specific-standard-version.h"
+  requires cplusplus14
+  export *
+}

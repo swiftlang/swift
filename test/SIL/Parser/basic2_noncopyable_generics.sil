@@ -34,3 +34,5 @@ struct NEG<T : ~Escapable> : ~Escapable {
     self.t = t
   }
 }
+
+extension NEG: Escapable where T: Escapable {}

@@ -20,7 +20,7 @@
 // expected-note@-1 3 {{'m4(_:label2:)' declared here}}
 
 @attached(peer) macro m5(label1: Int, label2: String) = #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")
-// expected-note@-1{{'m5(label1:label2:)' declared here}}
+// expected-note@-1 2 {{'m5(label1:label2:)' declared here}}
 
 @attached(peer) macro m6(label: Int = 42) = #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")
 
@@ -37,6 +37,7 @@
 @m4 struct X4 { } // expected-error{{missing arguments for parameters #1, 'label2' in macro expansion}}{{4-4=(<#Int#>, label2: <#String#>)}}
 
 @m5 struct X5 { } // expected-error{{missing arguments for parameters 'label1', 'label2' in macro expansion}}{{4-4=(label1: <#Int#>, label2: <#String#>)}}
+@m5() struct X5_1 { } // expected-error{{missing arguments for parameters 'label1', 'label2' in macro expansion}}{{5-5=label1: <#Int#>, label2: <#String#>}}
 
 @m6 struct X6 { }
 

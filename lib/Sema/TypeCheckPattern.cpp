@@ -449,16 +449,14 @@ public:
     }
 
     const auto options = TypeResolutionOptions(std::nullopt) |
-                         TypeResolutionFlags::SilenceErrors;
+                         TypeResolutionFlags::SilenceDiagnostics;
 
     // See if the repr resolves to a type.
     const auto ty = TypeResolution::resolveContextualType(
         repr, DC, options,
-        [](auto unboundTy) {
-          // FIXME: Don't let unbound generic types escape type resolution.
-          // For now, just return the unbound generic type.
-          return unboundTy;
-        },
+        // FIXME: Don't let unbound generic types escape type resolution.
+        // For now, just return the unbound generic type.
+        TypeResolution::defaultUnboundTypeOpener,
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get,
@@ -568,16 +566,14 @@ public:
       auto *qualIdentTR = cast<QualifiedIdentTypeRepr>(repr);
 
       const auto options = TypeResolutionOptions(std::nullopt) |
-                           TypeResolutionFlags::SilenceErrors;
+                           TypeResolutionFlags::SilenceDiagnostics;
 
       // See first if the entire repr resolves to a type.
       const Type enumTy = TypeResolution::resolveContextualType(
           qualIdentTR->getBase(), DC, options,
-          [](auto unboundTy) {
-            // FIXME: Don't let unbound generic types escape type
-            // resolution. For now, just return the unbound generic type.
-            return unboundTy;
-          },
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          TypeResolution::defaultUnboundTypeOpener,
           // FIXME: Don't let placeholder types escape type resolution.
           // For now, just return the placeholder type.
           PlaceholderType::get,
@@ -1085,9 +1081,9 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
       ctx.Diags
           .diagnose(NLE->getLoc(), diag::value_type_comparison_with_nil_illegal,
                     patternTy)
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
 
-      if (ctx.isLanguageModeAtLeast(6))
+      if (ctx.isLanguageModeAtLeast(LanguageMode::v6))
         return nullptr;
     }
   }

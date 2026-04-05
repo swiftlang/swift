@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature CoroutineAccessors
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature CoroutineAccessors
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 // REQUIRES: swift_feature_CoroutineAccessors
 
 class Klass {}
@@ -45,7 +44,7 @@ struct Wrapper {
     }
   }
   var k6: Klass {
-    borrow {
+    borrow { // expected-error{{A 'borrow' accessor can only be defined along with a 'mutate' accessor}}
       return _otherK
     }
     mutate { // expected-error{{variable cannot provide both a 'mutate' accessor and a setter}}
@@ -59,7 +58,7 @@ struct Wrapper {
     }
   }
   var k7: Klass {
-    borrow {
+    borrow { // expected-error{{A 'borrow' accessor can only be defined along with a 'mutate' accessor}}
       return _otherK
     }
     mutate { // expected-note{{mutate accessor defined here}}
@@ -76,33 +75,48 @@ struct Wrapper {
       return &_otherK
     }
   }
+  var k9: Klass {
+    borrow { // expected-error{{A 'borrow' accessor can only be defined along with a 'mutate' accessor}}
+      return _otherK
+    }
+    _modify {
+      yield &_otherK
+    }
+  }
+  var k10: Klass {
+    borrow { // expected-error{{A 'borrow' accessor can only be defined along with a 'mutate' accessor}}
+      return _otherK
+    }
+    yielding mutate {
+      yield &_otherK
+    }
+  }
+  var k11: Klass {
+    borrow { // expected-error{{A 'borrow' accessor can only be defined along with a 'mutate' accessor}}
+      return _otherK
+    }
+    set {
+      _otherK = newValue
+    }
+  }
+  var k12: Klass {
+    get {
+      return _otherK
+    }
+    mutate { // expected-error{{A 'mutate' accessor can only be defined along with a 'borrow' accessor}}
+      return &_otherK
+    }
+  }
 }
 
 var i: Int
 
 var i_accessor: Int {
-  borrow { // expected-error{{a 'borrow' accessor is supported only on a struct}}
+  borrow { // expected-error{{a 'borrow' accessor is unsupported here}}
     fatalError()
   }
-  mutate { // expected-error{{a 'mutate' accessor is supported only on a struct}}
+  mutate { // expected-error{{a 'mutate' accessor is unsupported here}}
     return &i // expected-error{{'&' may only be used to pass an argument to inout parameter}}
-  }
-}
-
-class KlassWrapper {
-  var _k: Klass
-
-  init(_ k: Klass) {
-    self._k = k
-  }
-
-  var k: Klass {
-    borrow {// expected-error{{a 'borrow' accessor is supported only on a struct}}
-      return _k
-    }
-    mutate {// expected-error{{a 'mutate' accessor is supported only on a struct}}
-      return &_k
-    }
   }
 }
 

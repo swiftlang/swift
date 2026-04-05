@@ -164,19 +164,25 @@ public:
   /// The \c args arguments are passed through to Type::subst.
   template <typename ...Args>
   Requirement subst(Args &&...args) const {
-    auto newFirst = getFirstType().subst(std::forward<Args>(args)...);
+    return tranformSubjectTypes(
+        [&](Type ty) { return ty.subst(std::forward<Args>(args)...); });
+  }
+
+  /// Calls a transform function on the subject type(s) of the requirement.
+  /// Note this only deals with the top-level of the subjects.
+  Requirement tranformSubjectTypes(llvm::function_ref<Type(Type)> fn) const {
+    auto newFirst = fn(getFirstType());
     switch (getKind()) {
     case RequirementKind::SameShape:
-    case RequirementKind::Conformance:
     case RequirementKind::Superclass:
-    case RequirementKind::SameType: {
-      auto newSecond = getSecondType().subst(std::forward<Args>(args)...);
-      return Requirement(getKind(), newFirst, newSecond);
-    }
+    case RequirementKind::SameType:
+      return Requirement(getKind(), newFirst, fn(getSecondType()));
+    case RequirementKind::Conformance:
+      // The second type of a conformance isn't strictly speaking a subject.
+      return Requirement(getKind(), newFirst, getSecondType());
     case RequirementKind::Layout:
       return Requirement(getKind(), newFirst, getLayoutConstraint());
     }
-
     llvm_unreachable("Unhandled RequirementKind in switch.");
   }
 
@@ -202,10 +208,6 @@ public:
   /// 'T : C' can be satisfied; however, if 'T' already has an unrelated
   /// superclass requirement, 'T : C' cannot be satisfied.
   bool canBeSatisfied() const;
-  
-  /// True if the requirement states a conformance to an invertible protocol
-  /// that is implied by default (such as `Copyable` or `Escapable`.
-  bool isInvertibleProtocolRequirement() const;
 
   /// Linear order on requirements in a generic signature.
   int compare(const Requirement &other) const;

@@ -161,3 +161,127 @@ func badForwardReference() {
 
   let z2 = 0
 }
+
+
+public func basicAsyncDefer() async {
+    defer { await asyncFunc() }
+    voidFunc()
+}
+
+func asyncFunc() async {}
+func voidFunc() {}
+
+func testClosure() async {
+    let f = {
+        defer { await asyncFunc() }
+        voidFunc()
+    }
+
+    await f()
+}
+
+func asyncDeferInSyncFunc() {
+    defer { await asyncFunc() } // expected-error {{'async' defer must appear within an 'async' context}}
+    voidFunc()
+}
+
+func asyncLetDeferInSyncFunc() {
+  defer { async let _: () = voidFunc() } // expected-error {{'async' defer must appear within an 'async' context}}
+  voidFunc()
+}
+
+@MainActor
+func mainActorFunc() {}
+
+@MainActor
+func mainActorAsyncFunc() async {}
+
+
+func asyncFuncToDeferCallToMainActor() async {
+  defer {
+    await mainActorFunc()
+    await mainActorAsyncFunc()
+  }
+  voidFunc()
+}
+
+@MainActor
+func mainActorAsyncFuncToDeferCallToMainActor() async {
+  defer {
+    mainActorFunc()
+    await mainActorAsyncFunc()
+  }
+  voidFunc()
+}
+
+actor A {
+  nonisolated func asyncMethod() async {
+    defer {
+      await isolatedMethod()
+    }
+    voidFunc()
+  }
+
+  nonisolated func nonisolatedSyncMethod() {
+    defer { // expected-error {{'async' defer must appear within an 'async' context}}
+      await isolatedMethod()
+    }
+    voidFunc()
+  }
+
+  func isolatedMethod() async {
+    defer {
+      await anotherIsolatedMethod()
+    }
+    voidFunc()
+  }
+
+  func anotherIsolatedMethod() async {}
+  func isolatedSyncMethod() {
+    defer {
+      anotherIsolatedSyncMethod()
+    }
+    voidFunc()
+  }
+  func anotherIsolatedSyncMethod() {}
+}
+
+func testLocalIsolatedParameter(_ a: isolated A) async {
+  var x = 0
+  defer {
+    await a.isolatedMethod()
+    await a.asyncMethod()
+    a.isolatedSyncMethod()
+    x = 2
+  }
+  voidFunc()
+  x = 1
+  _ = x
+}
+
+func testNestedIsolation(_ a: isolated A) async {
+  let _: @MainActor () async -> Void = {
+    func inner(isolated: isolated (any Actor)? = nil) async {
+      let y: Int = 0
+      defer {
+        voidFunc()
+        _ = y
+      }
+      
+      _ = y
+    }
+  }
+}
+
+func testLocalNonisolatedParameter(_ a: A) async {
+  var x: Int = 0
+  defer {
+    await a.isolatedMethod()
+    await a.asyncMethod()
+    await a.isolatedSyncMethod()
+    x = 2
+  }
+  voidFunc()
+  x = 1
+  _ = x
+}

@@ -152,7 +152,6 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
                                            SourceLoc diagLoc,
                                            bool forTestable) {
   ASTContext &ctx = getContext();
-  auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   ModuleDecl *M = file->getParentModule();
 
   bool missingDependency = false;
@@ -163,6 +162,11 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     assert(!dependency.isLoaded() && "already loaded?");
 
     if (dependency.isHeader()) {
+      auto clangImporter =
+          static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+      if (!clangImporter)
+        return Status::FailedToLoadBridgingHeader;
+
       // The path may be empty if the file being loaded is a partial AST,
       // and the current compiler invocation is a merge-modules step.
       if (!dependency.Core.RawPath.empty()) {
@@ -210,11 +214,6 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     auto importPath = builder.copyTo(ctx);
     auto modulePath = importPath.getModulePath(dependency.isScoped());
     auto accessPath = importPath.getAccessPath(dependency.isScoped());
-    if (!getContext().LangOpts.DisableDeserializationOfExplicitPaths &&
-        !dependency.Core.BinaryModulePath.empty())
-      ctx.addExplicitModulePath(modulePath.front().Item.str(),
-                                dependency.Core.BinaryModulePath.str());
-
     auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
       // If we're missing the module we're an overlay for, treat that specially.
@@ -296,7 +295,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
 
   StringRef SDKPath = ctx.SearchPathOpts.getSDKPath();
   // In Swift 6 mode, we do not inherit search paths from loaded non-SDK modules.
-  if (!ctx.isLanguageModeAtLeast(6) &&
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v6) &&
       (SDKPath.empty() ||
        !Core->ModuleInputBuffer->getBufferIdentifier().starts_with(SDKPath))) {
     for (const auto &searchPath : Core->SearchPaths) {

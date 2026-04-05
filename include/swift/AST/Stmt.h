@@ -208,6 +208,12 @@ public:
                   /*implicit=*/true);
   }
 
+  static BraceStmt *createImplicit(ASTContext &ctx, SourceLoc lbloc,
+                                   ArrayRef<ASTNode> elements,
+                                   SourceLoc rbloc) {
+    return create(ctx, lbloc, elements, rbloc, /*implicit=*/true);
+  }
+
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
 
@@ -445,7 +451,11 @@ public:
 
   /// Dig the original user's body of the defer out for AST fidelity.
   BraceStmt *getBodyAsWritten() const;
-  
+
+  /// Turn this into an async defer by modifying the temp decl and call expr
+  /// appropriately.
+  void makeAsync(ASTContext &ctx);
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Defer; }
 };
 

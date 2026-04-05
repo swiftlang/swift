@@ -64,9 +64,7 @@ SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
       FileIDsByFilePath(SM->computeFileIDMap(/*shouldDiagnose=*/true)) {
   const SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
-    // FIXME: Create file system to read the profile. In the future, the vfs
-    // needs to come from CompilerInstance.
-    auto FS = llvm::vfs::getRealFileSystem();
+    auto FS = M.getASTContext().SourceMgr.getFileSystem();
     auto ReaderOrErr =
         llvm::IndexedInstrProfReader::create(Opts.UseProfile, *FS);
     if (auto E = ReaderOrErr.takeError()) {
@@ -882,6 +880,8 @@ bool SILGenModule::shouldSkipDecl(Decl *D) {
 }
 
 void SILGenModule::visit(Decl *D) {
+  PrettyStackTraceDecl debugStack("silgen visitDecl", D);
+
   if (shouldSkipDecl(D))
     return;
 

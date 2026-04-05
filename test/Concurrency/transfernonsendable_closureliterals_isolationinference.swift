@@ -378,11 +378,11 @@ extension MyActor {
         normalAcceptsAsyncClosure { print(self) }
 
         // CHECK-LABEL: closure #2 in MyActor.test_CallerSyncNormal_CalleeAsyncNonIsolated()
-        // CHECK-NEXT: Isolation: nonisolated
+        // CHECK-NEXT: Isolation: {{nonisolated|caller_isolation_inheriting}}
         normalAcceptsSendingAsyncClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerSyncNormal_CalleeAsyncNonIsolated()
-        // CHECK-NEXT: // Isolation: nonisolated
+        // CHECK-NEXT: // Isolation: {{nonisolated|caller_isolation_inheriting}}
         normalAcceptsSendableAsyncClosure { print(self) }
     }
 
@@ -410,11 +410,11 @@ extension MyActor {
         // expected-ni-ns-note @-4 {{sending 'self'-isolated value of non-Sendable type '@concurrent () async -> ()' to main actor-isolated global function 'normalGlobalActorAcceptsAsyncClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
 
         // CHECK-LABEL: // closure #2 in MyActor.test_CallerSyncNormal_CalleeAsyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: nonisolated
+        // CHECK-NEXT: // Isolation: {{nonisolated|caller_isolation_inheriting}}
         await normalGlobalActorAcceptsSendingAsyncClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerSyncNormal_CalleeAsyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: nonisolated
+        // CHECK-NEXT: // Isolation: {{nonisolated|caller_isolation_inheriting}}
         await normalGlobalActorAcceptsSendableAsyncClosure { print(self) }
     }
 
@@ -489,11 +489,11 @@ extension MyActor {
         // expected-ni-note @-1 {{sending 'self'-isolated value of non-Sendable type '() async -> ()' to nonisolated global function 'asyncNormalAcceptsAsyncClosure' risks causing races in between 'self'-isolated and nonisolated uses}}
 
         // CHECK-LABEL: closure #2 in MyActor.test_CallerAsyncNormal_CalleeAsyncNonIsolated()
-        // CHECK-NEXT: Isolation: nonisolated
+        // CHECK-NEXT: Isolation: {{nonisolated|caller_isolation_inheriting}}
         await asyncNormalAcceptsSendingAsyncClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerAsyncNormal_CalleeAsyncNonIsolated()
-        // CHECK-NEXT: // Isolation: nonisolated
+        // CHECK-NEXT: // Isolation: {{nonisolated|caller_isolation_inheriting}}
         await asyncNormalAcceptsSendableAsyncClosure { print(self) }
     }
 
@@ -529,11 +529,11 @@ extension MyActor {
         // expected-ni-ns-note @-4 {{sending 'self'-isolated value of non-Sendable type '@concurrent () async -> ()' to main actor-isolated global function 'asyncNormalGlobalActorAcceptsAsyncClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
 
         // CHECK-LABEL: // closure #2 in MyActor.test_CallerAsyncNormal_CalleeAsyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: nonisolated
+        // CHECK-NEXT: // Isolation: {{nonisolated|caller_isolation_inheriting}}
         await asyncNormalGlobalActorAcceptsSendingAsyncClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerAsyncNormal_CalleeAsyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: nonisolated
+        // CHECK-NEXT: // Isolation: {{nonisolated|caller_isolation_inheriting}}
         await asyncNormalGlobalActorAcceptsSendableAsyncClosure { print(self) }
     }
 

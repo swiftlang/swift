@@ -307,6 +307,12 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   if (!enableCopyPropagation || !Builder.hasOwnership())
     return;
 
+  // For very large functions OSSA canonicalization can run into noticeable quadratic
+  // behavior. Don't canonicalize functions with more than 100000 SIL instructions.
+  // This limit is large enough to not affect most of real-world SIL functions.
+  if (initialWorklistSize > 100000)
+    return;
+
   llvm::SmallSetVector<SILValue, 16> defsToCanonicalize;
 
   // copyInst was either optimized by a SILCombine visitor or is a copy_value
@@ -408,6 +414,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
   SILCombineCanonicalize scCanonicalize(Worklist, *DEBA->get(&F));
 
+  initialWorklistSize = Worklist.size();
+
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
     SILInstruction *I = Worklist.pop_back_val();
@@ -484,6 +492,9 @@ void SILCombiner::processInstruction(SILInstruction *I,
             //   destroy_addr %1
             // ```
             !hasAddressOperands(svi) &&
+
+            // Don't risk sinking mark_dependence out of the lifetime of the base value.
+            !isa<MarkDependenceInst>(svi) &&
 
             SILValue(svi)->getOwnershipKind() == OwnershipKind::Owned) {
           // Try to sink the value. If we sank the value and deleted it,

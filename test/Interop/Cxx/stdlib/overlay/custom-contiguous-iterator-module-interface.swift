@@ -6,29 +6,29 @@
 // UNSUPPORTED: LinuxDistribution=amzn-2
 
 // CHECK: struct ConstContiguousIterator : UnsafeCxxContiguousIterator, UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
-// CHECK:   var pointee: Int32
 // CHECK:   func successor() -> ConstContiguousIterator
 // CHECK:   typealias Pointee = Int32
 // CHECK:   typealias Distance = Int32
+// CHECK:   var pointee: Int32
 // CHECK: }
 
 // CHECK: struct HasCustomContiguousIteratorTag : UnsafeCxxContiguousIterator, UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
-// CHECK:   var pointee: Int32
 // CHECK:   func successor() -> HasCustomContiguousIteratorTag
 // CHECK:   typealias Pointee = Int32
 // CHECK:   typealias Distance = Int32
+// CHECK:   var pointee: Int32
 // CHECK: }
 
 // CHECK: struct MutableContiguousIterator : UnsafeCxxMutableContiguousIterator, UnsafeCxxMutableRandomAccessIterator, UnsafeCxxMutableInputIterator {
-// CHECK:   var pointee: Int32
 // CHECK:   func successor() -> MutableContiguousIterator
 // CHECK:   typealias Pointee = Int32
 // CHECK:   typealias Distance = Int32
+// CHECK:   var pointee: Int32
 // CHECK: }
 
 // CHECK: struct HasNoContiguousIteratorConcept : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
-// CHECK:   var pointee: Int32
 // CHECK:   func successor() -> HasNoContiguousIteratorConcept
 // CHECK:   typealias Pointee = Int32
 // CHECK:   typealias Distance = Int32
+// CHECK:   var pointee: Int32
 // CHECK: }

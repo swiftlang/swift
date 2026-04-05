@@ -21,7 +21,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
-#include "Dependencies.h"
 #include "TBD.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTDumper.h"
@@ -63,6 +62,7 @@
 #include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/FrontendTool/Dependencies.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
@@ -204,11 +204,11 @@ printModuleInterfaceIfNeeded(llvm::vfs::OutputBackend &outputBackend,
     return false;
 
   DiagnosticEngine &diags = M->getDiags();
-  if (!LangOpts.isLanguageModeAtLeast(5)) {
-    assert(LangOpts.isLanguageModeAtLeast(4));
-    diags.diagnose(SourceLoc(),
-                   diag::warn_unsupported_module_interface_swift_version,
-                   LangOpts.isLanguageModeAtLeast(4, 2) ? "4.2" : "4");
+  if (!LangOpts.isLanguageModeAtLeast(LanguageMode::v5)) {
+    assert(LangOpts.isLanguageModeAtLeast(LanguageMode::v4));
+    diags.diagnose(
+        SourceLoc(), diag::warn_unsupported_module_interface_swift_version,
+        LangOpts.isLanguageModeAtLeast(LanguageMode::v4_2) ? "4.2" : "4");
   }
   if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
     diags.diagnose(SourceLoc(),
@@ -357,6 +357,37 @@ static bool dumpPrecompiledClangModule(const CompilerInstance &Instance) {
   return clangImporter->dumpPrecompiledModule(
       opts.InputsAndOutputs.getFilenameOfFirstInput(),
       opts.InputsAndOutputs.getSingleOutputFilename());
+}
+
+static bool printPolyglotAST(CompilerInstance &Instance) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &opts = Invocation.getFrontendOptions();
+  auto &Context = Instance.getASTContext();
+  auto *clangImporter = static_cast<ClangImporter *>(
+      Context.getClangModuleLoader());
+  for (auto unloadedImport :
+       Instance.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Context.getModule(unloadedImport.module.getModulePath());
+  }
+
+  // The first input file is the target header or implementation file.
+  StringRef headerPath = opts.InputsAndOutputs.getFilenameOfFirstInput();
+  clangImporter->importBridgingHeader(headerPath, Instance.getMainModule(),
+                                      /*diagLoc=*/{},
+                                      /*trackParsedSymbols=*/true);
+
+  std::string outputPath = opts.InputsAndOutputs.getSingleOutputFilename();
+  std::error_code EC;
+  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::OF_None);
+  if (out.has_error() || EC) {
+    Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
+                           EC.message());
+    out.clear_error();
+    return true;
+  }
+
+  clangImporter->printPolyglotAST(headerPath, out);
+  return Context.hadError();
 }
 
 static bool buildModuleFromInterface(CompilerInstance &Instance) {
@@ -1307,6 +1338,8 @@ static bool performAction(CompilerInstance &Instance, int &ReturnValue,
     return precompileClangModule(Instance);
   case FrontendOptions::ActionType::DumpPCM:
     return dumpPrecompiledClangModule(Instance);
+  case FrontendOptions::ActionType::EmitPolyglotAST:
+    return printPolyglotAST(Instance);
 
   // MARK: Module Interface Actions
   case FrontendOptions::ActionType::CompileModuleFromInterface:
@@ -1429,7 +1462,8 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
       *Instance.getCompilerBaseKey(), Instance.getDiags(),
       Instance.getInvocation().getFrontendOptions(), *CDP,
       Instance.getInvocation().getCASOptions().EnableCachingRemarks,
-      Instance.getInvocation().getIRGenOptions().UseCASBackend);
+      Instance.getInvocation().getIRGenOptions().UseCASBackend,
+      Instance.getInvocation().getCASOptions().WriteOutputHashXAttr);
 
   // If we didn't replay successfully, re-start capture.
   if (!replayed)
@@ -1481,9 +1515,9 @@ static bool generateReproducer(CompilerInstance &Instance,
   llvm::sys::path::append(casPath, "cas");
   clang::CASOptions newCAS;
   newCAS.CASPath = casPath.str();
-  newCAS.PluginPath = casOpts.CASOpts.PluginPath;
-  newCAS.PluginOptions = casOpts.CASOpts.PluginOptions;
-  auto db = newCAS.getOrCreateDatabases();
+  newCAS.PluginPath = casOpts.Config.PluginPath;
+  newCAS.PluginOptions = casOpts.Config.PluginOptions;
+  auto db = newCAS.CASConfiguration::createDatabases();
   if (!db) {
     diags.diagnose(SourceLoc(), diag::error_cas_initialization,
                    toString(db.takeError()));
@@ -1840,17 +1874,18 @@ generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
            StringRef OutputFilename, ModuleOrSourceFile MSF,
            llvm::GlobalVariable *&HashGlobal,
            ArrayRef<std::string> parallelOutputFilenames,
-           ArrayRef<std::string> parallelIROutputFilenames) {
+           ArrayRef<std::string> parallelIROutputFilenames,
+           std::optional<llvm::cas::ObjectRef> cacheKeyForJob) {
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     return performIRGeneration(SF, IRGenOpts, TBDOpts, std::move(SM),
                                OutputFilename, PSPs, std::move(CAS),
                                SF->getPrivateDiscriminator().str(), &HashGlobal,
-                               casBackend);
+                               casBackend, cacheKeyForJob);
 
   return performIRGeneration(
       cast<ModuleDecl *>(MSF), IRGenOpts, TBDOpts, std::move(SM),
       OutputFilename, PSPs, std::move(CAS), parallelOutputFilenames,
-      parallelIROutputFilenames, &HashGlobal, casBackend);
+      parallelIROutputFilenames, &HashGlobal, casBackend, cacheKeyForJob);
 }
 
 static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
@@ -1990,6 +2025,13 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
     return;
   }
 
+  // DiagnosticVerifier hasn't run yet. Freeing the AST context will free the
+  // source buffers.
+  if (Instance.getInvocation().getDiagnosticOptions().VerifyMode !=
+      DiagnosticOptions::NoVerify) {
+    return;
+  }
+
   // Make sure to perform the end of pipeline actions now, because they need
   // access to the ASTContext.
   performEndOfPipelineActions(Instance);
@@ -2024,9 +2066,9 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
-                     TargetMachine.get(), OutputFilename,
-                     Instance.getOutputBackend(),
-                     Instance.getStatsReporter());
+                     TargetMachine.get(),
+                     Instance.getSourceMgr().getFileSystem(), OutputFilename,
+                     Instance.getOutputBackend(), Instance.getStatsReporter());
 }
 
 static bool performCompileStepsPostSILGen(
@@ -2253,7 +2295,9 @@ static bool performCompileStepsPostSILGen(
   auto IRModule = generateIR(
       IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
       Instance.getSharedCASInstance(), casBackend, OutputFilename, MSF,
-      HashGlobal, ParallelOutputFilenames, ParallelIROutputFilenames);
+      HashGlobal, ParallelOutputFilenames, ParallelIROutputFilenames,
+      IRGenOpts.DebugModuleSelfKey ? Instance.getCompilerBaseKey()
+                                   : std::nullopt);
 
   // Write extra LLVM IR output if requested
   if (IRModule && !PSPs.SupplementaryOutputs.LLVMIROutputPath.empty()) {

@@ -33,10 +33,10 @@ public class ObjCTest: NSObject {
 
   // CHECK: #if {{.*}} $ABIAttributeSE0479
   // CHECK: @abi(func abiIBActionFunc(_: Any))
-  // CHECK: @objc @IBAction @_Concurrency.MainActor @preconcurrency public func abiIBActionFunc(_: Any)
+  // CHECK: @objc @IBAction @_Concurrency::MainActor @preconcurrency public func abiIBActionFunc(_: Any)
   // CHECK: #else
   // CHECK: @_silgen_name("$s10attrs_objc8ObjCTestC15abiIBActionFuncyyypF")
-  // CHECK: @objc @IBAction @_Concurrency.MainActor @preconcurrency public func abiIBActionFunc(_: Any)
+  // CHECK: @objc @IBAction @_Concurrency::MainActor @preconcurrency public func abiIBActionFunc(_: Any)
   // CHECK: #endif
   @abi(func abiIBActionFunc(_: Any))
   @IBAction public func abiIBActionFunc(_: Any) {}

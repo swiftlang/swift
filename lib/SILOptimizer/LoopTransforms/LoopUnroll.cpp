@@ -34,7 +34,6 @@
 using namespace swift;
 using namespace swift::PatternMatch;
 
-using llvm::DenseMap;
 using llvm::MapVector;
 
 
@@ -60,7 +59,7 @@ public:
 
   // Update SSA helper.
   void collectLoopLiveOutValues(
-      DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues);
+      MapVector<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues);
 
 protected:
   // SILCloner CRTP override.
@@ -335,7 +334,7 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
 /// Collect all the loop live out values in the map that maps original live out
 /// value to live out value in the cloned loop.
 void LoopCloner::collectLoopLiveOutValues(
-    DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues) {
+    MapVector<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues) {
   for (auto *Block : Loop->getBlocks()) {
     // Look at block arguments.
     for (auto *Arg : Block->getArguments()) {
@@ -370,7 +369,7 @@ void LoopCloner::collectLoopLiveOutValues(
 
 static void
 updateSSA(SILFunction *Fn, SILLoop *Loop,
-          DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues) {
+          MapVector<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues) {
   SILSSAUpdater SSAUp;
   for (auto &MapEntry : LoopLiveOutValues) {
     // Collect out of loop uses of this value.
@@ -437,7 +436,7 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA, DeadEnd
   SmallVector<SILBasicBlock *, 16> Latches;
   Latches.push_back(Latch);
 
-  DenseMap<SILValue, SmallVector<SILValue, 8>> LoopLiveOutValues;
+  MapVector<SILValue, SmallVector<SILValue, 8>> LoopLiveOutValues;
 
   // Copy the body MaxTripCount-1 times.
   for (uint64_t Cnt = 1; Cnt < *MaxTripCount; ++Cnt) {

@@ -68,6 +68,8 @@ protected:
     : super(IGM), Target(target), VTable(vtable) {}
 
 public:
+  const SILVTable *getVTable() const { return VTable; }
+
   bool isPureObjC() const {
     return Target->getObjCImplementationDecl();
   }
@@ -110,6 +112,8 @@ public:
       asImpl().addClassDataPointer();
       return;
     }
+
+    asImpl().addConformanceTable();
 
     // Pointer to layout string
     asImpl().addLayoutStringPointer();
@@ -290,6 +294,16 @@ public:
   void addNominalTypeDescriptor() { addPointer(); }
   void addIVarDestroyer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
+
+  void addConformanceTable() {
+    if (!this->VTable)
+      return;
+    
+    for (unsigned i = 0, e = this->VTable->getConformances().size(); i < e; ++i) {
+      addPointer();
+    }
+  }
+
   void addLayoutStringPointer() { addPointer(); }
   void addDestructorFunction() { addPointer(); }
   void addSuperclass() { addPointer(); }

@@ -22,7 +22,7 @@ extension Generic where T == -123 {} // expected-error {{cannot constrain type p
 extension Generic where T == -Int {} // expected-error {{expected type}}
                                      // expected-error@-1 {{expected '{' in extension}}
 
-let d = Generic<123>.self // expected-error {{integer unexpectedly used in a type position}}
+let d = Generic<123>.self // expected-error {{cannot use value type '123' for generic argument 'T'}}
 
 // FIXME: This should at least be parsable...?
 let e = Generic<-123>.self // expected-error {{generic parameter 'T' could not be inferred}}

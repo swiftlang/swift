@@ -41,13 +41,14 @@
 // RUN:   %t/user.swift -o %t/deps2.json -auto-bridging-header-chaining -scanner-output-dir %t -scanner-debug-write-output \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t -enable-library-evolution
 
-// RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -emit-module \
+// RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -scan-dependencies \
 // RUN:   -module-name User -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/user.swift -auto-bridging-header-chaining -o %t/User.swiftmodule \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t > %t/header1.h
 // RUN:   %FileCheck %s --check-prefix=HEADER1 --input-file=%t/header1.h
-// HEADER1: #include
+// HEADER1: #if __has_include
+// HEADER1-NEXT: #import
 // HEADER1-SAME: Bridging.h
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py %swift_frontend_plain %t/deps2.json -o %t/User.cmd -b %t/header1.cmd
@@ -72,15 +73,17 @@
 // RUN:   -I %t %t/user2.swift -import-objc-header %t/Bridging2.h -auto-bridging-header-chaining -scanner-output-dir %t -scanner-debug-write-output \
 // RUN:   -o %t/deps3.json
 
-// RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -emit-module \
+// RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -scan-dependencies \
 // RUN:   -module-name User -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/user.swift -auto-bridging-header-chaining -o %t/User.swiftmodule -import-objc-header %t/Bridging2.h \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t > %t/header2.h
 // RUN:   %FileCheck %s --check-prefix=HEADER2 --input-file=%t/header2.h
-// HEADER2: #include
+// HEADER2: __has_include
+// HEADER2-NEXT: #import
 // HEADER2-SAME: Bridging.h
-// HEADER2: #include
+// HEADER2: __has_include
+// HEADER2-NEXT: #import
 // HEADER2-SAME: Bridging2.h
 
 // RUN: %FileCheck %s --check-prefix DEPS_JSON --input-file=%t/deps3.json

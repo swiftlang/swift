@@ -592,6 +592,7 @@ protected:
 
   NodePointer popAssocTypeName();
   NodePointer popAssocTypePath();
+  NodePointer popAssociatedConformanceWitnessAccessorSubject();
   NodePointer getDependentGenericParamType(int depth, int index);
   NodePointer demangleGenericParamIndex();
   NodePointer popProtocolConformance();

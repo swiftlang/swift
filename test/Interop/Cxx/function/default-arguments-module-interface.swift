@@ -48,8 +48,7 @@
 // CHECK: }
 
 // CHECK: struct HasCtorWithDefaultArg {
-// TODO: support default arguments of constructors (https://github.com/apple/swift/issues/70124)
-// TODO:   init(_ a: Int32, _ b: Int32 = cxxDefaultArg, _ c: Int32 = cxxDefaultArg)
+// CHECK:   init(_ a: Int32, _ b: Int32 = cxxDefaultArg, _ c: Int32 = cxxDefaultArg)
 // CHECK: }
 
 // CHECK: struct TemplatedHasMethodWithDefaultArg<CFloat> {

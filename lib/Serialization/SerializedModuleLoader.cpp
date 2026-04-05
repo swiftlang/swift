@@ -983,12 +983,16 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (!loadedModuleFile->getPublicModuleName().empty())
       M.setPublicModuleName(Ctx.getIdentifier(loadedModuleFile->getPublicModuleName()));
+    if (!loadedModuleFile->getOSLogStringSectionName().empty())
+      Ctx.LangOpts.OSLogStringSectionName = loadedModuleFile->getOSLogStringSectionName();
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
     if (loadedModuleFile->strictMemorySafety())
       M.setStrictMemorySafety();
     if (loadedModuleFile->deferredCodeGen())
       M.setDeferredCodeGen();
+    if (loadedModuleFile->isAggressiveCMOEnabled())
+      M.setAggressiveCMOEnabled();
     if (loadedModuleFile->hasCxxInteroperability()) {
       M.setHasCxxInteroperability();
       M.setCXXStdlibKind(loadedModuleFile->getCXXStdlibKind());

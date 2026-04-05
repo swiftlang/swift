@@ -86,6 +86,8 @@ enum class ExportabilityReason : unsigned {
   AvailableAttribute,
   PublicVarDecl,
   ImplicitlyPublicVarDecl,
+  ImplicitlyPublicVarDeclOpenClass,
+  ImplicitlyPublicVarDeclClassDeinit,
   AssociatedValue,
   ImplicitlyPublicAssociatedValue,
 };
@@ -213,8 +215,7 @@ public:
 };
 
 /// Diagnose uses of unavailable declarations in expressions.
-void diagnoseExprAvailability(const Expr *E, DeclContext *DC,
-                              bool preconcurrency);
+void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
 
 /// Diagnose uses of unavailable declarations in statements (via patterns, etc)
 /// but not expressions.
@@ -263,6 +264,13 @@ bool checkTypeMetadataAvailability(Type type, SourceRange loc,
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);
+
+/// Emit suggested Fix-Its for a reference to an unavailable symbol requiring
+/// the given availability range in the given domain.
+void fixAvailability(SourceRange ReferenceRange, const DeclContext *ReferenceDC,
+                     AvailabilityDomain Domain,
+                     const AvailabilityRange &RequiredAvailability,
+                     ASTContext &Context);
 
 } // namespace swift
 

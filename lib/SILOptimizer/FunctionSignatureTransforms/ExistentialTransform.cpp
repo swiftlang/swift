@@ -27,8 +27,10 @@
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/SmallVector.h"
@@ -649,10 +651,24 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
   populateThunkBody();
 
   assert(F->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
-  // We know that this pass does not create infinite loops even if it
-  // deletes basic blocks.
-  F->setNeedBreakInfiniteLoops(false);
-  // Also, it does not introduce incomplete lifetimes.
+
+  SILPassManager *pm = &FunctionBuilder.getPassManager();
+  auto *invocation = pm->getSwiftPassInvocation()->getCurrent();
+  invocation->initializeNestedSwiftPassInvocation(F);
+
+  removeUnreachableBlocks(*F);
+
+  if (F->needBreakInfiniteLoops()) {
+    breakInfiniteLoops(pm, F);
+  }
+  if (F->needCompleteLifetimes()) {
+    pm->invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
+    completeAllLifetimes(pm, F);
+  }
+
+  invocation->deinitializeNestedSwiftPassInvocation();
+
+  // We didn't introduce any incomplete lifetimes in the specialized function.
   NewF->setNeedCompleteLifetimes(false);
 
   LLVM_DEBUG(llvm::dbgs() << "After ExistentialSpecializer Pass\n"; F->dump();

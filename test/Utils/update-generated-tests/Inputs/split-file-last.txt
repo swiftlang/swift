@@ -1,0 +1,6 @@
+//--- a.txt
+int x;
+
+//--- b.txt
+// GENERATED-BY: echo hello
+placeholder

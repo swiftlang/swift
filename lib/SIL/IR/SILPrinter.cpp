@@ -29,6 +29,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -104,6 +105,10 @@ llvm::cl::opt<bool> SILPrintFunctionIsolationInfo(
     "sil-print-function-isolation-info", llvm::cl::init(false),
     llvm::cl::desc("Print out isolation info on functions in a manner that SIL "
                    "understands [e.x.: not in comments]"));
+
+llvm::cl::opt<bool> SILPrintLoopHeaders(
+    "sil-print-loopheaders", llvm::cl::init(true),
+    llvm::cl::desc("Print a comment on basic blocks that are loop headers"));
 
 static std::string demangleSymbol(StringRef Name) {
   if (SILFullDemangle)
@@ -747,6 +752,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   LineComments lineComments;
   unsigned LastBufferID;
   llvm::DenseSet<const SILBasicBlock *> printedBlocks;
+  llvm::SmallPtrSet<SILBasicBlock *, 32> loopHeaders;
 
   // Printers for the underlying stream.
 #define SIMPLE_PRINTER(TYPE) \
@@ -907,6 +913,10 @@ public:
   //===--------------------------------------------------------------------===//
   // Big entrypoints.
   void print(const SILFunction *F) {
+    if (SILPrintLoopHeaders) {
+      findLoopHeaders(*const_cast<SILFunction *>(F), loopHeaders);
+    }
+
     // If we are asked to emit sorted SIL, print out our BBs in RPOT order.
     if (Ctx.sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
@@ -1039,6 +1049,11 @@ public:
       *this << "// " << debugName.value() << '\n';
     }
 
+    if (SILPrintLoopHeaders &&
+        loopHeaders.count(const_cast<SILBasicBlock *>(BB))) {
+      *this << "// Loop header\n";
+    }
+
     // Then print the name of our block, the arguments, and the block colon.
     *this << Ctx.getID(BB);
     printBlockArguments(BB);
@@ -1064,8 +1079,8 @@ public:
       for (auto Id : PredIDs)
         *this << ' ' << Id;
     }
-    *this << '\n';
 
+    *this << '\n';
     const auto &SM = BB->getModule().getASTContext().SourceMgr;
     std::optional<SILLocation> PrevLoc;
     for (const SILInstruction &I : *BB) {
@@ -1678,6 +1693,8 @@ public:
       *this << "[objc] ";
     if (ARI->canAllocOnStack())
       *this << "[stack] ";
+    if (!ARI->isStackAllocationNested())
+      *this << "[non_nested] ";
     auto Types = ARI->getTailAllocatedTypes();
     auto Counts = ARI->getTailAllocatedCounts();
     for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
@@ -1830,8 +1847,11 @@ public:
       *this << "[isolated_any] ";
       break;
     }
-    if (CI->isOnStack())
+    if (CI->isOnStack()) {
       *this << "[on_stack] ";
+      if (!CI->isStackAllocationNested())
+        *this << "[non_nested] ";
+    }
     visitApplyInstBase(CI);
   }
 
@@ -3742,6 +3762,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[signature_optimized_thunk] ";
     break;
   case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
+  case IsDistributedThunk: OS << "[distributed_thunk] "; break;
   }
   if (isDynamicallyReplaceable()) {
     OS << "[dynamically_replacable] ";
@@ -3788,9 +3809,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[available " << availability.getVersionString() << "] ";
   }
 
-  // This is here only for testing purposes.
-  if (SILPrintFunctionIsolationInfo) {
-    if (auto isolation = getActorIsolation()) {
+  if (auto isolation = getActorIsolation()) {
+    if (isolation->isSILParsed() || SILPrintFunctionIsolationInfo) {
       OS << "[isolation \"";
       isolation->printForSIL(OS);
       OS << "\"] ";
@@ -4472,6 +4492,20 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << getClass()->getName();
   }
   OS << " {\n";
+
+  PrintOptions options = PrintOptions::printSIL();
+
+  for (auto confEntry : getConformances()) {
+    if (confEntry.hasConformance()) {
+      OS << "  conformance ";
+      confEntry.getConformance()->printName(OS, options);
+      OS << '\n';
+    } else {
+      OS << "  no_conformance ";
+      printValueDecl(confEntry.getProtocol(), OS);
+      OS << '\n';
+    }
+  }
 
   for (auto &entry : getEntries()) {
     OS << "  ";

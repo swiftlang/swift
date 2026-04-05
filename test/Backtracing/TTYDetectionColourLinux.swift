@@ -4,7 +4,7 @@
 
 // RUN: %target-build-swift %s -o %t/crash-host
 
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no,interactive=no %target-run %t/crash-host %t/crash)| %FileCheck %s
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,interactive=no %target-run %t/crash-host %t/crash | %FileCheck %s
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

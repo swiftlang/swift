@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature Lifetimes 
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Lifetimes
 
 // REQUIRES: swift_feature_Lifetimes
 
@@ -24,7 +24,7 @@ func testMissingLParenError(_ ne: NE) -> NE {
   ne
 }
 
-@_lifetime() // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier}}
+@_lifetime() // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
 func testMissingDependence(_ ne: NE) -> NE {
   ne
 }

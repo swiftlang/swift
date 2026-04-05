@@ -174,6 +174,22 @@ copy_files(public/Platform Overlay/Linux/glibc
     TiocConstants.swift
     tgmath.swift.gyb)
 
+# WASI Overlay
+message(STATUS "WASI[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/WASI/WASILibc")
+copy_files(public/Platform Overlay/WASI/WASILibc
+  FILES
+    Platform.swift
+    POSIXError.swift
+    tgmath.swift.gyb
+    TiocConstants.swift
+    WASILibc.swift.gyb)
+
+message(STATUS "WASI modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/WASI/clang")
+copy_files(public/Platform Overlay/WASI/clang
+  FILES
+    SwiftWASILibc.apinotes
+    wasi-libc.modulemap)
+
 # Windows Overlay
 message(STATUS "WinSDK[${StdlibSources}/public/Windows] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK")
 copy_files(public/Windows Overlay/Windows/WinSDK FILES WinSDK.swift)
@@ -209,7 +225,9 @@ copy_library_sources(Distributed "public" "Supplemental")
 copy_library_sources(Observation "public" "Supplemental")
 copy_library_sources(Synchronization "public" "Supplemental")
 copy_library_sources(Volatile "public" "Supplemental")
+
 copy_library_sources("" "public/RuntimeModule" "Supplemental/Runtime")
+copy_library_sources("" "public/libexec/swift-backtrace" "Supplemental/StackWalker")
 
 copy_library_sources(_RegexParser "Sources" "Supplemental/StringProcessing"
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")

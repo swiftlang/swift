@@ -5612,13 +5612,15 @@ public:
     // function argument or Builtin.Borrow.
     if (F.getModule().getStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
-      auto base = getAccessBase(RI->getOperand());
-      require(!base->getType().isAddress()
-               || isa<SILFunctionArgument>(base)
-               || isa<DereferenceAddrBorrowInst>(base)
-               || isa<DereferenceBorrowAddrInst>(base)
-               || (isa<ApplyInst>(base)
-                   && cast<ApplyInst>(base)->hasAddressResult()),
+      auto base = AccessBase::compute(RI->getOperand());
+      auto root = base ? base.isReference() ? base.getOwnershipReferenceRoot()
+                                            : base.getBaseAddress()
+                       : SILValue();
+      require(!root || !root->getType().isAddress() ||
+                  isa<SILFunctionArgument>(root) ||
+                  (isa<ApplyInst>(root) &&
+                       cast<ApplyInst>(root)->hasAddressResult() ||
+                   isa<GlobalAddrInst>(root)),
               "unidentified address return");
     }
   }
@@ -6718,7 +6720,7 @@ public:
     if (!innerIndex) return;
 
     auto packType = i->getIndexedPackType();
-    require(i->getComponentStartIndex() < packType->getNumElements(),
+    require(i->getComponentStartIndex() <= packType->getNumElements(),
             "component index must be in bounds for indexed pack type");
     verifySameShape(innerIndex->getIndexedPackType(), packType,
                     i->getComponentStartIndex(), i->getComponentEndIndex());
@@ -7378,10 +7380,12 @@ public:
         auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
         auto *distributedProtocol =
             ctx.getProtocol(KnownProtocolKind::DistributedActor);
-        require(argType->canBeIsolatedTo() ||
-                    genericSig->requiresProtocol(argType, actorProtocol) ||
-                    genericSig->requiresProtocol(argType, distributedProtocol),
-                "Only any actor types can be isolated");
+        require(
+            argType->canBeIsolatedTo() ||
+                (genericSig &&
+                 (genericSig->requiresProtocol(argType, actorProtocol) ||
+                  genericSig->requiresProtocol(argType, distributedProtocol))),
+            "Only any actor types can be isolated");
         require(!foundIsolatedParameter, "Two isolated parameters");
         foundIsolatedParameter = true;
       }

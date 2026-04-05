@@ -33,10 +33,12 @@ void * _Nullable _swift_getExclusivityTLS(void);
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_setExclusivityTLS(void * _Nullable newValue);
 
-#elif defined(__APPLE__) && __arm64__
+#elif defined(TARGET_OS_MAC) && TARGET_OS_MAC && !TARGET_OS_SIMULATOR && __arm64__
 
-// Use a fast path on Apple ARM64, where we have a dedicated TLS key and fast
-// access to read/write it.
+// Use a fast path on Darwin ARM64, where we have a dedicated TLS key and fast
+// access to read/write it. Note: for historical reasons, TARGET_OS_MAC includes
+// the various OSX-derived Darwin OSes as well. TARGET_OS_OSX is the one that's
+// only macOS.
 
 #ifndef __PTK_FRAMEWORK_SWIFT_KEY7
 # define __PTK_FRAMEWORK_SWIFT_KEY7 107

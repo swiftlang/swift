@@ -1387,7 +1387,7 @@ func keypath_function_transitive_conversions() {
   let _: (Base) -> Base? = \Base?.self
   let _: (Base) -> Base? = \Base?.self?.base
   // FIXME: This error text is bogus due to KeyPath base covariance.
-  let _: (Base?) -> Base = \Base.base // expected-error {{value of optional type 'Base?' must be unwrapped to refer to member 'base' of wrapped base type 'Base'}} expected-note {{use unwrapped type 'Base' as key path root}} {{29-33=Base}}
+  let _: (Base?) -> Base = \Base.base // expected-error {{value of optional type 'Optional<Base>' must be unwrapped to refer to member 'base' of wrapped base type 'Base'}} expected-note {{use unwrapped type 'Base' as key path root}} {{29-33=Base}}
   let _: (Base) -> Base = \.base
   let _: (Base) -> Base = \Base.derived
   let _: (Base) -> Base = \.derived

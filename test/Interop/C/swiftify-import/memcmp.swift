@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -7,7 +6,7 @@
 // from being picked up as the canonical decl.
 // RUN: %empty-directory(%t/sdk)
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -sdk %t/sdk \
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -strict-memory-safety -sdk %t/sdk \
 // RUN:   -Xcc -Werror %t%{fs-sep}test.swift -import-objc-header %t%{fs-sep}test.h -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions
 
 // Check that ClangImporter does not try to apply _SwiftifyImport to functions in SwiftShims,

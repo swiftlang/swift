@@ -103,7 +103,8 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Identifier_WrappedDiag) {
         diags.setPrintDiagnosticNamesMode(PrintDiagnosticNamesMode::Identifier);
 
         diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_stdlib)
-            .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, 99);
+            .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning,
+                                            LanguageMode::future);
       },
       [](DiagnosticEngine &diags, const DiagnosticInfo &info) {
         EXPECT_EQ(info.ID, diag::error_in_a_future_swift_lang_mode.ID);
@@ -144,7 +145,7 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Group) {
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
         EXPECT_FALSE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
-        EXPECT_EQ(info.Category, "DeprecatedDeclaration");
+        EXPECT_EQ(info.getCategoryName(), "DeprecatedDeclaration");
       },
       /*expectedNumCallbackCalls=*/1);
 }
@@ -159,12 +160,13 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Group_WrappedDiag) {
         TestDiagnostic diagnostic(diag::error_immediate_mode_missing_stdlib.ID,
                                   DiagGroupID::DeprecatedDeclaration);
         diags.diagnose(SourceLoc(), diagnostic)
-            .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, 99);
+            .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning,
+                                            LanguageMode::future);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
         EXPECT_EQ(info.ID, diag::error_in_a_future_swift_lang_mode.ID);
         EXPECT_FALSE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
-        EXPECT_EQ(info.Category, "DeprecatedDeclaration");
+        EXPECT_EQ(info.getCategoryName(), "DeprecatedDeclaration");
       },
       /*expectedNumCallbackCalls=*/1);
 }
@@ -180,11 +182,13 @@ TEST(DiagnosticInfo, CategoryDeprecation) {
         EXPECT_TRUE(diags.isDeprecationDiagnostic(diag.ID));
 
         diags.diagnose(SourceLoc(), diag);
-        diags.diagnose(SourceLoc(), diag).warnUntilLanguageMode(6);
-        diags.diagnose(SourceLoc(), diag).warnUntilLanguageMode(99);
+        diags.diagnose(SourceLoc(), diag)
+            .warnUntilLanguageMode(LanguageMode::v6);
+        diags.diagnose(SourceLoc(), diag)
+            .warnUntilLanguageMode(LanguageMode::future);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
-        EXPECT_EQ(info.Category, "deprecation");
+        EXPECT_EQ(info.getCategoryName(), "deprecation");
       },
       /*expectedNumCallbackCalls=*/3);
 }
@@ -197,11 +201,13 @@ TEST(DiagnosticInfo, CategoryNoUsage) {
         EXPECT_TRUE(diags.isNoUsageDiagnostic(diag.ID));
 
         diags.diagnose(SourceLoc(), diag);
-        diags.diagnose(SourceLoc(), diag).warnUntilLanguageMode(6);
-        diags.diagnose(SourceLoc(), diag).warnUntilLanguageMode(99);
+        diags.diagnose(SourceLoc(), diag)
+            .warnUntilLanguageMode(LanguageMode::v6);
+        diags.diagnose(SourceLoc(), diag)
+            .warnUntilLanguageMode(LanguageMode::future);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
-        EXPECT_EQ(info.Category, "no-usage");
+        EXPECT_EQ(info.getCategoryName(), "no-usage");
       },
       /*expectedNumCallbackCalls=*/3);
 }
@@ -214,12 +220,13 @@ TEST(DiagnosticInfo, CategoryAPIDigesterBreakage) {
         EXPECT_TRUE(diags.isAPIDigesterBreakageDiagnostic(diag.ID));
 
         diags.diagnose(SourceLoc(), diag, StringRef());
-        diags.diagnose(SourceLoc(), diag, StringRef()).warnUntilLanguageMode(6);
         diags.diagnose(SourceLoc(), diag, StringRef())
-            .warnUntilLanguageMode(99);
+            .warnUntilLanguageMode(LanguageMode::v6);
+        diags.diagnose(SourceLoc(), diag, StringRef())
+            .warnUntilLanguageMode(LanguageMode::future);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
-        EXPECT_EQ(info.Category, "api-digester-breaking-change");
+        EXPECT_EQ(info.getCategoryName(), "api-digester-breaking-change");
       },
       /*expectedNumCallbackCalls=*/3);
 }

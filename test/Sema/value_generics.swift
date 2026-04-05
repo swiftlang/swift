@@ -64,7 +64,7 @@ extension Generic where T == 123.Type {} // expected-error {{cannot constrain ty
 extension Generic where T == 123? {} // expected-error {{cannot constrain type parameter 'T' to be integer '123'}}
                                      // expected-error@-1 {{expected '{' in extension}}
 
-func f(_: Generic<123>) {} // expected-error {{integer unexpectedly used in a type position}}
+func f(_: Generic<123>) {} // expected-error {{cannot use value type '123' for generic argument 'T'}}
 func g<let N: Int>(_: Generic<N>) {} // expected-error {{cannot use value type 'N' for generic argument 'T'}}
 func h(_: (Int, 123)) {} // expected-error {{expected type}}
 func i(_: () -> 123) {} // expected-error {{expected type}}

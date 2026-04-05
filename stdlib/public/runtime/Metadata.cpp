@@ -31,7 +31,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/RemoteInspection/GenericMetadataCacheEntry.h"
 #include "swift/Runtime/Borrow.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/EnvironmentVariables.h"
@@ -1696,10 +1695,12 @@ swift::swift_getFixedArrayTypeMetadata(MetadataRequest request,
                             MetadataState::Complete};
   }
   
-  // If the element type has no tail padding, then its metadata is good enough
+  // If the element type has no tail padding, and is already addressable-for-
+  // dependencies, then its metadata is good enough
   // to hold space for the vector.
   if (count == 1
-      && element->getValueWitnesses()->size == element->getValueWitnesses()->stride) {
+      && element->getValueWitnesses()->size == element->getValueWitnesses()->stride
+      && element->getValueWitnesses()->isAddressableForDependencies()) {
     return MetadataResponse{element, MetadataState::Complete};
   }
   
@@ -1890,12 +1891,14 @@ FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
   auto arraySize
     = Witnesses.size = Witnesses.stride = eltWitnesses->stride * count;
   // We take on most of the properties of the element type, except that an array
-  // of elements might end up larger than an inline buffer.
+  // of elements might end up larger than an inline buffer, and the array is
+  // always addressable for dependencies.
   Witnesses.flags = eltWitnesses->flags
     .withInlineStorage(
               ValueWitnessTable::isValueInline(eltWitnesses->isBitwiseTakable(),
                                                arraySize,
-                                               eltWitnesses->getAlignment()));
+                                               eltWitnesses->getAlignment()))
+    .withAddressableForDependencies(true);
   // We get extra inhabitants from the first element.
   Witnesses.extraInhabitantCount = eltWitnesses->extraInhabitantCount;
   
@@ -2607,6 +2610,7 @@ static void performBasicLayout(TypeLayout &layout,
   bool isPOD = layout.flags.isPOD();
   bool isBitwiseTakable = layout.flags.isBitwiseTakable();
   bool isBitwiseBorrowable = layout.flags.isBitwiseBorrowable();
+  bool isAddressableForDependencies = layout.flags.isAddressableForDependencies();
   for (unsigned i = 0; i != numElements; ++i) {
     auto &elt = elements[i];
 
@@ -2623,6 +2627,8 @@ static void performBasicLayout(TypeLayout &layout,
     if (!eltLayout->flags.isPOD()) isPOD = false;
     if (!eltLayout->flags.isBitwiseTakable()) isBitwiseTakable = false;
     if (!eltLayout->flags.isBitwiseBorrowable()) isBitwiseBorrowable = false;
+    if (eltLayout->flags.isAddressableForDependencies())
+      isAddressableForDependencies = true;
   }
   bool isInline =
       ValueWitnessTable::isValueInline(isBitwiseTakable, size, alignMask + 1);
@@ -2633,6 +2639,7 @@ static void performBasicLayout(TypeLayout &layout,
                      .withPOD(isPOD)
                      .withBitwiseTakable(isBitwiseTakable)
                      .withBitwiseBorrowable(isBitwiseBorrowable)
+                     .withAddressableForDependencies(isAddressableForDependencies)
                      .withInlineStorage(isInline);
   layout.extraInhabitantCount = 0;
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));

@@ -1,0 +1,42 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -loadable-address -sil-print-types | %FileCheck %s
+
+// Complementary SIL-level test for loadable_by_address_swift6.swift.
+//
+// Tests that LoadableByAddress correctly handles a @sil_sending Optional
+// closure parameter where the closure takes a large-loadable struct by value.
+//
+// G<Int> is large loadable: its 4 String fields exceed the threshold, so
+// LoadableByAddress must convert the @guaranteed G<Int> parameter convention
+// inside the nested closure type to @in_guaranteed (by-address lowering).
+// The @sil_sending attribute on the outer parameter must be preserved.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+public struct G<T> {
+  @_hasStorage public let a: String { get }
+  @_hasStorage public let b: String { get }
+  @_hasStorage public let c: String { get }
+  @_hasStorage public let d: String { get }
+}
+
+// Test: LoadableByAddress lowers @guaranteed G<Int> -> @in_guaranteed G<Int>
+// inside a nested Optional<@callee_guaranteed ...> type, while preserving
+// the @sil_sending attribute on the outer function parameter.
+//
+// CHECK-LABEL:  sil @test_sending_optional_closure : $@convention(thin) <T> (@sil_sending @owned Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@in_guaranteed G<τ_0_0>) -> () for <T>>) -> () {
+// CHECK: alloc_stack $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@in_guaranteed G<τ_0_0>) -> () for <T>>, var, name "body", type $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@in_guaranteed G<τ_0_0>) -> () for <T>>
+// CHECK:       } // end sil function 'test_sending_optional_closure'
+sil @test_sending_optional_closure : $@convention(thin) <T> (@sil_sending @owned Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@guaranteed G<τ_0_0>) -> () for <T>>) -> () {
+// %0 "body"                                      // user: %2
+bb0(%0 : $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@guaranteed G<τ_0_0>) -> () for <T>>):
+  %1 = alloc_stack [lexical] [var_decl] $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@guaranteed G<τ_0_0>) -> () for <T>>, var, name "body", type $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@guaranteed G<τ_0_0>) -> () for <T>>
+  debug_value %0 : $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@guaranteed G<τ_0_0>) -> () for <T>>, var, name "arg", type $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@guaranteed G<τ_0_0>) -> () for <T>>
+  store %0 to %1
+  destroy_addr %1
+  dealloc_stack %1
+  %5 = tuple ()
+  return %5
+}

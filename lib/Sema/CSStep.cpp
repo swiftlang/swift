@@ -21,7 +21,9 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -30,6 +32,11 @@
 using namespace llvm;
 using namespace swift;
 using namespace constraints;
+
+#define DEBUG_TYPE "Constraint solver overall"
+
+STATISTIC(NumEarlyBindingAttempts, "bindings attempted before disjunctions");
+STATISTIC(NumLateBindingAttempts, "bindings attempted after disjunctions");
 
 ComponentStep::Scope::Scope(ComponentStep &component)
     : CS(component.CS), Component(component) {
@@ -258,53 +265,58 @@ StepResult ComponentStep::take(bool prevFailed) {
   // Setup active scope, only if previous component didn't fail.
   setupScope();
 
-  const auto *bestBindings = CS.determineBestBindings();
-  auto disjunction = CS.selectDisjunction();
-  auto *conjunction = CS.selectConjunction();
+  auto attemptBinding = [&](const inference::BindingSet &bindingSet) {
+    if (bindingSet.getNumExactBindings() == 1)
+      ++NumEarlyBindingAttempts;
+    else
+      ++NumLateBindingAttempts;
 
-  enum class StepKind { Binding, Disjunction, Conjunction };
-
-  auto chooseStep = [&]() -> std::optional<StepKind> {
-    // Bindings usually happen first, but sometimes we want to prioritize a
-    // disjunction or conjunction.
-    if (bestBindings) {
-      if (disjunction &&
-          !bestBindings->favoredOverDisjunction(disjunction->first))
-        return StepKind::Disjunction;
-
-      if (conjunction && !bestBindings->favoredOverConjunction(conjunction))
-        return StepKind::Conjunction;
-
-      return StepKind::Binding;
-    }
-    if (disjunction)
-      return StepKind::Disjunction;
-
-    if (conjunction)
-      return StepKind::Conjunction;
-
-    return std::nullopt;
+    return suspend(
+        std::make_unique<TypeVariableStep>(CS, bindingSet.getTypeVariable(),
+                                           bindingSet, Solutions));
   };
 
-  if (auto step = chooseStep()) {
-    switch (*step) {
-    case StepKind::Binding:
-      return suspend(
-          std::make_unique<TypeVariableStep>(CS, bestBindings->getTypeVariable(),
-                                             *bestBindings, Solutions));
-    case StepKind::Disjunction: {
-      CS.retireConstraint(disjunction->first);
-      return suspend(
-          std::make_unique<DisjunctionStep>(CS, *disjunction, Solutions));
-    }
-    case StepKind::Conjunction: {
-      CS.retireConstraint(conjunction);
+  auto attemptDisjunction = [&](std::pair<Constraint *,
+                                          llvm::TinyPtrVector<Constraint *>> disjunction) {
+    CS.retireConstraint(disjunction.first);
+    return suspend(
+        std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+  };
+
+  auto attemptConjunction = [&](Constraint *conjunction) {
+    CS.retireConstraint(conjunction);
       return suspend(
           std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
+  };
+
+  const auto *bestBindings = CS.determineBestBindings();
+  if (!CS.shouldAttemptFixes()) {
+    // If we have a binding set ready to go, attempt it first.
+    if (bestBindings && bestBindings->getNumExactBindings() == 1) {
+      return attemptBinding(*bestBindings);
     }
-    }
-    llvm_unreachable("Unhandled case in switch!");
   }
+
+  // FIXME: Remove favoredOverDisjunction() and favoredOverConjunction().
+
+  // Check if we have a disjunction that is better than our binding set.
+  auto disjunction = CS.selectDisjunction();
+  if (disjunction &&
+      (!bestBindings ||
+       !bestBindings->favoredOverDisjunction(disjunction->first))) {
+    return attemptDisjunction(*disjunction);
+  }
+
+  // Check if we have a conjunction that is better than our binding set.
+  auto *conjunction = CS.selectConjunction();
+  if (conjunction &&
+      (!bestBindings ||
+       !bestBindings->favoredOverConjunction(conjunction))) {
+    return attemptConjunction(conjunction);
+  }
+
+  if (bestBindings)
+    return attemptBinding(*bestBindings);
 
   if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables()) {
     // If there are no disjunctions or type variables to bind

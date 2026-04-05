@@ -251,7 +251,7 @@ class ProbeImplicit_BaseIsolatedClass: BaseIsolatedClass {}
 // CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test30ProbeDefault_BaseIsolatedClassCfD : $@convention(method) (@owned ProbeDefault_BaseIsolatedClass) -> () {
 class ProbeDefault_BaseIsolatedClass: BaseIsolatedClass {
-    deinit {
+    deinit { // expected-note {{add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'}}
 #if !SILGEN
         isolatedFunc() // expected-error {{call to main actor-isolated global function 'isolatedFunc()' in a synchronous nonisolated context}}
 #endif
@@ -311,7 +311,7 @@ class ProbeImplicit_DerivedIsolatedClass: DerivedIsolatedClass {}
 // CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test33ProbeDefault_DerivedIsolatedClassCfD : $@convention(method) (@owned ProbeDefault_DerivedIsolatedClass) -> () {
 class ProbeDefault_DerivedIsolatedClass: DerivedIsolatedClass {
-    deinit {
+    deinit { // expected-note {{add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'}}
 #if !SILGEN
         isolatedFunc() // expected-error {{call to main actor-isolated global function 'isolatedFunc()' in a synchronous nonisolated context}}
 #endif

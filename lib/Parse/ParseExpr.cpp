@@ -1387,11 +1387,13 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (Tok.is(tok::l_brace) && isValidTrailingClosure(isExprBasic, *this)) {
       // FIXME: if Result has a trailing closure, break out.
 
-      // Stop after literal expressions, which may never have trailing closures.
+      // Stop after most types of literals, which may never have trailing closures.
+      // Array and dictionary literals support trailing closures since this can mean
+      // `[Element].init { }` or `[Key: Value].init { }`.
       const auto *callee = Result.get();
-      if (isa<LiteralExpr>(callee) || isa<CollectionExpr>(callee) ||
-          isa<TupleExpr>(callee))
+      if (isa<LiteralExpr>(callee) || isa<TupleExpr>(callee)) {
         break;
+      }
 
       SmallVector<Argument, 2> trailingClosures;
       auto trailingResult =
@@ -3192,14 +3194,10 @@ Expr *Parser::parseExprAnonClosureArg() {
   auto closure = dyn_cast_or_null<ClosureExpr>(
       dyn_cast<AbstractClosureExpr>(CurDeclContext));
   if (!closure) {
-    if (Context.LangOpts.DebuggerSupport) {
-      auto refKind = DeclRefKind::Ordinary;
-      auto identifier = Context.getIdentifier(Name);
-      return new (Context) UnresolvedDeclRefExpr(DeclNameRef(identifier),
-                                                 refKind, DeclNameLoc(Loc));
-    }
-    diagnose(Loc, diag::anon_closure_arg_not_in_closure);
-    return new (Context) ErrorExpr(Loc);
+    auto refKind = DeclRefKind::Ordinary;
+    auto identifier = Context.getIdentifier(Name);
+    return new (Context) UnresolvedDeclRefExpr(DeclNameRef(identifier), refKind,
+                                               DeclNameLoc(Loc));
   }
 
   // Check whether the closure already has explicit parameters.

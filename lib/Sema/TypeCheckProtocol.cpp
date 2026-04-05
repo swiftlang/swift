@@ -49,6 +49,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RequirementMatch.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
@@ -306,6 +307,29 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
   return witness;
 }
 
+static GenericSignature maybeAddDifferentiableFromContext(DeclContext *dc,
+                                                          GenericSignature derivativeGenSig) {
+  auto conformanceGenSig = dc->getGenericSignatureOfContext();
+  if (!conformanceGenSig)
+    return derivativeGenSig;
+
+  // The protocol conditional conformance itself might bring some T :
+  // Differentiable conformances. Add them the the derivative generic signature.
+  SmallVector<Requirement, 4> diffRequirements;
+  llvm::copy_if(conformanceGenSig.getRequirements(),
+                std::back_inserter(diffRequirements),
+                [](const Requirement &requirement) {
+                  if (requirement.getKind() != RequirementKind::Conformance)
+                    return false;
+
+                  auto protoKind = requirement.getProtocolDecl()->getKnownProtocolKind();
+                  return protoKind && *protoKind == KnownProtocolKind::Differentiable;
+                });
+
+  return buildGenericSignature(dc->getASTContext(), derivativeGenSig,
+                               {}, std::move(diffRequirements), /*allowInverses=*/true);
+}
+
 /// Given a witness, a requirement, and an existing `RequirementMatch` result,
 /// check if the requirement's `@differentiable` attributes are met by the
 /// witness.
@@ -437,6 +461,9 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         auto derivativeGenSig = witnessAFD->getGenericSignature();
         if (supersetConfig)
           derivativeGenSig = supersetConfig->derivativeGenericSignature;
+
+        derivativeGenSig = maybeAddDifferentiableFromContext(dc, derivativeGenSig);
+
         // Use source location of the witness declaration as the source location
         // of the implicit `@differentiable` attribute.
         auto *newAttr = DifferentiableAttr::create(
@@ -534,6 +561,11 @@ checkWitnessAccessor(AbstractStorageDecl *witness,
   }
   if (hasMutate) {
     if (!witness->hasStorage() && !witness->getAccessor(AccessorKind::Mutate)) {
+      return RequirementMatch(witness, MatchKind::BorrowMutateConflict);
+    }
+  }
+  if (hasBorrow || hasMutate) {
+    if (!witness->getDeclContext()->getAsDecl()->canSupportBorrowAccessors()) {
       return RequirementMatch(witness, MatchKind::BorrowMutateConflict);
     }
   }
@@ -731,12 +763,15 @@ bool swift::TypeChecker::witnessStructureMatches(ValueDecl *req,
       == std::nullopt;
 }
 
+static PossibleEffects getEffects(ValueDecl *value);
+
 RequirementMatch swift::matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-    llvm::function_ref<
-        std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type>(void)>
-        setup,
+    llvm::function_ref<MatchWitnessTypes(void)> setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
+    llvm::function_ref<std::optional<RequirementMatch>(
+        const LifetimeDependentInterface &, const LifetimeDependentInterface &)>
+        matchLifetimes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
         finalize) {
   bool decomposeFunctionType = false;
@@ -751,11 +786,11 @@ RequirementMatch swift::matchWitness(
   // in the process.
   Type reqType, witnessType, reqThrownError, witnessThrownError;
   {
-    std::optional<RequirementMatch> result;
-    std::tie(result, reqType, witnessType, reqThrownError, witnessThrownError) = setup();
-    if (result) {
-      return std::move(result.value());
-    }
+    auto types = setup();
+    reqType = types.requirement;
+    witnessType = types.witness;
+    reqThrownError = types.requirementThrows;
+    witnessThrownError = types.witnessThrows;
   }
 
   SmallVector<OptionalAdjustment, 2> optionalAdjustments;
@@ -790,7 +825,7 @@ RequirementMatch swift::matchWitness(
       // If our requirement says that it has a sending result, then our witness
       // must also have a sending result since otherwise, in generic contexts,
       // we would be returning non-disconnected values as disconnected.
-      if (dc->getASTContext().isLanguageModeAtLeast(6)) {
+      if (dc->getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
         if (reqFnType->hasExtInfo() && reqFnType->hasSendingResult() &&
             (!witnessFnType->hasExtInfo() || !witnessFnType->hasSendingResult()))
           return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
@@ -830,7 +865,7 @@ RequirementMatch swift::matchWitness(
 
       // If we have a requirement without sending and our witness expects a
       // sending parameter, error.
-      if (dc->getASTContext().isLanguageModeAtLeast(6)) {
+      if (dc->getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
         if (!reqParams[i].getParameterFlags().isSending() &&
             witnessParams[i].getParameterFlags().isSending())
           return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
@@ -877,6 +912,13 @@ RequirementMatch swift::matchWitness(
         return RequirementMatch(witness, MatchKind::AsyncConflict);
       }
 
+      // Check that lifetime dependencies match
+      if (auto result = matchLifetimes(
+              LifetimeDependentInterface::fromValueDecl(witness, witnessFnType),
+              LifetimeDependentInterface::fromValueDecl(req, reqFnType))) {
+        return std::move(result.value());
+      }
+
       if (!reqThrownError) {
         // Save the thrown error types of the requirement and witness so we
         // can check them later.
@@ -919,6 +961,26 @@ RequirementMatch swift::matchWitness(
 
     if (auto result = matchTypes(reqType, witnessType)) {
       return std::move(result.value());
+    }
+  }
+
+  {
+    // The witness must have the same or fewer effects than the requirement.
+    auto reqEff = getEffects(req);
+    auto witnessEff = getEffects(witness);
+    if (auto invalidEffects = witnessEff - reqEff) {
+      for (auto kind : EffectKinds::all()) {
+        if (invalidEffects.contains(kind)) {
+          switch (kind) {
+          case EffectKind::Unsafe:
+            continue;  // This is diagnosed as a warning elsewhere.
+          case EffectKind::Throws:
+            return RequirementMatch(witness, MatchKind::ThrowsConflict);
+          case EffectKind::Async:
+            return RequirementMatch(witness, MatchKind::AsyncConflict);
+          }
+        }
+      }
     }
   }
 
@@ -1200,7 +1262,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
   // Set up the constraint system for matching.
   auto setup =
-      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type> {
+      [&]() -> MatchWitnessTypes {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
@@ -1264,8 +1326,19 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
     Type witnessThrownError = openWitnessTypeInfo.thrownErrorTypeOnAccess;
 
-    return std::make_tuple(std::nullopt, reqType, openWitnessType,
-                           reqThrownError, witnessThrownError);
+    return MatchWitnessTypes{reqType, openWitnessType, reqThrownError,
+                             witnessThrownError};
+  };
+
+  // Attempt to add constraints to make the supplied function types match.
+  auto matchLifetimes = [&](const LifetimeDependentInterface &witnessInterface,
+                            const LifetimeDependentInterface &reqInterface)
+      -> std::optional<RequirementMatch> {
+    if (!cs->matchFunctionLifetimes(witnessInterface, reqInterface,
+                                    witnessLocator)) {
+      return RequirementMatch(witness, MatchKind::LifetimeConflict);
+    }
+    return std::nullopt;
   };
 
   // Match a type in the requirement to a type in the witness.
@@ -1358,7 +1431,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     return result;
   };
 
-  return matchWitness(dc, req, witness, setup, matchTypes, finalize);
+  return matchWitness(dc, req, witness, setup, matchTypes, matchLifetimes,
+                      finalize);
 }
 
 bool
@@ -1698,7 +1772,8 @@ bool WitnessChecker::findBestWitness(
 
     if (anyFromUnconstrainedExtension &&
         conformance != nullptr &&
-        conformance->isInvalid()) {
+        conformance->isInvalid() &&
+        !conformance->isReparented()) {
       doNotDiagnoseMatches = true;
     }
 
@@ -2590,9 +2665,11 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     // In -swift-version 5 mode, a conditional conformance to a protocol can imply
     // a Sendable conformance.
-    if (!Context.isLanguageModeAtLeast(6))
+    if (!Context.isLanguageModeAtLeast(LanguageMode::v6))
       allowImpliedConditionalConformance = true;
   } else if (Proto->isMarkerProtocol()) {
+    allowImpliedConditionalConformance = true;
+  } else if (Proto->getAttrs().hasAttribute<ReparentableAttr>()) {
     allowImpliedConditionalConformance = true;
   }
 
@@ -3051,9 +3128,9 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
 
   case MatchKind::RequiresNonSendable:
-    diags.diagnose(match.Witness, diag::protocol_witness_non_sendable,
-                   withAssocTypes,
-                   module->getASTContext().isLanguageModeAtLeast(6));
+    diags.diagnose(
+        match.Witness, diag::protocol_witness_non_sendable, withAssocTypes,
+        module->getASTContext().isLanguageModeAtLeast(LanguageMode::v6));
     break;
 
   case MatchKind::RenamedMatch: {
@@ -3283,8 +3360,17 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     if (!hasMutate) {
       diagMsg += "/mutate";
     }
-    diags.diagnose(witness, diag::protocol_witness_borrow_mutate_conflict,
-                   diagMsg);
+    auto *decl = witness->getDeclContext()->getAsDecl();
+    if (!decl->canSupportBorrowAccessors()) {
+      diags.diagnose(witness, diag::protocol_witness_borrow_mutate_unsupported);
+    } else {
+      diags.diagnose(witness, diag::protocol_witness_borrow_mutate_conflict,
+                     diagMsg);
+    }
+    break;
+  }
+  case MatchKind::LifetimeConflict: {
+    diags.diagnose(match.Witness, diag::protocol_witness_lifetime_conflict);
     break;
   }
   }
@@ -3697,7 +3783,7 @@ public:
     SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
     ctx.Diags
         .diagnose(diagLoc, diag::witness_not_usable_from_inline, witness, proto)
-        .warnUntilLanguageMode(5);
+        .warnUntilLanguageMode(LanguageMode::v5);
     emitDeclaredHereIfNeeded(ctx.Diags, diagLoc, witness);
   }
 };
@@ -4446,7 +4532,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                 .diagnose(getLocForDiagnosingWitness(conformance, witness),
                           diag::witness_not_as_sendable, witness,
                           conformance->getProtocol())
-                .limitBehaviorUntilLanguageMode(limit, 6)
+                .limitBehaviorUntilLanguageMode(limit, LanguageMode::v6)
                 .limitBehaviorIf(preconcurrencyBehaviorLimit);
             diags.diagnose(requirement, diag::less_sendable_reqt_here);
             return preconcurrencyBehaviorLimit &&
@@ -4474,7 +4560,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       //
       // Work around this by discarding the witness if its not sufficiently
       // visible.
-      if (!getASTContext().isLanguageModeAtLeast(5))
+      if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
         if (requirement->getAttrs().hasAttribute<OptionalAttr>())
           return ResolveWitnessResult::Missing;
 
@@ -4954,6 +5040,25 @@ static bool isolationsMatch(
   return false;
 }
 
+/// Whether a witness declaration could be marked 'nonisolated'.
+static bool couldApplyNonisolated(WitnessIsolationError const &witnessError) {
+  if (hasExplicitGlobalActorAttr(witnessError.witness) ||
+      witnessError.witness->getLoc().isInvalid())
+    return false;
+  if (auto *var = dyn_cast<VarDecl>(witnessError.witness)) {
+    if (var->hasStorage()) {
+      // Mutable VarDecl with storage, for an immutable requirement, can be
+      // converted to 'let nonisolated'.
+      return !var->isLet() && isa<VarDecl>(witnessError.requirement) &&
+             !cast<VarDecl>(witnessError.requirement)
+                  ->isSettable(/*useDC=*/nullptr);
+    }
+    // Computed VarDecl can be converted if no property wrapper is present.
+    return !var->hasAttachedPropertyWrapper();
+  }
+  return isa<AbstractFunctionDecl, SubscriptDecl>(witnessError.witness);
+}
+
 static void diagnoseConformanceIsolationErrors(
     const NormalProtocolConformance *conformance
 ) {
@@ -5015,10 +5120,7 @@ static void diagnoseConformanceIsolationErrors(
       }
 
       // If this is an entity where `nonisolated` would make sense, suggest it.
-      if ((isa<AbstractFunctionDecl>(witnessError.witness) ||
-           isa<SubscriptDecl>(witnessError.witness)) &&
-          !hasExplicitGlobalActorAttr(witnessError.witness) &&
-          witnessError.witness->getLoc().isValid()) {
+      if (couldApplyNonisolated(witnessError)) {
         potentialNonisolated.push_back(witnessError.witness);
       }
 
@@ -5068,13 +5170,13 @@ static void diagnoseConformanceIsolationErrors(
                     diag::conformance_mismatched_isolation_common,
                     conformance->getType(), conformance->getProtocol(),
                     *potentialIsolation)
-          .limitBehaviorUntilLanguageMode(behavior, 6);
+          .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
     } else {
       ctx.Diags
           .diagnose(conformance->getProtocolNameLoc(),
                     diag::conformance_mismatched_isolation,
                     conformance->getType(), conformance->getProtocol())
-          .limitBehaviorUntilLanguageMode(behavior, 6);
+          .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
     }
 
     // Suggest isolating the conformance, if possible.
@@ -5094,18 +5196,6 @@ static void diagnoseConformanceIsolationErrors(
                              globalActorType, isMainActor, globalActorTypeStr);
       conformance->applyConformanceAttribute(diag,
                                              "@" + globalActorTypeStr.str());
-    }
-
-    // If marking witnesses as 'nonisolated' could work, suggest that.
-    if (!potentialNonisolated.empty() && !hasIsolatedConformances) {
-      auto diag = ctx.Diags.diagnose(
-          conformance->getLoc(),
-          diag::note_make_witnesses_nonisolated);
-      for (auto witness: potentialNonisolated) {
-        diag.fixItInsert(
-            witness->getAttributeInsertionLoc(/*forModifier=*/true),
-            "nonisolated ");
-      }
     }
 
     // If the conformance could be @preconcurrency, suggest it.
@@ -5137,6 +5227,29 @@ static void diagnoseConformanceIsolationErrors(
 
         if (!witnessError.isMissingDistributed)
           witnessError.diagnose(conformance);
+      }
+    }
+
+    // If marking a witness as 'nonisolated' could work, suggest that.
+    if (!hasIsolatedConformances) {
+      for (auto witness : potentialNonisolated) {
+        auto var = dyn_cast<VarDecl>(witness);
+        // Not a variable, or a computed property.
+        if (!var || !var->hasStorage()) {
+          ctx.Diags
+              .diagnose(witness, diag::note_make_witness_nonisolated, witness)
+              .fixItInsert(
+                  witness->getAttributeInsertionLoc(/*forModifier=*/true),
+                  "nonisolated ");
+          continue;
+        }
+        // Mutable variables (since we didn't add let witnesses), which can be
+        // converted to 'nonisolated let'.
+        auto loc = getFixItLocForVarToLet(var);
+        if (loc.isValid()) {
+          ctx.Diags.diagnose(var, diag::note_make_witness_immutable, var)
+              .fixItReplace(loc, "nonisolated let");
+        }
       }
     }
   }
@@ -5265,7 +5378,7 @@ static void diagnoseInvariantSelfRequirement(
   diags.diagnose(loc, diag::non_final_class_cannot_conform_to_self_same_type,
                  adoptee, proto->getDeclaredInterfaceType(),
                  firstType, kind, secondType)
-      .warnUntilLanguageMode(6);
+      .warnUntilLanguageMode(LanguageMode::v6);
 }
 
 static bool
@@ -5288,9 +5401,8 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
 
   // In Swift 6 and earlier type witness availability diagnostics are warnings.
   using namespace version;
-  const unsigned warnBeforeVersion = Version::getFutureMajorLanguageVersion();
-  bool shouldError =
-      ctx.LangOpts.EffectiveLanguageVersion.isVersionAtLeast(warnBeforeVersion);
+  const auto languageModeForError = LanguageMode::future;
+  bool shouldError = ctx.LangOpts.isLanguageModeAtLeast(languageModeForError);
 
   switch (domain.getKind()) {
   case AvailabilityDomain::Kind::Universal:
@@ -5308,15 +5420,15 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
   if (constraint->isUnavailable()) {
     ctx.addDelayedConformanceDiag(
         conformance, shouldError,
-        [witness, assocType, attr,
-         shouldError](NormalProtocolConformance *conformance) {
+        [witness, assocType, attr, shouldError,
+         languageModeForError](NormalProtocolConformance *conformance) {
           SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
           EncodedDiagnosticMessage encodedMessage(attr.getMessage());
           auto &ctx = conformance->getDeclContext()->getASTContext();
           ctx.Diags
               .diagnose(loc, diag::witness_unavailable, witness,
                         conformance->getProtocol(), encodedMessage.Message)
-              .warnUntilLanguageModeIf(!shouldError, warnBeforeVersion);
+              .warnUntilLanguageModeIf(!shouldError, languageModeForError);
 
           emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);
           ctx.Diags.diagnose(assocType, diag::requirement_declared_here,
@@ -5329,8 +5441,8 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
 
   ctx.addDelayedConformanceDiag(
       conformance, shouldError,
-      [witness, attr, requiredRange,
-       shouldError](NormalProtocolConformance *conformance) {
+      [witness, attr, requiredRange, shouldError,
+       languageModeForError](NormalProtocolConformance *conformance) {
         SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
         auto &ctx = conformance->getDeclContext()->getASTContext();
         auto domain = attr.getDomain();
@@ -5341,14 +5453,14 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
                         domain.isPlatform() ? ctx.getTargetAvailabilityDomain()
                                             : domain,
                         *requiredRange)
-              .warnUntilLanguageModeIf(!shouldError, warnBeforeVersion);
+              .warnUntilLanguageModeIf(!shouldError, languageModeForError);
         } else {
           ctx.Diags
               .diagnose(
                   loc,
                   diag::availability_protocol_requirement_only_available_in,
                   conformance->getProtocol(), witness, domain)
-              .warnUntilLanguageModeIf(!shouldError, warnBeforeVersion);
+              .warnUntilLanguageModeIf(!shouldError, languageModeForError);
         }
 
         emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);

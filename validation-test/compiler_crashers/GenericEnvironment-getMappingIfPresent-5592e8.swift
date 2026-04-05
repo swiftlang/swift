@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::GenericEnvironment::getMappingIfPresent(swift::CanType) const","signatureAssert":"Assertion failed: (Index < Length && \"Invalid index!\"), function operator[]"}
+// {"kind":"typecheck","signature":"swift::GenericEnvironment::getMappingIfPresent(swift::CanType) const","signatureAssert":"Assertion failed: (Index < Length && \"Invalid index!\"), function operator[]","signatureNext":"GenericEnvironment::getOrCreateArchetypeFromInterfaceType"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   struct b < each c {

@@ -154,13 +154,11 @@ public:
   enum class Kind {
     /// The first three LoweredValue kinds correspond to a SIL address value.
 
-    /// The LoweredValue of a resilient, generic, or loadable typed alloc_stack
-    /// keeps an optional stackrestore point in addition to the address of the
-    /// allocated buffer. For all other address values the stackrestore point is
-    /// just null.
-    /// If the stackrestore point is set (currently, this might happen for
-    /// opaque types: generic and resilient) the deallocation of the stack must
-    /// reset the stack pointer to this point.
+    /// An address.
+    Address,
+
+    /// The address of a local state allocation, together with enough
+    /// information to deallocate it.
     StackAddress,
 
     /// A @box together with the address of the box value.
@@ -196,7 +194,8 @@ private:
   using ExplosionVector = SmallVector<llvm::Value *, 4>;
   using SingletonExplosion = llvm::Value*;
 
-  using Members = ExternalUnionMembers<StackAddress,
+  using Members = ExternalUnionMembers<Address,
+                                       StackAddress,
                                        OwnedAddress,
                                        DynamicallyEnforcedAddress,
                                        ExplosionVector,
@@ -208,6 +207,7 @@ private:
   
   static Members::Index getMemberIndexForKind(Kind kind) {
     switch (kind) {
+    case Kind::Address: return Members::indexOf<Address>();
     case Kind::StackAddress: return Members::indexOf<StackAddress>();
     case Kind::OwnedAddress: return Members::indexOf<OwnedAddress>();
     case Kind::DynamicallyEnforcedAddress: return Members::indexOf<DynamicallyEnforcedAddress>();
@@ -231,8 +231,8 @@ public:
 
   /// Create an address value without a stack restore point.
   LoweredValue(const Address &address)
-      : kind(Kind::StackAddress) {
-    Storage.emplace<StackAddress>(kind, address);
+      : kind(Kind::Address) {
+    Storage.emplace<Address>(kind, address);
   }
 
   /// Create an address value with an optional stack restore point.
@@ -301,7 +301,8 @@ public:
   }
   
   bool isAddress() const {
-    return (kind == Kind::StackAddress ||
+    return (kind == Kind::Address ||
+            kind == Kind::StackAddress ||
             kind == Kind::DynamicallyEnforcedAddress);
   }
   bool isBoxWithAddress() const {
@@ -319,7 +320,9 @@ public:
   }
 
   Address getAnyAddress() const {
-    if (kind == LoweredValue::Kind::StackAddress) {
+    if (kind == LoweredValue::Kind::Address) {
+      return Storage.get<Address>(kind);
+    } else if (kind == LoweredValue::Kind::StackAddress) {
       return Storage.get<StackAddress>(kind).getAddress();
     } else {
       return getDynamicallyEnforcedAddress().Addr;
@@ -1032,7 +1035,8 @@ public:
 
     // Mark variables in async functions that don't generate a shadow copy for
     // lifetime extension, so they get spilled into the async context.
-    if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync())
+    if (!IGM.IRGen.Opts.shouldOptimize() &&
+        (CurSILFn->isAsync() || CurSILFn->isCoroutine()))
       if (isa<llvm::AllocaInst>(Storage)) {
         if (emitLifetimeExtendingUse(Storage))
           if (ValueVariables.insert(Storage).second)
@@ -1052,7 +1056,8 @@ public:
 
     // Mark variables in async functions for lifetime extension, so they get
     // spilled into the async context.
-    if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync()) {
+    if (!IGM.IRGen.Opts.shouldOptimize() &&
+        (CurSILFn->isAsync() || CurSILFn->isCoroutine())) {
       if (emitLifetimeExtendingUse(shadow)) {
         if (ValueVariables.insert(shadow).second)
           ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
@@ -1088,7 +1093,8 @@ public:
 
       // Mark variables in async functions for lifetime extension, so they get
       // spilled into the async context.
-      if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync())
+      if (!IGM.IRGen.Opts.shouldOptimize() &&
+          (CurSILFn->isAsync() || CurSILFn->isCoroutine()))
         if (vals.begin() != vals.end()) {
           auto Value = vals.front();
           if (isa<llvm::Instruction>(Value) || isa<llvm::Argument>(Value))
@@ -1209,6 +1215,7 @@ public:
   bool shouldUseDispatchThunk(SILDeclRef method);
 
   void visitSILBasicBlock(SILBasicBlock *BB);
+  void setupDebugLocationFor(SILInstruction &I, bool IsInCleanupBlock);
   void emitErrorResultVar(CanSILFunctionType FnTy,
                           SILResultInfo ErrorInfo,
                           DebugValueInst *DbgValue);
@@ -1844,6 +1851,10 @@ getCOrObjCEntryPointArgumentEmission(IRGenSILFunction &IGF,
 void LoweredValue::getExplosion(IRGenFunction &IGF, SILType type,
                                 Explosion &ex) const {
   switch (kind) {
+  case Kind::Address:
+    ex.add(Storage.get<Address>(kind).getAddress());
+    return;
+
   case Kind::StackAddress:
     ex.add(Storage.get<StackAddress>(kind).getAddressPointer());
     return;
@@ -1882,6 +1893,7 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, SILType type,
 llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF,
                                                  SILType type) const {
   switch (kind) {
+  case Kind::Address:
   case Kind::StackAddress:
   case Kind::DynamicallyEnforcedAddress:
   case Kind::CoroutineState:
@@ -2797,6 +2809,55 @@ void IRGenSILFunction::estimateStackSize() {
   }
 }
 
+void IRGenSILFunction::setupDebugLocationFor(SILInstruction &I,
+                                             const bool IsInCleanupBlock) {
+  // Choose the debug location to use when lowering `I`.
+  // If `I` contains a non CleanupLocation location, use that location.
+  //
+  // CleanupLocations point to the declaration of the object being destroyed
+  // (for diagnostic purposes); using it would create jumps in the line table.
+  // The jumps are avoided by:
+  // * If `I` has a cleanup location but is followed by non-cleanup locations,
+  // keep the location used in the previous instruction.
+  // * Otherwise (all subsequent instructions have CleanupLocations), use the
+  // location at the end of the BB, which matches the end-of-scope location.
+  const SILDebugScope *DS = I.getDebugScope();
+  SILLocation ILoc = I.getLoc();
+  const bool IsCleanupInstruction = ILoc.is<CleanupLocation>();
+
+  if (!IsInCleanupBlock && IsCleanupInstruction) {
+    // Reuse the last location, unless there is none.
+    if (Builder.getCurrentDebugLocation() == llvm::DebugLoc())
+      IGM.DebugInfo->setCurrentLoc(Builder, DS,
+                                   RegularLocation::getAutoGeneratedLocation());
+    return;
+  }
+
+  if (IsInCleanupBlock) {
+    auto *BB = I.getParent();
+    assert(BB->getTerminator());
+    ILoc = BB->getTerminator()->getLoc();
+    DS = BB->getTerminator()->getDebugScope();
+  }
+
+  if (DS)
+    IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
+}
+
+/// Find the first instruction `I` such that `I` and all subsequent instructions
+/// in `BB` have a CleanupLocation (or are a TerminatorInst). The terminator
+/// instruction is always included.
+static SILInstruction *findFirstCleanupBlockInstruction(SILBasicBlock &BB) {
+  SILInstruction *I = BB.getTerminator();
+  for (SILInstruction *Prev = I->getPreviousInstruction(); Prev;
+       Prev = Prev->getPreviousInstruction()) {
+    if (!Prev->getLoc().is<CleanupLocation>())
+      return I;
+    I = Prev;
+  }
+  return I;
+}
+
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
@@ -2809,67 +2870,15 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   DominanceScope dominance(*this, InEntryBlock ? DominancePoint::universal()
                                                : DominancePoint(BB));
 
-  // Generate the body.
-  bool InCleanupBlock = false;
-  bool KeepCurrentLocation = false;
+  SILInstruction *const CleanupBlockStartInst =
+      findFirstCleanupBlockInstruction(*BB);
+  bool IsInCleanupBlock = false;
 
   for (auto &I : *BB) {
+    IsInCleanupBlock = (&I == CleanupBlockStartInst);
+
     if (IGM.DebugInfo) {
-      // Set the debug info location for I, if applicable.
-      auto DS = I.getDebugScope();
-      SILLocation ILoc = I.getLoc();
-      // Handle cleanup locations.
-      if (ILoc.is<CleanupLocation>()) {
-        // Cleanup locations point to the decl of the value that is
-        // being destroyed (for diagnostic generation). As far as
-        // the linetable is concerned, cleanups at the end of a
-        // lexical scope should point to the cleanup location, which
-        // is the location of the last instruction in the basic block.
-        if (!InCleanupBlock) {
-          InCleanupBlock = true;
-          // Scan ahead to see if this is the final cleanup block in
-          // this basic block.
-          auto It = I.getIterator();
-          do ++It; while (It != BB->end() &&
-                          It->getLoc().is<CleanupLocation>());
-          // We are still in the middle of a basic block?
-          if (It != BB->end() && !isa<TermInst>(It))
-            KeepCurrentLocation = true;
-        }
-
-        // Assign the cleanup location to this instruction.
-        if (!KeepCurrentLocation) {
-          assert(BB->getTerminator());
-          ILoc = BB->getTerminator()->getLoc();
-          DS = BB->getTerminator()->getDebugScope();
-        }
-      } else if (InCleanupBlock) {
-        KeepCurrentLocation = false;
-        InCleanupBlock = false;
-      }
-
-      // Until SILDebugScopes are properly serialized, bare functions
-      // are allowed to not have a scope.
-      if (!DS) {
-        if (CurSILFn->isBare())
-          DS = CurSILFn->getDebugScope();
-        assert(maybeScopeless(I) && "instruction has location, but no scope");
-      }
-
-      // Set the builder's debug location.
-      if (DS && !KeepCurrentLocation)
-        IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
-      else {
-        // Reuse the last scope for an easier-to-read line table.
-        auto Prev = --I.getIterator();
-        if (Prev != BB->end())
-          DS = Prev->getDebugScope();
-
-        // Use an artificial (line 0) location, to indicate we'd like to
-        // reuse the last debug loc.
-        IGM.DebugInfo->setCurrentLoc(
-            Builder, DS, RegularLocation::getAutoGeneratedLocation());
-      }
+      setupDebugLocationFor(I, IsInCleanupBlock);
       if (isa<TermInst>(&I))
         emitDebugVariableRangeExtension(BB);
     }
@@ -3597,6 +3606,7 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
   }
 
   case LoweredValue::Kind::EmptyExplosion:
+  case LoweredValue::Kind::Address:
   case LoweredValue::Kind::OwnedAddress:
   case LoweredValue::Kind::StackAddress:
   case LoweredValue::Kind::DynamicallyEnforcedAddress:
@@ -3745,9 +3755,9 @@ static void emitBuiltinStackAlloc(IRGenSILFunction &IGF,
 
   // Emit a static alloca if the size is constant.
   if (auto *constSize = dyn_cast<llvm::ConstantInt>(size)) {
-    auto stackAddress = IGF.createAlloca(IGF.IGM.Int8Ty, constSize, align,
-                                         "temp_alloc");
-    IGF.setLoweredStackAddress(i, {stackAddress});
+    auto stackAddress =
+      IGF.emitStaticByteArrayAlloca(constSize, align, "temp_alloc");
+    IGF.setLoweredStackAddress(i, stackAddress);
     return;
   }
 
@@ -3765,7 +3775,7 @@ static void emitBuiltinStackDealloc(IRGenSILFunction &IGF,
   auto stackAddress = IGF.getLoweredStackAddress(address);
 
   if (stackAddress.getAddress().isValid()) {
-    IGF.emitDeallocateDynamicAlloca(stackAddress, false);
+    IGF.emitStackDeallocation(stackAddress);
   }
 }
 
@@ -4149,6 +4159,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
   auto fnType = v->getType().castTo<SILFunctionType>();
 
   switch (lv.kind) {
+  case LoweredValue::Kind::Address:
   case LoweredValue::Kind::StackAddress:
   case LoweredValue::Kind::DynamicallyEnforcedAddress:
   case LoweredValue::Kind::OwnedAddress:
@@ -4385,7 +4396,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   auto closureStackAddr = emitFunctionPartialApplication(
       *this, *CurSILFn, calleeFn, innerContext, llArgs, params,
       i->getSubstitutionMap(), origCalleeTy, i->getSubstCalleeType(),
-      i->getType().castTo<SILFunctionType>(), function, false);
+      i->getType().castTo<SILFunctionType>(), function, false,
+      i->isStackAllocationNested());
   setLoweredExplosion(v, function);
 
   if (closureStackAddr) {
@@ -4437,24 +4449,21 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
 }
 
 void IRGenFunction::emitCoroutineOrAsyncExit(bool isUnwind) {
-  // LLVM's retcon lowering is a bit imcompatible with Swift
-  // model. Essentially it assumes that unwind destination is kind of terminal -
-  // it cannot return back to caller and must somehow terminate the process /
-  // thread. Therefore we are always use normal LLVM coroutine termination.
-  // However, for yield_once coroutines we need also specify undef results on
-  // unwind path. Eventually, we'd get rid of these crazy phis...
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->setCurrentLoc(Builder, getDebugScope(),
+                                 RegularLocation::getAutoGeneratedLocation());
+  // LLVM's retcon lowering assumes the unwind destination cannot return back to
+  // caller and must terminate the process, which is incompatible with the Swift
+  // model. To avoid this, use the normal LLVM coroutine termination.
 
-  // If the coroutine exit block already exists, just branch to it.
-  auto *coroEndBB = getCoroutineExitBlock();
-  auto *unwindBB = Builder.GetInsertBlock();
-
-  // If the coroutine exit block already exists, just branch to it.
-  if (coroEndBB) {
+  // If the coroutine exit block already exists, branch to it.
+  if (auto *coroEndBB = getCoroutineExitBlock()) {
+    auto *unwindBB = Builder.GetInsertBlock();
     Builder.CreateBr(coroEndBB);
 
     if (!isAsync()) {
-      // If there are any result values we need to add undefs for all values
-      // coming from unwind block
+      // For yield_once coroutines, it's also necessary to specify undef results
+      // on the unwind path. TODO: get rid of these phis.
       for (auto &phi : coroutineResults)
         cast<llvm::PHINode>(phi)->addIncoming(llvm::UndefValue::get(phi->getType()),
                                               unwindBB);
@@ -4464,7 +4473,7 @@ void IRGenFunction::emitCoroutineOrAsyncExit(bool isUnwind) {
   }
 
   // Otherwise, create it and branch to it.
-  coroEndBB = createBasicBlock("coro.end");
+  llvm::BasicBlock *coroEndBB = createBasicBlock("coro.end");
   setCoroutineExitBlock(coroEndBB);
   Builder.CreateBr(coroEndBB);
   Builder.emitBlock(coroEndBB);
@@ -6699,6 +6708,11 @@ buildTailArrays(IRGenSILFunction &IGF,
 }
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
+  // We can ignore isStackAllocationNested() here because we currently only
+  // use static allocas for the stack promotion optimization. If we ever do
+  // want to try dynamic allocations, we'll need to pay attention
+  // (probably by just disabling the optimization).
+
   int StackAllocSize = -1;
   if (i->canAllocOnStack()) {
     estimateStackSize();
@@ -6722,6 +6736,11 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
+  // We can ignore isStackAllocationNested() here because we currently only
+  // use static allocas for the stack promotion optimization. If we ever do
+  // want to try dynamic allocations, we'll need to pay attention
+  // (probably by just disabling the optimization).
+
   int StackAllocSize = -1;
   if (i->canAllocOnStack()) {
     assert(i->isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType());
@@ -6755,7 +6774,9 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   if (auto *closure = dyn_cast<PartialApplyInst>(i->getOperand())) {
     assert(closure->isOnStack());
     auto stackAddr = LoweredPartialApplyAllocations[i->getOperand()];
-    emitDeallocateDynamicAlloca(stackAddr, closure->isStackAllocationNested());
+    if (stackAddr.isValid()) {
+      emitStackDeallocation(stackAddr);
+    }
     return;
   }
   if (isaResultOf<BeginApplyInst>(i->getOperand())) {
@@ -6773,9 +6794,8 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   auto allocatedType = asi->getType();
   const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
   StackAddress stackAddr = getLoweredStackAddress(asi);
-  auto isNested = asi->isStackAllocationNested();
 
-  allocatedTI.deallocateStack(*this, stackAddr, allocatedType, isNested);
+  allocatedTI.deallocateStack(*this, stackAddr, allocatedType);
 }
 
 void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {
@@ -7917,7 +7937,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
       argsBufAlign = Builder.CreateOr(argsBufAlign, alignMask);
     }
 
-    dynamicArgsBuf = emitDynamicAlloca(IGM.Int8Ty, argsBufSize, Alignment(16));
+    dynamicArgsBuf = emitStackAllocation(argsBufSize, Alignment(16));
     
     Address argsBuf = dynamicArgsBuf->getAddress();
     
@@ -7955,7 +7975,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   call->setDoesNotThrow();
 
   if (dynamicArgsBuf) {
-    emitDeallocateDynamicAlloca(*dynamicArgsBuf);
+    emitStackDeallocation(*dynamicArgsBuf);
   }
 
   auto loweredKeyPathTy = IGM.getLoweredType(I->getKeyPathType());
@@ -8564,13 +8584,23 @@ bool IRGenSILFunction::shouldUseDispatchThunk(SILDeclRef method) {
   AccessLevel methodAccess = method.getDecl()->getEffectiveAccess();
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
   bool shouldUseDispatchThunk = false;
-  // Because typechecking for the debugger has more lax rules, check the access
-  // level of the getter to decide whether to use a dispatch thunk for the
-  // debugger.
+  bool isResilient =
+      IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal);
   bool inDebugger = classDecl->getASTContext().LangOpts.DebuggerSupport;
-  bool shouldUseDispatchThunkIfInDebugger = methodAccess >= AccessLevel::Public;
-  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal) &&
-      (!inDebugger || shouldUseDispatchThunkIfInDebugger)) {
+  bool shouldUseDispatchThunkIfInDebugger = false;
+  if (inDebugger && isResilient) {
+    // Because typechecking for the debugger has more lax rules, check the
+    // access level of the method to decide whether to use a dispatch thunk for
+    // the debugger.
+    shouldUseDispatchThunkIfInDebugger = methodAccess >= AccessLevel::Public;
+
+    // This is only legal if the method actually has a vtable.
+    auto hasVtable =
+        IGM.getClassMetadataLayout(classDecl).getStoredMethodInfoIfPresent(
+            method);
+    shouldUseDispatchThunkIfInDebugger |= !hasVtable;
+  }
+  if (isResilient && (!inDebugger || shouldUseDispatchThunkIfInDebugger)) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().VirtualFunctionElimination) {
     // For VFE, use a thunk if the target class is in another module. This
@@ -8644,14 +8674,14 @@ void IRGenSILFunction::visitObjCMethodInst(swift::ObjCMethodInst *i) {
 void IRGenSILFunction::visitGetAsyncContinuationInst(
     GetAsyncContinuationInst *i) {
   Explosion out;
-  emitGetAsyncContinuation(i->getLoweredResumeType(), StackAddress(), out,
+  emitGetAsyncContinuation(i->getLoweredResumeType(), Address(), out,
                            i->throws());
   setLoweredExplosion(i, out);
 }
 
 void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
     GetAsyncContinuationAddrInst *i) {
-  auto resultAddr = getLoweredStackAddress(i->getOperand());
+  auto resultAddr = getLoweredAddress(i->getOperand());
   Explosion out;
   emitGetAsyncContinuation(i->getLoweredResumeType(), resultAddr, out,
                            i->throws());

@@ -188,3 +188,4 @@ endif()
 
 find_package_handle_standard_args(SwiftCxxOverlay DEFAULT_MSG
   ${vars_to_check})
+

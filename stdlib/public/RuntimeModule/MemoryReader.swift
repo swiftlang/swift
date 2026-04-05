@@ -17,10 +17,11 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(anyAppleOS)
 internal import Darwin
 #elseif os(Windows)
 internal import ucrt
+internal import WinSDK
 #elseif canImport(Glibc)
 internal import Glibc
 #elseif canImport(Musl)
@@ -32,7 +33,7 @@ internal import BacktracingImpl.OS.Darwin
 #endif
 
 @_spi(MemoryReaders)
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 public protocol MemoryReader {
   typealias Address = UInt64
   typealias Size = UInt64
@@ -64,7 +65,7 @@ public protocol MemoryReader {
   func fetchString(from addr: Address, length: Int) throws -> String?
 }
 
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 extension MemoryReader {
 
   public func fetch<T>(from address: Address,
@@ -119,7 +120,7 @@ extension MemoryReader {
 }
 
 @_spi(MemoryReaders)
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 public struct UnsafeLocalMemoryReader: MemoryReader {
   public init() {}
 
@@ -144,13 +145,13 @@ public struct UnsafeLocalMemoryReader: MemoryReader {
 
 #if os(macOS)
 @_spi(MemoryReaders)
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 public struct MachError: Error {
   var result: kern_return_t
 }
 
 @_spi(MemoryReaders)
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 public struct UncachedRemoteMemoryReader: MemoryReader {
   private var task: task_t
 
@@ -178,7 +179,7 @@ public struct UncachedRemoteMemoryReader: MemoryReader {
 }
 
 @_spi(MemoryReaders)
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 public struct UncachedLocalMemoryReader: MemoryReader {
   public typealias Address = UInt64
   public typealias Size = UInt64
@@ -186,6 +187,45 @@ public struct UncachedLocalMemoryReader: MemoryReader {
   public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
     let reader = UncachedRemoteMemoryReader(task: mach_task_self())
+    return try reader.fetch(from: address, into: buffer)
+  }
+}
+#endif
+
+#if os(Windows)
+@_spi(MemoryReaders) public struct Win32Error: Error {
+  var result: DWORD
+}
+
+@_spi(MemoryReaders)
+public struct UncachedRemoteMemoryReader: MemoryReader {
+  private var hProcess: HANDLE
+
+  public init(hProcess: UInt) {
+    self.hProcess = HANDLE(bitPattern: hProcess)!
+  }
+
+  public func fetch(from address: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
+    var cbRead = SIZE_T(0)
+    let bRet = ReadProcessMemory(hProcess,
+                                 UnsafeRawPointer(bitPattern: UInt(address)),
+                                 buffer.baseAddress, SIZE_T(buffer.count),
+                                 &cbRead)
+    if !bRet {
+      throw Win32Error(result: GetLastError())
+    }
+  }
+}
+
+@_spi(MemoryReaders)
+public struct UncachedLocalMemoryReader: MemoryReader {
+  private let reader = UncachedRemoteMemoryReader(
+    hProcess: UInt(bitPattern: GetCurrentProcess())
+  )
+
+  public func fetch(from address: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
     return try reader.fetch(from: address, into: buffer)
   }
 }
