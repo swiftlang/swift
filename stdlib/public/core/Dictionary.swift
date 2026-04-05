@@ -984,10 +984,10 @@ extension Dictionary {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the dictionary.
   @inlinable
-  public func mapValuesWithKeys<T, E>(
+  public func mapKeyedValues<T, E>(
     _ transform: (Key, Value) throws(E) -> T
   ) throws(E) -> Dictionary<Key, T> {
-    return try Dictionary<Key, T>(_native: _variant.mapValuesWithKeys(transform))
+    return try Dictionary<Key, T>(_native: _variant.mapKeyedValues(transform))
   }
 #if !$Embedded
   // ABI-only entrypoint for the rethrows version of mapValues, which has been

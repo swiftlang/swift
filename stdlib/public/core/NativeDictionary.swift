@@ -774,7 +774,7 @@ extension _NativeDictionary { // High-level operations
   }
 
   @inlinable
-  internal func mapValuesWithKeys<T, E>(
+  internal func mapKeyedValues<T, E>(
     _ transform: (Key, Value) throws(E) -> T
   ) throws(E) -> _NativeDictionary<Key, T> {
     let resultStorage = unsafe _DictionaryStorage<Key, T>.copy(original: _storage)

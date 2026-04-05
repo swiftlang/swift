@@ -573,7 +573,7 @@ extension __CocoaDictionary {
   }
 
   @inlinable
-  internal func mapValuesWithKeys<Key: Hashable, Value, T, E>(
+  internal func mapKeyedValues<Key: Hashable, Value, T, E>(
     _ transform: (Key, Value) throws(E) -> T
   ) throws(E) -> _NativeDictionary<Key, T> {
     var result = _NativeDictionary<Key, T>(capacity: self.count)
