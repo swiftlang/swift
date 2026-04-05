@@ -6,6 +6,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_EmbeddedExistentials
 
 enum MyError: Error, Equatable {
   case simple
