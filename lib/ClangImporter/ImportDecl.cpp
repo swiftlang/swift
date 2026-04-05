@@ -8502,6 +8502,50 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
       if (classImplementsProtocol(superInterface, clangProto, true))
         continue;
 
+    auto importClangMethod = [&](const clang::ObjCMethodDecl *objcMethod,
+                                 bool hasAsync) {
+      // For now, just remember that we saw this method.
+      methodsByName[objcMethod->getSelector()].emplace_back(objcMethod, proto,
+                                                            hasAsync);
+    };
+
+    auto importClangProperty = [&](const clang::ObjCPropertyDecl *objcProp) {
+      // We can't import a property if there's already a method with this
+      // name. (This also covers other properties with that same name.)
+      // FIXME: We should still mirror the setter as a method if it's
+      // not already there.
+      clang::Selector sel = objcProp->getGetterName();
+      if (interfaceDecl->getInstanceMethod(sel))
+        return;
+
+      bool inNearbyCategory =
+          std::any_of(interfaceDecl->known_categories_begin(),
+                      interfaceDecl->known_categories_end(),
+                      [=](const clang::ObjCCategoryDecl *category) -> bool {
+                        if (!Impl.getClangSema().isVisible(category)) {
+                          return false;
+                        }
+                        if (category != decl) {
+                          auto *categoryModule =
+                              Impl.getClangModuleForDecl(category);
+                          if (categoryModule != declModule &&
+                              categoryModule != interfaceModule) {
+                            return false;
+                          }
+                        }
+                        return category->getInstanceMethod(sel);
+                      });
+      if (inNearbyCategory)
+        return;
+
+      if (auto imported =
+              Impl.importMirroredDecl(objcProp, dc, getVersion(), proto)) {
+        members.push_back(imported);
+        // FIXME: We should mirror properties of the root class onto the
+        // metatype.
+      }
+    };
+
     auto importProtocolRequirement = [&](Decl *member) {
       // Skip compatibility stubs; there's no reason to mirror them.
       if (member->isUnavailableInCurrentSwiftVersion())
@@ -8513,49 +8557,12 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
         if (!objcProp)
           return;
 
-        // We can't import a property if there's already a method with this
-        // name. (This also covers other properties with that same name.)
-        // FIXME: We should still mirror the setter as a method if it's
-        // not already there.
-        clang::Selector sel = objcProp->getGetterName();
-        if (interfaceDecl->getInstanceMethod(sel))
-          return;
-
-        bool inNearbyCategory =
-            std::any_of(interfaceDecl->known_categories_begin(),
-                        interfaceDecl->known_categories_end(),
-                        [=](const clang::ObjCCategoryDecl *category) -> bool {
-                          if (!Impl.getClangSema().isVisible(category)) {
-                            return false;
-                          }
-                          if (category != decl) {
-                            auto *categoryModule =
-                                Impl.getClangModuleForDecl(category);
-                            if (categoryModule != declModule &&
-                                categoryModule != interfaceModule) {
-                              return false;
-                            }
-                          }
-                          return category->getInstanceMethod(sel);
-                        });
-        if (inNearbyCategory)
-          return;
-
-        if (auto imported =
-                Impl.importMirroredDecl(objcProp, dc, getVersion(), proto)) {
-          members.push_back(imported);
-          // FIXME: We should mirror properties of the root class onto the
-          // metatype.
-        }
-
+        importClangProperty(objcProp);
         return;
       }
 
       auto afd = dyn_cast<AbstractFunctionDecl>(member);
-      if (!afd)
-        return;
-
-      if (isa<AccessorDecl>(afd))
+      if (!afd || isa<AccessorDecl>(afd))
         return;
 
       auto objcMethod =
@@ -8563,9 +8570,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
       if (!objcMethod)
         return;
 
-      // For now, just remember that we saw this method.
-      methodsByName[objcMethod->getSelector()]
-        .emplace_back(objcMethod, proto, afd->hasAsync());
+      importClangMethod(objcMethod, afd->hasAsync());
     };
 
     if (name) {
@@ -8576,6 +8581,29 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
         if (member->getDeclContext() == proto)
           importProtocolRequirement(member);
 
+      if (results.empty() && !name->isSpecial() && !name->empty()) {
+        // In some situations, lookupDirect may not find all members; for
+        // example, if an Objective-C @interface inherits from an @objc protocol
+        // defined in Swift but doesn't explicitly re-declare its members. To
+        // find them, look them up directly on the Clang protocol.
+        for (auto *m : clangProto->decls()) {
+          auto *named = dyn_cast<clang::NamedDecl>(m);
+          if (!named)
+            continue;
+          auto importedName = Impl.importFullName(named, getVersion());
+          if (importedName &&
+              importedName.getDeclName().getBaseName() == *name) {
+            if (auto *method = dyn_cast<clang::ObjCMethodDecl>(m)) {
+              importClangMethod(method, /*hasAsync*/ false);
+              if (importedName.getAsyncAlternateInfo().has_value()) {
+                importClangMethod(method, /*hasAsync*/ true);
+              }
+            } else if (auto *prop = dyn_cast<clang::ObjCPropertyDecl>(m)) {
+              importClangProperty(prop);
+            }
+          }
+        }
+      }
     } else {
       // Otherwise, import all mirrored members.
       for (auto *member : proto->getMembers())
