@@ -358,7 +358,8 @@ public func swift_deallocBox(_ pointer: UnsafeMutableRawPointer) {
 
 /// Compute the byte offset from the start of an error box to the stored value,
 /// and the total allocation size needed for the box.
-private func _errorBoxLayout(
+@usableFromInline
+internal func _errorBoxLayout(
   metadata: UnsafeRawPointer
 ) -> (startOfValue: Int, totalSize: Int, totalAlignMask: Int) {
   let alignMask = Int(unsafe _swift_embedded_metadata_get_align_mask(
@@ -373,7 +374,8 @@ private func _errorBoxLayout(
 }
 
 /// Read the type metadata, error conformance, and value address from an error box.
-private func _errorBoxContents(
+@usableFromInline
+internal func _errorBoxContents(
   _ p: UnsafeRawPointer
 ) -> (type: UnsafeRawPointer, conformance: UnsafeRawPointer, value: UnsafeMutableRawPointer) {
   let type = unsafe (UnsafeMutableRawPointer(mutating: p)
@@ -387,17 +389,22 @@ private func _errorBoxContents(
   return unsafe (type, conformance, value)
 }
 
-/// Error box destroy implementation. Called from C wrapper `_swift_embedded_error_destroy`
-/// (in EmbeddedShims.h) which provides the swiftcc+swiftself convention for HeapObjectDestroyer.
-@c
-public func _swift_embedded_error_destroy_impl(
-  _ object: UnsafeMutableRawPointer
+/// Error box destroy implementation. Called from the C calling convention bridge
+/// `_swift_embedded_error_box_destroy` (in EmbeddedShims.h), which receives the object
+/// via swiftself (as required by HeapObjectDestroyer) and forwards it here as a regular
+/// swiftcc parameter. This indirection is necessary because Swift cannot produce a
+/// function with the swiftself attribute on a free function parameter.
+/// @used ensures IRGen emits this even though no Swift code calls it directly.
+@_silgen_name("_swift_embedded_error_destroy_impl") @export(implementation) @used
+public func _errorBoxDestroyImpl(
+  _ object: Builtin.RawPointer
 ) {
-  let contents = unsafe _errorBoxContents(UnsafeRawPointer(object))
+  let p = UnsafeMutableRawPointer(object)
+  let contents = unsafe _errorBoxContents(UnsafeRawPointer(p))
   unsafe _swift_embedded_metadata_destroy(
     UnsafeMutableRawPointer(mutating: contents.type), contents.value)
   let layout = unsafe _errorBoxLayout(metadata: contents.type)
-  unsafe swift_slowDealloc(object, layout.totalSize, layout.totalAlignMask)
+  unsafe swift_slowDealloc(p, layout.totalSize, layout.totalAlignMask)
 }
 
 /// Metadata storage for error boxes. Layout matches ClassMetadata: [superclass, destroy, ivarDestroyer].
@@ -579,7 +586,8 @@ public func swift_dynamicCast(
   let boxPtrRaw: Builtin.RawPointer = unsafe UnsafeMutableRawPointer(src)
     .assumingMemoryBound(to: Builtin.RawPointer.self).pointee
   let boxPtrBits = UInt(Builtin.ptrtoint_Word(boxPtrRaw))
-  if boxPtrBits != 0,
+  let isAligned = unsafe (boxPtrBits & UInt(MemoryLayout<UnsafeRawPointer>.alignment - 1)) == 0
+  if boxPtrBits != 0 && isAligned,
      unsafe _swift_embedded_get_heap_object_metadata_pointer(
        UnsafeMutableRawPointer(boxPtrRaw)) == UnsafeMutableRawPointer(Builtin.addressof(&_errorMetadataStorage)) {
     // src holds a pointer to an error box. Extract the concrete type.

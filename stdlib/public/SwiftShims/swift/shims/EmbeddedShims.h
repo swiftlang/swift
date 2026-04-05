@@ -240,18 +240,24 @@ _swift_embedded_metadata_destroy(void *metadata, void *value) {
 }
 
 // Swift implementation of error box destroy logic (defined in EmbeddedRuntime.swift).
-extern void _swift_embedded_error_destroy_impl(void * _Nonnull object);
+// Takes the object as a regular swiftcc parameter (x0/rdi on arm64/x86_64).
+SWIFT_CC_swift extern void _swift_embedded_error_destroy_impl(void * _Nonnull object);
 
-// Calling convention wrapper: swiftcc + swiftself, matching HeapObjectDestroyer.
-// Weak linkage ensures linker deduplication across TUs.
-SWIFT_CC_swift __attribute__((weak)) void
-_swift_embedded_error_destroy(SWIFT_CONTEXT void * _Nonnull object) {
+// Calling convention bridge: HeapObjectDestroyer passes the object via swiftself
+// (x20 on arm64, r13 on x86_64), but @_silgen_name Swift functions receive it as a
+// regular parameter (x0/rdi). This wrapper receives via SWIFT_CONTEXT (swiftself)
+// and forwards as a regular parameter to the Swift implementation.
+// Named _swift_embedded_error_box_destroy (not _swift_embedded_error_destroy) to
+// avoid SIL name collision — Swift IRGen would otherwise shadow the clang-compiled
+// version, losing the swiftcall/swiftself attributes.
+SWIFT_CC_swift static inline void
+_swift_embedded_error_box_destroy(SWIFT_CONTEXT void * _Nonnull object) {
   _swift_embedded_error_destroy_impl(object);
 }
 
-// Returns the address of the wrapper for metadata storage initialization.
+// Returns the address of the calling convention bridge for metadata storage init.
 static inline void * _Nonnull _swift_embedded_error_destroy_ptr(void) {
-  return (void *)_swift_embedded_error_destroy;
+  return (void *)_swift_embedded_error_box_destroy;
 }
 
 #ifdef __cplusplus
