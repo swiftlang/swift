@@ -165,15 +165,15 @@ final class _Storage<Element, Failure: Error>: @unchecked Sendable {
     @unsafe
     enum TerminateAction: ~Copyable {
       @unsafe
-      struct CallHandlerAndResume: ~Copyable {
+      struct CallAndResume: ~Copyable {
         let terminationHandler: TerminationHandler?
         var consumers: Consumers
         let failure: Failure?
       }
 
-      case callHandlerAndResume(CallHandlerAndResume)
+      case callAndResume(CallAndResume)
 
-      case callHandler(terminationHandler: TerminationHandler?)
+      case call(terminationHandler: TerminationHandler?)
 
       case none
     }
@@ -353,9 +353,7 @@ extension _Storage._StateMachine {
       switch idle.buffer.isEmpty {
       case true:
         unsafe self = unsafe .init(state: .terminated(.init(failure: failure)))
-        return unsafe .callHandler(
-          terminationHandler: idle.terminationHandler.take()
-        )
+        return unsafe .call(terminationHandler: idle.terminationHandler.take())
 
       case false:
         unsafe self = unsafe .init(state: .draining(.init(
@@ -364,14 +362,12 @@ extension _Storage._StateMachine {
             )
           )
         )
-        return unsafe .callHandler(
-          terminationHandler: idle.terminationHandler.take()
-        )
+        return unsafe .call(terminationHandler: idle.terminationHandler.take())
       }
 
     case .waiting(var waiting):
       unsafe self = unsafe .init(state: .terminated(.init(failure: .none)))
-      return unsafe .callHandlerAndResume(.init(
+      return unsafe .callAndResume(.init(
           terminationHandler: waiting.terminationHandler.take(),
           consumers: waiting.consumers,
           failure: failure
@@ -511,19 +507,19 @@ extension _Storage {
     }
 
     switch unsafe consume action {
-    case .callHandlerAndResume(var callHandlerAndResume):
-      unsafe callHandlerAndResume.terminationHandler?(terminationReason)
+    case .callAndResume(var callAndResume):
+      unsafe callAndResume.terminationHandler?(terminationReason)
 
-      if let failure = unsafe callHandlerAndResume.failure {
-        let consumer = unsafe callHandlerAndResume.consumers.popFirst()
+      if let failure = unsafe callAndResume.failure {
+        let consumer = unsafe callAndResume.consumers.popFirst()
         unsafe consumer?.resume(returning: .failure(failure))
       }
 
-      while let consumer = unsafe callHandlerAndResume.consumers.popFirst() {
+      while let consumer = unsafe callAndResume.consumers.popFirst() {
         unsafe consumer.resume(returning: .success(nil))
       }
 
-    case .callHandler(let terminationHandler):
+    case .call(let terminationHandler):
       terminationHandler?(terminationReason)
 
     case .none:
