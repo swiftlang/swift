@@ -1,6 +1,6 @@
 # Swift SDK Build
 
-Building a `Swift SDK` involves cross-compiling [Swift Core libraries](https://www.swift.org/documentation/core-libraries/) and `Swift standard library`. It allows building and maintaining custom Swift SDKs for a specific target and Swift SDK distribution to Swift application developers.
+Building a `Swift SDK` from source involves cross-compiling [Swift Core libraries](https://www.swift.org/documentation/core-libraries/) and `Swift standard library`. It allows building and maintaining custom `Swift SDKs` for a specific target and its distribution to Swift application developers.
 
 ## Cross-Compilation Triples
 
