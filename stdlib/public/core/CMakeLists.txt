@@ -348,6 +348,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Suppresse
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Reparenting")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Lifetimes")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAndMutateAccessors")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowInout")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
