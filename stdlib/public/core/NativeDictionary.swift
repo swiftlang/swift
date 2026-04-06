@@ -784,7 +784,7 @@ extension _NativeDictionary { // High-level operations
       let key = unsafe self.uncheckedKey(at: bucket)
       let old = unsafe self.uncheckedValue(at: bucket)
       let new = try transform(key, old)
-      try result._insert(at: bucket, key: key, value: new)
+      result._insert(at: bucket, key: key, value: new)
     }
     return result
   }

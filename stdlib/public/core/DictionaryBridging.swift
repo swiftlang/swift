@@ -581,7 +581,7 @@ extension __CocoaDictionary {
       let key = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
       let old = _forceBridgeFromObjectiveC(cocoaValue, Value.self)
       let new = try transform(key, old)
-      try result.insertNew(key: key, value: new)
+      result.insertNew(key: key, value: new)
     }
     return result
   }

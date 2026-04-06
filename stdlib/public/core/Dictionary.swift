@@ -1045,6 +1045,33 @@ extension Dictionary {
     }
     return Dictionary<Key, T>(_native: result)
   }
+  /// Returns a new dictionary containing only the key-value pairs that have
+  /// non-`nil` values as the result of transformation by the given closure.
+  ///
+  /// Use this method to receive a dictionary with non-optional values when
+  /// your transformation produces optional values.
+  ///
+  /// - Parameter transform: A closure that transforms a value. `transform`
+  ///   accepts each key-value pair of the dictionary as its parameter and
+  ///   returns an optional transformed value of the same or of a different type.
+  /// - Returns: A dictionary containing the keys and non-`nil` transformed
+  ///   values of this dictionary.
+  ///
+  /// - Complexity: O(*m* + *n*), where *n* is the length of the original
+  ///   dictionary and *m* is the length of the resulting dictionary.
+  @inlinable
+  public func compactMapKeyedValues<T, E>(
+    _ transform: (Key, Value) throws(E) -> T?
+  ) throws(E) -> Dictionary<Key, T> {
+    // cannot call reduce here, does not support typed throws
+    var result: _NativeDictionary<Key, T> = .init()
+    for (key, original): (Key, Value) in self {
+      if let value = try transform(key, original) {
+        result.insertNew(key: key, value: value)
+      }
+    }
+    return Dictionary<Key, T>(_native: result)
+  }
 
   /// Updates the value stored in the dictionary for the given key, or adds a
   /// new key-value pair if the key does not exist.
