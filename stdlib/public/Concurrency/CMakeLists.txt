@@ -136,6 +136,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   AsyncStreamBuffer.swift
   AsyncStream.swift
   AsyncThrowingStream.swift
+  Deadline.swift
   Deque/_DequeBuffer.swift
   Deque/_DequeBufferHeader.swift
   Deque/_DequeSlot.swift
