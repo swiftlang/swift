@@ -500,6 +500,9 @@ enum class FixKind : uint8_t {
 
   /// Ignore that a conformance is isolated but is not allowed to be.
   IgnoreIsolatedConformance,
+
+  /// Ignore that an isolated conformance is used in a Sendable existential.
+  IgnoreIsolatedConformanceInSendableExistential,
 };
 
 class ConstraintFix {
@@ -3988,6 +3991,38 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreIsolatedConformance;
+  }
+};
+
+class IgnoreIsolatedConformanceInSendableExistential : public ConstraintFix {
+  ProtocolConformance *conformance;
+
+  IgnoreIsolatedConformanceInSendableExistential(
+      ConstraintSystem &cs, ConstraintLocator *locator,
+      ProtocolConformance *conformance)
+      : ConstraintFix(cs,
+                      FixKind::IgnoreIsolatedConformanceInSendableExistential,
+                      locator),
+        conformance(conformance) {}
+
+public:
+  std::string getName() const override {
+    return "ignore isolated conformance in Sendable existential";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreIsolatedConformanceInSendableExistential *
+  create(ConstraintSystem &cs, ConstraintLocator *locator,
+         ProtocolConformance *conformance);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() ==
+           FixKind::IgnoreIsolatedConformanceInSendableExistential;
   }
 };
 

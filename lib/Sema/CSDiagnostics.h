@@ -3409,6 +3409,21 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose when an isolated conformance is stored into a Sendable existential
+/// type, e.g., `any P & Sendable`.
+class DisallowedIsolatedConformanceInSendableExistential final
+    : public FailureDiagnostic {
+  ProtocolConformance *conformance;
+
+public:
+  DisallowedIsolatedConformanceInSendableExistential(
+      const Solution &solution, ProtocolConformance *conformance,
+      ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), conformance(conformance) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
