@@ -2,6 +2,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+// REQUIRES: swift_feature_IsolatedConformances
 
 @globalActor
 actor AnotherActor: GlobalActor {
