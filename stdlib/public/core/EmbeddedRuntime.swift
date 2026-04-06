@@ -394,8 +394,8 @@ internal func _errorBoxContents(
 /// via swiftself (as required by HeapObjectDestroyer) and forwards it here as a regular
 /// swiftcc parameter. This indirection is necessary because Swift cannot produce a
 /// function with the swiftself attribute on a free function parameter.
-/// @used ensures IRGen emits this even though no Swift code calls it directly.
-@_silgen_name("_swift_embedded_error_destroy_impl") @export(implementation) @used
+/// Linked transitively via the Swift reference in `_ensureErrorMetadataInitialized`.
+@_silgen_name("_swift_embedded_error_destroy_impl") @export(implementation)
 public func _errorBoxDestroyImpl(
   _ object: Builtin.RawPointer
 ) {
@@ -420,6 +420,10 @@ private var _errorMetadataInitialized = false
 
 private func _ensureErrorMetadataInitialized() {
   guard !_errorMetadataInitialized else { return }
+  // Reference the impl from Swift to ensure the SIL linker includes it transitively
+  // when swift_allocError is linked. Without this, the function is only referenced
+  // from C (the swiftself wrapper in EmbeddedShims.h) which the SIL linker can't follow.
+  _ = unsafe unsafeBitCast(_errorBoxDestroyImpl, to: UnsafeRawPointer.self)
   let destroyPtr = unsafe _swift_embedded_error_destroy_ptr()
   unsafe withUnsafeMutablePointer(to: &_errorMetadataStorage.destroy) { p in
     unsafe (p.pointee = UnsafeRawPointer(destroyPtr))
