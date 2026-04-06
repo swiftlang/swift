@@ -2621,8 +2621,10 @@ tryCast(
       // If the destination type is an NSError or NSObject, and the source type
       // is an Error, then the cast might succeed by NSError bridging.
       if (auto srcErrorWitness = findErrorWitness(srcType)) {
-        if (destType == getNSErrorMetadata()
-            || destType == getNSObjectMetadata()) {
+        auto nsErrorMetadata = getNSErrorMetadata();
+        if (nsErrorMetadata &&
+            (destType == nsErrorMetadata ||
+             destType == getNSObjectMetadata())) {
           auto flags = DynamicCastFlags::Default;
           auto error = dynamicCastValueToNSError(srcValue, srcType,
                                                  srcErrorWitness, flags);

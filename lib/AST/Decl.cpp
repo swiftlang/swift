@@ -7147,6 +7147,9 @@ StringRef ClassDecl::getObjCRuntimeName(
       return name->getString(buffer);
   }
 
+  if (getASTContext().LangOpts.EnableGNUstepObjCInterop)
+    return getName().str();
+
   // Produce the mangled name for this class.
   return mangleObjCRuntimeName(this, buffer);
 }
@@ -7667,6 +7670,12 @@ StringRef ProtocolDecl::getObjCRuntimeName(
     if (auto name = objc->getName())
       return name->getString(buffer);
   }
+
+  if (auto attr = getAttrs().getAttribute<ObjCRuntimeNameAttr>())
+    return attr->Name;
+
+  if (getASTContext().LangOpts.EnableGNUstepObjCInterop)
+    return getName().str();
 
   // Produce the mangled name for this protocol.
   return mangleObjCRuntimeName(this, buffer);

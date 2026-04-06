@@ -23,7 +23,7 @@
 
 #include "swift/Runtime/Config.h"
 
-#if SWIFT_OBJC_INTEROP
+#if SWIFT_OBJC_INTEROP_ERROR_BRIDGING
 #include "ErrorObject.h"
 #include "Private.h"
 #include "SwiftObject.h"
@@ -34,7 +34,11 @@
 #include "swift/Runtime/ObjCBridge.h"
 #include <Foundation/Foundation.h>
 #include <dlfcn.h>
+#if __has_include(<objc/NSObject.h>)
 #include <objc/NSObject.h>
+#else
+#include <Foundation/NSObject.h>
+#endif
 #include <objc/message.h>
 #include <objc/objc.h>
 #include <objc/runtime.h>
@@ -672,5 +676,77 @@ swift::swift_errorRelease(SwiftError *error) {
   return objc_release((id)error);
 }
 
-#endif
+#elif SWIFT_OBJC_INTEROP
 
+#include "ErrorObject.h"
+#include "Private.h"
+#include "swift/Demangling/ManglingMacros.h"
+#include "swift/Runtime/Casting.h"
+
+using namespace swift;
+
+extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s5Error);
+
+const WitnessTable *swift::findErrorWitness(const Metadata *srcType) {
+  return swift_conformsToProtocolCommon(srcType, &PROTOCOL_DESCR_SYM(s5Error));
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+id _swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
+                                         const Metadata *T,
+                                         const WitnessTable *Error) {
+  (void)error;
+  (void)T;
+  (void)Error;
+  return nil;
+}
+
+id swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
+  (void)errorObject;
+  return nil;
+}
+
+Class swift::getNSErrorClass() {
+  return Nil;
+}
+
+const Metadata *swift::getNSErrorMetadata() {
+  return nullptr;
+}
+
+id swift::dynamicCastValueToNSError(OpaqueValue *src,
+                                    const Metadata *srcType,
+                                    const WitnessTable *srcErrorWitness,
+                                    DynamicCastFlags flags) {
+  (void)src;
+  (void)srcType;
+  (void)srcErrorWitness;
+  (void)flags;
+  return nil;
+}
+
+bool swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
+                                               OpaqueValue *dest,
+                                               const Metadata *destType,
+                                               DynamicCastFlags flags) {
+  (void)object;
+  (void)dest;
+  (void)destType;
+  (void)flags;
+  return false;
+}
+
+bool swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
+                                         OpaqueValue *src,
+                                         const Metadata *srcType,
+                                         const Metadata *destType,
+                                         DynamicCastFlags flags) {
+  (void)dest;
+  (void)src;
+  (void)srcType;
+  (void)destType;
+  (void)flags;
+  return false;
+}
+
+#endif

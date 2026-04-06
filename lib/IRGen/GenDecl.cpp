@@ -93,6 +93,11 @@ llvm::cl::opt<bool> UseBasicDynamicReplacement(
 
 namespace {
 
+static StringRef getObjCClassRefSectionName(IRGenModule &IGM) {
+  return IGM.Context.LangOpts.EnableGNUstepObjCInterop ? "__objc_class_refs"
+                                                       : "__objc_classrefs";
+}
+
 /// Add methods, properties, and protocol conformances from a JITed extension
 /// to an ObjC class using the ObjC runtime.
 ///
@@ -4945,7 +4950,7 @@ Address IRGenModule::getAddrOfObjCClassRef(ClassDecl *theClass) {
   // Define it lazily.
   if (auto global = dyn_cast<llvm::GlobalVariable>(addr)) {
     if (global->isDeclaration()) {
-      global->setSection(GetObjCSectionName("__objc_classrefs",
+      global->setSection(GetObjCSectionName(getObjCClassRefSectionName(*this),
                                             "regular,no_dead_strip"));
       global->setLinkage(llvm::GlobalVariable::PrivateLinkage);
       global->setExternallyInitialized(true);

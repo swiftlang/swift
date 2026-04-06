@@ -1355,37 +1355,47 @@ namespace {
       std::optional<CanType> specializedGenericType =
           getSpecializedGenericType();
 
-      // The isa is the metaclass pointer for the root class.
-      auto rootClass = getRootClassForMetaclass(IGM, getClass());
-      Type rootType;
-      if (specializedGenericType && rootClass->isGenericContext()) {
-        rootType =
-            (*specializedGenericType)->getRootClass(
-               /*useArchetypes=*/false);
-      } else {
-        rootType = Type();
-      }
-      auto rootPtr = getMetaclassRefOrNull(rootType, rootClass);
-
-      // The superclass of the metaclass is the metaclass of the
-      // superclass.  Note that for metaclass stubs, we can always
-      // ignore parent contexts and generic arguments.
-      //
-      // If this class has no formal superclass, then its actual
-      // superclass is SwiftObject, i.e. the root class.
+      llvm::Constant *rootPtr;
       llvm::Constant *superPtr;
-      if (auto base = getSuperclassDeclForMetadata(IGM, getClass())) {
-        if (specializedGenericType && base->isGenericContext()) {
-          superPtr = getMetaclassRefOrNull(
-              getSuperclassForMetadata(IGM, *specializedGenericType,
-                                       /*useArchetypes=*/false),
-              base);
-        } else {
-          superPtr = getMetaclassRefOrNull(Type(), base);
-        }
+      if (IGM.Context.LangOpts.EnableGNUstepObjCInterop) {
+        // GNUstep's loader initializes metaclass isa / superclass links from
+        // the class records.  Emitting external metaclass references here is
+        // incompatible with the GNUstep symbol model because metaclass symbols
+        // are kept local to the defining object.
+        rootPtr = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
+        superPtr = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
       } else {
-        superPtr = getMetaclassRefOrNull(
-            Type(), IGM.getObjCRuntimeBaseForSwiftRootClass(getClass()));
+        // The isa is the metaclass pointer for the root class.
+        auto rootClass = getRootClassForMetaclass(IGM, getClass());
+        Type rootType;
+        if (specializedGenericType && rootClass->isGenericContext()) {
+          rootType =
+              (*specializedGenericType)->getRootClass(
+                 /*useArchetypes=*/false);
+        } else {
+          rootType = Type();
+        }
+        rootPtr = getMetaclassRefOrNull(rootType, rootClass);
+
+        // The superclass of the metaclass is the metaclass of the
+        // superclass.  Note that for metaclass stubs, we can always
+        // ignore parent contexts and generic arguments.
+        //
+        // If this class has no formal superclass, then its actual
+        // superclass is SwiftObject, i.e. the root class.
+        if (auto base = getSuperclassDeclForMetadata(IGM, getClass())) {
+          if (specializedGenericType && base->isGenericContext()) {
+            superPtr = getMetaclassRefOrNull(
+                getSuperclassForMetadata(IGM, *specializedGenericType,
+                                         /*useArchetypes=*/false),
+                base);
+          } else {
+            superPtr = getMetaclassRefOrNull(Type(), base);
+          }
+        } else {
+          superPtr = getMetaclassRefOrNull(
+              Type(), IGM.getObjCRuntimeBaseForSwiftRootClass(getClass()));
+        }
       }
 
       auto dataPtr = emitROData(ForMetaClass, DoesNotHaveUpdateCallback);

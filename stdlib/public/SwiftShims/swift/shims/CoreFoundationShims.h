@@ -26,7 +26,7 @@
 extern "C" {
 #endif
 
-#ifdef __OBJC2__
+#ifdef __OBJC__
 #if __LLP64__
 typedef unsigned long long _swift_shims_CFHashCode;
 typedef signed long long _swift_shims_CFIndex;
@@ -87,11 +87,10 @@ _swift_shims_NSUInteger
 _swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline(id _Nonnull obj,
                                                         unsigned long encoding);
 
-#endif // __OBJC2__
+#endif // __OBJC__
 
 #ifdef __cplusplus
 } // extern "C"
 #endif
 
 #endif // SWIFT_STDLIB_SHIMS_COREFOUNDATIONSHIMS_H
-

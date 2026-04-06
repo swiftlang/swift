@@ -18,7 +18,11 @@
 #include "swift/Runtime/Config.h"
 
 #if SWIFT_OBJC_INTEROP
+#if __has_include(<objc/NSObject.h>)
 #include <objc/NSObject.h>
+#else
+#include <Foundation/NSObject.h>
+#endif
 #include <objc/runtime.h>
 #include <objc/message.h>
 #include <objc/objc.h>
@@ -58,16 +62,26 @@
 #include <unordered_map>
 #include <unordered_set>
 #if SWIFT_OBJC_INTEROP
-# import <CoreFoundation/CFBase.h> // for CFTypeID
-# import <Foundation/Foundation.h>
-# include <malloc/malloc.h>
+# if __has_include(<CoreFoundation/CFBase.h>)
+#  import <CoreFoundation/CFBase.h> // for CFTypeID
+# else
+#  import <CoreFoundation.h>
+# endif
+# if __has_include(<Foundation/Foundation.h>)
+#  import <Foundation/Foundation.h>
+# else
+#  import <Foundation.h>
+# endif
+# if __has_include(<malloc/malloc.h>)
+#  include <malloc/malloc.h>
+# endif
 # include <dispatch/dispatch.h>
 #endif
 
 using namespace swift;
 using namespace hashable_support;
 
-#if SWIFT_HAS_ISA_MASKING
+#if SWIFT_HAS_ISA_MASKING && SWIFT_OBJC_INTEROP_HAS_PACKED_ISA_CLASS_MASK
 OBJC_EXPORT __attribute__((__weak_import__))
 const uintptr_t objc_debug_isa_class_mask;
 
@@ -208,7 +222,7 @@ static id _getClassDescription(Class cls) {
 
 @implementation SwiftObject
 + (void)initialize {
-#if SWIFT_HAS_ISA_MASKING && !TARGET_OS_SIMULATOR && !NDEBUG
+#if SWIFT_HAS_ISA_MASKING && SWIFT_OBJC_INTEROP_HAS_PACKED_ISA_CLASS_MASK && !TARGET_OS_SIMULATOR && !NDEBUG
   uintptr_t libObjCMask = (uintptr_t)&objc_absolute_packed_isa_class_mask;
   assert(libObjCMask);
 
@@ -263,8 +277,13 @@ static id _getClassDescription(Class cls) {
 }
 
 - (struct _NSZone *)zone {
+#if __has_include(<malloc/malloc.h>)
   auto zone = malloc_zone_from_ptr(self);
   return (struct _NSZone *)(zone ? zone : malloc_default_zone());
+#else
+  (void)self;
+  return nullptr;
+#endif
 }
 
 - (void)doesNotRecognizeSelector: (SEL) sel {
@@ -1194,8 +1213,10 @@ swift_dynamicCastObjCClassImpl(const void *object,
 
   // For casts to NSError or NSObject, we might need to bridge via the Error
   // protocol. Try it now.
-  if (targetType == reinterpret_cast<const ClassMetadata*>(getNSErrorClass()) ||
-      targetType == reinterpret_cast<const ClassMetadata*>([NSObject class])) {
+  Class nsErrorClass = getNSErrorClass();
+  if (nsErrorClass &&
+      (targetType == reinterpret_cast<const ClassMetadata*>(nsErrorClass) ||
+       targetType == reinterpret_cast<const ClassMetadata*>([NSObject class]))) {
     auto srcType = swift_getObjCClassMetadata(
         reinterpret_cast<const ClassMetadata*>(
           object_getClass(id_const_cast(object))));
@@ -1224,8 +1245,10 @@ swift_dynamicCastObjCClassUnconditionalImpl(const void *object,
 
   // For casts to NSError or NSObject, we might need to bridge via the Error
   // protocol. Try it now.
-  if (targetType == reinterpret_cast<const ClassMetadata*>(getNSErrorClass()) ||
-      targetType == reinterpret_cast<const ClassMetadata*>([NSObject class])) {
+  Class nsErrorClass = getNSErrorClass();
+  if (nsErrorClass &&
+      (targetType == reinterpret_cast<const ClassMetadata*>(nsErrorClass) ||
+       targetType == reinterpret_cast<const ClassMetadata*>([NSObject class]))) {
     auto srcType = swift_getObjCClassMetadata(
         reinterpret_cast<const ClassMetadata*>(
           object_getClass(id_const_cast(object))));
@@ -1400,7 +1423,9 @@ static bool objcSupportsLazyRealization() {
 }
 
 void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
+#if SWIFT_OBJC_INTEROP_HAS_APPLE_CLASS_IMAGE_API
   static const objc_image_info ImageInfo = {0, 0};
+#endif
 
   Class c = class_const_cast(_c);
 
@@ -1410,14 +1435,27 @@ void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
   }
 
   // Register the class.
+#if SWIFT_OBJC_INTEROP_HAS_APPLE_CLASS_IMAGE_API
   Class registered = objc_readClassPair(c, &ImageInfo);
   assert(registered == c
          && "objc_readClassPair failed to instantiate the class in-place");
   (void)registered;
+#else
+  // GNUstep/libobjc2 compiler-emitted classes are registered by the image load
+  // path. Force resolution and initialization rather than using the dynamic
+  // class-pair API, which is intended for objc_allocateClassPair() classes.
+  objc_send_initialize((id)c);
+#endif
 }
 
 Class swift::swift_getInitializedObjCClass(Class c) {
   if (!objcSupportsLazyRealization()) {
+#if defined(__GNUSTEP_RUNTIME__)
+    // GNUstep/libobjc2 exposes an explicit class initialization entry point.
+    // Using it avoids sending a class message to a class that has not yet been
+    // fully initialized by the runtime.
+    objc_send_initialize((id)c);
+#else
     // Used when we have class metadata and we want to ensure a class has been
     // initialized by the Objective-C runtime. We need to do this because the
     // class "c" might be valid metadata, but it hasn't been initialized yet.
@@ -1426,6 +1464,7 @@ Class swift::swift_getInitializedObjCClass(Class c) {
     // return something different. See
     // https://github.com/apple/swift/issues/52863 for an example.
     [c self];
+#endif
   }
   return c;
 }

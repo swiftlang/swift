@@ -15,7 +15,11 @@
 #if SWIFT_OBJC_INTEROP && defined(SWIFT_ENABLE_REFLECTION)
 
 #include "Private.h"
+#if __has_include(<Foundation/Foundation.h>)
 #include <Foundation/Foundation.h>
+#else
+#include <Foundation.h>
+#endif
 #include <objc/objc.h>
 #include <objc/runtime.h>
 

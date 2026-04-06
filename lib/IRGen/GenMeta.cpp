@@ -5157,8 +5157,11 @@ namespace {
 
     void addMetaclassObject(ConstantStructBuilder &B) {
       // isa
-      ClassDecl *rootClass = getRootClassForMetaclass(IGM, Target);
-      auto isa = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
+      llvm::Constant *isa = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
+      if (!IGM.Context.LangOpts.EnableGNUstepObjCInterop) {
+        ClassDecl *rootClass = getRootClassForMetaclass(IGM, Target);
+        isa = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
+      }
       B.add(isa);
       // super, which is dependent if the superclass is generic
       B.addNullPointer(IGM.ObjCClassPtrTy);
@@ -5453,6 +5456,24 @@ static void emitObjCClassSymbol(IRGenModule &IGM, ClassDecl *classDecl,
                                           metadata, &IGM.Module);
   ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
       .to(alias, link.isForDefinition());
+
+  if (!IGM.Context.LangOpts.EnableGNUstepObjCInterop)
+    return;
+
+  llvm::SmallString<64> nameBuffer;
+  StringRef runtimeName = classDecl->getObjCRuntimeName(nameBuffer);
+  auto refName = (Twine("._OBJC_REF_CLASS_") + runtimeName).str();
+  if (IGM.Module.getNamedValue(refName))
+    return;
+
+  auto *ref = new llvm::GlobalVariable(
+      IGM.Module, IGM.ObjCClassPtrTy, /*isConstant*/ false,
+      llvm::GlobalValue::ExternalLinkage,
+      llvm::ConstantExpr::getBitCast(metadata, IGM.ObjCClassPtrTy), refName);
+  ref->setSection(
+      IGM.GetObjCSectionName("__objc_class_refs", "regular,no_dead_strip"));
+  ref->setExternallyInitialized(true);
+  IGM.addCompilerUsedGlobal(ref);
 }
 
 /// Check whether the metadata update strategy requires runtime support that is

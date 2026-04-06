@@ -2061,6 +2061,13 @@ FUNCTION(GetObjCProtocol, objc2, objc_getProtocol, C_CC, AlwaysAvailable,
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::ObjectiveC),
          UNKNOWN_MEMEFFECTS)
+FUNCTION(ObjCMsgLookupSuper, objc2, objc_msg_lookup_super,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(ObjCSuperPtrTy, ObjCSELTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::ObjectiveC),
+         UNKNOWN_MEMEFFECTS)
 FUNCTION(AllocateObjCProtocol, objc2, objc_allocateProtocol, C_CC, AlwaysAvailable,
          RETURNS(ProtocolDescriptorPtrTy),
          ARGS(Int8PtrTy),

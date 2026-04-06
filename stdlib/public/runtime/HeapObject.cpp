@@ -36,7 +36,11 @@
 #include <cstdlib>
 #include <new>
 #if SWIFT_OBJC_INTEROP
-# include <objc/NSObject.h>
+# if __has_include(<objc/NSObject.h>)
+#  include <objc/NSObject.h>
+# else
+#  include <Foundation/NSObject.h>
+# endif
 # include <objc/runtime.h>
 # include <objc/message.h>
 # include <objc/objc.h>
@@ -876,7 +880,12 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 #endif
 
   if (!fastDeallocSupported || !object->refCounts.getPureSwiftDeallocation()) {
+#if defined(__GNUSTEP_RUNTIME__)
+    objc_removeAssociatedObjects((id)object);
+    (void)objc_delete_weak_refs((id)object);
+#else
     objc_destructInstance((id)object);
+#endif
   }
 #endif
 

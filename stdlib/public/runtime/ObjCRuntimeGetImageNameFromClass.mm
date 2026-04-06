@@ -23,6 +23,12 @@
 
 #include "swift/Runtime/Metadata.h"
 
+#if defined(__GNUSTEP_RUNTIME__)
+
+void swift::setUpObjCRuntimeGetImageNameFromClass() {}
+
+#else
+
 #include <dlfcn.h>
 #include <objc/runtime.h>
 #include <objc/message.h>
@@ -381,4 +387,5 @@ void swift::setUpObjCRuntimeGetImageNameFromClass() {
   }
 }
 
+#endif // defined(__GNUSTEP_RUNTIME__)
 #endif // SWIFT_OBJC_INTEROP

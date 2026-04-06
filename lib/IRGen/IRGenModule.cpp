@@ -1332,10 +1332,15 @@ llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
     return ObjCEmptyCachePtr;
 
   if (ObjCInterop) {
-    // struct objc_cache _objc_empty_cache;
-    ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache", OpaqueTy);
-    ApplyIRLinkage(IRLinkage::ExternalImport)
-        .to(cast<llvm::GlobalVariable>(ObjCEmptyCachePtr));
+    if (Context.LangOpts.EnableGNUstepObjCInterop) {
+      ObjCEmptyCachePtr = llvm::ConstantPointerNull::get(OpaquePtrTy);
+    } else {
+      // struct objc_cache _objc_empty_cache;
+      ObjCEmptyCachePtr =
+          Module.getOrInsertGlobal("_objc_empty_cache", OpaqueTy);
+      ApplyIRLinkage(IRLinkage::ExternalImport)
+          .to(cast<llvm::GlobalVariable>(ObjCEmptyCachePtr));
+    }
   } else {
     // FIXME: Remove even the null value per rdar://problem/18801263
     ObjCEmptyCachePtr = llvm::ConstantPointerNull::get(OpaquePtrTy);

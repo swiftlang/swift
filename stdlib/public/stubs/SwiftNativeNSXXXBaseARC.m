@@ -13,6 +13,7 @@
 
 #if SWIFT_OBJC_INTEROP
 
+#include <stdbool.h>
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
 #include <objc/NSObject.h>

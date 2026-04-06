@@ -54,7 +54,11 @@ using namespace swift::hashable_support;
 using namespace metadataimpl;
 
 #if SWIFT_OBJC_INTEROP
+#if __has_include(<objc/NSObject.h>)
 #include <objc/NSObject.h>
+#else
+#include <Foundation/NSObject.h>
+#endif
 #include <objc/runtime.h>
 #include <objc/message.h>
 #include <objc/objc.h>
@@ -1365,7 +1369,8 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
         // Though they're statically-allocated globals, Protocol inherits
         // NSObject's default refcounting behavior so must be retained.
         auto protocolObj = existential->getProtocols()[0].getObjCProtocol();
-        return objc_retain(protocolObj);
+        return objc_retain(reinterpret_cast<id>(
+            const_cast<Protocol *>(protocolObj)));
       }
     }
   }
@@ -1383,10 +1388,13 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
   }
   // Handle Errors.
   else if (auto srcErrorWitness = findErrorWitness(srcType)) {
-    // Bridge the source value to an NSError.
-    auto flags = consume ? DynamicCastFlags::TakeOnSuccess
-                         : DynamicCastFlags::Default;
-    return dynamicCastValueToNSError(src, srcType, srcErrorWitness, flags);
+    if (getNSErrorClass()) {
+      // Bridge the source value to an NSError when Cocoa error bridging is
+      // available. Otherwise, fall through to SwiftValue boxing below.
+      auto flags = consume ? DynamicCastFlags::TakeOnSuccess
+                           : DynamicCastFlags::Default;
+      return dynamicCastValueToNSError(src, srcType, srcErrorWitness, flags);
+    }
   }
   // Handle functions:  "Block" types can be bridged literally
   else if (auto fn = dyn_cast<FunctionTypeMetadata>(srcType)) {

@@ -429,7 +429,7 @@ static bool fixupHandlerInstaller = [] {
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 #endif
 
-#if SWIFT_OBJC_INTEROP
+#if SWIFT_OBJC_INTEROP && !defined(__GNUSTEP_RUNTIME__)
 extern "C" void *_objc_empty_cache;
 #endif
 
@@ -550,7 +550,11 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
 #if SWIFT_OBJC_INTEROP
   // Cache data.  Install the same initializer that the compiler is
   // required to use.  We don't need to do this in non-ObjC-interop modes.
+#if defined(__GNUSTEP_RUNTIME__)
+  metadata->CacheData[0] = nullptr;
+#else
   metadata->CacheData[0] = &_objc_empty_cache;
+#endif
   metadata->CacheData[1] = nullptr;
 #endif
 
@@ -3651,7 +3655,11 @@ _swift_relocateClassMetadata(const ClassDescriptor *description,
 #if SWIFT_OBJC_INTEROP
   // Cache data.  Install the same initializer that the compiler is
   // required to use.  We don't need to do this in non-ObjC-interop modes.
+#if defined(__GNUSTEP_RUNTIME__)
+  metadata->CacheData[0] = nullptr;
+#else
   metadata->CacheData[0] = &_objc_empty_cache;
+#endif
   metadata->CacheData[1] = nullptr;
 #endif
 
@@ -3819,6 +3827,9 @@ static void initGenericClassObjCName(ClassMetadata *theClass) {
 }
 
 static bool installLazyClassNameHook() {
+#if defined(__GNUSTEP_RUNTIME__)
+  return false;
+#else
   static objc_hook_lazyClassNamer oldHook;
   auto myHook = [](Class theClass) -> const char * {
     ClassMetadata *metadata = (ClassMetadata *)theClass;
@@ -3833,6 +3844,7 @@ static bool installLazyClassNameHook() {
   }
 
   return false;
+#endif
 }
 
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
@@ -4458,11 +4470,15 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // The compiler enforces that @objc methods in extensions of classes
     // with resilient ancestry have the correct availability, so it should
     // be safe to ignore the stub in this case.
+#if defined(__GNUSTEP_RUNTIME__)
+    swift_instantiateObjCClass(self);
+#else
     if (stub != nullptr && SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift)) {
       SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub)));
     } else {
       swift_instantiateObjCClass(self);
     }
+#endif
   }
 #else
   assert(!self->getDescription()->hasObjCResilientClassStub());
@@ -4501,7 +4517,11 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets,
                                bool allowDependency) {
+#if defined(__GNUSTEP_RUNTIME__)
+  bool requiresUpdate = false;
+#else
   bool requiresUpdate = SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
+#endif
 
   // If we're on a newer runtime, we're going to be initializing the
   // field offset vector. Realize the superclass metadata first, even
@@ -4549,7 +4569,11 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
     initObjCClass(self, numFields, fieldTypes, fieldOffsets);
 
     // See remark above about how this slides field offset globals.
+#if defined(__GNUSTEP_RUNTIME__)
+    swift_getInitializedObjCClass((Class)self);
+#else
     SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift((Class)self, (Class)self));
+#endif
   }
 
   return MetadataDependency();
@@ -4581,6 +4605,11 @@ swift::swift_updatePureObjCClassMetadata(Class cls,
                                          ClassLayoutFlags flags,
                                          size_t numFields,
                                          const TypeLayout * const *fieldTypes) {
+#if defined(__GNUSTEP_RUNTIME__)
+  SWIFT_DEFER {
+    swift_getInitializedObjCClass(cls);
+  };
+#else
   bool hasRealizeClassFromSwift =
     SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
   assert(hasRealizeClassFromSwift);
@@ -4591,6 +4620,7 @@ swift::swift_updatePureObjCClassMetadata(Class cls,
     // stored in the field offset globals.
     SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift(cls, cls));
   };
+#endif
 
   // Update the field offset globals using runtime type information; the layout
   // of resilient types might be different than the statically-emitted layout.
