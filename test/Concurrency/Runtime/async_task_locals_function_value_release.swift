@@ -8,8 +8,9 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // In optimized builds specifically the task local add builtins (AddTaskLocalValue/TaskLocalValuePush)
-// would end use a the AST type directly, which would then be reabstraction thunk with ~Copyable and
-// other not representable at runtime types.
+// would end up using the wrong type in this example, and attempt to demangle
+// at runtime a type including ~Copyable -- which cannot be represented at runtime
+// and therefore crash while trying to do so. 
 
 @TaskLocal var taskLocal: (() -> Void)?
 
