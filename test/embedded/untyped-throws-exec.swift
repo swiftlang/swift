@@ -18,6 +18,10 @@ func mayThrow(_ n: Int) throws {
   if n == 1 { throw MyError.withValue(42) }
 }
 
+func withRethrow(_ body: () throws -> Void) rethrows {
+  try body()
+}
+
 @main
 struct Main {
   static func main() {
@@ -49,10 +53,29 @@ struct Main {
     } catch {
       print("FAIL")
     }
+
+    // Rethrows propagates error
+    do {
+      try withRethrow { try mayThrow(0) }
+    } catch let e as MyError {
+      print(e == .simple ? "OK4" : "FAIL")
+    } catch {
+      print("FAIL")
+    }
+
+    // Rethrows with non-throwing closure
+    do {
+      try withRethrow { }
+      print("OK5")
+    } catch {
+      print("FAIL")
+    }
   }
 }
 
 // CHECK: OK1
 // CHECK: OK2
 // CHECK: OK3
+// CHECK: OK4
+// CHECK: OK5
 // CHECK-NOT: FAIL
