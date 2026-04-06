@@ -14,6 +14,7 @@
 
 #include "ArgumentSource.h"
 #include "Cleanup.h"
+#include "ExecutorBreadcrumb.h"
 #include "Conversion.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -1863,6 +1864,14 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
   if (throws) {
     SGF.B.emitBlock(errorBlock);
 
+    // After the continuation resumes with a failure, hop back to the expected executor.
+    //
+    // This is critical for CallerIsolationInheriting (nonisolated(nonsending))
+    // functions: without this hop, the function may return on whichever thread
+    // resumed the continuation, violating the contract that the function
+    // maintains the caller's isolation.
+    ExecutorBreadcrumb(/*mustReturnToExecutor=*/true).emit(SGF, loc);
+
     Scope errorScope(SGF, loc);
 
     auto errorTy = SGF.getASTContext().getErrorExistentialType();
@@ -1873,6 +1882,9 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
   }
 
   SGF.B.emitBlock(resumeBlock);
+
+  // After the continuation resumes, hop back to the expected executor.
+  ExecutorBreadcrumb(/*mustReturnToExecutor=*/true).emit(SGF, loc);
 
   // The incoming value is the maximally-abstracted result type of the
   // continuation. Move it out of the resume buffer and reabstract it if
