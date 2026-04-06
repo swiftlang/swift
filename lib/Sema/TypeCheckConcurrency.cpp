@@ -6235,17 +6235,29 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
     // decl.
     auto isolation = getOverriddenIsolationFor(value);
 
-    // If this is an override of an async completion handler, mark
-    // it `@concurrent` instead of inferring `nonisolated(nonsending)`
-    // to preserve pre-SE-0461 behavior.
-    if (isolation.isCallerIsolationInheriting() &&
-        overriddenValue->hasClangNode()) {
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(overriddenValue)) {
-        if (AFD->getForeignAsyncConvention()) {
-          return {{ActorIsolation::forNonisolated(/*unsafe=*/false),
-                   IsolationSource(overriddenValue, IsolationSource::Override)},
-                  overriddenValue,
-                  isolation};
+    // Overriden declaration is `nonisolated(nonsending)`.
+    if (isolation.isCallerIsolationInheriting()) {
+      // Override is non-async when the overriden member was async. Let's
+      // produce `nonisolated` here which is equivalent.
+      if (!value->isAsync()) {
+        return {{ActorIsolation::forNonisolated(/*unsafe=*/false),
+                 IsolationSource(overriddenValue, IsolationSource::Override)},
+                overriddenValue,
+                isolation};
+      }
+
+      // If this is an override of an async completion handler, mark
+      // it `@concurrent` instead of inferring `nonisolated(nonsending)`
+      // to preserve pre-SE-0461 behavior.
+      if (overriddenValue->hasClangNode()) {
+        if (auto *AFD = dyn_cast<AbstractFunctionDecl>(overriddenValue)) {
+          if (AFD->getForeignAsyncConvention()) {
+            return {
+                {ActorIsolation::forNonisolated(/*unsafe=*/false),
+                 IsolationSource(overriddenValue, IsolationSource::Override)},
+                overriddenValue,
+                isolation};
+          }
         }
       }
     }
