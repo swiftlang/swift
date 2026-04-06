@@ -774,5 +774,6 @@ internal func utf8Length(
   ) else {
     return nil
   }
-  return (count &+ addedByteCount, isASCII: count == inCount)
+  count &+= addedByteCount
+  return (count, isASCII: count == inCount)
 }
