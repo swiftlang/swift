@@ -417,13 +417,15 @@ var _errorMetadataStorage:
   = (superclass: nil, destroy: nil, ivarDestroyer: nil)
 
 private var _errorMetadataInitialized = false
+// Holds a Swift reference to _errorBoxDestroyImpl so the SIL linker includes it
+// transitively when swift_allocError is linked. Without this, the impl is only
+// referenced from C (the swiftself wrapper in EmbeddedShims.h) which the SIL
+// linker can't follow. The reference is written once during metadata init.
+private var _errorBoxDestroyImplRef: (Builtin.RawPointer) -> Void = { _ in }
 
 private func _ensureErrorMetadataInitialized() {
   guard !_errorMetadataInitialized else { return }
-  // Reference the impl from Swift to ensure the SIL linker includes it transitively
-  // when swift_allocError is linked. Without this, the function is only referenced
-  // from C (the swiftself wrapper in EmbeddedShims.h) which the SIL linker can't follow.
-  _ = unsafe unsafeBitCast(_errorBoxDestroyImpl, to: UnsafeRawPointer.self)
+  _errorBoxDestroyImplRef = _errorBoxDestroyImpl
   let destroyPtr = unsafe _swift_embedded_error_destroy_ptr()
   unsafe withUnsafeMutablePointer(to: &_errorMetadataStorage.destroy) { p in
     unsafe (p.pointee = UnsafeRawPointer(destroyPtr))
