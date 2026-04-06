@@ -315,8 +315,6 @@ private:
                           const SILOptions &SILOptions,
                           ASTContext &ScanASTContext,
                           DependencyTracker &DependencyTracker,
-                          std::shared_ptr<llvm::cas::ObjectStore> CAS,
-                          std::shared_ptr<llvm::cas::ActionCache> ActionCache,
                           DiagnosticEngine &Diagnostics, bool ParallelScan,
                           bool EmitScanRemarks);
   llvm::Error initializeWorkerClangScanningTool();

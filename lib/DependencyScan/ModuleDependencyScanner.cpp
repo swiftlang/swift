@@ -218,6 +218,12 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
           getClangScanningFS(globalScanningService, CAS, ScanASTContext)),
       CAS(CAS), ActionCache(ActionCache),
       diagnosticReporter(DiagnosticReporter) {
+  assert(globalScanningService.ClangScanningService->getCAS() == CAS &&
+         "Need to be the same CAS instance");
+  assert(globalScanningService.ClangScanningService->getActionCache() ==
+             ActionCache &&
+         "Need to be the same ActionCache instance");
+
   // Instantiate a worker-specific diagnostic engine and copy over
   // the scanner's diagnostic consumers (expected to be thread-safe).
   workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(ScanASTContext.SourceMgr);
@@ -534,7 +540,6 @@ ModuleDependencyScanner::create(SwiftDependencyScanningService &service,
       std::unique_ptr<ModuleDependencyScanner>(new ModuleDependencyScanner(
           service, cache, instance->getInvocation(), instance->getSILOptions(),
           instance->getASTContext(), *instance->getDependencyTracker(),
-          instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
           instance->getDiags(),
           instance->getInvocation().getFrontendOptions().ParallelDependencyScan,
           instance->getInvocation()
@@ -560,24 +565,22 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     ModuleDependenciesCache &Cache,
     const CompilerInvocation &ScanCompilerInvocation,
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
-    swift::DependencyTracker &DependencyTracker,
-    std::shared_ptr<llvm::cas::ObjectStore> CAS,
-    std::shared_ptr<llvm::cas::ActionCache> ActionCache,
-    DiagnosticEngine &Diagnostics, bool ParallelScan,
-    bool EmitScanRemarks)
+    swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics,
+    bool ParallelScan, bool EmitScanRemarks)
     : ScanCompilerInvocation(ScanCompilerInvocation),
       ScanASTContext(ScanASTContext),
       ScanDiagnosticReporter(Diagnostics, EmitScanRemarks),
       ModuleOutputPath(ScanCompilerInvocation.getFrontendOptions()
-                       .ExplicitModulesOutputPath),
+                           .ExplicitModulesOutputPath),
       SDKModuleOutputPath(ScanCompilerInvocation.getFrontendOptions()
-                          .ExplicitSDKModulesOutputPath),
+                              .ExplicitSDKModulesOutputPath),
       DependencyCache(Cache),
       NumThreads(ParallelScan
                      ? llvm::hardware_concurrency().compute_thread_count()
                      : 1),
-      ScanningThreadPool(llvm::hardware_concurrency(NumThreads)), CAS(CAS),
-      ActionCache(ActionCache) {
+      ScanningThreadPool(llvm::hardware_concurrency(NumThreads)),
+      CAS(ScanningService.ClangScanningService->getCAS()),
+      ActionCache(ScanningService.ClangScanningService->getActionCache()) {
   // Setup prefix mapping.
   auto &ScannerPrefixMapper =
       ScanCompilerInvocation.getSearchPathOptions().ScannerPrefixMapper;

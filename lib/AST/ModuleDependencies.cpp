@@ -655,7 +655,7 @@ swift::dependencies::registerBackDeployLibraries(
 
 bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     CompilerInstance &Instance) {
-  if (!Instance.getInvocation().getCASOptions().EnableCaching)
+  if (!Instance.getInvocation().requiresCAS())
     return false;
 
   if (CASConfig) {
