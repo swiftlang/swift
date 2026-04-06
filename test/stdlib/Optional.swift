@@ -23,7 +23,7 @@ OptionalTests.test("nil comparison") {
   expectFalse(x != nil)
 
   switch x {
-  case .some(let y): expectUnreachable()
+  case .some(_): expectUnreachable()
   case .none: break
   }
 
@@ -31,10 +31,10 @@ OptionalTests.test("nil comparison") {
   expectTrue(x != nil)
 
   do {
-    var y1: Int? = .none
+    let y1: Int? = .none
     expectTrue(y1 == nil)
 
-    var y2: Int? = .none
+    let y2: Int? = .none
     expectTrue(y2 == nil)
   }
 
@@ -91,7 +91,7 @@ OptionalTests.test("CustomReflectable") {
     var output = ""
     dump(value, to: &output)
     expectEqual("- nil\n", output)
-    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+    expectEqual(.optional, Mirror(reflecting: value as Any).displayStyle)
   }
   do {
     let value: OpaqueValue<Int>? = OpaqueValue(1010)
@@ -103,7 +103,7 @@ OptionalTests.test("CustomReflectable") {
       "    - value: 1010\n" +
       "    - identity: 0\n"
     expectEqual(expected, output)
-    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+    expectEqual(.optional, Mirror(reflecting: value as Any).displayStyle)
   }
   // Test with a reference type.
   do {
@@ -111,7 +111,7 @@ OptionalTests.test("CustomReflectable") {
     var output = ""
     dump(value, to: &output)
     expectEqual("- nil\n", output)
-    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+    expectEqual(.optional, Mirror(reflecting: value as Any).displayStyle)
   }
   do {
     let value: LifetimeTracked? = LifetimeTracked(1010)
@@ -124,7 +124,7 @@ OptionalTests.test("CustomReflectable") {
       "    - identity: 0\n" +
       "    - serialNumber: 1\n"
     expectEqual(expected, output)
-    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+    expectEqual(.optional, Mirror(reflecting: value as Any).displayStyle)
   }
 }
 
@@ -308,7 +308,7 @@ OptionalTests.test("Casting Optional") {
 
   // https://github.com/apple/swift/issues/43076
   // Weakened optionals don't zero
-  var t = LifetimeTracked(0)
+  let t = LifetimeTracked(0)
   _ = anyToAny(Optional(t), CustomDebugStringConvertible.self)
   expectTrue(anyToAnyIs(Optional(t), CustomDebugStringConvertible.self))
 
