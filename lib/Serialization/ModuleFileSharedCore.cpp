@@ -253,6 +253,7 @@ static ValidationInfo validateControlBlock(
     bool requiresRevisionMatch,
     StringRef requiredSDK,
     std::optional<llvm::Triple> target,
+    std::optional<bool> isEmbedded,
     ExtendedValidationInfo *extendedInfo,
     PathObfuscator &pathRecoverer) {
   // The control block is malformed until we've at least read a major version
@@ -288,6 +289,13 @@ static ValidationInfo validateControlBlock(
         }
         if (!readOptionsBlock(cursor, scratch, *extendedInfo, pathRecoverer)) {
           result.status = Status::Malformed;
+          return result;
+        }
+
+        // Validate extended options.
+        if (isEmbedded &&
+            extendedInfo->isEmbeddedSwiftModule() != *isEmbedded) {
+          result.status = Status::EmbeddedMismatch;
           return result;
         }
       } else {
@@ -676,6 +684,7 @@ std::string serialization::StatusToString(Status S) {
   case Status::TargetIncompatible: return "TargetIncompatible";
   case Status::TargetTooNew: return "TargetTooNew";
   case Status::SDKMismatch: return "SDKMismatch";
+  case Status::EmbeddedMismatch: return "EmbeddedMismatch";
   }
   llvm_unreachable("The switch should cover all cases");
 }
@@ -692,7 +701,8 @@ ValidationInfo serialization::validateSerializedAST(
     SmallVectorImpl<SearchPath> *searchPaths,
     ExplicitSwiftModuleMap *explicitSwiftModuleMap,
     ExplicitClangModuleMap *explicitClangModuleMap,
-    std::optional<llvm::Triple> target) {
+    std::optional<llvm::Triple> target,
+    std::optional<bool> isEmbedded) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -734,7 +744,7 @@ ValidationInfo serialization::validateSerializedAST(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
           /*requiresRevisionMatch=*/true,
-          requiredSDK, target,
+          requiredSDK, target, isEmbedded,
           extendedInfo, localObfuscator);
       if (result.status != Status::Valid)
         return result;
@@ -1287,6 +1297,7 @@ bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer)
           docCursor, scratch, {SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR},
           /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          /*isEmbedded*/std::nullopt,
           /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
@@ -1432,6 +1443,7 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent(PathObfuscator &pathRec
           {SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR},
           /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          /*isEmbedded*/std::nullopt,
           /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
@@ -1511,6 +1523,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     bool isFramework,
     StringRef requiredSDK,
     std::optional<llvm::Triple> target,
+    std::optional<bool> isEmbedded,
     serialization::ValidationInfo &info, PathObfuscator &pathRecoverer)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
@@ -1561,7 +1574,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       info = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          /*requiresRevisionMatch=*/true, requiredSDK, target,
+          /*requiresRevisionMatch=*/true, requiredSDK, target, isEmbedded,
           &extInfo, pathRecoverer);
       if (info.status != Status::Valid) {
         error(info.status);

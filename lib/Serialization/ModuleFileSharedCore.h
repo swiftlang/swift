@@ -447,6 +447,7 @@ private:
       bool isFramework,
       StringRef requiredSDK,
       std::optional<llvm::Triple> target,
+      std::optional<bool> isEmbedded,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
@@ -586,13 +587,14 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
        bool isFramework,
        StringRef requiredSDK, std::optional<llvm::Triple> target,
+       std::optional<bool> isEmbedded,
        PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiredSDK, target, info,
+        requiredSDK, target, isEmbedded, info,
         pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
