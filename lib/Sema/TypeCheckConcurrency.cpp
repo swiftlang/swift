@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckConcurrency.h"
+#include "../AST/AbstractConformance.h"
 #include "MiscDiagnostics.h"
 #include "NonisolatedNonsendingByDefaultMigration.h"
 #include "TypeCheckDistributed.h"
@@ -4100,6 +4101,24 @@ namespace {
       if (!unsatisfiedIsolation)
         return false;
 
+      // Check for isolated conformances escaping through the callee's
+      // generic substitutions across the isolation boundary.
+      {
+        std::optional<std::pair<ConcreteDeclRef, SourceLoc>> calleeDeclRef;
+        if (auto *selfApply = dyn_cast<SelfApplyExpr>(apply->getFn()->getValueProvidingExpr())) {
+          calleeDeclRef = findReference(selfApply->getFn()->getValueProvidingExpr());
+        } else {
+          calleeDeclRef = findReference(apply->getFn());
+        }
+
+        if (calleeDeclRef) {
+          checkIsolatedConformancesForIsolationCrossing(
+              calleeDeclRef->first, apply->getLoc(),
+              *unsatisfiedIsolation, getDeclContext(),
+              RefineConformances{*this});
+        }
+      }
+
       // Record whether the callee isolation or the context isolation
       // is preconcurrency, which is used later to downgrade errors to
       // warnings in minimal checking.
@@ -4539,11 +4558,11 @@ namespace {
       if (!declRef)
         return false;
 
+      auto *const decl = declRef.getDecl();
+
       // Make sure isolated conformances are formed in the right context.
       checkIsolatedConformancesInContext(declRef, loc, getDeclContext(),
                                          RefineConformances{*this});
-
-      auto *const decl = declRef.getDecl();
 
       // If this declaration is a callee from the enclosing application,
       // it's already been checked via the call.
@@ -8924,7 +8943,10 @@ namespace {
     llvm::TinyPtrVector<ProtocolConformance *> badIsolatedConformances;
     DeclContext *fromDC;
     HandleConformanceIsolationFn handleBad;
-    mutable std::optional<ActorIsolation> fromIsolation;
+
+    // Isolation can either be set explicitly,
+    // or will be lazy loaded from the 'fromDC' context otherwise.
+    mutable std::optional<ActorIsolation> isolation;
 
   public:
     MismatchedIsolatedConformances(const DeclContext *fromDC,
@@ -8932,11 +8954,20 @@ namespace {
       : fromDC(const_cast<DeclContext *>(fromDC)),
         handleBad(handleBad) { }
 
-    ActorIsolation getContextIsolation() const {
-      if (!fromIsolation)
-        fromIsolation = getActorIsolationOfContext(fromDC);
+    MismatchedIsolatedConformances(ActorIsolation targetIsolation,
+                                   const DeclContext *fromDC,
+                                   HandleConformanceIsolationFn handleBad)
+      : fromDC(const_cast<DeclContext *>(fromDC)),
+        handleBad(handleBad),
+        isolation(targetIsolation) { }
 
-      return *fromIsolation;
+    /// Lazy compute the isolation of the context 'fromDC',
+    /// unless the isolation was set explicitly already.
+    ActorIsolation getIsolation() const {
+      if (!isolation)
+        isolation = getActorIsolationOfContext(fromDC);
+
+      return *isolation;
     }
 
     ArrayRef<ProtocolConformance *> getBadIsolatedConformances() const {
@@ -8957,7 +8988,12 @@ namespace {
 
       auto conformanceIsolation = concrete->getIsolation();
       if (!conformanceIsolation.isGlobalActor() ||
-          conformanceIsolation == getContextIsolation())
+          conformanceIsolation == getIsolation())
+        return true;
+
+      // In a nonisolated(nonsending) context the conformance is valid because
+      // effectively always is on the caller's isolation.
+      if (getIsolation().isCallerIsolationInheriting())
         return true;
 
       badIsolatedConformances.push_back(concrete);
@@ -8986,7 +9022,7 @@ namespace {
           .diagnose(
               loc, diag::isolated_conformance_wrong_domain,
               firstConformance->getIsolation(), firstConformance->getType(),
-              firstConformance->getProtocol()->getName(), getContextIsolation())
+              firstConformance->getProtocol()->getName(), getIsolation())
           .warnUntilLanguageMode(LanguageMode::v6);
       return true;
     }
@@ -9030,4 +9066,87 @@ bool swift::checkIsolatedConformancesInContext(
   MismatchedIsolatedConformances mismatched(dc, handleBad);
   forEachConformance(type, mismatched);
   return mismatched.diagnose(loc);
+}
+
+bool swift::checkIsolatedConformancesForIsolationCrossing(
+    ConcreteDeclRef declRef, SourceLoc loc,
+    ActorIsolation targetIsolation, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad) {
+  MismatchedIsolatedConformances mismatched(targetIsolation, dc, handleBad);
+  forEachConformance(declRef, mismatched);
+  bool diagnosed = mismatched.diagnose(loc);
+
+  // Return early, we already found a problem
+  if (diagnosed)
+    return diagnosed;
+
+  auto &ctx = dc->getASTContext();
+  auto *sendableMetatypeProto =
+      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+
+  // Also check for abstract conformances, since if we can't prove they are nonisolated,
+  // we must conservatively reject them.
+  if (auto subs = declRef.getSubstitutions()) {
+    // For protocol member calls, the Self conformance is used for witness
+    // dispatch and doesn't escape to another context, so we skip it.
+    Type selfInterfaceType;
+    if (auto *calleeProto =
+            declRef.getDecl()->getDeclContext()->getSelfProtocolDecl()) {
+      selfInterfaceType = calleeProto->getSelfInterfaceType();
+    }
+
+    for (auto conf : subs.getConformances()) {
+      // We're only checking abstract conformances here; concrete ones
+      // were checked above already.
+      if (!conf.isAbstract())
+        continue;
+
+      auto *abstract = conf.getAbstract();
+      auto *proto = abstract->getProtocol();
+      Type conformingType = abstract->getType();
+
+      // Skip Self conformances; these should be diagnosed already in other ways
+      if (selfInterfaceType) {
+        if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
+          if (archetype->getInterfaceType()->isEqual(selfInterfaceType))
+            continue;
+        }
+      }
+
+      // Marker protocols have no requirements and can never be isolated.
+      if (proto->isMarkerProtocol())
+        continue;
+
+      // Protocols inheriting from SendableMetatype cannot have isolated
+      // conformances.
+      if (sendableMetatypeProto &&
+          proto->inheritsFrom(sendableMetatypeProto))
+        continue;
+
+      // If the conforming type is Sendable, its conformances cannot be
+      // isolated — isolated conformances require non-Sendable types.
+      if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
+        if (archetype->isSendableType()) {
+          continue;
+        }
+      }
+
+      // Get the name of the generic type parameter for the diagnostic.
+      // For opaque types ('some Protocol'), we leave the name empty so
+      // the diagnostic uses "underlying type of 'some Proto'" instead.
+      Identifier genericParamName;
+      if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
+        if (!archetype->getAs<OpaqueTypeArchetypeType>())
+          genericParamName = archetype->getName();
+      }
+
+      ctx.Diags
+          .diagnose(loc, diag::isolated_conformance_may_cross_isolation,
+                    genericParamName, proto->getName().str(), targetIsolation)
+          .warnUntilLanguageMode(LanguageMode::v6);
+      diagnosed = true;
+    }
+  }
+
+  return diagnosed;
 }

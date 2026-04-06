@@ -792,6 +792,18 @@ bool checkIsolatedConformancesInContext(
     Type type, SourceLoc loc, const DeclContext *dc,
     HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
 
+/// Check for isolated conformances escaping through a call that crosses
+/// an isolation boundary. The conformances in the 'declRef' are checked against
+/// the given target isolation of the call rather than the isolation of its
+/// DeclContext.
+///
+/// Also checks for abstract (generic) conformances that may be isolated,
+/// skipping Self conformances for protocol members (used only for dispatch).
+bool checkIsolatedConformancesForIsolationCrossing(
+    ConcreteDeclRef declRef, SourceLoc loc,
+    ActorIsolation targetIsolation, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
+
 /// For a protocol conformance that does not have a "raw" isolation, infer its isolation.
 ///
 /// - hasKnownIsolatedWitness: indicates when it is known that there is an actor-isolated witness, meaning
