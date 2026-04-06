@@ -3755,8 +3755,8 @@ namespace {
           // can really only happen when the property is a struct with a
           // mutating async method.
           if (auto partialApply = dyn_cast<ApplyExpr>(apply->getFn())) {
-            if (auto declRef = dyn_cast<DeclRefExpr>(partialApply->getFn())) {
-              ValueDecl *fnDecl = declRef->getDecl();
+            if (auto *fnDecl = partialApply->getCalledValue(
+                    /*skipFunctionConversions=*/true)) {
               ctx.Diags
                   .diagnose(apply->getLoc(), diag::actor_isolated_mutating_func,
                             fnDecl->getName(), decl)

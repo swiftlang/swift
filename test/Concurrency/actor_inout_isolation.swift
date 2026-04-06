@@ -23,15 +23,20 @@ struct Point {
     defer { (x, y) = (self.x, self.y) }
     (self.x, self.y) = (x, y)
   }
+
+  nonisolated(nonsending) mutating func setComponentsNonisolated(x: inout Int, y: inout Int) async {
+    defer { (x, y) = (self.x, self.y) }
+    (self.x, self.y) = (x, y)
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
 actor TestActor {
   // expected-note@+1{{mutation of this property is only permitted within the actor}}
   var position = Point(x: 0, y: 0) // expected-note 2{{property declared here}}
-  var nextPosition = Point(x: 0, y: 1) // expected-note 2{{property declared here}}
-  var value1: Int = 0 // expected-note 6{{property declared here}}
-  var value2: Int = 1 // expected-note 4{{property declared here}}
+  var nextPosition = Point(x: 0, y: 1) // expected-note 4{{property declared here}}
+  var value1: Int = 0 // expected-note 7{{property declared here}}
+  var value2: Int = 1 // expected-note 5{{property declared here}}
   var points: [Point] = [] // expected-note {{property declared here}}
 
   subscript(x : inout Int) -> Int { // expected-error {{'inout' may only be used on function or initializer parameters}}
@@ -142,6 +147,20 @@ extension TestActor {
     // expected-error@+2:38{{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
     // expected-error@+1:50{{actor-isolated property 'value2' cannot be passed 'inout' to 'async' function call}}
     await position.setComponents(x: &value1, y: &value2)
+  }
+
+  func callNonisolatedNonsendingMutatingFunctionOnStruct() async {
+    // expected-error@+4:20{{cannot call mutating async function 'setComponentsNonisolated(x:y:)' on actor-isolated property 'position'}}
+    // expected-note@+3:11{{'position' can be concurrently accessed during mutation, risking data races}}
+    // expected-error@+2:49{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
+    // expected-error@+1:69{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
+    await position.setComponentsNonisolated(x: &nextPosition.x, y: &nextPosition.y)
+
+    // expected-error@+4:20{{cannot call mutating async function 'setComponentsNonisolated(x:y:)' on actor-isolated property 'position'}}
+    // expected-note@+3:11{{'position' can be concurrently accessed during mutation, risking data races}}
+    // expected-error@+2:49{{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
+    // expected-error@+1:61{{actor-isolated property 'value2' cannot be passed 'inout' to 'async' function call}}
+    await position.setComponentsNonisolated(x: &value1, y: &value2)
   }
 }
 
@@ -307,6 +326,7 @@ actor ProtectArray {
 
 extension Optional {
   mutating func mutate() async {}
+  nonisolated(nonsending) mutating func mutateNonisolated() async {}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -316,6 +336,10 @@ actor ProtectDictionary {
   func invalid() async {
     await dict[0].mutate()
     // expected-warning@-1 {{cannot call mutating async function 'mutate()' on actor-isolated property 'dict'; this is an error in the Swift 6 language mode}}
+    // expected-note@-2{{'dict' can be concurrently accessed during mutation, risking data races}}
+
+    await dict[0].mutateNonisolated()
+    // expected-warning@-1 {{cannot call mutating async function 'mutateNonisolated()' on actor-isolated property 'dict'; this is an error in the Swift 6 language mode}}
     // expected-note@-2{{'dict' can be concurrently accessed during mutation, risking data races}}
   }
 }
