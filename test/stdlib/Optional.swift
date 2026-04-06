@@ -428,32 +428,36 @@ OptionalTests.test("unsafelyUnwrapped nil")
 }
 
 OptionalTests.test("Span from Optional.none")
-.xfail(.always("rdar://173472004"))
 .require(.stdlib_6_2).code {
   var o = Optional<[Int]>.none
-  let span = o.span
-  o = [1, 2, 3] // Should not compile, exclusivity violation
-  expectEqual(span.count, 0)
+  do {
+    let span = o.span
+    // o = [1, 2, 3] // Does not compile, exclusivity violation
+    expectEqual(span.count, 0)
 
-  // make it fail at test time if exclusivity was violated
-  expectNil(o, "fail due to exclusivity violation")
+    // make it fail at test time if exclusivity was violated
+    expectNil(o, "fail due to exclusivity violation")
+  }
+  o = nil
 }
 
 OptionalTests.test("Span from Optional.some")
-.xfail(.always("rdar://173472004"))
 .require(.stdlib_6_2).code {
   let a: [Int] = [1, 2, 3]
   var o: Optional = a
-  let span = o.span
-  o = nil // Should not compile, exclusivity violation
-  expectEqual(span.count, 1)
-  expectEqual(span[0], o, "accessed mysterious memory location")
+  do {
+    let span = o.span
+    // o = nil // Does not compile, exclusivity violation
+    expectEqual(span.count, 1)
+    expectEqual(span[0], o, "accessed mysterious memory location")
 
-  expectNotNil(o, "fail due to exclusivity violation")
+    expectNotNil(o, "fail due to exclusivity violation")
 
-  let b = [4, 5, 6]
-  o = b // Should not compile, exclusivity violation
-  expectNotEqual(span[0], b, "accessed mysterious memory location")
+    let b = [4, 5, 6]
+    // o = b // Does not compile, exclusivity violation
+    expectNotEqual(span[0], b, "accessed mysterious memory location")
+  }
+  o = nil
 }
 
 OptionalTests.test("_span() from Optional.none")
