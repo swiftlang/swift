@@ -170,10 +170,17 @@ final class _Storage<Element, Failure: Error>: @unchecked Sendable {
       case none(yieldResult: Continuation.YieldResult)
     }
 
+    @unsafe
     enum NextAction {
-      case resume(element: Element?)
+      case resume(
+        consumer: Consumer,
+        element: Element?
+      )
 
-      case `throw`(failure: Failure)
+      case `throw`(
+        consumer: Consumer,
+        failure: Failure
+      )
 
       case suspend
     }
@@ -366,18 +373,21 @@ extension _Storage._StateMachine {
             )
           )
         )
-        return .suspend
+        return unsafe .suspend
 
       case false:
         let element = idle.buffer.removeFirst()
         unsafe self = unsafe .init(state: .idle(idle))
-        return .resume(element: element)
+        return unsafe .resume(
+          consumer: consumer,
+          element: element
+        )
       }
 
     case .waiting(var waiting):
       unsafe waiting.consumers.append(consumer)
       unsafe self = unsafe .init(state: .waiting(waiting))
-      return .suspend
+      return unsafe .suspend
 
     case .draining(var draining):
       guard
@@ -392,10 +402,16 @@ extension _Storage._StateMachine {
 
         switch draining.failure {
         case .some(let failure):
-          return .throw(failure: failure)
+          return unsafe .throw(
+            consumer: consumer,
+            failure: failure
+          )
 
         case .none:
-          return .resume(element: nil)
+          return unsafe .resume(
+            consumer: consumer,
+            element: nil
+          )
         }
       }
 
@@ -407,11 +423,17 @@ extension _Storage._StateMachine {
             )
           )
         )
-        return .resume(element: element)
+        return unsafe .resume(
+          consumer: consumer,
+          element: element
+        )
 
       case false:
         unsafe self = unsafe .init(state: .draining(draining))
-        return .resume(element: element)
+        return unsafe .resume(
+          consumer: consumer,
+          element: element
+        )
       }
 
     case .terminated(let terminated):
@@ -424,10 +446,16 @@ extension _Storage._StateMachine {
 
       switch terminated.failure {
       case .some(let failure):
-        return .throw(failure: failure)
+        return unsafe .throw(
+          consumer: consumer,
+          failure: failure
+        )
 
       case .none:
-        return .resume(element: nil)
+        return unsafe .resume(
+          consumer: consumer,
+          element: nil
+        )
       }
     }
   }
@@ -503,11 +531,11 @@ extension _Storage {
       unsafe state.next(consumer)
     }
 
-    switch action {
-    case .resume(let element):
+    switch unsafe action {
+    case .resume(let consumer, let element):
       unsafe consumer.resume(returning: .success(element))
 
-    case .throw(let failure):
+    case .throw(let consumer, let failure):
       unsafe consumer.resume(returning: .failure(failure))
 
     case .suspend:
