@@ -316,7 +316,7 @@ extension RawSpan {
   ///           `RawSpan`'s lifetime and the memory it represents.
   @_alwaysEmitIntoClient
   @lifetime(copy span)
-  public init<Element: BitwiseCopyable>(
+  public init<Element: BitwiseCopyable & ~Escapable>(
     _elements span: Span<Element>
   ) {
     let pointer = unsafe span._pointer
@@ -563,7 +563,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  consuming public func _unsafeView<T: BitwiseCopyable>(
+  consuming public func _unsafeView<T: BitwiseCopyable & ~Escapable>(
     as type: T.Type
   ) -> Span<T> {
     let rawBuffer = unsafe UnsafeRawBufferPointer(start: _pointer, count: _count)
@@ -653,7 +653,8 @@ extension RawSpan {
   ///     with the value in the range of memory referenced by this pointer.
   @unsafe
   @_alwaysEmitIntoClient
-  public func unsafeLoadUnaligned<T: BitwiseCopyable>(
+  @_lifetime(borrow self)
+  public func unsafeLoadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
     _precondition(
@@ -685,10 +686,12 @@ extension RawSpan {
   ///     with the value in the range of memory referenced by this pointer.
   @unsafe
   @_alwaysEmitIntoClient
-  public func unsafeLoadUnaligned<T: BitwiseCopyable>(
+  @_lifetime(borrow self)
+  public func unsafeLoadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromUncheckedByteOffset offset: Int, as type: T.Type
   ) -> T {
-    unsafe _start().loadUnaligned(fromByteOffset: offset, as: T.self)
+    let element = unsafe _start().loadUnaligned(fromByteOffset: offset, as: T.self)
+    return unsafe _overrideLifetime(element, borrowing: self)
   }
 }
 
