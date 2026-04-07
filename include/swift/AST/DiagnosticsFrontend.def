@@ -307,7 +307,7 @@ ERROR(error_index_failed_status_check,none,
       "failed file status check: %0", (StringRef))
 ERROR(error_index_inputs_more_than_outputs,none,
       "index output filenames do not match input source files", ())
-REMARK(remark_indexing_system_module,none,
+GROUPED_REMARK(remark_indexing_system_module,IndexingSystemModule,none,
        "indexing system module at %0"
        "%select{|; skipping because of a broken swiftinterface}1",
        (StringRef, bool))
@@ -434,7 +434,7 @@ WARNING(warning_module_shadowing_may_break_module_interface,none,
         "https://github.com/apple/swift/issues/56573 for workarounds",
         (DescriptiveDeclKind, FullyQualified<Type>,
         /*shadowedModule=*/ModuleDecl *, /*interfaceModule*/ModuleDecl *))
-REMARK(rebuilding_module_from_interface,none,
+GROUPED_REMARK(rebuilding_module_from_interface,ModuleInterfaceRebuild,none,
        "rebuilding module '%0' from interface '%1'", (StringRef, StringRef))
 NOTE(sdk_version_pbm_version,none,
      "SDK build version is '%0'; prebuilt modules were "
@@ -478,10 +478,10 @@ ERROR(error_creating_remark_serializer,none,
 ERROR(invalid_can_import_module_version,none,
       "invalid version passed to -module-can-import-version: '%0'", (StringRef))
 
-REMARK(interface_file_lock_failure,none,
+GROUPED_REMARK(interface_file_lock_failure,ModuleInterfaceRebuild,none,
       "building module interface without lock file", ())
 
-REMARK(interface_file_lock_timed_out,none,
+GROUPED_REMARK(interface_file_lock_timed_out,ModuleInterfaceRebuild,none,
       "timed out waiting to acquire lock file for module interface '%0'", (StringRef))
 
 ERROR(error_option_required,none, "option '%0' is required", (StringRef))
@@ -510,8 +510,8 @@ GROUPED_ERROR(error_caching_no_cas_fs, CompilationCaching, none,
 GROUPED_ERROR(error_option_incompatible, CompilationCaching, none,
     "'%0' is incompatible with '%1'", (StringRef, StringRef))
 
-REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
-REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
+GROUPED_REMARK(replay_output, CompilationCaching, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
+GROUPED_REMARK(output_cache_miss, CompilationCaching, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
 
 // CAS related diagnostics
 GROUPED_ERROR(error_invalid_cas_id, CompilationCaching, none, "CAS cannot parse id '%0': %1", (StringRef, StringRef))

@@ -880,13 +880,13 @@ ERROR(sema_opening_import,Fatal,
 NOTE(sema_module_aliased,none,
      "module name '%0' is aliased to '%1'", (StringRef, StringRef))
 
-REMARK(serialization_skipped_invalid_decl,none,
+GROUPED_REMARK(serialization_skipped_invalid_decl,ModuleSerialization,none,
        "serialization skipped invalid %kind0",
        (const Decl *))
-REMARK(serialization_skipped_invalid_type,none,
+GROUPED_REMARK(serialization_skipped_invalid_type,ModuleSerialization,none,
        "serialization skipped for invalid type %0",
        (TypeRepr *))
-REMARK(serialization_skipped_invalid_type_unknown_name,none,
+GROUPED_REMARK(serialization_skipped_invalid_type_unknown_name,ModuleSerialization,none,
        "serialization skipped for invalid type",
        ())
 ERROR(serialization_failed,none,
@@ -1019,16 +1019,16 @@ ERROR(cxx_stdlib_kind_mismatch,none,
       "module %0 was built with %1, but current compilation uses %2",
       (Identifier, StringRef, StringRef))
 
-ERROR(modularization_issue_decl_moved,Fatal,
+GROUPED_ERROR(modularization_issue_decl_moved,ModularizationIssue,Fatal,
       "reference to %select{declaration|type}0 '%1' broken by a context change; "
       "'%1' was expected to be in %2, but now a candidate is found only in %3",
       (bool, StringRef, const ModuleDecl*, const ModuleDecl*))
-ERROR(modularization_issue_decl_type_changed,Fatal,
+GROUPED_ERROR(modularization_issue_decl_type_changed,ModularizationIssue,Fatal,
       "reference to %select{declaration|type}0 '%1' broken by a context change; "
       "the declaration kind of '%1' %select{from %2|}5 changed since building '%3'"
       "%select{|, it was in %2 and now a candidate is found only in %4}5",
       (bool, StringRef, const ModuleDecl*, StringRef, const ModuleDecl*, bool))
-ERROR(modularization_issue_decl_not_found,Fatal,
+GROUPED_ERROR(modularization_issue_decl_not_found,ModularizationIssue,Fatal,
       "reference to %select{declaration|type}0 '%1' broken by a context change; "
       "'%1' is not found, it was expected to be in %2",
       (bool, StringRef, const ModuleDecl*))
@@ -1087,13 +1087,13 @@ NOTE(modularization_issue_worked_around,none,
      "attempting to recover from the previous modularization issue",
      ())
 
-ERROR(modularization_issue_conformance_xref_error,none,
+GROUPED_ERROR(modularization_issue_conformance_xref_error,ModularizationIssue,none,
       "Conformance of %0 to %1 not found in referenced module %2",
       (DeclName, DeclName, DeclName))
 NOTE(modularization_issue_conformance_xref_note,none,
      "Breaks conformances of '%0' to %1",
      (StringRef, DeclName))
-ERROR(modularization_issue_conformance_error,none,
+GROUPED_ERROR(modularization_issue_conformance_error,ModularizationIssue,none,
       "Listed conformances of '%0' "
       "do not match current requirement signature of %1; "
       "%2 conformances for %3 requirements",
@@ -1287,31 +1287,31 @@ ERROR(module_allowable_client_violation,none,
       "module %0 doesn't allow importation from module %1",
       (Identifier, Identifier))
 
-REMARK(cross_import_added,none,
+GROUPED_REMARK(cross_import_added,CrossImport,none,
        "import of %0 and %1 triggered a cross-import of %2",
        (Identifier, Identifier, Identifier))
 
-REMARK(module_loaded,none,
+GROUPED_REMARK(module_loaded,ModuleLoading,none,
        "loaded module %0"
        "%select{| (overlay for a clang dependency)}1"
        "; source: '%2', loaded: '%3'",
        (Identifier, unsigned, StringRef, StringRef))
 
-REMARK(module_api_import,none,
+GROUPED_REMARK(module_api_import,ModuleAPIImport,none,
        "%select{|implicitly used }4"
        "%kind0 is imported via %1"
        "%select{, which reexports definition from %2|}3",
        (const Decl *, ModuleDecl *, ModuleDecl *, bool, bool))
-REMARK(module_api_import_conformance,none,
+GROUPED_REMARK(module_api_import_conformance,ModuleAPIImport,none,
        "conformance of %0 to %kind1 used here is imported via %2"
        "%select{ which reexports the definition from %3|}4",
        (const Type, const Decl *, ModuleDecl *, ModuleDecl *, bool))
-REMARK(module_api_import_aliases,none,
+GROUPED_REMARK(module_api_import_aliases,ModuleAPIImport,none,
        "typealias underlying type %kind0 is imported via %1"
        "%select{, which reexports definition from %2|}3",
        (const Decl *, ModuleDecl *, ModuleDecl *, bool))
 
-REMARK(macro_loaded,none,
+GROUPED_REMARK(macro_loaded,MacroLoading,none,
        "loaded macro implementation module %0 from "
        "%select{shared library '%2'|executable '%2'|"
        "compiler plugin server '%2' with shared library '%3'}1",
@@ -1321,7 +1321,7 @@ ERROR(resolved_macro_changed,none,
       "resolved macro library '%0' failed verification: %1",
       (StringRef, StringRef))
 
-REMARK(transitive_dependency_behavior,none,
+GROUPED_REMARK(transitive_dependency_behavior,ModuleLoading,none,
        "%1 has %select{a required|an optional|an ignored}2 "
        "transitive dependency on '%0'",
        (StringRef, Identifier, unsigned))
@@ -2449,19 +2449,19 @@ WARNING(dependency_scan_module_incompatible, none,
         "module file '%0' is incompatible with this Swift compiler: %1",
         (StringRef, StringRef))
 
-REMARK(dependency_scan_number_swift_queries, none,
+GROUPED_REMARK(dependency_scan_number_swift_queries, DependencyScan, none,
        "Number of Swift module queries: '%0'",
        (uint32_t))
-REMARK(dependency_scan_number_named_clang_queries, none,
+GROUPED_REMARK(dependency_scan_number_named_clang_queries, DependencyScan, none,
        "Number of named Clang module queries: '%0'",
        (uint32_t))
-REMARK(dependency_scan_number_swift_dependencies, none,
+GROUPED_REMARK(dependency_scan_number_swift_dependencies, DependencyScan, none,
        "Number of recorded Swift module dependencies: '%0'",
        (uint32_t))
-REMARK(dependency_scan_number_named_clang_dependencies, none,
+GROUPED_REMARK(dependency_scan_number_named_clang_dependencies, DependencyScan, none,
        "Number of recorded Clang module dependencies queried by-name from a Swift client: '%0'",
        (uint32_t))
-REMARK(dependency_scan_number_clang_dependencies, none,
+GROUPED_REMARK(dependency_scan_number_clang_dependencies, DependencyScan, none,
        "Number of recorded Clang module dependencies: '%0'",
        (uint32_t))
 
@@ -8090,21 +8090,21 @@ WARNING(access_notes_file_io_error,none,
         "ignored access notes file at '%0' because it cannot be read: %1",
         (StringRef, StringRef))
 
-REMARK(attr_added_by_access_note, none,
+GROUPED_REMARK(attr_added_by_access_note, AccessNote, none,
        "implicitly added '%1' to this %kindonly2, as " WHICH_ACCESS_NOTE(0),
        (StringRef, StringRef, const ValueDecl *))
 NOTE(fixit_attr_added_by_access_note, none,
      "add '%0' explicitly to silence this warning",
      (StringRef))
 
-REMARK(attr_removed_by_access_note, none,
+GROUPED_REMARK(attr_removed_by_access_note, AccessNote, none,
        "implicitly removed '%1' from this %kindonly2, as " WHICH_ACCESS_NOTE(0),
        (StringRef, StringRef, const ValueDecl *))
 NOTE(fixit_attr_removed_by_access_note, none,
      "remove '%0' explicitly to silence this warning",
      (StringRef))
 
-REMARK(attr_objc_name_changed_by_access_note, none,
+GROUPED_REMARK(attr_objc_name_changed_by_access_note, AccessNote, none,
        "implicitly changed Objective-C name of this %kindonly1 to %2, as "
        WHICH_ACCESS_NOTE(0),
        (StringRef, const ValueDecl *, ObjCSelector))
@@ -8115,11 +8115,11 @@ NOTE(fixit_attr_objc_name_changed_by_access_note, none,
 // Bad access note diagnostics. These are usually emitted as remarks, but
 // '-Raccess-note=all-validate' emits them as errors.
 
-ERROR(attr_objc_name_conflicts_with_access_note, none,
+GROUPED_ERROR(attr_objc_name_conflicts_with_access_note, AccessNote, none,
       "ignored access note: did not change Objective-C name of this "
       "%kindonly1 from %2 to %3, even though it was " WHICH_ACCESS_NOTE(0),
       (StringRef, const ValueDecl *, ObjCSelector, ObjCSelector))
-ERROR(wrap_invalid_attr_added_by_access_note, none,
+GROUPED_ERROR(wrap_invalid_attr_added_by_access_note, AccessNote, none,
       "ignored access note: %0; did not implicitly add '%2' to this "
       "%kindonly3, even though it was " WHICH_ACCESS_NOTE(1),
       (DiagnosticInfo *, StringRef, StringRef, const ValueDecl *))
@@ -9245,7 +9245,7 @@ NOTE(perf_hint_add_thrown_error_type,none,
 ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
       "invalid use of @_unsafeSelfDependentResult", ())
 
-REMARK(macro_expansion_line, none, "macro content: |%0|", (StringRef))
+GROUPED_REMARK(macro_expansion_line, MacroExpansions, none, "macro content: |%0|", (StringRef))
 
 GROUPED_WARNING(oslog_missing_string_section,OSLog,none,
                 "global variable 'osLogStringSectionName' is missing from the OSLog module; defaulting to '__TEXT,__oslogstring,cstring_literals'", ())

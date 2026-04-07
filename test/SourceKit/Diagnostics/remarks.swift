@@ -9,7 +9,10 @@ public typealias Foo = String
 // CHECK-NEXT:       key.filepath: "{{.*}}",
 // CHECK-NEXT:       key.severity: source.diagnostic.severity.remark,
 // CHECK-NEXT:       key.id: "module_api_import",
-// CHECK-NEXT:       key.description: "struct 'String' is imported via 'Swift'"
+// CHECK-NEXT:       key.description: "struct 'String' is imported via 'Swift'",
+// CHECK-NEXT:       key.educational_note_paths: [
+// CHECK-NEXT:       "{{.*}}module-api-import.md"
+// CHECK-NEXT:       ]
 // CHECK-NEXT:   }
 // CHECK-NEXT:   ]
 // CHECK-NEXT: }

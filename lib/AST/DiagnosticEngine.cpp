@@ -121,9 +121,9 @@ static const constexpr StoredDiagnosticInfo storedDiagnosticInfos[] = {
 #define NOTE(ID, Options, Text, Signature)                                     \
   StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticOptions::Options,       \
                        DiagGroupID::no_group),
-#define REMARK(ID, Options, Text, Signature)                                   \
+#define GROUPED_REMARK(ID, Group, Options, Text, Signature)                    \
   StoredDiagnosticInfo(DiagnosticKind::Remark, DiagnosticOptions::Options,     \
-                       DiagGroupID::no_group),
+                       DiagGroupID::Group),
 #include "swift/AST/DiagnosticsAll.def"
 };
 static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
