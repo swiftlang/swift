@@ -3910,7 +3910,9 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
       "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context|" \
       "in a property declaration member of a type not marked '@_implementationOnly'|" \
       "in a property declaration member of an open class|" \
-      "in a property declaration member of a class without the required '@export(interface)' deinit in Embedded|" \
+      "in a stored property of a class without meeting the Embedded mode requirements|" \
+      "in a stored property of a class without meeting the Embedded mode requirements|" \
+      "in a stored property of a class without meeting the Embedded mode requirements|" \
       "in an associated value of a public or '@usableFromInline' enum|" \
       "in an associated value of an enum not marked '@_implementationOnly'}"
 
@@ -3958,9 +3960,10 @@ ERROR(unexportable_clang_function_type,none,
       (Type))
 
 NOTE(embedded_classes_require_export_interface_deinit,none,
-     "add a '@export(interface)' deinit to the class "
-     "for properties to reference a hidden dependency. "
-     "This is a restriction in Embedded mode.",
+     "add a '@export(interface)' deinit to the parent class",
+     ())
+NOTE(embedded_class_property_requires_implementation_only,none,
+     "mark the stored property '@_implementationOnly'",
      ())
 
 ERROR(cxx_class_instantiation_failed,none,
