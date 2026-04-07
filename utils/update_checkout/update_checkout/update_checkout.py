@@ -1038,11 +1038,11 @@ def main() -> int:
 
         if args.dump_hashes:
             dump_repo_hashes(args, config)
-            sys.exit(0)
+            return 0
 
         if args.dump_hashes_config:
             dump_repo_hashes(args, config, args.dump_hashes_config)
-            sys.exit(0)
+            return 0
 
         _check_missing_clones(args=args, config=config, scheme_map=scheme_map)
 
@@ -1059,7 +1059,7 @@ def main() -> int:
     fail_count = do_checkout()
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
-    else:
+    elif not args.dump_hashes and not args.dump_hashes_config:
         print("update-checkout succeeded")
         print_repo_hashes(args, config)
     sys.exit(fail_count)

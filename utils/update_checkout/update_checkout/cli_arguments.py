@@ -175,4 +175,4 @@ repositories.
         subparsers = parser.add_subparsers(dest='command')
         subparsers.add_parser('status', help='Print the status of all the repositories')
 
-        return parser.parse_args()
+        return parser.parse_args(namespace=CliArguments())
