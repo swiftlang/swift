@@ -739,12 +739,13 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
 }
 
 static bool writeAPIDescriptor(ModuleDecl *M, StringRef OutputPath,
-                               llvm::vfs::OutputBackend &Backend) {
-  return withOutputPath(M->getDiags(), Backend, OutputPath,
-                        [&](raw_ostream &OS) -> bool {
-                          writeAPIJSONFile(M, OS, /*PrettyPrinted=*/false);
-                          return false;
-                        });
+                               llvm::vfs::OutputBackend &Backend,
+                               const TBDGenOptions &TBDOpts) {
+  return withOutputPath(
+      M->getDiags(), Backend, OutputPath, [&](raw_ostream &OS) -> bool {
+        writeAPIJSONFile(M, OS, TBDOpts, /*PrettyPrinted=*/false);
+        return false;
+      });
 }
 
 static bool writeAPIDescriptorIfNeeded(CompilerInstance &Instance) {
@@ -762,8 +763,10 @@ static bool writeAPIDescriptorIfNeeded(CompilerInstance &Instance) {
   const std::string &APIDescriptorPath =
       Invocation.getAPIDescriptorPathForWholeModule();
 
+  const auto &TBDOpts = Invocation.getTBDGenOptions();
+
   return writeAPIDescriptor(Instance.getMainModule(), APIDescriptorPath,
-                            Instance.getOutputBackend());
+                            Instance.getOutputBackend(), TBDOpts);
 }
 
 static bool performCompileStepsPostSILGen(
