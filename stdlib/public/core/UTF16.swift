@@ -441,76 +441,54 @@ private enum ScalarFallbackResult: UInt8 {
   case multiByte
 }
 
-@_transparent var utf8OneByteMax: UInt16 { 0x7F }
-@_transparent var utf8TwoByteMax: UInt16 { 0x7FF }
-@_transparent var utf16LeadSurrogateMin: UInt16 { 0xD800 }
-@_transparent var utf16TrailSurrogateMin: UInt16 { 0xDC00 }
-@_transparent var utf16SurrogateMax: UInt16 { 0xDFFF }
-@_transparent var utf16ReplacementCharacter: UInt32 { 0xFFFD }
-@_transparent var utf16ScalarMax: UInt32 { 0x10FFFF }
-@_transparent var utf16BasicMultilingualPlaneMax: UInt32 { 0xFFFF }
-@_transparent var utf16AstralPlaneMin: UInt32 { 0x10000 }
+#if arch(arm64_32)
+typealias Word = UInt64
+#else
+typealias Word = UInt
+#endif
+@_transparent var mask:Word {
+  Word(truncatingIfNeeded: 0xFF80FF80_FF80FF80 as UInt64)
+}
+
+typealias Block = (Word, Word, Word, Word)
 
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
 #if _pointerBitWidth(_32) && !arch(arm64_32)
 @_transparent var blockSize:Int { 8 }
-typealias CodeUnitBlock = SIMD8<UInt16>
-typealias ByteBlock = SIMD16<UInt8>
-typealias ByteHalfBlock = SIMD8<UInt8>
+@_transparent
+func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD8<UInt8>? {
+  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
+  return unsafe ((block.0 | block.1 | block.2 | block.3) & mask == 0)
+    ? unsafeBitCast(block, to: SIMD16<UInt8>.self).evenHalf : nil
+}
 #else
 @_transparent var blockSize:Int { 16 }
-typealias CodeUnitBlock = SIMD16<UInt16>
-typealias ByteBlock = SIMD32<UInt8>
-typealias ByteHalfBlock = SIMD16<UInt8>
-#endif
-
 @_transparent
-func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> ByteHalfBlock? {
-  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: CodeUnitBlock.self)
-  if any(block .> utf8OneByteMax) {
-    return nil
-  }
-  return unsafe unsafeBitCast(block, to: ByteBlock.self).evenHalf
+func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD16<UInt8>? {
+  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
+  return unsafe ((block.0 | block.1 | block.2 | block.3) & mask == 0)
+    ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
 }
-
-func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16? {
-  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: CodeUnitBlock.self)
-  let multiByteLanes = block .> utf8OneByteMax
-  if !any(multiByteLanes) {
-    return UInt16(truncatingIfNeeded: blockSize)
-  }
-  let surrogates = (block .>= utf16LeadSurrogateMin) .& (block .<= utf16SurrogateMax)
-  if any(surrogates) {
-    return nil
-  }
-  // Everything is 1, 2, or 3-byte BMP
-  return CodeUnitBlock.one
-      .replacing(with: 2, where: multiByteLanes)
-      .replacing(with: 3, where: block .> utf8TwoByteMax)
-      .wrappedSum()
-}
-
+#endif
 #else
 @_transparent var blockSize:Int { 1 }
-
 @_transparent
 func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>? {
   let value = unsafe pointer.pointee
-  if value <= utf8OneByteMax {
+  if value & 0xFF80 == 0 {
     return CollectionOfOne(UInt8(truncatingIfNeeded: value))
   }
   return nil
 }
-
-func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16? {
-  return switch unsafe pointer.pointee {
-  case 0 ... utf8OneByteMax: 1
-  case (utf8OneByteMax + 1) ... utf8TwoByteMax: 2
-  case utf16LeadSurrogateMin ... utf16SurrogateMax: nil
-  default: 3
-  }
-}
 #endif
+
+@_transparent var utf8TwoByteMax: UInt32 { 0x7FF }
+@_transparent var utf16LeadSurrogateMin: UInt32 { 0xD800 }
+@_transparent var utf16TrailSurrogateMin: UInt32 { 0xDC00 }
+@_transparent var utf16ReplacementCharacter: UInt32 { 0xFFFD }
+@_transparent var utf16ScalarMax: UInt32 { 0x10FFFF }
+@_transparent var utf16BasicMultilingualPlaneMax: UInt32 { 0xFFFF }
+@_transparent var utf16AstralPlaneMin: UInt32 { 0x10000 }
 
 /*
  This is expressible in a more concise way using the other transcoding
@@ -522,7 +500,7 @@ private func encodeScalarAsUTF8(
   _ scalar: UInt32,
   output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>
 ) {
-  _debugPrecondition(scalar > utf8OneByteMax)
+  _debugPrecondition(scalar >= 0x80)
   _debugPrecondition(scalar <= utf16ScalarMax)
   if scalar <= utf8TwoByteMax {
     // Scalar fits in 11 bits
@@ -579,8 +557,8 @@ private func processNonASCIIScalarFallback(
          trail = smallest trailing surrogate + low 10 bits of value
          */
         scalar = utf16AstralPlaneMin
-          + ((UInt32(cu) - UInt32(utf16LeadSurrogateMin)) << 10)
-          + (UInt32(next) - UInt32(utf16TrailSurrogateMin))
+          + ((UInt32(cu) - utf16LeadSurrogateMin) << 10)
+          + (UInt32(next) - utf16TrailSurrogateMin)
         unsafe input += 2
       }
     }
@@ -719,10 +697,10 @@ private func utf8Length(
   var count = 0
   while unsafe input < end {
     let cu = unsafe input.pointee
-    if cu <= utf8OneByteMax {
+    if cu < 0x80 {
       count &+= 1
       unsafe input += 1
-    } else if cu <= utf8TwoByteMax {
+    } else if cu < 0x800 {
       count &+= 2
       unsafe input += 1
     } else if UTF16.isLeadSurrogate(cu) {
@@ -772,10 +750,10 @@ internal func utf8Length(
   //   U+E000..U+FFFF  → 3 UTF-8 bytes  (BMP, non-surrogate)
 
   while unsafe input < (inputEnd - blockSize) {
-    if let addedCount = unsafe fastUTF8LengthOfBlock(at: input) {
+    if let _ = unsafe allASCIIBlock(at: input) {
       _onFastPath()
       unsafe input += blockSize
-      count &+= Int(addedCount)
+      count += blockSize
     } else {
       let blockEnd = unsafe Swift.min(input + blockSize, inputEnd)
       guard let addedCount = unsafe utf8Length(
