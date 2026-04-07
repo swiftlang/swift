@@ -472,7 +472,7 @@ extension Span where Element: ~Copyable & ~Escapable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: BitwiseCopyable {
+extension Span where Element: BitwiseCopyable & ~Escapable {
   /// Accesses the element at the specified position in the `Span`.
   ///
   /// - Parameter position: The offset of the element to access. `position`
@@ -481,6 +481,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
+    @_lifetime(copy self)
     get {
       _checkIndex(position)
       return unsafe self[unchecked: position]
@@ -499,17 +500,19 @@ extension Span where Element: BitwiseCopyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
+    @_lifetime(copy self)
     get {
       let elementOffset = position &* MemoryLayout<Element>.stride
       let address = unsafe _start().advanced(by: elementOffset)
-      return unsafe address.loadUnaligned(as: Element.self)
+      let element = unsafe address.loadUnaligned(as: Element.self)
+      return unsafe _overrideLifetime(element, copying: self)
     }
   }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: BitwiseCopyable {
+extension Span where Element: BitwiseCopyable & ~Escapable {
 
   /// Construct a raw span over the memory represented by this span.
   ///

@@ -316,7 +316,7 @@ extension RawSpan {
   ///           `RawSpan`'s lifetime and the memory it represents.
   @_alwaysEmitIntoClient
   @lifetime(copy span)
-  public init<Element: BitwiseCopyable>(
+  public init<Element: BitwiseCopyable & ~Escapable>(
     _elements span: Span<Element>
   ) {
     let pointer = unsafe span._pointer
