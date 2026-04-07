@@ -29,7 +29,8 @@ class SomeViewController: UIViewController {
             width: view.bounds.width,
             height: (view.subviews.map { $0.frame.height }
               .reduce(+)
-              // expected-error@-1 {{missing argument for parameter #2 in call}}
+              // expected-error@-1 {{no exact matches in reference to operator function '+'}}
+              // expected-error@-2 {{missing argument for parameter 'into' in call}}
               ?? 0) + 20.0
         )
     }
