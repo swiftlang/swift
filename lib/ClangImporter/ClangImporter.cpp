@@ -3873,6 +3873,29 @@ void ClangImporter::lookupTypeDecl(
     }
   }
 
+  // In C++ language mode, CF_OPTIONS/NS_OPTIONS have a different expansion. If
+  // the tag lookup didn't find anything, try an ordinary name lookup for the
+  // typedef and resolve it to the anonymous enum.
+  if (!foundViaClang && kind == ClangTypeKind::Tag &&
+      !Impl.DisableSourceImport &&
+      Impl.SwiftContext.LangOpts.EnableCXXInterop) {
+    clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
+                                     clang::Sema::LookupOrdinaryName);
+    if (sema.LookupName(lookupResult, /*Scope=*/sema.TUScope)) {
+      for (auto clangDecl : lookupResult) {
+        if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(clangDecl)) {
+          auto qualType = Impl.getClangASTContext().getTypedefType(typedefDecl);
+          if (auto optionSetEnum = findOptionSetEnum(qualType, Impl)) {
+            if (auto typeDecl = optionSetEnum.getType()->getAnyNominal()) {
+              foundViaClang = true;
+              receiver(typeDecl);
+            }
+          }
+        }
+      }
+    }
+  }
+
   // If Clang couldn't find the type, query the DWARFImporterDelegate.
   if (!foundViaClang)
     Impl.lookupTypeDeclDWARF(rawName, kind, receiver);
