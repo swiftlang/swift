@@ -2022,15 +2022,14 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   SSAPrunedLiveness liveness(function, &discoveredBlocks);
   liveness.initializeDef(this);
 
-  StackList<SILValue> values(function);
-  values.push_back(this);
+  ValueWorklist values(function);
+  values.push(this);
 
-  while (!values.empty()) {
-    auto value = values.pop_back_val();
+  while (auto value = values.pop()) {
     for (auto *use : value->getUses()) {
       if (!use->isConsuming()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
-          values.push_back(cvi);
+          values.pushIfNotVisited(cvi);
         }
         continue;
       }
@@ -2068,7 +2067,7 @@ PartialApplyInst::visitOnStackLifetimeEnds(
                                  "forwarded to a destroy_value");
       }
       forward.visitForwardedValues([&values](auto value) {
-        values.push_back(value);
+        values.pushIfNotVisited(value);
         return true;
       });
     }
