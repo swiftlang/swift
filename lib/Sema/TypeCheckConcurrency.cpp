@@ -6116,68 +6116,91 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       if (isa<AssociatedTypeDecl>(value))
         return {};
 
+      // Opaque types cannot have custom isolation, they are tied to
+      // their parent declaration.
+      if (isa<OpaqueTypeDecl>(value))
+        return {};
+
+      // The declaration has an isolation specified by an attribute.
+      if (getIsolationFromAttributes(value))
+        return {};
+
+      if (auto *nominal = dyn_cast<NominalTypeDecl>(value)) {
+        // Actors cannot infer isolation.
+        if (nominal->isAnyActor())
+          return {};
+
+        // The declaration is a nominal type that doesn't support default
+        // isolation inference because it conforms to `SendableMetatype`
+        // inheriting protocol.
+        if (sendableConformanceRequiresNonisolated(nominal))
+          return {};
+      }
+
+      // Non-type declarations that are located inside of a type that conforms
+      // to a `SendableMetatype` inheriting protocol don't participate in
+      // default isolation inference.
+      if (!isa<TypeDecl>(value)) {
+        if (auto *nominal = value->getDeclContext()->getSelfNominalTypeDecl()) {
+          if (sendableConformanceRequiresNonisolated(nominal))
+            return {};
+        }
+      }
+
+      // Extensions suppress default isolation inference if:
+      //  - They have an explicit isolation attribute; or
+      //  - They extend a type that directly conforms to a `SendableMetatype`
+      //    inheriting protocol; or
+      //  - The extension is synthesized by a macro expansion.
+      auto suppressesIsolationInference = [&](ExtensionDecl *extension) {
+        if (getIsolationFromAttributes(extension))
+          return true;
+
+        auto *nominal = extension->getExtendedNominal();
+        if (sendableConformanceRequiresNonisolated(nominal))
+          return true;
+
+        // Isolation of an extension synthesized by a macro expansion
+        // should match isolation of the type. Conformances/members
+        // declared in such extensions are handled as-if they are
+        // associated directly with the primary declaration of the type.
+        if (extension->isInMacroExpansionInContext())
+          return true;
+
+        return false;
+      };
+
+      if (auto *extension = dyn_cast<ExtensionDecl>(value)) {
+        if (suppressesIsolationInference(extension))
+          return {};
+      }
+
       // Members and nested types must check the isolation of the enclosing
       // nominal type.
-      auto *dc = value->getInnermostDeclContext();
+      auto *dc = value->getDeclContext();
       while (dc) {
         if (auto *nominal = dc->getSelfNominalTypeDecl()) {
           if (nominal->isAnyActor())
             return {};
 
-          if (dc != dyn_cast<DeclContext>(value)) {
-            // If the nominal type is global-actor-isolated, there's nothing
-            // more to look for.
-            if (getActorIsolation(nominal).isMainActor())
-              break;
+          // If the nominal type is global-actor-isolated, there's nothing
+          // more to look for.
+          if (getActorIsolation(nominal).isMainActor())
+            break;
 
-            // If this is an extension of a nonisolated type, its isolation
-            // is independent of the type.
-            if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-              // Isolation of an extension synthesized by a macro expansion
-              // should match isolation of the type. Conformances/members
-              // declared in such extensions are handled as-if they are
-              // associated directly with the primary declaration of the type.
-              if (ext->isInMacroExpansionInContext())
-                return {};
+          if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+            if (suppressesIsolationInference(ext))
+              return {};
 
-              // If there were isolation attributes on the extension, respect
-              // them.
-              if (getIsolationFromAttributes(ext).has_value())
-                return {};
-
-              // Members declared in an extension are @MainActor isolated
-              // even if it's an extension of a nonisolated type. This helps
-              // to extend types from other modules, for example, to conform
-              // to new protocols declared in @MainActor isolated module without
-              // having to explicitly state `@MainActor`.
-              auto isolation =
-                  ActorIsolation::forGlobalActor(globalActor)
-                      .withPreconcurrency(
-                          !ctx.isLanguageModeAtLeast(LanguageMode::v6));
-              return {{{isolation, {}}, nullptr, {}}};
-            }
-
-            // The type is nonisolated, so its members are nonisolated.
+            // Keep looking.
+          } else {
+            // The type is nonisolated or isolated to some other global-actor
+            // which disables default isolation inference.
             return {};
           }
         }
 
         dc = dc->getParent();
-      }
-
-      // If this is or is a non-type member of a nominal type that conforms to a
-      // SendableMetatype-inheriting protocol in its primary definition, disable
-      // @MainActor inference.
-      auto nominalTypeDecl = dyn_cast<NominalTypeDecl>(value);
-      if (!nominalTypeDecl && !isa<TypeDecl>(value)) {
-        nominalTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl();
-      }
-      if (nominalTypeDecl &&
-          sendableConformanceRequiresNonisolated(nominalTypeDecl)) {
-        InferredActorIsolation isolation{
-            ActorIsolation::forNonisolated(/*unsafe=*/false), /*source=*/{}};
-        return {
-            {isolation, /*overridenValue=*/nullptr, /*overridenIsolation=*/{}}};
       }
 
       if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
@@ -8877,7 +8900,9 @@ ActorIsolation swift::inferConformanceIsolation(
         // implicitly nonisolated (i.e. via primary declaration conforming to
         // a `Sendable` protocol) and that gives us a hint that conformance
         // should be nonisolated as well.
-        if (nominalIsolation.isNonisolated() && !hasKnownIsolatedWitness)
+        if ((nominalIsolation.isNonisolated() ||
+             nominalIsolation.isUnspecified()) &&
+            !hasKnownIsolatedWitness)
           return nominalIsolation;
 
         return ActorIsolation::forMainActor(ctx);

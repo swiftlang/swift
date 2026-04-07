@@ -36,7 +36,7 @@ nonisolated public protocol Q: Sendable {
 }
 
 // CHECK: @_Concurrency::MainActor @preconcurrency public protocol IsolatedProto<T> {
-// CHECK:   associatedtype T
+// CHECK: {{^}}  associatedtype T
 // CHECK: }
 public protocol IsolatedProto<T> {
   associatedtype T
@@ -45,10 +45,10 @@ public protocol IsolatedProto<T> {
 // CHECK: @_Concurrency::MainActor @preconcurrency public struct S : A::P {
 public struct S: P {
   // CHECK: @_Concurrency::MainActor @preconcurrency public enum E : Swift::String {
-  // CHECK:   case a
-  // CHECK:   case b
+  // CHECK: {{^}}  case a
+  // CHECK: {{^}}  case b
   // CHECK:   nonisolated public init?(rawValue: Swift::String)
-  // CHECK:   public typealias RawValue = Swift::String
+  // CHECK: {{^}}  public typealias RawValue = Swift::String
   // CHECK:   nonisolated public var rawValue: Swift::String {
   // CHECK:     get
   // CHECK:   }
@@ -71,8 +71,10 @@ public struct S: P {
   // CHECK: @_Concurrency::MainActor @preconcurrency public subscript(x: Swift::Int) -> Swift::Int {
   public subscript(x: Int) -> Int {
     // CHECK: get
+    // CHECK-NOT: @_Concurrency::MainActor get
     get { x }
     // CHECK: set
+    // CHECK-NOT: @_Concurrency::MainActor set
     set { }
   }
   // CHECK: }
@@ -86,9 +88,9 @@ public func opaqueTest() -> some P {
 
 // CHECK: public struct R : A::Q {
 public struct R: Q {
-  // CHECK: public struct Inner {
+  // CHECK: {{^}}  public struct Inner {
   public struct Inner {
-    // CHECK: public init()
+    // CHECK: {{^}}    public init()
     public init() {}
   }
   // CHECK: }
@@ -114,6 +116,29 @@ public class C {
 }
 // CHECK: }
 
+// CHECK: {{^}}extension A::C {
+public extension C {
+  // CHECK: {{^}}  public enum E : Swift::Error {
+  enum E: Error {
+    // CHECK: {{^}}    case terminated
+    case terminated
+
+    // CHECK: {{^}}    public func test()
+    public func test() {}
+  }
+
+  // CHECK: @_Concurrency::MainActor @preconcurrency public func shouldBeMainIsolated()
+  func shouldBeMainIsolated() {}
+}
+// CHECK: }
+
+// CHECK: {{^}}extension A::C.A::E : Swift::Equatable {
+extension C.E : Equatable {
+  // CHECK: {{^}}  public static func == (lhs: A::C.A::E, rhs: A::C.A::E) -> Swift::Bool 
+  public static func == (lhs: Self, rhs: Self) -> Bool { false }
+}
+// CHECK: }
+
 // CHECK: @_Concurrency::MainActor @preconcurrency open class IsolatedDeinitTest {
 open class IsolatedDeinitTest {
   // CHECK:   {{(@objc )?}} isolated deinit
@@ -124,13 +149,31 @@ open class IsolatedDeinitTest {
 // CHECK: @_Concurrency::MainActor @preconcurrency public struct TestAccessors {
 public struct TestAccessors {
   // CHECK: @_Concurrency::MainActor @preconcurrency public var test: Swift::Int {
-  // CHECK:   get
-  // CHECK:   set
+  // CHECK: {{^}}  get
+  // CHECK: {{^}}  set
   // CHECK: }
   public var test: Int {
     get { 42 }
     set { }
   }
+}
+// CHECK: }
+
+// The enum is nonisolated and so are it's members because it conforms to `Error` that inferits from `Sendable`.
+// CHECK: {{^}}public enum E : Swift::Error {
+public enum E: Error {
+  // CHECK: {{^}}  case aborted
+  case aborted
+
+  // CHECK: {{^}}  public static func == (lhs: A::E, rhs: A::E) -> Swift::Bool
+  public static func ==(lhs: E, rhs: E) -> Bool { false }
+}
+// CHECK: }
+
+// CHECK: extension Swift::Int {
+public extension Int {
+  // CHECK: @_Concurrency::MainActor @preconcurrency public func test()
+  func test() {}
 }
 // CHECK: }
 
