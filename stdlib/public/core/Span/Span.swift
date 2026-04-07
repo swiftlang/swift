@@ -26,7 +26,7 @@ import Swift
 @safe
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
+public struct Span<Element: ~Copyable & ~Escapable>: ~Escapable, Copyable, BitwiseCopyable {
 
   /// The starting address of this `Span`.
   ///
@@ -88,7 +88,7 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span: @unchecked Sendable where Element: Sendable & ~Copyable {}
+extension Span: @unchecked Sendable where Element: Sendable & ~Copyable & ~Escapable {}
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
@@ -217,7 +217,7 @@ extension Span /*where Element: Copyable*/ {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: BitwiseCopyable {
+extension Span where Element: BitwiseCopyable & ~Escapable {
 
   /// Unsafely create a `Span` over initialized memory.
   ///
@@ -402,7 +402,7 @@ extension Span where Element: BitwiseCopyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: ~Copyable {
+extension Span where Element: ~Copyable & ~Escapable {
 
   /// The number of elements in the span.
   ///
@@ -436,7 +436,7 @@ extension Span where Element: ~Copyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: ~Copyable {
+extension Span where Element: ~Copyable & ~Escapable {
   // SILOptimizer looks for fixed_storage.check_index semantics for bounds check optimizations.
   @_semantics("fixed_storage.check_index")
   @inline(__always)
@@ -454,6 +454,7 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
     @_transparent
+    @_lifetime(copy self)
     borrow {
       _checkIndex(position)
       return unsafe self[unchecked: position]
@@ -472,6 +473,7 @@ extension Span where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
+    @_lifetime(copy self)
     @_unsafeSelfDependentResult
     borrow {
       Builtin.borrowAt(unsafe _unsafeAddressOfElement(unchecked: position))
@@ -490,7 +492,7 @@ extension Span where Element: ~Copyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: BitwiseCopyable {
+extension Span where Element: BitwiseCopyable & ~Escapable {
   /// Accesses the element at the specified index in the `Span`.
   ///
   /// - Parameter position: The offset of the element to access. `position`
@@ -500,6 +502,7 @@ extension Span where Element: BitwiseCopyable {
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
     @_transparent
+    @_lifetime(copy self)
     get {
       _checkIndex(position)
       return unsafe self[unchecked: position]
@@ -518,16 +521,18 @@ extension Span where Element: BitwiseCopyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
+    @_lifetime(copy self)
     get {
-      let address = unsafe _unsafeAddressOfElement(unchecked: position)
-      return unsafe UnsafeRawPointer(address).loadUnaligned(as: Element.self)
+      let ptr = unsafe _unsafeAddressOfElement(unchecked: position)
+      let element = unsafe UnsafeRawPointer(ptr).loadUnaligned(as: Element.self)
+      return unsafe _overrideLifetime(element, copying: self)
     }
   }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: Copyable {
+extension Span where Element: Copyable & ~Escapable {
 
   /// Construct a raw span over the memory represented by this span.
   ///
@@ -564,7 +569,7 @@ extension Span where Element: ConvertibleToBytes {
 // MARK: sub-spans
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: ~Copyable {
+extension Span where Element: ~Copyable & ~Escapable {
 
   /// Constructs a new span over the items within the supplied range of
   /// indices within this span.
@@ -721,7 +726,7 @@ extension Span where Element: ~Copyable {
 // MARK: UnsafeBufferPointer access hatch
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: ~Copyable  {
+extension Span where Element: ~Copyable {
 
   /// Calls a closure with a pointer to the viewed contiguous storage.
   ///
@@ -753,7 +758,7 @@ extension Span where Element: ~Copyable  {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: BitwiseCopyable {
+extension Span where Element: BitwiseCopyable & ~Escapable {
 
   /// Calls the given closure with a pointer to the underlying bytes of
   /// the viewed contiguous storage.
@@ -784,7 +789,7 @@ extension Span where Element: BitwiseCopyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: ~Copyable {
+extension Span where Element: ~Copyable & ~Escapable {
   /// Returns a Boolean value indicating whether two instances refer to the same
   /// memory region.
   ///
@@ -845,7 +850,7 @@ extension Span where Element: ~Copyable {
 // MARK: prefixes and suffixes
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: ~Copyable {
+extension Span where Element: ~Copyable & ~Escapable {
 
   /// Returns a span containing the initial elements of this span,
   /// up to the specified maximum length.
