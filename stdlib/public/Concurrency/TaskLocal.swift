@@ -122,6 +122,11 @@ public macro TaskLocal() =
 ///
 /// In either cases listed above, the binding and reading of the task-local value works as expected.
 ///
+/// ### Task local values, without tasks
+/// If a task local value is bound in a context executing outside of a task (e.g. on a plain old Thread),
+/// the task local will fall-back to managing a thread-local value for the scope of the `withValue` function.
+/// In other words, this task locals work as expected even if used in a context without an active swift concurrency task.
+///
 /// ### Examples
 ///
 ///
@@ -161,6 +166,8 @@ public macro TaskLocal() =
 /// - SeeAlso: ``TaskLocal()-macro``
 @available(SwiftStdlib 5.1, *)
 public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {
+  @usableFromInline
+  @available(SwiftStdlib 5.1, *)
   let defaultValue: Value
 
   public init(wrappedValue defaultValue: Value) {
@@ -177,6 +184,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// If no current task is available in the context where this call is made,
   /// or if the task-local has no value bound, this will return the `defaultValue`
   /// of the task local.
+  @inlinable
   public func get() -> Value {
     guard let rawValue = unsafe _taskLocalValueGet(key: key) else {
       return self.defaultValue
@@ -373,6 +381,7 @@ func _taskLocalValuePush<Value>(
 func _taskLocalValuePop()
 
 @available(SwiftStdlib 5.1, *)
+@usableFromInline
 @_silgen_name("swift_task_localValueGet")
 func _taskLocalValueGet(
   key: Builtin.RawPointer/*Key*/

@@ -418,3 +418,7 @@ Added: _swift_task_dealloc_through
 // Clock systemEpochs
 Added: _$ss15ContinuousClockV11systemEpochAB7InstantVvpMV
 Added: _$ss15SuspendingClockV11systemEpochAB7InstantVvpMV
+
+// TaskLocal.defaultValue exposed as @usableFromInline
+Added: _$ss9TaskLocalC12defaultValuexvg
+Added: _$ss9TaskLocalC12defaultValuexvpMV
