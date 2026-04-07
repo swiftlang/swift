@@ -6059,6 +6059,9 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
 
+  using ThunkGenFlag = SILGenFunction::ThunkGenFlag;
+  auto options = SILGenFunction::ThunkGenOptions();
+
   SmallVector<ManagedValue, 8> params;
   SmallVector<ManagedValue, 8> indirectResults;
   SmallVector<ManagedValue, 1> indirectErrorResults;
@@ -6088,10 +6091,11 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
   // Forward the implicit isolation parameter.
   if (implicitIsolationParam.isValid()) {
     argValues.push_back(implicitIsolationParam.getValue());
+    options |= ThunkGenFlag::CalleeHasImplicitIsolatedParam;
   }
 
    // Add the rest of the arguments.
-  forwardFunctionArguments(SGF, loc, fnType, params, argValues);
+  forwardFunctionArguments(SGF, loc, fnType, params, argValues, options);
 
   auto fun = fnType->isCalleeGuaranteed() ? fnValue.borrow(SGF, loc).getValue()
                                           : fnValue.forward(SGF);
