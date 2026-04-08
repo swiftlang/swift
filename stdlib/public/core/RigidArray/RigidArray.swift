@@ -207,7 +207,7 @@ extension RigidArray where Element: ~Copyable {
   internal mutating func _unsafeEdit<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutableBufferPointer<Element>, inout Int) throws(E) -> R
   ) throws(E) -> R {
-    defer { precondition(_count >= 0 && _count <= capacity) }
+    defer { _precondition(_count >= 0 && _count <= capacity) }
     return unsafe try body(_storage, &_count)
   }
 }
@@ -216,14 +216,14 @@ extension RigidArray where Element: ~Copyable {
 extension RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal func _contiguousSubrange(following index: inout Int) -> Range<Int> {
-    precondition(index >= 0 && index <= _count, "Index out of bounds")
+    _precondition(index >= 0 && index <= _count, "Index out of bounds")
     defer { index = _count }
     return unsafe Range(uncheckedBounds: (index, _count))
   }
 
   @_alwaysEmitIntoClient
   internal func _contiguousSubrange(preceding index: inout Int) -> Range<Int> {
-    precondition(index >= 0 && index <= _count, "Index out of bounds")
+    _precondition(index >= 0 && index <= _count, "Index out of bounds")
     defer { index = 0 }
     return unsafe Range(uncheckedBounds: (0, index))
   }
@@ -245,7 +245,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func reallocate(capacity newCapacity: Int) {
-    precondition(newCapacity >= count, "RigidArray capacity overflow")
+    _precondition(newCapacity >= count, "RigidArray capacity overflow")
     guard newCapacity != capacity else { return }
     let newStorage: UnsafeMutableBufferPointer<Element> = .allocate(
       capacity: newCapacity)
@@ -293,10 +293,10 @@ extension RigidArray {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public func clone(capacity: Int) -> Self {
-    precondition(capacity >= count, "RigidArray capacity overflow")
+    _precondition(capacity >= count, "RigidArray capacity overflow")
     var result = RigidArray<Element>(capacity: capacity)
     let initialized = unsafe result._storage.initialize(fromContentsOf: _items)
-    precondition(initialized == count)
+    _precondition(initialized == count)
     result._count = count
     return result
   }
@@ -314,7 +314,7 @@ extension RigidArray where Element: ~Copyable {
     let target = unsafe _storage.extracting(
       Range(uncheckedBounds: (index, index + source.count)))
     let i = unsafe target.moveInitialize(fromContentsOf: source)
-    assert(i == target.endIndex)
+    _internalInvariant(i == target.endIndex)
   }
 
   @unsafe
@@ -322,15 +322,15 @@ extension RigidArray where Element: ~Copyable {
   internal mutating func _openGap(
     at index: Int, count: Int
   ) -> UnsafeMutableBufferPointer<Element> {
-    assert(index >= 0 && index <= _count)
-    assert(count <= freeCapacity)
+    _internalInvariant(index >= 0 && index <= _count)
+    _internalInvariant(count <= freeCapacity)
     guard count > 0 else { return unsafe _storage.extracting(index ..< index) }
     let source = unsafe _storage.extracting(
       Range(uncheckedBounds: (index, _count)))
     let target = unsafe _storage.extracting(
       Range(uncheckedBounds: (index + count, _count + count)))
     let i = unsafe target.moveInitialize(fromContentsOf: source)
-    assert(i == target.count)
+    _internalInvariant(i == target.count)
     return unsafe _storage.extracting(
       Range(uncheckedBounds: (index, index + count)))
   }
@@ -346,8 +346,8 @@ extension RigidArray where Element: ~Copyable {
   internal mutating func _resizeGap(
     in subrange: Range<Int>, to newItemCount: Int
   ) -> UnsafeMutableBufferPointer<Element> {
-    assert(subrange.lowerBound >= 0 && subrange.upperBound <= _count)
-    assert(newItemCount >= 0 && newItemCount - subrange.count <= freeCapacity)
+    _internalInvariant(subrange.lowerBound >= 0 && subrange.upperBound <= _count)
+    _internalInvariant(newItemCount >= 0 && newItemCount - subrange.count <= freeCapacity)
     if newItemCount > subrange.count {
       _ = unsafe _openGap(
         at: subrange.upperBound, count: newItemCount - subrange.count)

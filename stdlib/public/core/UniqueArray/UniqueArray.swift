@@ -189,7 +189,7 @@ extension UniqueArray where Element: ~Copyable {
   @_transparent
   internal func _grow(freeCapacity: Int) -> Int {
     Swift.max(
-      count + freeCapacity,
+      count &+ freeCapacity,
       _growUniqueArrayCapacity(capacity))
   }
 

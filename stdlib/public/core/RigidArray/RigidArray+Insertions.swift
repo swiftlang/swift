@@ -33,7 +33,7 @@ extension RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public mutating func insert(_ item: consuming Element, at index: Int) {
     _checkValidIndex(index)
-    precondition(!isFull, "RigidArray capacity overflow")
+    _precondition(!isFull, "RigidArray capacity overflow")
     if index < count {
       let source = unsafe _storage.extracting(index ..< count)
       let target = unsafe _storage.extracting(index + 1 ..< count + 1)
@@ -95,8 +95,8 @@ extension RigidArray where Element: ~Copyable {
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
     _checkValidIndex(index)
-    precondition(newItemCount >= 0, "Cannot add a negative number of items")
-    precondition(newItemCount <= freeCapacity, "RigidArray capacity overflow")
+    _precondition(newItemCount >= 0, "Cannot add a negative number of items")
+    _precondition(newItemCount <= freeCapacity, "RigidArray capacity overflow")
     let target = unsafe _openGap(at: index, count: newItemCount)
     _count &+= newItemCount
     var span = unsafe OutputSpan(buffer: target, initializedCount: 0)
@@ -270,12 +270,12 @@ extension RigidArray {
     newCount: Int
   ) {
     _checkValidIndex(index)
-    precondition(newCount <= freeCapacity, "RigidArray capacity overflow")
+    _precondition(newCount <= freeCapacity, "RigidArray capacity overflow")
     let gap = unsafe _openGap(at: index, count: newCount)
 
     let done: Void? = items.withContiguousStorageIfAvailable { buffer in
       let i = unsafe gap._initializePrefix(copying: buffer)
-      precondition(
+      _precondition(
         i == newCount,
         "Broken Collection: count doesn't match contents")
       _count += newCount
@@ -283,7 +283,7 @@ extension RigidArray {
     if done != nil { return }
 
     var (it, copied) = unsafe items._copyContents(initializing: gap)
-    precondition(
+    _precondition(
       it.next() == nil && copied == newCount,
       "Broken Collection: count doesn't match contents")
     _count += newCount

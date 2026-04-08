@@ -33,7 +33,7 @@ extension UniqueArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func insert(_ item: consuming Element, at index: Int) {
-    precondition(index >= 0 && index <= count)
+    _precondition(index >= 0 && index <= count)
     // FIXME: Avoid moving the subsequent elements twice.
     _ensureFreeCapacity(1)
     _storage.insert(item, at: index)

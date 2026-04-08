@@ -54,7 +54,7 @@ extension RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @discardableResult
   public mutating func removeLast() -> Element {
-    precondition(!isEmpty, "Cannot remove last element from an empty array")
+    _precondition(!isEmpty, "Cannot remove last element from an empty array")
     let old = unsafe _storage.moveElement(from: _count - 1)
     _count -= 1
     return old
@@ -75,7 +75,7 @@ extension RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public mutating func removeLast(_ k: Int) {
     if k == 0 { return }
-    precondition(
+    _precondition(
       k >= 0 && k <= _count,
       "Count of elements to remove is out of bounds")
     unsafe _storage.extracting(

@@ -78,7 +78,7 @@ extension RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal func _checkItemIndex(_ index: Int) {
-    precondition(
+    _precondition(
       UInt(bitPattern: index) < UInt(bitPattern: _count),
       "Index out of bounds")
   }
@@ -86,7 +86,7 @@ extension RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal func _checkValidIndex(_ index: Int) {
-    precondition(
+    _precondition(
       UInt(bitPattern: index) <= UInt(bitPattern: _count),
       "Index out of bounds")
   }
@@ -94,7 +94,7 @@ extension RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal func _checkValidBounds(_ subrange: Range<Int>) {
-    precondition(
+    _precondition(
       subrange.lowerBound >= 0 && subrange.upperBound <= _count,
       "Index range out of bounds")
   }

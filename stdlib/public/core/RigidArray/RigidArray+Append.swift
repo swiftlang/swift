@@ -23,7 +23,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public mutating func append(_ item: consuming Element) {
-    precondition(!isFull, "RigidArray capacity overflow")
+    _precondition(!isFull, "RigidArray capacity overflow")
     unsafe _storage.initializeElement(at: _count, to: item)
     _count &+= 1
   }
@@ -74,8 +74,8 @@ extension RigidArray where Element: ~Copyable {
     addingCount newItemCount: Int,
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
-    precondition(newItemCount >= 0, "Cannot add a negative number of items")
-    precondition(freeCapacity >= newItemCount, "RigidArray capacity overflow")
+    _precondition(newItemCount >= 0, "Cannot add a negative number of items")
+    _precondition(freeCapacity >= newItemCount, "RigidArray capacity overflow")
     let buffer = unsafe _freeSpace._extracting(first: newItemCount)
     var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
     defer {
@@ -104,10 +104,10 @@ extension RigidArray where Element: ~Copyable {
   public mutating func append(
     moving items: UnsafeMutableBufferPointer<Element>
   ) {
-    precondition(items.count <= freeCapacity, "RigidArray capacity overflow")
+    _precondition(items.count <= freeCapacity, "RigidArray capacity overflow")
     guard items.count > 0 else { return }
     let c = unsafe _freeSpace._moveInitializePrefix(from: items)
-    assert(c == items.count)
+    _internalInvariant(c == items.count)
     _count &+= items.count
   }
 
@@ -151,7 +151,7 @@ extension RigidArray {
   public mutating func append(
     copying newElements: UnsafeBufferPointer<Element>
   ) {
-    precondition(
+    _precondition(
       newElements.count <= freeCapacity,
       "RigidArray capacity overflow")
     guard newElements.count > 0 else { return }
@@ -224,6 +224,6 @@ extension RigidArray {
     if done != nil { return }
 
     var it = self._append(prefixOf: newElements)
-    precondition(it.next() == nil, "RigidArray capacity overflow")
+    _precondition(it.next() == nil, "RigidArray capacity overflow")
   }
 }

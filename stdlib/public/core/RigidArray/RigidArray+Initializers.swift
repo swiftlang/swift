@@ -27,7 +27,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public init(capacity: Int) {
-    precondition(capacity >= 0, "Array capacity must be nonnegative")
+    _precondition(capacity >= 0, "Array capacity must be nonnegative")
     if capacity > 0 {
       unsafe _storage = .allocate(capacity: capacity)
     } else {

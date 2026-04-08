@@ -60,8 +60,8 @@ extension RigidArray where Element: ~Copyable {
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) -> Void {
     _checkValidBounds(subrange)
-    precondition(newItemCount >= 0, "Cannot add a negative number of items")
-    precondition(
+    _precondition(newItemCount >= 0, "Cannot add a negative number of items")
+    _precondition(
       newItemCount - subrange.count <= freeCapacity,
       "RigidArray capacity overflow")
     try _uncheckedReplace(
@@ -302,7 +302,7 @@ extension RigidArray where Element: Copyable {
       unsafe target.withUnsafeMutableBufferPointer { dst, dstCount in
         let done: Void? = newElements.withContiguousStorageIfAvailable { src in
           let i = unsafe dst._initializePrefix(copying: src)
-          precondition(
+          _precondition(
             i == newCount,
             "Broken Collection: count doesn't match contents")
           dstCount = i
@@ -311,7 +311,7 @@ extension RigidArray where Element: Copyable {
 
         var (it, copied) = unsafe newElements._copyContents(initializing: dst)
         dstCount = copied
-        precondition(
+        _precondition(
           it.next() == nil && copied == newCount,
           "Broken Collection: count doesn't match contents")
       }
