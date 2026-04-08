@@ -3312,6 +3312,7 @@ function Build-XCTest([Hashtable] $Platform) {
       ENABLE_TESTING = "NO";
       XCTest_INSTALL_NESTED_SUBDIR = "YES";
       SwiftTesting_DIR = (Get-ProjectCMakeModules $Platform Testing);
+      SwiftTestingMacros_DIR = (Get-ProjectCMakeModules $Platform BootstrapTestingMacros);
     }
 }
 
