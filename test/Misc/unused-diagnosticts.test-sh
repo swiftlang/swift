@@ -13,7 +13,6 @@
 #--- unused.expected
 accessor_requires_borrow_and_mutate_accessors
 borrow_inout_experimental
-lifetime_dependence_invalid_init_return
 make_inverse_conditional_non_requirement_explicit
 make_inverse_conditional_requirement_explicit
 perf_hint_param_expects_existential
