@@ -13,4 +13,3 @@
 #--- unused.expected
 accessor_requires_borrow_and_mutate_accessors
 borrow_inout_experimental
-sil_operand_has_incompatible_ownership_kind
