@@ -329,9 +329,6 @@ ERROR(accessor_requires_coroutine_accessors,none,
       (StringRef))
 WARNING(old_coroutine_accessor,none,
       "'%1' is deprecated; please use 'yielding %0' instead", (StringRef, StringRef))
-ERROR(accessor_requires_borrow_and_mutate_accessors,none,
-      "%0 requires '-enable-experimental-feature BorrowAndMutateAccessors'",
-      (StringRef))
 ERROR(borrow_mutate_pair_restrict,none,
       "A '%0' accessor can only be defined along with a '%1' accessor",
       (StringRef, StringRef))
