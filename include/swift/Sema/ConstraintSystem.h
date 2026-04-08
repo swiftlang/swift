@@ -4553,6 +4553,11 @@ unsigned getNumApplications(bool hasAppliedSelf,
 /// Determine whether the debug output is enabled for the given target.
 bool debugConstraintSolverForTarget(ASTContext &C,
                                     SyntacticElementTarget target);
+
+/// Determine whether the given declaration is only generic because it
+/// adopted typed throws.
+bool isGenericOnlyOverThrownType(AbstractFunctionDecl *func);
+
 } // end namespace constraints
 
 /// If the expression has the effect of a forced downcast, find the

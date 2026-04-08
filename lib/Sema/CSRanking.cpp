@@ -579,8 +579,13 @@ bool CompareDeclSpecializationRequest::evaluate(
   // A non-generic declaration is more specialized than a generic declaration.
   if (auto func1 = dyn_cast<AbstractFunctionDecl>(decl1)) {
     auto func2 = cast<AbstractFunctionDecl>(decl2);
-    if (func1->hasGenericParamList() != func2->hasGenericParamList())
-      return completeResult(func2->hasGenericParamList());
+    bool func1IsGeneric =
+        func1->hasGenericParamList() && !isGenericOnlyOverThrownType(func1);
+    bool func2IsGeneric =
+        func2->hasGenericParamList() && !isGenericOnlyOverThrownType(func2);
+
+    if (func1IsGeneric != func2IsGeneric)
+      return completeResult(func2IsGeneric);
   }
 
   if (auto subscript1 = dyn_cast<SubscriptDecl>(decl1)) {
