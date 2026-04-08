@@ -228,9 +228,6 @@ REMARK(warn_scanner_deserialize_failed, none,
 REMARK(remark_reuse_cache, none,
        "Incremental module scan: Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
 
-REMARK(remark_scanner_uncached_lookups, none,
-       "Module Dependency Scanner queries executed: '%0'.", (unsigned))
-
 REMARK(remark_save_cache, none,
        "Incremental module scan: Serializing module scanning dependency cache to: '%0'.", (StringRef))
 

@@ -13,5 +13,4 @@
 #--- unused.expected
 accessor_requires_borrow_and_mutate_accessors
 borrow_inout_experimental
-remark_scanner_uncached_lookups
 sil_operand_has_incompatible_ownership_kind
