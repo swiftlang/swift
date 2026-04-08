@@ -84,12 +84,12 @@ func _unlock(_ ptr: UnsafeRawPointer)
 ///
 /// - `NextAction`:
 ///   - `resume`: The new consumer is resumed.
-///   - `throw`: The new consumer is resumed by throwing an instance of `Failure`
+///   - `throw`: The new consumer is resumed by throwing an instance of `Failure`.
 ///   - `suspend`:  The new consumer is suspended. No action is taken.
 ///
 /// - `TerminateAction`:
 ///   - `callAndResume`: The `TerminationHandler` is called, and all consumers are resumed.
-///   - `call`: Only the `TerminationHandler` is called
+///   - `call`: Only the `TerminationHandler` is called.
 ///   - `none`: No action is taken.
 @safe
 final class _Storage<Element, Failure: Error>: @unchecked Sendable {
@@ -120,8 +120,8 @@ final class _Storage<Element, Failure: Error>: @unchecked Sendable {
   @unsafe
   struct _StateMachine: ~Copyable {
     typealias Buffer = _Deque<Element>
-    typealias Consumer = UnsafeContinuation<Result<Element?, Failure>, Never>
-    typealias Consumers = _Deque<Consumer>
+    typealias Consumer = UnsafeContinuation<Result<Element?, Failure>, Never> // TODO: Switch to ~Copyable Continuation type
+    typealias Consumers = _Deque<Consumer> // TODO: Switch to UniqueDeque
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
 
     @unsafe
@@ -394,7 +394,7 @@ extension _Storage._StateMachine {
         let element = draining.buffer.popFirst()
       else {
         unsafe self = unsafe .init(state: .terminated(.init(
-              failure: .none,
+              failure: nil,
               terminationHandler: draining.terminationHandler
             )
           )
@@ -438,7 +438,7 @@ extension _Storage._StateMachine {
 
     case .terminated(let terminated):
       unsafe self = unsafe .init(state: .terminated(.init(
-            failure: .none,
+            failure: nil,
             terminationHandler: nil
           )
         )
@@ -479,7 +479,7 @@ extension _Storage._StateMachine {
       }
 
     case .waiting(var waiting):
-      unsafe self = unsafe .init(state: .terminated(.init(failure: .none)))
+      unsafe self = unsafe .init(state: .terminated(.init(failure: nil)))
       return unsafe .callAndResume(.init(
           terminationHandler: waiting.terminationHandler.take(),
           consumers: waiting.consumers,
