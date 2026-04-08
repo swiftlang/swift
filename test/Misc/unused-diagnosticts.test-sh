@@ -13,7 +13,6 @@
 #--- unused.expected
 accessor_requires_borrow_and_mutate_accessors
 borrow_inout_experimental
-embedded_swift_metatype
 embedded_swift_value_deinit
 experimental_macro
 lifetime_dependence_cannot_use_parsed_scoped_consuming
