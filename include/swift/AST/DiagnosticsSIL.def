@@ -1245,9 +1245,6 @@ GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation,
 GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_type, RegionIsolationCrossIsolationDataRace, none,
       "passing %select{%0|%1 %0}4 to %3 %kind2 risks causing data races",
       (Type, StringRef, const ValueDecl *, StringRef, bool))
-GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_sil, RegionIsolationCrossIsolationDataRace, none,
-      "passing %1 %0 to %3 %2 risks causing data races",
-      (Identifier, StringRef, Identifier, StringRef))
 
 // We always put the potential task-isolated value first to simplify the note.
 GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_nonisolatedfunction, RegionIsolationCrossIsolationDataRace, none,
