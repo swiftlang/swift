@@ -5250,6 +5250,12 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
       (fnTy1->isAsync() || fnTy2->isAsync()))
     return ABIDifference::NeedsThunk;
 
+  // A synchronous function requires a thunk to be treated as an asynchronous
+  // function. An async function cannot be called synchronously just by adding a
+  // thunk and hopefully doesn't get here.
+  if (!fnTy1->isAsync() && fnTy2->isAsync())
+    return ABIDifference::NeedsThunk;
+
   for (unsigned i = 0, e = fnTy1->getParameters().size(); i < e; ++i) {
     auto param1 = fnTy1->getParameters()[i], param2 = fnTy2->getParameters()[i];
     
