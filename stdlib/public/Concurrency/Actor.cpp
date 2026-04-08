@@ -2538,6 +2538,12 @@ static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
     asImpl(executor.getDefaultActor())->unlock(true);
 }
 
+static inline const char* safeGetIdentityDebugName(SerialExecutorRef exec) {
+  if (exec.isGeneric())
+    return exec.isForSynchronousStart() ? " (GenericExecutor/SynchronousStart)" : " (GenericExecutor)";
+  return "";
+}
+
 SWIFT_CC(swiftasync)
 static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
                                   TaskContinuationFunction *resumeFunction,
@@ -2556,7 +2562,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
                        "new serial executor: %p%s; task executor: from %p%s to %p%s",
                        task,
                        currentExecutor.getIdentity(),
-                       currentExecutor.getIdentityDebugName(),
+                       safeGetIdentityDebugName(currentExecutor),
                        newExecutor.getIdentity(),
                        newExecutor.getIdentityDebugName(),
                        currentTaskExecutor.getIdentity(),

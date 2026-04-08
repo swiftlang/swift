@@ -712,7 +712,7 @@ public:
     auto *flags = reinterpret_cast<std::atomic<decltype(ActiveTaskStatus::Flags)>*>(storage + offsetof(ActiveTaskStatus, Flags));
     // Release memory ordering so that other threads can not decide to reuse this
     // Task's intrusive linkage before all of our earlier uses have completed
-    auto oldFlags = flags->fetch_and(~(IsIntrusivelyLinked & HasRetainForInstrusiveLinkage), std::memory_order_release);
+    auto oldFlags = flags->fetch_and(~(IsIntrusivelyLinked | HasRetainForInstrusiveLinkage), std::memory_order_release);
 
     // Tell the caller if it needs to do a release on the Task
     return (oldFlags & HasRetainForInstrusiveLinkage) != 0;
@@ -1138,6 +1138,7 @@ inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
 /// done when a Task's intrusive link is dequeued but after reading the local
 /// stealer exclusion value. This should not be called from any other context.
 void AsyncTask::taskRemoveEnqueued() {
+  SWIFT_TASK_DEBUG_LOG("Removing enqueued bit from Task %p", this);
   // In theory, we could do plumbing so that this happens as a part of a later
   // CAS when possible (and prevents a single forced CAS fail in some cases).
   if (ActiveTaskStatus::atomicRemoveIntrusivelyLinked(_private().StatusStorage)) {
@@ -1356,7 +1357,7 @@ inline std::pair<bool, uint32_t> AsyncTask::flagAsRunningFromEnqueued(uint8_t al
     if (oldStatus.hasActiveStealers()) {
       newStatus = newStatus.withNextStealerExclusionValue();
     }
-    newStatus.withoutActiveStealers();
+    newStatus = newStatus.withoutActiveStealers();
 #endif
   }, [&](ActiveTaskStatus toCheck) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -1516,7 +1517,6 @@ swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
       newStatus = newStatus.withIntrusivelyLinked();
       needsStealer = false;
     } else {
-      newStatus = newStatus.withActiveStealers();
       needsStealer = true;
       newStatus = newStatus.withRetainForInstrusiveLinkage();
       if (!oldStatus.hasRetainForInstrusiveLinkage()) {
@@ -1526,10 +1526,14 @@ swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
       }
     }
 
+    if (updateStealerExclusionValue) {
+      newStatus = newStatus.withActiveStealers();
+    }
+
     SWIFT_TASK_DEBUG_LOG(
-        "Needs to update based on %d || %d. Needs stealer %d. Exclusion value is %d",
+        "Needs to update based on %d || %d. Needs stealer %d. Exclusion value is %d. Setting active stealers from %d to %d",
         updateStealerExclusionValue, !oldStatus.isIntrusivelyLinked(), needsStealer,
-        newStatus.getStealerExclusionValue());
+        newStatus.getStealerExclusionValue(), oldStatus.hasActiveStealers(), newStatus.hasActiveStealers());
     // This can always be relaxed because it only needs to be read
     // either by a thread syncronizing with the status lock or someone
     // reading the stealer which we will later publish on this thread.
