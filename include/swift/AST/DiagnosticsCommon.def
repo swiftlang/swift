@@ -290,7 +290,6 @@ ERROR(borrow_mutate_accessor_not_supported_in_decl, none,
 NOTE(bridged_note, none, "%0", (StringRef))
 WARNING(bridged_warning, none,"%0", (StringRef))
 ERROR(bridged_error, none, "%0", (StringRef))
-ERROR(bridged_fatal_error, Fatal, "%0", (StringRef))
 REMARK(bridged_remark, none, "%0", (StringRef))
 
 //------------------------------------------------------------------------------

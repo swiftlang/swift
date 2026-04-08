@@ -13,7 +13,6 @@
 #--- unused.expected
 accessor_requires_borrow_and_mutate_accessors
 borrow_inout_experimental
-bridged_fatal_error
 cannot_find_executor_factory_type
 clang_swift_attr_unhandled
 embedded_swift_metatype
