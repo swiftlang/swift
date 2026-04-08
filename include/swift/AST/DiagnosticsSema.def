@@ -8665,10 +8665,6 @@ ERROR(lifetime_dependence_cannot_use_kind, none,
 ERROR(lifetime_dependence_only_on_function_method_init_result, none,
       "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers", ())
-ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
-      "expected 'nil' or 'self' as return values in an initializer with "
-      "lifetime dependent specifiers",
-       ())
 ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
       "lifetime dependence specifiers cannot be applied to tuple elements", ())
 ERROR(lifetime_dependence_contextual_keyword_conflict_name, none,
