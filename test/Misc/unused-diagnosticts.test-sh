@@ -13,7 +13,6 @@
 #--- unused.expected
 accessor_requires_borrow_and_mutate_accessors
 borrow_inout_experimental
-lifetime_dependence_cannot_use_parsed_scoped_consuming
 lifetime_dependence_ctor_non_self_or_nil_return
 lifetime_dependence_invalid_init_return
 make_inverse_conditional_non_requirement_explicit

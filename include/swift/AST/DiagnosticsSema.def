@@ -8662,9 +8662,6 @@ ERROR(lifetime_dependence_duplicate_param_id, none,
 ERROR(lifetime_dependence_cannot_use_kind, none,
       "invalid use of %0 lifetime dependence for %1 ownership",
       (StringRef, StringRef))
-ERROR(lifetime_dependence_cannot_use_parsed_scoped_consuming, none,
-      "invalid use of scoped lifetime dependence with consuming ownership",
-      ())
 ERROR(lifetime_dependence_only_on_function_method_init_result, none,
       "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers", ())
