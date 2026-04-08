@@ -1113,9 +1113,6 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_multiple_value, none,
      "closure captures non-Sendable %0",
      (DeclName))
-NOTE(regionbasedisolation_closure_captures, none,
-     "closure captures %0",
-     (DeclName))
 NOTE(regionbasedisolation_closure_captures_actor, none,
      "closure captures %0 allowing access to %1 state within the closure",
      (DeclName, StringRef))
