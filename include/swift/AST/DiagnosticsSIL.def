@@ -1268,8 +1268,6 @@ GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_cast, RegionIsolat
       (Identifier, StringRef, Type, StringRef, bool))
 
 // Concurrency related diagnostics
-ERROR(cannot_find_executor_factory_type, none,
-      "the DefaultExecutorFactory type could not be found", ())
 ERROR(executor_factory_must_conform, none,
       "the DefaultExecutorFactory does not conform to 'ExecutorFactory'", ())
 
