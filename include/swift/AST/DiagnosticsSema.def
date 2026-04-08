@@ -8364,9 +8364,6 @@ ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
 
-ERROR(experimental_macro,none,
-      "macro %0 is experimental",
-      (DeclName))
 ERROR(experimental_closure_body_macro,none,
       "function body macros on closures is experimental",
       ())
