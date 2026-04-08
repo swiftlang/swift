@@ -1417,6 +1417,9 @@ def parse_sil : Flag<["-"], "parse-sil">,
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Parse the input file(s) as the Swift standard library">;
+def disable_deployment_target_validation_for_parse_stdlib : Flag<["-"], "disable-deployment-target-validation-for-parse-stdlib">,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
+  HelpText<"Disable deployment target validation when building the Swift standard library">;
 
 def enable_builtin_module : Flag<["-"], "enable-builtin-module">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
