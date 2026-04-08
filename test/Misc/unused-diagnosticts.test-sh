@@ -1,0 +1,31 @@
+# RUN: %empty-directory(%t)
+# RUN: split-file %s %t
+# RUN: cd %swift_src_root
+# RUN: %utils/find-unused-diagnostics.sh > %t/unused.txt
+# RUN: %diff %t/unused.txt %t/unused.expected
+
+# If you broke this test you likely removed the last use of a
+# diagnostic, without removing the diagnostic. If this was a
+# false positive, add the diagnostic name to the list below.
+
+# UNSUPPORTED: OS=windows-msvc
+
+#--- unused.expected
+accessor_requires_borrow_and_mutate_accessors
+borrow_inout_experimental
+bridged_fatal_error
+cannot_find_executor_factory_type
+clang_swift_attr_unhandled
+embedded_swift_metatype
+embedded_swift_value_deinit
+experimental_macro
+lifetime_dependence_cannot_use_parsed_scoped_consuming
+lifetime_dependence_ctor_non_self_or_nil_return
+lifetime_dependence_invalid_init_return
+make_inverse_conditional_non_requirement_explicit
+make_inverse_conditional_requirement_explicit
+perf_hint_param_expects_existential
+regionbasedisolation_closure_captures
+regionbasedisolation_merge_region_failure_error_functionisolation_sil
+remark_scanner_uncached_lookups
+sil_operand_has_incompatible_ownership_kind
