@@ -1570,6 +1570,17 @@ func testNilCoalescingOperatorRemoveFix() {
       ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-1:9-+0:12=}}
 }
 
+// https://github.com/swiftlang/swift/issues/88204
+func testNilCoalescingWithOptionalLHSPromotedToDoubleOptional() {
+  let transform: (Int) -> Int? = { _ in .some(0) }
+  let ten: Int = 10
+  let optional: Int? = .some(1)
+
+  // Should compile without a warning: the LHS is already optional, so the
+  // "non-optional type" warning would be misleading/false.
+  let _ = (optional ?? ten).flatMap(transform)
+}
+
 // https://github.com/apple/swift/issues/74617
 struct Foo_74617 {
   public var bar: Float { 123 }

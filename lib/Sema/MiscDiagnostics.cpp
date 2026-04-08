@@ -1439,7 +1439,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       Expr *subExpr = nullptr;
       if (calleeName == "??" &&
-          (subExpr = isImplicitPromotionToOptional(lhs))) {
+          (subExpr = isImplicitPromotionToOptional(lhs)) &&
+          !subExpr->getType()->getOptionalObjectType()) {
 
         Ctx.Diags
             .diagnose(DRE->getLoc(), diag::use_of_qq_on_non_optional_value,
