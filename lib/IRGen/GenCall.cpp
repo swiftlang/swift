@@ -4037,6 +4037,7 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
         resultTy = func->getParamStructRetType(0);
       }
       auto temp = IGF.createAlloca(resultTy, Alignment(), "indirect.result");
+      Args[0] = temp.getAddress();
       emitToMemory(temp, substResultTI, isOutlined);
       return;
     }
@@ -4063,6 +4064,7 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
         auto resultTy = func->getParamStructRetType(1);
         auto temp = IGF.createAlloca(resultTy, Alignment(/*safe alignment*/ 16),
                                      "indirect.result");
+        Args[1] = temp.getAddress();
         emitToMemory(temp, substResultTI, isOutlined);
         return;
       }
@@ -4071,6 +4073,7 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
     StackAddress ctemp = substResultTI.allocateStack(IGF, substResultType,
                                                      "call.aggresult");
     Address temp = ctemp.getAddress();
+    Args[0] = temp.getAddress();
     emitToMemory(temp, substResultTI, isOutlined);
 
     // We can use a take.
