@@ -304,7 +304,10 @@ extension Reproducer {
     var frontendArgs: [String]?
 
     var sig: Signature {
-      var symbols = [signature]
+      var symbols: [String] = []
+      if signature != signatureAssert?.fullMessage {
+        symbols.append(signature)
+      }
       if let signatureNext {
         symbols.append(signatureNext)
       }

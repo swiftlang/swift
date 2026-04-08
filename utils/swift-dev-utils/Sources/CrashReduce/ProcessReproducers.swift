@@ -287,9 +287,11 @@ public actor ProcessReproducers {
       }
       groupedRepros[sig, default: []].append(crasher)
     }
+    log.info("found \(groupedRepros.count) new crasher(s), reducing...")
 
+    // creduce already parallelizes so only do 3 in parallel.
     var processedPaths = Set(repros.map(\.path))
-    let worklist = TaskWorklist<[Reproducer]>()
+    let worklist = TaskWorklist<[Reproducer]>(maxParallel: 3)
     for reproGroup in groupedRepros.sorted(by: \.key).map(\.value) {
       worklist.addTask {
         // Take the first reproducer in the group that reduces successfully.
@@ -397,7 +399,11 @@ public actor ProcessReproducers {
       try await withCReduceTest(crasher.options, signatures: signatures) { testPath in
         let result = try await run(
           .path(creducePath), arguments: .init(
-            ["--tidy", "--not-c", testPath.rawPath] + inputs.map(\.rawPath)
+            [
+              "--tidy",
+              "--n", "\(ProcessInfo.processInfo.processorCount)",
+              "--not-c", testPath.rawPath
+            ] + inputs.map(\.rawPath)
           ),
           workingDirectory: testPath.parentDir!.storage,
           output: .string(limit: .max),
