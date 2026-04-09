@@ -1,25 +1,18 @@
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library) | %FileCheck %s
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
+// RUN: %target-run-simple-leaks-swift( -target %target-swift-5.1-abi-triple -parse-as-library)
+// RUN: %target-run-simple-leaks-swift( -target %target-swift-5.1-abi-triple -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
-// TODO: move to target-run-simple-leaks-swift once CI is using at least Xcode 14.3
-
-// Task group addTask is not supported in freestanding mode
-// UNSUPPORTED: freestanding
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-
 // REQUIRES: concurrency_runtime
+// REQUIRES: OS=macosx
+
 // UNSUPPORTED: back_deployment_runtime
 
 final class Something {
   let int: Int
   init(int: Int) {
     self.int = int
-  }
-
-  deinit {
-    print("deinit, Something, int: \(self.int)")
   }
 }
 
@@ -36,13 +29,6 @@ func test_taskGroup_next() async {
     for await value in group {
       sum += value.int
     }
-
-
-    // CHECK-DAG: deinit, Something, int: 0
-    // CHECK-DAG: deinit, Something, int: 1
-    // CHECK-DAG: deinit, Something, int: 2
-    // CHECK-DAG: deinit, Something, int: 3
-    // CHECK-DAG: deinit, Something, int: 4
 
     return sum
   }
