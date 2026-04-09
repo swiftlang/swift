@@ -223,6 +223,11 @@ param
 )
 
 ## Prepare the build environment.
+$Test = @("lldb")
+$SkipPackaging = $true
+$WindowsSDKArchitectures = @("X64")
+$WindowsSDKVersions = @("Windows")
+$Windows = $true
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version 3.0
@@ -4539,20 +4544,20 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Subprocess $HostPlatform
   Invoke-BuildStep Build-ToolsProtocols $HostPlatform
   Invoke-BuildStep Build-Build $HostPlatform
-  Invoke-BuildStep Build-PackageManager $HostPlatform
-  Invoke-BuildStep Build-Markdown $HostPlatform
-  Invoke-BuildStep Build-Format $HostPlatform
-  Invoke-BuildStep Build-LMDB $HostPlatform
-  Invoke-BuildStep Build-IndexStoreDB $HostPlatform
-  Invoke-BuildStep Build-SourceKitLSP $HostPlatform
-  Invoke-BuildStep Build-Inspect $HostPlatform
+  # Invoke-BuildStep Build-PackageManager $HostPlatform
+  # Invoke-BuildStep Build-Markdown $HostPlatform
+  # Invoke-BuildStep Build-Format $HostPlatform
+  # Invoke-BuildStep Build-LMDB $HostPlatform
+  # Invoke-BuildStep Build-IndexStoreDB $HostPlatform
+  # Invoke-BuildStep Build-SourceKitLSP $HostPlatform
+  # Invoke-BuildStep Build-Inspect $HostPlatform
 }
 
 Install-HostToolchain
 
-if (-not $SkipBuild -and -not $IsCrossCompiling) {
-  Invoke-BuildStep Build-DocC $HostPlatform
-}
+# if (-not $SkipBuild -and -not $IsCrossCompiling) {
+#   Invoke-BuildStep Build-DocC $HostPlatform
+# }
 
 if (-not $SkipBuild) {
   Invoke-BuildStep Build-mimalloc $HostPlatform
