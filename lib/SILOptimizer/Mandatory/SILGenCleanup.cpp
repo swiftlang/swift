@@ -16,23 +16,16 @@
 
 #define DEBUG_TYPE "silgen-cleanup"
 
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "llvm/ADT/PostOrderIterator.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 using namespace swift;
@@ -94,19 +87,20 @@ struct SILGenCanonicalize final : CanonicalizeInstruction {
 };
 
 //===----------------------------------------------------------------------===//
-// SILGenCleanup: Top-Level Module Transform
+// SILGenCleanup: Per-Function Transform
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-// SILGenCleanup must run on all functions that will be seen by any analysis
-// used by diagnostics before transforming the function that requires the
-// analysis. e.g. Closures need to be cleaned up before the closure's parent can
-// be diagnosed.
+// SILGenCleanup performs cleanup of SILGen output before diagnostic passes. The
+// pass manager runs function passes in bottom-up call-graph order (via
+// BottomUpFunctionOrder), ensuring closures are cleaned up before their parent
+// functions.
 //
-// TODO: This pass can be converted to a function transform if the mandatory
-// pipeline runs in bottom-up closure order.
-struct SILGenCleanup : SILModuleTransform {
+// The needBreakInfiniteLoops / needCompleteLifetimes flags set during SILGen
+// are cleared by postEmitFunction, so the pass manager's pre-condition is
+// satisfied.
+struct SILGenCleanup : SILFunctionTransform {
   void run() override;
 
   bool fixupBorrowAccessors(SILFunction *function);
@@ -250,44 +244,38 @@ bool SILGenCleanup::removeAccessToNonDestructiveEnumProjection(
 }
 
 void SILGenCleanup::run() {
-  auto &module = *getModule();
-  for (auto &function : module) {
-    if (!function.isDefinition())
-      continue;
+  SILFunction *function = getFunction();
+  if (!function->isDefinition())
+    return;
 
-    getPassManager()->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(&function);
+  PrettyStackTraceSILFunction stackTrace("silgen cleanup", function);
 
-    PrettyStackTraceSILFunction stackTrace("silgen cleanup", &function);
+  LLVM_DEBUG(llvm::dbgs()
+             << "\nRunning SILGenCleanup on " << function->getName() << "\n");
 
-    LLVM_DEBUG(llvm::dbgs()
-               << "\nRunning SILGenCleanup on " << function.getName() << "\n");
+  removeUnreachableBlocks(*function);
+  bool changed = fixupBorrowAccessors(function);
+  changed |= removeAccessToNonDestructiveEnumProjection(function);
+  breakInfiniteLoops(getPassManager(), function);
+  completeAllLifetimes(getPassManager(), function,
+                       /*includeTrivialVars=*/true);
+  function->verifyOwnership(/*deadEndBlocks=*/nullptr);
 
-    removeUnreachableBlocks(function);
-    bool changed = fixupBorrowAccessors(&function);
-    changed |= removeAccessToNonDestructiveEnumProjection(&function);
-    breakInfiniteLoops(getPassManager(), &function);
-    completeAllLifetimes(getPassManager(), &function, /*includeTrivialVars=*/ true);
-    function.verifyOwnership(/*deadEndBlocks=*/nullptr);
+  DeadEndBlocks deadEndBlocks(function);
+  SILGenCanonicalize sgCanonicalize(deadEndBlocks);
 
-    DeadEndBlocks deadEndBlocks(&function);
-    SILGenCanonicalize sgCanonicalize(deadEndBlocks);
-
-    // Iterate over all blocks even if they aren't reachable. No phi-less
-    // dataflow cycles should have been created yet, and these transformations
-    // are simple enough they shouldn't be affected by cycles.
-    for (auto &bb : function) {
-      for (auto ii = bb.begin(), ie = bb.end(); ii != ie;) {
-        ii = sgCanonicalize.canonicalize(&*ii);
-        ii = sgCanonicalize.deleteDeadOperands(ii, ie);
-      }
+  // Iterate over all blocks even if they aren't reachable. No phi-less
+  // dataflow cycles should have been created yet, and these transformations
+  // are simple enough they shouldn't be affected by cycles.
+  for (auto &bb : *function) {
+    for (auto ii = bb.begin(), ie = bb.end(); ii != ie;) {
+      ii = sgCanonicalize.canonicalize(&*ii);
+      ii = sgCanonicalize.deleteDeadOperands(ii, ie);
     }
-    changed |= sgCanonicalize.changed;
-    if (changed) {
-      auto invalidKind = SILAnalysis::InvalidationKind::Instructions;
-      invalidateAnalysis(&function, invalidKind);
-    }
- 
-    getPassManager()->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
+  }
+  changed |= sgCanonicalize.changed;
+  if (changed) {
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 }
 
