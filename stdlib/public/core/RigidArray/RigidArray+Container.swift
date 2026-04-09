@@ -299,7 +299,7 @@ extension RigidArray where Element: ~Copyable {
   ///    This optimization may be removed in future versions; do not rely on it.
   ///
   /// - Parameter index: A valid index of the array. On return, `index` is
-  ///    set to `limit` if
+  ///    set to the resulting position.
   /// - Parameter n: The distance to offset `index`.
   ///    On return, `n` is set to zero if the operation succeeded without
   ///    hitting the limit; otherwise, `n` reflects the number of steps that
