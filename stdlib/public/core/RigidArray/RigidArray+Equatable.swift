@@ -11,6 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.4, *)
+extension RigidArray where Element: ~Copyable {
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: borrowing Self) -> Bool {
+    unsafe self._count == other._count &&
+    self._storage.isTriviallyIdentical(to: other._storage)
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
 extension RigidArray: Equatable where Element: Equatable & ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
@@ -19,12 +28,5 @@ extension RigidArray: Equatable where Element: Equatable & ~Copyable {
     right: borrowing Self
   ) -> Bool {
     left.span._elementsEqual(to: right.span)
-  }
-
-  @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
-  public func isTriviallyIdentical(to other: borrowing Self) -> Bool {
-    unsafe self._count == other._count &&
-    self._storage.isTriviallyIdentical(to: other._storage)
   }
 }
