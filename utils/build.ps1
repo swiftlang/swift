@@ -223,11 +223,10 @@ param
 )
 
 ## Prepare the build environment.
-$Test = @("lldb")
+$Test = @("swift")
 $SkipPackaging = $true
 $WindowsSDKArchitectures = @("X64")
 $Windows = $true
-$WindowsSDKVersions = @("WindowsExperimental")
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version 3.0
