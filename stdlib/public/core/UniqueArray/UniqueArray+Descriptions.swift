@@ -10,20 +10,28 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME: Waiting for https://github.com/swiftlang/swift/pull/85874 to land
-
-// @available(SwiftStdlib 6.4, *)
+// FIXME: Enable once SE-0499 is implemented
+// @available(SwiftStdlib x.y, *)
 // extension UniqueArray: CustomStringConvertible where Element: ~Copyable {
-//   public var description: String {
-//     /// FIXME: Print the item descriptions when available.
-//     "<\(count) items>"
-//   }
 // }
 
-// @available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.4, *)
+extension UniqueArray where Element: ~Copyable {
+  public var description: String {
+    /// FIXME: Print the item descriptions when available.
+    "<\(count) items>"
+  }
+}
+
+// FIXME: Enable once SE-0499 is implemented
+// @available(SwiftStdlib x.y, *)
 // extension UniqueArray: CustomDebugStringConvertible where Element: ~Copyable {
-//   public var debugDescription: String {
-//     /// FIXME: Print the item descriptions when available.
-//     "<\(count) items>"
-//   }
 // }
+
+@available(SwiftStdlib 6.4, *)
+extension UniqueArray where Element: ~Copyable {
+  public var debugDescription: String {
+    /// FIXME: Print the item descriptions when available.
+    "<\(count) items>"
+  }
+}

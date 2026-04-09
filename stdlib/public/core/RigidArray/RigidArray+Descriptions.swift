@@ -10,22 +10,30 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME: Waiting for https://github.com/swiftlang/swift/pull/85874 to land
-
-// @available(SwiftStdlib 6.4, *)
+// FIXME: Enable once SE-0499 is implemented
+// @available(SwiftStdlib x.y, *)
 // extension RigidArray: CustomStringConvertible where Element: ~Copyable {
-//   @available(SwiftStdlib 6.4, *)
-//   public var description: String {
-//     /// FIXME: Print the item descriptions when available.
-//     "<\(count) items>"
-//   }
 // }
 
-// @available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.4, *)
+extension RigidArray where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  public var description: String {
+    /// FIXME: Print the item descriptions when available.
+    "<\(count) items>"
+  }
+}
+
+// FIXME: Enable once SE-0499 is implemented
+// @available(SwiftStdlib x.y, *)
 // extension RigidArray: CustomDebugStringConvertible where Element: ~Copyable {
-//   @available(SwiftStdlib 6.4, *)
-//   public var debugDescription: String {
-//     /// FIXME: Print the item descriptions when available.
-//     "<\(count) items>"
-//   }
 // }
+
+@available(SwiftStdlib 6.4, *)
+extension RigidArray where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  public var debugDescription: String {
+    /// FIXME: Print the item descriptions when available.
+    "<\(count) items>"
+  }
+}
