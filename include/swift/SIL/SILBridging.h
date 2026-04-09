@@ -596,6 +596,7 @@ struct BridgedFunction {
   bool isTrapNoReturn() const;
   bool isConvertPointerToPointerArgument() const;
   bool isAddressor() const;
+  BRIDGED_INLINE bool isLazyPropertyGetter() const;
   bool isAutodiffVJP() const;
   bool isAutodiffSubsetParametersThunk() const;
   SwiftInt specializationLevel() const;
@@ -1523,6 +1524,7 @@ struct BridgedContext {
 
   BRIDGED_INLINE bool isTransforming(BridgedFunction function) const;
   BRIDGED_INLINE void notifyChanges(NotificationKind changeKind) const;
+  BRIDGED_INLINE bool hasChangeNotification(NotificationKind changeKind) const;
 
   // Module
 

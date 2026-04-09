@@ -78,7 +78,8 @@ public func registerOptimizerTests() {
     memoryEffectsTest,
     scopedHashTableTest,
     scopedHashTableInsertLookupTest,
-    scopedHashTablePopTest
+    scopedHashTablePopTest,
+    isLazyPropertyGetterTest
   )
 
   registerModuleTest(functionUsesTest, { functionUsesTest.pass.run($0) })

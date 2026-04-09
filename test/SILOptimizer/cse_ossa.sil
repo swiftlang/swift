@@ -1419,9 +1419,10 @@ bb0(%0 : @guaranteed $LazyKlass):
 // CHECK-NOT:   apply [[GETTER]]
 // CHECK: } // end sil function 'cse_ossa_getter'
 // SWIFT-CSE-LABEL: sil @cse_ossa_getter :
-// SWIFT-CSE: apply
-// SWIFT-CSE: apply
-// SWIFT-CSE-LABEL: } // end sil function 'cse_ossa_getter'
+// SWIFT-CSE:   [[GETTER:%[0-9]+]] = function_ref @lazy_class_getter_ossa
+// SWIFT-CSE:   apply [[GETTER]]
+// SWIFT-CSE-NOT:   apply [[GETTER]]
+// SWIFT-CSE: } // end sil function 'cse_ossa_getter'
 sil @cse_ossa_getter : $@convention(thin) (@guaranteed LazyKlass) -> (Int64, Int64) {
 bb0(%0 : $LazyKlass):
   %1 = function_ref @lazy_class_getter_ossa : $@convention(method) (@guaranteed LazyKlass) -> Int64

@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -common-subexpression-elimination | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s --check-prefix=TEST-RUNNER
 
 import Builtin
 import Swift
@@ -1008,4 +1009,273 @@ bb0:
   %7 = builtin "once"(%4 : $Builtin.RawPointer, %5 : $@convention(c) () -> ()) : $()
   %r1 = tuple ()
   return %r1 : $()
+}
+
+// -----------------------------------------------------------------------
+// is-lazy-property-getter tests
+// -----------------------------------------------------------------------
+
+// Positive (non-OSSA): class self, switch_enum on Optional, .some dest has 1 arg.
+sil private [lazy_getter] [noinline] @lazy_class_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  %none = enum $Optional<Builtin.Int64>, #Optional.none!enumelt
+  switch_enum %none : $Optional<Builtin.Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%val : $Builtin.Int64):
+  br bb3(%val : $Builtin.Int64)
+
+bb2:
+  %zero = integer_literal $Builtin.Int64, 0
+  br bb3(%zero : $Builtin.Int64)
+
+bb3(%ret : $Builtin.Int64):
+  return %ret : $Builtin.Int64
+}
+
+// Positive (OSSA): same shape but [ossa].
+sil private [ossa] [lazy_getter] [noinline] @lazy_class_getter_ossa : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : @guaranteed $Builtin.NativeObject):
+  %none = enum $Optional<Builtin.Int64>, #Optional.none!enumelt
+  switch_enum %none : $Optional<Builtin.Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%val : $Builtin.Int64):
+  br bb3(%val : $Builtin.Int64)
+
+bb2:
+  %zero = integer_literal $Builtin.Int64, 0
+  br bb3(%zero : $Builtin.Int64)
+
+bb3(%ret : $Builtin.Int64):
+  return %ret : $Builtin.Int64
+}
+
+// Negative: struct self — first argument is an address (@inout).
+sil private [lazy_getter] [noinline] @lazy_struct_getter : $@convention(method) (@inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%self : $*Builtin.Int64):
+  %none = enum $Optional<Builtin.Int64>, #Optional.none!enumelt
+  switch_enum %none : $Optional<Builtin.Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%val : $Builtin.Int64):
+  br bb3(%val : $Builtin.Int64)
+
+bb2:
+  %zero = integer_literal $Builtin.Int64, 0
+  br bb3(%zero : $Builtin.Int64)
+
+bb3(%ret : $Builtin.Int64):
+  return %ret : $Builtin.Int64
+}
+
+// Negative: callee lacks [lazy_getter] attribute.
+sil private [noinline] @plain_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  %none = enum $Optional<Builtin.Int64>, #Optional.none!enumelt
+  switch_enum %none : $Optional<Builtin.Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%val : $Builtin.Int64):
+  br bb3(%val : $Builtin.Int64)
+
+bb2:
+  %zero = integer_literal $Builtin.Int64, 0
+  br bb3(%zero : $Builtin.Int64)
+
+bb3(%ret : $Builtin.Int64):
+  return %ret : $Builtin.Int64
+}
+
+// Negative: entry block ends with switch_enum_addr, not switch_enum.
+sil private [lazy_getter] [noinline] @lazy_switch_enum_addr_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  %storage = alloc_stack $Optional<Builtin.Int64>
+  switch_enum_addr %storage : $*Optional<Builtin.Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  %val_addr = unchecked_take_enum_data_addr %storage : $*Optional<Builtin.Int64>, #Optional.some!enumelt
+  %val = load %val_addr : $*Builtin.Int64
+  dealloc_stack %storage : $*Optional<Builtin.Int64>
+  br bb3(%val : $Builtin.Int64)
+
+bb2:
+  %zero = integer_literal $Builtin.Int64, 0
+  dealloc_stack %storage : $*Optional<Builtin.Int64>
+  br bb3(%zero : $Builtin.Int64)
+
+bb3(%ret : $Builtin.Int64):
+  return %ret : $Builtin.Int64
+}
+
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_class
+// TEST-RUNNER:       true
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_class
+sil @is_lazy_property_getter_class : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  specify_test "is-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @lazy_class_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_struct
+// TEST-RUNNER:       false
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_struct
+sil @is_lazy_property_getter_struct : $@convention(thin) (@inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%self : $*Builtin.Int64):
+  specify_test "is-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @lazy_struct_getter : $@convention(method) (@inout Builtin.Int64) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@inout Builtin.Int64) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_not_lazy
+// TEST-RUNNER:       false
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_not_lazy
+sil @is_lazy_property_getter_not_lazy : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  specify_test "is-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @plain_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_switch_enum_addr
+// TEST-RUNNER:       false
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_switch_enum_addr
+sil @is_lazy_property_getter_switch_enum_addr : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  specify_test "is-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @lazy_switch_enum_addr_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// Positive: OSSA caller + OSSA callee → true.
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_ossa_ossa
+// TEST-RUNNER:       true
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_ossa_ossa
+sil [ossa] @is_lazy_property_getter_ossa_ossa : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : @guaranteed $Builtin.NativeObject):
+  specify_test "is-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @lazy_class_getter_ossa : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// Negative: OSSA caller + non-OSSA callee → false (cannot inline non-OSSA into OSSA).
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_ossa_nonossa
+// TEST-RUNNER:       false
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_ossa_nonossa
+sil [ossa] @is_lazy_property_getter_ossa_nonossa : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : @guaranteed $Builtin.NativeObject):
+  specify_test "is-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @lazy_class_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// -----------------------------------------------------------------------
+// Lazy property getter CSE tests
+// -----------------------------------------------------------------------
+
+struct StructWithLazyProperty {
+  var lazyProperty: Int64 { mutating get set }
+  @_hasStorage @_hasInitialValue var lazyPropertyStorage : Int64? { get set }
+}
+
+sil private [lazy_getter] [noinline] @lazy_getter : $@convention(method) (@inout StructWithLazyProperty) -> Int64 {
+bb0(%0 : $*StructWithLazyProperty):
+  %2 = struct_element_addr %0 : $*StructWithLazyProperty, #StructWithLazyProperty.lazyPropertyStorage 
+  %3 = load %2 : $*Optional<Int64>
+  switch_enum %3 : $Optional<Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%5 : $Int64):
+  br bb3(%5 : $Int64)
+
+bb2:
+  %9 = integer_literal $Builtin.Int64, 27
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  %12 = enum $Optional<Int64>, #Optional.some!enumelt, %10 : $Int64
+  store %12 to %2 : $*Optional<Int64>
+  br bb3(%10 : $Int64)
+
+bb3(%15 : $Int64):
+  return %15 : $Int64
+}
+
+sil @take_int : $@convention(thin) (Int64) -> ()
+
+// CHECK-LABEL: sil @dont_cse_lazy_property_of_overwritten_struct : $@convention(thin) () -> () {
+// CHECK:   [[GETTER:%[0-9]+]] = function_ref @lazy_getter
+// CHECK:   apply [[GETTER]]
+// CHECK:   apply [[GETTER]]
+// CHECK: } // end sil function 'dont_cse_lazy_property_of_overwritten_struct'
+sil @dont_cse_lazy_property_of_overwritten_struct : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $StructWithLazyProperty
+  %4 = enum $Optional<Int64>, #Optional.none!enumelt
+  %5 = struct $StructWithLazyProperty (%4 : $Optional<Int64>)
+  store %5 to %0 : $*StructWithLazyProperty
+  %7 = function_ref @lazy_getter : $@convention(method) (@inout StructWithLazyProperty) -> Int64
+  %8 = apply %7(%0) : $@convention(method) (@inout StructWithLazyProperty) -> Int64
+  %9 = function_ref @take_int : $@convention(thin) (Int64) -> ()
+  %10 = apply %9(%8) : $@convention(thin) (Int64) -> ()
+  store %5 to %0 : $*StructWithLazyProperty
+  %18 = apply %7(%0) : $@convention(method) (@inout StructWithLazyProperty) -> Int64
+  %20 = apply %9(%18) : $@convention(thin) (Int64) -> ()
+  dealloc_stack %0 : $*StructWithLazyProperty
+  %22 = tuple ()
+  return %22 : $()
+}
+
+sil @paable : $@convention(thin) (Builtin.Int64) -> ()
+
+final class FC {
+  @_hasStorage @_hasInitialValue final var storage: Optional<Builtin.Int64>
+}
+
+sil @consume_int64 : $@convention(thin) (Builtin.Int64) -> ()
+
+sil [lazy_getter] [ossa] @partial_apply_on_stack_nesting_violator : $@convention(method) (@guaranteed FC) -> Builtin.Int64 {
+entry(%instance : @guaranteed $FC):
+    %storage_addr = ref_element_addr %instance : $FC, #FC.storage
+    %optional = load [trivial] %storage_addr : $*Optional<Builtin.Int64>
+    switch_enum %optional : $Optional<Builtin.Int64>, case #Optional.some!enumelt: some, case #Optional.none!enumelt: none
+none:
+    %one = integer_literal $Builtin.Int64, 1
+    %optone = enum $Optional<Builtin.Int64>, #Optional.some!enumelt, %one : $Builtin.Int64
+    store %optone to [trivial] %storage_addr : $*Optional<Builtin.Int64>
+    br exit(%one : $Builtin.Int64)
+
+some(%value : $Builtin.Int64):
+    %paable = function_ref @paable : $@convention(thin) (Builtin.Int64) -> ()
+    %first = partial_apply [callee_guaranteed] [on_stack] %paable(%value) : $@convention(thin) (Builtin.Int64) -> ()
+    %second = partial_apply [callee_guaranteed] [on_stack] %paable(%value) : $@convention(thin) (Builtin.Int64) -> ()
+    // Note that the destroy_values do not occur in an order which coincides
+    // with stack disciplined dealloc_stacks.
+    destroy_value %first : $@noescape @callee_guaranteed () -> ()
+    destroy_value %second : $@noescape @callee_guaranteed () -> ()
+    br exit(%value : $Builtin.Int64)
+
+exit(%retval : $Builtin.Int64):
+    return %retval : $Builtin.Int64
+}
+
+// Verify that when inlining partial_apply_on_stack_nesting_violator, the stack
+// nesting of the on_stack closures is fixed.
+// CHECK-LABEL: sil @test_inline_stack_violating_ossa_func : {{.*}} {
+// CHECK:         [[PAABLE:%[^,]+]] = function_ref @paable
+// CHECK:         [[FIRST:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[PAABLE]]
+// CHECK:         [[SECOND:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[PAABLE]]
+// CHECK:         dealloc_stack [[SECOND]]
+// CHECK:         dealloc_stack [[FIRST]]
+// CHECK-LABEL: } // end sil function 'test_inline_stack_violating_ossa_func'
+sil @test_inline_stack_violating_ossa_func : $@convention(thin) (FC) -> () {
+entry(%instance : $FC):
+    %callee = function_ref @partial_apply_on_stack_nesting_violator : $@convention(method) (@guaranteed FC) -> Builtin.Int64
+    %consume = function_ref @consume_int64 : $@convention(thin) (Builtin.Int64) -> ()
+    %first = apply %callee(%instance) : $@convention(method) (@guaranteed FC) -> Builtin.Int64
+    apply %consume(%first) : $@convention(thin) (Builtin.Int64) -> ()
+    %second = apply %callee(%instance) : $@convention(method) (@guaranteed FC) -> Builtin.Int64
+    apply %consume(%second) : $@convention(thin) (Builtin.Int64) -> ()
+    %retval = tuple ()
+    return %retval : $()
 }

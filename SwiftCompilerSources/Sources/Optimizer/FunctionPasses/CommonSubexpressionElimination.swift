@@ -16,8 +16,11 @@
 // It is invoked using the flag:
 //   "common-subexpression-elimination"   — post-inlining, runs on canonical SIL
 //
+// Lazy property getter applies are CSE-ed: two calls to the same getter on the
+// same `self` value in a dominator relationship can share the first call's result.
+//
 // TODO: A "swift-high-level-cse" variant (pre-inlining, CSEs semantic array calls)
-// will be added once ApplyInst handling is implemented.
+// will be added later.
 //
 //===----------------------------------------------------------------------===//
 
@@ -34,13 +37,22 @@ let commonSubexpressionElimination = FunctionPass(name: "common-subexpression-el
 
   let domTree = context.dominatorTree
   var map = ScopedHashMap()
+  var lazyPropertyGetters : [ApplyInst] = []
 
   processFunction(
     startBlock: entryBlock,
     domTree: domTree,
     map: &map,
+    &lazyPropertyGetters,
     context
   )
+  processLazyPropertyGetters(lazyPropertyGetters, function: function, context)
+  if context.hasChanged(.Branches) {
+    _ = context.removeDeadBlocks(in: function)
+  }
+  if context.needBreakInfiniteLoops {
+    breakInfiniteLoops(in: function, context)
+  }
 }
 
 // -----------------------------------------------------------------------
@@ -53,10 +65,11 @@ private func processFunction(
   startBlock: BasicBlock,
   domTree: DominatorTree,
   map: inout ScopedHashMap,
+  _ lazyPropertyGetters: inout [ApplyInst],
   _ context: FunctionPassContext
 ) {
   // Process the entry block, then drive the DFS.
-  processBlock(startBlock, map: &map, context)
+  processBlock(startBlock, map: &map, &lazyPropertyGetters, context)
 
   // Each stack frame holds the block being visited and an index into its
   // dominator-tree children so we can resume after processing each child.
@@ -70,7 +83,7 @@ private func processFunction(
       // Advance the child pointer for this frame, then visit the next child.
       dfsStack[dfsStack.count - 1].childIndex += 1
       let child = children[childIndex]
-      processBlock(child, map: &map, context)
+      processBlock(child, map: &map, &lazyPropertyGetters, context)
       dfsStack.append((child, 0))
     } else {
       // All children exhausted — pop this block's entries from the map
@@ -94,6 +107,7 @@ private func processFunction(
 private func processBlock(
   _ block: BasicBlock,
   map: inout ScopedHashMap,
+  _ lazyPropertyGetters: inout [ApplyInst],
   _ context: FunctionPassContext
 ) {
   // `block.instructions` skips deleted instructions automatically, so it is
@@ -112,11 +126,84 @@ private func processBlock(
     assert(inst.isIdenticalTo(inst), "inst must match itself for map to work")
 
     if let availInst = map.lookup(ref) {
-      tryCSEReplace(inst: inst, with: availInst, context)
+      if let ai = inst as? ApplyInst {
+        lazyPropertyGetters.append(ai)
+      } else {
+        tryCSEReplace(inst: inst, with: availInst, context)
+      }
       continue
     }
 
     map.insert(ref)
+  }
+}
+
+
+private func isLazyPropertyGetter(_ ai: ApplyInst) -> Bool {
+  guard let callee = ai.referencedFunction,
+        callee.isDefinition,
+        callee.isLazyPropertyGetter
+  else { return false }
+
+  // We cannot inline a non-ossa function into an ossa function
+  if ai.parentFunction.hasOwnership && !callee.hasOwnership { return false }
+
+  // Only handle classes, but not structs.
+  // Lazy property getters of structs have an indirect inout self parameter.
+  // We don't know if the whole struct is overwritten between two getter calls.
+  // In such a case, the lazy property could be reset to an Optional.none.
+  if ai.arguments[0].type.isAddress { return false }
+
+  // Check if the first block has a switch_enum of an Optional.
+  // We don't handle getters of generic types, which have a switch_enum_addr.
+  // This will be obsolete with opaque values anyway.
+  guard let sei = callee.entryBlock.terminator as? SwitchEnumInst else {
+    return false
+  }
+
+  guard let someDest = sei.getUniqueSuccessor(forCaseIndex: Builder.optionalSomeCaseIndex) else {
+    return false
+  }
+  return someDest.arguments.count == 1
+}
+
+/// Replace lazy property getters (which are dominated by the same getter)
+/// by a direct load of the value.
+private func processLazyPropertyGetters(
+  _ lazyPropertyGetters: [ApplyInst],
+  function: Function,
+  _ context: FunctionPassContext
+) {
+  for ai in lazyPropertyGetters {
+    guard let callee = ai.referencedFunction else { continue }
+    assert(callee.isLazyPropertyGetter)
+    let callBlock = ai.parentBlock
+
+    if ai.inliningCanInvalidateStackNesting {
+      context.notifyInvalidatedStackNesting()
+    }
+
+    guard context.loadFunction(function: callee, loadCalleesRecursively:false)
+        else {continue}
+    context.inlineFunction(apply: ai, mandatoryInline: false)
+
+    // After inlining the getter, the call block's terminator is the
+    // switch_enum from the getter's entry block.
+    guard let sei = callBlock.terminator as? SwitchEnumInst,
+          let someDest = sei.getUniqueSuccessor(forCaseIndex: Builder.optionalSomeCaseIndex),
+          someDest.arguments.count == 1 else { continue }
+
+    let builder = Builder(before: sei, context)
+    let ued = builder.createUncheckedEnumData(
+      enum: sei.enumOp,
+      caseIndex: Builder.optionalSomeCaseIndex,
+      resultType: someDest.arguments[0].type)
+    _ = builder.createBranch(to: someDest, arguments: [ued])
+    context.erase(instruction: sei)
+  }
+
+  if (context.needFixStackNesting){
+    context.fixStackNesting(in: function)
   }
 }
 
@@ -392,6 +479,16 @@ private func getHash(of inst: Instruction) -> Int? {
     hasher.combine(x.indexedPackType)
     for op in x.operands { hasher.combine(op.value.hashable) }
 
+  // Only CSE applies that are lazy property getter calls: they are
+  // side-effect-free once the property is set, and the getter is
+  // structurally verified by isLazyPropertyGetter.
+  // isLazyPropertyGetter guarantees referencedFunction is non-nil.
+  case let x as ApplyInst:
+    guard isLazyPropertyGetter(x) else { return nil }
+    hasher.combine(ObjectIdentifier(ApplyInst.self))
+    hasher.combine(x.referencedFunction)
+    hasher.combine(x.arguments.first!.hashable)  // `self` is the only argument
+
   default:
     return nil
   }
@@ -516,6 +613,18 @@ let scopedHashTableInsertLookupTest = FunctionTest("scoped-hash-table-insert-loo
   var map = ScopedHashMap()
   map.insert(InstructionReference(inst: inst1)!)
   print(map.lookup(InstructionReference(inst: inst2)!) != nil ? "hit" : "miss")
+}
+
+/// Takes `@instruction` (expected to be an apply), prints "true" if it is a
+/// call to a lazy property getter that the CSE pass can handle, "false" otherwise.
+let isLazyPropertyGetterTest = FunctionTest("is-lazy-property-getter") {
+  function, arguments, context in
+  let inst = arguments.takeInstruction()
+  guard let ai = inst as? ApplyInst else {
+    print("not an apply")
+    return
+  }
+  print(isLazyPropertyGetter(ai) ? "true" : "false")
 }
 
 /// Insert `keepInst` (in a block other than `popBlock`) and `popInst` (in
