@@ -740,7 +740,6 @@ struct BridgedInstruction {
   bool mayAccessPointer() const;
   bool mayLoadWeakOrUnowned() const;
   bool maySynchronize() const;
-  bool mayBeDeinitBarrierNotConsideringSideEffects() const;
   BRIDGED_INLINE bool shouldBeForwarding() const;
   BRIDGED_INLINE bool isIdenticalTo(BridgedInstruction inst) const;
 

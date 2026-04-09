@@ -28,6 +28,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/Test.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -414,8 +415,9 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
   // consuming use of the copy and the destroy.  If any of those instructions
   // is a deinit barrier, it would be illegal to shorten the original lexical
   // value's lifetime to end at that consuming use.  Bail if any are.
-  if (llvm::any_of(visitedInsts, [](auto *inst) {
-        return mayBeDeinitBarrierNotConsideringSideEffects(inst);
+  auto *bca = ctx.ctx.pm->getAnalysis<BasicCalleeAnalysis>();
+  if (llvm::any_of(visitedInsts, [bca](auto *inst) {
+        return isDeinitBarrier(inst, bca);
       }))
     return false;
 

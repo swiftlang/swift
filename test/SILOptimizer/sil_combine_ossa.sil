@@ -5589,6 +5589,24 @@ bb0(%0 : @owned $B, %1 : @guaranteed $D):
   return %5
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_destroy_over_deinit_barrier2 :
+// CHECK:         store %1 to [trivial]
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'dont_hoist_destroy_over_deinit_barrier2'
+sil [ossa] @dont_hoist_destroy_over_deinit_barrier2 : $@convention(thin) (@owned Klass, UInt8) -> () {
+bb0(%0 : @owned $Klass, %1 : $UInt8):
+  %2 = begin_borrow %0
+  %3 = ref_tail_addr %2, $UInt8
+  %4 = address_to_pointer %3 to $Builtin.RawPointer
+  end_borrow %2
+  %6 = pointer_to_address %4 to [strict] $*UInt8
+  store %1 to [trivial] %6
+  %8 = end_cow_mutation %0
+  destroy_value %8
+  %10 = tuple ()
+  return %10
+}
+
 // Just check that this doesn't produce illegal SIL
 sil [ossa] @inject_enum_addr_in_different_block : $@convention(thin) (@inout Substring) -> @owned Optional<Character> {
 bb0(%0 : $*Substring):
