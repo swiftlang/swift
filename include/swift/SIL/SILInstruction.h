@@ -2319,11 +2319,25 @@ class AllocPackMetadataInst final
           AllocationInst> {
   friend SILBuilder;
 
-  AllocPackMetadataInst(SILDebugLocation loc, SILType elementType)
+  USE_SHARED_UINT8;
+
+  AllocPackMetadataInst(SILDebugLocation loc, SILType elementType,
+                        StackAllocationIsNested_t isNested)
       : NullaryInstructionWithTypeDependentOperandsBase(
-            loc, {}, elementType.getAddressType()) {}
+            loc, {}, elementType.getAddressType()) {
+    sharedUInt8().AllocPackMetadataInst.isNested = bool(isNested);
+  }
 
 public:
+  StackAllocationIsNested_t isStackAllocationNested() const {
+    return StackAllocationIsNested_t(
+             sharedUInt8().AllocPackMetadataInst.isNested);
+  }
+
+  void setStackAllocationIsNested(StackAllocationIsNested_t isNested) {
+    sharedUInt8().AllocPackMetadataInst.isNested = bool(isNested);
+  }
+
   /// The instruction which may trigger on-stack pack metadata when IRGen
   /// lowering.
   SILInstruction *getIntroducer() { return getNextInstruction(); }
@@ -9854,6 +9868,7 @@ public:
   AllocPackMetadataInst *getAllocation() {
     return cast<AllocPackMetadataInst>(getOperand().getDefiningInstruction());
   }
+
   /// The instruction which may trigger on-stack pack metadata when IRGen
   /// lowering.
   SILInstruction *getIntroducer() { return getAllocation()->getIntroducer(); }

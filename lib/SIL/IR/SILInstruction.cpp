@@ -1369,6 +1369,8 @@ StackAllocationIsNested_t SILInstruction::isStackAllocationNested() const {
     return PAI->isStackAllocationNested();
   } else if (auto ARI = dyn_cast<AllocRefInstBase>(this)) {
     return ARI->isStackAllocationNested();
+  } else if (auto API = dyn_cast<AllocPackMetadataInst>(this)) {
+    return API->isStackAllocationNested();
   } else {
     // TODO: implement for all remaining allocations
     return StackAllocationIsNested;
@@ -1383,6 +1385,8 @@ void SILInstruction::setStackAllocationIsNested(
     PAI->setStackAllocationIsNested(nested);
   } else if (auto ARI = dyn_cast<AllocRefInstBase>(this)) {
     ARI->setStackAllocationIsNested(nested);
+  } else if (auto API = dyn_cast<AllocPackMetadataInst>(this)) {
+    API->setStackAllocationIsNested(nested);
   } else if (!nested) {
     verificationFailure("setStackAllocationIsNested unimplemented for instruction",
                         this, [](SILPrintContext &ctx) {});

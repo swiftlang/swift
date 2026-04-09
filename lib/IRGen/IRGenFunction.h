@@ -258,6 +258,11 @@ private:
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
+public:
+  /// Whether pack metadata allocations in the current scope are known to be
+  /// nested.
+  StackAllocationIsNested_t packMetadataIsNested = StackAllocationIsNested;
+
 protected:
   // Whether pack metadata stack promotion is disabled for this function in
   // particular.
@@ -317,6 +322,13 @@ public:
                                      StackAllocationIsNested,
                                    const llvm::Twine &name = "");
 
+  StackAddress emitArrayStackAllocation(llvm::Type *elementType,
+                                        llvm::Value *arraySize,
+                                        Alignment align,
+                                        StackAllocationIsNested_t isNested =
+                                          StackAllocationIsNested,
+                                        const llvm::Twine &name = "");
+
   /// Deallocate memory that was allocated with emitStackAllocation.
   ///
   /// Calling this is equivalent to calling whichever the appropriate
@@ -348,6 +360,11 @@ public:
   /// The memory should be deallocated with emitDeallocateStaticAlloca.
   StackAddress emitStaticAlloca(llvm::Type *ty, Size size, Alignment align,
                                 const llvm::Twine &name = "");
+  StackAddress emitStaticArrayAlloca(llvm::Type *ty,
+                                     Size eltSize,
+                                     llvm::ConstantInt *arraySize,
+                                     Alignment align,
+                                     const llvm::Twine &name = "");
   StackAddress emitStaticByteArrayAlloca(llvm::ConstantInt *size,
                                          Alignment align,
                                          const llvm::Twine &name = "");

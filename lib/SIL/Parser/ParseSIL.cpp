@@ -5003,11 +5003,24 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
   case SILInstructionKind::AllocPackMetadataInst: {
+    auto isNested = StackAllocationIsNested;
+    StringRef attributeName;
+    SourceLoc attributeLoc;
+    while (parseSILOptional(attributeName, attributeLoc, *this)) {
+      if (attributeName == "non_nested")
+        isNested = StackAllocationIsNotNested;
+      else {
+        P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
+                   attributeName, "alloc_pack_metadata");
+        return true;
+      }
+    }
+
     SILType Ty;
     if (parseSILType(Ty))
       return true;
 
-    ResultVal = B.createAllocPackMetadata(InstLoc, Ty);
+    ResultVal = B.createAllocPackMetadata(InstLoc, Ty, isNested);
     break;
   }
   case SILInstructionKind::AllocStackInst: {

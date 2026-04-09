@@ -715,6 +715,15 @@ public:
   /// Distribution level of the module.
   LibraryLevel getLibraryLevel() const;
 
+  /// The stored library level from deserialized module data.
+  /// Returns LibraryLevel::Other if no level was stored.
+  LibraryLevel getStoredLibraryLevel() const {
+    return LibraryLevel(Bits.ModuleDecl.StoredLibraryLevel);
+  }
+  void setStoredLibraryLevel(LibraryLevel level) {
+    Bits.ModuleDecl.StoredLibraryLevel = unsigned(level);
+  }
+
   /// Returns true if this module was or is being compiled for testing.
   bool hasIncrementalInfo() const { return Bits.ModuleDecl.HasIncrementalInfo; }
   void setHasIncrementalInfo(bool enabled = true) {

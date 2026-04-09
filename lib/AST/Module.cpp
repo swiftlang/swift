@@ -3331,8 +3331,13 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
     return ctx.LangOpts.LibraryLevel;
 
   } else {
-    // Other Swift modules are SPI if they are from the PrivateFrameworks
-    // folder in the SDK.
+    // IPI is never returned by the path heuristic, so the stored value
+    // is the only way to detect it.
+    auto stored = module->getStoredLibraryLevel();
+    if (stored == LibraryLevel::IPI)
+      return stored;
+
+    // For API/SPI, use the path heuristic as before.
     auto modulePath = module->getModuleFilename();
     return fromPrivateFrameworks(modulePath) ?
       LibraryLevel::SPI : LibraryLevel::API;

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 990; // vtable conformance entries
+const uint16_t SWIFTMODULE_VERSION_MINOR = 991; // add LIBRARY_LEVEL to options_block
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1004,6 +1004,7 @@ namespace options_block {
     DEFERRED_CODE_GEN,
     OSLOG_STRING_SECTION_NAME,
     AGGRESSIVE_CMO,
+    LIBRARY_LEVEL,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1125,6 +1126,11 @@ namespace options_block {
   using SwiftInterfaceCompilerVersionLayout = BCRecordLayout<
     SWIFT_INTERFACE_COMPILER_VERSION,
     BCBlob // version tuple
+  >;
+
+  using LibraryLevelLayout = BCRecordLayout<
+    LIBRARY_LEVEL,
+    BCFixed<2>
   >;
 }
 

@@ -778,7 +778,7 @@ protected:
     HasLazyUnderlyingSubstitutions : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8+1+2,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -854,7 +854,10 @@ protected:
 
     /// Whether this module was compile with "aggressive" CMO i.e
     /// the flag: -cross-module-optimization.
-    AggressiveCMOEnabled : 1
+    AggressiveCMOEnabled : 1,
+
+    /// The stored library level from deserialized module data (LibraryLevel).
+    StoredLibraryLevel : 2
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,

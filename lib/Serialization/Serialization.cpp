@@ -893,6 +893,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, CXX_STDLIB_KIND);
   BLOCK_RECORD(options_block, PUBLIC_MODULE_NAME);
   BLOCK_RECORD(options_block, SWIFT_INTERFACE_COMPILER_VERSION);
+  BLOCK_RECORD(options_block, LIBRARY_LEVEL);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -1224,6 +1225,10 @@ void Serializer::writeHeader() {
         CXXStdlibKind.emit(ScratchRecord,
                            static_cast<uint8_t>(M->getCXXStdlibKind()));
       }
+
+      options_block::LibraryLevelLayout LibLevel(Out);
+      LibLevel.emit(ScratchRecord,
+                    unsigned(M->getASTContext().LangOpts.LibraryLevel));
 
       if (M->isAggressiveCMOEnabled()) {
         options_block::AggressiveCMOEnabledLayout AggressiveCMOEnabled(Out);

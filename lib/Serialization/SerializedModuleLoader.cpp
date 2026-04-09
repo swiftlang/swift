@@ -997,6 +997,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setDeferredCodeGen();
     if (loadedModuleFile->isAggressiveCMOEnabled())
       M.setAggressiveCMOEnabled();
+    M.setStoredLibraryLevel(loadedModuleFile->getLibraryLevel());
     if (loadedModuleFile->hasCxxInteroperability()) {
       M.setHasCxxInteroperability();
       M.setCXXStdlibKind(loadedModuleFile->getCXXStdlibKind());

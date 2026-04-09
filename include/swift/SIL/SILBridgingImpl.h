@@ -2505,12 +2505,15 @@ BridgedInstruction BridgedBuilder::createAllocPack(BridgedType type) const {
   return {unbridged().createAllocPack(regularLoc(), type.unbridged())};
 }
 
-BridgedInstruction BridgedBuilder::createAllocPackMetadata() const {
-  return {unbridged().createAllocPackMetadata(regularLoc())};
+BridgedInstruction BridgedBuilder::createAllocPackMetadata(bool nested) const {
+  return {unbridged().createAllocPackMetadata(regularLoc(), std::nullopt,
+      swift::StackAllocationIsNested_t(nested))};
 }
 
-BridgedInstruction BridgedBuilder::createAllocPackMetadata(BridgedType type) const {
-  return {unbridged().createAllocPackMetadata(regularLoc(), type.unbridged())};
+BridgedInstruction BridgedBuilder::createAllocPackMetadata(BridgedType type,
+                                                           bool nested) const {
+  return {unbridged().createAllocPackMetadata(regularLoc(), type.unbridged(),
+      swift::StackAllocationIsNested_t(nested))};
 }
 
 BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) const {

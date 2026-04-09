@@ -6693,7 +6693,13 @@ void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
   setLoweredStackAddress(i, addr);
 }
 
-void IRGenSILFunction::visitAllocPackMetadataInst(AllocPackMetadataInst *i) {}
+void IRGenSILFunction::visitAllocPackMetadataInst(AllocPackMetadataInst *i) {
+  // alloc_pack_metadata is meant to control pack metadata just for the
+  // next instruction. As long as we enter these scopes prior to
+  // every such instruction, we can just treat this as global state
+  // on the IGF.
+  packMetadataIsNested = i->isStackAllocationNested();
+}
 
 static void
 buildTailArrays(IRGenSILFunction &IGF,

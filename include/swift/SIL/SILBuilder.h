@@ -448,12 +448,15 @@ public:
   }
   AllocPackMetadataInst *
   createAllocPackMetadata(SILLocation loc,
-                          std::optional<SILType> elementType = std::nullopt) {
+                          std::optional<SILType> elementType = std::nullopt,
+                          StackAllocationIsNested_t isNested =
+                            StackAllocationIsNested) {
     return insert(new (getModule()) AllocPackMetadataInst(
         getSILDebugLocation(loc),
         elementType.value_or(
             SILType::getEmptyTupleType(getModule().getASTContext())
-                .getAddressType())));
+                .getAddressType()),
+        isNested));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,

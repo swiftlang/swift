@@ -237,6 +237,12 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::AGGRESSIVE_CMO:
       extendedInfo.setAggressiveCMOEnabled(true);
       break;
+    case options_block::LIBRARY_LEVEL: {
+      unsigned rawLevel;
+      options_block::LibraryLevelLayout::readRecord(scratch, rawLevel);
+      extendedInfo.setLibraryLevel(LibraryLevel(rawLevel));
+      break;
+    }
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1605,6 +1611,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.StrictMemorySafety = extInfo.strictMemorySafety();
       Bits.DeferredCodeGen = extInfo.deferredCodeGen();
       Bits.AggressiveCMOEnabled = extInfo.isAggressiveCMOEnabled();
+      Bits.LibraryLevel = unsigned(extInfo.getLibraryLevel());
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();

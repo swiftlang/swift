@@ -722,6 +722,9 @@ public:
   /// (the flag -cross-module-optimization).
   bool isAggressiveCMOEnabled() const { return Core->isAggressiveCMOEnabled(); }
 
+  /// The library level of this module.
+  LibraryLevel getLibraryLevel() const { return Core->getLibraryLevel(); }
+
   /// Associates this module file with the AST node representing it.
   ///
   /// Checks that the file is compatible with the AST module it's being loaded

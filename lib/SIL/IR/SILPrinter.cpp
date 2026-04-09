@@ -1685,6 +1685,7 @@ public:
     *this << API->getType().getObjectType();
   }
   void visitAllocPackMetadataInst(AllocPackMetadataInst *APMI) {
+    printNonNested(APMI);
     *this << APMI->getType().getObjectType();
   }
 
