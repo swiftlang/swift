@@ -2631,7 +2631,7 @@ RValue RValueEmitter::visitSingleValueStmtExpr(SingleValueStmtExpr *E,
     return SGF.emitEmptyTupleRValue(E, C);
   }
   auto &lowering = SGF.getTypeLowering(E->getType());
-  auto resultAddr = SGF.emitTemporaryAllocation(E, lowering.getLoweredType());
+  SILValue resultAddr = SGF.getBufferForExprResult(E, lowering.getLoweredType(), C);
 
   // Collect the target exprs that will be used for initialization.
   SmallVector<Expr *, 4> scratch;
@@ -2643,7 +2643,8 @@ RValue RValueEmitter::visitSingleValueStmtExpr(SingleValueStmtExpr *E,
   SGF.SingleValueStmtInitStack.push_back(std::move(initInfo));
   SWIFT_DEFER { SGF.SingleValueStmtInitStack.pop_back(); };
   emitStmt();
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(resultAddr));
+
+  return RValue(SGF, E, SGF.manageBufferForExprResult(resultAddr, lowering, C));
 }
 
 RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
