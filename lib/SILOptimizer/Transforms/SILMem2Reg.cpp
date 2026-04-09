@@ -1981,13 +1981,13 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
             LiveValues::toReplace(asi,
                                   /*replacement=*/initialValue),
             /*isStorageValid=*/!doesLoadInvalidateStorage(inst)};
-// Disabled to work around a compiler crash. See rdar://171023691
-#if 0
-        if (auto varInfo = asi->getVarInfo()) {
-          SILBuilderWithScope(inst, ctx).createDebugValue(
-              inst->getLoc(), initialValue, *varInfo);
+        if (auto var = asi->getVarInfo()) {
+          SILBuilder Builder(inst, ctx);
+          // Force the debug_value to be in the same scope as the alloc_stack
+          // so it refers to the correct variable.
+          Builder.setCurrentDebugScope(asi->getDebugScope());
+          Builder.createDebugValue(inst->getLoc(), initialValue, *var);
         }
-#endif
       }
       auto *loadInst = dyn_cast<LoadInst>(inst);
       if (loadInst &&
