@@ -4,8 +4,7 @@
 class BaseClass<T> {
   func wait() async -> T {}
   func waitOrDie() async throws -> T {}
-  // TODO: When overriding an async method with a sync method is possible, this case should also be tested.
-  // See https://forums.swift.org/t/override-functions-behaves-differently-in-async-and-throws/83998/14
+  // TODO: test sync override of async method (https://github.com/swiftlang/swift/issues/88367)
   // func retry() async {}
   var isReady: Bool { get async {} }
   subscript(waitingOn i: Int) -> T { get async {} }
