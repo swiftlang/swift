@@ -2295,7 +2295,7 @@ function Build-Compilers([Hashtable] $Platform, [string] $Variant) {
 
   $Settings = @{
     FallbackLibrarySearchPaths = @("usr/bin")
-    Identifier = "${ToolchainIdentifier}"
+    Identifier = "${ToolchainIdentifier}.${Variant}"
     Version = "${ProductVersion}"
   }
   Write-PList -Settings $Settings -Path "$($Platform.ToolchainInstallRoot)\ToolchainInfo.plist"
@@ -3134,10 +3134,8 @@ function Write-SDKSettings([OS] $OS, [string] $Identifier = $OS.ToString()) {
     VersionMap = @{}
     HeaderSearchPaths = @( "usr/include" );
     LibrarySearchPaths = @();
-    Toolchains = @( "${ToolchainIdentifier}" );
     DefaultProperties = @{
       PLATFORM_NAME = $OS.ToString().ToLowerInvariant()
-      DEFAULT_COMPILER = "${ToolchainIdentifier}"
     }
     SupportedTargets = @{
       $OS.ToString().ToLowerInvariant() = @{
