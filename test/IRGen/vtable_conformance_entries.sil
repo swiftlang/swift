@@ -15,11 +15,11 @@ public protocol P : C {
 public protocol Q : C {
 }
 
-// CHECK-LABEL: @"$s4test1CCMf" = internal global <{{.*}}> <{ ptr null, ptr @"$s4test1CCAA1PAAWP", ptr null, ptr @"$s4test1CCfD",
+// CHECK-LABEL: @"$s4test1CCMf" = internal global <{{.*}}> <{ ptr null, ptr @"$s4test1CCAA1PAAWP", ptr null, ptr @"$s4test1CCfD{{.*}}",
 public class C : P {
 }
 
-// CHECK-LABEL: @"$s4test1DCMf" = internal global <{{.*}}> <{ ptr @"$s4test1DCAA1QAAWP", ptr @"$s4test1CCAA1PAAWP", ptr null, ptr @"$s4test1DCfD",
+// CHECK-LABEL: @"$s4test1DCMf" = internal global <{{.*}}> <{ ptr @"$s4test1DCAA1QAAWP", ptr @"$s4test1CCAA1PAAWP", ptr null, ptr @"$s4test1DCfD{{.*}}",
 public class D : C, Q {
 }
 
@@ -43,13 +43,13 @@ sil_vtable D {
 
 // CHECK-LABEL: define {{.*}} @unconditional_cast(ptr %0)
 // CHECK:         %1 = load ptr, ptr %0
-// CHECK:         %2 = getelementptr ptr, ptr %1, i32 -5
-// CHECK:         %3 = load ptr, ptr %2
-// CHECK:         %4 = icmp ne ptr %3, null
-// CHECK:         %5 = select i1 %4, ptr %0, ptr null
-// CHECK:         %6 = insertvalue { ptr, ptr } undef, ptr %5, 0
-// CHECK:         %7 = insertvalue { ptr, ptr } %6, ptr %3, 1
-// CHECK:         ret { ptr, ptr } %7
+// CHECK:         [[G:%.*]] = getelementptr ptr, ptr %{{[0-9]+}}, i32 -5
+// CHECK:         [[L:%.*]] = load ptr, ptr [[G]]
+// CHECK:         [[C:%.*]] = icmp ne ptr [[L]], null
+// CHECK:         [[S:%.*]] = select i1 [[C]], ptr %0, ptr null
+// CHECK:         [[I1:%.*]] = insertvalue { ptr, ptr } undef, ptr [[S]], 0
+// CHECK:         [[I2:%.*]] = insertvalue { ptr, ptr } [[I1]], ptr [[L]], 1
+// CHECK:         ret { ptr, ptr } [[I2]]
 sil @unconditional_cast : $@convention(thin) (@owned C) -> @owned any Q {
 bb0(%0 : $C):
   %1 = unconditional_checked_cast [prohibit_isolated_conformances] %0 to any Q
@@ -58,12 +58,12 @@ bb0(%0 : $C):
 
 // CHECK-LABEL: define {{.*}} @conditional_cast(ptr %0)
 // CHECK:         %1 = load ptr, ptr %0
-// CHECK:         %2 = getelementptr ptr, ptr %1, i32 -5
-// CHECK:         %3 = load ptr, ptr %2
-// CHECK:         %4 = icmp ne ptr %3, null
-// CHECK:         %5 = select i1 %4, ptr %0, ptr null
-// CHECK:         %6 = icmp ne ptr %5, null
-// CHECK:         br i1 %6,
+// CHECK:         [[G:%.*]] = getelementptr ptr, ptr %{{[0-9]+}}, i32 -5
+// CHECK:         [[L:%.*]] = load ptr, ptr [[G]]
+// CHECK:         [[C:%.*]] = icmp ne ptr [[L]], null
+// CHECK:         [[S:%.*]] = select i1 [[C]], ptr %0, ptr null
+// CHECK:         [[I:%.*]] = icmp ne ptr [[S]], null
+// CHECK:         br i1 [[I]],
 sil @conditional_cast : $@convention(thin) (@owned C) -> @owned Optional<any Q> {
 bb0(%0 : $C):
   checked_cast_br [prohibit_isolated_conformances] C in %0 to any Q, bb1, bb2

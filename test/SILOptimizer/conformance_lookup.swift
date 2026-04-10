@@ -43,7 +43,7 @@ public class Base {
 // CHECK-SIL-NEXT:    no_conformance P
 // CHECK-SIL-NEXT:    no_conformance P2
 // CHECK-SIL-NEXT:    #Base.init
-// CHECK-IR-MODULE-LABEL: @"$s6Module1CCMf" = internal global {{.*}} <{ ptr null, ptr null, ptr null, ptr @"$s6Module1CCfD",
+// CHECK-IR-MODULE-LABEL: @"$s6Module1CCMf" = internal global {{.*}} <{ ptr null, ptr null, ptr null, ptr @"$s6Module1CCfD{{.*}}",
 public class C: Base {
   override public init() { super.init() }
 }
@@ -52,7 +52,7 @@ public class C: Base {
 // CHECK-SIL-NEXT:    conformance D: P module Module
 // CHECK-SIL-NEXT:    no_conformance P2
 // CHECK-SIL-NEXT:    #Base.init
-// CHECK-IR-MODULE-LABEL: @"$s6Module1DCMf" = internal global {{.*}} <{ ptr null, ptr @"$s6Module1DCAA1PAAWP", ptr null, ptr @"$s6Module1DCfD",
+// CHECK-IR-MODULE-LABEL: @"$s6Module1DCMf" = internal global {{.*}} <{ ptr null, ptr @"$s6Module1DCAA1PAAWP", ptr null, ptr @"$s6Module1DCfD{{.*}}",
 public final class D: C, P {
   var x = 17
 
@@ -67,7 +67,7 @@ public final class D: C, P {
 // CHECK-SIL-NEXT:    conformance D2: P module Module
 // CHECK-SIL-NEXT:    conformance D2: P2 module Module
 // CHECK-SIL-NEXT:    #Base.init
-// CHECK-IR-MODULE-LABEL: @"$s6Module2D2CMf" = internal global {{.*}} <{ ptr @"$s6Module2D2CAA2P2AAWP", ptr @"$s6Module2D2CAA1PAAWP", ptr null, ptr @"$s6Module2D2CfD",
+// CHECK-IR-MODULE-LABEL: @"$s6Module2D2CMf" = internal global {{.*}} <{ ptr @"$s6Module2D2CAA2P2AAWP", ptr @"$s6Module2D2CAA1PAAWP", ptr null, ptr @"$s6Module2D2CfD{{.*}}",
 public final class D2: C, P2 {
   var x = 27
 
@@ -85,7 +85,7 @@ public final class D2: C, P2 {
 // CHECK-SIL-NEXT:    no_conformance P
 // CHECK-SIL-NEXT:    no_conformance P2
 // CHECK-SIL-NEXT:    #Base.init
-// CHECK-IR-MODULE-LABEL: @"$s6Module1ECMf" = internal global {{.*}} <{ ptr null, ptr null, ptr null, ptr @"$s6Module1ECfD",
+// CHECK-IR-MODULE-LABEL: @"$s6Module1ECMf" = internal global {{.*}} <{ ptr null, ptr null, ptr null, ptr @"$s6Module1ECfD{{.*}}",
 public class E: C {
   override public init() {}
 }
@@ -94,7 +94,7 @@ public class E: C {
 // CHECK-SIL-MODULE-NEXT:    conformance E2: P module Module
 // CHECK-SIL-MODULE-NEXT:    no_conformance P2
 // CHECK-SIL-MODULE-NEXT:    #Base.init
-// CHECK-IR-MODULE-LABEL: @"$s6Module2E2CMf" = internal global {{.*}} <{ ptr null, ptr @"$s6Module2E2CAA1PAAWP", ptr null, ptr @"$s6Module2E2CfD",
+// CHECK-IR-MODULE-LABEL: @"$s6Module2E2CMf" = internal global {{.*}} <{ ptr null, ptr @"$s6Module2E2CAA1PAAWP", ptr null, ptr @"$s6Module2E2CfD{{.*}}",
 public class E2: E, P {
   public func foo() {
     print("E2.foo")
@@ -105,7 +105,7 @@ public class E2: E, P {
 // CHECK-SIL-NEXT:    no_conformance P2
 // CHECK-SIL-NEXT:    no_conformance Q
 // CHECK-SIL-NEXT:    #Base.init
-// CHECK-IR-MODULE-LABEL: @"$s6Module1FCMf" = internal global {{.*}} <{ ptr null, ptr null, ptr null, ptr null, ptr @"$s6Module1FCfD",
+// CHECK-IR-MODULE-LABEL: @"$s6Module1FCMf" = internal global {{.*}} <{ ptr null, ptr null, ptr null, ptr null, ptr @"$s6Module1FCfD{{.*}}",
 public class F: E {
   override public init() {}
 }
@@ -115,7 +115,7 @@ public class F: E {
 // CHECK-SIL-NEXT:    no_conformance P2
 // CHECK-SIL-NEXT:    conformance G: Q module Module
 // CHECK-SIL-NEXT:    #Base.init
-// CHECK-IR-MODULE-LABEL: @"$s6Module1GCMf" = internal global {{.*}} <{ ptr @"$s6Module1GCAA1QAAWP", ptr null, ptr null, ptr null, ptr @"$s6Module1GCfD",
+// CHECK-IR-MODULE-LABEL: @"$s6Module1GCMf" = internal global {{.*}} <{ ptr @"$s6Module1GCAA1QAAWP", ptr null, ptr null, ptr null, ptr @"$s6Module1GCfD{{.*}}",
 public class G: F, Q {
   override public init() {}
 
@@ -129,7 +129,7 @@ public class G: F, Q {
 // CHECK-SIL-NEXT:    no_conformance P2
 // CHECK-SIL-NEXT:    conformance H: inherit (G: Q module Module)
 // CHECK-SIL-NEXT:    #Base.init
-// CHECK-IR-MODULE-LABEL: @"$s6Module1HCMf" = internal global {{.*}} <{ ptr @"$s6Module1GCAA1QAAWP", ptr null, ptr null, ptr null, ptr @"$s6Module1HCfD",
+// CHECK-IR-MODULE-LABEL: @"$s6Module1HCMf" = internal global {{.*}} <{ ptr @"$s6Module1GCAA1QAAWP", ptr null, ptr null, ptr null, ptr @"$s6Module1HCfD{{.*}}",
 public final class H: G {
   override public init() {}
 }
@@ -138,7 +138,7 @@ public final class H: G {
 // CHECK-SIL-NEXT:    no_conformance P
 // CHECK-SIL-NEXT:    no_conformance P2
 // CHECK-SIL-NEXT:    #Base.init
-// CHECK-IR-MODULE-LABEL: @"$s6Module1ICMf" = internal global {{.*}} <{ ptr null, ptr null, ptr null, ptr @"$s6Module1ICfD",
+// CHECK-IR-MODULE-LABEL: @"$s6Module1ICMf" = internal global {{.*}} <{ ptr null, ptr null, ptr null, ptr @"$s6Module1ICfD{{.*}}",
 public final class I: E {
   override public init() {}
 }
@@ -177,10 +177,10 @@ open class D4: C4, P4 {
 
 // CHECK-IR-MODULE-LABEL: define {{.*}} @"$s6Module6cast2PyAA1P_pSgAA1CCF"
 // CHECK-IR-MODULE:         %1 = load ptr, ptr %0  
-// CHECK-IR-MODULE-64-NEXT: %2 = getelementptr i8, ptr %1, i64 -32
-// CHECK-IR-MODULE-32-NEXT: %2 = getelementptr i8, ptr %1, i32 -16
-// CHECK-IR-MODULE-NEXT:    %3 = load ptr, ptr %2
-// CHECK-IR-MODULE-NEXT:    icmp eq ptr %3, null
+// CHECK-IR-MODULE-64:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i64 -32
+// CHECK-IR-MODULE-32:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i32 -16
+// CHECK-IR-MODULE-NEXT:    [[L:%.*]] = load ptr, ptr [[G]]
+// CHECK-IR-MODULE-NEXT:    icmp eq ptr [[L]], null
 // CHECK:                   ret
 @inline(never)
 func cast2P(_ c: C) -> P? {
@@ -189,10 +189,10 @@ func cast2P(_ c: C) -> P? {
 
 // CHECK-IR-MODULE-LABEL: define {{.*}} @"$s6Module7cast2P2yAA0C0_pSgAA1CCF"
 // CHECK-IR-MODULE:         %1 = load ptr, ptr %0  
-// CHECK-IR-MODULE-64-NEXT: %2 = getelementptr i8, ptr %1, i64 -40
-// CHECK-IR-MODULE-32-NEXT: %2 = getelementptr i8, ptr %1, i32 -20
-// CHECK-IR-MODULE-NEXT:    %3 = load ptr, ptr %2
-// CHECK-IR-MODULE-NEXT:    icmp eq ptr %3, null
+// CHECK-IR-MODULE-64:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i64 -40
+// CHECK-IR-MODULE-32:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i32 -20
+// CHECK-IR-MODULE-NEXT:    [[L:%.*]] = load ptr, ptr [[G]]
+// CHECK-IR-MODULE-NEXT:    icmp eq ptr [[L]], null
 // CHECK:                   ret
 @inline(never)
 func cast2P2(_ c: C) -> P2? {
@@ -201,10 +201,10 @@ func cast2P2(_ c: C) -> P2? {
 
 // CHECK-IR-MODULE-LABEL: define {{.*}} @"$s6Module6cast2QyAA1Q_pSgAA1FCF"
 // CHECK-IR-MODULE:         %1 = load ptr, ptr %0  
-// CHECK-IR-MODULE-64-NEXT: %2 = getelementptr i8, ptr %1, i64 -48
-// CHECK-IR-MODULE-32-NEXT: %2 = getelementptr i8, ptr %1, i32 -24
-// CHECK-IR-MODULE-NEXT:    %3 = load ptr, ptr %2
-// CHECK-IR-MODULE-NEXT:    icmp eq ptr %3, null
+// CHECK-IR-MODULE-64:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i64 -48
+// CHECK-IR-MODULE-32:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i32 -24
+// CHECK-IR-MODULE-NEXT:    [[L:%.*]] = load ptr, ptr [[G]]
+// CHECK-IR-MODULE-NEXT:    icmp eq ptr [[L]], null
 // CHECK:                   ret
 @inline(never)
 func cast2Q(_ c: F) -> Q? {
@@ -309,10 +309,10 @@ import Module
 
 // CHECK-IR-MAIN-LABEL: define {{.*}} @"$s4Main6cast2Py6Module1P_pSgAC1CCF"
 // CHECK-IR-MAIN:         %1 = load ptr, ptr %0  
-// CHECK-IR-MAIN-64-NEXT: %2 = getelementptr i8, ptr %1, i64 -32
-// CHECK-IR-MAIN-32-NEXT: %2 = getelementptr i8, ptr %1, i32 -16
-// CHECK-IR-MAIN-NEXT:    %3 = load ptr, ptr %2
-// CHECK-IR-MAIN-NEXT:    icmp eq ptr %3, null
+// CHECK-IR-MAIN-64:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i64 -32
+// CHECK-IR-MAIN-32:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i32 -16
+// CHECK-IR-MAIN-NEXT:    [[L:%.*]] = load ptr, ptr [[G]]
+// CHECK-IR-MAIN-NEXT:    icmp eq ptr [[L]], null
 // CHECK:                   ret
 @inline(never)
 func cast2P(_ c: C) -> P? {
@@ -321,10 +321,10 @@ func cast2P(_ c: C) -> P? {
 
 // CHECK-IR-MAIN-LABEL: define {{.*}} @"$s4Main7cast2P2y6Module0C0_pSgAC1CCF"
 // CHECK-IR-MAIN:         %1 = load ptr, ptr %0  
-// CHECK-IR-MAIN-64-NEXT: %2 = getelementptr i8, ptr %1, i64 -40
-// CHECK-IR-MAIN-32-NEXT: %2 = getelementptr i8, ptr %1, i32 -20
-// CHECK-IR-MAIN-NEXT:    %3 = load ptr, ptr %2
-// CHECK-IR-MAIN-NEXT:    icmp eq ptr %3, null
+// CHECK-IR-MAIN-64:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i64 -40
+// CHECK-IR-MAIN-32:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i32 -20
+// CHECK-IR-MAIN-NEXT:    [[L:%.*]] = load ptr, ptr [[G]]
+// CHECK-IR-MAIN-NEXT:    icmp eq ptr [[L]], null
 // CHECK:                   ret
 @inline(never)
 func cast2P2(_ c: C) -> P2? {
@@ -333,10 +333,10 @@ func cast2P2(_ c: C) -> P2? {
 
 // CHECK-IR-MAIN-LABEL: define {{.*}} @"$s4Main6cast2Qy6Module1Q_pSgAC1FCF"
 // CHECK-IR-MAIN:         %1 = load ptr, ptr %0  
-// CHECK-IR-MAIN-64-NEXT: %2 = getelementptr i8, ptr %1, i64 -48
-// CHECK-IR-MAIN-32-NEXT: %2 = getelementptr i8, ptr %1, i32 -24
-// CHECK-IR-MAIN-NEXT:    %3 = load ptr, ptr %2
-// CHECK-IR-MAIN-NEXT:    icmp eq ptr %3, null
+// CHECK-IR-MAIN-64:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i64 -48
+// CHECK-IR-MAIN-32:      [[G:%.*]] = getelementptr i8, ptr %{{[0-9]+}}, i32 -24
+// CHECK-IR-MAIN-NEXT:    [[L:%.*]] = load ptr, ptr [[G]]
+// CHECK-IR-MAIN-NEXT:    icmp eq ptr [[L]], null
 // CHECK:                   ret
 @inline(never)
 func cast2Q(_ c: F) -> Q? {
