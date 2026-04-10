@@ -317,7 +317,6 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableParameters>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowAndMutateAccessors>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowInout>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>

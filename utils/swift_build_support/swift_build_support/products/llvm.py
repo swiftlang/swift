@@ -430,11 +430,6 @@ class LLVM(cmake_product.CMakeProduct):
             # outside of `build-script` (e.g. with `run-test`)
             build_targets.append('LLVMTestingSupport')
 
-        build_root = os.path.dirname(self.build_dir)
-        host_machine_target = targets.StdlibDeploymentTarget.host_target().name
-        host_build_dir = os.path.join(build_root, 'llvm-{}'.format(
-            host_machine_target))
-
         if self.is_cross_compile_target(host_target):
             build_root = os.path.dirname(self.build_dir)
             host_machine_target = targets.StdlibDeploymentTarget.host_target().name
