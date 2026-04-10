@@ -108,7 +108,7 @@ extension Sequence {
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_alwaysEmitIntoClient
   @warn_unqualified_access
-  public func min<E: Error>(
+  public func min<E: Error>( // AsyncSequence now has an untyped throws duplicate of this method to resolve ambiguity
     by areInIncreasingOrder: (Element, Element) throws(E) -> Bool
   ) throws(E) -> Element? {
     var it = makeIterator()
@@ -167,7 +167,7 @@ extension Sequence {
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_alwaysEmitIntoClient
   @warn_unqualified_access
-  public func max<E: Error>(
+  public func max<E: Error>( // AsyncSequence now has an untyped throws duplicate of this method to resolve ambiguity
     by areInIncreasingOrder: (Element, Element) throws(E) -> Bool
   ) throws(E) -> Element? {
     var it = makeIterator()
@@ -591,7 +591,7 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_alwaysEmitIntoClient
-  public func contains<E: Error>(
+  public func contains<E: Error>( // AsyncSequence now has an untyped throws duplicate of this method to resolve ambiguity
     where predicate: (Element) throws(E) -> Bool
   ) throws(E) -> Bool {
     for e in self {
@@ -637,7 +637,7 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_alwaysEmitIntoClient
-  public func allSatisfy<E: Error>(
+  public func allSatisfy<E: Error>( // AsyncSequence now has an untyped throws duplicate of this method to resolve ambiguity
     _ predicate: (Element) throws(E) -> Bool
   ) throws(E) -> Bool {
     return try !contains { element throws(E) in try !predicate(element) }
@@ -778,7 +778,7 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_alwaysEmitIntoClient
-  public func reduce<Result, E: Error>(
+  public func reduce<Result, E: Error>( // AsyncSequence now has an untyped throws duplicate of this method to resolve ambiguity
     _ initialResult: Result,
     _ nextPartialResult:
       (_ partialResult: Result, Element) throws(E) -> Result
@@ -854,7 +854,7 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_alwaysEmitIntoClient
-  public func reduce<Result, E: Error>(
+  public func reduce<Result, E: Error>( // AsyncSequence now has an untyped throws duplicate of this method to resolve ambiguity
     into initialResult: __owned Result,
     _ updateAccumulatingResult:
       (_ partialResult: inout Result, Element) throws(E) -> ()
