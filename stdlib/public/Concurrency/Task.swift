@@ -642,7 +642,7 @@ extension Task {
   @available(SwiftStdlib 6.2, *)
   public var name: String? {
     if #available(StdlibDeploymentTarget 6.4, *) {
-      if let name = _getTaskName(self._task) {
+      if let name = unsafe _getTaskName(self._task) {
         unsafe String(cString: name)
       } else {
         nil
@@ -909,7 +909,7 @@ public struct UnsafeCurrentTask {
   @available(SwiftStdlib 6.2, *)
   public var name: String? {
     if #available(StdlibDeploymentTarget 6.4, *) {
-      if let name = _getTaskName(self._task) {
+      if let name = unsafe _getTaskName(self._task) {
         unsafe String(cString: name)
       } else {
         nil
@@ -924,14 +924,15 @@ public struct UnsafeCurrentTask {
 @available(*, unavailable)
 extension UnsafeCurrentTask: Sendable { }
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.2, *)
 extension ExecutorJob {
   /// If this job is a swift concurrency task return the ``UnsafeCurrentTask`` handle for it.
   ///
   /// Not all jobs are tasks so this operation will return `nil` for kinds of jobs other than tasks.
-  @available(SwiftStdlib 6.4, *)
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var unsafeCurrentTask: UnsafeCurrentTask? {
-    guard _jobGetKind(self.context) == 0 else { // == JobKind::Task
+    guard self.kind == .task else {
       return nil
     }
 
