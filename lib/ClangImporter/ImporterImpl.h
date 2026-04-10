@@ -34,6 +34,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
@@ -2209,6 +2210,9 @@ bool hasIteratorAPIAttr(const clang::Decl *decl);
 bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 bool hasNonCopyableAttr(const clang::RecordDecl *decl);
 bool hasEscapableAttr(const clang::RecordDecl *decl);
+CxxValueSemanticsKind
+getCxxValueSemanticsKind(const clang::Type *type,
+                         ClangImporter::Implementation &Impl);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
 

@@ -6317,9 +6317,9 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
 
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types, unless the base accessor returns it by value.
-  bool useAddress = contextTy->isNoncopyable() &&
-                    (baseClassVar->getReadImpl() == ReadImplKind::Stored ||
-                     baseClassVar->getAccessor(AccessorKind::Address));
+  bool useAddress = baseClassVar->getAccessor(AccessorKind::Address) ||
+                    (contextTy->isNoncopyable() &&
+                     baseClassVar->getReadImpl() == ReadImplKind::Stored);
 
   ParameterList *bodyParams = nullptr;
   if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
@@ -6467,12 +6467,6 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
   }
 
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    auto contextTy =
-        newContext->mapTypeIntoEnvironment(subscript->getElementInterfaceType());
-    // Subscripts that return non-copyable types are not yet supported.
-    // See: https://github.com/apple/swift/issues/70047.
-    if (contextTy->isNoncopyable())
-      return nullptr;
     auto out = SubscriptDecl::create(
         subscript->getASTContext(), subscript->getName(), subscript->getStaticLoc(),
         subscript->getStaticSpelling(), subscript->getSubscriptLoc(),
@@ -8209,6 +8203,13 @@ bool importer::hasNonEscapableAttr(const clang::RecordDecl *decl) {
 
 bool importer::hasEscapableAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "Escapable");
+}
+
+CxxValueSemanticsKind
+importer::getCxxValueSemanticsKind(const clang::Type *type,
+                                   ClangImporter::Implementation &Impl) {
+  return evaluateOrDefault(Impl.SwiftContext.evaluator,
+                           CxxValueSemantics({type, &Impl}), {});
 }
 
 /// Recursively checks that there are no pointers in any fields or base classes.

@@ -2184,13 +2184,6 @@ namespace {
           .isReference();
     }
 
-    bool recordIsCopyable(const clang::RecordDecl *decl) {
-      auto semanticsKind = evaluateOrDefault(
-          Impl.SwiftContext.evaluator,
-          CxxValueSemantics({decl->getTypeForDecl(), &Impl}), {});
-      return semanticsKind == CxxValueSemanticsKind::Copyable;
-    }
-
     void markReturnsUnsafeNonescapable(AbstractFunctionDecl *fd) {
       fd->addAttribute(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
 
@@ -2489,7 +2482,8 @@ namespace {
             loc, ArrayRef<InheritedEntry>(), nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
-      if (!recordIsCopyable(decl)) {
+      if (getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) !=
+          CxxValueSemanticsKind::Copyable) {
         if (decl->isInStdNamespace() && decl->getName() == "promise") {
           // Do not import std::promise.
           return nullptr;
@@ -3361,9 +3355,8 @@ namespace {
 
       // It is important that we bail on an unimportable record *before* we import
       // any of its members or cache the decl.
-      auto valueSemanticsKind = evaluateOrDefault(
-          Impl.SwiftContext.evaluator,
-          CxxValueSemantics({decl->getTypeForDecl(), &Impl}), {});
+      auto valueSemanticsKind =
+          getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl);
       if (valueSemanticsKind == CxxValueSemanticsKind::Unknown) {
 
         HeaderLoc loc(decl->getLocation());
@@ -3611,9 +3604,8 @@ namespace {
       // when it comes to getter/setter generation.
       if (auto parent = dyn_cast<clang::CXXRecordDecl>(
               decl->getAnonField()->getParent())) {
-        auto semanticsKind = evaluateOrDefault(
-            Impl.SwiftContext.evaluator,
-            CxxValueSemantics({parent->getTypeForDecl(), &Impl}), {});
+        auto semanticsKind =
+            getCxxValueSemanticsKind(parent->getTypeForDecl(), Impl);
         if (semanticsKind == CxxValueSemanticsKind::Unknown)
           return nullptr;
       }
