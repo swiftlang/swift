@@ -1343,6 +1343,23 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   return nullptr;
 }
 
+static bool isPrecededByUnconditionalFail(SILInstruction *inst) {
+  // It's fine to just check the previous instruction (and not all preceding
+  // instructions in the block), because - even if another SILCombine optimization
+  // inserts an instruction between the `cond_fail` and the cast - it will not
+  // end in an infinite optimization loop. In worst case two cond_fail instructions
+  // will be generated.
+  if (SILInstruction *pred = inst->getPreviousInstruction()) {
+    if (auto *cf = dyn_cast<CondFailInst>(pred)) {
+      if (auto *literal = dyn_cast<IntegerLiteralInst>(cf->getOperand())) {
+        if (!literal->getValue().isZero())
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
 ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     UnconditionalCheckedCastInst *Inst) {
   SILDynamicCastInst dynamicCast(Inst);
@@ -1353,6 +1370,10 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
       dynamicCast.classifyFeasibility(false /*allowWholeModule*/);
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
+    // Check if the cast was already optimized.
+    if (isPrecededByUnconditionalFail(Inst))
+      return nullptr;
+
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
@@ -1543,6 +1564,10 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
   }
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
+    // Check if the cast was already optimized.
+    if (isPrecededByUnconditionalFail(Inst))
+      return nullptr;
+
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
