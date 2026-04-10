@@ -355,6 +355,7 @@ EXPECTED_DEFAULTS = {
     'clean_install_destdir': False,
     'use_linker': None,
     'enable_new_runtime_build': False,
+    'continue_on_test_failure': False,
 }
 
 
@@ -933,4 +934,6 @@ EXPECTED_OPTIONS = [
     StrOption('--llvm-install-components'),
     ChoicesOption('--use-linker', dest='use_linker', choices=['gold', 'lld']),
     EnableOption('--enable-new-runtime-build', dest='enable_new_runtime_build'),
+
+    EnableOption('--continue-on-test-failure', dest='continue_on_test_failure'),
 ]

@@ -259,9 +259,10 @@ FrontendSourceFileDepGraphFactory::FrontendSourceFileDepGraphFactory(
     const SourceFile *SF, llvm::vfs::OutputBackend &backend,
     StringRef outputPath, const DependencyTracker &depTracker,
     const bool alsoEmitDotFile)
-    : AbstractSourceFileDepGraphFactory(
-          SF->getASTContext().hadError(), outputPath, SF->getInterfaceHash(),
-          alsoEmitDotFile, SF->getASTContext().Diags, backend),
+    : AbstractSourceFileDepGraphFactory(SF->getASTContext().hadError(),
+                                        SF->getFilename(),
+                                        SF->getInterfaceHash(), alsoEmitDotFile,
+                                        SF->getASTContext().Diags, backend),
       SF(SF), depTracker(depTracker) {}
 
 //==============================================================================
