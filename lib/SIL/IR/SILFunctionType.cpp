@@ -1474,7 +1474,8 @@ public:
       return ParameterConvention::Indirect_In_Guaranteed;
     case ValueOwnership::Owned:
       if (kind == ConventionsKind::CFunction ||
-          kind == ConventionsKind::CFunctionType)
+          kind == ConventionsKind::CFunctionType ||
+          kind == ConventionsKind::CXXMethod)
         return getIndirectParameter(index, type, substTL);
       return ParameterConvention::Indirect_In;
     }

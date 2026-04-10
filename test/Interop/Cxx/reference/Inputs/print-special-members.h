@@ -19,3 +19,11 @@ struct Copyable {
 
 inline void byRValueRef(MoveOnly&& x) {}
 inline void byRValueRef(Copyable&& x) {}
+
+template <typename T>
+struct UniversalRef {
+  inline void byRValueRef(T &&x) {}
+};
+
+using UniversalMoveOnly = UniversalRef<MoveOnly>;
+using UniversalCopyable = UniversalRef<Copyable>;

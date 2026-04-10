@@ -34,6 +34,20 @@ func moveOnly2() {
 // CHECK-DASH-ONONE-NEXT: MoveOnly 2 destroyed
 }
 
+func moveOnly3() {
+    var u = UniversalMoveOnly.init()
+    let x = MoveOnly()
+// CHECK-DASH-ONONE: MoveOnly 0 created
+// CHECK-DASH-O: MoveOnly 0 created
+    u.byRValueRef(consuming: x)
+// CHECK-DASH-ONONE-NEXT: MoveOnly 1 move-created
+// CHECK-DASH-O-NEXT: MoveOnly 1 move-created
+// CHECK-DASH-ONONE-NEXT: MoveOnly 0 destroyed
+// CHECK-DASH-O-NEXT: MoveOnly 0 destroyed
+// CHECK-DASH-ONONE-NEXT: MoveOnly 1 destroyed
+// CHECK-DASH-O-NEXT: MoveOnly 1 destroyed
+}
+
 func copyable1() {
     let x = Copyable()
 // CHECK-DASH-ONONE-NEXT: Copyable 0 created
@@ -60,11 +74,27 @@ func copyable2() {
 // CHECK-DASH-O-NEXT: Copyable 0 destroyed
 }
 
+func copyable3() {
+    var u = UniversalCopyable.init()
+    let x = Copyable()
+// CHECK-DASH-ONONE-NEXT: Copyable 0 created
+// CHECK-DASH-O-NEXT: Copyable 0 created
+    u.byRValueRef(consuming: x)
+// CHECK-DASH-ONONE-NEXT: Copyable 1 copy-created
+// CHECK-DASH-O-NEXT: Copyable 1 copy-created
+// CHECK-DASH-ONONE-NEXT: Copyable 1 destroyed
+// CHECK-DASH-O-NEXT: Copyable 1 destroyed
+// CHECK-DASH-ONONE-NEXT: Copyable 0 destroyed
+// CHECK-DASH-O-NEXT: Copyable 0 destroyed
+}
+
 func main() {
     moveOnly1()
     moveOnly2()
+    moveOnly3()
     copyable1()
     copyable2()
+    copyable3()
 }
 
 main()
