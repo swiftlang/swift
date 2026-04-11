@@ -145,6 +145,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
   registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
   registerForSILCombine(EndCOWMutationAddrInst.self, { run(EndCOWMutationAddrInst.self, $0) })
+  registerForSILCombine(DifferentiableFunctionInst.self, { run(DifferentiableFunctionInst.self, $0) })
 
   // Test passes
   registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })

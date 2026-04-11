@@ -1477,10 +1477,29 @@ final public class VectorBaseAddrInst : SingleValueInstruction, UnaryInstruction
   public var vector: Value { operand.value }
 }
 
-final public class DifferentiableFunctionInst: SingleValueInstruction {}
+public enum DifferentiableFunctionTypeComponent: Int {
+  case original = 0
+  case jvp = 1
+  case vjp = 2
+}
+
+final public class DifferentiableFunctionInst: SingleValueInstruction {
+  public func getExtractee(extractee: DifferentiableFunctionTypeComponent) -> Value? {
+    if bridged.DifferentiableFunctionInst_hasExtractee(extractee.rawValue) {
+      return bridged.DifferentiableFunctionInst_getExtractee(extractee.rawValue).value
+    }
+    return nil
+  }
+}
 
 final public class LinearFunctionInst: SingleValueInstruction {}
-final public class DifferentiableFunctionExtractInst: SingleValueInstruction {}
+
+final public class DifferentiableFunctionExtractInst: SingleValueInstruction {
+  public var extractee: DifferentiableFunctionTypeComponent {
+    DifferentiableFunctionTypeComponent(rawValue: bridged.DifferentiableFunctionExtractInst_getExtractee())!
+  }
+}
+
 final public class LinearFunctionExtractInst: SingleValueInstruction {}
 final public class DifferentiabilityWitnessFunctionInst: SingleValueInstruction {}
 
