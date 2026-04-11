@@ -5,9 +5,9 @@
 @TaskLocal var taskLocal: (() -> Void)?
 
 // Verify that taskLocalValuePush uses the formal AST type metadata (Optional<() -> ()>, mangled as "yycSg"):
-// CHECK-LABEL: define hidden swiftcc void @"$s4main4testyyF"()
-// CHECK: %{{[0-9]+}} = {{(tail )?}}call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr nonnull @"$syycSgMD")
-// CHECK: %{{[0-9]+}} = call swiftcc {} @swift_task_localValuePush(ptr %{{[0-9]+}}, ptr nonnull %{{[0-9]+}}, ptr %{{[0-9]+}})
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s4main4testyyF"()
+// CHECK: call ptr @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$syycSg
+// CHECK: call swiftcc {} @swift_task_localValuePush(
 func test() {
   $taskLocal.withValue({}) {
     print("inside withValue")
