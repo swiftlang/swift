@@ -22,35 +22,27 @@ module Function {
 #pragma once
 
 struct Incomplete;
-// cxx-note@-1 {{forward declaration of}}
-// cxx-note@-2 {{forward declaration of}}
-// cxx-note@-3 {{forward declaration of}}
+// cxx-note@-1 * {{forward declaration of}}
 
 // None of GoodStruct's members should prevent it from being imported sans error
 struct GoodStruct {
   GoodStruct() = default;
   GoodStruct(Incomplete);
 
-  // expected-swift-note@+3 {{explicitly marked unavailable here}}
-  // expected-swift-note@+2 {{explicitly marked unavailable here}}
-  // expected-swift-note@+1 {{explicitly marked unavailable here}}
+  // expected-swift-note@+1 * {{explicitly marked unavailable here}}
   Incomplete badReturn() const;
-  // cxx-note@-1 {{declared here}}
-  // cxx-note@-2 {{declared here}}
-  // cxx-note@-3 {{declared here}}
+  // cxx-note@-1 * {{declared here}}
 
-  // expected-swift-note@+2 {{unavailable (cannot import)}}
-  // expected-swift-note@+1 {{unavailable (cannot import)}}
+  // expected-swift-note@+1 * {{unavailable (cannot import)}}
   void badArg(Incomplete) const;
 
-  // expected-swift-note@+2 {{unavailable (cannot import)}}
-  // expected-swift-note@+1 {{unavailable (cannot import)}}
+  // expected-swift-note@+1 * {{unavailable (cannot import)}}
   static Incomplete badStatic(Incomplete);
 
   void overloadsSameNumArgs(int) const;
   void overloadsSameNumArgs(Incomplete) const;
 
-  // expected-swift-note@+1 {{declared here}}
+  // expected-swift-note@+1 * {{declared here}}
   void overloadsDiffNumArgs(int, int) const;
   void overloadsDiffNumArgs(Incomplete) const;
 

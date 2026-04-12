@@ -51,24 +51,20 @@ struct GoodStruct {
   // NOTE: if the above has only one argument, Bro<Ken> will get instantiated
   // while considering the copy constructor overload candidate.
 
-  // expected-swift-note@+3 {{explicitly marked unavailable here}}
-  // expected-swift-note@+2 {{explicitly marked unavailable here}}
-  // expected-swift-note@+1 {{explicitly marked unavailable here}}
+  // expected-swift-note@+1 * {{explicitly marked unavailable here}}
   Bro<Ken> badReturn() const;
-  // expected-swift-note@-1 {{requested here}}
+  // expected-swift-note@-1 * {{requested here}}
 
-  // expected-swift-note@+2 {{unavailable (cannot import)}}
-  // expected-swift-note@+1 {{unavailable (cannot import)}}
+  // expected-swift-note@+1 * {{unavailable (cannot import)}}
   void badArg(Bro<Ken>) const;
 
-  // expected-swift-note@+2 {{unavailable (cannot import)}}
-  // expected-swift-note@+1 {{unavailable (cannot import)}}
+  // expected-swift-note@+1 * {{unavailable (cannot import)}}
   static Bro<Ken> badStatic(Bro<Ken>);
 
   void overloadsSameNumArgs(int) const;
   void overloadsSameNumArgs(Bro<Ken>) const;
 
-  // expected-swift-note@+1 {{declared here}}
+  // expected-swift-note@+1 * {{declared here}}
   void overloadsDiffNumArgs(int, int) const;
   void overloadsDiffNumArgs(Bro<Ken>) const;
 
