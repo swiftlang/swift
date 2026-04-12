@@ -1,4 +1,4 @@
-# swift_build_support/products/wasmstdlib.py --------------------*- python -*-
+# swift_build_support/products/wasistdlib.py --------------------*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
@@ -21,7 +21,7 @@ from .. import cmake
 from .. import shell
 
 
-class WasmStdlib(cmake_product.CMakeProduct):
+class WASIStdlib(cmake_product.CMakeProduct):
     @classmethod
     def product_source_name(cls):
         return "swift"
@@ -35,10 +35,10 @@ class WasmStdlib(cmake_product.CMakeProduct):
         return False
 
     def should_build(self, host_target):
-        return self.args.build_wasmstdlib
+        return self.args.build_wasistdlib
 
     def should_test(self, host_target):
-        return self.args.test_wasmstdlib
+        return self.args.test_wasistdlib
 
     def build(self, host_target):
         self._build(host_target, 'wasm32-wasip1', 'wasip1-wasm32')
@@ -288,7 +288,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
                 swift.Swift]
 
 
-class WasmThreadsStdlib(WasmStdlib):
+class WASIThreadsStdlib(WASIStdlib):
     def build(self, host_target):
         self._build(host_target, 'wasm32-wasip1-threads', 'wasip1-threads-wasm32')
 

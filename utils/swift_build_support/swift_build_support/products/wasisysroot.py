@@ -34,7 +34,7 @@ class WASISysroot(product.Product):
     def should_build(self, host_target):
         # WASI sysroot should always be built if standard library is being
         # built for WebAssembly.
-        return self.args.build_wasmstdlib
+        return self.args.build_wasistdlib
 
     def should_test(self, host_target):
         return False
