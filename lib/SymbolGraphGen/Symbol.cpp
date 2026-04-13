@@ -471,6 +471,19 @@ void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
                                              OS);
       }
     });
+  } else if (const auto *MD = dyn_cast_or_null<MacroDecl>(D)) {
+    OS.attributeObject("functionSignature", [&]() {
+      // Parameters
+      if (const auto *ParamList = MD->getParameterList()) {
+        serializeParameterList(ParamList);
+      }
+
+      // Returns
+      if (const auto ReturnType = MD->getCachedResultInterfaceType()) {
+        Graph->serializeDeclarationFragments("returns", ReturnType.value(),
+                                             BaseType, OS);
+      }
+    });
   }
 }
 
