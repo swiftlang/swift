@@ -76,7 +76,7 @@ Default: "r28c"
 
 .PARAMETER AndroidAPILevel
 The API Level to target when building the Android SDKs. Must be between 21 and 36.
-Default: 24
+Default: 23
 
 .PARAMETER AndroidSDKVersions
 An array of SDKs to build for the Android OS.
@@ -182,7 +182,7 @@ param
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
   [string] $AndroidNDKVersion = "r28c",
   [ValidateRange(21, 36)]
-  [int] $AndroidAPILevel = 24,
+  [int] $AndroidAPILevel = 23,
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
   [ValidateSet("dynamic", "static")]
   [string[]] $AndroidSDKLinkModes = @("dynamic", "static"),
