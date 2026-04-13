@@ -9,6 +9,7 @@
 
 // UNSUPPORTED: back_deployment_runtime
 
+// Use this class to detect if the values are retained longer than necessary
 final class Something {
   let int: Int
   init(int: Int) {
@@ -27,6 +28,8 @@ func test_taskGroup_next() async {
 
     var sum = 0
     for await value in group {
+      // Uncomment to simulate a leak and verify the `leaks` detection actually works:
+      // _ = Unmanaged.passRetained(value)
       sum += value.int
     }
 
