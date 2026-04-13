@@ -121,7 +121,20 @@ private:
     // then filter out any lookups that don't match.
     if (!path.matches(name))
       return;
-    module->lookupValue(name, lookupKind, flags, localDecls);
+    if (path.empty()) {
+      module->lookupValue(name, lookupKind, flags, localDecls);
+    } else {
+      // Scoped import: look up into a temporary, then append non-macros.
+      // Macros cannot be scoped-imported (there is no `import macro` syntax),
+      // so filter them out to prevent `import struct M.Foo` from bringing a
+      // macro named `Foo` into scope.
+      SmallVector<ValueDecl *, 4> tmpDecls;
+      module->lookupValue(name, lookupKind, flags, tmpDecls);
+      for (auto *VD : tmpDecls) {
+        if (!isa<MacroDecl>(VD))
+          localDecls.push_back(VD);
+      }
+    }
   }
 };
 
@@ -149,8 +162,20 @@ private:
   void doLocalLookup(ModuleDecl *module, ImportPath::Access path,
                      OptionSet<ModuleLookupFlags> flags,
                      SmallVectorImpl<ValueDecl *> &localDecls) {
-    VectorDeclConsumer consumer(localDecls);
-    module->lookupVisibleDecls(path, consumer, lookupKind);
+    if (path.empty()) {
+      VectorDeclConsumer consumer(localDecls);
+      module->lookupVisibleDecls(path, consumer, lookupKind);
+    } else {
+      // Scoped import: collect into a temporary, then append non-macros.
+      // Macros cannot be scoped-imported (there is no `import macro` syntax).
+      SmallVector<ValueDecl *, 4> tmpDecls;
+      VectorDeclConsumer consumer(tmpDecls);
+      module->lookupVisibleDecls(path, consumer, lookupKind);
+      for (auto *VD : tmpDecls) {
+        if (!isa<MacroDecl>(VD))
+          localDecls.push_back(VD);
+      }
+    }
   }
 };
 
