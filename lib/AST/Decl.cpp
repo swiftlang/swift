@@ -2053,6 +2053,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 {
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
   Bits.ExtensionDecl.HasLazyConformances = false;
+  Bits.ExtensionDecl.IsMetatypeExtension = false;
   setTrailingWhereClause(trailingWhereClause);
 }
 
@@ -9431,6 +9432,18 @@ Type DeclContext::getSelfInterfaceType() const {
       return builtinTupleDecl->getTupleSelfType(dyn_cast<ExtensionDecl>(this));
 
     if (isa<ProtocolDecl>(nominalDecl)) {
+      // For metatype extensions, Self is the concrete existential type
+      // rather than the generic parameter.
+      for (auto *dc = this; dc; dc = dc->getParent()) {
+        if (auto *ext = dyn_cast<ExtensionDecl>(dc)) {
+          if (ext->isMetatypeExtension())
+            return ExistentialType::get(nominalDecl->getDeclaredInterfaceType());
+          break;
+        }
+        if (isa<NominalTypeDecl>(dc))
+          break;
+      }
+
       auto *genericParams = nominalDecl->getGenericParams();
       return genericParams->getParams().front()
           ->getDeclaredInterfaceType();

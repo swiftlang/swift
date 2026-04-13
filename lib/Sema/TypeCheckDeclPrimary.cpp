@@ -3880,6 +3880,26 @@ public:
       return;
     }
 
+    // Validate metatype extension constraints.
+    if (ED->isMetatypeExtension()) {
+      if (!ED->getASTContext().LangOpts.hasFeature(Feature::ProtocolMetatypeExtensions)) {
+        ED->diagnose(diag::metatype_extension_requires_flag);
+        ED->setInvalid();
+        return;
+      }
+      if (!isa<ProtocolDecl>(nominal)) {
+        ED->diagnose(diag::metatype_extension_non_protocol, extType);
+        ED->setInvalid();
+        return;
+      }
+      for (auto *member : ED->getMembers()) {
+        if (auto *VD = dyn_cast<ValueDecl>(member)) {
+          if (VD->isInstanceMember())
+            VD->diagnose(diag::metatype_extension_instance_member);
+        }
+      }
+    }
+
     if (!extType->hasError()) {
       // The first condition catches syntactic forms like
       //     protocol A & B { ... } // may be protocols or typealiases

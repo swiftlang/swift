@@ -10606,6 +10606,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
     };
 
+    // Metatype extension members are only accessible on the protocol
+    // metatype itself, not on conforming types.
+    if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+      if (ext->isMetatypeExtension() && !instanceTy->isExistentialType())
+        return;
+    }
+
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
 
@@ -10692,6 +10699,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                     ->hasTypeParameter()) {
 
       /* We're OK */
+    } else if (instanceTy->isExistentialType() &&
+               isa<ExtensionDecl>(decl->getDeclContext()) &&
+               cast<ExtensionDecl>(decl->getDeclContext())->isMetatypeExtension()) {
+      // Metatype extension members are directly accessible on the
+      // protocol metatype without requiring Self to be bound.
     } else if (hasStaticMembers && baseObjTy->is<MetatypeType>() &&
                instanceTy->isExistentialType()) {
       // Static member lookup on protocol metatype in generic context

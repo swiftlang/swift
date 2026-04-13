@@ -2154,6 +2154,13 @@ WARNING(extern_c_maybe_invalid_name, none,
 ERROR(extern_variable_initializer, none,
       "'@_extern' variable cannot have an initializer", ())
 
+ERROR(metatype_extension_requires_flag, none,
+      "protocol metatype extensions require '-enable-experimental-feature ProtocolMetatypeExtensions'", ())
+ERROR(metatype_extension_non_protocol, none,
+      "metatype extension can only extend a protocol, not %0", (Type))
+ERROR(metatype_extension_instance_member, none,
+      "instance members are not allowed in metatype extensions", ())
+
 // @_staticExclusiveOnly
 ERROR(attr_static_exclusive_only_disabled,none,
       "attribute requires '-enable-experimental feature StaticExclusiveOnly'", ())
