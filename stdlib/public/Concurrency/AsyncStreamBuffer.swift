@@ -240,7 +240,7 @@ final class _Storage<Element, Failure: Error>: @unchecked Sendable {
 
 extension _Storage._StateMachine {
   func getOnTermination() -> TerminationHandler? {
-    switch unsafe self.state {
+    switch unsafe self.state { // TODO: Return a TerminationHandler only in certain states
     case .idle(let idle):
       return idle.terminationHandler
 

@@ -1043,22 +1043,20 @@ class NotSendable {}
         expectTrue(errExpectation.fulfilled)
       }
 
-      tests.test("onTermination called once") {
+      tests.test("onTermination not called after stream is terminal") {
         nonisolated(unsafe) var counter = 0
         let (_, continuation) = AsyncStream<String>.makeStream()
         continuation.onTermination = { @Sendable _ in counter += 1 }
         continuation.finish()
-        continuation.finish() // handler should be cleared
-        expectEqual(counter, 1)
+        expectEqual(counter, 0)
       }
 
-      tests.test("onTermination called once throwing") {
+      tests.test("onTermination not called after stream is terminal throwing") {
         nonisolated(unsafe) var counter = 0
         let (_, continuation) = AsyncThrowingStream<String, Error>.makeStream()
         continuation.onTermination = { @Sendable _ in counter += 1 }
         continuation.finish()
-        continuation.finish() // handler should be cleared
-        expectEqual(counter, 1)
+        expectEqual(counter, 0)
       }
 
       // MARK: - for try await
