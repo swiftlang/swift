@@ -102,8 +102,6 @@ public:
   static bool isArgZeroRef(ArgTy &a = customTy) { return a.value == 0; }
 };
 
-// TODO: support default arguments of constructors
-// (https://github.com/apple/swift/issues/70124)
 struct HasCtorWithDefaultArg {
   int value;
 

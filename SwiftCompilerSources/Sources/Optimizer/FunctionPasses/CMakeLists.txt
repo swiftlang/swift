@@ -17,6 +17,7 @@ swift_compiler_sources(Optimizer
   ClosureSpecialization.swift
   ComputeEscapeEffects.swift
   ComputeSideEffects.swift
+  CondFailOptimization.swift
   CopyToBorrowOptimization.swift
   DeadAccessScopeElimination.swift
   DeadStoreElimination.swift

@@ -278,10 +278,12 @@ LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
 LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
+LANGUAGE_FEATURE(BuiltinTaskCancellationShield, 0, "Task Cancellation Shield Builtins")
 LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
 BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude private initialized properties from memberwise init")
 LANGUAGE_FEATURE(BuiltinMarkDependence, 0, "markDependence Builtin")
 LANGUAGE_FEATURE(BuiltinAddTaskLocalValue, 0, "addTaskLocalValue and removeTaskLocalValue builtins")
+SUPPRESSIBLE_LANGUAGE_FEATURE(TildeSendable, 518, "~Sendable for explicitly marking non-Sendable types")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
@@ -319,7 +321,6 @@ MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, LanguageMode::future)
 MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, LanguageMode::future)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, LanguageMode::future)
 UPCOMING_FEATURE(ImmutableWeakCaptures, 481, LanguageMode::future)
-UPCOMING_FEATURE(StrictAccessControl, 0, LanguageMode::future)
 
 //===----------------------------------------------------------------------===//
 // MARK: - Optional features
@@ -574,7 +575,7 @@ EXPERIMENTAL_FEATURE(DeprecateCompatMemberwiseInit, false)
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 
 /// Enable borrow/mutate accessors
-EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, true)
+LANGUAGE_FEATURE(BorrowAndMutateAccessors, 507, "borrow and mutate accessors")
 
 /// Enable borrowing for-in loops
 EXPERIMENTAL_FEATURE(BorrowingForLoop, false)
@@ -588,9 +589,6 @@ EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 /// 'Swift' availability is always standalone, even when targeting platforms
 /// that have a built-in Swift runtime. Implies 'SwiftRuntimeAvailability'.
 EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
-
-/// Allow use of `~Sendable`.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
 
 /// Allow use of protocol typed values in Embedded mode (`Any` and friends)
 EXPERIMENTAL_FEATURE(EmbeddedExistentials, true)
@@ -625,6 +623,9 @@ EXPERIMENTAL_FEATURE(BorrowInout, true)
 
 /// Allow access to the BorrowingSequence protocols/types outside the stdlib.
 EXPERIMENTAL_FEATURE(BorrowingSequence, true)
+
+/// Turns some source breaking access control warnings into errors.
+EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

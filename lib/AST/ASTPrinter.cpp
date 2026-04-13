@@ -8199,6 +8199,16 @@ public:
     Printer << "_";
   }
 
+  void visitJoinType(JoinType *T,
+                     NonRecursivePrintOptions nrOptions) {
+    Printer << "∨";
+  }
+
+  void visitMeetType(MeetType *T,
+                     NonRecursivePrintOptions nrOptions) {
+    Printer << "∧";
+  }
+
   void visitIntegerType(IntegerType *T, NonRecursivePrintOptions nrOptions) {
     if (T->isNegative()) {
       Printer << "-";

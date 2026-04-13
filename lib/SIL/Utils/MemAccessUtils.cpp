@@ -481,18 +481,6 @@ bool swift::maySynchronize(SILInstruction *instruction) {
   return isa<HopToExecutorInst>(instruction);
 }
 
-bool swift::mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction) {
-  if (FullApplySite::isa(instruction) || isa<EndApplyInst>(instruction) ||
-      isa<AbortApplyInst>(instruction)) {
-    return true;
-  }
-  bool retval = mayAccessPointer(instruction)
-             || mayLoadWeakOrUnowned(instruction)
-             || maySynchronize(instruction);
-  assert(!retval || !isa<BranchInst>(instruction) && "br as deinit barrier!?");
-  return retval;
-}
-
 //===----------------------------------------------------------------------===//
 //                         MARK: AccessRepresentation
 //===----------------------------------------------------------------------===//

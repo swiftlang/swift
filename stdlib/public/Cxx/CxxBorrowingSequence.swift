@@ -24,7 +24,9 @@ public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~E
   override associatedtype Element: ~Copyable
   override associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = CxxBorrowingIterator<Self>
   associatedtype RawIterator: UnsafeCxxInputIterator
-    where RawIterator.Pointee == Element, RawIterator.DereferenceResult == UnsafePointer<Element>
+    where RawIterator.Pointee == Element,
+          RawIterator.DereferenceResult: _Pointer,
+          RawIterator.DereferenceResult.Pointee == Element
 
   /// Do not implement this function manually in Swift.
   func __beginUnsafe() -> RawIterator
@@ -60,10 +62,10 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.Element: ~Copy
       return Span()
     }
 
-    let ptr = unsafe self.current.__operatorStar()
+    let rawPtr = self.current.__operatorStar()._rawValue
     self.current = self.current.successor()
     return unsafe _cxxOverrideLifetime(
-        Span(_unsafeStart: ptr, count: 1),
+        Span(_unsafeStart: UnsafePointer(rawPtr), count: 1),
         borrowing: self)
   }
 }
@@ -88,11 +90,11 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: U
       return Span()
     }
 
-    let ptr = unsafe self.current.__operatorStar()
+    let rawPtr = self.current.__operatorStar()._rawValue
     let distance = min(count, maximumCount)
     self.current += T.RawIterator.Distance(distance)
     return unsafe _cxxOverrideLifetime(
-        Span(_unsafeStart: ptr, count: distance),
+        Span(_unsafeStart: UnsafePointer(rawPtr), count: distance),
         borrowing: self)
   }
 }

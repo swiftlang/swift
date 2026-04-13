@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringMap.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 
@@ -172,6 +173,25 @@ private:
                            unsigned BufferID, unsigned DiagnosticLineNo) const;
 
   llvm::DenseMap<SourceLoc, unsigned> Expansions;
+
+  struct MarkerLocation {
+    unsigned BufferID;
+    unsigned Line;
+  };
+
+  /// Map from location marker names to their buffer and line number.
+  /// Populated by scanForMarkers() before parsing expected diagnostics.
+  llvm::StringMap<MarkerLocation> LocationMarkers;
+
+  /// Scan the buffer for location marker definitions (// #name).
+  void scanForMarkers(unsigned BufferID);
+
+  /// Check whether any location marker is defined at the given buffer and line.
+  bool hasMarkerAtLine(unsigned BufferID, unsigned Line) const;
+
+  /// Report any remaining diagnostics on lines with markers that were deferred
+  /// during per-file verification. Returns true if any were found.
+  bool verifyDeferredMarkerDiagnostics();
 
   void printRemainingDiagnostics() const;
 };

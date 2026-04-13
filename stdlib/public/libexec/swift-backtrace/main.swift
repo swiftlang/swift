@@ -744,7 +744,7 @@ Generate a backtrace for the parent process.
         backtraceFormatter.writeCrashLog(now: now.iso8601)
     }
 
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if os(anyAppleOS)
     // On Darwin, if Developer Mode is turned off, or we can't tell if it's
     // on or not, disable interactivity
     var developerMode: Int32 = 0
@@ -810,7 +810,7 @@ Generate a backtrace for the parent process.
     }
   }
 
-  #if os(Linux) || os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(Linux) || os(anyAppleOS)
   static func setRawMode() -> termios {
     var oldAttrs = termios()
     tcgetattr(0, &oldAttrs)

@@ -6693,7 +6693,13 @@ void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
   setLoweredStackAddress(i, addr);
 }
 
-void IRGenSILFunction::visitAllocPackMetadataInst(AllocPackMetadataInst *i) {}
+void IRGenSILFunction::visitAllocPackMetadataInst(AllocPackMetadataInst *i) {
+  // alloc_pack_metadata is meant to control pack metadata just for the
+  // next instruction. As long as we enter these scopes prior to
+  // every such instruction, we can just treat this as global state
+  // on the IGF.
+  packMetadataIsNested = i->isStackAllocationNested();
+}
 
 static void
 buildTailArrays(IRGenSILFunction &IGF,
@@ -8584,13 +8590,23 @@ bool IRGenSILFunction::shouldUseDispatchThunk(SILDeclRef method) {
   AccessLevel methodAccess = method.getDecl()->getEffectiveAccess();
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
   bool shouldUseDispatchThunk = false;
-  // Because typechecking for the debugger has more lax rules, check the access
-  // level of the getter to decide whether to use a dispatch thunk for the
-  // debugger.
+  bool isResilient =
+      IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal);
   bool inDebugger = classDecl->getASTContext().LangOpts.DebuggerSupport;
-  bool shouldUseDispatchThunkIfInDebugger = methodAccess >= AccessLevel::Public;
-  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal) &&
-      (!inDebugger || shouldUseDispatchThunkIfInDebugger)) {
+  bool shouldUseDispatchThunkIfInDebugger = false;
+  if (inDebugger && isResilient) {
+    // Because typechecking for the debugger has more lax rules, check the
+    // access level of the method to decide whether to use a dispatch thunk for
+    // the debugger.
+    shouldUseDispatchThunkIfInDebugger = methodAccess >= AccessLevel::Public;
+
+    // This is only legal if the method actually has a vtable.
+    auto hasVtable =
+        IGM.getClassMetadataLayout(classDecl).getStoredMethodInfoIfPresent(
+            method);
+    shouldUseDispatchThunkIfInDebugger |= !hasVtable;
+  }
+  if (isResilient && (!inDebugger || shouldUseDispatchThunkIfInDebugger)) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().VirtualFunctionElimination) {
     // For VFE, use a thunk if the target class is in another module. This

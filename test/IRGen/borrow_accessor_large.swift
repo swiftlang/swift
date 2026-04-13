@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -c %s -Xllvm -sil-print-after=loadable-address  -enable-experimental-feature BorrowAndMutateAccessors  2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -emit-irgen %s -enable-experimental-feature BorrowAndMutateAccessors  2>&1 | %FileCheck --check-prefixes=CHECK-IRGEN  %s
+// RUN: %target-swift-frontend -c %s -Xllvm -sil-print-after=loadable-address   2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-irgen %s  2>&1 | %FileCheck --check-prefixes=CHECK-IRGEN  %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 // REQUIRES: OS=macosx
 
 public class Klass {

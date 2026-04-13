@@ -1369,6 +1369,8 @@ StackAllocationIsNested_t SILInstruction::isStackAllocationNested() const {
     return PAI->isStackAllocationNested();
   } else if (auto ARI = dyn_cast<AllocRefInstBase>(this)) {
     return ARI->isStackAllocationNested();
+  } else if (auto API = dyn_cast<AllocPackMetadataInst>(this)) {
+    return API->isStackAllocationNested();
   } else {
     // TODO: implement for all remaining allocations
     return StackAllocationIsNested;
@@ -1383,6 +1385,8 @@ void SILInstruction::setStackAllocationIsNested(
     PAI->setStackAllocationIsNested(nested);
   } else if (auto ARI = dyn_cast<AllocRefInstBase>(this)) {
     ARI->setStackAllocationIsNested(nested);
+  } else if (auto API = dyn_cast<AllocPackMetadataInst>(this)) {
+    API->setStackAllocationIsNested(nested);
   } else if (!nested) {
     verificationFailure("setStackAllocationIsNested unimplemented for instruction",
                         this, [](SILPrintContext &ctx) {});
@@ -2022,15 +2026,14 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   SSAPrunedLiveness liveness(function, &discoveredBlocks);
   liveness.initializeDef(this);
 
-  StackList<SILValue> values(function);
-  values.push_back(this);
+  ValueWorklist values(function);
+  values.push(this);
 
-  while (!values.empty()) {
-    auto value = values.pop_back_val();
+  while (auto value = values.pop()) {
     for (auto *use : value->getUses()) {
       if (!use->isConsuming()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
-          values.push_back(cvi);
+          values.pushIfNotVisited(cvi);
         }
         continue;
       }
@@ -2068,7 +2071,7 @@ PartialApplyInst::visitOnStackLifetimeEnds(
                                  "forwarded to a destroy_value");
       }
       forward.visitForwardedValues([&values](auto value) {
-        values.push_back(value);
+        values.pushIfNotVisited(value);
         return true;
       });
     }

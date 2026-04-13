@@ -2213,6 +2213,25 @@ BridgedVTableEntry BridgedVTable::getEntry(SwiftInt index) const {
   return BridgedVTableEntry(vTable->getEntries()[index]);
 }
 
+SwiftInt BridgedVTable::getNumConformanceEntries() const {
+  return SwiftInt(vTable->getConformances().size());
+}
+
+bool BridgedVTable::hasConformance(SwiftInt index) const {
+  auto confEntry = vTable->getConformances()[index];
+  return confEntry.hasConformance();
+}
+
+BridgedDeclObj BridgedVTable::getProtocol(SwiftInt index) const {
+  auto confEntry = vTable->getConformances()[index];
+  return {confEntry.getProtocol()};
+}
+
+BridgedConformance BridgedVTable::getConformance(SwiftInt index) const {
+  auto confEntry = vTable->getConformances()[index];
+  return BridgedConformance(swift::ProtocolConformanceRef(confEntry.getConformance()));
+}
+
 BridgedDeclObj BridgedVTable::getClass() const {
   return vTable->getClass();
 }
@@ -2239,6 +2258,14 @@ void BridgedVTable::replaceEntries(BridgedArrayRef bridgedEntries) const {
     entries.push_back(e.unbridged());
   }
   vTable->replaceEntries(entries);
+}
+
+void BridgedVTable::appendConformance(BridgedDeclObj protocolDecl) const {
+  vTable->appendConformance(protocolDecl.getAs<swift::ProtocolDecl>());
+}
+
+void BridgedVTable::appendConformance(BridgedConformance conformance) const {
+  vTable->appendConformance(conformance.unbridged().getConcrete());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2478,12 +2505,15 @@ BridgedInstruction BridgedBuilder::createAllocPack(BridgedType type) const {
   return {unbridged().createAllocPack(regularLoc(), type.unbridged())};
 }
 
-BridgedInstruction BridgedBuilder::createAllocPackMetadata() const {
-  return {unbridged().createAllocPackMetadata(regularLoc())};
+BridgedInstruction BridgedBuilder::createAllocPackMetadata(bool nested) const {
+  return {unbridged().createAllocPackMetadata(regularLoc(), std::nullopt,
+      swift::StackAllocationIsNested_t(nested))};
 }
 
-BridgedInstruction BridgedBuilder::createAllocPackMetadata(BridgedType type) const {
-  return {unbridged().createAllocPackMetadata(regularLoc(), type.unbridged())};
+BridgedInstruction BridgedBuilder::createAllocPackMetadata(BridgedType type,
+                                                           bool nested) const {
+  return {unbridged().createAllocPackMetadata(regularLoc(), type.unbridged(),
+      swift::StackAllocationIsNested_t(nested))};
 }
 
 BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) const {
@@ -3195,6 +3225,50 @@ BridgedContext::getTupleTypeWithLabels(BridgedArrayRef elementTypes,
 
 BridgedDeclObj BridgedContext::getSwiftArrayDecl() const {
   return {context->getModule()->getASTContext().getArrayDecl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftIntDecl() const {
+  return {context->getModule()->getASTContext().getIntDecl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftInt64Decl() const {
+  return {context->getModule()->getASTContext().getInt64Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftInt32Decl() const {
+  return {context->getModule()->getASTContext().getInt32Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftInt16Decl() const {
+  return {context->getModule()->getASTContext().getInt16Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftInt8Decl() const {
+  return {context->getModule()->getASTContext().getInt8Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftUIntDecl() const {
+  return {context->getModule()->getASTContext().getUIntDecl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftUInt64Decl() const {
+  return {context->getModule()->getASTContext().getUInt64Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftUInt32Decl() const {
+  return {context->getModule()->getASTContext().getUInt32Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftUInt16Decl() const {
+  return {context->getModule()->getASTContext().getUInt16Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftUInt8Decl() const {
+  return {context->getModule()->getASTContext().getUInt8Decl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftStringDecl() const {
+  return {context->getModule()->getASTContext().getStringDecl()};
 }
 
 BridgedDeclObj BridgedContext::getSwiftMutableSpanDecl() const {

@@ -1395,13 +1395,21 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
   TypeBase *tybase = type.getPointer();
   switch (type->getKind()) {
     case TypeKind::TypeVariable:
-      llvm_unreachable("mangling type variable");
-
+    case TypeKind::Join:
+    case TypeKind::Meet:
     case TypeKind::ErrorUnion:
-      llvm_unreachable("Error unions should not persist to mangling");
-
     case TypeKind::Module:
-      llvm_unreachable("Cannot mangle module type yet");
+    case TypeKind::BuiltinUnboundGeneric:
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::PackArchetype:
+    case TypeKind::ElementArchetype:
+    case TypeKind::ExistentialArchetype:
+    case TypeKind::SILMoveOnlyWrapped:
+    case TypeKind::SILBlockStorage:
+      ABORT([&](llvm::raw_ostream &out) {
+        out << "Cannot mangle this kind of type:\n";
+        type->dump(out);
+      });
 
     case TypeKind::Error:
     case TypeKind::Placeholder:
@@ -1452,8 +1460,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendOperator("Bb");
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
-    case TypeKind::BuiltinUnboundGeneric:
-      ABORT("Don't know how to mangle a BuiltinUnboundGenericType");
     case TypeKind::Locatable: {
       auto loc = cast<LocatableType>(tybase);
       return appendType(loc->getSinglyDesugaredType(), sig, forDecl);
@@ -1765,15 +1771,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
                                     forDecl);
 
       // type ::= archetype
-    case TypeKind::PrimaryArchetype:
-    case TypeKind::PackArchetype:
-    case TypeKind::ElementArchetype:
-    case TypeKind::ExistentialArchetype:
-      ABORT([&](auto &out) {
-        out << "Cannot mangle free-standing archetype: ";
-        tybase->dump(out);
-      });
-
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
       auto opaqueDecl = opaqueType->getDecl();
@@ -1893,12 +1890,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       return;
     }
-
-    case TypeKind::SILMoveOnlyWrapped:
-      // If we hit this, we just mangle the underlying name and move on.
-      llvm_unreachable("should never be mangled?");
-    case TypeKind::SILBlockStorage:
-      llvm_unreachable("should never be mangled");
   }
   llvm_unreachable("bad type kind");
 }
@@ -4045,7 +4036,7 @@ ASTMangler::dropProtocolsFromAssociatedTypes(Type type,
   if (!OptimizeProtocolNames || !sig)
     return type;
 
-  if (!type->hasDependentMember())
+  if (!type->hasTypeParameter())
     return type;
 
   return type.transformRec([&](TypeBase *t) -> std::optional<Type> {

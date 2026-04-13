@@ -1,8 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-library-evolution -emit-module -module-name borrow_accessor_protocol -enable-experimental-feature BorrowAndMutateAccessors -o %t %S/Inputs/borrow_accessor_protocol.swift
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module -module-name borrow_accessor_protocol -o %t %S/Inputs/borrow_accessor_protocol.swift
 // RUN: %target-swift-frontend -I %t -emit-silgen %s -verify | %FileCheck %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 import borrow_accessor_protocol
 

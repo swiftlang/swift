@@ -1523,6 +1523,7 @@ private:
   /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
   bool diagnoseClosure(const ClosureExpr *closure);
+  bool diagnoseClosure(const ClosureExpr *closure, FunctionType *expectedType);
 
   /// Diagnose a single missing argument to a buildBlock call.
   bool diagnoseMissingResultBuilderElement() const;

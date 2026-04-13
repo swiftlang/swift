@@ -126,8 +126,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   PriorityQueue.swift
   SourceCompatibilityShims.swift
   Task.swift
-  Task+immediate.swift
-  Task+init.swift
   Task+PriorityEscalation.swift
   Task+TaskExecutor.swift
   TaskCancellation.swift
@@ -217,7 +215,9 @@ if((SWIFT_BUILD_CLANG_OVERLAYS
   set(SWIFT_CONCURRENCY_DEPENDENCIES _Builtin_float)
 endif()
 set(SWIFT_CONCURRENCY_GYB_SOURCES
-  TaskGroup+addTask.swift.gyb)
+  Task+init.swift.gyb
+  TaskGroup+addTask.swift.gyb
+  Task+immediate.swift.gyb)
 
 # Build with a minimum deployment target of 10.15
 if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "10.15")
@@ -308,6 +308,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
     set(extra_c_compile_flags)
     set(extra_swift_compile_flags)
+
+    # Skip Concurrency for freestanding Wasm (no libc/libc++ available).
+    if("${triple}" MATCHES "-none-wasm$")
+      continue()
+    endif()
 
     if (SWIFT_HOST_VARIANT STREQUAL "linux")
       if(NOT "${mod}" MATCHES "-linux-gnu$")

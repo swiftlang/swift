@@ -97,12 +97,22 @@ enum class RegionMergeReason : uint8_t {
   /// task-isolated value is merged into one of those fields.
   Assign = 1,
 
-  /// dstRegionElt is an ActorIsolated introducing value from a function
-  /// with isolation. srcRegionElt is a value that is in a region with some
-  /// other incompatible isolation.
+  /// dstRegionElt is a fake value used by an instruction without a result to
+  /// introduce ActorIsolation into a region of one of its
+  /// parameters. srcRegionElt is a value that is in a region with some other
+  /// incompatible isolation.
   ///
-  /// E.x.: Passing a task-isolated value to a MainActor isolated function.
-  IsolatedFunction = 2,
+  /// E.x.:
+  ///
+  /// 1. Passing a task-isolated value to a MainActor isolated function that
+  /// does not have a result. In this case, the MainActor isolated function will
+  /// create a dstRegionElt that is an ActorIntroducingInst and merge it into
+  /// its operand's regions causing the error.
+  ///
+  /// 2. Casting a value using checked_cast_br_addr to a protocol that is
+  /// potentially an isolated conformance to a value with a conflicting
+  /// isolation.
+  ActorIntroducingInst = 2,
 
   /// Regions are being merged as a result of capturing values in a
   /// nonisolated closure. This occurs when a closure with no isolation
@@ -127,8 +137,14 @@ enum class RegionMergeReason : uint8_t {
   /// nonisolated function.
   NonisolatedFunction = 5,
 
+  /// Regions are being merged since we are performing some sort of cast. The
+  /// cast could result in a merge failure if the cast results in a value
+  /// isolated to an isolated conformance and the isolated conformance conflicts
+  /// with the isolation of the input value.
+  Cast = 6,
+
   First = Assign,
-  Last = NonisolatedFunction,
+  Last = Cast,
 };
 
 /// The representative value of the equivalence class that makes up a tracked
@@ -627,7 +643,7 @@ public:
   RegionMergeReason##NAME = uint8_t(RegionMergeReason::NAME)                   \
                             << RegionMergeReasonBitStart
     REGION_MERGE_REASON_DEF(Assign),
-    REGION_MERGE_REASON_DEF(IsolatedFunction),
+    REGION_MERGE_REASON_DEF(ActorIntroducingInst),
     REGION_MERGE_REASON_DEF(NonisolatedClosure),
     REGION_MERGE_REASON_DEF(Builtin),
     REGION_MERGE_REASON_DEF(NonisolatedFunction),

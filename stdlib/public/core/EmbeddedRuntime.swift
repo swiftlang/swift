@@ -223,8 +223,8 @@ func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSi
 public func swift_allocObjectTyped(metadata: Builtin.RawPointer, requiredSize: Int, requiredAlignmentMask: Int, typeId: UInt64) -> Builtin.RawPointer {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
   var _p: UnsafeMutableRawPointer? = nil
-  unsafe _swift_typedAllocate(&p, requiredSize, requiredAlignmentMask, typeId)
-  let p = p!
+  unsafe _swift_typedAllocate(&_p, requiredSize, requiredAlignmentMask, typeId)
+  let p = unsafe _p!
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutablePointer<ClassMetadata>(metadata))
   unsafe object.pointee.refcount = 1
@@ -822,19 +822,24 @@ func _embeddedReportExclusivityViolation(
   newAction: Access.Action, newPC: UnsafeRawPointer?,
   pointer: UnsafeRawPointer
 ) {
-  print("Simultaneous access to 0x", terminator: "")
-  printAsHex(Int(bitPattern: pointer), terminator: "")
-  print(", but modification requires exclusive access")
+  if _isDebugAssertConfiguration() {
+    print("Simultaneous access to 0x", terminator: "")
+    printAsHex(Int(bitPattern: pointer), terminator: "")
+    print(", but modification requires exclusive access")
 
-  print("Previous access (a ", terminator: "")
-  oldAction.printName()
-  print(") started at 0x", terminator: "")
-  printAsHex(Int(bitPattern: oldPC))
+    print("Previous access (a ", terminator: "")
+    oldAction.printName()
+    print(") started at 0x", terminator: "")
+    printAsHex(Int(bitPattern: oldPC))
 
-  print("Current access (a ", terminator: "")
-  newAction.printName()
-  print(") started at 0x", terminator: "")
-  printAsHex(Int(bitPattern: newPC))
+    print("Current access (a ", terminator: "")
+    newAction.printName()
+    print(") started at 0x", terminator: "")
+    printAsHex(Int(bitPattern: newPC))
+  }
+  Builtin.condfail_message(
+    true._value, StaticString("dynamic exclusivity violation").unsafeRawPointer)
+  Builtin.int_trap()
 }
 
 // CXX Exception Personality

@@ -124,14 +124,6 @@ public:
       return Type();
     }
 
-    if (rpk == RepressibleProtocolKind::Sendable) {
-      if (!ctx.LangOpts.hasFeature(Feature::TildeSendable)) {
-        diagnoseInvalid(repr, repr.getLoc(),
-                        diag::tilde_sendable_requires_feature_flag);
-        return Type();
-      }
-    }
-
     if (auto *TD = dyn_cast<const TypeDecl *>(decl)) {
       if (rpk == RepressibleProtocolKind::Sendable) {
         auto *C = dyn_cast<ClassDecl>(TD);
@@ -484,6 +476,29 @@ static void checkInheritanceClause(
       }
 
       if (canHaveSuperclass) {
+        // Check for self-referential generic superclass in Embedded Swift.
+        // A class like `class Tree: ManagedBuffer<Int, Tree>` creates a
+        // circular metadata dependency that cannot be resolved statically.
+        if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+          if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+                  classDecl, inherited.getSourceRange().Start,
+                  /*wasAlwaysEmbeddedError=*/true)) {
+            if (auto superBGT = inheritedTy->getAs<BoundGenericClassType>()) {
+              for (auto arg : superBGT->getGenericArgs()) {
+                if (auto *nominal = arg->getAnyNominal()) {
+                  if (nominal == classDecl) {
+                    diags.diagnose(
+                        inherited.getSourceRange().Start,
+                        diag::self_referential_superclass_in_embedded_swift,
+                        classDecl->getDeclaredInterfaceType(), inheritedTy)
+                      .limitBehavior(*behavior);
+                  }
+                }
+              }
+            }
+          }
+        }
+
         // Record the superclass.
         superclassTy = inheritedTy;
         superclassRange = inherited.getSourceRange();
@@ -1838,9 +1853,15 @@ static void diagnoseRetroactiveConformances(
 
   for (auto *conformance : ext->getLocalConformances()) {
     auto *proto = conformance->getProtocol();
+    bool isRetroactive = conformance->isRetroactive();
     bool inserted = protocols.insert(std::make_pair(
-        proto, conformance->isRetroactive())).second;
+        proto, isRetroactive)).second;
     ASSERT(inserted);
+
+    if (isRetroactive && proto->isEligibleForFastCasting()) {
+      ext->diagnose(diag::retroactive_fast_cast, proto);
+      return;
+    }
 
     if (proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype)) {
       protocolsWithRetroactiveAttr.insert(proto);
@@ -3326,6 +3347,13 @@ public:
           }
         }
       }
+    }
+
+    // Actors require the concurrency module.
+    if (CD->isActor() && !Ctx.getLoadedModule(Ctx.Id_Concurrency)) {
+      auto sourceFile = CD->getParentSourceFile();
+      if (sourceFile && sourceFile->Kind != SourceFileKind::SIL)
+        CD->diagnose(diag::no_concurrency_module, "actor");
     }
 
     // Check distributed actors

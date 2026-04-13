@@ -110,6 +110,7 @@ struct SILGenCleanup : SILModuleTransform {
   void run() override;
 
   bool fixupBorrowAccessors(SILFunction *function);
+  bool removeAccessToNonDestructiveEnumProjection(SILFunction *function);
 };
 
 /*  SILGen may produce a borrow accessor result from within a local borrow
@@ -193,6 +194,61 @@ bool SILGenCleanup::fixupBorrowAccessors(SILFunction *function) {
   return true;
 }
 
+// When switching over an address enum with a potentially noncopyable payload,
+// SILGen emits a scoped 'begin_access' in the payload projection block. This
+// scoped access is problematic when returning a borrowing of the projection for
+// non-destructive enums because it gets treated as an escape:
+//
+//   extension Optional where Wrapped: ~Copyable & ~Escapable {
+//     func borrow() -> Borrow<Wrapped>? {
+//       switch self {
+//       case .some(let wrapped):
+//         return Borrow(wrapped)
+//       case .none:
+//         return nil
+//       }
+//     }
+//   }
+//
+// The above is perfectly safe since projecting the wrapped value out of an
+// optional does not destroy the enum value itself. For destructive enums
+// however, the above cannot possibly work because after switching over the
+// value we need to reconstruct the enum, so borrows cannot be returned from
+// such scopes (they could be yielded). Remove this scoped access for
+// non-destructive cases only.
+bool SILGenCleanup::removeAccessToNonDestructiveEnumProjection(
+                                                        SILFunction *function) {
+  auto changed = false;
+
+  for (auto &bb : *function) {
+    for (auto &inst : bb) {
+      auto beginAccess = dyn_cast<BeginAccessInst>(&inst);
+
+      if (!beginAccess) {
+        continue;
+      }
+
+      auto enumProjection =
+          dyn_cast<UncheckedTakeEnumDataAddrInst>(beginAccess->getSource());
+
+      if (!enumProjection || enumProjection->isDestructive()) {
+        continue;
+      }
+
+      for (auto end : beginAccess->getEndAccesses()) {
+        end->eraseFromParent();
+      }
+
+      beginAccess->replaceAllUsesWith(enumProjection);
+      beginAccess->eraseFromParent();
+
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
 void SILGenCleanup::run() {
   auto &module = *getModule();
   for (auto &function : module) {
@@ -208,6 +264,7 @@ void SILGenCleanup::run() {
 
     removeUnreachableBlocks(function);
     bool changed = fixupBorrowAccessors(&function);
+    changed |= removeAccessToNonDestructiveEnumProjection(&function);
     breakInfiniteLoops(getPassManager(), &function);
     completeAllLifetimes(getPassManager(), &function, /*includeTrivialVars=*/ true);
     function.verifyOwnership(/*deadEndBlocks=*/nullptr);

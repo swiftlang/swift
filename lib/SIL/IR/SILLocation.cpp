@@ -32,8 +32,16 @@ SILLocation::SILLocation(Stmt *S) : SILLocation(ASTNodeTy(S), RegularKind) {
 }
 
 SILLocation::SILLocation(Expr *E) : SILLocation(ASTNodeTy(E), RegularKind) {
-  if (E->isImplicit())
-    kindAndFlags.fields.implicit = true;
+  if (E->isImplicit()) {
+    if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+      if (ICE->getSyntacticSubExpr()->isImplicit()) {
+        // If this is just an implicit conversion of an explicit node, don't mark the location as implicit.
+        kindAndFlags.fields.implicit = true;
+      }
+    } else {
+      kindAndFlags.fields.implicit = true;
+    }
+  }
 }
 SILLocation::SILLocation(Decl *D) : SILLocation(ASTNodeTy(D), RegularKind) {
   if (D && D->isImplicit())

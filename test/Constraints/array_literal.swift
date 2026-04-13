@@ -181,11 +181,45 @@ func defaultToAny(i: Int, s: String) {
   _ = f3() ?? []
 }
 
+func defaultToAnyNoDiagnostic() {
+  let x = 0
+  let y = ""
+  let z: Any = 0
+  let optZ: Any? = 0
+
+  struct Exactly<T> {}
+  func typeIs<T>(_: T) -> Exactly<T> {}
+
+  // element type is already Any, doesn't count
+  let array1 = [x, y, z]
+  let type1 = typeIs(array1)
+  let _: Exactly<[Any]> = type1
+
+  // element type is Any?; make sure that's the join type that we use
+  let array2 = [x, y, optZ]
+  let type2 = typeIs(array2)
+  let _: Exactly<[Any?]> = type2
+
+  // element type is already Any, no diagnostic
+  let array3 = [z, optZ]
+  // expected-warning@-1 {{expression implicitly coerced from 'Any?' to 'Any'}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+
+  let type3 = typeIs(array3)
+  let _: Exactly<[Any]> = type3
+
+  let array3a = [z, optZ as Any]
+  let type3a = typeIs(array3a)
+  let _: Exactly<[Any]> = type3a
+}
+
 func noInferAny(iob: inout B, ioc: inout C) {
   var b = B()
   var c = C()
-  let _ = [b, c, iob, ioc] // do not infer [Any] when elements are lvalues or inout
-  let _: [A] = [b, c, iob, ioc] // do not infer [Any] when elements are lvalues or inout
+  let _ = [b, c, iob, ioc] // do not infer [Any] when elements are lvalues
+  let _: [A] = [b, c, iob, ioc] // do not infer [Any] when elements are lvalues
   b = B()
   c = C()
 }
@@ -426,5 +460,74 @@ do {
 
   func test() {
     takesSequence([[B.self]], [])
+  }
+}
+
+// Regression tests reduced from projects
+do {
+  protocol XCTMetric {}
+
+  class NSObject {}
+
+  class XCTClockMetric: NSObject, XCTMetric {}
+  class XCTApplicationLaunchMetric: NSObject, XCTMetric {}
+  class XCTMemoryMetric: NSObject, XCTMetric {}
+  class XCTCPUMetric: NSObject, XCTMetric {}
+
+  class XCTOSSignpostMetric: NSObject, XCTMetric {
+    static var scrollingAndDecelerationMetric: any XCTMetric { fatalError() }
+    static var navigationTransitionMetric: any XCTMetric { fatalError() }
+  }
+
+  var metrics: [XCTMetric] {
+    let metrics = [
+      XCTClockMetric(),
+      XCTApplicationLaunchMetric(),
+      XCTMemoryMetric(),
+      XCTOSSignpostMetric.scrollingAndDecelerationMetric,
+      XCTCPUMetric(),
+    ]
+    return metrics
+  }
+}
+
+do {
+  struct S {
+    var description: String { "" }
+  }
+
+  struct UUID {
+    var uuidString: String { "" }
+  }
+
+  class C {
+    let a: S
+    let b: UUID?
+    let c: Int?
+    let d: Bool
+    let e: S?
+    let f: Float
+    let g: String
+    let h: Int?
+    let i: Int?
+
+    init() { fatalError() }
+  }
+
+  func f(array: [C]) {
+    var dict = [String: Any]()
+    dict[""] = array.map {
+      [
+        "a": $0.a.description,
+        "b": $0.b?.uuidString ?? "",
+        "c": $0.c != nil,
+        "d": $0.d,
+        "e": $0.e?.description ?? "",
+        "f": $0.f,
+        "g": $0.g,
+        "h": $0.h ?? "",
+        "i": $0.i != nil,
+      ]
+    }
   }
 }

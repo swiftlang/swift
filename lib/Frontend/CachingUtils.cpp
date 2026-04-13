@@ -18,6 +18,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ConstExtract/ConstExtract.h"
 #include "swift/Frontend/CASOutputBackends.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/CompileJobCacheResult.h"
@@ -33,10 +34,10 @@
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/CAS/TreeEntry.h"
+#include "llvm/CASUtil/Utils.h"
 #include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
-#include "llvm/CASUtil/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -325,6 +326,13 @@ static bool replayCachedCompilerOutputsImpl(
                       "failed to emit dependency file");
         return failedReplay();
       }
+    } else if (Output.Kind == file_types::ID::TY_ConstValues) {
+      if (remapConstValuesJSON(Output.Proxy.getData(), *File,
+                               Opts.CacheReplayPrefixMap)) {
+        Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
+                      "failed to remap const values file");
+        return failedReplay();
+      }
     } else
       *File << Output.Proxy.getData();
 
@@ -513,7 +521,7 @@ static llvm::Error createCASObjectNotFoundError(const llvm::cas::CASID &ID) {
                            "CASID missing from Object Store " + ID.toString());
 }
 
-Expected<IntrusiveRefCntPtr<vfs::FileSystem>>
+Expected<IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
 createCASFileSystem(ObjectStore &CAS, const std::string &IncludeTree,
                     const std::string &IncludeTreeFileList) {
   assert(!IncludeTree.empty() ||

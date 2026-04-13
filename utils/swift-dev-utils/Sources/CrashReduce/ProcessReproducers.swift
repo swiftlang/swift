@@ -77,10 +77,16 @@ public actor ProcessReproducers {
   }
 
   func getCrash(for reproFile: ReproducerFile) async throws -> CrashInfo? {
-    if let crashLog = reproFile.reproducer.crashInfo {
-      return crashLog
+    let repro = reproFile.reproducer
+    if let crashInfo = repro.crashInfo {
+      return crashInfo
     }
-    return try await checkCrash(of: PotentialCrasher(reproFile))?.crashInfo
+    // If we have multiple signatures, run multiple times to gather them all.
+    let crasher = PotentialCrasher(reproFile)
+    if !repro.signatures.secondaries.isEmpty && repro.options.isDeterministic {
+      return try await checkDeterministicCrash(of: crasher)?.crashInfo
+    }
+    return try await checkCrash(of: crasher)?.crashInfo
   }
 
   func firstNewSignature(_ sigs: KnownSignatures) -> Signature? {
@@ -164,6 +170,7 @@ public actor ProcessReproducers {
                 log.info(logMsg)
               }
               if oldSigs.primary != crash.signatures.primary ||
+                  oldSigs != crash.signatures ||
                   oldIsStackOverflow != crash.primary.isStackOverflow {
                 repro.checkFilename(warn: false)
                 try repro.write()
@@ -280,9 +287,11 @@ public actor ProcessReproducers {
       }
       groupedRepros[sig, default: []].append(crasher)
     }
+    log.info("found \(groupedRepros.count) new crasher(s), reducing...")
 
+    // creduce already parallelizes so only do 3 in parallel.
     var processedPaths = Set(repros.map(\.path))
-    let worklist = TaskWorklist<[Reproducer]>()
+    let worklist = TaskWorklist<[Reproducer]>(maxParallel: 3)
     for reproGroup in groupedRepros.sorted(by: \.key).map(\.value) {
       worklist.addTask {
         // Take the first reproducer in the group that reduces successfully.
@@ -390,7 +399,11 @@ public actor ProcessReproducers {
       try await withCReduceTest(crasher.options, signatures: signatures) { testPath in
         let result = try await run(
           .path(creducePath), arguments: .init(
-            ["--tidy", "--not-c", testPath.rawPath] + inputs.map(\.rawPath)
+            [
+              "--tidy",
+              "--n", "\(ProcessInfo.processInfo.processorCount)",
+              "--not-c", testPath.rawPath
+            ] + inputs.map(\.rawPath)
           ),
           workingDirectory: testPath.parentDir!.storage,
           output: .string(limit: .max),

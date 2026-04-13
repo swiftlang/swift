@@ -253,13 +253,14 @@ public struct Builder {
     return notifyNew(allocPack.getAs(AllocPackInst.self))
   }
 
-  public func createAllocPackMetadata() -> AllocPackMetadataInst {
-    let allocPackMetadata = bridged.createAllocPackMetadata()
+  public func createAllocPackMetadata(nested: Bool = true) -> AllocPackMetadataInst {
+    let allocPackMetadata = bridged.createAllocPackMetadata(nested)
     return notifyNew(allocPackMetadata.getAs(AllocPackMetadataInst.self))
   }
 
-  public func createAllocPackMetadata(_ packType: Type) -> AllocPackMetadataInst {
-    let allocPackMetadata = bridged.createAllocPackMetadata(packType.bridged)
+  public func createAllocPackMetadata(_ packType: Type,
+                                      nested: Bool = true) -> AllocPackMetadataInst {
+    let allocPackMetadata = bridged.createAllocPackMetadata(packType.bridged, nested)
     return notifyNew(allocPackMetadata.getAs(AllocPackMetadataInst.self))
   }
 

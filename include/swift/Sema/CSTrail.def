@@ -78,7 +78,7 @@ LOCATOR_CHANGE(RecordedOpenedExistentialType, OpenedExistentialTypes)
 LOCATOR_CHANGE(RecordedDefaultedConstraint, DefaultedConstraints)
 LOCATOR_CHANGE(ResolvedOverload, ResolvedOverloads)
 LOCATOR_CHANGE(RecordedArgumentList, ArgumentLists)
-LOCATOR_CHANGE(RecordedImplicitCallAsFunctionRoot, ImplicitCallAsFunctionRoots)
+LOCATOR_CHANGE(RecordedImplicitCallAsFunction, ImplicitCallAsFunctions)
 LOCATOR_CHANGE(RecordedSynthesizedConformance, SynthesizedConformances)
 
 EXPR_CHANGE(AppliedPropertyWrapper)

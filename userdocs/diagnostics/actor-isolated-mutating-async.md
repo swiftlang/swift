@@ -38,7 +38,7 @@ Building the above code produces an error about calling a mutating async functio
 |   }
 ```
 
-A `mutating async` function takes `self` as `inout`. This means that the value of `backpack` will be copied into `refill`, then copied out when the method returns. While `refill` is suspended, the main actor is free to do other work. This is a data race, since `refill` is still mutating `backpack`. If `eatSnack` ran before `refill` finished, it would decrement `snacks`, but the eaten snack reappears when `refill` writes back the stale copy. 
+A `mutating async` function takes `self` as `inout`. This means that the value of `backpack` will be copied into `refill`, then copied out when the method returns. `inout` requires exclusive access for the duration of the call. While `refill` is suspended, the main actor is free to do other work. This is a data race, since `refill` is still mutating `backpack`. If `eatSnack` ran before `refill` finished, it would decrement `snacks`, but the eaten snack reappears when `refill` writes back the stale copy. 
 
 ```swift
 // Task 1: getReady()                  | // Task 2
@@ -79,4 +79,5 @@ func getReady() async {
 
 ## See also
 
+- [In-Out Parameters](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/declarations#In-Out-Parameters)
 - [Overlapping accesses, but operation requires exclusive access (ExclusivityViolation)](exclusivity-violation.md)

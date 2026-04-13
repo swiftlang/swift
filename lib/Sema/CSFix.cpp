@@ -31,7 +31,6 @@
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSFix.h"
-#include "swift/Sema/FixBehavior.h"
 #include "swift/Sema/OverloadChoice.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SmallString.h"
@@ -408,11 +407,6 @@ bool AddSendableAttribute::attempt(ConstraintSystem &cs,
   auto fixBehavior = getConcurrencyFixBehavior(
       cs, constraintKind, locator, /*forSendable=*/true);
   if (!fixBehavior)
-    return true;
-
-  // If the @Sendable mismatch is an error, let's delay recording the fix
-  // until diagnostic mode.
-  if (fixBehavior == FixBehavior::Error && !cs.shouldAttemptFixes())
     return true;
 
   auto *fix = AddSendableAttribute::create(

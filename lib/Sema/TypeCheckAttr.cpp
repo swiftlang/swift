@@ -3164,7 +3164,7 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     if (!concurrencyModule) {
       context.Diags.diagnose(mainFunction->getAsyncLoc(),
                              diag::no_concurrency_module, "async main");
-      auto result = new (context) ErrorExpr(mainFunction->getSourceRange());
+      auto result = new (context) ErrorExpr(mainFunction->getSourceRange(), ErrorType::get(context));
       ASTNode stmts[] = {result};
       auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc(),
                                     /*Implicit*/ true);
@@ -5121,8 +5121,12 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
 
   auto *VD = cast<ValueDecl>(D);
 
-  // @_implementationOnly on types only applies to non-public types.
-  if (isa<NominalTypeDecl>(D)) {
+  // @_implementationOnly on types only applies to non-public types and
+  // classes stored properties.
+  auto *varDecl = dyn_cast<VarDecl>(VD);
+  if (isa<NominalTypeDecl>(D) ||
+      (varDecl && varDecl->hasStorage() &&
+       isa<ClassDecl>(varDecl->getDeclContext()))) {
     auto access =
         VD->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
@@ -5305,6 +5309,162 @@ getAvailableAttrGroups(ArrayRef<const AvailableAttr *> attrs) {
   return results;
 }
 
+/// Check for platform availability attributes that could be consolidated using
+/// a single `@available(anyAppleOS ...)` attribute.
+void suggestAnyAppleOSAvailability(const Decl *D,
+                                   ArrayRef<AvailableAttr *> attrs,
+                                   ASTContext &ctx) {
+  auto &diags = ctx.Diags;
+  SourceFile *sf = D->getDeclContext()->getParentSourceFile();
+  if (!sf)
+    return;
+
+  if (!diags.isDiagnosticGroupEnabled(sf,
+                                      DiagGroupID::UseAnyAppleOSAvailability))
+    return;
+
+  // Collect the attributes that could be replaced with an anyAppleOS attribute.
+  llvm::SmallDenseMap<llvm::VersionTuple,
+                      llvm::SmallVector<const AvailableAttr *, 6>>
+      attrsByIntroVersion;
+
+  for (const AvailableAttr *attr : attrs) {
+    auto semAttr = D->getSemanticAvailableAttr(attr);
+    if (!semAttr || !semAttr->isPlatformSpecific())
+      continue;
+
+    if (attr->getKind() != AvailableAttr::Kind::Default)
+      continue;
+
+    auto platform = semAttr->getPlatform();
+
+    // Don't diagnose any declaration that already has an anyAppleOS attribute.
+    if (platform == PlatformKind::anyAppleOS)
+      return;
+
+    if (!inheritsAvailabilityFromPlatform(platform, PlatformKind::anyAppleOS))
+      continue;
+
+    if (isApplicationExtensionPlatform(platform))
+      continue;
+
+    // anyAppleOS only supports versions 26 and later.
+    auto rawIntroduced = attr->getRawIntroduced();
+    if (!rawIntroduced || rawIntroduced->getMajor() < 26)
+      continue;
+
+    attrsByIntroVersion[rawIntroduced->normalize()].push_back(attr);
+  }
+
+  if (attrsByIntroVersion.empty())
+    return;
+
+  llvm::VersionTuple commonVersion;
+  llvm::SmallVector<const AvailableAttr *, 6> attrsToReplace;
+  for (auto &[version, attrList] : attrsByIntroVersion) {
+    // Prefer replacing the longest list of attributes.
+    if (attrList.size() < attrsToReplace.size())
+      continue;
+
+    // If the lists have the same length, prefer the earlier version.
+    if (attrList.size() == attrsToReplace.size()) {
+      if (version > commonVersion)
+        continue;
+    }
+
+    commonVersion = version;
+    attrsToReplace = attrList;
+  }
+
+  if (attrsToReplace.size() < 2)
+    return;
+
+  // Check whether the attributes have any fields besides 'introduced:' and skip
+  // if they do since we don't attempt to judge whether those fields match and
+  // could be consolidated.
+  // FIXME: This is conservative; attrs with matching fields could be merged.
+  for (auto *attr : attrsToReplace) {
+    if (attr->getRawDeprecated() || attr->getRawObsoleted() ||
+        !attr->getMessage().empty() || !attr->getRename().empty())
+      return;
+  }
+
+  auto diag = diags.diagnose(D->getLoc(), diag::availability_use_any_apple_os,
+                             commonVersion);
+
+  // Note each introduced version that could be replaced.
+  for (auto *attr : attrsToReplace) {
+    auto semAttr = D->getSemanticAvailableAttr(attr);
+    if (!semAttr)
+      continue;
+
+    diags.diagnose(semAttr->getIntroducedSourceRange().Start,
+                   diag::availability_decl_is_available_in, D,
+                   semAttr->getDomain(), *semAttr->getIntroduced());
+  }
+
+  auto attrGroups = getAvailableAttrGroups(attrs);
+  if (attrGroups.empty()) {
+    // The attributes are all written in long-form.
+    // FIXME: Generate fix-its for this pattern if it is common enough.
+    return;
+  }
+
+  if (attrGroups.size() > 1) {
+    // The attributes are written in multiple short-form groups.
+    return;
+  }
+
+  // The attributes include a single short-form. If they all belong
+  // to the same group we can emit a fix-it to update it.
+  llvm::SmallSet<const AvailableAttr *, 8> remainingAttrsToSkip;
+  for (auto *attr : attrsToReplace)
+    remainingAttrsToSkip.insert(attr);
+
+  llvm::SmallString<128> replacement;
+  llvm::raw_svector_ostream os(replacement);
+  os << "anyAppleOS " << commonVersion;
+
+  auto groupHead = attrGroups.front();
+
+  // Get the location of the @available attr's right paren.
+  SourceLoc groupEndLoc = groupHead->getEndLoc();
+
+  // Build up the fix-it contents and find the starting source loc for the
+  // availability specs.
+  SourceLoc groupStartLoc = groupHead->getDomainLoc();
+  for (auto *member = groupHead; member != nullptr;
+       member = member->getNextGroupedAvailableAttr()) {
+    // The attributes are enumerated in reverse, so the group's starting loc
+    // is the last domain loc we see.
+    groupStartLoc = member->getDomainLoc();
+    if (remainingAttrsToSkip.erase(member))
+      continue;
+    if (auto semAttr = D->getSemanticAvailableAttr(member)) {
+      os << ", " << platformString(semAttr->getPlatform());
+      if (auto v = member->getRawIntroduced())
+        os << " " << *v;
+    }
+  }
+  os << ", *";
+
+  // Only emit the fix-it if all of the attributes to replace were found in
+  // the group.
+  if (remainingAttrsToSkip.empty()) {
+    // Make sure we have a valid source range in a single buffer. We might not
+    // if some attributes were expanded from an availability macro.
+    if (groupStartLoc.isInvalid() || groupEndLoc.isInvalid())
+      return;
+
+    auto startBuffer = ctx.SourceMgr.findBufferContainingLoc(groupStartLoc);
+    auto endBuffer = ctx.SourceMgr.findBufferContainingLoc(groupEndLoc);
+    if (startBuffer != endBuffer)
+      return;
+
+    diag.fixItReplaceChars(groupStartLoc, groupEndLoc, replacement);
+  }
+}
+
 void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   if (attrs.empty())
     return;
@@ -5373,6 +5533,8 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
           .fixItInsert(groupEndLoc, ", *");
     }
   }
+
+  suggestAnyAppleOSAvailability(D, attrs, Ctx);
 
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
@@ -8172,7 +8334,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       ctx.Diags
           .diagnose(attr->getStartLoc(),
                     diag::nonisolated_unsafe_uneffective_on_funcs, VD)
-          .fixItReplace(attr->getStartLoc(), "nonisolated");
+          .fixItReplace(attr->getRange(), "nonisolated");
     }
 
     (void)getActorIsolation(VD);

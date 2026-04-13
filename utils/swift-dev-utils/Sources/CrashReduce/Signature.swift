@@ -25,8 +25,8 @@ public final class Signature: Sendable {
       var result: ShortSignature?
       if let symbol {
         result = try? SymbolParser.parse(symbol).shortSignature
-      } else if let assertion {
-        result = .init(symbol: assertion.message)
+      } else if let assertion, let function = assertion.function {
+        result = .init(symbol: function)
       }
       if result?.symbol.isEmpty == true {
         result = nil

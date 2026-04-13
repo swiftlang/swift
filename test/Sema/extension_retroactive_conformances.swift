@@ -39,6 +39,11 @@ public struct Sample9 {}
 public struct Sample9a {}
 public struct Sample9b {}
 
+@_semantics("fast_cast")
+public protocol FastCast {}
+
+public class C {}
+
 #else
 
 import Library
@@ -149,5 +154,7 @@ extension Sample9a: @retroactive SampleProtocol3<Int> {}
 extension Sample9b: Library.SampleProtocol3<Int> {}
 // expected-warning@-1 {{extension declares a conformance of imported type 'Sample9b' to imported protocol 'SampleProtocol3'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
 // expected-note@-2 {{add '@retroactive' to silence this warning}}
+
+extension C: FastCast {} // expected-error {{cannot add retroactive conformance for a fast-cast protocol 'FastCast'}}
 
 #endif

@@ -467,8 +467,9 @@ irgen::emitTypeMetadataPack(IRGenFunction &IGF, CanPackType packType,
 
   assert(packType->containsPackExpansionType());
   auto pack =
-      IGF.emitDynamicAlloca(IGF.IGM.TypeMetadataPtrTy, shape,
-                            IGF.IGM.getPointerAlignment(), AllowsTaskAlloc);
+      IGF.emitArrayStackAllocation(IGF.IGM.TypeMetadataPtrTy, shape,
+                                   IGF.IGM.getPointerAlignment(),
+                                   IGF.packMetadataIsNested);
 
   auto visitFn =
     [&](CanType eltTy, unsigned staticIndex,
@@ -607,8 +608,9 @@ irgen::emitWitnessTablePack(IRGenFunction &IGF, CanPackType packType,
 
   assert(packType->containsPackExpansionType());
   auto pack =
-      IGF.emitDynamicAlloca(IGF.IGM.WitnessTablePtrTy, shape,
-                            IGF.IGM.getPointerAlignment(), AllowsTaskAlloc);
+      IGF.emitArrayStackAllocation(IGF.IGM.WitnessTablePtrTy, shape,
+                                   IGF.IGM.getPointerAlignment(),
+                                   IGF.packMetadataIsNested);
 
   auto index = 0;
   auto visitFn = [&](CanType eltTy, unsigned staticIndex,
@@ -704,6 +706,10 @@ void IRGenFunction::eraseStackPackWitnessTableAlloc(StackAddress addr,
 }
 
 void IRGenFunction::withLocalStackPackAllocs(llvm::function_ref<void()> fn) {
+  // These scopes should always be properly nested.
+  llvm::SaveAndRestore<StackAllocationIsNested_t>
+    savedState(packMetadataIsNested, StackAllocationIsNested);
+
   auto oldSize = OutstandingStackPackAllocs.size();
   fn();
   SmallVector<StackPackAlloc, 2> allocs;
@@ -1414,8 +1420,9 @@ irgen::emitInducedTupleTypeMetadataPack(
   auto *shape = emitTupleTypeMetadataLength(IGF, tupleMetadata);
 
   auto pack =
-      IGF.emitDynamicAlloca(IGF.IGM.TypeMetadataPtrTy, shape,
-                            IGF.IGM.getPointerAlignment(), AllowsTaskAlloc);
+      IGF.emitArrayStackAllocation(IGF.IGM.TypeMetadataPtrTy, shape,
+                                   IGF.IGM.getPointerAlignment(),
+                                   IGF.packMetadataIsNested);
   auto elementForIndex =
     [&](llvm::Value *index) -> llvm::Value * {
       return irgen::emitTupleTypeMetadataElementType(IGF, tupleMetadata, index);

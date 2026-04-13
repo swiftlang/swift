@@ -285,7 +285,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       getLangOptions().SkipNonExportableDecls;
 
   serializationOpts.SkipImplementationOnlyDecls =
-      getLangOptions().hasFeature(Feature::CheckImplementationOnly);
+      getLangOptions().hasFeature(Feature::CheckImplementationOnlyStrict) &&
+      !::getenv("SWIFT_DISABLE_IMPLICIT_CHECK_IMPLEMENTATION_ONLY");
 
   serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
 
@@ -1552,6 +1553,9 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().hasFeature(Feature::Embedded) &&
         Invocation.getLangOptions().hasFeature(Feature::DeferredCodeGen))
       MainModule->setDeferredCodeGen(true);
+    if (Invocation.getSILOptions().CMOMode ==
+        CrossModuleOptimizationMode::Aggressive)
+      MainModule->setAggressiveCMOEnabled(true);
 
     configureAvailabilityDomains(getASTContext(),
                                  Invocation.getFrontendOptions(), MainModule);

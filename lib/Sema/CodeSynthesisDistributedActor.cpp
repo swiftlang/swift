@@ -735,7 +735,7 @@ static bool canSynthesizeDistributedThunk(AbstractFunctionDecl *distributedTarge
 
   auto serializationTy =
       getDistributedActorSerializationType(distributedTarget->getDeclContext());
-  return !serializationTy->hasError() && !serializationTy->hasDependentMember();
+  return !serializationTy->hasError() && !serializationTy->isTypeParameter();
 }
 
 /******************************************************************************/

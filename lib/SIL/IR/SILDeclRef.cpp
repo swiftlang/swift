@@ -2070,9 +2070,7 @@ ActorIsolation SILDeclRef::getActorIsolation() const {
   // If we have a stored property initializer for a VarDecl with an explicit
   // isolation, match that explicit isolation.
   if (isStoredPropertyInitializer()) {
-    if (auto isolation = swift::getActorIsolation(cast<VarDecl>(getDecl()));
-        isolation &&  isolation.isGlobalActor())
-      return isolation;
+    return cast<VarDecl>(getDecl())->getInitializerIsolation();
   }
 
   return getActorIsolationOfContext(getInnermostDeclContext());

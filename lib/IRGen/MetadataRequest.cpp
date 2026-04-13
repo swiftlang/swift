@@ -1875,6 +1875,15 @@ namespace {
       return emitDirectMetadataRef(type);
     }
 
+#define UNSUPPORTED_METADATA(type)                                              \
+    MetadataResponse                                                            \
+    visit##type##Type(Can##type##Type t, DynamicMetadataRequest request) {      \
+      ABORT([&](llvm::raw_ostream &out) {                                       \
+        out << "Cannot emit metadata for type:\n";                              \
+        t->dump(out);                                                           \
+      });                                                                       \
+    }
+
     MetadataResponse
     visitBuiltinIntegerLiteralType(CanBuiltinIntegerLiteralType type,
                                    DynamicMetadataRequest request) {
@@ -1934,11 +1943,7 @@ namespace {
       return emitDirectMetadataRef(type);
     }
 
-    MetadataResponse
-    visitBuiltinPackIndexType(CanBuiltinPackIndexType type,
-                              DynamicMetadataRequest request) {
-      llvm_unreachable("metadata unsupported for this builtin type");
-    }
+    UNSUPPORTED_METADATA(BuiltinPackIndex)
 
     MetadataResponse
     visitBuiltinFloatType(CanBuiltinFloatType type,
@@ -1951,12 +1956,8 @@ namespace {
                            DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
-    
-    MetadataResponse
-    visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type,
-                                   DynamicMetadataRequest request) {
-      llvm_unreachable("not a real type");
-    }
+
+    UNSUPPORTED_METADATA(BuiltinUnboundGeneric)
 
     MetadataResponse
     visitBuiltinBorrowType(CanBuiltinBorrowType type,
@@ -1997,20 +1998,9 @@ namespace {
       return emitTypeMetadataPackRef(IGF, type, request);
     }
 
-    MetadataResponse visitSILPackType(CanSILPackType type,
-                                      DynamicMetadataRequest request) {
-      llvm_unreachable("cannot emit metadata for a SIL pack type");
-    }
-
-    MetadataResponse visitPackExpansionType(CanPackExpansionType type,
-                                            DynamicMetadataRequest request) {
-      llvm_unreachable("cannot emit metadata for a pack expansion by itself");
-    }
-
-    MetadataResponse visitPackElementType(CanPackElementType type,
-                                          DynamicMetadataRequest request) {
-      llvm_unreachable("cannot emit metadata for a pack element by itself");
-    }
+    UNSUPPORTED_METADATA(SILPack)
+    UNSUPPORTED_METADATA(PackExpansion)
+    UNSUPPORTED_METADATA(PackElement)
 
     MetadataResponse visitTupleType(CanTupleType type,
                                     DynamicMetadataRequest request) {
@@ -2022,12 +2012,7 @@ namespace {
       return setLocal(type, response);
     }
 
-    MetadataResponse visitGenericFunctionType(CanGenericFunctionType type,
-                                              DynamicMetadataRequest request) {
-      IGF.unimplemented(SourceLoc(),
-                        "metadata ref for generic function type");
-      return MetadataResponse::getUndef(IGF);
-    }
+    UNSUPPORTED_METADATA(GenericFunction)
 
     MetadataResponse visitFunctionType(CanFunctionType type,
                                        DynamicMetadataRequest request) {
@@ -2087,11 +2072,7 @@ namespace {
       return setLocal(type, MetadataResponse::forComplete(call));
     }
 
-    MetadataResponse visitModuleType(CanModuleType type,
-                                     DynamicMetadataRequest request) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for module type");
-      return MetadataResponse::getUndef(IGF);
-    }
+    UNSUPPORTED_METADATA(Module)
 
     MetadataResponse visitDynamicSelfType(CanDynamicSelfType type,
                                           DynamicMetadataRequest request) {
@@ -2278,31 +2259,22 @@ namespace {
       return setLocal(type, MetadataResponse::forComplete(metadata));
     }
 
-    MetadataResponse
-    visitParameterizedProtocolType(CanParameterizedProtocolType type,
-                                   DynamicMetadataRequest request) {
-      llvm_unreachable("constraint type should be wrapped in existential type");
-    }
 
-    MetadataResponse visitReferenceStorageType(CanReferenceStorageType type,
-                                               DynamicMetadataRequest request) {
-      llvm_unreachable("reference storage type should have been converted by "
-                       "SILGen");
-    }
-    MetadataResponse visitSILFunctionType(CanSILFunctionType type,
-                                          DynamicMetadataRequest request) {
-      llvm_unreachable("should not be asking for metadata of a lowered SIL "
-                       "function type--SILGen should have used the AST type");
-    }
-    MetadataResponse visitSILTokenType(CanSILTokenType type,
-                                          DynamicMetadataRequest request) {
-      llvm_unreachable("should not be asking for metadata of a SILToken type");
-    }
-    MetadataResponse
-    visitSILMoveOnlyWrappedType(CanSILMoveOnlyWrappedType type,
-                                DynamicMetadataRequest request) {
-      llvm_unreachable("should not be asking for metadata of a move only type");
-    }
+    UNSUPPORTED_METADATA(ParameterizedProtocol)
+    UNSUPPORTED_METADATA(ReferenceStorage)
+    UNSUPPORTED_METADATA(SILFunction)
+    UNSUPPORTED_METADATA(SILToken)
+    UNSUPPORTED_METADATA(SILMoveOnlyWrapped)
+    UNSUPPORTED_METADATA(GenericTypeParam)
+    UNSUPPORTED_METADATA(DependentMember)
+    UNSUPPORTED_METADATA(LValue)
+    UNSUPPORTED_METADATA(InOut)
+    UNSUPPORTED_METADATA(Error)
+    UNSUPPORTED_METADATA(Integer)
+    UNSUPPORTED_METADATA(SILBlockStorage)
+    UNSUPPORTED_METADATA(BuiltinDefaultActorStorage)
+    UNSUPPORTED_METADATA(BuiltinNonDefaultDistributedActorStorage)
+
     MetadataResponse visitArchetypeType(CanArchetypeType type,
                                         DynamicMetadataRequest request) {
       if (auto packArchetypeType = dyn_cast<PackArchetypeType>(type))
@@ -2310,46 +2282,6 @@ namespace {
 
       return emitArchetypeTypeMetadataRef(IGF, type, request);
     }
-
-    MetadataResponse visitGenericTypeParamType(CanGenericTypeParamType type,
-                                               DynamicMetadataRequest request) {
-      llvm_unreachable("dependent type should have been substituted by Sema or SILGen");
-    }
-
-    MetadataResponse visitDependentMemberType(CanDependentMemberType type,
-                                              DynamicMetadataRequest request) {
-      llvm_unreachable("dependent type should have been substituted by Sema or SILGen");
-    }
-
-    MetadataResponse visitLValueType(CanLValueType type,
-                                     DynamicMetadataRequest request) {
-      llvm_unreachable("lvalue type should have been lowered by SILGen");
-    }
-    MetadataResponse visitInOutType(CanInOutType type,
-                                    DynamicMetadataRequest request) {
-      llvm_unreachable("inout type should have been lowered by SILGen");
-    }
-    MetadataResponse visitErrorType(CanErrorType type,
-                                    DynamicMetadataRequest request) {
-      llvm_unreachable("error type should not appear in IRGen");
-    }
-
-    MetadataResponse visitIntegerType(CanIntegerType type,
-                                      DynamicMetadataRequest request) {
-      llvm_unreachable("integer type should not appear in IRGen");
-    }
-
-    // These types are artificial types used for internal purposes and
-    // should never appear in a metadata request.
-#define INTERNAL_ONLY_TYPE(ID)                                               \
-    MetadataResponse visit##ID##Type(Can##ID##Type type,                     \
-                                     DynamicMetadataRequest request) {       \
-      llvm_unreachable("cannot ask for metadata of compiler-internal type"); \
-    }
-    INTERNAL_ONLY_TYPE(SILBlockStorage)
-    INTERNAL_ONLY_TYPE(BuiltinDefaultActorStorage)
-    INTERNAL_ONLY_TYPE(BuiltinNonDefaultDistributedActorStorage)
-#undef INTERNAL_ONLY_TYPE
 
     MetadataResponse visitSILBoxType(CanSILBoxType type,
                                      DynamicMetadataRequest request) {
@@ -2367,6 +2299,8 @@ namespace {
       IGF.setScopedLocalTypeMetadata(type, response);
       return response;
     }
+
+#undef UNSUPPORTED_METADATA
   };
 } // end anonymous namespace
 

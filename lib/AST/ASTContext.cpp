@@ -5693,7 +5693,6 @@ CanSILFunctionType SILFunctionType::get(
   // revisit this.
   if (genericSig || patternSubs) {
     properties.removeHasTypeParameter();
-    properties.removeHasDependentMember();
   }
 
   auto outerSubs = genericSig ? invocationSubs : patternSubs;
@@ -5863,7 +5862,6 @@ InOutType *InOutType::get(Type objectTy) {
 
 DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
   auto properties = base->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(name);
@@ -5882,7 +5880,6 @@ DependentMemberType *DependentMemberType::get(Type base,
                                               AssociatedTypeDecl *assocType) {
   assert(assocType && "Missing associated type");
   auto properties = base->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(assocType);

@@ -1,4 +1,21 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: not --crash %target-typecheck-verify-swift -verify-ignore-unrelated -DSALVAGE
+
+// The next two sets of examples cause difficulties because our
+// subtype lattice is not distributive. We cannot always compute
+// an accurate upper bound, because of existential types; if
+// we pick the wrong upper bound too early, certain expressions
+// will fail.
+
+protocol Command {
+  var name: String { get }
+  static var id: Int { get }
+}
+
+extension Command {
+  var name: String { return "" }
+  static var id: Int { return 0 }
+}
 
 // Originally from rdar://35088384:
 //
@@ -6,8 +23,6 @@
 // recent swift-4.0-branch builds, because we incorrectly infer the type
 // of the array literal as [Any].
 do {
-  protocol Command {}
-
   struct Undo: Command {}
   struct Cut: Command {}
   struct Copy: Command {}
@@ -52,6 +67,51 @@ do {
 
   func perform4<S: Sequence>(_: S) where S.Element == Any.Type? {}
   perform4([Undo.self, Cut.self, Copy.self])
+
+  // expected-error@+1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  let _: [Int: any Command] = Dictionary(
+    uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
+
+  // expected-error@+1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  let _: [Int: (any Command)?] = Dictionary(
+    uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
+
+  let _: [Int: any Command.Type] = Dictionary(
+    uniqueKeysWithValues: [Undo.self, Cut.self, Copy.self, Paste.self].map { ($0.id, $0) })
+
+  let _: [Int: (any Command.Type)?] = Dictionary(
+    uniqueKeysWithValues: [Undo.self, Cut.self, Copy.self, Paste.self].map { ($0.id, $0) })
+}
+
+// rdar://problem/38159133
+// https://github.com/apple/swift/issues/49673
+// Swift 4.1 Xcode 9.3b4 regression
+
+do {
+  class Super {}
+  class A: Super, Command {}
+  class B: Super, Command {}
+
+  func rdar38159133(a: A, b: B, aOpt: A?, bOpt: B?) {
+    let _ = Array<any Command>([a, b])
+    let _: [any Command] = [a, b]
+    let _: [any Command] = Array([a, b])
+    let _: [any Command] = [a, b].filter { _ in true }
+    let _: [any Command] = [aOpt, bOpt].compactMap { $0 }
+
+    // Some of these might be hard to resolve, but we should produce better diagnostics.
+
+    let _: [any Command] = [aOpt, bOpt].filter { $0 != nil }
+    // expected-error@-1 {{no exact matches in call to instance method 'filter'}}
+    let _: [any Command] = [a, b].map { $0 }
+    // expected-error@-1 {{failed to produce diagnostic for expression}}
+    let _: [any Command] = [a, b].flatMap { [$0] }
+    // expected-error@-1 {{cannot convert value of type 'Super' to expected element type 'any Command'}}
+
+    #if SALVAGE
+    let _: [any Command] = [[a], [b]].flatMap { $0 }
+    #endif
+  }
 }
 
 do {
@@ -94,22 +154,6 @@ do {
   let _: Dictionary<Double, StaticString> = .init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
 }
 
-// rdar://problem/38159133
-// https://github.com/apple/swift/issues/49673
-// Swift 4.1 Xcode 9.3b4 regression
-
-protocol P_38159133 {}
-
-do {
-  class Super {}
-  class A: Super, P_38159133 {}
-  class B: Super, P_38159133 {}
-
-  func rdar38159133(_ a: A?, _ b: B?) {
-    let _: [P_38159133] = [a, b].compactMap { $0 } // Ok
-  }
-}
-
 // Tests for a special form of inference where we have both a
 // subtype and a supertype binding for a type variable, and the
 // subtype binding contains a type variable but the supertype
@@ -132,6 +176,164 @@ do {
     let _: [(String, String)] = v + Array(v)
     let _: [(String, String)] = Array(v) + v
     let _: [(String, String)] = Array(v) + Array(v)
+  }
+}
+
+protocol P {}
+
+extension String: P {}
+extension Int: P {}
+extension Optional: P where Wrapped: P {}
+
+do {
+  class C {
+    var string = ""
+    var integer = 0
+    var data = Data()
+    var optData: Data? = nil
+    var optOptData: Data?? = nil
+    var dictionary: [AnyHashable: Any]? = nil
+
+    static func _data(_: [AnyHashable: Any]?) -> Data {
+      return Data()
+    }
+
+    static func _optData(_: [AnyHashable: Any]?) -> Data? {
+      return nil
+    }
+  }
+
+  struct Data: P {}
+
+  func f1<T: Collection, U: Collection>(_: T)
+    where T.Element == U, U.Element == any P {}
+  // expected-note@-2 5{{where 'U.Element' = 'Any'}}
+
+  func test1(_ elts: [C]) {
+    f1(elts.map { c in [c.string] })
+
+    f1(elts.map { c in [c.string, c.integer] })
+    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
+
+    f1(elts.map { c in [c.string, c.integer, c.data] })
+    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
+
+    f1(elts.map { c in [c.string, c.integer, c.optData] })
+    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
+
+    f1(elts.map { c in [c.string, c.integer, c.optOptData] })
+
+    f1(elts.map { c in [c.string, c.integer, c.data, c.optData] })
+    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
+
+    f1(elts.map { c in [c.string, c.integer, c.data, c.optData, c.optOptData] })
+
+    f1(elts.map { c in [c.string, c.integer, c.dictionary.map { C._data($0) }] })
+    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
+
+    f1(elts.map { c in [c.string, c.integer, c.dictionary.map { C._optData($0) }] })
+  }
+
+  struct Literal: ExpressibleByStringInterpolation {
+    init(stringInterpolation: Interpolation) {}
+    init(stringLiteral: String) {}
+
+    struct Interpolation: StringInterpolationProtocol {
+      typealias StringLiteralType = String
+
+      init(literalCapacity: Int, interpolationCount: Int) {}
+
+      func appendLiteral(_: String) {}
+      func appendInterpolation<T: Collection, U: Collection>(_: T)
+        where T.Element == U, U.Element == any P {}
+        // expected-note@-2 5{{where 'U.Element' = 'Any'}}
+    }
+  }
+
+  func f2(_: Literal) {}
+
+  func test2(_ elts: [C]) {
+    f2("\(elts.map { c in [c.string] })")
+
+    f2("\(elts.map { c in [c.string, c.integer] })")
+    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
+
+    f2("\(elts.map { c in [c.string, c.integer, c.data] })")
+    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
+
+    f2("\(elts.map { c in [c.string, c.integer, c.optData] })")
+    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
+
+    f2("\(elts.map { c in [c.string, c.integer, c.optOptData ] })")
+
+    f2("\(elts.map { c in [c.string, c.integer, c.data, c.optData] })")
+    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
+
+    f2("\(elts.map { c in [c.string, c.integer, c.data, c.optData, c.optOptData] })")
+
+    f2("\(elts.map { c in [c.string, c.integer, c.dictionary.map { C._data($0) }] })")
+    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
+
+    f2("\(elts.map { c in [c.string, c.integer, c.dictionary.map { C._optData($0) }] })")
+  }
+}
+
+do {
+  class Super {}
+  class First<T>: Super {}
+  class Second: Super {}
+
+  func f0() -> [(String, () -> Super)] {
+    return [
+      ("", { return First<Int>() }),
+      ("", { return First<Bool>() }),
+      ("", { return Second() })
+    ]
+  }
+
+
+  func f1() -> [(String, () -> Super)] {
+    let result = [
+      ("", { return First<Int>() }),
+      ("", { return First<Bool>() }),
+      ("", { return Second() })
+    ]
+    return result
+  }
+
+  func f2() -> [(String, () -> Super)] {
+    return [
+      ("", {
+        let result = First<Int>()
+        return result
+      }),
+      ("", {
+        let result = First<Bool>()
+        return result
+      }),
+      ("", {
+        let result = Second()
+        return result
+      })
+    ]
+  }
+
+  func f3() -> [(String, () -> Super)] {
+    let result = [
+      ("", {
+        let result = First<Int>()
+        return result
+      }),
+      ("", {
+        let result = First<Bool>()
+        return result
+      }),
+      ("", {
+        let result = Second()
+        return result
+      })
+    ]
+    return result
   }
 }
 

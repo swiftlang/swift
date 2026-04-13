@@ -536,7 +536,7 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
   case Kind::CoroutineYieldTypes: {
     auto fnType = Storage.get<CanSILFunctionType>(StoredKind);
 
-    llvm::ConstantInt *&cache = IGM.getPointerAuthCaches().Types[fnType];
+    llvm::ConstantInt *&cache = IGM.getPointerAuthCaches().YieldTypes[fnType];
     if (cache)
       return cache;
 

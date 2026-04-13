@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -sil-print-types -opt-mode=none -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
-// RUN: %target-sil-opt -sil-print-types -opt-mode=speed -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
+// RUN: %target-sil-opt -module-name Swift -sil-print-types -opt-mode=none -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
+// RUN: %target-sil-opt -module-name Swift -sil-print-types -opt-mode=speed -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
 
 import Builtin
 
@@ -17,6 +17,21 @@ sil @use_klass_unowned : $@convention(thin) (Klass) -> ()
 enum FakeOptional<T> {
 case none
 case some(T)
+}
+
+@_marker
+protocol Copyable {}
+
+enum NonDestructive<T: ~Copyable>: ~Copyable {
+  case none
+  case some(T)
+}
+
+struct NC: ~Copyable {}
+
+enum Destructive: ~Copyable {
+  case some(NC)
+  case other(NC)
 }
 
 sil @use_fakeoptional_klass_guaranteed : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
@@ -381,4 +396,67 @@ sil [ossa] @narrowLoadThroughProjectionSequence : $@convention(thin) () -> () {
   dealloc_box %box : ${ let Outer }
   %retval = tuple ()
   return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nondestructive_scoped_access : {{.*}} {
+// CHECK:       bb0(%0 : $*NonDestructive<T>):
+// CHECK:         [[MARK_0:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] %0
+// CHECK:         [[OUTER_ACCESS:%.*]] = begin_access [read] [static] [no_nested_conflict] [[MARK_0]]
+//
+// CHECK:       bb1:
+// CHECK:         [[PROJECTION:%.*]] = unchecked_take_enum_data_addr [[OUTER_ACCESS]] : $*NonDestructive<T>, #NonDestructive.some!enumelt
+// CHECK:         [[MARK_1:%.*]] = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] [[PROJECTION]]
+// CHECK-LABEL: } // end sil function 'nondestructive_scoped_access'
+sil [ossa] @nondestructive_scoped_access : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed NonDestructive<T>) -> () {
+bb0(%0 : $*NonDestructive<T>):
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %0
+  %3 = begin_access [read] [static] [no_nested_conflict] %2
+  switch_enum_addr %3, case #NonDestructive.some!enumelt: bb1, case #NonDestructive.none!enumelt: bb2
+
+bb1:
+  %5 = unchecked_take_enum_data_addr %3, #NonDestructive.some!enumelt
+  %6 = begin_access [read] [static] [no_nested_conflict] %5
+  %7 = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] %6
+  end_access %6
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  end_access %3
+  %13 = tuple ()
+  return %13
+}
+
+// CHECK-LABEL: sil [ossa] @destructive_scoped_access : {{.*}} {
+// CHECK:       bb0(%0 : $*Destructive):
+// CHECK:         [[MARK_0:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] %0
+// CHECK:         [[OUTER_ACCESS:%.*]] = begin_access [read] [static] [no_nested_conflict] [[MARK_0]]
+//
+// CHECK:       bb1:
+// CHECK:         [[PROJECTION:%.*]] = unchecked_take_enum_data_addr [[OUTER_ACCESS]] : $*Destructive, #Destructive.some!enumelt
+// CHECK:         [[SCOPED_ACCESS:%.*]] = begin_access [read] [static] [no_nested_conflict] [[PROJECTION]]
+// CHECK:         [[MARK_1:%.*]] = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] [[SCOPED_ACCESS]]
+// CHECK-LABEL: } // end sil function 'destructive_scoped_access'
+sil [ossa] @destructive_scoped_access : $@convention(thin) (@in_guaranteed Destructive) -> () {
+bb0(%0 : $*Destructive):
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %0
+  %3 = begin_access [read] [static] [no_nested_conflict] %2
+  switch_enum_addr %3, case #Destructive.some!enumelt: bb1, case #Destructive.other!enumelt: bb2
+
+bb1:
+  %5 = unchecked_take_enum_data_addr %3, #Destructive.some!enumelt
+  %6 = begin_access [read] [static] [no_nested_conflict] %5
+  %7 = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] %6
+  end_access %6
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  end_access %3
+  %13 = tuple ()
+  return %13
 }

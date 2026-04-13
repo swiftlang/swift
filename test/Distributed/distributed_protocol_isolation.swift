@@ -105,14 +105,16 @@ protocol StrictlyLocal {
 // expected-error@+1{{conformance of 'Nope1_StrictlyLocal' to protocol 'StrictlyLocal' crosses into actor-isolated code and can cause data races}}
 distributed actor Nope1_StrictlyLocal: StrictlyLocal {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{40-40=@preconcurrency }}
-  // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
 
   func local() {}
   // expected-note@-1{{actor-isolated instance method 'local()' cannot satisfy nonisolated requirement}}
+  // expected-note@-2{{mark instance method 'local()' 'nonisolated'}}{{3-3=nonisolated }}
   func localThrows() throws {}
   // expected-note@-1{{actor-isolated instance method 'localThrows()' cannot satisfy nonisolated requirement}}
+  // expected-note@-2{{mark instance method 'localThrows()' 'nonisolated'}}{{3-3=nonisolated }}
   func localAsync() async {}
   // expected-note@-1{{actor-isolated instance method 'localAsync()' cannot satisfy nonisolated requirement}}
+  // expected-note@-2{{mark instance method 'localAsync()' 'nonisolated'}}{{3-3=nonisolated }}
 }
 
 // expected-error@+1{{conformance of 'Nope2_StrictlyLocal' to protocol 'StrictlyLocal' involves isolation mismatches and can cause data races}}
@@ -204,10 +206,10 @@ func test_watching_A(a: A_TerminationWatchingA) async throws {
 // expected-error@+1{{conformance of 'DA_TerminationWatchingA' to protocol 'TerminationWatchingA' crosses into actor-isolated code and can cause data races}}
 distributed actor DA_TerminationWatchingA: TerminationWatchingA {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
-  // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
 
   func terminated(a: String) { }
   // expected-note@-1{{actor-isolated instance method 'terminated(a:)' cannot satisfy nonisolated requirement}}
+  // expected-note@-2{{mark instance method 'terminated(a:)' 'nonisolated'}}{{3-3=nonisolated }}
 }
 
 distributed actor DA_TerminationWatchingDA: TerminationWatchingDA {

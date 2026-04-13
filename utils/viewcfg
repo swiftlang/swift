@@ -39,12 +39,13 @@ class Block(object):
 
     current_index = 0
 
-    def __init__(self, name, preds):
+    def __init__(self, name, preds, is_loop_header=False):
         self.name = name
         self.content = None
         self.preds = []
         self.succs = None
         self.last_line = None
+        self.is_loop_header = is_loop_header
         self.index = Block.current_index
         Block.current_index += 1
         if preds is not None:
@@ -80,8 +81,8 @@ def parse_args():
     Simple regex based transform of SIL and LLVM-IR into graphviz form.
     """)
     parser.add_argument("output_suffix", nargs='?')
-    parser.add_argument("--disable_inst_dump", action='store_true')
-    parser.add_argument("--input_file", type=argparse.FileType('r'),
+    parser.add_argument("--disable-inst-dump", action='store_true')
+    parser.add_argument("--input-file", type=argparse.FileType('r'),
                         default=sys.stdin)
     parser.add_argument("--renderer", choices=["Graphviz", "dot"],
                         default="Graphviz", help="Default is Graphviz")
@@ -98,9 +99,11 @@ def main():
     block_list = []
     block_map = {}
     cur_block = None
+    next_block_is_loop_header = False
     sil_block_pattern = re.compile(r'^(\S+)(\(.*\))?: *(\/\/ *Preds:(.*))?$')
     llvm_block_pattern1 = re.compile(r'^"?([^\s"]+)"?: *; *preds =(.*)?$')
     llvm_block_pattern2 = re.compile(r'^(\d+):? *; *preds =(.*)?$')
+    loop_header_pattern = re.compile(r'^// Loop header\s*$')
 
     # Scan the input file.
     for line in args.input_file.readlines():
@@ -109,7 +112,9 @@ def main():
         llvm_block_match2 = llvm_block_pattern2.match(line)
         block_name = None
         preds = None
-        if sil_block_match:
+        if loop_header_pattern.match(line):
+            next_block_is_loop_header = True
+        elif sil_block_match:
             block_name = sil_block_match.group(1)
             preds = sil_block_match.group(4)
         elif llvm_block_match1:
@@ -127,7 +132,8 @@ def main():
             cur_block = None
 
         if block_name is not None:
-            cur_block = Block(block_name, preds)
+            cur_block = Block(block_name, preds, next_block_is_loop_header)
+            next_block_is_loop_header = False
             cur_block.add_line(line)
             block_list.append(cur_block)
             block_map[block_name] = cur_block
@@ -163,6 +169,11 @@ def main():
                     "\tNode" + str(block.index) +
                     " [shape=record,color=gray,fontcolor=gray,label=\"{" +
                     block.name + "}\"];\n")
+            elif block.is_loop_header:
+                out_file.write(
+                    "\tNode" + str(block.index) +
+                    " [shape=record,color=red,label=\"{" +
+                    block.content + "}\"];\n")
             else:
                 out_file.write(
                     "\tNode" + str(block.index) +

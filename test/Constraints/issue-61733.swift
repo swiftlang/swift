@@ -1,16 +1,39 @@
 // RUN: %target-typecheck-verify-swift
+
 // REQUIRES: asserts
+
 // Issue: https://github.com/swiftlang/swift/issues/61733
-// Verifies SE-0375 fix for (any P)? → (some P) conversion via ForceOptional
 
 protocol P {}
+
 struct S: P {}
 
+@_marker
+protocol Marker {
+}
+
 func takesOptionalP(_: (some P)?) {}
+// expected-note@-1 {{required by global function 'takesOptionalP' where 'some P' = 'any P'}}
 
 func passOptional(foo: (any P)?) {
-    takesOptionalP(foo)
-    // expected-error @-1 {{value of optional type '(any P)?' must be unwrapped to a value of type 'any P'}}
-    // expected-note @-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note @-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // TODO(diagnostics): The message should suggest an optional unwrap here instead.
+  takesOptionalP(foo) // expected-error {{type 'any P' cannot conform to 'P'}}
+  // expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
+}
+
+struct NoOpening {
+  var v: (any Marker)? = nil
+
+  func takesOptional<T>(_: T?) {}
+
+  func testMarkerWithOptionals() {
+    takesOptional(self.v) // Ok
+  }
+
+  func testCompositions(v: (any P & Marker)?, t: (any P & Marker).Type) {
+    func takesGeneric<T, U>(_: T, is: U.Type) {
+    }
+
+    takesGeneric(v, is: t) // Ok
+  }
 }

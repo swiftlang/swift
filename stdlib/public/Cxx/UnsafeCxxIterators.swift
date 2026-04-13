@@ -51,10 +51,10 @@ where Pointee: ~Copyable {
 
 extension UnsafeMutablePointer: @unsafe UnsafeCxxInputIterator
 where Pointee: ~Copyable {
-  public typealias DereferenceResult = UnsafePointer<Self.Pointee>
+  public typealias DereferenceResult = Self
   @inlinable
   public func __operatorStar() -> DereferenceResult {
-    return unsafe UnsafePointer(self)
+    return unsafe self
   }
 }
 

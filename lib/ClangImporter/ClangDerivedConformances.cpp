@@ -1149,7 +1149,6 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   assert(pointeeTy && "valid conformance must have a Pointee witness");
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("_Element"), pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
 

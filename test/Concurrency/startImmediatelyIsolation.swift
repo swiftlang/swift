@@ -53,7 +53,7 @@ actor TestSelfCapture {
 
 struct TestThrowing {
   func test() {
-    // expected-error@+1{{invalid conversion of thrown error type 'any Error' to 'Never'}}
+    // expected-error@+1{{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '@isolated(any) () async -> Void'}}
     let t: Task<Void, Never> = Task.immediate {
       throw Boom()
     }

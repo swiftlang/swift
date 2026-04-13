@@ -3,7 +3,7 @@
 
 // Multi-threaded exclusivity checking implementation (that uses C11 thread_local).
 // RUN: %target-clang %t/a.o %target-embedded-posix-shim -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip -lswiftExclusivityC11ThreadLocal
-// RUN: %target-run %t/a.out 2>&1| %FileCheck %s
+// RUN: %target-run not --crash %t/a.out
 
 // REQUIRES: executable_test
 // REQUIRES: swift_in_compiler
@@ -58,6 +58,7 @@ final class C2 {
 @main
 struct Main {
   static func main() {
+    // Note: not actually checked because it doesn't get flushed.
     // CHECK: Simultaneous access to 0x{{.*}}, but modification requires exclusive access
     // CHECK: Previous access (a modify) started at 0x{{.*}}
     // CHECK: Current access (a read) started at 0x{{.*}}

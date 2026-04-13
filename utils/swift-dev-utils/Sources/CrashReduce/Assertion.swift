@@ -16,6 +16,7 @@ import Foundation
 public struct Assertion: Hashable, Sendable {
   public var fullMessage: String
   public var message: String
+  public var function: String?
 
   private static func matchAssert(_ str: String) -> Assertion? {
     str.scanningUTF8 { scanner in
@@ -35,9 +36,11 @@ public struct Assertion: Hashable, Sendable {
         scanner.skip(while: \.isSpaceOrTab)
         guard scanner.tryEat(utf8: "function") else { return nil }
         scanner.skip(while: \.isSpaceOrTab)
-        scanner.skip(until: { $0 == "," || $0.isSpaceOrTab })
+        let fn = scanner.eat(while: { $0 != "," && !$0.isSpaceOrTab })
         let full = scanner.decodeUTF8(start ..< scanner.cursor)
-        return Assertion(fullMessage: full, message: msg)
+        return Assertion(
+          fullMessage: full, message: msg, function: fn.map(String.init)
+        )
       }
       return nil
     }
@@ -63,9 +66,10 @@ public struct Assertion: Hashable, Sendable {
     }
   }
 
-  init(fullMessage: String, message: String) {
+  init(fullMessage: String, message: String, function: String?) {
     self.fullMessage = fullMessage
     self.message = message
+    self.function = function
   }
 }
 

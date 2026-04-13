@@ -925,17 +925,26 @@ bool swift::emitLoadedModuleTraceIfNeeded(const ModuleDependencyID &mainModule,
     return llvm::find(directDeps, mod) != directDeps.end();
   };
 
+  auto realPath = [&](const std::string &path) {
+    SmallString<128> realPath;
+    if (ctxt.SourceMgr.getFileSystem()->getRealPath(path, realPath))
+      return path;
+    return realPath.str().str();
+  };
+
   std::vector<SwiftModuleTraceInfo> swiftModules;
   for (auto &mod : allLoadedModules) {
     // Record swift module dependencies and ignore other dependencies.
     auto &info = cache.findKnownDependency(mod);
     if (auto *binary = info.getAsSwiftBinaryModule())
-      swiftModules.push_back({mod.ModuleName, binary->getDefiningModulePath(),
+      swiftModules.push_back({mod.ModuleName,
+                              realPath(binary->getDefiningModulePath()),
                               isDirectImport(mod), binary->isResilient,
                               binary->isStrictMemorySafety});
     else if (auto *textual = info.getAsSwiftInterfaceModule())
       swiftModules.push_back(
-          {mod.ModuleName, textual->swiftInterfaceFile, isDirectImport(mod),
+          {mod.ModuleName, realPath(textual->swiftInterfaceFile),
+           isDirectImport(mod),
            /*isResilient=*/true, textual->isStrictMemorySafety});
   }
 

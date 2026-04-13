@@ -181,6 +181,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       bridged.hasSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
     }
   }
+
   public var isSerialized: Bool {
     switch serializedKind {
     case .notSerialized, .serializedForPackage:

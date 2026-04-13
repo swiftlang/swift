@@ -1903,9 +1903,22 @@ struct PartitionOpBuilder {
     auto elt = getActorIntroducingRepresentative(actorIsolation);
     currentInstPartitionOps->emplace_back(
         PartitionOp::AssignFresh(elt, currentInst));
+    currentInstPartitionOps->emplace_back(PartitionOp::Merge(
+        elt, sourceValue.getID(), RegionMergeReason::ActorIntroducingInst,
+        sourceOperand));
+  }
+
+  void addActorIntroducingInst(
+      ArrayRef<std::pair<Operand *, TrackableValue>> sourceOperandTVPairs,
+      SILIsolationInfo actorIsolation) {
+    auto elt = getActorIntroducingRepresentative(actorIsolation);
     currentInstPartitionOps->emplace_back(
-        PartitionOp::Merge(elt, sourceValue.getID(),
-                           RegionMergeReason::IsolatedFunction, sourceOperand));
+        PartitionOp::AssignFresh(elt, currentInst));
+    for (auto pair : sourceOperandTVPairs) {
+      currentInstPartitionOps->emplace_back(PartitionOp::Merge(
+          elt, pair.second.getID(), RegionMergeReason::ActorIntroducingInst,
+          pair.first));
+    }
   }
 
   void addRequire(TrackableValueLookupResult value);
@@ -2123,6 +2136,10 @@ getPartitionOpsForInstruction(PartitionOpTranslator *translator,
                               SILInstruction *inst,
                               std::vector<PartitionOp> &foundPartitionOps);
 
+static void
+getPartitionOpsForBlock(PartitionOpTranslator *translator, SILBasicBlock *block,
+                        std::vector<PartitionOp> &foundPartitionOps);
+
 /// PartitionOpTranslator is responsible for performing the translation from
 /// SILInstructions to PartitionOps. Not all SILInstructions have an effect on
 /// the region partition, and some have multiple effects - such as an
@@ -2144,6 +2161,8 @@ class PartitionOpTranslator {
   friend void(getPartitionOpsForInstruction)(PartitionOpTranslator *,
                                              SILInstruction *,
                                              std::vector<PartitionOp> &);
+  friend void(getPartitionOpsForBlock)(PartitionOpTranslator *, SILBasicBlock *,
+                                       std::vector<PartitionOp> &);
   SILFunction *function;
 
   /// The initial partition of the entry block.
@@ -2421,21 +2440,6 @@ public:
       }
     }
 
-    // Merge all srcs if we have any.
-    if (sourceOperandTVPairs.size()) {
-      // NOTE: A merge can fail if we have multiple operands with incompatible
-      // regions. We will dynamically emit an error in such a case and not merge
-      // that value into our region... we do want to merge /all/ other operands
-      // though so we merge as much as possible. To ensure that this happens, we
-      // merge all operands into the first operand's region to ensure that we
-      // are always accumulating into a value that we haven't skipped since we
-      // never skip the firstValue.
-      auto firstValue = sourceOperandTVPairs[0].second;
-      for (unsigned i = 1; i < sourceOperandTVPairs.size(); i++) {
-        builder.addMerge(firstValue, sourceOperandTVPairs[i].first, reason);
-      }
-    }
-
     // Then process our direct results.
     for (SILValue result : directResultValues) {
       // If we had isolation info explicitly passed in... use our
@@ -2462,25 +2466,26 @@ public:
 
     // Finally, process our indirect results.
     for (Operand *result : indirectResultAddresses) {
-      // If we had isolation info explicitly passed in... use our
-      // resultIsolationInfoError. Otherwise, we want to infer.
-      if (resultIsolationInfoOverride) {
-        // We only get back result if it is non-Sendable.
-        if (auto nonSendableValue = initializeTrackedValue(
-                result->get(), resultIsolationInfoOverride)) {
-          // If we did not insert, emit an unknown patten error.
-          if (!nonSendableValue->second) {
-            builder.addUnknownPatternError(result->get());
-          }
-          indirectResultTVPairs.emplace_back(result, nonSendableValue->first);
-        }
-      } else {
-        if (auto lookupResult = tryToTrackValue(result->get())) {
-          if (lookupResult->value.isSendable())
-            continue;
-          auto value = lookupResult->value;
-          indirectResultTVPairs.emplace_back(result, value);
-        }
+      if (auto lookupResult = tryToTrackValue(result->get())) {
+        if (lookupResult->value.isSendable())
+          continue;
+        auto value = lookupResult->value;
+        indirectResultTVPairs.emplace_back(result, value);
+      }
+    }
+
+    // Merge all srcs if we have any.
+    if (sourceOperandTVPairs.size()) {
+      // NOTE: A merge can fail if we have multiple operands with incompatible
+      // regions. We will dynamically emit an error in such a case and not merge
+      // that value into our region... we do want to merge /all/ other operands
+      // though so we merge as much as possible. To ensure that this happens, we
+      // merge all operands into the first operand's region to ensure that we
+      // are always accumulating into a value that we haven't skipped since we
+      // never skip the firstValue.
+      auto firstValue = sourceOperandTVPairs[0].second;
+      for (unsigned i = 1; i < sourceOperandTVPairs.size(); i++) {
+        builder.addMerge(firstValue, sourceOperandTVPairs[i].first, reason);
       }
     }
 
@@ -2512,10 +2517,17 @@ public:
           [](const std::pair<Operand *, TrackableValue> &pair) {
             return pair.second;
           });
+      // TODO: How can we inject if there isn't an operand? I think we may need
+      // to make a cheating way to do it.
       builder.addAssignFresh(
           llvm::concat<TrackableValue>(directResultTVs, transformRange));
       return;
     }
+
+    if (resultIsolationInfoOverride)
+      builder.addActorIntroducingInst(sourceOperandTVPairs.back().second,
+                                      sourceOperandTVPairs.back().first,
+                                      resultIsolationInfoOverride);
 
     // Otherwise, we need to assign all of the results to be in the same region
     // as the operands. Without losing generality, we just use the first
@@ -3346,6 +3358,44 @@ public:
     builder.addUnknownPatternError(value);
   }
 
+  void translatePredTransformingTerminator(
+      SILBasicBlock *basicBlock, std::vector<PartitionOp> &foundPartitionOps) {
+    // Always just use front for this purpose.
+    builder.reset(&basicBlock->front());
+    auto *singlePred = basicBlock->getSinglePredecessorBlock();
+    if (!singlePred)
+      return;
+
+    auto *termInst =
+        dyn_cast<CheckedCastBranchInst>(singlePred->getTerminator());
+    if (!termInst)
+      return;
+
+    auto castValue = tryToTrackValue(termInst->getOperand());
+
+    if (termInst->getSuccessBB() == basicBlock) {
+      if (auto argValue =
+              tryToTrackValue(basicBlock->getSILPhiArguments()[0])) {
+        builder.addAssignFresh(argValue->value);
+        if (castValue) {
+          builder.addMerge(argValue->value, &termInst->getOperandRef(),
+                           RegionMergeReason::Cast);
+        }
+      }
+      return;
+    }
+
+    // Along the non-success path for simplicity today, we just assign fresh and
+    // assign. TODO: We could make this lookthrough.
+    if (auto argValue = tryToTrackValue(basicBlock->getSILPhiArguments()[0])) {
+      builder.addAssignFresh(argValue->value);
+      if (castValue) {
+        builder.addAssignDirectResult(argValue->value,
+                                      &termInst->getOperandRef());
+      }
+    }
+  }
+
   /// Translate the instruction's in \p basicBlock to a vector of PartitionOps
   /// that define the block's dataflow.
   void translateSILBasicBlock(SILBasicBlock *basicBlock,
@@ -3360,6 +3410,14 @@ public:
     // Translate each SIL instruction to the PartitionOps that it represents if
     // any.
     builder.initialize(foundPartitionOps);
+
+    // First perform any operations that are sunk from terminators from previous
+    // blocks.
+    //
+    // E.x.: If we cast, we want to only merge each of the SIL phi parameters
+    // along their respective paths.
+    translatePredTransformingTerminator(basicBlock, foundPartitionOps);
+
     for (auto &instruction : *basicBlock) {
       REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Visiting: " << instruction);
       translateSILInstruction(&instruction);
@@ -3480,6 +3538,13 @@ void regionanalysisimpl::getPartitionOpsForInstruction(
     std::vector<PartitionOp> &foundPartitionOps) {
   translator->builder.initialize(foundPartitionOps);
   translator->translateSILInstruction(inst);
+}
+
+void regionanalysisimpl::getPartitionOpsForBlock(
+    PartitionOpTranslator *translator, SILBasicBlock *block,
+    std::vector<PartitionOp> &foundPartitionOps) {
+  translator->builder.initialize(foundPartitionOps);
+  translator->translateSILBasicBlock(block, foundPartitionOps);
 }
 
 Element PartitionOpBuilder::lookupValueID(SILValue value) {
@@ -3843,7 +3908,6 @@ CONSTANT_TRANSLATION(YieldInst, Require)
 // Terminators that act as phis.
 CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
-CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 
 // Function exiting terminators.
@@ -4465,10 +4529,18 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
   // differently depending on what the result of checked_cast_addr_br
   // is. For now just keep the current behavior. It is more conservative,
   // but still correct.
-  translateSILMultiAssign(ArrayRef<SILValue>(), ArrayRef<Operand *>(),
-                          makeOperandRefRange(ccabi->getAllOperands()),
+  translateSILMultiAssign(ArrayRef<SILValue>(),
+                          TinyPtrVector<Operand *>(&ccabi->getAllOperands()[1]),
+                          TinyPtrVector<Operand *>(&ccabi->getAllOperands()[0]),
                           RegionMergeReason::Unknown,
                           SILIsolationInfo::getConformanceIsolation(ccabi));
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics PartitionOpTranslator::visitCheckedCastBranchInst(
+    CheckedCastBranchInst *ccabi) {
+  // Just require the operand. We perform merging/etc in the destination blocks.
+  translateSILRequire(ccabi->getOperand());
   return TranslationSemantics::Special;
 }
 
@@ -4777,6 +4849,33 @@ static FunctionTest PartitionOpsTest(
       assert(valueInst);
       std::vector<PartitionOp> blockPartitionOps;
       getPartitionOpsForInstruction(&translator, valueInst, blockPartitionOps);
+      // First dump the value map.
+      valueMap.print(llvm::outs());
+      // Then dump the instructions.
+      for (auto &partitionOp : blockPartitionOps) {
+        partitionOp.print(llvm::outs());
+      }
+    });
+
+// Arguments:
+// - SILBasicBlock: the block that we are lowering.
+// Dumps:
+// - The inferred isolation.
+static FunctionTest PartitionOpsBlockLoweringTest(
+    "sil_regionanalysis_partitionoptranslation_block",
+    [](auto &function, auto &arguments, auto &test) {
+      llvm::BumpPtrAllocator allocator;
+      IsolationHistory::Factory historyFactory(allocator);
+      RegionAnalysisValueMap valueMap(&function);
+      PartitionOpTranslator translator(
+          &function,
+          test.template getAnalysis<PostOrderAnalysis>()->get(&function),
+          valueMap, historyFactory);
+
+      auto *blockInst = arguments.takeBlock();
+      assert(blockInst);
+      std::vector<PartitionOp> blockPartitionOps;
+      getPartitionOpsForBlock(&translator, blockInst, blockPartitionOps);
       // First dump the value map.
       valueMap.print(llvm::outs());
       // Then dump the instructions.

@@ -17,7 +17,7 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(anyAppleOS)
 internal import Darwin
 internal import BacktracingImpl.OS.Darwin
 #endif
@@ -147,7 +147,7 @@ public struct ImageMap: Collection, Sendable, Hashable {
 
   /// Capture the image map for the current process.
   public static func capture() -> ImageMap {
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if os(anyAppleOS)
     return capture(for: mach_task_self())
     #elseif os(Windows)
     return capture(for: UInt(bitPattern: GetCurrentProcess()))

@@ -135,7 +135,9 @@ private func tryOptimizeEnumComparison(apply: ApplyInst, _ context: SimplifyCont
   let lhs = apply.arguments[0]
   let rhs = apply.arguments[1]
   guard let enumDecl = lhs.type.nominal as? EnumDecl,
-        enumDecl.hasRawType,
+        // A custom raw type can implement the case comparison in a way that comparing different cases
+        // will return `true`. Therefore only do the optimization for known stdlib raw value types.
+        enumDecl.hasKnownRawType(context),
         !enumDecl.isResilient(in: apply.parentFunction),
         !enumDecl.hasClangNode,
         lhs.type.isAddress,
@@ -305,5 +307,31 @@ private extension Type {
   func optionalPayloadType(in function: Function) -> Type {
     let subs = contextSubstitutionMap
     return subs.replacementTypes[0].loweredType(in: function)
+  }
+}
+
+private extension EnumDecl {
+  func hasKnownRawType(_ context: SimplifyContext) -> Bool {
+    guard let rawType,
+          let rawTypeDecl = rawType.nominal
+    else {
+      return false
+    }
+    switch rawTypeDecl {
+    case context.swiftIntDecl,
+         context.swiftInt64Decl,
+         context.swiftInt32Decl,
+         context.swiftInt16Decl,
+         context.swiftInt8Decl,
+         context.swiftUIntDecl,
+         context.swiftUInt64Decl,
+         context.swiftUInt32Decl,
+         context.swiftUInt16Decl,
+         context.swiftUInt8Decl,
+         context.swiftStringDecl:
+      return true
+    default:
+      return false
+    }
   }
 }

@@ -715,6 +715,15 @@ public:
   /// Distribution level of the module.
   LibraryLevel getLibraryLevel() const;
 
+  /// The stored library level from deserialized module data.
+  /// Returns LibraryLevel::Other if no level was stored.
+  LibraryLevel getStoredLibraryLevel() const {
+    return LibraryLevel(Bits.ModuleDecl.StoredLibraryLevel);
+  }
+  void setStoredLibraryLevel(LibraryLevel level) {
+    Bits.ModuleDecl.StoredLibraryLevel = unsigned(level);
+  }
+
   /// Returns true if this module was or is being compiled for testing.
   bool hasIncrementalInfo() const { return Bits.ModuleDecl.HasIncrementalInfo; }
   void setHasIncrementalInfo(bool enabled = true) {
@@ -794,6 +803,17 @@ public:
   }
   void setSerializePackageEnabled(bool flag = true) {
     Bits.ModuleDecl.SerializePackageEnabled = flag;
+  }
+  // Returns true if aggressive cross-module-optimzation was enabled.
+  // Aggressive CMO assumes non-public types are accessible from outside the
+  // module (in contrast to default CMO which only assumes public types are
+  // accessible) .
+  bool isAggressiveCMOEnabled() const {
+    return Bits.ModuleDecl.AggressiveCMOEnabled;
+  }
+
+  void setAggressiveCMOEnabled(bool flag = true) {
+    Bits.ModuleDecl.AggressiveCMOEnabled = flag;
   }
 
   /// Returns true if this module is a non-Swift module that was imported into

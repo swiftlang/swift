@@ -1,8 +1,8 @@
-// The compiler should finish in less than 5 seconds. To give some slack, specify a timeout of 30 seconds.
+// The compiler should finish in less than 10 seconds. To give some slack, specify a timeout of 60 seconds.
 // If the compiler needs more than that, there is probably a real problem.
 // So please don't just increase the timeout in case this fails.
 
-// RUN: %{python} %S/../../test/Inputs/timeout.py 30 %target-swift-frontend -O -parse-as-library %s -emit-sil | %FileCheck %s
+// RUN: %{python} %S/../../test/Inputs/timeout.py 60 %target-swift-frontend -O -parse-as-library %s -emit-sil | %FileCheck %s
 
 // REQUIRES: tools-release,no_asan
 

@@ -83,7 +83,42 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
     }
   }
 
+  /// Conformance entries are used for fast conformance lookup, which doesn't
+  /// need to query the runtime's conformance lookup table.
+  /// A conformance entry specifies if the class conforms or does not conform
+  /// to a protocol. At runtime, a type cast instruction to an existential can
+  /// directly load the witness table pointer from the VTable. If null, the
+  /// class does not conform to the protocol.
+  public enum ConformanceEntry {
+    case noConformance(ProtocolDecl)
+    case conformance(Conformance)
+  }
+
+  public struct ConformanceEntryArray : BridgedRandomAccessCollection {
+    fileprivate let bridgedTable: BridgedVTable
+    public let count: Int
+
+    init(vTable: VTable) {
+      self.bridgedTable = vTable.bridged
+      self.count = vTable.bridged.getNumConformanceEntries()
+    }
+
+    public var startIndex: Int { return 0 }
+    public var endIndex: Int { return count }
+
+    public subscript(_ index: Int) -> ConformanceEntry {
+      assert(index >= startIndex && index < endIndex)
+      if bridgedTable.hasConformance(index) {
+        return .conformance(Conformance(bridged: bridgedTable.getConformance(index)))
+      } else {
+        return .noConformance(bridgedTable.getProtocol(index).getAs(ProtocolDecl.self))
+      }
+    }
+  }
+
   public var entries: EntryArray { EntryArray(vTable: self) }
+
+  public var conformances: ConformanceEntryArray { ConformanceEntryArray(vTable: self) }
 
   public var `class`: ClassDecl { bridged.getClass().getAs(ClassDecl.self) }
 
@@ -99,6 +134,13 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
       return Entry(bridged: bridgedEntryOrNil.entry)
     }
     return nil
+  }
+
+  public func append(conformance: ConformanceEntry) {
+    switch conformance {
+      case .noConformance(let proto): bridged.appendConformance(proto.bridged)
+      case .conformance(let conf):    bridged.appendConformance(conf.bridged)
+    }
   }
 
   public var description: String {

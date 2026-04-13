@@ -95,21 +95,27 @@ func testOpenExistential(existential: any P) async {
   await _openExistential(existential, do: open)
 }
 
-func testWithoutActuallyEscaping(_ f: () async -> ()) async {
-  // CHECK-LABEL: // closure #1 in testWithoutActuallyEscaping(_:)
+func testWithoutActuallyEscaping(_ f: () async -> (), _ f2: (Int) async -> Void) async {
+  // CHECK-LABEL: // closure #1 in testWithoutActuallyEscaping(_:_:)
   // CHECK-NEXT: // Isolation: caller_isolation_inheriting
   await withoutActuallyEscaping(f) {
     await $0()
   }
 
-  // CHECK-LABEL: // closure #2 in testWithoutActuallyEscaping(_:)
+  // CHECK-LABEL: // closure #2 in testWithoutActuallyEscaping(_:_:)
   // CHECK-NEXT: // Isolation: global_actor. type: MainActor
   await withoutActuallyEscaping(f) { @MainActor in
     await $0()
   }
 
+  // CHECK-LABEL: // closure #3 in testWithoutActuallyEscaping(_:_:)
+  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
+  await withoutActuallyEscaping(f2) { body in
+    await body(42)
+  }
+
   actor Test {
-    // CHECK-LABEL: // closure #1 in testActorIsolatedCapture() in Test #1 in testWithoutActuallyEscaping(_:)
+    // CHECK-LABEL: // closure #1 in testActorIsolatedCapture() in Test #1 in testWithoutActuallyEscaping(_:_:)
     // CHECK-NEXT: // Isolation: actor_instance. name: 'self'
     func testActorIsolatedCapture() async {
       await withoutActuallyEscaping(compute) {

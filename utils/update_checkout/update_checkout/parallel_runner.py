@@ -1,12 +1,11 @@
 import sys
 import os
 import time
-from typing import Callable, List, Any, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 from threading import Lock, Thread, Event
 from concurrent.futures import ThreadPoolExecutor
 import shutil
 
-from .git_command import GitException
 from .runner_arguments import (
     RunnerArguments,
     AdditionalSwiftSourcesArguments,
@@ -64,14 +63,10 @@ class MonitoredFunction:
     def __call__(self, *args: Union[RunnerArguments, AdditionalSwiftSourcesArguments]):
         task_name = args[0].repo_name
         self._task_tracker.mark_task_as_running(task_name)
-        result = None
         try:
-            result = self._fn(*args)
-        except Exception as e:
-            print(e)
+            return self._fn(*args)
         finally:
             self._task_tracker.mark_task_as_done(task_name)
-            return result
 
 
 class ParallelRunner:
@@ -84,7 +79,7 @@ class ParallelRunner:
         def run_safely(*args, **kwargs):
             try:
                 return fn(*args, **kwargs)
-            except GitException as e:
+            except Exception as e:
                 return e
 
         if n_threads == 0:
@@ -147,7 +142,7 @@ class ParallelRunner:
 
     @staticmethod
     def check_results(
-        results: Optional[List[Union[GitException, Exception, Any]]], operation: str
+        results: Optional[List[Union[Exception, None]]], operation: str
     ) -> int:
         """Check the results of ParallelRunner and print the failures."""
 
@@ -157,14 +152,10 @@ class ParallelRunner:
         for r in results:
             if r is None:
                 continue
-            if isinstance(r, tuple) and len(r) == 3:
-                if r[1] == 0:
-                    continue
+            if isinstance(r, tuple) and len(r) == 3 and r[1] == 0:
+                continue
             if fail_count == 0:
                 print(f"======{operation} FAILURES======")
             fail_count += 1
-            if isinstance(r, (GitException, Exception)):
-                print(r)
-                continue
             print(r)
         return fail_count

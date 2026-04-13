@@ -105,7 +105,7 @@ func test_no_filtering_of_overloads() {
   }
 
   test {
-    _ = S() { // Ok
+    _ = S() { // expected-warning {{using '_' to ignore the result of a Void-returning function is redundant}}
       _ = 42
       print("Hello")
     }

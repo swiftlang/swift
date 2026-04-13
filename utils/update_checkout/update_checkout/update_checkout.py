@@ -229,12 +229,70 @@ def update_single_repository(pool_args: UpdateArguments):
                     repo_path, ["rev-parse", "--verify", checkout_target], echo=verbose
                 )
             except Exception:
-                Git.run(
+                # The target isn't known locally. This can happen when the
+                # repo was cloned with --single-branch (e.g. via
+                # --skip-history) and we now need a different branch or tag.
+                # Fetch the ref explicitly.
+                is_tag, _, _ = Git.run(
                     repo_path,
-                    ["fetch", "--recurse-submodules=yes", "--tags"] + fetch_extra_args,
-                    echo=verbose,
-                    prefix=prefix,
+                    ["ls-remote", "--tags", "origin", checkout_target],
                 )
+                if is_tag:
+                    Git.run(
+                        repo_path,
+                        [
+                            "fetch",
+                            "--recurse-submodules=yes",
+                            "origin",
+                            f"+refs/tags/{checkout_target}"
+                            f":refs/tags/{checkout_target}",
+                        ]
+                        + fetch_extra_args,
+                        echo=verbose,
+                        prefix=prefix,
+                    )
+                elif not is_commit_hash(checkout_target):
+                    Git.run(
+                        repo_path,
+                        [
+                            "fetch",
+                            "--recurse-submodules=yes",
+                            "--tags",
+                            "origin",
+                            f"+refs/heads/{checkout_target}"
+                            f":refs/remotes/origin/{checkout_target}",
+                        ]
+                        + fetch_extra_args,
+                        echo=verbose,
+                        prefix=prefix,
+                    )
+                    # Shallow clones do not auto-create a local tracking branch
+                    # on checkout. Check if it exists if not set up tracking.
+                    # --list output is empty string if the branch doesn't exist,
+                    # non-empty if it does.
+                    existing_branch, _, _ = Git.run(
+                        repo_path,
+                        ["branch", "--list", checkout_target],
+                    )
+                    if not existing_branch:
+                        Git.run(
+                            repo_path,
+                            [
+                                "branch",
+                                checkout_target,
+                                f"refs/remotes/origin/{checkout_target}",
+                            ],
+                            echo=verbose,
+                            prefix=prefix,
+                        )
+                else:
+                    Git.run(
+                        repo_path,
+                        ["fetch", "--recurse-submodules=yes", "--tags"]
+                        + fetch_extra_args,
+                        echo=verbose,
+                        prefix=prefix,
+                    )
 
             try:
                 Git.run(
@@ -980,11 +1038,11 @@ def main() -> int:
 
         if args.dump_hashes:
             dump_repo_hashes(args, config)
-            sys.exit(0)
+            return 0
 
         if args.dump_hashes_config:
             dump_repo_hashes(args, config, args.dump_hashes_config)
-            sys.exit(0)
+            return 0
 
         _check_missing_clones(args=args, config=config, scheme_map=scheme_map)
 
@@ -1001,7 +1059,7 @@ def main() -> int:
     fail_count = do_checkout()
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
-    else:
+    elif not args.dump_hashes and not args.dump_hashes_config:
         print("update-checkout succeeded")
         print_repo_hashes(args, config)
     sys.exit(fail_count)

@@ -376,6 +376,7 @@ func _taskRemoveCancellationHandler(
 public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Value,
 ) async throws(Failure) -> Value {
+#if $BuiltinTaskCancellationShield
   let didInstallShield = Builtin.taskCancellationShieldPush()
 
   defer {
@@ -385,6 +386,9 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
   }
 
   return try await operation()
+#else
+  fatalError("Swift compiler is incompatible with this SDK version")
+#endif
 }
 
 
@@ -466,6 +470,7 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
 public func withTaskCancellationShield<Value, Failure>(
   operation: () throws(Failure) -> Value,
 ) throws(Failure) -> Value {
+#if $BuiltinTaskCancellationShield
   let didInstallShield = Builtin.taskCancellationShieldPush()
 
   defer {
@@ -475,6 +480,9 @@ public func withTaskCancellationShield<Value, Failure>(
   }
 
   return try operation()
+#else
+  fatalError("Swift compiler is incompatible with this SDK version")
+#endif
 }
 
 @available(SwiftStdlib 6.4, *)

@@ -1246,7 +1246,6 @@ ERROR(regionbasedisolation_merge_region_failure_error_functionisolation, none,
 ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_type, none,
       "passing %select{%0|%1 %0}4 to %3 %kind2 risks causing data races",
       (Type, StringRef, const ValueDecl *, StringRef, bool))
-
 ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_sil, none,
       "passing %1 %0 to %3 %2 risks causing data races",
       (Identifier, StringRef, Identifier, StringRef))
@@ -1257,6 +1256,10 @@ ERROR(regionbasedisolation_merge_region_failure_error_nonisolatedfunction, none,
       (Identifier, StringRef, Identifier, StringRef, const ValueDecl *, bool))
 NOTE(regionbasedisolation_merge_region_failure_error_nonisolatedfunction_note, none,
      "%2 could begin referencing %0 allowing concurrent access to %0 by %3 code and %select{code in the current task|%1 code}5", (Identifier, StringRef, Identifier, StringRef, const ValueDecl *, bool))
+
+ERROR(regionbasedisolation_merge_region_failure_error_cast, none,
+      "casting %select{%0|%1 %0}4 to %3 %2 risks causing data races",
+      (Identifier, StringRef, Type, StringRef, bool))
 
 // Concurrency related diagnostics
 ERROR(cannot_find_executor_factory_type, none,

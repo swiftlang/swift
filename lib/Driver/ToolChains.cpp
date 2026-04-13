@@ -801,6 +801,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-scan-dependencies";
   case file_types::TY_JSONArguments:
     return "-emit-supported-arguments";
+  case file_types::TY_JSONPolyglotAST:
+    return "-emit-polyglot-ast";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -1093,6 +1095,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_IndexData:
     case file_types::TY_JSONDependencies:
     case file_types::TY_JSONArguments:
+    case file_types::TY_JSONPolyglotAST:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:

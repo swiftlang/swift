@@ -257,13 +257,6 @@ bool mayLoadWeakOrUnowned(SILInstruction* instruction);
 /// point like a memory barrier, lock or syscall.
 bool maySynchronize(SILInstruction* instruction);
 
-/// Conservatively, whether this instruction could be a barrier to hoisting
-/// destroys.
-///
-/// Does not consider function so effects, so every apply is treated as a
-/// barrier.
-bool mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction);
-
 } // end namespace swift
 
 //===----------------------------------------------------------------------===//

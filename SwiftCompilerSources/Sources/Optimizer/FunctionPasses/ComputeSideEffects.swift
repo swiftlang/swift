@@ -283,8 +283,7 @@ private struct CollectedEffects {
     // If we didn't already, check whether the instruction could be a deinit
     // barrier.  If it's an apply of some sort, that was already done in
     // handleApply.
-    if !checkedIfDeinitBarrier,
-       inst.mayBeDeinitBarrierNotConsideringSideEffects {
+    if !checkedIfDeinitBarrier, inst.isDeinitBarrier {
       globalEffects.isDeinitBarrier = true
     }
   }

@@ -1795,7 +1795,8 @@ public:
   llvm::GlobalValue *defineTypeMetadata(
       CanType concreteType, bool isPattern, bool isConstant,
       ConstantInitFuture init, llvm::StringRef section = {},
-      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {},
+      unsigned numConformanceEntries = 0);
 
   TypeEntityReference
   getContextDescriptorEntityReference(const LinkEntity &entity);

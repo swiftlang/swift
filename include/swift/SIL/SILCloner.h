@@ -1087,7 +1087,9 @@ void SILCloner<ImplClass>::visitAllocPackMetadataInst(
     AllocPackMetadataInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createAllocPackMetadata(
-                                    getOpLocation(Inst->getLoc())));
+                                    getOpLocation(Inst->getLoc()),
+                                    getOpType(Inst->getType()),
+                                    Inst->isStackAllocationNested()));
 }
 
 template<typename ImplClass>

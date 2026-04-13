@@ -189,6 +189,15 @@ An expected diagnostic is denoted by a comment which begins with `expected-error
 
 - (Optional) Location information. By default, the comment will match any diagnostic emitted on the same line. However, it's possible to override this behavior and/or specify column information as well. `// expected-error@-1 ...` looks for an error on the previous line, `// expected-warning@+1:3 ...` looks for a warning on the next line at the third column, and `// expected-note@:7 ...` looks for a note on the same line at the seventh column.
 
+  Named location markers can also be used instead of line offsets. A marker is defined by placing `// #name` in a comment (where `name` consists of alphanumeric characters, hyphens, or underscores, and must be the only content in the comment). The marker can then be referenced with `@#name`:
+
+  ```swift
+  let x: Int = "hello" // #myMarker
+  // expected-error@#myMarker {{cannot convert value}}
+  ```
+
+  Markers are especially useful when the diagnostic and its expectation are far apart, when lines are frequently added or removed nearby, or when referring to diagnostics in a different file. An optional column can also be specified: `// expected-error@#myMarker:14 ...`.
+
 - (Optional) A match count which specifies how many times the diagnostic is expected to appear. This may be a positive integer or `*`, which allows for zero or more matches. The match count must be surrounded by whitespace if present. For example, `// expected-error 2 ...` looks for two matching errors, and `// expected-warning * ...` looks for any number of matching warnings.
 
 - (Required) The expected error message. The message should be enclosed in double curly braces and should not include the `error:`/`warning:`/`note:`/`remark:` prefix. For example, `// expected-error {{invalid redeclaration of 'y'}}` would match an error with that message on the same line. The expected message does not need to match the emitted message verbatim. As long as the expected message is a substring of the original message, they will match.

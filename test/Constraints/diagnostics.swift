@@ -1133,7 +1133,6 @@ func rdar17170728() {
   // `reduce(into:)`, and the actual problem is that Int cannot be used as a boolean
   // condition.
   let _ = [i, j, k].reduce(0 as Int?) { // expected-error {{missing argument label 'into:' in call}}
-  // expected-error@-1 {{generic parameter 'E' could not be inferred}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
     // expected-error@-1 {{binary operator '+' cannot be applied to operands of type 'Bool.Stride' and 'Bool'}}
   }

@@ -2244,7 +2244,7 @@ std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
                       return L.Offset < R.Offset;
                     });
 
-  TypedMemoryLayoutSemantics layoutSemantics;
+  TypedMemoryLayoutSemantics layoutSemantics = TypedMemoryLayoutSemantics::None;
   SmallVector<TypedMemoryLayoutSemantics> unfolded;
   unfolded.resize(offset, TypedMemoryLayoutSemantics::None);
   for (auto &cur : layoutProperties) {

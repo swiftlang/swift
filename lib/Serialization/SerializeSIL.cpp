@@ -3335,6 +3335,22 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
                            S.addDeclRef(vt.getClass()),
                            (unsigned)vt.getSerializedKind());
 
+  for (auto confEntry : vt.getConformances()) {
+    if (confEntry.hasConformance()) {
+      auto confID = S.addConformanceRef(confEntry.getConformance());
+      VTableConformanceEntry::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[VTableConformanceEntry::Code],
+        confID);
+    } else {
+      auto protoID = S.addDeclRef(confEntry.getProtocol());
+      VTableNoConformanceEntry::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[VTableNoConformanceEntry::Code],
+        protoID);
+    }
+  }
+
   for (auto &entry : vt.getEntries()) {
     SmallVector<uint64_t, 4> ListOfValues;
     SILFunction *impl = entry.getImplementation();
@@ -3812,6 +3828,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();
+  registerSILAbbr<VTableConformanceEntry>();
+  registerSILAbbr<VTableNoConformanceEntry>();
   registerSILAbbr<MoveOnlyDeinitLayout>();
   registerSILAbbr<SILGlobalVarLayout>();
   registerSILAbbr<WitnessTableLayout>();

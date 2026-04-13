@@ -384,6 +384,7 @@ void addSimplifyCFGSILCombinePasses(SILPassPipelinePlan &P) {
   // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
   // cond_br).
   P.addSILCombine();
+  P.addCondFailOptimization();
   // Which can expose opportunity for simplifycfg.
   P.addSimplifyCFG();
 }
@@ -1001,6 +1002,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   P.addCopyToBorrowOptimization();
 
   P.addCrossModuleOptimization();
+  P.addConformanceCheckOptimization();
 
   // It is important to serialize before any of the @_semantics
   // functions are inlined, because otherwise the information about

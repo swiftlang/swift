@@ -2106,10 +2106,18 @@ static void emitRawApply(SILGenFunction &SGF,
     else
       errorAddrOrType = substFnConv.getSILErrorType(SGF.getTypeExpansionContext());
 
-    SILBasicBlock *errorBB =
-      SGF.getTryApplyErrorDest(loc, substFnType, prevExecutor,
-                                *errorAddrOrType,
-                               options.contains(ApplyFlags::DoesNotThrow));
+    bool suppressErrorPath = options.contains(ApplyFlags::DoesNotThrow);
+
+    // If we're constructing a no-throw function and emitting a throws(Never)
+    // try_apply, we also want to emit the error branch as unreachable.
+    if (!suppressErrorPath &&
+        !SGF.F.getLoweredFunctionType()->hasErrorResult() &&
+        substFnType->getErrorResult().getInterfaceType()->isNever()) {
+      suppressErrorPath = true;
+    }
+
+    SILBasicBlock *errorBB = SGF.getTryApplyErrorDest(
+        loc, substFnType, prevExecutor, *errorAddrOrType, suppressErrorPath);
 
     options -= ApplyFlags::DoesNotThrow;
     SGF.B.createTryApply(loc, fnValue, subs, argValues, normalBB, errorBB,
@@ -3491,6 +3499,11 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     return ManagedValue();
   };
   
+  // See through opaque value placeholders, e.g. the for-each sequence.
+  if (auto *OV = dyn_cast<OpaqueValueExpr>(expr)) {
+    if (auto *underlying = OpaqueExprs.lookup(OV))
+      expr = underlying;
+  }
   if (auto le = dyn_cast<LoadExpr>(expr)) {
     expr = le->getSubExpr();
   }

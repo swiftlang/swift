@@ -1,11 +1,15 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20)
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG -enable-experimental-feature BorrowingForLoop)
+
 
 // TODO: test failed in macOS PR testing but passes locally: rdar://163049442
 // UNSUPPORTED: OS_FAMILY=darwin && !CPU=arm64
 
 // REQUIRES: executable_test
 // REQUIRES: std_span
+// REQUIRES: swift_feature_BorrowingForLoop
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
@@ -710,5 +714,63 @@ StdSpanTestSuite.test("Convert between Swift and C++ span types")
     }
   }
 }
+
+StdSpanTestSuite.test("CxxSpan conforms to CxxBorrowingSequence")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let s = initSpan()
+  let arr : [Int32] = [1, 2, 3]
+
+  var iterator = s.makeBorrowingIterator()
+  var counter = 0
+  while true {
+    var span = iterator.nextSpan()
+    if (span.count == 0) { break }
+    for i in 0..<span.count {
+      expectEqual(span[i], arr[counter])
+      counter += 1
+    }
+  }
+  expectEqual(counter, 3)
+}
+
+#if hasFeature(BorrowingForLoop)
+
+StdSpanTestSuite.test("CxxSpan of noncopyable conforms to CxxBorrowingSequence")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let s = makeSpanOfNonCopyable()
+  let arr : [Int32] = [1, 2, 3]
+
+  var iterator = s.makeBorrowingIterator()
+  var counter = 0
+  while true {
+    var span = iterator.nextSpan()
+    if (span.count == 0) { break }
+    for i in 0..<span.count {
+      expectEqual(span[i].number, arr[counter])
+      counter += 1
+    }
+  }
+  expectEqual(counter, 3)
+}
+
+StdSpanTestSuite.test("Borrowing for loop")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let span = makeSpanOfNonCopyable()
+  let arr : [Int32] = [1, 2, 3]
+  var counter = 0
+  for el in span {
+    expectEqual(el.number, arr[counter])
+    counter += 1
+  }
+  expectEqual(counter, 3)
+}
+
+#endif
 
 runAllTests()
