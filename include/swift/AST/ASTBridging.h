@@ -1570,6 +1570,9 @@ void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl decl,
                                            BridgedArrayRef members,
                                            BridgedFingerprint fingerprint);
 
+SWIFT_NAME("BridgedExtensionDecl.setIsMetatypeExtension(self:)")
+void BridgedExtensionDecl_setIsMetatypeExtension(BridgedExtensionDecl decl);
+
 SWIFT_NAME(
     "BridgedEnumDecl.createParsed(_:declContext:enumKeywordLoc:name:nameLoc:"
     "genericParamList:inheritedTypes:genericWhereClause:braceRange:)")
