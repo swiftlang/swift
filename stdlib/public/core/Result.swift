@@ -358,9 +358,9 @@ extension Result where Success: ~Copyable {
   ///
   /// - Parameter body: A potentially throwing async closure to evaluate.
   @_alwaysEmitIntoClient
-  public nonisolated(nonsending) init(catching body: nonisolated(nonsending) () async throws(Failure) -> Success) {
+  public nonisolated(nonsending) init(catching body: nonisolated(nonsending) () async throws(Failure) -> Success) async {
     do {
-      self = .success(try body())
+      self = .success(try await body())
     } catch {
       self = .failure(error)
     }
