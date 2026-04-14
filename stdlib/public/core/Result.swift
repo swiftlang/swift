@@ -352,6 +352,19 @@ extension Result where Success: ~Copyable {
       self = .failure(error)
     }
   }
+
+  /// Creates a new result by evaluating an async throwing closure, capturing the
+  /// returned value as a success, or any thrown error as a failure.
+  ///
+  /// - Parameter body: A potentially throwing async closure to evaluate.
+  @_alwaysEmitIntoClient
+  public nonisolated(nonsending) init(catching body: nonisolated(nonsending) () async throws(Failure) -> Success) {
+    do {
+      self = .success(try body())
+    } catch {
+      self = .failure(error)
+    }
+  }
 }
 
 extension Result where Failure == Swift.Error {
