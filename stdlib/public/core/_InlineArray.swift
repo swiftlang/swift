@@ -226,10 +226,7 @@ extension _InlineArray where Element: ~Copyable {
         return
       }
 
-      unsafe buffer.initializeElement(
-        at: 0,
-        to: o.take()._consumingUncheckedUnwrapped()
-      )
+      unsafe buffer.initializeElement(at: 0, to: o.take()._uncheckedUnwrap())
 
       for i in 1 ..< count {
         do throws(E) {

@@ -172,6 +172,58 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   }
 }
 
+extension Optional where Wrapped: ~Copyable {
+  /// Returns a borrowed reference to the payload within the optional, if there
+  /// is one.
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_lifetime(borrow self)
+  @_transparent
+  public func borrow() -> Borrow<Wrapped>? {
+    switch self {
+    case .some(let wrapped):
+      return Borrow(wrapped)
+
+    case .none:
+      return nil
+    }
+  }
+
+  /// Returns the mutable reference to the payload within the optional, if there
+  /// is one.
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_lifetime(&self)
+  @_transparent
+  public mutating func mutate() -> Inout<Wrapped>? {
+    if self == nil {
+      return nil
+    }
+
+    let ptr = unsafe UnsafeMutablePointer<Wrapped>(
+      Builtin.unprotectedAddressOf(&self)
+    )
+    return unsafe Inout(unsafeAddress: ptr, mutating: &self)
+  }
+
+  /// Sets the value of the optional to the passed in new value while returning
+  /// a mutable reference to that value inside the optional.
+  ///
+  /// If there's already a value within the optional, that value is destroyed.
+  ///
+  /// - Parameter new: The new payload value to put into the optional.
+  /// - Returns: A mutable reference inside the optional to its newly inserted
+  ///   payload.
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_lifetime(&self)
+  @_transparent
+  public mutating func insert(_ new: consuming Wrapped) -> Inout<Wrapped> {
+    self = .some(new)
+    return mutate().unsafelyUnwrap()
+  }
+}
+
 extension Optional {
   /// Evaluates the given closure when this `Optional` instance is not `nil`,
   /// passing the unwrapped value as a parameter.
@@ -220,26 +272,33 @@ extension Optional {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
-  // FIXME(NCG): Make this public.
+extension Optional where Wrapped: ~Copyable & ~Escapable {
+  /// Evaluates the given closure when this `Optional` instance is not `nil`,
+  /// passing the unwrapped value as a parameter.
+  ///
+  /// Use the `map` method with a closure that returns a non-optional value.
+  /// This example performs an arithmetic operation on an
+  /// optional integer.
+  ///
+  ///     let possibleNumber: Int? = Int("42")
+  ///     let possibleSquare = possibleNumber.map { $0 * $0 }
+  ///     print(possibleSquare)
+  ///     // Prints "Optional(1764)"
+  ///
+  ///     let noNumber: Int? = nil
+  ///     let noSquare = noNumber.map { $0 * $0 }
+  ///     print(noSquare)
+  ///     // Prints "nil"
+  ///
+  /// - Parameter transform: A closure that takes the unwrapped value
+  ///   of the instance.
+  /// - Returns: The result of the given closure. If this instance is `nil`,
+  ///   returns `nil`.
   @_alwaysEmitIntoClient
-  public consuming func _consumingMap<U: ~Copyable, E: Error>(
+  public consuming func map<U: ~Copyable, E: Error>(
     _ transform: (consuming Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch consume self {
-    case .some(let y):
-      return .some(try transform(y))
-    case .none:
-      return .none
-    }
-  }
-
-  // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
-  public borrowing func _borrowingMap<U: ~Copyable, E: Error>(
-    _ transform: (borrowing Wrapped) throws(E) -> U
-  ) throws(E) -> U? {
-    switch self {
     case .some(let y):
       return .some(try transform(y))
     case .none:
@@ -294,28 +353,33 @@ extension Optional {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
-  // FIXME(NCG): Make this public.
+extension Optional where Wrapped: ~Copyable & ~Escapable {
+  /// Evaluates the given closure when this `Optional` instance is not `nil`,
+  /// passing the unwrapped value as a parameter.
+  ///
+  /// Use the `flatMap` method with a closure that returns an optional value.
+  /// This example performs an arithmetic operation with an optional result on
+  /// an optional integer.
+  ///
+  ///     let possibleNumber: Int? = Int("42")
+  ///     let nonOverflowingSquare = possibleNumber.flatMap { x -> Int? in
+  ///         let (result, overflowed) = x.multipliedReportingOverflow(by: x)
+  ///         return overflowed ? nil : result
+  ///     }
+  ///     print(nonOverflowingSquare)
+  ///     // Prints "Optional(1764)"
+  ///
+  /// - Parameter transform: A closure that takes the unwrapped value
+  ///   of the instance.
+  /// - Returns: The result of the given closure. If this instance is `nil`,
+  ///   returns `nil`.
   @_alwaysEmitIntoClient
-  public consuming func _consumingFlatMap<U: ~Copyable, E: Error>(
+  public consuming func flatMap<U: ~Copyable, E: Error>(
     _ transform: (consuming Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch consume self {
     case .some(let y):
       return try transform(consume y)
-    case .none:
-      return .none
-    }
-  }
-
-  // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
-  public func _borrowingFlatMap<U: ~Copyable, E: Error>(
-    _ transform: (borrowing Wrapped) throws(E) -> U?
-  ) throws(E) -> U? {
-    switch self {
-    case .some(let y):
-      return try transform(y)
     case .none:
       return .none
     }
@@ -365,15 +429,32 @@ extension Optional where Wrapped: ~Escapable {
 }
 
 extension Optional where Wrapped: ~Copyable & ~Escapable {
-  // FIXME(NCG): Do we want this? It seems like we do. Make this public.
+  /// The wrapped value of this instance, unwrapped without checking whether
+  /// the instance is `nil`.
+  ///
+  /// The `unsafelyUnwrap` method provides the same value as the forced
+  /// unwrap operator (postfix `!`). However, in optimized builds (`-O`), no
+  /// check is performed to ensure that the current instance actually has a
+  /// value. Accessing this method in the case of a `nil` value is a serious
+  /// programming error and could lead to undefined behavior or a runtime
+  /// error.
+  ///
+  /// In debug builds (`-Onone`), the `unsafelyUnwrap` method has the same
+  /// behavior as using the postfix `!` operator and triggers a runtime error
+  /// if the instance is `nil`.
+  ///
+  /// - Warning: This method trades safety for performance.  Use
+  ///   `unsafelyUnwrap` only when you are confident that this instance
+  ///   will never be equal to `nil` and only after you've tried using the
+  ///   postfix `!` operator.
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public consuming func _consumingUnsafelyUnwrap() -> Wrapped {
+  public consuming func unsafelyUnwrap() -> Wrapped {
     switch consume self {
     case .some(let x):
       return x
     case .none:
-      _debugPreconditionFailure("consumingUsafelyUnwrap of nil optional")
+      _debugPreconditionFailure("unsafelyUnwrap of nil optional")
     }
   }
 }
@@ -404,11 +485,11 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// overhead for users, even in Debug builds.
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  internal consuming func _consumingUncheckedUnwrapped() -> Wrapped {
+  internal consuming func _uncheckedUnwrap() -> Wrapped {
     if let x = self {
       return x
     }
-    _internalInvariantFailure("_uncheckedUnwrapped of nil optional")
+    _internalInvariantFailure("_uncheckedUnwrap of nil optional")
   }
 }
 
@@ -523,7 +604,8 @@ func _diagnoseUnexpectedNilOptional(
   }
 }
 
-extension Optional: Equatable where Wrapped: Equatable {
+@_preInverseGenerics
+extension Optional: Equatable where Wrapped: Equatable & ~Copyable & ~Escapable {
   /// Returns a Boolean value indicating whether two optional instances are
   /// equal.
   ///
@@ -568,26 +650,50 @@ extension Optional: Equatable where Wrapped: Equatable {
   /// - Parameters:
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
+  @_preInverseGenerics
   @_transparent
-  public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
-    switch (lhs, rhs) {
-    case let (l?, r?):
-      return l == r
-    case (nil, nil):
-      return true
-    default:
-      return false
+  public static func ==(
+    lhs: borrowing Wrapped?,
+    rhs: borrowing Wrapped?
+  ) -> Bool {
+    switch lhs {
+    case let l?:
+      switch rhs {
+      case let r?:
+        return l == r
+
+      case nil:
+        return false
+      }
+
+    case nil:
+      switch rhs {
+      case nil:
+        return true
+
+      default:
+        return false
+      }
     }
   }
 }
 
-extension Optional: Hashable where Wrapped: Hashable {
+@_preInverseGenerics
+extension Optional: Hashable where Wrapped: Hashable & ~Copyable {
+  // Note: This explicit `hashValue` applies @_preInverseGenerics to emulate the
+  // original compiler-synthesized version.
+  @_preInverseGenerics
+  public var hashValue: Int {
+    _hashValue(for: self)
+  }
+
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
   @inlinable
+  @_preInverseGenerics
   public func hash(into hasher: inout Hasher) {
     switch self {
     case .none:
