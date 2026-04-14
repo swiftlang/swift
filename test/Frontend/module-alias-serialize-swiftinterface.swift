@@ -14,10 +14,10 @@
 // RUN: not test -f %t/XLogging.swiftmodule
 
 /// Check AppleLogging.swiftmodule correctly contains AppleLogging as module name in the binary
-// RUN: llvm-bcanalyzer --dump %t/AppleLogging.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-FOUND
+// RUN: %llvm-bcanalyzer --dump %t/AppleLogging.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-FOUND
 // BCANALYZER-FOUND: MODULE_NAME{{.*}}AppleLogging
 
-// RUN: llvm-bcanalyzer --dump %t/AppleLogging.swiftmodule | not grep XLogging
+// RUN: %llvm-bcanalyzer --dump %t/AppleLogging.swiftmodule | not grep XLogging
 
 /// 2. Lib
 /// Create an interface for Lib that imports XLogging with -module-alias XLogging=AppleLogging

@@ -2,9 +2,9 @@
 //
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -module-name comments -package-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc -emit-module-source-info-path %t/comments.swiftsourceinfo %s
-// RUN: llvm-bcanalyzer %t/comments.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/comments.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -enable-swiftsourceinfo -source-filename %s -I %t | %FileCheck %s -check-prefix=FIRST
 
 // Test the case when we have a multiple files in a module.
@@ -13,9 +13,9 @@
 // RUN: %target-swift-frontend -module-name comments -package-name comments -emit-module -emit-module-path %t/first.swiftmodule -emit-module-doc -emit-module-doc-path %t/first.swiftdoc -primary-file %s %S/Inputs/def_comments.swift -emit-module-source-info-path %t/first.swiftsourceinfo
 // RUN: %target-swift-frontend -module-name comments -package-name comments -emit-module -emit-module-path %t/second.swiftmodule -emit-module-doc -emit-module-doc-path %t/second.swiftdoc %s -primary-file %S/Inputs/def_comments.swift -emit-module-source-info-path %t/second.swiftsourceinfo
 // RUN: %target-swift-frontend -module-name comments -package-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc %t/first.swiftmodule %t/second.swiftmodule -emit-module-source-info-path %t/comments.swiftsourceinfo
-// RUN: llvm-bcanalyzer %t/comments.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/comments.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -enable-swiftsourceinfo -source-filename %s -I %t > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=FIRST < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=SECOND < %t.printed.txt
@@ -115,6 +115,6 @@ package func first_package_function() {}
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/Hidden)
 // RUN: %target-swift-frontend -module-name comments -package-name comments -emit-module -emit-module-path %t/Hidden/comments.swiftmodule -emit-module-interface-path %t/comments.swiftinterface -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc -emit-module-source-info-path %t/comments.swiftsourceinfo %s -enable-library-evolution -swift-version 5
-// RUN: llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -enable-swiftsourceinfo -source-filename %s -I %t -swift-version 5 | %FileCheck %s -check-prefix=INTERFACE

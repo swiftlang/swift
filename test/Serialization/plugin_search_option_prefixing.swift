@@ -15,7 +15,7 @@
 // RUN:   -debug-prefix-map %t=/externalsearchpath \
 // RUN:   -debug-prefix-map %swift-plugin-server=/externalserverpath \
 // RUN:   -debug-prefix-map %swift-plugin-dir=/plugindir
-// RUN: llvm-bcanalyzer -dump %t/Test.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer -dump %t/Test.swiftmodule | %FileCheck %s
 
 // CHECK: <PLUGIN_SEARCH_OPTION abbrevid=9 op0=1/> blob data = '/externalsearchpath#/externalserverpath'
 // CHECK: <PLUGIN_SEARCH_OPTION abbrevid=9 op0=0/> blob data = '/plugindir'

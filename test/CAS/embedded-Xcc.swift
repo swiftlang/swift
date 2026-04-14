@@ -18,7 +18,7 @@
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   -filelist %t/inputs.FileList @%t/MyApp.cmd
 
-// RUN: llvm-bcanalyzer --dump %t/Test.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer --dump %t/Test.swiftmodule | %FileCheck %s
 
 // CHECK: <XCC abbrevid=7/> blob data = '-cc1'
 // CHECK: <XCC abbrevid=7/> blob data = '-D'

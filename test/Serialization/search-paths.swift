@@ -24,10 +24,10 @@
 // Make sure we don't end up with duplicate search paths.
 // RUN: %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I %t/secret -F %t/Frameworks -Fsystem %t/SystemFrameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options
 // RUN: %target-swift-frontend %s -typecheck -I %t
-// RUN: llvm-bcanalyzer -dump %t/has_xref.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer -dump %t/has_xref.swiftmodule | %FileCheck %s
 
 // RUN: %target-swift-frontend %s -emit-module -o %t/main.swiftmodule -I %t -I %t/secret -F %t/Frameworks -Fsystem %t/SystemFrameworks
-// RUN: llvm-bcanalyzer -dump %t/main.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer -dump %t/main.swiftmodule | %FileCheck %s
 
 import has_xref // expected-error {{missing required modules: 'has_alias', 'struct_with_operators'}}
 

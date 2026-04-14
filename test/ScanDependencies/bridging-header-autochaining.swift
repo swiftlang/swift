@@ -61,7 +61,7 @@
 // RUN:   -emit-module -o %t/User.swiftmodule -emit-module-interface-path %t/User.swiftinterface -enable-library-evolution
 
 /// Make sure the emitted content is compatible with original. The embedded header path needs to be original header and no bridging header module leaking into interface.
-// RUN: llvm-bcanalyzer -dump %t/User.swiftmodule | %FileCheck %s --check-prefix CHECK-NO-HEADER
+// RUN: %llvm-bcanalyzer -dump %t/User.swiftmodule | %FileCheck %s --check-prefix CHECK-NO-HEADER
 // CHECK-NO-HEADER-NOT: <IMPORTED_HEADER
 // RUN: %FileCheck %s --check-prefix NO-OBJC-LEAKING --input-file=%t/User.swiftinterface
 // NO-OBJC-LEAKING-NOT: import __ObjC
@@ -156,7 +156,7 @@
 // RUN:   -emit-module -o %t/User3.swiftmodule
 
 /// Verify the encoded here is just the `-import-objc-header` option.
-// RUN: llvm-bcanalyzer -dump %t/User3.swiftmodule | %FileCheck %s --check-prefix CHECK-HEADER
+// RUN: %llvm-bcanalyzer -dump %t/User3.swiftmodule | %FileCheck %s --check-prefix CHECK-HEADER
 // CHECK-HEADER: <IMPORTED_HEADER
 // CHECK-HEADER-SAME: Bridging3.h
 
