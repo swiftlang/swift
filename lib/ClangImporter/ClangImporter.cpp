@@ -737,19 +737,22 @@ void importer::getNormalInvocationArguments(
       invocationArgStrs.push_back("-isystem");
       invocationArgStrs.push_back(std::string(path.str()));
     } else {
-      // On Darwin, Clang uses -isysroot to specify the include
-      // system root. On other targets, it seems to use --sysroot.
+      // Darwin uses -isysroot; other targets use --sysroot=. The distinction
+      // matters because the Clang driver sets D.SysRoot only from --sysroot=,
+      // not -isysroot. Toolchain helpers such as AddClangSystemIncludeArgs and
+      // AddClangCXXStdlibIncludeArgs read D.SysRoot to build include paths, so
+      // omitting --sysroot= on non-Darwin produces broken paths. The driver
+      // automatically forwards --sysroot= to CC1 as -isysroot.
       if (triple.isOSDarwin()) {
         invocationArgStrs.push_back("-isysroot");
         invocationArgStrs.push_back(searchPathOpts.getSDKPath().str());
       } else {
-        if (auto sysroot = searchPathOpts.getSysRoot()) {
-          invocationArgStrs.push_back("--sysroot");
-          invocationArgStrs.push_back(sysroot->str());
-        } else {
-          invocationArgStrs.push_back("--sysroot");
-          invocationArgStrs.push_back(searchPathOpts.getSDKPath().str());
-        }
+        std::string sysroot;
+        if (auto s = searchPathOpts.getSysRoot())
+          sysroot = s->str();
+        else
+          sysroot = searchPathOpts.getSDKPath().str();
+        invocationArgStrs.emplace_back("--sysroot=" + sysroot);
       }
     }
   }

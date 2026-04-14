@@ -2243,6 +2243,15 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_index_store_path))
     Opts.IndexStorePath = A->getValue();
 
+  // Forward -sysroot as --sysroot= so the Clang driver sets D.SysRoot, which
+  // toolchain helpers (AddClangSystemIncludeArgs, etc.) use to locate system
+  // headers. Skipped in -direct-clang-cc1-module-build mode where ExtraArgs
+  // are parsed directly as CC1 args and --sysroot= is driver-only.
+  if (!Args.hasArg(OPT_direct_clang_cc1_module_build)) {
+    if (const Arg *A = Args.getLastArg(OPT_sysroot))
+      Opts.ExtraArgs.push_back("--sysroot=" + std::string(A->getValue()));
+  }
+
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
     StringRef clangArg = A->getValue();
     if (clangArg.consume_front("-working-directory")) {
