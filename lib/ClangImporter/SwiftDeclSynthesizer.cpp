@@ -3094,6 +3094,11 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
   clang::ASTContext &clangCtx = cxxRecordDecl->getASTContext();
   clang::Sema &clangSema = ImporterImpl.getClangSema();
 
+  if (clang::Sema::SFINAETrap trap(clangSema);
+      !clangSema.hasReachableDefinition(
+          const_cast<clang::CXXRecordDecl *>(cxxRecordDecl)))
+    return {};
+
   clang::QualType cxxRecordTy = clangCtx.getRecordType(cxxRecordDecl);
   clang::SourceLocation cxxRecordDeclLoc = cxxRecordDecl->getLocation();
 
@@ -3258,9 +3263,8 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
         /*IsStdInitListInitialization=*/false,
         /*RequiresZeroInit=*/false, clang::CXXConstructionKind::Complete,
         clang::SourceRange());
-    assert(!synthCtorExprResult.isInvalid() &&
-           "Unable to synthesize constructor expression for c++ foreign "
-           "reference type");
+    if (synthCtorExprResult.isInvalid())
+      continue;
     clang::Expr *synthCtorExpr = synthCtorExprResult.get();
 
     clang::ExprResult synthNewExprResult = clangSema.BuildCXXNew(
@@ -3270,9 +3274,8 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
         cxxRecordDeclLoc, synthCtorExpr);
     // NOTE: ^ some valid location is needed here because BuildCXXNew uses that
     //       to determine the CXXNewInitializationStyle
-    assert(
-        !synthNewExprResult.isInvalid() &&
-        "Unable to synthesize `new` expression for c++ foreign reference type");
+    if (synthNewExprResult.isInvalid())
+      continue;
     auto *synthNewExpr = cast<clang::CXXNewExpr>(synthNewExprResult.get());
 
     clang::ReturnStmt *synthRetStmt =
@@ -3631,15 +3634,36 @@ SwiftDeclSynthesizer::addRefCountOperations(
     cloneReferenceAttributes(baseClangDecl, clangDecl, clangCtx);
     return std::make_pair(retainResult, releaseResult);
   }
-  if (!retainResult.operation || !releaseResult.operation)
+
+  auto getUnderlyingOp = [this](ValueDecl *op) -> const clang::FunctionDecl * {
+    if (!op)
+      return nullptr;
+    if (auto *original = this->ImporterImpl.getOriginalForClonedMember(op))
+      op = original;
+    return dyn_cast_or_null<clang::FunctionDecl>(op->getClangDecl());
+  };
+  auto *retainClangFn = getUnderlyingOp(retainResult.operation);
+  auto *releaseClangFn = getUnderlyingOp(releaseResult.operation);
+  if (!retainClangFn || !releaseClangFn)
     return std::make_pair(retainResult, releaseResult);
-  auto retainClangFn =
-      cast<clang::FunctionDecl>(retainResult.operation->getClangDecl());
-  auto releaseClangFn =
-      cast<clang::FunctionDecl>(releaseResult.operation->getClangDecl());
+
+  auto &clangSema = ImporterImpl.getClangSema();
+  {
+    clang::Sema::SFINAETrap trap(clangSema);
+    // The derived FRT and its FRT base must both have reachable definitions so
+    // that we can synthesize expressions that implicitly cast from one to the
+    // other (which requires knowing their layout).
+    if (!clangSema.hasReachableDefinition(
+            const_cast<clang::CXXRecordDecl *>(clangDecl)) ||
+        !clangSema.hasReachableDefinition(
+            const_cast<clang::CXXRecordDecl *>(baseClangDecl))) {
+      retainResult.kind = releaseResult.kind =
+          CustomRefCountingOperationResult::unreachable;
+      return std::make_pair(retainResult, releaseResult);
+    }
+  }
 
   // Synthesize forwarding function.
-  auto &clangSema = ImporterImpl.getClangSema();
 
   clang::QualType methodType = clangCtx.getFunctionType(
       clangCtx.VoidTy, {}, clang::FunctionProtoType::ExtProtoInfo{});

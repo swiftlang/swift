@@ -922,13 +922,22 @@ static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
+static bool hasComputedPropertyAttr(const clang::Decl *decl) {
+  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+             return swiftAttr->getAttribute() == "import_computed_property";
+           return false;
+         });
+}
+
 /// Whether to import a member decl when importing its parent record.
 ///
 /// In theory this should just be isa<clang::FieldDecl>(decl), but currently
 /// various parts of ClangImporter still relies on eagerly importing non-field
 /// members (e.g., for deriving protocol conformances, etc.). This helper
 /// function encapsulates those edge cases.
-static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl) {
+static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
+                                                 const LangOptions &LangOpts) {
   // Look through using decls to determine whether to import decl
   while (auto *usd = dyn_cast<clang::UsingShadowDecl>(decl)) {
     // VisitUsingShadowDecl() only imports types and non-constructor methods,
@@ -968,9 +977,12 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl) {
           return true;
 
         // Name lookup doesn't know about these renamed methods, import eagerly
-        if (CXXMethodBridging(md).classify() !=
-            CXXMethodBridging::Kind::unknown)
-          return true;
+        if (LangOpts.CxxInteropGettersSettersAsProperties ||
+            hasComputedPropertyAttr(fn)) {
+          if (CXXMethodBridging(md).classify() !=
+              CXXMethodBridging::Kind::unknown)
+            return true;
+        }
       }
 
       // All other functions can be imported lazily
@@ -982,7 +994,6 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl) {
 
   return true;
 }
-
 
 namespace {
   /// Search the member tables for this class and its superclasses and try to
@@ -2593,7 +2604,8 @@ namespace {
 
         if (Impl.SwiftContext.LangOpts.hasFeature(
                 Feature::ImportCxxMembersLazily) &&
-            !shouldEagerlyImportClangRecordMember(nd))
+            !shouldEagerlyImportClangRecordMember(nd,
+                                                  Impl.SwiftContext.LangOpts))
           continue;
 
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
@@ -3005,6 +3017,16 @@ namespace {
         const clang::RecordDecl *decl, ClassDecl *classDecl,
         CustomRefCountingOperationResult retainOperation,
         CustomRefCountingOperationResult releaseOperation) {
+
+      if (retainOperation.kind ==
+              CustomRefCountingOperationResult::unreachable ||
+          releaseOperation.kind ==
+              CustomRefCountingOperationResult::unreachable) {
+        Impl.diagnose(HeaderLoc(decl->getLocation()),
+                      diag::foreign_reference_type_unreachable,
+                      classDecl->getNameStr());
+        return;
+      }
 
       enum class RetainReleaseOperationKind {
         notAfunction,
@@ -4590,41 +4612,7 @@ namespace {
       Impl.swiftify(result);
     }
 
-    static bool hasComputedPropertyAttr(const clang::Decl *decl) {
-      return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-               if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-                 return swiftAttr->getAttribute() == "import_computed_property";
-               return false;
-             });
-    }
-
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
-      // If the return type is a templated class, instantiate it. This must
-      // happen before we import the name of the method, as the name is affected
-      // by safety/unsafety of the return type. The safety detection logic
-      // (`IsSafeUseOfCxxDecl`) relies on the class being instantiated.
-      //
-      // This behavior is currently gated on ImportCxxMembersLazily to provide
-      // an easy off-ramp in case of qualification issues.
-      if (auto *returnedTmpl =
-              dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
-                  desugarIfElaborated(decl->getReturnType())->getAsTagDecl());
-          Impl.SwiftContext.LangOpts.hasFeature(
-              Feature::ImportCxxMembersLazily) &&
-          returnedTmpl && !returnedTmpl->getDefinition()) {
-        Impl.getClangSema().InstantiateClassTemplateSpecialization(
-            decl->getLocation(),
-            const_cast<clang::ClassTemplateSpecializationDecl *>(returnedTmpl),
-            clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-            /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
-        // N.B. InstantiateClassTemplateSpecialization() returns true if it
-        //      encountered an error while instantiating the returned template.
-        //      Even if it does, we don't bail out here, and defer error
-        //      handling to later. This is because that handler may involve
-        //      things like import a method and mark it as unavailable, rather
-        //      than simply not import it at all.
-      }
-
       // The static `operator ()` introduced in C++ 23 is still callable as an
       // instance operator in C++, and we want to preserve the ability to call
       // it as an instance method in Swift as well for source compatibility.
@@ -4638,6 +4626,55 @@ namespace {
           return result;
       }
       auto method = VisitFunctionDecl(decl);
+
+      // For regular methods (not operators, constructors, etc.), if the return
+      // type is an uninstantiated templated class, instantiate it now and
+      // update the imported name if it changed. The safety detection logic
+      // (IsSafeUseOfCxxDecl) relies on the returned class being instantiated,
+      // and may affect the imported name (e.g., adding a "__*Unsafe" prefix).
+      // We defer this instantiation to after importing the method so that we
+      // don't eagerly instantiate templates for methods we may not even end up
+      // importing. The "__*Unsafe" lookup fallback in ClangDirectLookupRequest
+      // will also find methods whose imported name changes due to safety after
+      // instantiation.
+      //
+      // This post-import behavior is gated on ImportCxxMembersLazily, because
+      // without that feature, IsSafeUseOfCxxDecl relies on ClangImporter
+      // (over-)eagerly instantiating typedef members.
+      if (method && Impl.SwiftContext.LangOpts.hasFeature(
+                        Feature::ImportCxxMembersLazily)) {
+        if (!isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
+                 clang::CXXConversionDecl>(decl) &&
+            decl->getOverloadedOperator() ==
+                clang::OverloadedOperatorKind::OO_None) {
+
+          using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
+
+          auto retTy = desugarIfElaborated(decl->getReturnType());
+          auto *retTemplate =
+              dyn_cast_or_null<ClassTmplSpec>(retTy->getAsTagDecl());
+
+          if (retTemplate && !retTemplate->hasDefinition()) {
+            // N.B. InstantiateClassTemplateSpecialization() returns true if it
+            // encountered an error while instantiating the returned template.
+            (void)Impl.getClangSema().InstantiateClassTemplateSpecialization(
+                decl->getLocation(), const_cast<ClassTmplSpec *>(retTemplate),
+                clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+                /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
+          }
+          // Re-import the name now that the return type template is (or was
+          // already) instantiated; safety may have changed, affecting the
+          // base name. Clear the cached name first so importFullName
+          // recomputes it.
+          Impl.getNameImporter().clearCachedName(decl, Impl.CurrentVersion);
+          if (auto updatedName =
+                  Impl.importFullName(decl, Impl.CurrentVersion)) {
+            auto *valueDecl = cast<ValueDecl>(method);
+            if (valueDecl->getName() != updatedName.getDeclName())
+              valueDecl->setName(updatedName.getDeclName());
+          }
+        }
+      }
 
       // Do not expose constructors of abstract C++ classes.
       if (auto recordDecl =
