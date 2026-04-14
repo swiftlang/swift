@@ -21,6 +21,7 @@ import platform
 import re
 import sys
 import time
+import subprocess
 
 from build_swift.build_swift import argparse
 from build_swift.build_swift import defaults
@@ -651,6 +652,16 @@ def main_preset():
     shell.call_without_sleeping(build_script_args)
     return 0
 
+def dump_current_checkout():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    print(20 * "=", "begin current checkout:")
+    subprocess.run(
+     ["./update-checkout", "--dump-hashes"],
+     cwd=current_dir
+    ) 
+    print(os.linesep, 20 * "=", "end current checkout:")
+
+
 
 # -----------------------------------------------------------------------------
 # Main (normal)
@@ -668,7 +679,6 @@ def main_normal():
                                       args.build_script_impl_args)
         except ValueError as e:
             exit_rejecting_arguments(e, parser)
-
         if '--check-args-only' in args.build_script_impl_args:
             return 0
 
@@ -681,6 +691,8 @@ def main_normal():
 
         print_note('Using toolchain {}'.format(xcrun_toolchain))
         args.darwin_xcrun_toolchain = xcrun_toolchain
+
+    dump_current_checkout()
 
     toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
     os.environ['TOOLCHAINS'] = args.darwin_xcrun_toolchain
