@@ -94,15 +94,20 @@ private struct FunctionChecker {
         for conf in ie.conformances {
           try checkConformance(conf, location: ie.location)
         }
-      } else if instruction is OpenExistentialAddrInst {
-          // okay in embedded with exitentials
+      } else if instruction is OpenExistentialAddrInst
+             || instruction is OpenExistentialBoxInst
+             || instruction is OpenExistentialBoxValueInst {
+          // okay in embedded with existentials
       } else {
-          // not supported even in embedded with exitentials
+          // not supported even in embedded with existentials
         throw Diagnostic(.embedded_swift_existential_type, instruction.operands[0].value.type, at: instruction.location)
       }
 
     case let aeb as AllocExistentialBoxInst:
-      throw Diagnostic(.embedded_swift_existential_type, aeb.type, at: instruction.location)
+      if !context.options.enableEmbeddedSwiftExistentials {
+        throw Diagnostic(.embedded_swift_existential_type, aeb.type, at: instruction.location)
+      }
+      // With EmbeddedExistentials enabled, error boxing is supported.
 
     case let ier as InitExistentialRefInst:
       for conf in ier.conformances {
