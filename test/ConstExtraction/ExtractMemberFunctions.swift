@@ -10,6 +10,12 @@ struct MyStruct {
     func myMethod(arg: String) -> String { 
         "" 
     }
+    static func myStaticFunc() -> MyStruct {
+        MyStruct()
+    }
+    func me() -> MyStruct {
+        self
+    }
 }
 
 class MyClass {
@@ -22,6 +28,7 @@ struct Statics: MyProto {
     var prop1 = MyStruct().myMethod(arg: "struct arg")
     var prop2 = MyClass().myMethod(arg: "class arg")
     var prop3 = MyStruct().myMethod(arg: "second struct").lowercased()
+    var prop4 = MyStruct.myStaticFunc().me()
 }
 
 // CHECK:       "label": "prop1",
@@ -101,6 +108,26 @@ struct Statics: MyProto {
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "memberLabel": "lowercased",
+// CHECK-NEXT:        "arguments": []
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ]
+// CHECK-NEXT:  }
+
+// CHECK:       "label": "prop4",
+// CHECK-NEXT:  "type": "ExtractMemberFunctions.MyStruct",
+// CHECK:       "valueKind": "MemberFunctionCall",
+// CHECK-NEXT:  "value": {
+// CHECK-NEXT:    "baseValue": {
+// CHECK-NEXT:      "valueKind": "StaticFunctionCall",
+// CHECK-NEXT:      "value": {
+// CHECK-NEXT:        "type": "ExtractMemberFunctions.MyStruct",
+// CHECK-NEXT:        "memberLabel": "myStaticFunc",
+// CHECK-NEXT:        "arguments": []
+// CHECK-NEXT:      }
+// CHECK-NEXT:    },
+// CHECK-NEXT:    "calls": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "memberLabel": "me",
 // CHECK-NEXT:        "arguments": []
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]

@@ -334,19 +334,18 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
             return std::make_shared<EnumValue>(baseIdentifierName, parameters);
           }
 
-            case DeclKind::Func: {
-              auto identifier = declRefExpr->getDecl()
-                                    ->getName()
-                                    .getBaseIdentifier()
-                                    .str()
-                                    .str();
+          case DeclKind::Func: {
+            auto funcDecl = cast<FuncDecl>(declRef.getDecl());
+            if (funcDecl->isStatic()) {
+              return std::make_shared<StaticFunctionCallValue>(
+                  baseIdentifierName, callExpr->getType(), parameters);
+            }
 
-              if (auto funcDecl = dyn_cast<FuncDecl>(declRef.getDecl())) {
-                if (funcDecl->isStatic()) {
-                  return std::make_shared<StaticFunctionCallValue>(identifier, callExpr->getType(), parameters);
-                }
-              }
-              return std::make_shared<MemberFunctionCallValue>(identifier, extractCompileTimeValue(dotSyntaxCallExpr->getBase(), declContext), parameters);
+            return std::make_shared<MemberFunctionCallValue>(
+                baseIdentifierName,
+                extractCompileTimeValue(dotSyntaxCallExpr->getBase(),
+                                        declContext),
+                parameters);
           }
 
           default: {
@@ -936,14 +935,16 @@ void writeValue(llvm::json::OStream &JSON,
   }
 
   case CompileTimeValue::ValueKind::MemberFunctionCall: {
-    // Collect the chain: walk baseValue pointers until we reach a non-MemberFunctionCall
+    // Collect the chain: walk baseValue pointers until we reach a
+    // non-MemberFunctionCall
     struct CallStep {
       std::string Label;
       std::vector<FunctionParameter> Parameters;
     };
     std::vector<CallStep> chain;
     std::shared_ptr<CompileTimeValue> cursor = Value;
-    while (cursor && cursor->getKind() == CompileTimeValue::ValueKind::MemberFunctionCall) {
+    while (cursor && cursor->getKind() ==
+                         CompileTimeValue::ValueKind::MemberFunctionCall) {
       auto *mfc = cast<MemberFunctionCallValue>(cursor.get());
       chain.push_back({mfc->getLabel(), mfc->getParameters()});
       cursor = mfc->getBaseValue();
@@ -954,9 +955,7 @@ void writeValue(llvm::json::OStream &JSON,
     JSON.attribute("valueKind", "MemberFunctionCall");
     JSON.attributeObject("value", [&]() {
       // Write the root (non-MemberFunctionCall) base once
-      JSON.attributeObject("baseValue", [&] {
-        writeValue(JSON, cursor);
-      });
+      JSON.attributeObject("baseValue", [&] { writeValue(JSON, cursor); });
       // Flat list of call steps in order
       JSON.attributeArray("calls", [&] {
         for (auto &step : chain) {
@@ -966,7 +965,8 @@ void writeValue(llvm::json::OStream &JSON,
               for (auto FP : step.Parameters) {
                 JSON.object([&] {
                   JSON.attribute("label", FP.Label);
-                  JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
+                  JSON.attribute("type",
+                                 toFullyQualifiedTypeNameString(FP.Type));
                   writeValue(JSON, FP.Value);
                 });
               }

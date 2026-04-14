@@ -466,8 +466,11 @@ private:
 ///
 class MemberFunctionCallValue : public CompileTimeValue {
 public:
-  MemberFunctionCallValue(std::string Label, std::shared_ptr<CompileTimeValue> BaseValue, std::vector<FunctionParameter> Parameters) :
-  CompileTimeValue(ValueKind::MemberFunctionCall), Label(Label), BaseValue(BaseValue), Parameters(Parameters) {}
+  MemberFunctionCallValue(std::string Label,
+                          std::shared_ptr<CompileTimeValue> BaseValue,
+                          std::vector<FunctionParameter> Parameters)
+      : CompileTimeValue(ValueKind::MemberFunctionCall), Label(Label),
+        BaseValue(BaseValue), Parameters(Parameters) {}
 
   static bool classof(const CompileTimeValue *T) {
     return T->getKind() == ValueKind::MemberFunctionCall;
