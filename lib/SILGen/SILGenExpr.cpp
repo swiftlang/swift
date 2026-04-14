@@ -2015,43 +2015,6 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
   CanAnyFunctionType subExprType =
       cast<FunctionType>(subExpr->getType()->getCanonicalType());
 
-  // We are pattern matching the following two patterns:
-  //
-  // Swift 6:
-  //
-  // (fn_cvt_expr type="nonisolated(nonsending) () async -> ()"
-  //   (fn_cvt_expr type="nonisolated(nonsending) @Sendable () async -> ()"
-  //      (declref_expr type="() async -> ()"
-  //
-  // Swift 5:
-  //
-  // (fn_cvt_expr type="nonisolated(nonsending) () async -> ()"
-  //   (declref_expr type="() async -> ()"
-  //
-  // The @Sendable in Swift 6 mode is due to us not representing
-  // nonisolated(nonsending) or @Sendable in the constraint evaluator.
-  //
-  // The reason why we need to evaluate this especially is that otherwise we
-  // generate multiple conversion thunks.
-
-  bool needsSendableConversion = false;
-  if (auto *subCvt = dyn_cast<FunctionConversionExpr>(subExpr)) {
-    auto *subSubExpr = subCvt->getSubExpr();
-    CanAnyFunctionType subSubExprType =
-        cast<FunctionType>(subSubExpr->getType()->getCanonicalType());
-
-    if (subExprType->hasExtInfo() && subExprType->getExtInfo().isSendable() &&
-        subSubExprType->hasExtInfo() &&
-        !subExprType->getExtInfo().isSendable() &&
-        subExprType->withSendable(true) == subSubExprType) {
-      subExpr = subSubExpr;
-
-      // We changed our subExpr... so recompute our srcType.
-      subExprType = cast<FunctionType>(subExpr->getType()->getCanonicalType());
-      needsSendableConversion = true;
-    }
-  }
-
   // Check if the only difference in between our destType and srcType is our
   // isolation and optionally Sendable.
   if (!subExprType->hasExtInfo() || !destType->hasExtInfo() ||
@@ -2075,12 +2038,6 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
   auto typeContext = SGF.getFunctionTypeInfo(substType);
   ManagedValue result = SGF.emitClosureValue(
       e, silDeclRef, typeContext, declRef->getDeclRef().getSubstitutions());
-  if (needsSendableConversion) {
-    auto funcType = cast<SILFunctionType>(result.getType().getASTType());
-    result = SGF.B.createConvertFunction(
-        e, result,
-        SILType::getPrimitiveObjectType(funcType->withSendable(true)));
-  }
   return RValue(SGF, e, destType, result);
 }
 
@@ -7331,9 +7288,8 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     optTemp->finishInitialization(SGF);
 
     if (subType.isLoadable(SGF.F) || !SGF.useLoweredAddresses()) {
-      ManagedValue value = SGF.B.createLoadTake(E, optTemp->getManagedAddress());
-      if (value.getType().isTrivial(SGF.F))
-        return RValue(SGF, {value}, subType.getASTType());
+      ManagedValue value =
+          SGF.B.createLoadTake(E, optTemp->getManagedAddress());
       return RValue(SGF, {value}, subType.getASTType());
     }
 
