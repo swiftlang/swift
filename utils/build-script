@@ -661,8 +661,6 @@ def dump_current_checkout():
     ) 
     print(os.linesep, 20 * "=", "end current checkout:")
 
-
-
 # -----------------------------------------------------------------------------
 # Main (normal)
 
