@@ -916,9 +916,16 @@ extension _StringGuts {
   
   @_effects(releasenone)
   internal func getUTF16Count() -> Int {
+#if _pointerBitWidth(_64)
     // Read the one-crumb value in a single atomic load to avoid a TOCTOU race
     // with loadUnmanagedBreadcrumbs(), which can CAS the slot to zero or
     // replace it with a real breadcrumbs pointer concurrently.
+    //
+    // On 32-bit platforms, Int(Int32.max) == Int.max, so any positive value
+    // (including a breadcrumbs pointer) would pass the range check below,
+    // causing a pointer address to be returned as a UTF-16 count. The
+    // one-crumb optimization is already disabled on 32-bit (hasOneCrumb
+    // returns false), so skip this fast path entirely.
     if hasNativeStorage {
       let val = _object.withNativeStorage { storage -> Int in
         guard storage.hasBreadcrumbs else { return -1 }
@@ -928,6 +935,7 @@ extension _StringGuts {
         return val
       }
     }
+#endif
 
     let result: Int
     if _useBreadcrumbs(forEncodedOffset: endIndex._encodedOffset) {
