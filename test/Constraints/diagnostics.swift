@@ -1576,9 +1576,9 @@ func testNilCoalescingWithOptionalLHSPromotedToDoubleOptional() {
   let ten: Int = 10
   let optional: Int? = .some(1)
 
-  // Should compile without a warning: the LHS is already optional, so the
-  // "non-optional type" warning would be misleading/false.
-  let _ = (optional ?? ten).flatMap(transform)
+  // The LHS is already optional and gets promoted to an additional level of
+  // optional (Int? -> Int??), making it always non-nil.
+  let _ = (optional ?? ten).flatMap(transform) // expected-warning {{left side of nil coalescing operator '??' adds an additional level of optional to 'Int?', making it always non-nil, so the right side is never used}}
 }
 
 // https://github.com/apple/swift/issues/74617

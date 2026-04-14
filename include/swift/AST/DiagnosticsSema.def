@@ -5133,6 +5133,10 @@ WARNING(bitcasting_to_change_from_unsized_to_sized_int, none,
 WARNING(use_of_qq_on_non_optional_value,none,
         "left side of nil coalescing operator '?""?' has non-optional type %0, "
         "so the right side is never used", (Type))
+WARNING(use_of_qq_with_optional_lhs_promotion,none,
+        "left side of nil coalescing operator '?""?' adds an additional level "
+        "of optional to %0, making it always non-nil, so the right side is "
+        "never used", (Type))
 WARNING(nonoptional_compare_to_nil,none,
         "comparing non-optional value of type %0 to '%select{Optional.none|nil}1' always returns"
         " %select{false|true}2", (Type, bool, bool))
