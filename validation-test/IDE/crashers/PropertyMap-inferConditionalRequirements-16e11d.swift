@@ -1,4 +1,4 @@
-// {"kind":"complete","original":"f14f150c","signature":"swift::Requirement::checkRequirement(llvm::SmallVectorImpl<swift::Requirement>&, bool, llvm::SmallVectorImpl<swift::ProtocolConformanceRef>*) const","signatureNext":"desugarRequirement"}
+// {"kind":"complete","original":"f14f150c","signature":"swift::rewriting::PropertyMap::inferConditionalRequirements(swift::ProtocolConformance*, llvm::ArrayRef<swift::rewriting::Term>) const","signatureNext":"PropertyMap::concretizeNestedTypesFromConcreteParent"}
 // RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 protocol a
 #^^#{

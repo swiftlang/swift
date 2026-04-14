@@ -151,8 +151,9 @@ public struct CrashLog: Sendable {
     if sig == nil {
       sig = assertion.map(Signature.assertion)
     }
-    guard let sig = sig else { return nil }
-    self.signature = sig
+    // If we still don't have a signature, just use a dummy "unknown" signature,
+    // this still allows to at least reduce the crasher.
+    self.signature = sig ?? Signature(symbols: ["unknown"], assertion: nil)
   }
 }
 
