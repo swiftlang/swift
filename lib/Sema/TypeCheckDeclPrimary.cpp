@@ -2322,6 +2322,15 @@ public:
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
     }
+    // Report import of an IPI module from a non-IPI module.
+    if (target && target->getLibraryLevel() == LibraryLevel::IPI &&
+        Ctx.LangOpts.LibraryLevel > LibraryLevel::IPI &&
+        !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+        ID->getAccessLevel() == AccessLevel::Public) {
+      auto importer = ID->getModuleContext();
+      Ctx.Diags.diagnose(ID, diag::error_import_of_ipi_module,
+                         target->getName(), importer->getName());
+    }
 
     // Preconcurrency imports aren't strictly memory-safe when we have strict
     // concurrency checking enabled.
