@@ -484,5 +484,24 @@ NOTE(counted_by_incompatible_type, none, "__counted_by attribute not on pointer 
 REMARK(ignoring_lifetimebound_escapable_return, none, "ignoring lifetimebound attribute because return value is Escapable", ())
 REMARK(ignoring_lifetimebound_on_frt, none, "ignoring lifetimebound attribute on reference counted parameter", ())
 
+REMARK(remark_clang_importer_redirected_file_mapping, none,
+  "clang importer redirected file mapping: real file '%0' -> virtual file '%1'",
+  (StringRef, StringRef))
+
+REMARK(remark_clang_importer_overriding_file, none,
+  "clang importer overriding file '%0'",
+  (StringRef))
+
+NOTE(note_clang_importer_overriding_file_contents, none,
+  "%0", (StringRef))
+
+REMARK(remark_clang_importer_driver_args, none,
+  "clang importer driver args: %0",
+  (StringRef))
+
+REMARK(remark_clang_importer_cc1_args, none,
+  "clang importer cc1 args: %0",
+  (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
