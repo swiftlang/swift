@@ -653,13 +653,14 @@ def main_preset():
     return 0
 
 def dump_current_checkout():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(base_path, "update-checkout")
     print(20 * "=", "begin current checkout:")
     subprocess.run(
-     ["./update-checkout", "--dump-hashes"],
-     cwd=current_dir
+     [file_path, "--dump-hashes"],
+     cwd=base_path 
     ) 
-    print(os.linesep, 20 * "=", "end current checkout:")
+    print(os.linesep + 20 * "=", "end current checkout:")
 
 # -----------------------------------------------------------------------------
 # Main (normal)
