@@ -464,27 +464,43 @@ def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-p
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput, CacheInvariant]>,
   Alias<emit_loaded_module_trace_path>;
+
+def Rhelp : Flag<["-"], "Rhelp">,
+  Flags<[FrontendOption]>,
+  HelpText<"List diagnostic groups that support remark output">;
+
+def enable_remark : Separate<["-"], "R">,
+  Flags<[FrontendOption, CacheInvariant]>,
+  HelpText<"Enable remarks in diagnostic group <group>. List groups with -Rhelp.">,
+  MetaVarName<"<group>">;
+
 def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit a remark if a cross-import of a module is triggered.">;
+  HelpText<"Emit a remark if a cross-import of a module is triggered.">,
+  Alias<enable_remark>, AliasArgs<["CrossImport"]>;
 
 def remark_loading_module : Flag<["-"], "Rmodule-loading">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit remarks about loaded module">;
+  HelpText<"Emit remarks about loaded module">,
+  Alias<enable_remark>, AliasArgs<["ModuleLoading"]>;
 def remark_module_recovery : Flag<["-"], "Rmodule-recovery">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit remarks about contextual inconsistencies in loaded modules">;
+  HelpText<"Emit remarks about contextual inconsistencies in loaded modules">,
+  Alias<enable_remark>, AliasArgs<["ModularizationIssue"]>;
 def remark_module_api_import : Flag<["-"], "Rmodule-api-import">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit remarks about the import bridging in each element composing the API">;
+  HelpText<"Emit remarks about the import bridging in each element composing the API">,
+  Alias<enable_remark>, AliasArgs<["ModuleAPIImport"]>;
 
 def remark_macro_loading : Flag<["-"], "Rmacro-loading">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit remarks about loaded macro implementations">;
+  HelpText<"Emit remarks about loaded macro implementations">,
+  Alias<enable_remark>, AliasArgs<["MacroLoading"]>;
 
 def remark_indexing_system_module : Flag<["-"], "Rindexing-system-module">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit a remark when indexing a system module">;
+  HelpText<"Emit a remark when indexing a system module">,
+  Alias<enable_remark>, AliasArgs<["IndexingSystemModule"]>;
 
 def remark_skip_explicit_interface_build : Flag<["-"], "Rskip-explicit-interface-build">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -492,11 +508,8 @@ def remark_skip_explicit_interface_build : Flag<["-"], "Rskip-explicit-interface
 
 def remark_module_serialization : Flag<["-"], "Rmodule-serialization">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit remarks about module serialization">;
-
-def Rhelp : Flag<["-"], "Rhelp">,
-  Flags<[FrontendOption]>,
-  HelpText<"List diagnostic groups that support remark output">;
+  HelpText<"Emit remarks about module serialization">,
+  Alias<enable_remark>, AliasArgs<["ModuleSerialization"]>;
 
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
@@ -2346,7 +2359,8 @@ def no_cache_compile_job:  Flag<["-"], "no-cache-compile-job">,
 
 def cache_remarks:  Flag<["-"], "Rcache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
-  HelpText<"Show remarks for compiler caching">;
+  HelpText<"Show remarks for compiler caching">,
+  Alias<enable_remark>, AliasArgs<["CompilationCaching"]>;
 
 def cache_disable_replay:  Flag<["-"], "cache-disable-replay">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,

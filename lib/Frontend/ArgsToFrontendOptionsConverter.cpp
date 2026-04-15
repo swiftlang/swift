@@ -158,10 +158,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.SerializeDependencyScannerCache |= Args.hasArg(OPT_serialize_dependency_scan_cache);
   Opts.ReuseDependencyScannerCache |= Args.hasArg(OPT_reuse_dependency_scan_cache);
   Opts.ValidatePriorDependencyScannerCache |= Args.hasArg(OPT_validate_prior_dependency_scan_cache);
-  Opts.EmitDependencyScannerRemarks |= Args.hasArg(OPT_dependency_scan_remarks);
-  Opts.EmitDependencyScannerCacheRemarks |=
-      Args.hasArg(OPT_dependency_scan_cache_remarks) ||
-      Opts.EmitDependencyScannerRemarks;
   Opts.ParallelDependencyScan = Args.hasFlag(OPT_parallel_scan,
                                              OPT_no_parallel_scan,
                                              true);
@@ -188,9 +184,6 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.SerializeModuleInterfaceDependencyHashes |=
     Args.hasArg(OPT_serialize_module_interface_dependency_hashes);
-
-  Opts.RemarkOnRebuildFromModuleInterface |=
-    Args.hasArg(OPT_Rmodule_interface_rebuild);
 
   Opts.DowngradeInterfaceVerificationError |=
     Args.hasArg(OPT_downgrade_typecheck_interface_error);

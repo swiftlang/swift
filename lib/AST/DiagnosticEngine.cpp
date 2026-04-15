@@ -1452,6 +1452,15 @@ DiagnosticState::determineBehavior(const Diagnostic &diag,
     if (suppressRemarks)
       lvl = DiagnosticBehavior::Ignore;
   }
+
+  if (lvl == DiagnosticBehavior::Remark) {
+    auto groupID = diag.getGroupID();
+    if (groupID != DiagGroupID::no_group &&
+        !getCustomRemarkOptionForGroup(groupID) &&
+        !isRemarkGroupEnabled(groupID))
+      lvl = DiagnosticBehavior::Ignore;
+  }
+
   return lvl;
 }
 
@@ -1534,6 +1543,8 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   if (behavior == DiagnosticBehavior::Ignore)
     return std::nullopt;
 
+  auto groupID = diagnostic.getGroupID();
+
   // Figure out the source location.
   SourceLoc loc = diagnostic.getLocOrDeclLoc();
   if (loc.isInvalid() && diagnostic.getDecl()) {
@@ -1549,7 +1560,6 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
       loc = evaluateOrDefault(eval, req, SourceLoc());
   }
 
-  auto groupID = diagnostic.getGroupID();
   StringRef CategoryName;
   if (auto wrapped = diagnostic.getWrappedDiagnostic())
     CategoryName = wrapped.value()->getCategoryName();

@@ -2507,12 +2507,7 @@ static void printRemarkHelp(const CompilerInvocation &Invocation) {
           return false;
         if (excludeFrontendOnly && group.frontendOnly)
           return false;
-        if (group.hasDynamicRemarks())
-          return true;
-        return llvm::any_of(group.diagnostics, [](DiagID diagID) {
-          return DiagnosticEngine::declaredDiagnosticKindFor(diagID) ==
-                 DiagnosticKind::Remark;
-        });
+        return group.hasDirectRemarks();
       });
 
   constexpr StringLiteral columnSep = " | ";

@@ -100,9 +100,13 @@ struct DiagGroupInfo {
   std::string getDocumentationURL(llvm::StringRef docsPath,
                                   llvm::StringRef localDocsPath) const;
 
-  /// Returns two if diagnostics of non-remark kind in this group can be
-  /// dynamically remapped to be emitted as remarks at runtime.
-  bool hasDynamicRemarks() const;
+  /// Returns true if this group contains GROUPED_REMARK diagnostics. Does NOT
+  /// consider subgroups (see hasTransitiveRemarks).
+  bool hasDirectRemarks() const;
+
+  /// Returns true if this group or any of its subgroups contain GROUPED_REMARK
+  /// diagnostics.
+  bool hasTransitiveRemarks() const;
 };
 
 // Add OptionSet aliases so that the '|' operator in the `DiagnosticGroups.def`
@@ -114,6 +118,7 @@ static constexpr OptionSet<DiagnosticGroupOptions> FrontendOnly = DiagnosticGrou
 extern const std::array<DiagGroupInfo, DiagGroupsCount> diagnosticGroupsInfo;
 const DiagGroupInfo &getDiagGroupInfoByID(DiagGroupID id);
 std::optional<DiagGroupID> getDiagGroupIDByName(std::string_view name);
+std::optional<llvm::StringRef> getCustomRemarkOptionForGroup(DiagGroupID id);
 
 } // end namespace swift
 

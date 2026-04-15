@@ -453,6 +453,13 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   // invoked from the driver
   if (inputArgs.hasArg(options::OPT_Rhelp))
     arguments.push_back("-Rhelp-swiftc");
+
+  // remap -R to -Rswiftc to avoid matching frontend-only groups when
+  // invoked from the driver
+  for (const auto *A : inputArgs.filtered(options::OPT_enable_remark)) {
+    arguments.push_back("-Rswiftc");
+    arguments.push_back(A->getValue());
+  }
 }
 
 void ToolChain::addPlatformSpecificPluginFrontendArgs(
