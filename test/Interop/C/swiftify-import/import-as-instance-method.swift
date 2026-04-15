@@ -4,9 +4,9 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety \
-// RUN:    -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}instance.h %t/test.swift -I %bridging-path -DVERIFY
+// RUN:    -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}instance.h %t/test.swift -I %bridging-path -DVERIFY -verify-additional-prefix lifetimebound- -Rclang-importer
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t%{fs-sep}Inputs -strict-memory-safety \
-// RUN:    -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}instance.h %t/test.swift -I %bridging-path -DVERIFY -verify-additional-prefix nolifetimebound-
+// RUN:    -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}instance.h %t/test.swift -I %bridging-path -DVERIFY -verify-additional-prefix nolifetimebound- -Rclang-importer
 // RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -dump-macro-expansions -I %bridging-path 2> %t/out.txt
 // RUN: diff --strip-trailing-cr %t/out.txt %t/out.expected
 
@@ -61,10 +61,13 @@ struct SWIFT_NONESCAPABLE B {};
 struct SWIFT_IMMORTAL_REFERENCE C {};
 typedef struct __attribute__((objc_bridge(id))) D *DRef;
 
+// expected-remark@+1 2{{added safe interop wrapper}}
 void basic(struct A *a, int * __counted_by(len) p __noescape, int len) __attribute__((swift_name("A.basic(self:_:_:)")));
 
+// expected-remark@+1 2{{added safe interop wrapper}}
 void renamed(struct A *a, int * __counted_by(len) p __noescape, int len) __attribute__((swift_name("A.bar(self:_:_:)")));
 
+// expected-remark@+1 2{{added safe interop wrapper}}
 void countedSelf(struct A * __counted_by(len)
   a, // expected-warning{{bounds attribute '__counted_by' ignored on parameter mapped to 'self'}}
   int * __counted_by(len) p __noescape, int len)
@@ -72,29 +75,46 @@ void countedSelf(struct A * __counted_by(len)
   swift_name // expected-note{{swift_name maps free function to instance method here}}
   ("A.countedSelf(self:_:_:)")));
 
+// expected-remark@+1 2{{added safe interop wrapper}}
 void constSelf(const struct A *a, int * __counted_by(len) p __noescape, int len) __attribute__((swift_name("A.constSelf(self:_:_:)")));
 
+// expected-remark@+1 2{{added safe interop wrapper}}
 void valSelf(struct A a, int * __counted_by(len) p __noescape, int len) __attribute__((swift_name("A.valSelf(self:_:_:)")));
 
+// expected-remark@+1 2{{added safe interop wrapper}}
 void refSelf(struct C *c, int * __counted_by(len) p __noescape, int len) __attribute__((swift_name("C.refSelf(self:_:_:)")));
 
+// expected-remark@+1 2{{added safe interop wrapper}}
 void refSelfCF(DRef d, int * __counted_by(len) p __noescape, int len) __attribute__((swift_name("D.refSelf(self:_:_:)")));
 
+// expected-lifetimebound-remark@+3 2{{added safe interop wrapper}}
+// expected-nolifetimebound-remark@+2 2{{did not add safe interop wrapper}}
+// expected-nolifetimebound-note@+1 2{{lifetimebound support is not yet stabilized}}
 int * __counted_by(len) lifetimeBoundSelf(struct A a __lifetimebound, int len) __attribute__((swift_name("A.lifetimeBoundSelf(self:_:)")));
 
+// expected-remark@+1{{added safe interop wrapper}}
 void nonescaping(const struct B *d, int * __counted_by(len) p __noescape, int len) __attribute__((swift_name("B.nonescaping(self:_:_:)")));
 
+// expected-lifetimebound-remark@+3{{added safe interop wrapper}}
+// expected-nolifetimebound-remark@+2{{did not add safe interop wrapper}}
+// expected-nolifetimebound-note@+1{{lifetimebound support is not yet stabilized}}
 int * __counted_by(len) nonescapingLifetimebound(struct B *d __lifetimebound, int len) __attribute__((swift_name("B.nonescapingLifetimebound(self:_:)")));
 
+// expected-remark@+1 2{{added safe interop wrapper}}
 struct A * createA(int len, int * __counted_by(len) p) __attribute__((swift_name("A.init(countA:pointerA:)")));
+// expected-remark@+1 2{{added safe interop wrapper}}
 struct A * createA2(int len, int * __counted_by(len) p __noescape) __attribute__((swift_name("A.init(countA2:pointerA2:)")));
 
 // This crashes the compiler rdar://169580475
 // struct B * createB(int len, int * __counted_by(len) p __lifetimebound) __attribute__((swift_name("B.init(_:_:)")));
 
+// expected-remark@+1 2{{added safe interop wrapper}}
 struct C * createC(int len, int * __counted_by(len) p) __attribute__((swift_name("C.init(countC:pointerC:)")));
 
 // This should not generate an overload, because Swift does not allow user-defined initiailizers for CF-style foreign references
+// expected-remark@+4{{added safe interop wrapper}}
+// expected-note@+3{{Swift cannot define initializer for CoreFoundation style reference type}}
+// expected-remark@+2{{did not add safe interop wrapper}}
 // expected-note@+1{{'init(countD:pointerD:)' declared here}}
 DRef createD(int len, int * __counted_by(len) p) __attribute__((swift_name("D.init(countD:pointerD:)")));
 
