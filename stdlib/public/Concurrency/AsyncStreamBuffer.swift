@@ -538,57 +538,112 @@ extension AsyncThrowingStream {
   }
 }
 
-// this is used to store closures; which are two words
-final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
-  var _value: Contents
-  private init(_doNotCallMe: ()) {
-    fatalError("_AsyncStreamCriticalStorage must be initialized by create")
-  }
+/// The state machine backing `Async{Throwing}Stream`'s unfolding variant.
+///
+/// States:
+///
+///   - `producing`: The stream calls the `produce` closure on consumer demand.
+///   - `terminated`: The stream is in a terminal state and immediately returns `nil`.
+///
+/// Transitions:
+///
+/// ```text
+/// Current State   Possible Next State
+/// -------------   -------------------
+/// producing     ->  terminated
+/// terminated    ->  terminated
+/// ```
+///
+/// Behavior:
+/// The stream can reach its terminal state either by producing `nil` or when a task with a consumer present is canceled.
+/// The `onCancel` closure will fire **once** and only if the consumer task was cancelled and an `onCancel` closure was set, after which it is cleared.
+/// Once the terminal state is reached, the installed `produce` and `onCancel` closure are cleared, and subsequent calls will immediately return `nil`.
+@safe
+final class _UnfoldingStorage<Element, Failure: Error>: @unchecked Sendable {
+  typealias Produce = @Sendable () async throws(Failure) -> Element?
+  typealias OnCancel = (@Sendable () -> Void)?
 
-  private func lock() {
-    let ptr =
-      unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
-    unsafe _lock(ptr)
-  }
-
-  private func unlock() {
-    let ptr =
-      unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
-    unsafe _unlock(ptr)
-  }
-
-  var value: Contents {
-    get {
-      lock()
-      let contents = _value
-      unlock()
-      return contents
-    }
-
-    set {
-      lock()
-      withExtendedLifetime(_value) {
-        _value = newValue
-        unlock()
-      }
-    }
-  }
-
-  static func create(_ initial: Contents) -> _AsyncStreamCriticalStorage {
-    let minimumCapacity = _lockWordCount()
-    let storage = unsafe Builtin.allocWithTailElems_1(
-      _AsyncStreamCriticalStorage.self,
-      minimumCapacity._builtinWordValue,
-      UnsafeRawPointer.self
+  enum State {
+    case producing(
+      produce: Produce,
+      onCancel: OnCancel
     )
 
-    let state =
-      unsafe UnsafeMutablePointer<Contents>(Builtin.addressof(&storage._value))
-    unsafe state.initialize(to: initial)
-    let ptr = unsafe UnsafeRawPointer(
-      Builtin.projectTailElems(storage, UnsafeRawPointer.self))
-    unsafe _lockInit(ptr)
-    return storage
+    case terminated
+  }
+
+  private let lock: UnsafeMutableRawPointer
+  private var state: State
+
+  init(
+    produce: @escaping Produce,
+    onCancel: OnCancel
+  ) {
+    unsafe self.lock = unsafe UnsafeMutableRawPointer.allocate(
+      byteCount: _lockWordCount() * MemoryLayout<UnsafeRawPointer>.stride,
+      alignment: MemoryLayout<UnsafeRawPointer>.alignment
+    )
+    unsafe _lockInit(self.lock)
+
+    self.state = .producing(
+      produce: produce,
+      onCancel: onCancel
+    )
+  }
+
+  deinit {
+    unsafe self.lock.deallocate()
+  }
+}
+
+extension _UnfoldingStorage {
+  nonisolated(nonsending) func next() async throws(Failure) -> Element? {
+    let state = withLock { state in
+      return state
+    }
+
+    guard
+      case .producing(let producer, _) = state
+    else { return nil }
+
+    switch try await producer() {
+    case .some(let element):
+      return element
+
+    case .none:
+      withLock { state in
+        state = .terminated
+      }
+      return nil
+    }
+  }
+
+  func terminate() {
+    let onCancel = withLock { state in
+      switch state {
+      case .producing(_, let onCancel):
+        state = .terminated
+        return onCancel
+
+      case .terminated:
+        return nil
+      }
+    }
+
+    onCancel?()
+  }
+}
+
+extension _UnfoldingStorage {
+  @safe
+  private func withLock<Value>(
+    _ action: (inout State) -> Value
+  ) -> Value {
+    unsafe _lock(self.lock)
+
+    defer { unsafe _unlock(self.lock) }
+
+    return action(&self.state)
   }
 }
 #endif

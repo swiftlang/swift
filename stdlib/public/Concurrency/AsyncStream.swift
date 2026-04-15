@@ -348,18 +348,16 @@ public struct AsyncStream<Element> {
     unfolding produce: @escaping @Sendable () async -> Element?,
     onCancel: (@Sendable () -> Void)? = nil
   ) {
-    let storage: _AsyncStreamCriticalStorage<Optional<() async -> Element?>>
-      = .create(produce)
-    context = _Context {
+    let _unfoldingStorage = _UnfoldingStorage(
+      produce: produce,
+      onCancel: onCancel
+    )
+
+    self.context = _Context {
       return await withTaskCancellationHandler {
-        guard let result = await storage.value?() else {
-          storage.value = nil
-          return nil
-        }
-        return result
+        return await _unfoldingStorage.next()
       } onCancel: {
-        storage.value = nil
-        onCancel?()
+        _unfoldingStorage.terminate()
       }
     }
   }
