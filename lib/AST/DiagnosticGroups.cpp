@@ -242,7 +242,8 @@ DiagGroupInfo::getDocumentationURL(llvm::StringRef docsPath, llvm::StringRef loc
   if (toolchainLocalDocumentation) {
     if (!localDocsPath.empty()) {
       llvm::SmallString<128> localPath(localDocsPath);
-      llvm::sys::path::append(localPath, documentationFile, ".md");
+      llvm::sys::path::append(localPath, documentationFile);
+      localPath += ".md";
       return std::string(localPath);
     }
     return "";
@@ -253,6 +254,10 @@ DiagGroupInfo::getDocumentationURL(llvm::StringRef docsPath, llvm::StringRef loc
     docURL += "/";
   docURL += documentationFile;
   return docURL;
+}
+
+bool DiagGroupInfo::hasDynamicRemarks() const {
+  return DiagGroupID::ModularizationIssue == id;
 }
 
 } // end namespace swift

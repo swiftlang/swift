@@ -1,6 +1,6 @@
 # Module interface rebuild remarks (ModuleInterfaceRebuild)
 
-Emits a remark if an imported needs to be re-compiled from its module interface.
+Emits a remark if an imported module needs to be re-compiled from its module interface.
 
 ## Overview
 

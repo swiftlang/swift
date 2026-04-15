@@ -494,6 +494,10 @@ def remark_module_serialization : Flag<["-"], "Rmodule-serialization">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit remarks about module serialization">;
 
+def Rhelp : Flag<["-"], "Rhelp">,
+  Flags<[FrontendOption]>,
+  HelpText<"List diagnostic groups that support remark output">;
+
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>;

@@ -448,6 +448,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
+
+  // remap -Rhelp to -Rhelp-swiftc to avoid listing frontend-only groups when
+  // invoked from the driver
+  if (inputArgs.hasArg(options::OPT_Rhelp))
+    arguments.push_back("-Rhelp-swiftc");
 }
 
 void ToolChain::addPlatformSpecificPluginFrontendArgs(

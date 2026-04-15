@@ -99,6 +99,10 @@ struct DiagGroupInfo {
   /// toolchain path for toolchain-local groups or the remote URL otherwise.
   std::string getDocumentationURL(llvm::StringRef docsPath,
                                   llvm::StringRef localDocsPath) const;
+
+  /// Returns two if diagnostics of non-remark kind in this group can be
+  /// dynamically remapped to be emitted as remarks at runtime.
+  bool hasDynamicRemarks() const;
 };
 
 // Add OptionSet aliases so that the '|' operator in the `DiagnosticGroups.def`

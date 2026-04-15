@@ -223,6 +223,14 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.PrintSupportedFeatures = true;
   }
 
+  if (Args.hasArg(OPT_Rhelp)) {
+    Opts.PrintRemarkHelp = true;
+  }
+
+  if (Args.hasArg(OPT_Rhelp_swiftc)) {
+    Opts.PrintRemarkHelpForDriver = true;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
     Opts.VerifyGenericSignaturesInModule = A->getValue();
   }
