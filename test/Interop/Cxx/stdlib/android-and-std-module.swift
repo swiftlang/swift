@@ -4,15 +4,15 @@
 // RUN: %target-swift-frontend %s -c -cxx-interoperability-mode=default -Xcc -std=c++20 -Xcc -fmodules-cache-path=%t
 
 // Ensure that the pre-compiled modules are emitted.
-// RUN: ls %t/Android*.pcm
-// RUN: ls %t/std*.pcm
+// RUN: stat %t/*/SwiftAndroid-*.pcm
+// RUN: stat %t/*/std-*.pcm
 
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend %s -c -cxx-interoperability-mode=default -Xcc -std=c++17 -Xcc -fmodules-cache-path=%t -DADD_CXXSTDLIB
 // RUN: %target-swift-frontend %s -c -cxx-interoperability-mode=default -Xcc -std=c++20 -Xcc -fmodules-cache-path=%t -DADD_CXXSTDLIB
 
-// REQUIRES: OS=linux-android-stat
+// REQUIRES: OS=linux-android || OS=linux-androideabi
 
 import Android
 import Bionic
