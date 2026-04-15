@@ -182,12 +182,17 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
          "Expected a member reference");
 
   // For a reference to an instance method on a metatype, we want to keep the
-  // curried self.
+  // curried self.  Metatype extension instance members are an exception: the
+  // metatype value IS self, so the curried self is applied.
   if (decl->isInstanceMember()) {
     assert(baseTy);
     if (isa<AbstractFunctionDecl>(decl) &&
-        baseTy->getRValueType()->is<AnyMetatypeType>())
+        baseTy->getRValueType()->is<AnyMetatypeType>()) {
+      if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext()))
+        if (ext->isMetatypeExtension())
+          return true;
       return false;
+    }
   }
 
   // Otherwise the reference applies self.
@@ -10618,6 +10623,16 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
     if (decl->isInstanceMember()) {
       if (baseObjTy->is<AnyMetatypeType>()) {
+        // Metatype extension instance members are instance members of the
+        // metatype type itself.  They are accessed directly on the protocol
+        // metatype value (e.g. P.value), not on an instance of the protocol.
+        if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+          if (ext->isMetatypeExtension()) {
+            result.addViable(candidate);
+            return;
+          }
+        }
+
         // `AnyObject` has special semantics, so let's just let it be.
         // Otherwise adjust base type and reference kind to make it
         // look as if lookup was done on the instance, that helps

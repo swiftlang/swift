@@ -3892,12 +3892,6 @@ public:
         ED->setInvalid();
         return;
       }
-      for (auto *member : ED->getMembers()) {
-        if (auto *VD = dyn_cast<ValueDecl>(member)) {
-          if (VD->isInstanceMember())
-            VD->diagnose(diag::metatype_extension_instance_member);
-        }
-      }
     }
 
     if (!extType->hasError()) {

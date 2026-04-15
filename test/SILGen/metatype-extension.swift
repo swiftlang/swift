@@ -4,27 +4,27 @@
 protocol P {}
 
 extension P.Protocol {
-  static var value: Int { 42 }
-  static func greet() -> String { "hello" }
+  var value: Int { 42 }
+  func greet() -> String { "hello" }
 }
 
 // Members are non-generic: no type parameters, no witness tables.
 
-// CHECK-LABEL: sil hidden [ossa] @$s18metatype_extension1PPAAE5valueSivgZ : $@convention(method) (@thin (any P).Type) -> Int
+// CHECK-LABEL: sil hidden [ossa] @$s18metatype_extension1PPAAE5valueSivg : $@convention(method) (@thin (any P).Type) -> Int
 // CHECK-NOT:     witness_method
 // CHECK-NOT:     witness_table
-// CHECK:       } // end sil function '$s18metatype_extension1PPAAE5valueSivgZ'
+// CHECK:       } // end sil function '$s18metatype_extension1PPAAE5valueSivg'
 
-// CHECK-LABEL: sil hidden [ossa] @$s18metatype_extension1PPAAE5greetSSyFZ : $@convention(method) (@thin (any P).Type) -> @owned String
+// CHECK-LABEL: sil hidden [ossa] @$s18metatype_extension1PPAAE5greetSSyF : $@convention(method) (@thin (any P).Type) -> @owned String
 // CHECK-NOT:     witness_method
 // CHECK-NOT:     witness_table
-// CHECK:       } // end sil function '$s18metatype_extension1PPAAE5greetSSyFZ'
+// CHECK:       } // end sil function '$s18metatype_extension1PPAAE5greetSSyF'
 
 // Direct access on the protocol metatype.
 
 // CHECK-LABEL: sil hidden [ossa] @$s18metatype_extension18testMetatypeDirectyyF
 // CHECK:         [[META:%[0-9]+]] = metatype $@thin (any P).Type
-// CHECK:         [[FN:%[0-9]+]] = function_ref @$s18metatype_extension1PPAAE5valueSivgZ : $@convention(method) (@thin (any P).Type) -> Int
+// CHECK:         [[FN:%[0-9]+]] = function_ref @$s18metatype_extension1PPAAE5valueSivg : $@convention(method) (@thin (any P).Type) -> Int
 // CHECK:         apply [[FN]]([[META]])
 // CHECK:       } // end sil function '$s18metatype_extension18testMetatypeDirectyyF'
 func testMetatypeDirect() {
@@ -35,7 +35,7 @@ func testMetatypeDirect() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s18metatype_extension18testMetatypeStoredyyF
 // CHECK:         [[META:%[0-9]+]] = metatype $@thin (any P).Type
-// CHECK:         [[FN:%[0-9]+]] = function_ref @$s18metatype_extension1PPAAE5greetSSyFZ : $@convention(method) (@thin (any P).Type) -> @owned String
+// CHECK:         [[FN:%[0-9]+]] = function_ref @$s18metatype_extension1PPAAE5greetSSyF : $@convention(method) (@thin (any P).Type) -> @owned String
 // CHECK:         apply [[FN]]([[META]])
 // CHECK:       } // end sil function '$s18metatype_extension18testMetatypeStoredyyF'
 func testMetatypeStored() {
@@ -47,11 +47,11 @@ func testMetatypeStored() {
 protocol Q: P {}
 
 extension Q.Protocol {
-  static var qValue: Int { 99 }
+  var qValue: Int { 99 }
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s18metatype_extension22testRefinementMetatypeyyF
-// CHECK:         function_ref @$s18metatype_extension1QPAAE6qValueSivgZ
+// CHECK:         function_ref @$s18metatype_extension1QPAAE6qValueSivg
 // CHECK-NOT:     function_ref {{.*}}PPAAE5value
 // CHECK:       } // end sil function '$s18metatype_extension22testRefinementMetatypeyyF'
 func testRefinementMetatype() {

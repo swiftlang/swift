@@ -4,13 +4,18 @@
 protocol P {}
 
 extension P.Protocol {
-  static var value: Int { 42 }
-  static func greet() -> String { "hello" }
+  var value: Int { 42 }
+  func greet() -> String { "hello" }
 }
 
 // --- Protocol metatype extension members are accessible on the protocol.
 let _: Int = P.value
 let _: String = P.greet()
+
+// --- Protocol metatype extension members are accessible on a stored metatype.
+let p = P.self
+let _: Int = p.value
+let _: String = p.greet()
 
 // --- Protocol metatype extension members are NOT accessible on conforming types.
 struct ConcreteP: P {}
@@ -21,12 +26,6 @@ let _ = ConcreteP.greet() // expected-error {{type 'ConcreteP' has no member 'gr
 protocol Q: P {}
 let _ = Q.value // expected-error {{type 'any Q' has no member 'value'}}
 let _ = Q.greet() // expected-error {{type 'any Q' has no member 'greet'}}
-
-// --- Instance members are not allowed.
-extension P.Protocol {
-  var x: Int { 0 } // expected-error {{instance members are not allowed in metatype extensions}}
-  func f() {} // expected-error {{instance members are not allowed in metatype extensions}}
-}
 
 // --- Metatype extension on non-protocol types.
 struct S {}
