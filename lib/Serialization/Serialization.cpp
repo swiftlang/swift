@@ -4402,6 +4402,7 @@ public:
                                 S.addDeclRef(extendedNominal),
                                 contextID.getOpaqueValue(),
                                 extension->isImplicit(),
+                                extension->isMetatypeExtension(),
                                 S.addGenericSignatureRef(
                                            extension->getGenericSignature()),
                                 numConformances,

@@ -342,6 +342,10 @@ void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl cDecl,
   setParsedMembers(cDecl.unbridged(), cMembers, cFingerprint);
 }
 
+void BridgedExtensionDecl_setIsMetatypeExtension(BridgedExtensionDecl cDecl) {
+  cDecl.unbridged()->setIsMetatypeExtension();
+}
+
 static ArrayRef<InheritedEntry>
 convertToInheritedEntries(ASTContext &ctx, BridgedArrayRef cInheritedTypes) {
   return ctx.AllocateTransform<InheritedEntry>(

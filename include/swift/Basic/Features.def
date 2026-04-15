@@ -627,6 +627,10 @@ EXPERIMENTAL_FEATURE(BorrowingSequence, true)
 /// Turns some source breaking access control warnings into errors.
 EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 
+/// Enables `metatype extension` declarations — extensions whose members live
+/// on the protocol metatype itself and are not inherited by conforming types.
+EXPERIMENTAL_FEATURE(ProtocolMetatypeExtensions, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

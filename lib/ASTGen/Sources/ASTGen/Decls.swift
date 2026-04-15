@@ -310,11 +310,18 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   func generate(extensionDecl node: ExtensionDeclSyntax) -> BridgedExtensionDecl {
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
+    // Detect `extension P.Protocol { }` — a protocol metatype extension.
+    // Strip the `.Protocol` so the extension binds to the protocol `P`.
+    let protoMeta = node.extendedType.as(MetatypeTypeSyntax.self)
+        .flatMap { $0.metatypeSpecifier.keywordKind == .Protocol ? $0 : nil }
+    let extendedType = protoMeta.map { self.generate(type: $0.baseType) }
+                    ?? self.generate(type: node.extendedType)
+
     let decl = BridgedExtensionDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       extensionKeywordLoc: self.generateSourceLoc(node.extensionKeyword),
-      extendedType: self.generate(type: node.extendedType),
+      extendedType: extendedType,
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
       braceRange: self.generateSourceRange(
@@ -323,6 +330,10 @@ extension ASTGenVisitor {
       )
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
+
+    if protoMeta != nil {
+      decl.setIsMetatypeExtension()
+    }
 
     let members = self.withDeclContext(decl.asDeclContext) {
       self.generate(memberBlockItemList: node.memberBlock.members)
