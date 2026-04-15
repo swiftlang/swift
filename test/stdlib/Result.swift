@@ -74,6 +74,14 @@ ResultTests.test("Throwing Initialization and Unwrapping") {
 
   func knownNotThrowing() -> String { return string }
 
+  func asyncThrowing() async throws -> String {
+    throw Err.err
+  }
+
+  func asyncNotThrowing() async throws -> String {
+    return string
+  }
+
   let result1 = Result { try throwing() }
   let result2 = Result { try notThrowing() }
 
@@ -120,6 +128,27 @@ ResultTests.test("Throwing Initialization and Unwrapping") {
   let result5 = Result { knownNotThrowing() }
   let _: Result<String, Never> = result5 // check the type
   _ = result5.get() // no need for 'try'
+
+  let result6 = await Result { try await asyncThrowing() }
+  let result7 = await Result { try await asyncNotThrowing() }
+
+  expectEqual(result6.failure as? Err, Err.err)
+  expectEqual(result7.success, string)
+    
+  do {
+    _ = try result6.get()
+  } catch let error as Err {
+    expectEqual(error, Err.err)
+  } catch {
+    expectUnreachable()
+  }
+    
+  do {
+    let unwrapped = try result7.get()
+    expectEqual(unwrapped, string)
+  } catch {
+    expectUnreachable()
+  }
 }
 
 ResultTests.test("Functional Transforms") {
