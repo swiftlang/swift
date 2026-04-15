@@ -4169,6 +4169,7 @@ static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
     CanType selfType = wrappedProperty->getDeclContext()
                            ->getSelfInterfaceType()
                            ->getCanonicalType();
+    selfType = sig.getReducedType(selfType);
     // Create the self param
     params.emplace_back(
         selfType, Identifier(),

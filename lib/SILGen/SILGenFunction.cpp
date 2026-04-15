@@ -1987,13 +1987,6 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
                              getLoweredType(MetatypeType::get(expectedSelfTy)));
   }
 
-  if (auto invocationSig = initTy->getInvocationGenericSignature()) {
-    if (invocationSig->areAllParamsConcrete())
-      substitutions = SubstitutionMap();
-  } else {
-    substitutions = SubstitutionMap();
-  }
-
   PartialApplyInst *initPAI =
       B.createPartialApply(loc, initFRef, substitutions, selfMetatype,
                            ParameterConvention::Direct_Guaranteed,
