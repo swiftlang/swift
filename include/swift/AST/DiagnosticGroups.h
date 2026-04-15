@@ -94,6 +94,11 @@ struct DiagGroupInfo {
 
   void traverseDepthFirst(
       llvm::function_ref<void(const DiagGroupInfo &)> func) const;
+
+  /// Returns the documentation URL for a diagnostic group, using the local
+  /// toolchain path for toolchain-local groups or the remote URL otherwise.
+  std::string getDocumentationURL(llvm::StringRef docsPath,
+                                  llvm::StringRef localDocsPath) const;
 };
 
 // Add OptionSet aliases so that the '|' operator in the `DiagnosticGroups.def`

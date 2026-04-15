@@ -53,6 +53,7 @@ namespace swift {
   class SourceFile;
   class ParamDecl;
   class AnyPattern;
+  class DiagnosticOptions;
 
   /// Enumeration describing all of possible diagnostics.
   ///
@@ -1282,7 +1283,17 @@ namespace swift {
     void forwardTentativeDiagnosticsTo(DiagnosticEngine &targetEngine);
 
   public:
-    DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
+    static DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
+
+    /// Returns diagnostic documentation path, using the user-provided path if
+    /// explicitly set, or falling back to the docs.swift.org URL.
+    static std::string
+    resolveDiagnosticDocumentationPath(const DiagnosticOptions &opts);
+
+    /// Returns the local diagnostic documentation path derived from the
+    /// compiler's executable path.
+    static std::string
+    resolveLocalDiagnosticDocumentationPath(llvm::StringRef mainExecutablePath);
 
     /// Get a localized format string for the given `DiagID`. If no localization
     /// is available, returns the default string.

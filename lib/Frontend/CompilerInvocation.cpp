@@ -2950,18 +2950,12 @@ static void configureDiagnosticEngine(
   Diagnostics.setWarningGroupControlRules(Options.WarningGroupControlRules);
   Diagnostics.setPrintDiagnosticNamesMode(Options.PrintDiagnosticNames);
 
-  std::string docsPath = Options.DiagnosticDocumentationPath;
-  if (docsPath.empty()) {
-    // Point at the latest Markdown documentation on GitHub.
-    docsPath = "https://docs.swift.org/compiler/documentation/diagnostics";
-  }
-  Diagnostics.setDiagnosticDocumentationPath(docsPath);
+  Diagnostics.setDiagnosticDocumentationPath(
+      DiagnosticEngine::resolveDiagnosticDocumentationPath(Options));
 
-  llvm::SmallString<128> localDocsPath(mainExecutablePath);
-  llvm::sys::path::remove_filename(localDocsPath); // Remove /swift-frontend
-  llvm::sys::path::remove_filename(localDocsPath); // Remove /bin
-  llvm::sys::path::append(localDocsPath, "share", "doc", "swift", "diagnostics");
-  Diagnostics.setLocalDiagnosticDocumentationPath(std::string(localDocsPath));
+  Diagnostics.setLocalDiagnosticDocumentationPath(
+      DiagnosticEngine::resolveLocalDiagnosticDocumentationPath(
+          mainExecutablePath));
 
   if (!Options.LocalizationCode.empty()) {
     std::string locPath = Options.LocalizationPath;

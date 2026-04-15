@@ -17,6 +17,9 @@
 
 #include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/DiagnosticList.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Path.h"
 #include <unordered_set>
 
 namespace swift {
@@ -233,5 +236,23 @@ CHECK_NOT_EMPTY(UnknownWarningGroup)
 #undef CHECK_NOT_EMPTY
 
 } // end namespace validation
+
+std::string
+DiagGroupInfo::getDocumentationURL(llvm::StringRef docsPath, llvm::StringRef localDocsPath) const {
+  if (toolchainLocalDocumentation) {
+    if (!localDocsPath.empty()) {
+      llvm::SmallString<128> localPath(localDocsPath);
+      llvm::sys::path::append(localPath, documentationFile, ".md");
+      return std::string(localPath);
+    }
+    return "";
+  }
+
+  std::string docURL(docsPath);
+  if (!docURL.empty() && docURL.back() != '/')
+    docURL += "/";
+  docURL += documentationFile;
+  return docURL;
+}
 
 } // end namespace swift
