@@ -63,4 +63,4 @@
 // CHECK-REALLY-EMPTY: '-isystem' '{{.*}}/bad-sdk/usr/lib/swift/shims'
 // CHECK-REALLY-EMPTY: error: could not find module 'Swift' for target '{{.*}}'; found: garbage-garbage-garbage, at: {{.*}}/Swift.swiftmodule
 
-    let x: Int = 1
+let x: Int = 1
