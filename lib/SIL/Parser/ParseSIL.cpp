@@ -6968,6 +6968,13 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       continue;
     }
 
+    if (AttrName == "nonisolated_nonsending") {
+      assert(!bool(AttrValue));
+      PartialApplyIsolation =
+          SILFunctionTypeIsolation::forNonisolatedNonsending();
+      continue;
+    }
+
     if (AttrName == "isolated_any") {
       assert(!bool(AttrValue));
       PartialApplyIsolation = SILFunctionTypeIsolation::forErased();

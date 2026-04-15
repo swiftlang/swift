@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 991; // add LIBRARY_LEVEL to options_block
+const uint16_t SWIFTMODULE_VERSION_MINOR = 992; // generalized isolation storage in SILFunctionTypeLayout
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -730,6 +730,14 @@ enum class FunctionTypeIsolation : uint8_t {
   GlobalActorOffset, // Add this to the global actor type ID
 };
 using FunctionTypeIsolationField = TypeIDField;
+
+enum class SILFunctionTypeIsolation : uint8_t {
+  Unknown,
+  NonisolatedNonsending,
+  Erased,
+};
+// An extra bit here to future-proof.
+using SILFunctionTypeIsolationField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -1507,7 +1515,7 @@ namespace decls_block {
     BCFixed<1>,                         // pseudogeneric?
     BCFixed<1>,                         // noescape?
     BCFixed<1>,                         // unimplementable?
-    BCFixed<1>,                         // erased isolation?
+    SILFunctionTypeIsolationField,      // isolation
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
     BCVBR<6>,                           // number of parameters

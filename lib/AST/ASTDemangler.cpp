@@ -25,6 +25,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclNameExtractor.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleNameLookup.h"
@@ -780,9 +781,17 @@ Type ASTBuilder::createImplFunctionType(
   #undef SIMPLE_CASE
   }
 
-  auto isolation = SILFunctionTypeIsolation::forUnknown();
-  if (flags.hasErasedIsolation())
-    isolation = SILFunctionTypeIsolation::forErased();
+  SILFunctionTypeIsolation isolation = SILFunctionTypeIsolation::forUnknown();
+  switch (flags.getIsolation()) {
+#define ISOLATION(CASE)                                                        \
+  case ImplFunctionIsolation::CASE:                                            \
+    isolation = SILFunctionTypeIsolation::for##CASE();                         \
+    break;
+    ISOLATION(Unknown)
+    ISOLATION(NonisolatedNonsending)
+    ISOLATION(Erased)
+#undef ISOLATION
+  }
 
   // There's no representation of this in the mangling because it can't
   // occur in well-formed programs.

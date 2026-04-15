@@ -127,6 +127,7 @@ extension ASTGenVisitor {
         .SILWeak,
         .SILSending,
         .SILImplicitLeadingParam,
+        .CallerIsolated,
         .UnownedInnerPointer:
         // TODO: Diagnose or fallback to CustomAttr?
         fatalError("SIL type attributes are not supported")

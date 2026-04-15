@@ -2917,14 +2917,15 @@ static CanSILFunctionType getSILFunctionType(
   updateResultTypeForForeignInfo(foreignInfo, genericSig, origResultType,
                                  substFormalResultType);
 
+  auto actorIsolation = getSILFunctionTypeActorIsolation(
+      substFnInterfaceType, origConstant, constant);
+
   // Destructure the input tuple type.
   SmallVector<SILParameterInfo, 8> inputs;
   SmallVector<int, 8> parameterMap;
   SmallBitVector addressableParams;
   SmallBitVector conditionallyAddressableParams;
   {
-    auto actorIsolation = getSILFunctionTypeActorIsolation(
-        substFnInterfaceType, origConstant, constant);
     DestructureInputs destructurer(expansionContext, TC, conventions,
                                    foreignInfo, actorIsolation, inputs,
                                    parameterMap,
@@ -3098,12 +3099,18 @@ static CanSILFunctionType getSILFunctionType(
         params, substFnInterfaceType.getResult(),
         convertRepresentation(silRep).value());
   }
+
+  bool isNonisolatedNonsending =
+      actorIsolation && actorIsolation->isCallerIsolationInheriting() &&
+      conventions.hasCallerIsolationParameter();
+
   auto silExtInfo =
       extInfoBuilder.withClangFunctionType(clangType)
           .withIsPseudogeneric(pseudogeneric)
           .withSendable(isSendable)
           .withAsync(isAsync)
           .withUnimplementable(unimplementable)
+          .withNonisolatedNonsending(isNonisolatedNonsending)
           .withLifetimeDependencies(TC.Context.AllocateCopy(loweredLifetimes))
           .build();
 
@@ -5516,6 +5523,9 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
     return ABICompatibilityCheckResult::DifferentErrorResultConventions;
   }
 
+  // `nonisolated(nonsending)` can be safely added and removed
+  // because isolation parameter is implicit and doesn't affect ABI.
+  
   // @isolated(any) imposes an additional requirement on the context
   // storage and cannot be added.  It can safely be removed, however.
   if (other->hasErasedIsolation() && !hasErasedIsolation())

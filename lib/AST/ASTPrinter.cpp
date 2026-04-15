@@ -7282,6 +7282,10 @@ public:
       Printer << " ";
     }
 
+    if (info.hasNonisolatedNonsendingIsolation()) {
+      Printer.printSimpleAttr("@caller_isolated") << " ";
+    }
+
     if (info.hasErasedIsolation()) {
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@isolated");

@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -2316,6 +2317,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
 
   switch (fn->getIsolation().getKind()) {
   case SILFunctionTypeIsolation::Unknown:
+    break;
+  case SILFunctionTypeIsolation::NonisolatedNonsending:
+    OpArgs.push_back('N');
     break;
   case SILFunctionTypeIsolation::Erased:
     if (AllowIsolatedAny)

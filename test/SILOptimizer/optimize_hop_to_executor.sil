@@ -14,6 +14,7 @@ actor MyActor {
 
 sil [ossa] @requiredToRunOnActor : $@convention(method) (@guaranteed MyActor) -> ()
 sil [ossa] @anotherAsyncFunction : $@convention(thin) @async () -> ()
+sil [ossa] @nonisolatedNonsendingAsyncFunction : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
 sil [ossa] @syncFunction : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil [ossa] @simpleRedundantActor : $@convention(method) @async (@guaranteed MyActor) -> () {
@@ -323,8 +324,21 @@ bb0(%0 : @guaranteed $MyActor):
 sil [ossa] @simpleCallerIsolationInheritingStopsDCE : $@convention(thin) @async (@guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor):
   hop_to_executor %0
-  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  %1 = unchecked_value_cast %0 to $Builtin.ImplicitActor
+  %f = function_ref @nonisolatedNonsendingAsyncFunction : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  apply %f(%1) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @callerIsolationInheritingParameterStopsDCE : $@convention(thin) @async (@guaranteed MyActor, @guaranteed @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+// CHECK: hop_to_executor
+// CHECK: } // end sil function 'callerIsolationInheritingParameterStopsDCE'
+sil [ossa] @callerIsolationInheritingParameterStopsDCE : $@convention(thin) @async (@guaranteed MyActor, @guaranteed @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $@caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
+  hop_to_executor %0
+  %2 = unchecked_value_cast %0 to $Builtin.ImplicitActor
+  apply %1(%2) : $@caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   %9999 = tuple ()
   return %9999 : $()
 }
@@ -341,15 +355,18 @@ bb0(%0 : @guaranteed $MyActor):
 sil [ossa] @simpleCallerIsolationInheritingStopsDCE2 : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
   hop_to_executor %0
-  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  %actor0 = unchecked_value_cast %0 to $Builtin.ImplicitActor
+  %f = function_ref @nonisolatedNonsendingAsyncFunction : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  apply %f(%actor0) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   hop_to_executor %1
+  %actor1 = unchecked_value_cast %1 to $Builtin.ImplicitActor
   %f2 = function_ref @syncFunction : $@convention(thin) () -> ()
   apply %f2() : $@convention(thin) () -> ()
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  apply %f(%actor1) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   hop_to_executor %2
+  %actor2 = unchecked_value_cast %2 to $Builtin.ImplicitActor
   apply %f2() : $@convention(thin) () -> () 
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  apply %f(%actor2) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   %9999 = tuple ()
   return %9999 : $()
 }
@@ -398,15 +415,16 @@ bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyAc
 sil [ossa] @callerIsolationInheritingStopsAllowsPropagating : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
   hop_to_executor %0
-  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  %actor0 = unchecked_value_cast %0 to $Builtin.ImplicitActor
+  %f = function_ref @nonisolatedNonsendingAsyncFunction : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  apply %f(%actor0) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   hop_to_executor %0
   %f2 = function_ref @syncFunction : $@convention(thin) () -> ()
   apply %f2() : $@convention(thin) () -> ()
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  apply %f(%actor0) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   hop_to_executor %0
   apply %f2() : $@convention(thin) () -> () 
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  apply %f(%actor0) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   %9999 = tuple ()
   return %9999 : $()
 }

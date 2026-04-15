@@ -13,7 +13,7 @@ func takeDefaulted(iso: isolated (any Actor)? = #isolation) {}
 
 // CHECK-LABEL: // nonisolatedNonsending()
 // CHECK-NEXT: // Isolation: caller_isolation_inheriting
-// CHECK-NEXT: sil hidden @$s4test21nonisolatedNonsendingyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK-NEXT: sil hidden @$s4test21nonisolatedNonsendingyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK:      bb0([[IMPLICIT_ACTOR:%.*]] : $Builtin.ImplicitActor):
 // CHECK:   [[ACTOR:%.*]] = implicitactor_to_opaqueisolation_cast [[IMPLICIT_ACTOR]]
 // CHECK:   retain_value [[ACTOR]]
@@ -26,7 +26,7 @@ func takeDefaulted(iso: isolated (any Actor)? = #isolation) {}
 //   Check that we emit #isolation correctly in closures.
 // CHECK-LABEL: // closure #1 in containsClosure()
 // CHECK-NEXT:  // Isolation: caller_isolation_inheriting
-// CHECK-LABEL: sil private @$s4test15containsClosureyyFyyYaYCcfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK-LABEL: sil private @$s4test15containsClosureyyFyyYaYCcfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK:       bb0(%0 : $Builtin.ImplicitActor):
 // CHECK:       [[ACTOR:%.*]] = implicitactor_to_opaqueisolation_cast %0
 // CHECK-NEXT:    // function_ref take(iso:)
@@ -138,7 +138,7 @@ func hasNestedDefer() async {
 
 // CHECK-LABEL: // $defer #1 () in $defer #1 () in hasNestedDefer()
 // CHECK-NEXT:  // Isolation: caller_isolation_inheriting
-// CHECK-NEXT: sil private @$s4test14hasNestedDeferyyYaF6$deferL_yyFACL_yyF : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK-NEXT: sil private @$s4test14hasNestedDeferyyYaF6$deferL_yyFACL_yyF : $@convention(thin) @caller_isolated (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK:       bb0(%0 : $Builtin.ImplicitActor):
 // CHECK-NEXT:    [[ACTOR:%.*]] = implicitactor_to_opaqueisolation_cast %0
 // CHECK-NEXT:    // function_ref take(iso:)

@@ -1926,6 +1926,13 @@ ManglingError Remangler::mangleImplEscaping(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError
+Remangler::mangleImplNonisolatedNonsendingIsolation(Node *node,
+                                                    unsigned depth) {
+  Buffer << 'N';
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
   Buffer << 'A';
   return ManglingError::Success;
@@ -2134,6 +2141,9 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         break;
       case Node::Kind::ImplErasedIsolation:
         Buffer << 'A';
+        break;
+      case Node::Kind::ImplNonisolatedNonsendingIsolation:
+        Buffer << 'N';
         break;
       case Node::Kind::ImplSendingResult:
         Buffer << 'T';

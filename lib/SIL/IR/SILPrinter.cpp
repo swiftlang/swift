@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrintOptions.h"
@@ -1843,6 +1844,9 @@ public:
     }
     switch (fnType->getIsolation().getKind()) {
     case SILFunctionTypeIsolation::Unknown:
+      break;
+    case SILFunctionTypeIsolation::NonisolatedNonsending:
+      *this << "[nonisolated_nonsending] ";
       break;
     case SILFunctionTypeIsolation::Erased:
       *this << "[isolated_any] ";

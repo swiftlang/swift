@@ -955,8 +955,7 @@ public:
   }
 
   bool isCallerIsolationInheriting() const {
-    auto isolation = getActorIsolation();
-    return isolation && isolation->isCallerIsolationInheriting();
+    return getSubstCalleeType()->hasNonisolatedNonsendingIsolation();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

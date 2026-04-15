@@ -2423,6 +2423,10 @@ NodePointer Demangler::demangleImplFunctionType() {
   if (nextIf('A'))
     type->addChild(createNode(Node::Kind::ImplErasedIsolation), *this);
 
+  if (nextIf('N'))
+    type->addChild(createNode(Node::Kind::ImplNonisolatedNonsendingIsolation),
+                   *this);
+
   switch ((MangledDifferentiabilityKind)peekChar()) {
   case MangledDifferentiabilityKind::Normal:  // 'd'
   case MangledDifferentiabilityKind::Linear:  // 'l'

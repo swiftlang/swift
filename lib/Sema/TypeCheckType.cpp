@@ -36,6 +36,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -4975,7 +4976,9 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   bool unimplementable = claim<UnimplementableTypeAttr>(attrs);
   auto isolation = SILFunctionTypeIsolation::forUnknown();
 
-  if (auto isolatedAttr = claim<IsolatedTypeAttr>(attrs)) {
+  if (claim<CallerIsolatedTypeAttr>(attrs)) {
+    isolation = SILFunctionTypeIsolation::forNonisolatedNonsending();
+  } else if (auto isolatedAttr = claim<IsolatedTypeAttr>(attrs)) {
     switch (isolatedAttr->getIsolationKind()) {
     case IsolatedTypeAttr::IsolationKind::Dynamic:
       if (representation != SILFunctionType::Representation::Thick) {
