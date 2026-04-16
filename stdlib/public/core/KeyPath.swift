@@ -734,7 +734,7 @@ public class ReferenceWritableKeyPath<
           let (rawComponent, optNextType) = unsafe buffer.next()
           _internalInvariant(optNextType != nil,
                      "reference prefix should not go to end of buffer")
-          let nextType = optNextType._unsafelyUnwrappedUnchecked
+          let nextType = unsafe optNextType._unsafelyUnwrappedUnchecked
 
           func projectNew<New>(_: New.Type) {
             func projectCurrent<Current>(_: Current.Type) {
