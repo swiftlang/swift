@@ -20,6 +20,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 
 #include "swift/Basic/APIntMap.h"
@@ -198,7 +199,7 @@ namespace {
           Spaces({}) {}
 
       static Space forType(Type T, DeclName NameForPrinting) {
-        if (T->isStructurallyUninhabited())
+        if (isEffectivelyUninhabited(T))
           return Space();
         return Space(T, NameForPrinting);
       }
@@ -808,6 +809,7 @@ namespace {
           arr.push_back(Space::forBool(true));
           arr.push_back(Space::forBool(false));
         } else if (auto *E = tp->getEnumOrBoundGenericEnum()) {
+          LLVM_DEBUG(llvm::dbgs() << "decomposing enum disjuncts...");
           // Look into each case of the enum and decompose it in turn.
           auto children = E->getAllElements();
           llvm::transform(
@@ -855,8 +857,10 @@ namespace {
               });
 
           if (!E->treatAsExhaustiveForDiags(DC)) {
+            LLVM_DEBUG(llvm::dbgs() << "!treatAsExhaustiveForDiags\n");
             arr.push_back(Space::forUnknown(/*allowedButNotRequired*/false));
           } else if (!E->getAttrs().hasAttribute<FrozenAttr>()) {
+            LLVM_DEBUG(llvm::dbgs() << "!hasAttribute<FrozenAttr>\n");
             arr.push_back(Space::forUnknown(/*allowedButNotRequired*/true));
           }
 
@@ -973,11 +977,81 @@ namespace {
       }
     }
 
+    static bool isEffectivelyUninhabited(Type T) {
+      SmallPtrSet<TypeBase *, 4> visitingSet;
+      return computeIsEffectivelyUninhabited(T, visitingSet);
+    }
+
+    static bool
+    computeIsEffectivelyUninhabited(Type T,
+                                    SmallPtrSetImpl<TypeBase *> &visitingSet) {
+      if (T->isStructurallyUninhabited())
+        return true;
+
+      // Guard against cases where we could recursively cycle back and attempt
+      // to reentrantly evaluate the same type. If this occurs, there's
+      // (presumably) no way to construct the type, so treat it as uninhabited.
+      // TODO: better convince myself assertion is true...
+      const auto CanTy = T->getCanonicalType();
+      if (!visitingSet.insert(CanTy.getPointer()).second)
+        return true;
+      SWIFT_DEFER { visitingSet.erase(CanTy.getPointer()); };
+
+      // Recurse over tuples.
+      if (auto *TTy = T->getAs<TupleType>())
+        for (auto eltTy : TTy->getElementTypes())
+          if (computeIsEffectivelyUninhabited(eltTy, visitingSet))
+            return true;
+
+      // Only evaluate enums for now.
+      auto *E = T->getEnumOrBoundGenericEnum();
+      if (!E)
+        return false;
+
+      // Imported C/@objc enums can hold any value of their raw type.
+      // TODO: is this logic correct?
+      if (E->hasClangNode())
+        return false;
+
+      // An enum is effectively uninhabited iff every non-unavailable case has
+      // at least one (effectively) uninhabited payload element.
+      for (auto *eed : E->getAllElements()) {
+        // TODO: what's the right handling of unavailable cases?
+        if (eed->isUnavailable())
+          continue;
+
+        // TODO: what about enum Z: Never {}?
+        // Is that possible?
+        if (!eed->hasAssociatedValues())
+          return false; // payload-less case is always constructible
+
+        bool anyCasePayloadUninhabited = false;
+        for (auto &param : eed->getCaseConstructorParams()) {
+          // TODO: should this use the canType?
+          auto payloadTy =
+              CanTy->getTypeOfMember(eed, param.getParameterType());
+          if (computeIsEffectivelyUninhabited(payloadTy, visitingSet)) {
+            anyCasePayloadUninhabited = true;
+            break;
+          }
+        }
+
+        // If none of the payloads were uninhabited, it means the case itself is
+        // constructible, so we're done: the type is not uninhabited.
+        if (!anyCasePayloadUninhabited)
+          return false;
+      }
+
+      LLVM_DEBUG(llvm::dbgs() << "isEffectivelyUninhab'd: true\n");
+      // Every case had an uninhabited payload.
+      return true;
+    }
+
     void checkExhaustiveness(bool limitedChecking) {
-      // If the type of the scrutinee is uninhabited, we're already dead.
-      // Allow any well-typed patterns through.
+      // If the scrutinee's type is (effectively) uninhabited, we're already
+      // dead. Allow any well-typed patterns through.
       auto subjectType = Switch->getSubjectExpr()->getType();
-      if (subjectType && subjectType->isStructurallyUninhabited()) {
+      if (subjectType && isEffectivelyUninhabited(subjectType)) {
         return;
       }
 
@@ -1039,11 +1113,17 @@ namespace {
       }
 
       Space totalSpace = Space::forType(subjectType, Identifier());
+      LLVM_DEBUG(llvm::dbgs() << "TOTAL SPACE:\n");
+      LLVM_DEBUG(totalSpace.dump());
       Space coveredSpace = Space::forDisjunct(spaces);
+      LLVM_DEBUG(llvm::dbgs() << "COVRD SPACE:\n");
+      LLVM_DEBUG(coveredSpace.dump());
 
       unsigned minusCount
         = Context.TypeCheckerOpts.SwitchCheckingInvocationThreshold;
       auto diff = totalSpace.minus(coveredSpace, DC, &minusCount);
+      LLVM_DEBUG(llvm::dbgs() << "DIFF:\n");
+      LLVM_DEBUG(if (diff) diff.value().dump());
       if (!diff) {
         diagnoseMissingCases(RequiresDefault::SpaceTooLarge, Space(),
                              unknownCase);
@@ -1051,6 +1131,8 @@ namespace {
       }
 
       auto uncovered = diff.value();
+      LLVM_DEBUG(llvm::dbgs() << "UNCOVRD:\n");
+      LLVM_DEBUG(uncovered.dump());
 
       // Account for unknown cases. If the developer wrote `unknown`, they're
       // all handled; otherwise, we ignore the ones that were added for enums
@@ -1163,6 +1245,7 @@ namespace {
               theEnum->getAttrs().hasAttribute<NonexhaustiveAttr>();
         }
 
+        LLVM_DEBUG(llvm::dbgs() << "emitting unknown case diag\n");
         auto diag =
             DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
                         subjectType, shouldIncludeFutureVersionComment);
