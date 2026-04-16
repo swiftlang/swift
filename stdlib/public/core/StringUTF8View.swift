@@ -605,7 +605,7 @@ extension String.UTF8View {
 
     let scalar = _guts.foreignErrorCorrectedScalar(
       startingAt: idx.strippingTranscoding).0
-    let encoded = Unicode.UTF8.encode(scalar)._unsafelyUnwrappedUnchecked
+    let encoded = unsafe Unicode.UTF8.encode(scalar)._unsafelyUnwrappedUnchecked
     _internalInvariant(idx.transcodedOffset < 1+encoded.count)
 
     return encoded[
