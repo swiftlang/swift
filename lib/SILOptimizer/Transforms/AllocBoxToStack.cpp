@@ -901,6 +901,9 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
+  if (auto isolation = Orig->getActorIsolation()) {
+    Fn->setActorIsolation(*isolation);
+  }
   if (!Orig->hasOwnership()) {
     Fn->setOwnershipEliminated();
   }

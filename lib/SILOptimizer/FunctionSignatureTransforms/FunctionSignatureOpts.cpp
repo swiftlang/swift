@@ -573,6 +573,9 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
       NewF->addSemanticsAttr(Attr);
   }
 
+  if (auto isolation = F->getActorIsolation())
+    NewF->setActorIsolation(*isolation);
+
   // Do the last bit of work to the newly created optimized function.
   DeadArgumentFinalizeOptimizedFunction();
   ArgumentExplosionFinalizeOptimizedFunction();

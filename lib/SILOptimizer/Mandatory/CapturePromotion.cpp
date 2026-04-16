@@ -476,6 +476,8 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
       orig->getDebugScope());
   for (auto &attr : orig->getSemanticsAttrs())
     fn->addSemanticsAttr(attr);
+  if (auto isolation = orig->getActorIsolation())
+    fn->setActorIsolation(*isolation);
   return fn;
 }
 

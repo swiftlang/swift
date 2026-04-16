@@ -1162,8 +1162,8 @@ bool UseAfterSendDiagnosticInferrer::initForIsolatedPartialApply(
   auto *diagnosticOp = diagnosticPair->first;
 
   ApplyIsolationCrossing crossing(
-      *op->getFunction()->getActorIsolation(),
-      *diagnosticOp->getFunction()->getActorIsolation());
+      op->getFunction()->getActorIsolation().value(),
+      diagnosticOp->getFunction()->getActorIsolation().value());
 
   auto &state = sendingOpToStateMap.get(sendingOp);
   if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
@@ -2078,8 +2078,8 @@ bool SentNeverSendableDiagnosticEmitter::initForIsolatedPartialApply(
   auto *diagnosticOp = diagnosticPair->first;
 
   ApplyIsolationCrossing crossing(
-      *op->getFunction()->getActorIsolation(),
-      *diagnosticOp->getFunction()->getActorIsolation());
+      op->getFunction()->getActorIsolation().value(),
+      diagnosticOp->getFunction()->getActorIsolation().value());
 
   // We do not need to worry about failing to infer a name here since we are
   // going to be returning some form of a SILFunctionArgument which is always

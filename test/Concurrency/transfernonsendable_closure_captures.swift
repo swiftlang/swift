@@ -1362,3 +1362,27 @@ func testNestedClosuresMixedSendability() {
     }
   }
 }
+
+// Inner closure in this example gets specialized and it's important to make sure that it gets the right isolation
+// and the reference to `ns` doesn't get diagnosed.
+func testCaptureWithClosureSpecialization() {
+  @MainActor func test(_: @escaping @MainActor () async -> Void) async {}
+
+  @MainActor
+  class Test {
+    func compute() async {
+      var ns: KlassNonsendable? = .init()
+      // expected-warning@-1 {{variable 'ns' was never mutated; consider changing to 'let' constant}}
+
+      await test {
+        if let ns {
+          Task {
+            await Self.takesNS(ns)
+          }
+        }
+      }
+    }
+
+    static func takesNS(_: KlassNonsendable) async {}
+  }
+}

@@ -45,6 +45,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:old-suppressed-associatedtypes>
 - <doc:module-version-missing>
 - <doc:oslog>
+- <doc:option-obsoleted-by-module-selectors>
 - <doc:result-builder-methods>
 - <doc:semantic-copies>
 - <doc:strict-language-features>
@@ -83,6 +84,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:multiple-inheritance>
 - <doc:nominal-types>
 - <doc:oslog>
+- <doc:option-obsoleted-by-module-selectors>
 - <doc:exclusivity-violation>
 - <doc:performance-hints>
 - <doc:property-wrapper-requirements>
