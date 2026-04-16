@@ -106,6 +106,47 @@ extension Int {
 
 extension Int.TypealiasInInternalUsesOnly { } // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
 
+protocol InternalProtocolWithImportedWitnesses {
+  var memberInInternalUsesOnly: Int { get }
+  var memberInInternalUsesOnlyDefaultedImport: Int { get }
+  var memberInMixedUses: Int { get }
+  var memberInInternalUsesOnlyReexported: Int { get }
+  var memberInInternalUsesOnlySPIOnly: Int { get }
+  var memberInInternalUsesOnlyDefaultedImportSPIOnly: Int { get }
+  var memberInInternalUsesOnlyTransitivelyImported: Int { get }
+}
+
+extension Int: InternalProtocolWithImportedWitnesses { }
+// expected-note@-1 {{property 'memberInInternalUsesOnlyReexported' from 'InternalUsesOnlyReexported' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
+// expected-note@-2 {{property 'memberInInternalUsesOnlyDefaultedImport' from 'InternalUsesOnlyDefaultedImport' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
+// expected-note@-3 {{property 'memberInMixedUses' from 'MixedUses' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
+// expected-note@-4 {{property 'memberInInternalUsesOnlyDefaultedImportSPIOnly' from 'InternalUsesOnlyDefaultedImportSPIOnly' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
+// expected-note@-5 {{property 'memberInInternalUsesOnly' from 'InternalUsesOnly' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
+// expected-note@-6 {{property 'memberInInternalUsesOnlyTransitivelyImported' from 'InternalUsesOnlyTransitivelyImported' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
+// expected-note@-7 {{property 'memberInInternalUsesOnlySPIOnly' from 'InternalUsesOnlySPIOnly' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
+
+package protocol PackageProtocolWithImportedWitnesses {
+  var memberInPackageUsesOnly: Int { get }
+  var memberInMixedUses: Int { get }
+}
+
+extension Int: PackageProtocolWithImportedWitnesses { }
+// expected-note@-1 {{property 'memberInPackageUsesOnly' from 'PackageUsesOnly' used to satisfy a requirement of protocol 'PackageProtocolWithImportedWitnesses'}}
+// expected-note@-2 {{property 'memberInMixedUses' from 'MixedUses' used to satisfy a requirement of protocol 'PackageProtocolWithImportedWitnesses'}}
+
+public protocol PublicProtocolWithImportedWitnesses {
+  var memberInPublicUsesOnly: Int { get }
+  var memberInPublicUsesOnlyDefaultedImport: Int { get }
+  var memberInMixedUses: Int { get }
+  var memberInPublicUsesOnlySPIOnly: Int { get }
+}
+
+extension Int: PublicProtocolWithImportedWitnesses { }
+// expected-note@-1 {{property 'memberInPublicUsesOnlySPIOnly' from 'PublicUsesOnlySPIOnly' used to satisfy a requirement of protocol 'PublicProtocolWithImportedWitnesses'}}
+// expected-note@-2 {{property 'memberInPublicUsesOnly' from 'PublicUsesOnly' used to satisfy a requirement of protocol 'PublicProtocolWithImportedWitnesses'}}
+// expected-note@-3 {{property 'memberInMixedUses' from 'MixedUses' used to satisfy a requirement of protocol 'PublicProtocolWithImportedWitnesses'}}
+// expected-note@-4 {{property 'memberInPublicUsesOnlyDefaultedImport' from 'PublicUsesOnlyDefaultedImport' used to satisfy a requirement of protocol 'PublicProtocolWithImportedWitnesses'}}
+
 //--- imports.swift
 
 internal import InternalUsesOnly

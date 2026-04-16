@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_MemberImportVisibility
 
 import members_C
-// expected-member-visibility-note 27{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
+// expected-member-visibility-note 28{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -137,8 +137,16 @@ class DerivedFromClassInC: DerivedClassInC {
   override func methodInC() {}
 }
 
-// FIXME: Visibility of defaultedRequirementInB() should be diagnosed (rdar://154237873)
-struct ConformsToProtocolInA: ProtocolInA {} // expected-member-visibility-error{{type 'ConformsToProtocolInA' does not conform to protocol 'ProtocolInA'}} expected-member-visibility-note {{add stubs for conformance}}{{44-44=\n    func defaultedRequirementInB() {\n        <#code#>\n    \}\n}}
+struct ConformsToProtocolInA: ProtocolInA {}
+// expected-member-visibility-error@-1{{type 'ConformsToProtocolInA' does not conform to protocol 'ProtocolInA'}}
+// expected-member-visibility-error@-2{{instance method 'defaultedRequirementInB()' used to satisfy a requirement of protocol 'ProtocolInA' is not available due to missing import of defining module 'members_B'}}
+
+// FIXME: The missing import for WitnessedInB should be diagnosed (rdar://154237873)
+extension StructWithWitnessesForProtocolWithAssociatedTypesInA: ProtocolWithAssociatedTypesInA {}
+// expected-warning@-1{{extension declares a conformance of imported type 'StructWithWitnessesForProtocolWithAssociatedTypesInA' to imported protocol 'ProtocolWithAssociatedTypesInA'; this will not behave correctly if the owners of 'members_A' introduce this conformance in the future}}
+// expected-note@-2{{add '@retroactive' to silence this warning}}
+// expected-member-visibility-error@-3{{type 'StructWithWitnessesForProtocolWithAssociatedTypesInA' does not conform to protocol 'ProtocolWithAssociatedTypesInA'}}
+// expected-member-visibility-note@-4{{add stubs for conformance}}{{97-97=\n    public typealias WitnessedInB = <#type#>\n}}
 
 func testInheritedMethods(
   a: BaseClassInA,

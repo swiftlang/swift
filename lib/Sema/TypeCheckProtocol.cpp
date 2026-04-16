@@ -1506,13 +1506,16 @@ WitnessChecker::WitnessChecker(ASTContext &ctx, ProtocolDecl *proto,
     : Context(ctx), Proto(proto), Adoptee(adoptee), DC(dc) {}
 
 static void
-lookupValueWitnessesViaImplementsAttr(
-    DeclContext *DC, ValueDecl *req, SmallVector<ValueDecl *, 4> &witnesses) {
+lookupValueWitnessesViaImplementsAttr(DeclContext *DC, ValueDecl *req,
+                                      SmallVector<ValueDecl *, 4> &witnesses,
+                                      bool ignoreMissingImports) {
 
   auto name = req->createNameRef();
   auto *nominal = DC->getSelfNominalTypeDecl();
 
   NLOptions subOptions = (NL_ProtocolMembers | NL_IncludeAttributeImplements);
+  if (ignoreMissingImports)
+    subOptions |= NL_IgnoreMissingImports;
 
   nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
 
@@ -1557,7 +1560,8 @@ static bool contextMayExpandOperator(
 }
 
 SmallVector<ValueDecl *, 4>
-swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames) {
+swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req,
+                            bool *ignoringNames, bool ignoreMissingImports) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
   assert(req->isProtocolRequirement() || isa<AccessorDecl>(req));
 
@@ -1565,7 +1569,8 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
 
   // Do an initial check to see if there are any @_implements remappings
   // for this requirement.
-  lookupValueWitnessesViaImplementsAttr(DC, req, witnesses);
+  lookupValueWitnessesViaImplementsAttr(DC, req, witnesses,
+                                        ignoreMissingImports);
 
   auto reqName = req->createNameRef();
   auto reqBaseName = reqName.withoutArgumentLabels(DC->getASTContext());
@@ -1601,8 +1606,10 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
     // extensions, including those that match only by base name. Take care not
     // to restate them in the resulting list, or else an otherwise valid
     // conformance will become ambiguous.
-    const NLOptions options =
-        doUnqualifiedLookup ? NLOptions(0) : NL_ProtocolMembers;
+    NLOptions options = doUnqualifiedLookup ? NLOptions(0) : NL_ProtocolMembers;
+
+    if (ignoreMissingImports)
+      options |= NL_IgnoreMissingImports;
 
     SmallVector<ValueDecl *, 4> lookupResults;
     bool addedAny = false;
@@ -1662,9 +1669,15 @@ bool WitnessChecker::findBestWitness(
                                bool &doNotDiagnoseMatches) {
   enum Attempt {
     Regular,
+    IgnoreMissingImports,
     OperatorsFromOverlay,
     Done
   };
+
+  const bool ignoreMissingImportsDuringRegularLookup =
+      DC->getAsDecl()->isImplicit() ||
+      !Context.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                   /*allowMigration=*/true);
 
   bool anyFromUnconstrainedExtension;
   numViable = 0;
@@ -1673,7 +1686,16 @@ bool WitnessChecker::findBestWitness(
     SmallVector<ValueDecl *, 4> witnesses;
     switch (attempt) {
     case Regular:
-      witnesses = lookupValueWitnesses(DC, requirement, ignoringNames);
+      witnesses = lookupValueWitnesses(DC, requirement, ignoringNames,
+                                       ignoreMissingImportsDuringRegularLookup);
+      break;
+    case IgnoreMissingImports:
+      if (ignoreMissingImportsDuringRegularLookup)
+        continue;
+
+      // Try again, this time ignoring missing imports to find more candidates.
+      witnesses = lookupValueWitnesses(DC, requirement, ignoringNames,
+                                       /*ignoreMissingImports=*/true);
       break;
     case OperatorsFromOverlay: {
       // If we have a Clang declaration, the matching operator might be in the
@@ -2024,6 +2046,10 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
       return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
     }
   }
+
+  // Check whether the witness has been imported appropriately.
+  if (shouldDiagnoseMissingImportForMember(match.Witness, DC))
+    return CheckKind::RequiresMissingImport;
 
   return CheckKind::Success;
 }
@@ -4722,6 +4748,21 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                            requirement);
           });
         break;
+
+      case CheckKind::RequiresMissingImport: {
+        // In migrate mode the conformance is still valid (it's just a warning
+        // to add the import), so don't mark it as an error.
+        bool isError = !Context.LangOpts.isMigratingToFeature(
+            Feature::MemberImportVisibility);
+        getASTContext().addDelayedConformanceDiag(
+            Conformance, isError,
+            [witness](NormalProtocolConformance *conformance) {
+              maybeDiagnoseMissingImportForConformanceWitness(
+                  witness, conformance->getProtocol(),
+                  conformance->getDeclContext(), conformance->getLoc());
+            });
+        break;
+      }
     }
 
     if (auto *classDecl = DC->getSelfClassDecl()) {

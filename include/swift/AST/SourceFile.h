@@ -55,6 +55,40 @@ enum class RestrictedImportKind {
 /// Import that limits the access level of imported entities.
 using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
 
+/// Carries information about a single use of a member declaration that may
+/// require a missing import to be diagnosed. An instance is created at each
+/// use site and later processed by \c diagnoseMissingImports().
+///
+/// When the member is a conformance witness, \c getProtocol() returns the
+/// protocol whose requirement the witness satisfies, enabling a more
+/// descriptive diagnostic.
+class MissingImportForMemberDiag {
+  SourceLoc loc;
+  const ProtocolDecl *protocol;
+  DiagnosticBehavior behaviorLimit;
+
+public:
+  /// Create a diagnostic for a use of \p decl at \p loc.
+  ///
+  /// \param loc         The source location of the use.
+  /// \param behaviorLimit  An optional limit on the diagnostic's severity.
+  /// \param protocol    If non-null, the protocol whose requirement the used
+  ///                    member satisfies as a witness.
+  MissingImportForMemberDiag(SourceLoc loc, DiagnosticBehavior behaviorLimit,
+                             const ProtocolDecl *protocol)
+      : loc(loc), protocol(protocol), behaviorLimit(behaviorLimit) {}
+
+  /// The source location of the member use.
+  SourceLoc getLoc() const { return loc; }
+
+  /// An optional upper bound on how severe the emitted diagnostic may be.
+  DiagnosticBehavior getBehaviorLimit() const { return behaviorLimit; }
+
+  /// If this use is a conformance witness, the protocol whose requirement
+  /// the witness satisfies; otherwise, \c nullptr.
+  const ProtocolDecl *getProtocol() const { return protocol; }
+};
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -137,8 +171,9 @@ private:
 
   /// Associates a list of source locations to the member declarations that must
   /// be diagnosed as being out of scope due to a missing import.
-  using DelayedMissingImportForMemberDiags = llvm::SmallDenseMap<
-      const ValueDecl *, std::vector<std::pair<SourceLoc, DiagnosticBehavior>>>;
+  using DelayedMissingImportForMemberDiags =
+      llvm::SmallDenseMap<const ValueDecl *,
+                          std::vector<MissingImportForMemberDiag>>;
   DelayedMissingImportForMemberDiags MissingImportForMemberDiagnostics;
 
   /// A unique identifier representing this file; used to mark private decls
@@ -522,10 +557,9 @@ public:
 
   /// Add a source location for which a delayed missing import for member
   /// diagnostic should be emited.
-  void addDelayedMissingImportForMemberDiagnostic(const ValueDecl *decl,
-                                                  SourceLoc loc,
-                                                  DiagnosticBehavior limit) {
-    MissingImportForMemberDiagnostics[decl].push_back({loc, limit});
+  void addDelayedMissingImportForMemberDiagnostic(
+      const ValueDecl *decl, const MissingImportForMemberDiag diag) {
+    MissingImportForMemberDiagnostics[decl].push_back(diag);
   }
 
   DelayedMissingImportForMemberDiags

@@ -245,6 +245,9 @@ enum class CheckKind : unsigned {
   /// The witness is a deprecated default implementation provided by the
   /// protocol.
   DefaultWitnessDeprecated,
+
+  /// The witness is defined in a module that hasn't been imported.
+  RequiresMissingImport,
 };
 
 /// Describes the suitability of the chosen witness for
