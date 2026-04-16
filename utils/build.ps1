@@ -2436,7 +2436,7 @@ function Patch-mimalloc() {
     [hashtable]$Platform
   )
 
-  $BuildSuffix = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
+  $BuildSuffix = if ($BuildPlatform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
 
   $Tools = @(
     "swift.exe",
