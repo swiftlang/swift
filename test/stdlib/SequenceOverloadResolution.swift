@@ -2,8 +2,8 @@
 
 // REQUIRES: concurrency
 
-// This test verifies that the overload resolution for a type
-// that conforms to both Sequence and AsyncSequence is correct.
+// This test verifies that in an async context, overload resolution
+// is correct for a type that conforms to both Sequence and AsyncSequence.
 // Since generalizing Sequence methods for typed throws, the
 // overload resolution prefers the corresponding AsyncSequence methods
 // which cannot be generalized yet.
@@ -18,7 +18,7 @@ struct DualSequence: Sequence, AsyncSequence, IteratorProtocol, AsyncIteratorPro
 }
 
 @available(SwiftStdlib 5.1, *)
-func testSynchronousOverloadsArePicked() {
+func testSynchronousOverloadsArePicked() async {
   let ds = DualSequence()
 
   _ = ds.contains { _ in false }

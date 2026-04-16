@@ -486,8 +486,8 @@ extension AsyncSequence where Element: Comparable {
   }
 }
 
-// These overloads exist to fix the incorrect overload resolution
-// when a type conforms to both Sequence and AsyncSequence.
+// These overloads exist to fix the incorrect overload resolution in an
+// async context when a type conforms to both Sequence and AsyncSequence.
 // They are now needed as Sequence methods are generalized for
 // typed throws but AsyncSequence methods cannot be generalized yet.
 //
