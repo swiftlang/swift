@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Path.h"
 #include <optional>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace swift {

@@ -22,7 +22,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include <array>
 #include <string_view>
-#include <unordered_map>
 
 namespace swift {
 enum class DiagnosticGroupOptions {
