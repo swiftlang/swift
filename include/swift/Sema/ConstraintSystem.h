@@ -3210,8 +3210,45 @@ public:
                                ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes()
-  bool matchFunctionLifetimes(const LifetimeDependentInterface &func1,
-                              const LifetimeDependentInterface &func2,
+  ///
+  /// Determine whether func1's interface's
+  /// lifetime dependencies are compatible with those specified by func2. If
+  /// they are, and all other aspects of the types are compatible, a function
+  /// with interface func1 can be cast to a type with interface func2.
+  ///
+  /// This is determined according to the Lifetime Subtyping rules in
+  /// ‎docs/ReferenceGuides/LifetimeAnnotation.md.
+  ///
+  /// Examples:
+  ///   struct NE: ~Escapable {}
+  ///   @_lifetime(copy ne0, copy ne1)
+  ///   func copying01(ne0: NE, ne1: NE) -> NE {
+  ///     return ne1
+  ///   }
+  ///   @_lifetime(copy ne0)
+  ///   func copying0(ne0: NE, ne1: NE) -> NE {
+  ///     return ne0
+  ///   }
+  ///   func takeCopying01(
+  ///     f: @_lifetime(copy ne0, copy ne1)
+  ///       (_ ne0: NE, _ ne1: NE) -> NE) {}
+  ///   func takeCopying0(
+  ///     f: @_lifetime(copy ne0)
+  ///       (_ ne0: NE, _ ne1: NE) -> NE) {}
+  ///
+  ///   takeCopying0(f: copying0)    // OK: Dependencies match exactly.
+  ///   takeCopying01(f: copying01)  // OK: Dependencies match exactly.
+  ///   takeCopying01(f: copying0)   // OK: No dependencies are dropped.
+  ///   takeCopying0(f: copying01)   // Error: The dependence on the second
+  ///   parameter is dropped.
+  ///
+  /// If lifetimes do not match, generate a set of constraints that would make
+  /// make func1's lifetimes match func2's if satisfied.
+  ///
+  /// Return false iff matching failed and compensatory constraints could not be
+  /// generated.
+  bool matchFunctionLifetimes(FunctionType *func1,
+                              FunctionType *func2,
                               ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up a value to a
@@ -3599,6 +3636,12 @@ private:
 
   /// Attempt to simplify the given EscapableFunctionOf constraint.
   SolutionKind simplifyEscapableFunctionOfConstraint(
+                                         Type type1, Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify the given LifetimeSubset constraint.
+  SolutionKind simplifyLifetimeSubsetConstraint(
                                          Type type1, Type type2,
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);

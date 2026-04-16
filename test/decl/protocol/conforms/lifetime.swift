@@ -280,9 +280,26 @@ public struct CNEGetCopy<T: ~Escapable>: ~Escapable {
 
   @_lifetime(copy self)
   func get() -> T { ne }
+
+  @_lifetime(borrow self, copy arg)
+  func getArg(arg: T) -> NE { fatalError() }
 }
 extension CNEGetCopy: Escapable where T: Escapable {}
 extension CNEGetCopy: IGet { } // OK: Dependencies are ignored when the target is Escapable.
+
+protocol ImmortalGet {
+  associatedtype NET: ~Escapable
+  @_lifetime(immortal)
+  func get() -> NET
+}
+extension CNEGetCopy: ImmortalGet { } // OK: Copied dependencies are ignored where Self : Escapable.
+
+protocol IgnoreCopyEscapable {
+  associatedtype T: ~Escapable
+  @_lifetime(borrow self)
+  func getArg(arg: T) -> NE
+}
+extension CNEGetCopy: IgnoreCopyEscapable where T: Escapable {} // OK: Copy dependencies are ignored when the source is Escapable
 
 public struct CNEGetBorrow<T: ~Escapable>: ~Escapable {
   let e: T
@@ -314,6 +331,20 @@ struct S157801454 : P157801454 { // expected-error{{type 'S157801454' does not c
     fatalError()
   }
 }
+
+// MARK: rdar://173168045, Associated type inference with lifetimes
+protocol IterProtocol<Element> {
+  associatedtype Element
+  mutating func next() -> Self.Element?
+}
+
+struct Iter<T: ~Escapable>: ~Escapable {
+  @_lifetime(copy self)
+  mutating func next() -> T? { fatalError() }
+}
+extension Iter: Escapable where T: Escapable {}
+extension Iter: IterProtocol where T: Escapable {} // OK: Dependencies are ignored when the target is Escapable
+
 
 // MARK: Simultaneous conformance to conflicting protocols
 protocol CopyF: ~Escapable {

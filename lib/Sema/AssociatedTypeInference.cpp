@@ -2145,12 +2145,15 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
 }
 
 /// Remove the 'self' type from the given type, if it's a method type.
-static Type removeSelfParam(ValueDecl *value, Type type) {
+/// Returns a pair: (self type if present, interface type)
+static std::pair<std::optional<Type>, Type> removeSelfParam(ValueDecl *value, Type type) {
   if (value->hasCurriedSelf()) {
-    return type->castTo<AnyFunctionType>()->getResult();
+    auto *aft = type->castTo<AnyFunctionType>();
+    ASSERT(aft->getNumParams() == 1 && "A method's type has 1 parameter: the curried self.");
+    return {std::optional(aft->getParams()[0].getPlainType()), aft->getResult()};
   }
 
-  return type;
+  return {std::nullopt, type};
 }
 
 InferredAssociatedTypesByWitnesses
@@ -2322,7 +2325,9 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
   InferredAssociatedTypesByWitness inferred;
   inferred.Witness = witness;
 
-  auto reqType = removeSelfParam(req, req->getInterfaceType());
+  Type reqType;
+  std::optional<Type> reqSelf;
+  std::tie(reqSelf, reqType) = removeSelfParam(req, req->getInterfaceType());
   Type witnessType;
 
   if (witness->isRecursiveValidation()) {
@@ -2343,7 +2348,8 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
     LLVM_DEBUG(llvm::dbgs() << "Witness type for matching is "
                             << witnessType << "\n";);
 
-    witnessType = removeSelfParam(witness, witnessType);
+    std::optional<Type> witnessSelf;
+    std::tie(witnessSelf, witnessType) = removeSelfParam(witness, witnessType);
 
     Type reqThrownError;
     Type witnessThrownError;
@@ -2372,8 +2378,14 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
                                                      witnessThrownError);
     }
 
-    return MatchWitnessTypes{reqType, witnessType, reqThrownError,
-                             witnessThrownError};
+    return MatchWitnessTypes{.requirement = reqType,
+                             .witness = witnessType,
+                             .requirementThrows = reqThrownError,
+                             .witnessThrows = witnessThrownError,
+                             // Lifetimes aren't relevant to associated type
+                             // inference, so just pass null lifetime types.
+                             .requirementLifetimeType = Type(),
+                             .witnessLifetimeType = Type()};
   };
 
   /// Visits a requirement type to match it to a potential witness for
@@ -2527,11 +2539,10 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
   };
 
   const auto matchLifetimes =
-      [&](const LifetimeDependentInterface &witnessInterface,
-          const LifetimeDependentInterface &reqInterface)
+      [&](Type witnessInterface, Type reqInterface)
       -> std::optional<RequirementMatch> {
-    if (!witnessInterface.canConvertTo(reqInterface))
-      return RequirementMatch(witness, MatchKind::LifetimeConflict);
+    // Lifetimes should not be necessary to match type witnesses, so do not
+    // check whether they match.
     return std::nullopt;
   };
 

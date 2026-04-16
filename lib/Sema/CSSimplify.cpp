@@ -34,6 +34,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
@@ -2121,6 +2122,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
   case ConstraintKind::LValueObject:
+  case ConstraintKind::LifetimeSubset:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2484,6 +2486,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
   case ConstraintKind::LValueObject:
+  case ConstraintKind::LifetimeSubset:
     return true;
   }
 
@@ -3098,36 +3101,13 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
 }
 
 bool ConstraintSystem::matchFunctionLifetimes(
-    const LifetimeDependentInterface &from,
-    const LifetimeDependentInterface &to, ConstraintLocatorBuilder locator) {
+    FunctionType *from,
+    FunctionType *to, ConstraintLocatorBuilder locator) {
 
-  // A function with a lifetime dependency in a generic context is equivalent to
-  // one without that lifetime dependency when the substituted type is
-  // Escapable.
-  //
-  // There is also a subtype relationship from less-constrained to
-  // more-constrained lifetime dependencies (see
-  // LifetimeDependentInterface::canConvertTo).
-  if (!from.canConvertTo(to)) {
-    auto escapable = getASTContext()
-                         .getProtocol(KnownProtocolKind::Escapable)
-                         ->getDeclaredType();
-
-    for (auto &fromDep : from.getLifetimeDependencies()) {
-      // If a dependency is present for the same target in both types, then
-      // the dependency must match.
-      if (to.hasTarget(fromDep.getTargetIndex())) {
-        if (!from.canConvertTargetTo(fromDep, to))
-          return false;
-        continue;
-      }
-
-      // If the dependency is absent from the destination type, constrain the
-      // corresponding parameter or result in the source type to be Escapable.
-      addConstraint(ConstraintKind::ConformsTo,
-                    from.getSourceOrTargetType(fromDep.getTargetIndex()),
-                    escapable, locator);
-    }
+  if (!canConvertLifetimeDependencies(from->getLifetimeDependencies(),
+                                      to->getLifetimeDependencies())) {
+    // Attempt to match lifetimes again after type simplification.
+    addConstraint(ConstraintKind::LifetimeSubset, from, to, locator);
   }
   return true;
 }
@@ -3276,6 +3256,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
   case ConstraintKind::LValueObject:
+  case ConstraintKind::LifetimeSubset:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -7363,6 +7344,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::Conjunction:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
+    case ConstraintKind::LifetimeSubset:
     case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
@@ -12844,6 +12826,38 @@ ConstraintSystem::simplifyEscapableFunctionOfConstraint(
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyLifetimeSubsetConstraint(
+    Type type1, Type type2, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+          Constraint::create(*this, ConstraintKind::LifetimeSubset, type1,
+                             type2, getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  };
+
+  type1 = simplifyType(type1);
+  type2 = simplifyType(type2);
+
+  if (type1->hasTypeVariable() || type2->hasTypeVariable())
+    return formUnsolved();
+
+  auto fn1 = type1->getAs<FunctionType>();
+  auto fn2 = type2->getAs<FunctionType>();
+  if (!fn1 || !fn2)
+    return SolutionKind::Error;
+
+  if (!canConvertLifetimeDependencies(fn1->getLifetimeDependencies(),
+                                      fn2->getLifetimeDependencies()))
+    return SolutionKind::Error;
+
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyOpenedExistentialOfConstraint(
                                         Type type1, Type type2,
                                         TypeMatchOptions flags,
@@ -15887,6 +15901,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyEscapableFunctionOfConstraint(first, second,
                                                  subflags, locator);
 
+  case ConstraintKind::LifetimeSubset:
+    return simplifyLifetimeSubsetConstraint(first, second, subflags, locator);
+
   case ConstraintKind::OpenedExistentialOf:
     return simplifyOpenedExistentialOfConstraint(first, second,
                                                  subflags, locator);
@@ -16454,6 +16471,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::EscapableFunctionOf:
     return simplifyEscapableFunctionOfConstraint(
+        constraint.getFirstType(), constraint.getSecondType(), std::nullopt,
+        constraint.getLocator());
+
+  case ConstraintKind::LifetimeSubset:
+    return simplifyLifetimeSubsetConstraint(
         constraint.getFirstType(), constraint.getSecondType(), std::nullopt,
         constraint.getLocator());
 
