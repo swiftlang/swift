@@ -74,7 +74,7 @@ _register("llvm_ranlib", "llvm-ranlib")
 _register("sccache", "sccache")
 _register("swiftc", "swiftc")
 _register("swift_build", "swift-build")
-
+_register("python3", "python3")
 
 class Darwin(Toolchain):
     def __init__(self, sdk, toolchain):
