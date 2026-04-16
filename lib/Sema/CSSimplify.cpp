@@ -6880,7 +6880,13 @@ bool ConstraintSystem::repairFailures(
           auto *overloadTy =
               simplifyType(overload->boundType)->castTo<FunctionType>();
           auto *argList = getArgumentList(argLoc);
-          ASSERT(argList);
+          // If the argument was synthesized by the solver, let's fail. This can
+          // happen when a parameter type is optional and (currently) inference
+          // would try both optional and non-optional bindings for the new
+          // argument which cases a mismatch in one of the conversion cases.
+          if (!argList || argList->size() <= argIdx)
+            return false;
+
           conversionsOrFixes.push_back(AllowArgumentMismatch::create(
               *this, getType(argList->getExpr(argIdx)),
               overloadTy->getParams()[paramIdx].getPlainType(), argLoc));
