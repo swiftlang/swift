@@ -1114,6 +1114,20 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
                                                   void *context);
 
+/// Set whether or not the concurrency library is tracking the time spent
+/// running tasks. Returns the old value.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+__attribute__((__cold__)) bool
+_swift_task_setTimeSpentRunningTracked(bool isTracked);
+
+  /// Get the duration spent running the given task (so far) in nanoseconds.
+///
+/// If `AsyncTask::isTimeSpentRunningTracked()` is `false` (the common case),
+/// task duration isn't tracked and this function returns `false`.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+__attribute__((__cold__)) bool
+_swift_task_getTimeSpentRunning(AsyncTask *task, uint64_t *outNanoseconds);
+
 enum swift_clock_id : int {
   swift_clock_id_continuous = 1,
   swift_clock_id_suspending = 2,
