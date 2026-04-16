@@ -1176,6 +1176,16 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 #endif
   }
 
+  // Task name -- this record MUST be FIRST task record.
+  // All other records pushed after it, will be dropped when the task completes;
+  //
+  // The task name record will be kept until we destroy the task, and therefore
+  // must be pushed onto the stack earlier than records which we intended to pop
+  // during task completion.
+  if (jobFlags.task_hasInitialTaskName()) {
+    task->pushInitialTaskName(taskName);
+  }
+
   // If we're supposed to copy task locals, do so now.
   if (taskCreateFlags.copyTaskLocals()) {
     swift_task_localsCopyTo(task);
@@ -1186,28 +1196,16 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     asyncLet_addImpl(task, asyncLet, !hasAsyncLetResultBuffer);
   }
 
-  // ==== Initial Task records
-  {
-
-    // Task name
-    // This record MUST be pushed before other initial records that should be dropped when the
-    // task completes; The task name record will be kept until we destroy the task, and therefore
-    // must be pushed onto the stack earlier than records which we intended to pop during task completion.
-    if (jobFlags.task_hasInitialTaskName()) {
-      task->pushInitialTaskName(taskName);
-    }
-
-    // Task executor preference
-    // If the task does not have a specific executor set already via create
-    // options, and there is a task executor preference set in the parent, we
-    // inherit it by deep-copying the preference record. if
-    // (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
-    if (jobFlags.task_hasInitialTaskExecutorPreference()) {
-      // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
-      // because the group takes a fast-path when attaching the child record.
-      task->pushInitialTaskExecutorPreference(taskExecutor,
-                                              /*owned=*/taskExecutorIsOwned);
-    }
+  // Task executor preference
+  // If the task does not have a specific executor set already via create
+  // options, and there is a task executor preference set in the parent, we
+  // inherit it by deep-copying the preference record. if
+  // (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
+  if (jobFlags.task_hasInitialTaskExecutorPreference()) {
+    // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
+    // because the group takes a fast-path when attaching the child record.
+    task->pushInitialTaskExecutorPreference(taskExecutor,
+                                            /*owned=*/taskExecutorIsOwned);
   }
 
   // If we're supposed to enqueue the task, do so now.
