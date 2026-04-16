@@ -21,6 +21,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "clang/AST/Mangle.h"
 
 using namespace swift;
@@ -391,6 +392,16 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       F->setAvailabilityForLinkage(*availability);
 
     F->setIsAlwaysWeakImported(decl->isAlwaysWeakImported());
+    if (auto cgModel = decl->getExplicitCodeGenerationModel()) {
+      switch (*cgModel) {
+      case CodeGenerationModel::Interface:
+      case CodeGenerationModel::Implementation:
+        F->setCodeGenerationModel(*cgModel);
+        break;
+      case CodeGenerationModel::Inlinable:
+        break;
+      }
+    }
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();

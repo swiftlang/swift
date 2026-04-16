@@ -25,6 +25,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -802,6 +803,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences,
       markedAsUsed, effect, numAttrs, hasQualifiedOwnership, isWeakImported,
+      codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
       onlyReferencedByDebugInfo;
@@ -811,6 +813,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, markedAsUsed,
       effect, numAttrs, hasQualifiedOwnership, isWeakImported,
+      codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
       onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,
@@ -981,6 +984,11 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setPerfConstraints((PerformanceConstraints)perfConstr);
     fn->setIsAlwaysWeakImported(isWeakImported);
+    if (codeGenerationModel) {
+      fn->setCodeGenerationModel(static_cast<CodeGenerationModel>(codeGenerationModel - 1));
+    } else {
+      fn->setCodeGenerationModel(std::nullopt);
+    }
     fn->setClassSubclassScope(SubclassScope(subclassScope));
     fn->setHasCReferences(bool(hasCReferences));
     fn->setMarkedAsUsed(bool(markedAsUsed));
@@ -4120,6 +4128,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, markedAsUsed,
       effect, numSpecAttrs, hasQualifiedOwnership, isWeakImported,
+      codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
       onlyReferencedByDebugInfo;
@@ -4129,6 +4138,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, markedAsUsed,
       effect, numSpecAttrs, hasQualifiedOwnership, isWeakImported,
+      codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
       onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,

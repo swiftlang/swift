@@ -1475,7 +1475,7 @@ void SILGenModule::emitDifferentiabilityWitness(
     // we can serialize it (the original function itself might be HiddenExternal
     // in this case if we only have declaration without definition).
     auto linkage =
-        originalFunction->markedAsAlwaysEmitIntoClient()
+        originalFunction->isAlwaysEmitIntoClient()
             ? SILLinkage::PublicNonABI
             : stripExternalFromLinkage(originalFunction->getLinkage());
     diffWitness = SILDifferentiabilityWitness::createDefinition(

@@ -76,6 +76,7 @@ namespace swift {
   class ASTPrinter;
   class ASTWalker;
   enum class BuiltinMacroKind: uint8_t;
+  enum class CodeGenerationModel: uint8_t;
   class ConstructorDecl;
   class DestructorDecl;
   class DiagnosticEngine;
@@ -778,7 +779,7 @@ protected:
     HasLazyUnderlyingSubstitutions : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8+1+2,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+2+8+1+2,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -849,8 +850,8 @@ protected:
     /// Whether this module has enabled strict memory safety checking.
     StrictMemorySafety : 1,
 
-    /// Whether this module uses deferred code generation in Embedded Swift.
-    DeferredCodeGen : 1,
+    /// The code generation model used by this module.
+    CodeGenModel : 2,
 
     /// Whether this module was compile with "aggressive" CMO i.e
     /// the flag: -cross-module-optimization.
@@ -1126,6 +1127,21 @@ public:
   /// This can be spelled with @export(interface) or the historical
   /// @_neverEmitIntoClient.
   bool isNeverEmittedIntoClient() const;
+
+  /// Compute the code generation model that was explicitly requested for
+  /// this declaration.
+  ///
+  /// This function queries attributes relevant to the code generation
+  /// model (@export, @inlinable, etc.) but does not apply defaults based
+  /// on Embedded Swift or feature flags.
+  std::optional<CodeGenerationModel>
+  getExplicitCodeGenerationModel() const;
+
+  /// Compute the code generation model for the declaration, combining the
+  /// explicitly-specified information from attributes with defaults
+  /// based on Embedded Swift or feature flags.
+  CodeGenerationModel
+  getEffectiveCodeGenerationModel() const;
 
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 

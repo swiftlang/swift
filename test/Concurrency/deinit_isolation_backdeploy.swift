@@ -12,4 +12,4 @@ class C {
 }
 
 // Make sure this function is available
-// CHECK: sil hidden_external [serialized] [available 12.0.0] @swift_task_deinitOnExecutorMainActorBackDeploy : $@convention(thin) (@owned AnyObject, @convention(thin) (@owned AnyObject) -> (), Builtin.Executor, Builtin.Word) -> ()
+// CHECK: sil hidden_external [serialized] [export_implementation] [available 12.0.0] @swift_task_deinitOnExecutorMainActorBackDeploy : $@convention(thin) (@owned AnyObject, @convention(thin) (@owned AnyObject) -> (), Builtin.Executor, Builtin.Word) -> ()

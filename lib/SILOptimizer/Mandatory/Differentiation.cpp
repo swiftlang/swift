@@ -1154,7 +1154,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
   // HiddenExternal if we only have declaration without definition), we want
   // derivatives to be serialized and do not patch `serializeFunctions`.
   if (orig->getLinkage() == SILLinkage::HiddenExternal &&
-      !orig->markedAsAlwaysEmitIntoClient())
+      !orig->isAlwaysEmitIntoClient())
     serializeFunctions = IsNotSerialized;
 
   // If the JVP doesn't exist, need to synthesize it.

@@ -56,6 +56,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Statistic.h"
@@ -2296,31 +2297,83 @@ bool Decl::isObjCImplementation() const {
 }
 
 bool Decl::isAlwaysEmittedIntoClient() const {
-  // @export(implementation)
-  if (auto exportAttr = getAttrs().getAttribute<ExportAttr>()) {
-    if (exportAttr->exportKind == ExportKind::Implementation)
-      return true;
-  }
-
-  // @_alwaysEmitIntoClient
-  if (getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-    return true;
+  if (auto codeGenModel = getExplicitCodeGenerationModel())
+    return *codeGenModel == CodeGenerationModel::Implementation;
 
   return false;
 }
 
 bool Decl::isNeverEmittedIntoClient() const {
-  // @export(interface)
-  if (auto exportAttr = getAttrs().getAttribute<ExportAttr>()) {
-    if (exportAttr->exportKind == ExportKind::Interface)
-      return true;
-  }
-
-  // @_neverEmitIntoClient
-  if (getAttrs().hasAttribute<NeverEmitIntoClientAttr>())
-    return true;
+  if (auto codeGenModel = getExplicitCodeGenerationModel())
+    return *codeGenModel == CodeGenerationModel::Interface;
 
   return false;
+}
+
+std::optional<CodeGenerationModel>
+Decl::getExplicitCodeGenerationModel() const {
+  bool sawInlinable = false;
+  for (auto attr : getAttrs()) {
+    // @export
+    if (auto exportAttr = dyn_cast<ExportAttr>(attr)) {
+      switch (exportAttr->exportKind) {
+        case ExportKind::Interface:
+          return CodeGenerationModel::Interface;
+
+        case ExportKind::Implementation:
+          return CodeGenerationModel::Implementation;
+      }
+    }
+
+    // @_alwaysEmitIntoClient - historical spelling for @export(implementation)
+    if (isa<AlwaysEmitIntoClientAttr>(attr))
+      return CodeGenerationModel::Implementation;
+
+    // @_neverEmitIntoClient - historical spelling for @export(interface)
+    if (isa<NeverEmitIntoClientAttr>(attr))
+      return CodeGenerationModel::Interface;
+
+    // @inlinable
+    if (isa<InlinableAttr>(attr)) {
+      sawInlinable = true;
+      continue;
+    }
+
+    // @inline(always) implies @inlinable on "public"
+    // (open, public, package) declarations.
+    if (auto inlineAttr = dyn_cast<InlineAttr>(attr)) {
+      if (inlineAttr->getKind() == InlineKind::Always) {
+        if (auto valueDecl = dyn_cast<ValueDecl>(this)) {
+          AccessScope access =
+                valueDecl->getFormalAccessScope(
+                    nullptr, /*treatUsableFromInlineAsPublic*/false,
+                    /*ignoreImportAccessLevel*/false);
+          if (access.isPublicOrPackage()) {
+            sawInlinable = true;
+          }
+        }
+      }
+      continue;
+    }
+  }
+
+  // If we saw an inlinable attribute but no other explicit attribute,
+  // treat as inlinable.
+  if (sawInlinable)
+    return CodeGenerationModel::Inlinable;
+
+  return std::nullopt;
+}
+
+CodeGenerationModel
+Decl::getEffectiveCodeGenerationModel() const {
+  // If there is an explicit attribute that specifies the model for this
+  // declaration, use it.
+  if (auto explicitModel = getExplicitCodeGenerationModel())
+    return *explicitModel;
+
+  // Otherwise, apply the model-level defaults.
+  return getModuleContext()->codeGenerationModel();
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -5051,21 +5104,8 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
 }
 
 bool ValueDecl::hasAttributeWithInlinableSemantics() const {
-  if (getAttrs().hasAttribute<InlinableAttr>())
-    return true;
-
-  // @inline(always) implies @inlinable on "public" (open, public, package)
-  // declarations.
-  AccessScope access =
-        getFormalAccessScope(nullptr, /*treatUsableFromInlineAsPublic*/false,
-                             /*ignoreImportAccessLevel*/false);
-  if (!access.isPublicOrPackage())
-    return false;
-
-  if (auto *inlineAttr = getAttrs().getAttribute<InlineAttr>()) {
-    if (inlineAttr && inlineAttr->getKind() == InlineKind::Always)
-      return true;
-  }
+  if (auto codeGenModel = getExplicitCodeGenerationModel())
+    return *codeGenModel == CodeGenerationModel::Inlinable;
 
   return false;
 }

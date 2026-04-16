@@ -29,6 +29,7 @@
 namespace swift {
 
 class ModuleFile;
+enum class CodeGenerationModel: uint8_t;
 struct ExplicitSwiftModuleMap;
 struct ExplicitClangModuleMap;
 enum class ResilienceStrategy : unsigned;
@@ -152,7 +153,7 @@ class ExtendedValidationInfo {
     unsigned AllowNonResilientAccess: 1;
     unsigned SerializePackageEnabled: 1;
     unsigned StrictMemorySafety: 1;
-    unsigned DeferredCodeGen: 1;
+    unsigned CodeGenModel: 2;
     unsigned AggressiveCMOEnabled : 1;
     unsigned LibraryLevel : 2;
   } Bits;
@@ -265,11 +266,11 @@ public:
     Bits.StrictMemorySafety = val;
   }
 
-  bool deferredCodeGen() const {
-    return Bits.DeferredCodeGen;
+  CodeGenerationModel codeGenerationModel() const {
+    return static_cast<CodeGenerationModel>(Bits.CodeGenModel);
   }
-  void setDeferredCodeGen(bool val = true) {
-    Bits.DeferredCodeGen = val;
+  void setCodeGenerationModel(CodeGenerationModel val) {
+    Bits.CodeGenModel = static_cast<unsigned>(val);
   }
 
   bool isAggressiveCMOEnabled() const {

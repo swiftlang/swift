@@ -6612,7 +6612,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   // linkage of derivative thunks so we can serialize them (the original
   // function itself might be HiddenExternal in this case if we only have
   // declaration without definition).
-  auto linkage = originalFn->markedAsAlwaysEmitIntoClient()
+  auto linkage = originalFn->isAlwaysEmitIntoClient()
                      ? SILLinkage::PublicNonABI
                      : stripExternalFromLinkage(originalFn->getLinkage());
 

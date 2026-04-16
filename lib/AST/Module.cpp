@@ -46,6 +46,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -781,7 +782,8 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
   Bits.ModuleDecl.StrictMemorySafety = 0;
-  Bits.ModuleDecl.DeferredCodeGen = 0;
+  Bits.ModuleDecl.CodeGenModel =
+      static_cast<unsigned>(CodeGenerationModel::Interface);
   Bits.ModuleDecl.AggressiveCMOEnabled = 0;
 
   // Populate the module's files.

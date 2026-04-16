@@ -26,6 +26,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
@@ -690,7 +691,9 @@ static bool parseDeclSILOptional(
     OptimizationMode *optimizationMode, PerformanceConstraints *perfConstraints,
     bool *isPerformanceConstraint, bool *markedAsUsed, StringRef *asmName,
     StringRef *section,
-    bool *isLet, bool *isWeakImported, bool *needStackProtection,
+    bool *isLet, bool *isWeakImported,
+    std::optional<CodeGenerationModel> *codeGenerationModel,
+    bool *needStackProtection,
     bool *isSpecialized, AvailabilityRange *availability,
     bool *isWithoutActuallyEscapingThunk,
     SmallVectorImpl<std::string> *Semantics,
@@ -764,6 +767,10 @@ static bool parseDeclSILOptional(
                       M.getASTContext().LangOpts.Target.str());
       else
         *isWeakImported = true;
+    } else if (codeGenerationModel && SP.P.Tok.getText() == "export_interface") {
+      *codeGenerationModel = CodeGenerationModel::Interface;
+    } else if (codeGenerationModel && SP.P.Tok.getText() == "export_implementation") {
+      *codeGenerationModel = CodeGenerationModel::Implementation;
     } else if (availability && SP.P.Tok.getText() == "available") {
       SP.P.consumeToken(tok::identifier);
 
@@ -7431,6 +7438,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   IsThunk_t isThunk = IsNotThunk;
   SILFunction::Purpose specialPurpose = SILFunction::Purpose::None;
   bool isWeakImported = false;
+  std::optional<CodeGenerationModel> codeGenerationModel;
   bool needStackProtection = false;
   AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
   bool isWithoutActuallyEscapingThunk = false;
@@ -7459,7 +7467,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &objCReplacementFor, &specialPurpose, &inlineStrategy,
           &optimizationMode, &perfConstr, &isPerformanceConstraint,
           &markedAsUsed, &asmName, &section, nullptr, &isWeakImported,
-          &needStackProtection, nullptr, &availability,
+          &codeGenerationModel, &needStackProtection, nullptr, &availability,
           &isWithoutActuallyEscapingThunk, &Semantics, &SpecAttrs, &ClangDecl,
           &MRK, &actorIsolation, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
@@ -7507,6 +7515,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
       FunctionState.F->setObjCReplacement(objCReplacementFor);
     FunctionState.F->setSpecialPurpose(specialPurpose);
     FunctionState.F->setIsAlwaysWeakImported(isWeakImported);
+    FunctionState.F->setCodeGenerationModel(codeGenerationModel);
     FunctionState.F->setAvailabilityForLinkage(availability);
     FunctionState.F->setWithoutActuallyEscapingThunk(
       isWithoutActuallyEscapingThunk);
@@ -7728,7 +7737,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
                            nullptr, nullptr, nullptr, &isMarkedAsUsed, &asmName,
                            &section, &isLet, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           State, M) ||
+                           nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_value_name) ||
@@ -7785,7 +7794,8 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, SP, M))
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           SP, M))
     return true;
   
   ValueDecl *VD;
@@ -7876,7 +7886,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            VTableState, M))
     return true;
 
@@ -8023,7 +8033,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            moveOnlyDeinitTableState, M))
     return true;
 
@@ -8547,7 +8557,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
           nullptr, &isSerialized, nullptr, nullptr, nullptr, nullptr, nullptr,
           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-          nullptr, nullptr, nullptr, nullptr, nullptr, &isSpecialized,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &isSpecialized,
           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
           WitnessState, M))
     return true;

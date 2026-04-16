@@ -714,8 +714,10 @@ public:
   /// \c true if this module was built with strict memory safety.
   bool strictMemorySafety() const { return Core->strictMemorySafety(); }
 
-  /// \c true if this module uses deferred code generation.
-  bool deferredCodeGen() const { return Core->deferredCodeGen(); }
+  /// The code generation model used by this module.
+  CodeGenerationModel codeGenerationModel() const {
+    return Core->codeGenerationModel();
+  }
 
 
   /// \c true if this module was built with aggressive CMO

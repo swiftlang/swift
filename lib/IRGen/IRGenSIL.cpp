@@ -2616,7 +2616,7 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
   if (CurSILFn->getLinkage() == SILLinkage::Shared) {
-    if (CurSILFn->markedAsAlwaysEmitIntoClient() &&
+    if (CurSILFn->isAlwaysEmitIntoClient() &&
         CurSILFn->hasOpaqueResultTypeWithAvailabilityConditions()) {
       auto *V = CurSILFn->getLocation().castToASTNode<ValueDecl>();
       auto *opaqueResult = V->getOpaqueResultTypeDecl();

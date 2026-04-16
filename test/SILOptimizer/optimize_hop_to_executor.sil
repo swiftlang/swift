@@ -15,6 +15,7 @@ actor MyActor {
 sil [ossa] @requiredToRunOnActor : $@convention(method) (@guaranteed MyActor) -> ()
 sil [ossa] @anotherAsyncFunction : $@convention(thin) @async () -> ()
 sil [ossa] @nonisolatedNonsendingAsyncFunction : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+sil [ossa] @asyncThrowingFunction : $@convention(thin) @async () -> @error any Error
 sil [ossa] @syncFunction : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil [ossa] @simpleRedundantActor : $@convention(method) @async (@guaranteed MyActor) -> () {
@@ -454,4 +455,29 @@ bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyAc
   hop_to_executor %0
   %9999 = tuple ()
   return %9999 : $()
+}
+
+// https://github.com/swiftlang/swift/issues/88259
+
+// CHECK-LABEL: sil [isolation "caller_isolation_inheriting"] [ossa] @callerIsolationInheritingPreservesHopBeforeThrow : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @error any Error {
+// CHECK: bb1
+// CHECK:   hop_to_executor
+// CHECK:   return
+// CHECK: bb2
+// CHECK:   hop_to_executor
+// CHECK:   throw
+// CHECK: } // end sil function 'callerIsolationInheritingPreservesHopBeforeThrow'
+sil [isolation "caller_isolation_inheriting"] [ossa] @callerIsolationInheritingPreservesHopBeforeThrow : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @error any Error {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor):
+  %f = function_ref @asyncThrowingFunction : $@convention(thin) @async () -> @error any Error
+  try_apply %f() : $@convention(thin) @async () -> @error any Error, normal bb1, error bb2
+
+bb1(%result : $()):
+  hop_to_executor %0 : $Builtin.ImplicitActor
+  %ret = tuple ()
+  return %ret: $()
+
+bb2(%error : @owned $any Error):
+  hop_to_executor %0 : $Builtin.ImplicitActor
+  throw %error : $any Error
 }

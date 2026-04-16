@@ -396,14 +396,15 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
     return true;
   }
 
-  // Treat returns from a caller isolation inheriting function as requiring the
-  // liveness of hop to executors before it.
+  // Treat function exits from a caller isolation inheriting function as
+  // requiring the liveness of hop to executors before it.
   //
   // DISCUSSION: We do this since callers of callee functions with isolation
   // inheriting isolation are not required to have a hop after the return from
   // the callee function... so we have no guarantee that there isn't code in the
   // caller that needs this hop to executor to run on the correct actor.
-  if (isa<ReturnInst>(inst)) {
+  if (auto *term = dyn_cast<TermInst>(inst);
+      term && term->isFunctionExiting()) {
     if (auto isolation = inst->getFunction()->getActorIsolation();
         isolation && isolation->isCallerIsolationInheriting()) {
       return true;

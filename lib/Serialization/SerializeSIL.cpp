@@ -621,7 +621,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
       (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(),
       (unsigned)F.markedAsUsed(), (unsigned)F.getEffectsKind(),
-      (unsigned)numTrailingRecords, (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
+      (unsigned)numTrailingRecords, (unsigned)F.hasOwnership(),
+      F.isAlwaysWeakImported(),
+      F.codeGenerationModel() ? (static_cast<unsigned>(*F.codeGenerationModel()) + 1) : 0,
       LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
@@ -3769,11 +3771,9 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   if (F->isAvailableExternally())
     return false;
 
-  if (F->getDeclRef().hasDecl()) {
-    if (auto decl = F->getDeclRef().getDecl())
-      if (decl->isNeverEmittedIntoClient())
-        return false;
-  }
+  // Don't serialize the body if the client can never see it.
+  if (F->isNeverEmitIntoClient())
+    return false;
 
   // If we are asked to serialize everything, go ahead and do it.
   if (Options.SerializeAllSIL)

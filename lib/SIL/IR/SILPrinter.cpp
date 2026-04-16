@@ -25,6 +25,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -3809,6 +3810,21 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
   if (isAlwaysWeakImported())
     OS << "[weak_imported] ";
+  if (auto cgModel = codeGenerationModel()) {
+    switch (*cgModel) {
+    case CodeGenerationModel::Interface:
+      OS << "[export_interface] ";
+      break;
+
+    case CodeGenerationModel::Implementation:
+      OS << "[export_implementation] ";
+      break;
+
+    case CodeGenerationModel::Inlinable:
+      break;
+    }
+  }
+
   auto availability = getAvailabilityForLinkage();
   if (!availability.isAlwaysAvailable()) {
     OS << "[available " << availability.getVersionString() << "] ";

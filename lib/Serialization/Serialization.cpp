@@ -888,7 +888,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
   BLOCK_RECORD(options_block, STRICT_MEMORY_SAFETY);
-  BLOCK_RECORD(options_block, DEFERRED_CODE_GEN);
+  BLOCK_RECORD(options_block, CODE_GENERATION_MODEL);
   BLOCK_RECORD(options_block, AGGRESSIVE_CMO);
   BLOCK_RECORD(options_block, CXX_STDLIB_KIND);
   BLOCK_RECORD(options_block, PUBLIC_MODULE_NAME);
@@ -1211,9 +1211,9 @@ void Serializer::writeHeader() {
         StrictMemorySafety.emit(ScratchRecord);
       }
 
-      if (M->deferredCodeGen()) {
-        options_block::DeferredCodeGenLayout DeferredCodeGen(Out);
-        DeferredCodeGen.emit(ScratchRecord);
+      {
+        options_block::CodeGenerationModelLayout codeGenModel(Out);
+        codeGenModel.emit(ScratchRecord, static_cast<unsigned>(M->codeGenerationModel()));
       }
 
       if (M->hasCxxInteroperability()) {
