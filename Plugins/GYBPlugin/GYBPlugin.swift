@@ -32,9 +32,9 @@ struct GYBPlugin: BuildToolPlugin {
 
     // TODO: Find 'python' in a more robust manner, or switch to a Swift-only
     // implementation of gyb.
-    let python = FileManager.default.fileExists(atPath: "/usr/local/bin/python")
-      ? URL(filePath: "/usr/local/bin/python")!
-      : URL(filePath: "/usr/bin/python")!
+    let python = FileManager.default.fileExists(atPath: "/usr/local/bin/python3")
+      ? URL(filePath: "/usr/local/bin/python3")!
+      : URL(filePath: "/usr/bin/python3")!
     let gybPath = URL(filePath: "utils/gyb")!.path
     
     // Set pointer size passed to GYB.

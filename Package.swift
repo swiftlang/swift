@@ -21,10 +21,17 @@ import CompilerPluginSupport
 import Foundation
 import PackageDescription
 
+let availabilitySettings: [SwiftSetting] = try!
+  availabilityMacros.map { macro in
+    .unsafeFlags([
+        "-Xfrontend", "-define-availability", "-Xfrontend", "\(macro)"
+    ])
+  }
+
 // Common Swift settings for the Standard Library and its various supporting
 // libraries. This was extracted from CMakeLists.txt and likely contains some
 // stale settings.
-let basicSwiftSettings: [SwiftSetting] = try! [
+let basicSwiftSettings: [SwiftSetting] = [
   .enableExperimentalFeature("NoncopyableGenerics2"),
   .enableExperimentalFeature("SE427NoInferenceOnExtension"),
   .enableExperimentalFeature("NonescapableTypes"),
@@ -41,14 +48,10 @@ let basicSwiftSettings: [SwiftSetting] = try! [
       "-Xfrontend", "-emit-empty-object-file",
       "-nostdimport", "-nostdlibimport",
     ])
-] + availabilityMacros.map { macro in
-  .unsafeFlags([
-      "-Xfrontend", "-define-availability", "-Xfrontend", "\(macro)"
-  ])
-}
+] + availabilitySettings
 
 let package = Package(
-  name: "SwiftStandardLibrary",
+  name: "swift-standard-library",
   platforms: [
     .macOS(.v15),
     .iOS(.v13),
@@ -76,6 +79,11 @@ let package = Package(
       name: "Synchronization",
       targets: ["Synchronization"]
     ),
+
+    .library(
+      name: "_Concurrency",
+      targets: ["_Concurrency"]
+    ),
   ],
   traits: [
     /// The UnicodeDataTables trait is used to link in the library containing
@@ -83,10 +91,17 @@ let package = Package(
     .trait(name: "UnicodeDataTables"),
   ],
   targets: [
+    .target(
+      name: "SwiftShims",
+      path: "stdlib/public/SwiftShims/swift/shims",
+      publicHeadersPath: "."
+    ),
+
     // Swift standard library
     .target(
       name: "Swift",
       dependencies: [
+        "SwiftShims",
         .target(
           name: "SwiftUnicodeDataTables",
           condition: .when(traits: ["UnicodeDataTables"])
@@ -216,21 +231,175 @@ let package = Package(
       plugins: ["GYBPlugin"],
     ),
 
+    .target(
+      name: "_ConcurrencyCpp",
+      path: "stdlib/public/Concurrency",
+      sources: [
+        "Actor.cpp",
+        "AsyncLet.cpp",
+        "Clock.cpp",
+        "ConcurrencyHooks.cpp",
+        "GlobalExecutor.cpp",
+        "EmbeddedSupport.cpp",
+        "Error.cpp",
+        "ExecutorBridge.cpp",
+        "ExecutorChecks.cpp",
+        "Task.cpp",
+        "TaskAlloc.cpp",
+        "TaskStatus.cpp",
+        "TaskGroup.cpp",
+        "TaskLocal.cpp",
+        "ThreadingError.cpp",
+        "TracingSignpost.cpp",
+        "AsyncStream.cpp",
+      ],
+      publicHeadersPath: ".",
+      cSettings: [
+        .headerSearchPath("../../../include/"),
+        .headerSearchPath("../../../stdlib/public/SwiftShims"),
+        .headerSearchPath("../../../stdlib/public/DummyHeaders"),
+        .headerSearchPath("../../../stdlib/include"),
+        .define("SWIFT_TARGET_LIBRARY_NAME", to: "swift_Concurrency"),
+        .define("SWIFT_CONCURRENCY_EMBEDDED", to: "1"),
+        .define("SWIFT_RUNTIME_EMBEDDED", to: "1"),
+      ],
+      plugins: ["GYBPlugin"],
+    ),
+
+    .target(
+      name: "ConcurrencyShims",
+      path: "stdlib/public/Concurrency/InternalShims",
+      publicHeadersPath: "."
+    ),
+
+    .target(
+      name: "_Concurrency",
+      dependencies: ["ConcurrencyShims", "Swift", "Synchronization", "_ConcurrencyCpp"],
+      path: "stdlib/public/Concurrency",
+      sources: [
+        "Actor.swift",
+        "AsyncLet.swift",
+        "CheckedContinuation.swift",
+        "Errors.swift",
+        "Executor.swift",
+        "ExecutorBridge.swift",
+        "ExecutorAssertions.swift",
+        "AsyncCompactMapSequence.swift",
+        "AsyncDropFirstSequence.swift",
+        "AsyncDropWhileSequence.swift",
+        "AsyncFilterSequence.swift",
+        "AsyncFlatMapSequence.swift",
+        "AsyncIteratorProtocol.swift",
+        "AsyncMapSequence.swift",
+        "AsyncPrefixSequence.swift",
+        "AsyncPrefixWhileSequence.swift",
+        "AsyncSequence.swift",
+        "AsyncThrowingCompactMapSequence.swift",
+        "AsyncThrowingDropWhileSequence.swift",
+        "AsyncThrowingFilterSequence.swift",
+        "AsyncThrowingFlatMapSequence.swift",
+        "AsyncThrowingMapSequence.swift",
+        "AsyncThrowingPrefixWhileSequence.swift",
+        "PartialAsyncTask.swift",
+        "GlobalActor.swift",
+        "GlobalConcurrentExecutor.swift",
+        "MainActor.swift",
+        "PriorityQueue.swift",
+        "SourceCompatibilityShims.swift",
+        "Task.swift",
+        "Task+PriorityEscalation.swift",
+        "Task+TaskExecutor.swift",
+        "TaskCancellation.swift",
+        "TaskGroup.swift",
+        "DiscardingTaskGroup.swift",
+        "TaskLocal.swift",
+        "TaskSleep.swift",
+        "AsyncStreamBuffer.swift",
+        "AsyncStream.swift",
+        "AsyncThrowingStream.swift",
+        "Deque/_DequeBuffer.swift",
+        "Deque/_DequeBufferHeader.swift",
+        "Deque/_DequeSlot.swift",
+        "Deque/_UnsafeWrappedBuffer.swift",
+        "Deque/Compatibility.swift",
+        "Deque/Deque+Storage.swift",
+        "Deque/Deque+UnsafeHandle.swift",
+        "Deque/Deque.swift",
+        "Deque/Deque+Codable.swift",
+        "Deque/Deque+Collection.swift",
+        "Deque/Deque+CustomDebugStringConvertible.swift",
+        "Deque/Deque+CustomReflectable.swift",
+        "Deque/Deque+CustomStringConvertible.swift",
+        "Deque/Deque+Equatable.swift",
+        "Deque/Deque+ExpressibleByArrayLiteral.swift",
+        "Deque/Deque+Extras.swift",
+        "Deque/Deque+Hashable.swift",
+        "Deque/Deque+Testing.swift",
+        "Deque/UnsafeMutableBufferPointer+Utilities.swift",
+        "Clock.swift",
+        "ContinuousClock.swift",
+        "SuspendingClock.swift",
+        "TaskSleepDuration.swift",
+        "UnimplementedExecutor.swift",
+        "CooperativeExecutor.swift",
+        "PlatformExecutorCooperative.swift",
+        "PlatformExecutorDarwin.swift",
+        "PlatformExecutorLinux.swift",
+        "PlatformExecutorWindows.swift",
+        "PlatformExecutorOpenBSD.swift",
+        "PlatformExecutorFreeBSD.swift",
+      ],
+      swiftSettings: basicSwiftSettings + [
+        .enableExperimentalFeature("BuiltinModule"),
+        .unsafeFlags(["-parse-stdlib"]),
+        .define("SWIFT_CONCURRENCY_EMBEDDED"),
+        .unsafeFlags(["-runtime-compatibility-version", "none"]),
+      ],
+      plugins: ["GYBPlugin"],
+    ),
+
     // Plugin for expanding .swift.gyb files into .swift files.
     .plugin(
       name: "GYBPlugin",
       capability: .buildTool(),
     ),
-  ]
+  ],
+  cxxLanguageStandard: .gnucxx17
 )
 
 // utils/availability-macros.def processing logic, used to figure out
 // availability macro definitions.
 var availabilityMacros: [String] {
   get throws {
-    let allLines = try String(contentsOfFile: Context.packageDirectory + "/utils/availability-macros.def", encoding: .utf8)
+    // Due to https://github.com/swiftlang/swift-package-manager/issues/5610,
+    // we're unable to use packageDirectory, so hardcode the string.
+    #if false
+    let allLines = try String(contentsOfFile: Context.packageDirectory + "utils/availability-macros.def", encoding: .utf8)
       .split(separator: "\n")
-     let foundMacros = allLines.compactMap { (line) -> String? in
+    #else
+    let allLines = """
+      SwiftStdlib 9999:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999
+      SwiftStdlib 5.0:macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2
+      SwiftStdlib 5.1:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0
+      SwiftStdlib 5.2:macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4
+      SwiftStdlib 5.3:macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0
+      SwiftStdlib 5.4:macOS 11.3, iOS 14.5, watchOS 7.4, tvOS 14.5
+      SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0
+      SwiftStdlib 5.6:macOS 12.3, iOS 15.4, watchOS 8.5, tvOS 15.4
+      SwiftStdlib 5.7:macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0
+      SwiftStdlib 5.8:macOS 13.3, iOS 16.4, watchOS 9.4, tvOS 16.4
+      SwiftStdlib 5.9:macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0
+      SwiftStdlib 5.10:macOS 14.4, iOS 17.4, watchOS 10.4, tvOS 17.4, visionOS 1.1
+      SwiftStdlib 6.0:macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0
+      SwiftStdlib 6.1:macOS 15.4, iOS 18.4, watchOS 11.4, tvOS 18.4, visionOS 2.4
+      SwiftStdlib 6.2:macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0
+      SwiftStdlib 6.3:macOS 26.4, iOS 26.4, watchOS 26.4, tvOS 26.4, visionOS 26.4
+      SwiftStdlib 6.4:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999
+      SwiftCompatibilitySpan 5.0:macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2, visionOS 1.0
+      SwiftCompatibilitySpan 6.2:macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionBacktracing 6.2: macOS 26.0
+      """.split(separator: "\n")
+    #endif
+    let foundMacros = allLines.compactMap { (line) -> String? in
       if line.contains("#") { return nil }
 
       guard let colonIndex = line.firstIndex(of: ":") else {
@@ -239,18 +408,18 @@ var availabilityMacros: [String] {
 
       // Under embedded swift, all stdlib APIs should be available always.
       // Replace all availability macros with very very old OS version.      
-      return String(line[..<colonIndex]) + ":macOS 10.9, iOS 7.0, watchOS 2.0, tvOS 9.0, visionOS 1.0"
+//      return String(line[..<colonIndex]) + ":macOS 10.14, iOS 12.0, watchOS 7.0, tvOS 12.0, visionOS 1.0"
+      return String(line[..<colonIndex]) + ":*"
     }
 
     // Create "StdlibDeploymentTarget" counterparts for "SwiftStdlib"
     // availability macros.
     return foundMacros + foundMacros.compactMap { macro in
-      guard macro.contains("SwiftStdlib") else {
+      if !macro.contains("SwiftStdlib") {
         return nil
       }
 
-      let afterPrefix = macro.index(macro.startIndex, offsetBy: "SwiftStdlib".count)
-      return "StdlibDeploymentTarget" + String(macro[afterPrefix...])
+      return macro.replacingOccurrences(of: "SwiftStdlib", with: "StdlibDeploymentTarget")
     }
   }
 }
