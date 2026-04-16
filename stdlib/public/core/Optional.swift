@@ -220,7 +220,7 @@ extension Optional where Wrapped: ~Copyable {
   @_transparent
   public mutating func insert(_ new: consuming Wrapped) -> Inout<Wrapped> {
     self = .some(new)
-    return mutate().unsafelyUnwrap()
+    return unsafe mutate().unsafelyUnwrap()
   }
 }
 
@@ -411,8 +411,8 @@ extension Optional where Wrapped: ~Escapable {
   ///   will never be equal to `nil` and only after you've tried using the
   ///   postfix `!` operator.
   @inlinable
-  @_preInverseGenerics
   @unsafe
+  @_preInverseGenerics
   public var unsafelyUnwrapped: Wrapped {
     // FIXME: Generalize this for ~Copyable wrapped types. Note that the current
     // implementation is copying the value, so that generalization will need to
@@ -447,8 +447,9 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   ///   `unsafelyUnwrap` only when you are confident that this instance
   ///   will never be equal to `nil` and only after you've tried using the
   ///   postfix `!` operator.
-  @_alwaysEmitIntoClient
   @lifetime(copy self)
+  @unsafe
+  @_alwaysEmitIntoClient
   public consuming func unsafelyUnwrap() -> Wrapped {
     switch consume self {
     case .some(let x):
@@ -465,6 +466,7 @@ extension Optional where Wrapped: ~Escapable {
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
   @inlinable
+  @unsafe
   @_preInverseGenerics
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
@@ -483,8 +485,9 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   ///
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
-  @_alwaysEmitIntoClient
   @lifetime(copy self)
+  @unsafe
+  @_alwaysEmitIntoClient
   internal consuming func _uncheckedUnwrap() -> Wrapped {
     if let x = self {
       return x
