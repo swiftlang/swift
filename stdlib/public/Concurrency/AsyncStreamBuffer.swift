@@ -52,6 +52,17 @@ func _lock(_ ptr: UnsafeRawPointer)
 func _unlock(_ ptr: UnsafeRawPointer)
 #endif
 
+fileprivate func _lockCreate() -> UnsafeMutableRawPointer {
+  let ptr = unsafe UnsafeMutableRawPointer.allocate(
+    byteCount: _lockWordCount() * MemoryLayout<UnsafeRawPointer>.stride,
+    alignment: MemoryLayout<UnsafeRawPointer>.alignment
+  )
+
+  unsafe _lockInit(ptr)
+
+  return unsafe ptr
+}
+
 @available(SwiftStdlib 5.1, *)
 extension AsyncStream {
   @safe
