@@ -1651,27 +1651,6 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   }
 }
 
-static bool checkDuplicatedMethodName(StringRef funcName,
-                                      const AccessorDecl *AD,
-                                      DeclAndTypePrinter &declAndTypePrinter,
-                                      raw_ostream &os) {
-  auto *&decl = declAndTypePrinter.getCxxDeclEmissionScope()
-                    .emittedAccessorMethodNames[funcName];
-
-  if (!decl) {
-    // This is the first time an accessor with this name has been emitted.
-    decl = AD;
-  } else if (decl != AD) {
-    // An accessor for another property had the same name.
-    os << "  // skip emitting accessor method for \'"
-       << AD->getStorage()->getBaseIdentifier().str() << "\'. \'" << funcName
-       << "\' already declared.\n";
-    return false;
-  }
-
-  return true;
-}
-
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     DeclAndTypePrinter &declAndTypePrinter,
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
@@ -1726,7 +1705,7 @@ static bool canRemapBoolPropertyNameDirectly(StringRef name) {
   return startsWithAndLonger("is") || startsWithAndLonger("has");
 }
 
-static std::string remapPropertyName(const AccessorDecl *accessor,
+std::string swift::remapPropertyName(const AccessorDecl *accessor,
                                      Type resultTy) {
   // For a getter or setter, go through the variable or subscript decl.
   StringRef propertyName =
@@ -1754,10 +1733,6 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
     std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo) {
   assert(accessor->isSetter() || accessor->getParameters()->size() == 0);
   std::string accessorName = remapPropertyName(accessor, resultTy);
-
-  if (!checkDuplicatedMethodName(accessorName, accessor, declAndTypePrinter,
-                                 os))
-    return;
 
   os << "  ";
 
