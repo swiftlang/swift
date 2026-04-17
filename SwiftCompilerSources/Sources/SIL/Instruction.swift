@@ -1999,6 +1999,8 @@ final public class PackLengthInst : SingleValueInstruction {
 @_semantics("fast_cast")
 public protocol AnyPackIndexInst : SingleValueInstruction {
   var indexedPackType: CanonicalType { get }
+  // The index of the pack element being accessed, if it is statically known.
+  var staticIndex: Int? { get }
 }
 
 extension AnyPackIndexInst {
@@ -2007,7 +2009,12 @@ extension AnyPackIndexInst {
   }
 }
 
-final public class DynamicPackIndexInst : SingleValueInstruction, UnaryInstruction, AnyPackIndexInst {}
+final public class DynamicPackIndexInst : SingleValueInstruction, UnaryInstruction, AnyPackIndexInst {
+  public var staticIndex: Int? {
+    (operand.value as? IntegerLiteralInst)?.value
+  }
+}
+
 final public class PackPackIndexInst : SingleValueInstruction, UnaryInstruction, AnyPackIndexInst {
   public var componentStartIndex: Int {
     Int(bridged.PackPackIndexInst_getComponentStartIndex())
@@ -2018,10 +2025,22 @@ final public class PackPackIndexInst : SingleValueInstruction, UnaryInstruction,
   public var sliceIndexOperand: AnyPackIndexInst {
     operand.value as! AnyPackIndexInst
   }
+  public var staticIndex: Int? {
+    if let staticSliceIndex = sliceIndexOperand.staticIndex {
+      // This instruction produces a dynamic index into a slice of the operand
+      // pack, which starts at componentStartIndex.
+      return componentStartIndex + staticSliceIndex
+    }
+    return nil
+  }
 }
+
 final public class ScalarPackIndexInst : SingleValueInstruction, AnyPackIndexInst {
   public var componentIndex: Int {
     Int(bridged.ScalarPackIndexInst_getComponentIndex())
+  }
+  public var staticIndex: Int? {
+    componentIndex
   }
 }
 
