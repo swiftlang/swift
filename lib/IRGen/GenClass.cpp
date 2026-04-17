@@ -1355,6 +1355,16 @@ namespace {
       std::optional<CanType> specializedGenericType =
           getSpecializedGenericType();
 
+      llvm::Constant *uncastMetaclass;
+      if (specializedGenericType) {
+        uncastMetaclass =
+            IGM.getAddrOfCanonicalSpecializedGenericMetaclassObject(
+                *specializedGenericType, ForDefinition);
+      } else {
+        uncastMetaclass =
+            IGM.getAddrOfMetaclassObject(getClass(), ForDefinition);
+      }
+
       llvm::Constant *rootPtr;
       llvm::Constant *superPtr;
       if (IGM.Context.LangOpts.EnableGNUstepObjCInterop) {
@@ -1407,24 +1417,46 @@ namespace {
 
       dataPtr = llvm::ConstantExpr::getPtrToInt(dataPtr, IGM.IntPtrTy);
 
-      llvm::Constant *fields[] = {
-        rootPtr,
-        superPtr,
-        IGM.getObjCEmptyCachePtr(),
-        IGM.getObjCEmptyVTablePtr(),
-        dataPtr
-      };
+      llvm::SmallVector<llvm::Constant *, 17> fields;
+      if (IGM.Context.LangOpts.EnableGNUstepObjCInterop) {
+        auto nullClass = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
+        auto nullOpaque = llvm::ConstantPointerNull::get(IGM.OpaquePtrTy);
+        auto nullFunction = llvm::ConstantPointerNull::get(IGM.FunctionPtrTy);
+        auto selfMetaclass =
+            llvm::ConstantExpr::getBitCast(uncastMetaclass,
+                                           IGM.ObjCClassPtrTy);
+
+        fields.append({
+          selfMetaclass,
+          superPtr,
+          buildName(),
+          llvm::ConstantInt::get(IGM.IntPtrTy, 0),
+          llvm::ConstantInt::get(IGM.IntPtrTy, 1),
+          llvm::ConstantInt::get(IGM.IntPtrTy, 0),
+          nullOpaque,
+          buildMethodList(MethodListKind::ClassMethods,
+                          llvm::GlobalVariable::InternalLinkage),
+          nullOpaque,
+          nullClass,
+          nullFunction,
+          nullFunction,
+          nullClass,
+          nullOpaque,
+          nullOpaque,
+          llvm::ConstantInt::get(IGM.IntPtrTy, 0),
+          nullOpaque
+        });
+      } else {
+        fields.append({
+          rootPtr,
+          superPtr,
+          IGM.getObjCEmptyCachePtr(),
+          IGM.getObjCEmptyVTablePtr(),
+          dataPtr
+        });
+      }
       auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
                                             llvm::ArrayRef(fields));
-      llvm::Constant *uncastMetaclass;
-      if (specializedGenericType) {
-        uncastMetaclass =
-            IGM.getAddrOfCanonicalSpecializedGenericMetaclassObject(
-                *specializedGenericType, ForDefinition);
-      } else {
-        uncastMetaclass =
-            IGM.getAddrOfMetaclassObject(getClass(), ForDefinition);
-      }
       auto metaclass = cast<llvm::GlobalVariable>(uncastMetaclass);
       metaclass->setInitializer(init);
     }
@@ -1907,6 +1939,11 @@ namespace {
     void emitAndAddMethodList(ConstantInitBuilder::StructBuilder &builder,
                               MethodListKind kind,
                               llvm::GlobalValue::LinkageTypes linkage) {
+      builder.add(buildMethodList(kind, linkage));
+    }
+
+    llvm::Constant *buildMethodList(MethodListKind kind,
+                                    llvm::GlobalValue::LinkageTypes linkage) {
       ArrayRef<MethodDescriptor> methods;
       StringRef namePrefix;
       switch (kind) {
@@ -1931,9 +1968,7 @@ namespace {
         namePrefix = "_PROTOCOL_INSTANCE_METHODS_OPT_";
         break;
       }
-      llvm::Constant *methodListPtr =
-          buildMethodList(methods, namePrefix, linkage);
-      builder.add(methodListPtr);
+      return buildMethodList(methods, namePrefix, linkage);
     }
 
     llvm::Constant *buildOptExtendedMethodTypes() {
@@ -1979,6 +2014,33 @@ namespace {
     llvm::Constant *buildMethodList(ArrayRef<MethodDescriptor> methods,
                                     StringRef name,
                                     llvm::GlobalValue::LinkageTypes linkage) {
+      if (IGM.Context.LangOpts.EnableGNUstepObjCInterop) {
+        if (methods.empty())
+          return null();
+
+        ConstantInitBuilder builder(IGM);
+        auto fields = builder.beginStruct();
+        fields.addNullPointer(IGM.OpaquePtrTy);
+        auto countPosition = fields.addPlaceholder();
+        fields.addInt(IGM.SizeTy, (3 * IGM.getPointerSize()).getValue());
+
+        auto array = fields.beginArray();
+        for (auto descriptor : methods)
+          buildMethod(array, descriptor);
+
+        if (array.empty()) {
+          array.abandon();
+          fields.abandon();
+          return null();
+        }
+
+        auto count = array.size();
+        array.finishAndAddTo(fields);
+        fields.fillPlaceholderWithInt(countPosition, IGM.Int32Ty, count);
+
+        return buildGlobalVariable(fields, name, /*isConst*/ false, linkage);
+      }
+
       return buildOptionalList(
           methods, 3 * IGM.getPointerSize(), name,
           /*isConst*/ false, linkage,

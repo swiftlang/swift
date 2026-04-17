@@ -481,14 +481,37 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   ObjCClassStructTy = llvm::StructType::create(getLLVMContext(), "objc_class");
 
-  llvm::Type *objcClassElts[] = {
-    ObjCClassPtrTy,
-    ObjCClassPtrTy,
-    OpaquePtrTy,
-    OpaquePtrTy,
-    IntPtrTy
-  };
-  ObjCClassStructTy->setBody(objcClassElts);
+  if (Context.LangOpts.EnableGNUstepObjCInterop) {
+    llvm::Type *objcClassElts[] = {
+      ObjCClassPtrTy, // isa
+      ObjCClassPtrTy, // super_class
+      Int8PtrTy,      // name
+      IntPtrTy,       // version
+      IntPtrTy,       // info
+      IntPtrTy,       // instance_size
+      OpaquePtrTy,    // ivars
+      OpaquePtrTy,    // methods
+      OpaquePtrTy,    // dtable
+      ObjCClassPtrTy, // subclass_list
+      FunctionPtrTy,  // cxx_construct
+      FunctionPtrTy,  // cxx_destruct
+      ObjCClassPtrTy, // sibling_class
+      OpaquePtrTy,    // protocols
+      OpaquePtrTy,    // extra_data
+      IntPtrTy,       // abi_version
+      OpaquePtrTy     // properties
+    };
+    ObjCClassStructTy->setBody(objcClassElts);
+  } else {
+    llvm::Type *objcClassElts[] = {
+      ObjCClassPtrTy,
+      ObjCClassPtrTy,
+      OpaquePtrTy,
+      OpaquePtrTy,
+      IntPtrTy
+    };
+    ObjCClassStructTy->setBody(objcClassElts);
+  }
 
   ObjCSuperStructTy = llvm::StructType::create(getLLVMContext(), "objc_super");
   llvm::Type *objcSuperElts[] = {
