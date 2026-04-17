@@ -152,6 +152,17 @@ BridgedOwnedString BridgedGenericSignature::getDebugDescription() const {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedGenericEnvironment
+//===----------------------------------------------------------------------===//
+
+BridgedOwnedString BridgedGenericEnvironment::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  unbridged()->dump(os);
+  return BridgedOwnedString(str);
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedPoundKeyword
 //===----------------------------------------------------------------------===//
 

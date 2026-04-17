@@ -14,6 +14,7 @@ add_swift_compiler_module(AST
     DeclContext.swift
     Conformance.swift
     DiagnosticEngine.swift
+    GenericEnvironment.swift
     GenericSignature.swift
     Registration.swift
     SubstitutionMap.swift

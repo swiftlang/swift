@@ -957,7 +957,10 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType TypeValueInst_getParamType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType PackLengthInst_getPackType() const;
   BRIDGED_INLINE SwiftInt ScalarPackIndexInst_getComponentIndex() const;
+  BRIDGED_INLINE SwiftInt PackPackIndexInst_getComponentStartIndex() const;
+  BRIDGED_INLINE SwiftInt PackPackIndexInst_getComponentEndIndex() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType AnyPackIndexInst_getIndexedPackType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericEnvironment OpenPackElementInst_getOpenedGenericEnvironment() const;
   BRIDGED_INLINE bool
   DifferentiableFunctionInst_hasExtractee(SwiftInt extractee) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue

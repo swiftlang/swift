@@ -129,12 +129,6 @@ private:
   /// generic signature.
   ArrayRef<Type> getContextTypes() const;
 
-  /// Retrieve the array of opened pack parameters for this opened-element
-  /// environment.  This is parallel to the array of element parameters,
-  /// i.e. the innermost generic context.
-  MutableArrayRef<Type> getOpenedPackParams();
-  ArrayRef<Type> getOpenedPackParams() const;
-
   /// Get the nested type storage, allocating it if required.
   NestedTypeStorage &getOrCreateNestedTypeStorage();
 
@@ -178,6 +172,12 @@ public:
   bool isCanonical() const { return canonical; }
 
   ArrayRef<GenericTypeParamType *> getGenericParams() const;
+
+  /// Retrieve the array of opened pack parameters for this opened-element
+  /// environment.  This is parallel to the array of element parameters,
+  /// i.e. the innermost generic context.
+  MutableArrayRef<Type> getOpenedPackParams();
+  ArrayRef<Type> getOpenedPackParams() const;
 
   /// Retrieve the existential type for an opened existential environment.
   Type getOpenedExistentialType() const;

@@ -575,6 +575,10 @@ bool BridgedASTType::isExistentialArchetypeWithError() const {
   return unbridged()->isOpenedExistentialWithError();
 }
 
+bool BridgedASTType::isLocalArchetype() const {
+  return unbridged()->is<swift::LocalArchetypeType>();
+}
+
 bool BridgedASTType::isExistential() const {
   return unbridged()->is<swift::ExistentialType>();
 }
@@ -671,6 +675,10 @@ bool BridgedASTType::isBox() const {
 
 bool BridgedASTType::isPack() const {
   return unbridged()->is<swift::PackType>();
+}
+
+bool BridgedASTType::isPackExpansion() const {
+  return unbridged()->is<swift::PackExpansionType>();
 }
 
 bool BridgedASTType::isSILPack() const {
@@ -838,6 +846,10 @@ BridgedASTType::GenericTypeParam_getParamKind() const {
 
 BridgedASTTypeArray BridgedASTType::BoundGenericType_getGenericArgs() const {
   return {llvm::cast<swift::BoundGenericType>(type)->getGenericArgs()};
+}
+
+BridgedASTTypeArray BridgedASTType::PackType_getElementTypes() const {
+  return {llvm::cast<swift::PackType>(type)->getElementTypes()};
 }
 
 static_assert((int)BridgedASTType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
@@ -1076,6 +1088,27 @@ swift::CanGenericSignature BridgedCanGenericSignature::unbridged() const {
 BridgedGenericSignature
 BridgedCanGenericSignature::getGenericSignature() const {
   return BridgedGenericSignature{impl};
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedGenericEnvironment
+//===----------------------------------------------------------------------===//
+
+swift::GenericEnvironment * _Nonnull BridgedGenericEnvironment::unbridged() const {
+  return env;
+}
+
+BridgedASTTypeArray BridgedGenericEnvironment::getOpenedPackParams() const {
+  return {env->getOpenedPackParams()};
+}
+
+BridgedASTType BridgedGenericEnvironment::mapTypeIntoEnvironment(BridgedASTType type) const {
+  return {env->mapTypeIntoEnvironment(type.unbridged()).getPointer()};
+}
+
+BridgedASTType
+BridgedGenericEnvironment::mapElementTypeIntoPackContext(BridgedASTType type) const {
+  return {env->mapElementTypeIntoPackContext(type.unbridged()).getPointer()};
 }
 
 //===----------------------------------------------------------------------===//

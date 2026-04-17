@@ -60,6 +60,7 @@ enum class DifferentiabilityKind : uint8_t;
 class Fingerprint;
 class Identifier;
 class IfConfigClauseRangeInfo;
+class GenericEnvironment;
 class GenericSignature;
 class GenericSignatureImpl;
 struct LabeledStmtInfo;
@@ -93,6 +94,7 @@ class BridgedLangOptions;
 struct BridgedSubstitutionMap;
 struct BridgedGenericSignature;
 struct BridgedCanGenericSignature;
+struct BridgedGenericEnvironment;
 struct BridgedConformance;
 class BridgedParameterList;
 
@@ -3082,6 +3084,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool archetypeRequiresClass() const;
   BRIDGED_INLINE bool isExistentialArchetype() const;
   BRIDGED_INLINE bool isExistentialArchetypeWithError() const;
+  BRIDGED_INLINE bool isLocalArchetype() const;
   BRIDGED_INLINE bool isExistential() const;
   BRIDGED_INLINE bool isDynamicSelf() const;
   BRIDGED_INLINE bool isClassExistential() const;
@@ -3105,6 +3108,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinFixedArray() const;
   BRIDGED_INLINE bool isBox() const;
   BRIDGED_INLINE bool isPack() const;
+  BRIDGED_INLINE bool isPackExpansion() const;
   BRIDGED_INLINE bool isSILPack() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinVectorElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArrayElementType() const;
@@ -3145,6 +3149,8 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isSILPackElementAddress() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
   BoundGenericType_getGenericArgs() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
+  PackType_getElementTypes() const;
 };
 
 class BridgedCanType {
@@ -3230,6 +3236,17 @@ struct BridgedCanGenericSignature {
   BRIDGED_INLINE swift::CanGenericSignature unbridged() const;
   BRIDGED_INLINE BridgedGenericSignature getGenericSignature() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoEnvironment(BridgedASTType type) const;
+};
+
+struct BridgedGenericEnvironment {
+  swift::GenericEnvironment * _Nonnull env;
+
+  BRIDGED_INLINE swift::GenericEnvironment * _Nonnull unbridged() const;
+  BridgedOwnedString getDebugDescription() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getOpenedPackParams() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoEnvironment(BridgedASTType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType
+  mapElementTypeIntoPackContext(BridgedASTType type) const;
 };
 
 struct BridgedFingerprint {
