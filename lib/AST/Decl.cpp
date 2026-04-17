@@ -5453,7 +5453,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
 
       if (access > importAccessLevel && isVisible) {
         access = std::min(access, importAccessLevel);
-        resultDC = useDC->getParentSourceFile();
+        resultDC = useDC->getOutermostParentSourceFile();
       }
     }
   }
