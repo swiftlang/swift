@@ -315,7 +315,7 @@ extension Task: Equatable {
 ///   to the priority of the enqueued task.
 ///   This priority elevation allows the new task
 ///   to be processed at the priority it was enqueued with.
-/// - If a higher-priority task calls the `get()` method,
+/// - If a higher-priority task accesses the `value` property,
 ///   then the priority of this task increases until the task completes.
 ///
 /// In both cases, priority elevation helps you prevent a low-priority task
