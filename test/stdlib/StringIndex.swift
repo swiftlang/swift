@@ -234,8 +234,7 @@ suite.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
 
       expectEqual(strRange, substrRange)
       guard strLB != nil && strUB != nil else {
-        // TODO: rdar://112643333
-        //expectNil(strRange)
+        expectNil(strRange)
         continue
       }
       expectEqual(strRange, Range(uncheckedBounds: (strLB!, strUB!)))

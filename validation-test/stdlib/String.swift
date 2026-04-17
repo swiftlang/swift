@@ -972,7 +972,7 @@ StringTests.test("stringGutsReserve")
     case 3: (base, startedNative) = ("x" as NSString as String, false)
     case 4: (base, startedNative) = ("x" as NSMutableString as String, false)
 #else
-    case 3: (base, startedNative) = ("x" as NSString as String, true)
+    case 3: (base, startedNative) = ("x" as NSString as String, false)
     case 4: (base, startedNative) = ("x" as NSMutableString as String, true)
 #endif
     case 5: (base, startedNative) = (shared, true)
@@ -981,8 +981,7 @@ StringTests.test("stringGutsReserve")
     default:
       fatalError("case unhandled!")
     }
-    // TODO: rdar://112643333
-    //expectEqual(isSwiftNative(base), startedNative)
+    expectEqual(isSwiftNative(base), startedNative)
 
     let originalBuffer = base.bufferID
     let isUnique = base._guts.isUniqueNative
