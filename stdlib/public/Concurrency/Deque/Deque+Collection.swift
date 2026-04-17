@@ -140,10 +140,10 @@ extension _Deque: Sequence {
   ///
   /// - Complexity: O(1) when this instance has a unique reference to its
   ///    underlying storage; O(`count`) otherwise.
-  func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try unsafe _storage.read { handle in
+  func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
+    return try unsafe _storage.read { handle throws(E) in
       let endSlot = unsafe handle.startSlot.advanced(by: handle.count)
       guard unsafe endSlot.position <= handle.capacity else { return nil }
       return unsafe try body(handle.buffer(for: handle.startSlot ..< endSlot))
@@ -412,11 +412,11 @@ extension _Deque: MutableCollection {
   /// - Complexity: O(1) when this instance has a unique reference to its
   ///    underlying storage; O(`count`) otherwise. (Not counting the call to
   ///    `body`.)
-  mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     _storage.ensureUnique()
-    return try unsafe _storage.update { handle in
+    return try unsafe _storage.update { handle throws(E) in
       let endSlot = unsafe handle.startSlot.advanced(by: handle.count)
       guard unsafe endSlot.position <= handle.capacity else {
         // FIXME: Rotate storage such that it becomes contiguous.

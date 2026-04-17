@@ -212,17 +212,33 @@ extension Unsafe${Mutable}BufferPointer: @unsafe Sequence {
     return (unsafe Iterator(_position: s + n, _end: s + count), n)
   }
 
-  @inlinable @_transparent
+  @_alwaysEmitIntoClient @_transparent
   @safe
-  public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
 %if Mutable:
     return try unsafe body(UnsafeBufferPointer(self))
 %else:
     return try unsafe body(self)
 %end
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withContiguousStorageIfAvailable<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) throws -> R?
+  )
+  @usableFromInline
+  @safe
+  internal func __rethrows_withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) throws -> R? {
+    return try self.withContiguousStorageIfAvailable(body)
+  }
+#endif // !hasFeature(Embedded)
 }
 
 extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
@@ -792,11 +808,11 @@ extension Unsafe${Mutable}BufferPointer:
     return try unsafe body(&self)
   }
 
-  @inlinable @_transparent
+  @_alwaysEmitIntoClient @_transparent
   @safe
-  public mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     let (oldBase, oldCount) = (self.baseAddress, self.count)
     defer {
       _debugPrecondition(unsafe (oldBase, oldCount) == (self.baseAddress, self.count),
@@ -804,6 +820,22 @@ extension Unsafe${Mutable}BufferPointer:
     }
     return try unsafe body(&self)
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func withContiguousMutableStorageIfAvailable<R>(
+      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    ) throws -> R?
+  )
+  @usableFromInline
+  @safe
+  internal mutating func __rethrows_withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) throws -> R? {
+    return try self.withContiguousMutableStorageIfAvailable(body)
+  }
+#endif // !hasFeature(Embedded)
 %  end
 }
 

@@ -104,10 +104,21 @@ Func Sequence.min(by:) has been removed
 Func Sequence.reduce(_:_:) has been removed
 Func Sequence.reduce(into:_:) has been removed
 Func Sequence.starts(with:by:) has been removed
+Func Sequence.withContiguousStorageIfAvailable(_:) has generic signature change from <Self, R where Self : Swift.Sequence> to <Self, R, E where Self : Swift.Sequence, E : Swift.Error>
+Func Sequence.withContiguousStorageIfAvailable(_:) has mangled name changing from '(extension in Swift):Swift.Sequence.withContiguousStorageIfAvailable<A>((Swift.UnsafeBufferPointer<A.Element>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.Sequence.withContiguousStorageIfAvailable<A, B where B1: Swift.Error>((Swift.UnsafeBufferPointer<A.Element>) throws(B1) -> A1) throws(B1) -> Swift.Optional<A1>'
+Func Sequence.withContiguousStorageIfAvailable(_:) has parameter 0 type change from (Swift.UnsafeBufferPointer<τ_0_0.Element>) throws -> τ_1_0 to (Swift.UnsafeBufferPointer<τ_0_0.Element>) throws(τ_1_1) -> τ_1_0
+Func Sequence.withContiguousStorageIfAvailable(_:) is now without rethrows
+Func Sequence.withContiguousStorageIfAvailable(_:) now requires new witness table entry
 Func Sequence._compactMap(_:) has been removed
 Func Sequence._filter(_:) has been removed
 Func Dictionary.filter(_:) has been removed
+Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has generic signature change from <Self, R where Self : Swift.MutableCollection> to <Self, R, E where Self : Swift.MutableCollection, E : Swift.Error>
+Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has mangled name changing from '(extension in Swift):Swift.MutableCollection.withContiguousMutableStorageIfAvailable<A>((inout Swift.UnsafeMutableBufferPointer<A.Element>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.MutableCollection.withContiguousMutableStorageIfAvailable<A, B where B1: Swift.Error>((inout Swift.UnsafeMutableBufferPointer<A.Element>) throws(B1) -> A1) throws(B1) -> Swift.Optional<A1>'
+Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<τ_0_0.Element>) throws -> τ_1_0 to (inout Swift.UnsafeMutableBufferPointer<τ_0_0.Element>) throws(τ_1_1) -> τ_1_0
+Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) is now without rethrows
+Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) now requires new witness table entry
 Func Set.filter(_:) has been removed
+Func String.UTF8View.withContiguousStorageIfAvailable(_:) has been removed
 Func String._slowWithCString(encodedAs:_:) has been removed
 Func String._withNFCCodeUnits(_:) has been renamed to Func __rethrows_underscore_withNFCCodeUnits(_:)
 Func String._withNFCCodeUnits(_:) has mangled name changing from 'Swift.String._withNFCCodeUnits((Swift.UInt8) throws -> ()) throws -> ()' to 'Swift.String.__rethrows_underscore_withNFCCodeUnits((Swift.UInt8) throws -> ()) throws -> ()'
@@ -146,7 +157,10 @@ Protocol StringProtocol has generic signature change from <Self : Swift.Bidirect
 // source-level name. This causes a false positive with the ABI checker.
 // The symbols are still present at the ABI level. The symbols are also still present
 // at the source level. The association between them is simply no longer straightforward.
+Func UnsafeBufferPointer.withContiguousStorageIfAvailable(_:) has been removed
 Func UnsafeBufferPointer.withMemoryRebound(to:_:) has been removed
+Func UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable(_:) has been removed
+Func UnsafeMutableBufferPointer.withContiguousStorageIfAvailable(_:) has been removed
 Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has been removed
 Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
@@ -850,8 +864,14 @@ Constructor Array.init(_unsafeUninitializedCapacity:initializingWith:) has been 
 Constructor Dictionary.init(_:uniquingKeysWith:) has been removed
 Constructor Dictionary.init(grouping:by:) has been removed
 Constructor _NativeDictionary.init(grouping:by:) has been removed
+Func Array.withContiguousMutableStorageIfAvailable(_:) has been removed
+Func Array.withContiguousStorageIfAvailable(_:) has been removed
 Func Array.withUnsafeBufferPointer(_:) has been removed
+Func ArraySlice.withContiguousMutableStorageIfAvailable(_:) has been removed
+Func ArraySlice.withContiguousStorageIfAvailable(_:) has been removed
 Func ArraySlice.withUnsafeBufferPointer(_:) has been removed
+Func ContiguousArray.withContiguousMutableStorageIfAvailable(_:) has been removed
+Func ContiguousArray.withContiguousStorageIfAvailable(_:) has been removed
 Func ContiguousArray.withUnsafeBufferPointer(_:) has been removed
 Func Dictionary._Variant.mapValues(_:) has been removed
 Func Dictionary._Variant.merge(_:uniquingKeysWith:) has been removed

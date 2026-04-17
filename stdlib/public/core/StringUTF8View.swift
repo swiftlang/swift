@@ -676,13 +676,28 @@ extension String.Index {
 }
 
 extension String.UTF8View {
-  @inlinable
-  public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  @_alwaysEmitIntoClient
+  public func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     guard _guts.isFastUTF8 else { return nil }
     return unsafe try _guts.withFastUTF8(body)
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withContiguousStorageIfAvailable<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) throws -> R?
+  )
+  @usableFromInline
+  internal func __rethrows_withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) throws -> R? {
+    return try unsafe self.withContiguousStorageIfAvailable(body)
+  }
+#endif // !hasFeature(Embedded)
 }
 
 extension String.UTF8View {

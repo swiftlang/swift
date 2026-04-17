@@ -445,10 +445,20 @@ public protocol Sequence<Element> {
   /// - Returns: The value returned from `body`, unless the sequence doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
+  @available(SwiftStdlib 6.4, *)
+  @safe
+  func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R?
+
+#if !hasFeature(Embedded)
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
   @safe
   func withContiguousStorageIfAvailable<R>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
+#endif // !hasFeature(Embedded)
 }
 
 // Provides a default associated type witness for Iterator when the
@@ -1281,14 +1291,36 @@ extension Sequence {
     }
     return (it, buffer.endIndex)
   }
-    
-  @inlinable
+
+  // This default implementation needs to be @_disfavoredOverload
+  // as the concrete implementations are now @_alwaysEmitIntoClient.
+  @_disfavoredOverload
+  @_alwaysEmitIntoClient
   @safe
-  public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     return nil
-  }  
+  }
+
+#if !hasFeature(Embedded)
+  // This default implementation needs to be @_disfavoredOverload
+  // as the concrete implementations are now @_alwaysEmitIntoClient.
+  @_disfavoredOverload
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withContiguousStorageIfAvailable<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) throws -> R?
+  )
+  @usableFromInline
+  @safe
+  internal func __rethrows_withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) throws -> R? {
+    return try self.withContiguousStorageIfAvailable(body)
+  }
+#endif // !hasFeature(Embedded)
 }
 
 // FIXME(ABI)#182

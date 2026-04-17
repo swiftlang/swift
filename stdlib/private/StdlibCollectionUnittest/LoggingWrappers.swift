@@ -217,11 +217,19 @@ extension LoggingSequence: Sequence {
     return base.underestimatedCount
   }
   
-  public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     SequenceLog.withContiguousStorageIfAvailable[selfType] += 1
+  #if hasFeature(Embedded)
     return try base.withContiguousStorageIfAvailable(body)
+  #else // hasFeature(Embedded)
+    do {
+      return try base.withContiguousStorageIfAvailable(body)
+    } catch {
+      throw error as! E
+    }
+  #endif // hasFeature(Embedded)
   }
 
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {
@@ -399,15 +407,27 @@ extension LoggingMutableCollection: MutableCollection {
     return result
   }
 
-  public mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     MutableCollectionLog.withContiguousMutableStorageIfAvailable[selfType] += 1
+  #if hasFeature(Embedded)
     let result = try base.withContiguousMutableStorageIfAvailable(body)
     if result != nil {
       Log.withContiguousMutableStorageIfAvailableNonNilReturns[selfType] += 1
     }
     return result
+  #else // hasFeature(Embedded)
+    do {
+      let result = try base.withContiguousMutableStorageIfAvailable(body)
+      if result != nil {
+        Log.withContiguousMutableStorageIfAvailableNonNilReturns[selfType] += 1
+      }
+      return result
+    } catch {
+      throw error as! E
+    }
+  #endif // hasFeature(Embedded)
   }
 
 }
@@ -614,15 +634,27 @@ extension BufferAccessLoggingMutableCollection: MutableCollection {
     return result
   }
   
-  public mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     Log.withContiguousMutableStorageIfAvailable[selfType] += 1
+  #if hasFeature(Embedded)
     let result = try base.withContiguousMutableStorageIfAvailable(body)
     if result != nil {
       Log.withContiguousMutableStorageIfAvailableNonNilReturns[selfType] += 1
     }
     return result
+  #else // hasFeature(Embedded)
+    do {
+      let result = try base.withContiguousMutableStorageIfAvailable(body)
+      if result != nil {
+        Log.withContiguousMutableStorageIfAvailableNonNilReturns[selfType] += 1
+      }
+      return result
+    } catch {
+      throw error as! E
+    }
+  #endif // hasFeature(Embedded)
   }
 }
 

@@ -36,8 +36,23 @@ Func AnyRandomAccessCollection.map(_:) has generic signature change from <Elemen
 Func AnyRandomAccessCollection.map(_:) is now without rethrows
 Func AnySequence.map(_:) has generic signature change from <Element, T> to <Element, T, E where E : Swift.Error>
 Func AnySequence.map(_:) is now without rethrows
+Func Array.withContiguousMutableStorageIfAvailable(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
+Func Array.withContiguousMutableStorageIfAvailable(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
+Func Array.withContiguousMutableStorageIfAvailable(_:) is now without rethrows
+Func Array.withContiguousStorageIfAvailable(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
+Func Array.withContiguousStorageIfAvailable(_:) is now without rethrows
+Func ArraySlice.withContiguousMutableStorageIfAvailable(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
+Func ArraySlice.withContiguousMutableStorageIfAvailable(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
+Func ArraySlice.withContiguousMutableStorageIfAvailable(_:) is now without rethrows
+Func ArraySlice.withContiguousStorageIfAvailable(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
+Func ArraySlice.withContiguousStorageIfAvailable(_:) is now without rethrows
 Func Collection.map(_:) has generic signature change from <Self, T where Self : Swift.Collection> to <Self, T, E where Self : Swift.Collection, E : Swift.Error>
 Func Collection.map(_:) is now without rethrows
+Func ContiguousArray.withContiguousMutableStorageIfAvailable(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
+Func ContiguousArray.withContiguousMutableStorageIfAvailable(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
+Func ContiguousArray.withContiguousMutableStorageIfAvailable(_:) is now without rethrows
+Func ContiguousArray.withContiguousStorageIfAvailable(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
+Func ContiguousArray.withContiguousStorageIfAvailable(_:) is now without rethrows
 Func Sequence.map(_:) has generic signature change from <Self, T where Self : Swift.Sequence> to <Self, T, E where Self : Swift.Sequence, E : Swift.Error>
 Func Sequence.map(_:) is now without rethrows
 Func withUnsafeMutablePointer(to:_:) is now without rethrows
@@ -58,6 +73,9 @@ Func RangeReplaceableCollection.filter(_:) is now without rethrows
 Func Dictionary.filter(_:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
 Func Dictionary.filter(_:) has self access kind changing from __Consuming to Consuming
 Func Dictionary.filter(_:) is now without rethrows
+Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has generic signature change from <Self, R where Self : Swift.MutableCollection> to <Self, R, E where Self : Swift.MutableCollection, E : Swift.Error>
+Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Self.Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Self.Element>) throws(E) -> R
+Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) is now without rethrows
 Func Sequence.allSatisfy(_:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
 Func Sequence.allSatisfy(_:) is now without rethrows
 Func Sequence.compactMap(_:) has generic signature change from <Self, ElementOfResult where Self : Swift.Sequence> to <Self, ElementOfResult, E where Self : Swift.Sequence, E : Swift.Error>
@@ -87,8 +105,17 @@ Func Sequence.starts(with:by:) is now without rethrows
 Func Set.filter(_:) has generic signature change from <Element where Element : Swift.Hashable> to <Element, E where Element : Swift.Hashable, E : Swift.Error>
 Func Set.filter(_:) has self access kind changing from __Consuming to Consuming
 Func Set.filter(_:) is now without rethrows
+Func Sequence.withContiguousStorageIfAvailable(_:) has generic signature change from <Self, R where Self : Swift.Sequence> to <Self, R, E where Self : Swift.Sequence, E : Swift.Error>
+Func Sequence.withContiguousStorageIfAvailable(_:) is now without rethrows
+Func Slice.withContiguousMutableStorageIfAvailable(_:) has generic signature change from <Base, R where Base : Swift.MutableCollection> to <Base, R, E where Base : Swift.MutableCollection, E : Swift.Error>
+Func Slice.withContiguousMutableStorageIfAvailable(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Swift.Slice<Base>.Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Swift.Slice<Base>.Element>) throws(E) -> R
+Func Slice.withContiguousMutableStorageIfAvailable(_:) is now without rethrows
+Func Slice.withContiguousStorageIfAvailable(_:) has generic signature change from <Base, R where Base : Swift.Collection> to <Base, R, E where Base : Swift.Collection, E : Swift.Error>
+Func Slice.withContiguousStorageIfAvailable(_:) is now without rethrows
 Func Substring.filter(_:) has generic signature change from to <E where E : Swift.Error>
 Func Substring.filter(_:) is now without rethrows
+Func String.UTF8View.withContiguousStorageIfAvailable(_:) has generic signature change from <R> to <R, E where E : Swift.Error>
+Func String.UTF8View.withContiguousStorageIfAvailable(_:) is now without rethrows
 Func String.withCString(_:) has generic signature change from <Result> to <Result, E where E : Swift.Error>
 Func String.withCString(_:) is now without rethrows
 Func String.withCString(encodedAs:_:) has generic signature change from <Result, TargetEncoding where TargetEncoding : Swift._UnicodeEncoding> to <Result, TargetEncoding, E where TargetEncoding : Swift._UnicodeEncoding, E : Swift.Error>
@@ -99,8 +126,17 @@ Func Substring.withCString(_:) has generic signature change from <Result> to <Re
 Func Substring.withCString(_:) is now without rethrows
 Func Substring.withCString(encodedAs:_:) has generic signature change from <Result, TargetEncoding where TargetEncoding : Swift._UnicodeEncoding> to <Result, TargetEncoding, E where TargetEncoding : Swift._UnicodeEncoding, E : Swift.Error>
 Func Substring.withCString(encodedAs:_:) is now without rethrows
+Func Substring.UTF8View.withContiguousStorageIfAvailable(_:) has generic signature change from <R> to <R, E where E : Swift.Error>
+Func Substring.UTF8View.withContiguousStorageIfAvailable(_:) is now without rethrows
 Func Substring.withUTF8(_:) has generic signature change from <R> to <R, E where E : Swift.Error>
 Func Substring.withUTF8(_:) is now without rethrows
+Func UnsafeBufferPointer.withContiguousStorageIfAvailable(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
+Func UnsafeBufferPointer.withContiguousStorageIfAvailable(_:) is now without rethrows
+Func UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
+Func UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
+Func UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable(_:) is now without rethrows
+Func UnsafeMutableBufferPointer.withContiguousStorageIfAvailable(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
+Func UnsafeMutableBufferPointer.withContiguousStorageIfAvailable(_:) is now without rethrows
 
 Protocol SIMDScalar has generic signature change from <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar> to <Self : Swift.BitwiseCopyable, Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMDMaskScalar == Self.SIMDMaskScalar.SIMDMaskScalar, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar>
 

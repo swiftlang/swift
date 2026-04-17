@@ -234,9 +234,18 @@ where SubSequence: MutableCollection
   /// - Returns: The value returned from `body`, unless the collection doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
+  @available(SwiftStdlib 6.4, *)
+  mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
+    _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R?
+
+#if !hasFeature(Embedded)
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
   mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
+#endif // !hasFeature(Embedded)
 }
 
 // TODO: swift-3-indexing-model - review the following
@@ -249,12 +258,33 @@ extension MutableCollection {
     return nil
   }
 
-  @inlinable
-  public mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  // This default implementation needs to be @_disfavoredOverload
+  // as the concrete implementations are now @_alwaysEmitIntoClient.
+  @_disfavoredOverload
+  @_alwaysEmitIntoClient
+  public mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     return nil
   }
+
+#if !hasFeature(Embedded)
+  // This default implementation needs to be @_disfavoredOverload
+  // as the concrete implementations are now @_alwaysEmitIntoClient.
+  @_disfavoredOverload
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func withContiguousMutableStorageIfAvailable<R>(
+      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    ) throws -> R?
+  )
+  @usableFromInline
+  internal mutating func __rethrows_withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) throws -> R? {
+    return try unsafe self.withContiguousMutableStorageIfAvailable(body)
+  }
+#endif // !hasFeature(Embedded)
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///
