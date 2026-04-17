@@ -1041,6 +1041,8 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
                : ("__DATA," + Section + "," + MachOAttributes).str();
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
+    if (Context.LangOpts.EnableGNUstepObjCInterop)
+      return Section.str();
     return Section.substr(2).str();
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
