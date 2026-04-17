@@ -2436,6 +2436,12 @@ function Patch-mimalloc() {
     [hashtable]$Platform
   )
 
+  # mimalloc patching is not supported when cross-compiling.
+  if ($IsCrossCompiling) { return }
+
+  # use the version of mimalloc that runs on this platform
+  # note: it will also target binaries that run on this platform and inject dlls
+  # for this platform, because mimalloc is not supported when cross-compiling
   $BuildSuffix = if ($BuildPlatform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
 
   $Tools = @(
