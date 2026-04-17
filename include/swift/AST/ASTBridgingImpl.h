@@ -694,6 +694,10 @@ bool BridgedASTType::isPack() const {
   return unbridged()->is<swift::PackType>();
 }
 
+bool BridgedASTType::isPackExpansion() const {
+  return unbridged()->is<swift::PackExpansionType>();
+}
+
 bool BridgedASTType::isSILPack() const {
   return unbridged()->is<swift::SILPackType>();
 }
@@ -875,6 +879,10 @@ bool BridgedASTType::Tuple_containsPackExpansionType() const {
 
 BridgedASTTypeArray BridgedASTType::BoundGenericType_getGenericArgs() const {
   return {llvm::cast<swift::BoundGenericType>(type)->getGenericArgs()};
+}
+
+BridgedASTTypeArray BridgedASTType::PackType_getElementTypes() const {
+  return {llvm::cast<swift::PackType>(type)->getElementTypes()};
 }
 
 static_assert((int)BridgedASTType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);

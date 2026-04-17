@@ -2271,8 +2271,18 @@ extension AnyPackIndexInst {
   }
 }
 
-final public class DynamicPackIndexInst : SingleValueInstruction, AnyPackIndexInst {}
-final public class PackPackIndexInst : SingleValueInstruction, AnyPackIndexInst {}
+final public class DynamicPackIndexInst : SingleValueInstruction, UnaryInstruction, AnyPackIndexInst {}
+final public class PackPackIndexInst : SingleValueInstruction, UnaryInstruction, AnyPackIndexInst {
+  public var componentStartIndex: Int {
+    Int(bridged.PackPackIndexInst_getComponentStartIndex())
+  }
+  public var componentEndIndex: Int {
+    Int(bridged.PackPackIndexInst_getComponentEndIndex())
+  }
+  public var sliceIndexOperand: AnyPackIndexInst {
+    operand.value as! AnyPackIndexInst
+  }
+}
 final public class ScalarPackIndexInst : SingleValueInstruction, AnyPackIndexInst {
   public var componentIndex: Int {
     Int(bridged.ScalarPackIndexInst_getComponentIndex())
