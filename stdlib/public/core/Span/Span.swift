@@ -937,7 +937,7 @@ extension Span where Element: ~Copyable & ~Escapable {
 
 #if !SPAN_COMPATIBILITY_STUB
 @available(SwiftStdlib 6.4, *)
-extension Span: BorrowingSequence where Element: ~Copyable {
+extension Span: BorrowingSequence where Element: ~Copyable & ~Escapable {
   @available(SwiftStdlib 6.4, *)
   @inlinable
   @lifetime(borrow self)
