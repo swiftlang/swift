@@ -44,7 +44,7 @@ from .swiftsyntax import SwiftSyntax
 from .tsan_libdispatch import TSanLibDispatch
 from .wasisysroot import WASISysroot
 from .wasmkit import WasmKit
-from .wasmstdlib import WasmStdlib, WasmThreadsStdlib
+from .wasistdlib import WASIStdlib, WASIThreadsStdlib
 from .wasiswiftsdk import WASISwiftSDK
 from .xctest import XCTest
 from .zlib import Zlib
@@ -86,7 +86,7 @@ __all__ = [
     'SwiftDocCRender',
     'WASISysroot',
     'WasmKit',
-    'WasmStdlib',
-    'WasmThreadsStdlib',
+    'WASIStdlib',
+    'WASIThreadsStdlib',
     'WASISwiftSDK',
 ]
