@@ -255,6 +255,6 @@ func testCompoundRefs() {
 // outside the closure's own type-check context.
 struct GenericBox<T> { struct Inner {} }
 let closureWithUnboundGenericIUO = {
-  var x: GenericBox.Inner! = GenericBox<Int>.Inner()
+  let x: GenericBox.Inner! = GenericBox<Int>.Inner()
   _ = x
 }
