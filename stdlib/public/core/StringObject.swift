@@ -1423,7 +1423,11 @@ extension _StringObject {
         #if !$Embedded
         let unmanaged = unsafe Unmanaged<AnyObject>.fromOpaque(largeAddress)
         let anyObj = unsafe unmanaged.takeUnretainedValue()
+        #if _runtime(_ObjC) && canImport(Glibc)
+        _ = anyObj
+        #else
         _internalInvariant(anyObj is __StringStorage)
+        #endif
         #endif
       }
     }

@@ -53,6 +53,16 @@
 
 using namespace swift;
 
+static bool shouldSkipGNUstepSwiftStdlibOwnershipVerify(const SILModule &mod) {
+  auto *swiftModule = mod.getSwiftModule();
+  if (!swiftModule)
+    return false;
+  const auto &langOpts = mod.getASTContext().LangOpts;
+  return swiftModule->getNameStr() == "Swift" &&
+         langOpts.EnableGNUstepObjCInterop &&
+         langOpts.Target.isOSLinux();
+}
+
 // This is an option to put the SILOwnershipVerifier in testing mode. This
 // causes the following:
 //
@@ -847,6 +857,8 @@ bool SILValueOwnershipChecker::checkUses() {
 
 bool disableOwnershipVerification(const SILModule &mod) {
   if (DisableOwnershipVerification)
+    return true;
+  if (shouldSkipGNUstepSwiftStdlibOwnershipVerify(mod))
     return true;
   if (mod.getASTContext().blockListConfig.hasBlockListAction(
           mod.getSwiftModule()->getRealName().str(),

@@ -64,7 +64,7 @@ protocol _CVarArgAligned: CVarArg {
   var _cVarArgAlignment: Int { get }
 }
 
-#if !_runtime(_ObjC)
+#if !_runtime(_ObjC) || os(Linux)
 /// Some pointers require an alternate object to be retained.  The object
 /// that is returned will be used with _cVarArgEncoding and held until
 /// the closure is complete.  This is required since autoreleased storage
@@ -489,7 +489,7 @@ final internal class __VaListBuilder {
   @safe
   internal var storage: ContiguousArray<Int>
 
-#if !_runtime(_ObjC)
+#if !_runtime(_ObjC) || os(Linux)
   @usableFromInline // c-abi
   @safe
   internal var retainer = [CVarArg]()
@@ -506,7 +506,7 @@ final internal class __VaListBuilder {
 
   @inlinable // c-abi
   internal func append(_ arg: CVarArg) {
-#if !_runtime(_ObjC)
+#if !_runtime(_ObjC) || os(Linux)
     var arg = arg
 
     // We may need to retain an object that provides a pointer value.
@@ -604,7 +604,7 @@ final internal class __VaListBuilder {
 
   @inlinable // c-abi
   internal func append(_ arg: CVarArg) {
-#if !_runtime(_ObjC)
+#if !_runtime(_ObjC) || os(Linux)
     var arg = arg
 
     // We may need to retain an object that provides a pointer value.
@@ -719,7 +719,7 @@ final internal class __VaListBuilder {
   @usableFromInline // c-abi
   internal var storage: UnsafeMutablePointer<Int>?
 
-#if !_runtime(_ObjC)
+#if !_runtime(_ObjC) || os(Linux)
   @usableFromInline // c-abi
   internal var retainer = [CVarArg]()
 #endif

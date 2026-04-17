@@ -98,6 +98,13 @@ check_include_file_cxx("clocale" SwiftCore_HAS_LOCALE)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
+if(NOT APPLE)
+  find_library(SwiftCore_GNUSTEP_BASE_LIBRARY
+    NAMES gnustep-base libgnustep-base)
+  find_library(SwiftCore_OBJC_RUNTIME_LIBRARY
+    NAMES objc libobjc)
+endif()
+
 defaulted_option(SwiftCore_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries")
 
 defaulted_option(SwiftCore_ENABLE_CRASH_REPORTER_CLIENT "Enable Apple CrashReporter integration")

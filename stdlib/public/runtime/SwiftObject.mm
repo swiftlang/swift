@@ -371,6 +371,17 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 
 - (BOOL)conformsToProtocol:(Protocol*)proto {
   if (!proto) return NO;
+#if defined(__GNUSTEP_RUNTIME__)
+  const Metadata *currentType = swift_getObjCClassMetadata(
+      reinterpret_cast<const ClassMetadata *>(
+          _swift_getObjCClassOfAllocated(self)));
+
+  while (currentType) {
+    if (class_conformsToProtocol(currentType->getObjCClassObject(), proto))
+      return YES;
+    currentType = _swift_class_getSuperclass(currentType);
+  }
+#else
   auto selfClass = _swift_getObjCClassOfAllocated(self);
 
   // Walk the superclass chain.
@@ -379,6 +390,7 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
       return YES;
     selfClass = class_getSuperclass(selfClass);
   }
+#endif
 
   return NO;
 }
@@ -386,6 +398,16 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 + (BOOL)conformsToProtocol:(Protocol*)proto {
   if (!proto) return NO;
 
+#if defined(__GNUSTEP_RUNTIME__)
+  const Metadata *currentType = swift_getObjCClassMetadata(
+      reinterpret_cast<const ClassMetadata *>(self));
+
+  while (currentType) {
+    if (class_conformsToProtocol(currentType->getObjCClassObject(), proto))
+      return YES;
+    currentType = _swift_class_getSuperclass(currentType);
+  }
+#else
   // Walk the superclass chain.
   Class selfClass = self;
   while (selfClass) {
@@ -393,6 +415,7 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
       return YES;
     selfClass = class_getSuperclass(selfClass);
   }
+#endif
 
   return NO;
 }
@@ -560,6 +583,16 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 /// reference-counting.
 bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 #if SWIFT_OBJC_INTEROP
+#if defined(__GNUSTEP_RUNTIME__)
+  // GNUstep ObjC interop can coexist with pure Swift class metadata that is
+  // not also an ObjC class object. Those records carry the direct metadata
+  // kind word instead of the ObjC-compatible isa/Data layout, so isTypeMetadata()
+  // would otherwise misclassify them as ObjC classes and route releases through
+  // objc_release.
+  auto rawKind = *reinterpret_cast<const uintptr_t *>(theClass);
+  if (rawKind == static_cast<uintptr_t>(MetadataKind::Class))
+    return true;
+#endif
   if (!theClass->isTypeMetadata()) return false;
   return (theClass->getFlags() & ClassFlags::UsesSwiftRefcounting);
 #else
@@ -575,12 +608,15 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 bool
 _swift_objcClassUsesNativeSwiftReferenceCounting(const Metadata *theClass) {
 #if SWIFT_OBJC_INTEROP
-  // If this is ObjC wrapper metadata, the class is definitely not using
-  // Swift ref-counting.
-  if (isa<ObjCClassWrapperMetadata>(theClass)) return false;
+  auto canonical = swift_getObjCClassMetadata(
+      reinterpret_cast<const ClassMetadata *>(theClass));
+  if (!canonical)
+    return false;
 
-  // Otherwise, it's class metadata.
-  return usesNativeSwiftReferenceCounting(cast<ClassMetadata>(theClass));
+  if (isa<ObjCClassWrapperMetadata>(canonical))
+    return false;
+
+  return usesNativeSwiftReferenceCounting(cast<ClassMetadata>(canonical));
 #else
   return true;
 #endif
@@ -1207,9 +1243,23 @@ swift_dynamicCastObjCClassImpl(const void *object,
   if (object == nullptr)
     return nullptr;
 
+#if defined(__GNUSTEP_RUNTIME__)
+  const Metadata *targetMetadata = swift_getObjCClassMetadata(targetType);
+  const Metadata *sourceMetadata = swift_getObjCClassMetadata(
+      reinterpret_cast<const ClassMetadata *>(
+          object_getClass(id_const_cast(object))));
+  for (auto currentType = sourceMetadata;
+       currentType != nullptr;
+       currentType = _swift_class_getSuperclass(currentType)) {
+    if (currentType == targetMetadata) {
+      return object;
+    }
+  }
+#else
   if ([id_const_cast(object) isKindOfClass:class_const_cast(targetType)]) {
     return object;
   }
+#endif
 
   // For casts to NSError or NSObject, we might need to bridge via the Error
   // protocol. Try it now.
@@ -1239,9 +1289,23 @@ swift_dynamicCastObjCClassUnconditionalImpl(const void *object,
   if (object == nullptr)
     return nullptr;
 
+#if defined(__GNUSTEP_RUNTIME__)
+  const Metadata *targetMetadata = swift_getObjCClassMetadata(targetType);
+  const Metadata *sourceMetadata = swift_getObjCClassMetadata(
+      reinterpret_cast<const ClassMetadata *>(
+          object_getClass(id_const_cast(object))));
+  for (auto currentType = sourceMetadata;
+       currentType != nullptr;
+       currentType = _swift_class_getSuperclass(currentType)) {
+    if (currentType == targetMetadata) {
+      return object;
+    }
+  }
+#else
   if ([id_const_cast(object) isKindOfClass:class_const_cast(targetType)]) {
     return object;
   }
+#endif
 
   // For casts to NSError or NSObject, we might need to bridge via the Error
   // protocol. Try it now.
@@ -1431,7 +1495,12 @@ void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
 
   if (!objcSupportsLazyRealization()) {
     // Ensure the superclass is realized.
+#if defined(__GNUSTEP_RUNTIME__)
+    // GNUstep/libobjc2 can fault if we eagerly message the superclass while
+    // realizing a Swift-emitted class. Touch the class itself below instead.
+#else
     [class_getSuperclass(c) class];
+#endif
   }
 
   // Register the class.
@@ -1442,19 +1511,19 @@ void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
   (void)registered;
 #else
   // GNUstep/libobjc2 compiler-emitted classes are registered by the image load
-  // path. Force resolution and initialization rather than using the dynamic
-  // class-pair API, which is intended for objc_allocateClassPair() classes.
-  objc_send_initialize((id)c);
+  // path. Resolving the class through the runtime avoids messaging a partially
+  // realized Swift-emitted class during metadata initialization.
+  (void)class_getSuperclass(c);
 #endif
 }
 
 Class swift::swift_getInitializedObjCClass(Class c) {
   if (!objcSupportsLazyRealization()) {
 #if defined(__GNUSTEP_RUNTIME__)
-    // GNUstep/libobjc2 exposes an explicit class initialization entry point.
-    // Using it avoids sending a class message to a class that has not yet been
-    // fully initialized by the runtime.
-    objc_send_initialize((id)c);
+    // GNUstep/libobjc2 Swift class metadata is instantiated explicitly through
+    // swift_instantiateObjCClass(). Re-touching metadata-backed class objects
+    // here can fault before libobjc2 has finished realizing them.
+    (void)c;
 #else
     // Used when we have class metadata and we want to ensure a class has been
     // initialized by the Objective-C runtime. We need to do this because the
@@ -1694,10 +1763,16 @@ ClassExtents
 _swift_getSwiftClassInstanceExtents(const Metadata *c) {
   assert(c && c->isClassObject());
   auto metaData = c->getClassObject();
-  return ClassExtents{
-    metaData->getInstanceAddressPoint(),
-    metaData->getInstanceSize() - metaData->getInstanceAddressPoint()
-  };
+#if defined(__GNUSTEP_RUNTIME__)
+  if (!metaData->isTypeMetadata()) {
+    auto negative = size_t(metaData->InstanceAddressPoint);
+    auto positive = size_t(metaData->InstanceSize) - negative;
+    return ClassExtents{negative, positive};
+  }
+#endif
+  auto negative = metaData->getInstanceAddressPoint();
+  auto positive = metaData->getInstanceSize() - metaData->getInstanceAddressPoint();
+  return ClassExtents{negative, positive};
 }
 
 #if SWIFT_OBJC_INTEROP

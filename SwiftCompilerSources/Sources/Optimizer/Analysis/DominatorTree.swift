@@ -40,7 +40,9 @@ struct DominatorTree {
     while idx < order.count {
       let block = order[idx]
       idx += 1
-      order.append(contentsOf: getChildren(of: block).lazy.filter(filter))
+      for child in getChildren(of: block) where filter(child) {
+        order.append(child)
+      }
     }
     return order
   }

@@ -505,12 +505,18 @@ swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
     return ns;
   }
 
-  // Otherwise, calculate the domain, code, and user info, and
-  // initialize the NSError.
   auto value = SwiftError::getIndirectValue(&errorObject);
   auto type = errorObject->getType();
   auto witness = errorObject->getErrorConformance();
 
+  if (id embedded = getErrorEmbeddedNSErrorIndirect(value, type, witness)) {
+    swift_unknownObjectRetain(embedded);
+    swift_unknownObjectRelease(ns);
+    return embedded;
+  }
+
+  // Otherwise, calculate the domain, code, and user info, and
+  // initialize the NSError.
   id domain = getErrorDomainNSString(value, type, witness);
   NSInteger code = getErrorCode(value, type, witness);
   id userInfo = getErrorUserInfoNSDictionary(value, type, witness);
@@ -702,7 +708,18 @@ id _swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
 }
 
 id swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
-  (void)errorObject;
+  id ns = reinterpret_cast<id>(errorObject);
+  auto value = SwiftError::getIndirectValue(&errorObject);
+  auto type = errorObject->getType();
+  auto witness = errorObject->getErrorConformance();
+
+  if (id embedded = getErrorEmbeddedNSErrorIndirect(value, type, witness)) {
+    swift_unknownObjectRetain(embedded);
+    swift_unknownObjectRelease(ns);
+    return embedded;
+  }
+
+  swift_unknownObjectRelease(ns);
   return nil;
 }
 

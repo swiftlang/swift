@@ -1095,10 +1095,15 @@ void IRGenModule::emitGlobalLists() {
     // Objective-C class references go in a variable with a meaningless
     // name but a magic section.
     emitGlobalList(
-        *this, ObjCClasses, "objc_classes",
-        GetObjCSectionName("__objc_classlist", "regular,no_dead_strip"),
+        *this, ObjCClasses,
+        Context.LangOpts.EnableGNUstepObjCInterop ? "gnustep_objc_classes"
+                                                  : "objc_classes",
+        GetObjCSectionName(
+            Context.LangOpts.EnableGNUstepObjCInterop ? "__objc_classes"
+                                                      : "__objc_classlist",
+            "regular,no_dead_strip"),
         llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
-        /*asContiguousArray*/ false);
+        /*asContiguousArray*/ Context.LangOpts.EnableGNUstepObjCInterop);
 
     // So do resilient class stubs.
     emitGlobalList(

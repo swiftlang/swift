@@ -478,6 +478,12 @@ extern "C" const ClassDescriptor NOMINAL_TYPE_DESCR_SYM(s12__SwiftValueC);
 static const void *swift_dynamicCastClassImpl(const void *object,
                                               const ClassMetadata *targetType) {
 #if SWIFT_OBJC_INTEROP
+  // GNUstep-imported Objective-C classes can surface as MetadataKind::Class on
+  // Linux even though they still require ObjC-style runtime casting.
+  if (targetType->isPureObjC()) {
+    return swift_dynamicCastObjCClass(object, targetType);
+  }
+
   assert(!targetType->isPureObjC());
 
   // Swift native classes never have a tagged-pointer representation.
@@ -516,6 +522,13 @@ static const void *
 swift_dynamicCastClassUnconditionalImpl(const void *object,
                                         const ClassMetadata *targetType,
                                         const char *file, unsigned line, unsigned column) {
+#if SWIFT_OBJC_INTEROP
+  if (targetType->isPureObjC()) {
+    return swift_dynamicCastObjCClassUnconditional(object, targetType,
+                                                   file, line, column);
+  }
+#endif
+
   auto value = swift_dynamicCastClass(object, targetType);
   if (value) return value;
 

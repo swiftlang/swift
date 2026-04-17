@@ -21,6 +21,13 @@ public func initializeSwiftModules() {
   registerSwiftAnalyses()
   registerOptimizerUtilities()
   registerSwiftPasses()
+#if os(Linux)
+  // GNUstep runtime bring-up currently trips generic metadata assertions while
+  // eagerly materializing the internal SIL/optimizer test registry at process
+  // startup. Skip those debug-only registrations until the Linux ObjC runtime
+  // path is stable enough to launch the toolchain normally.
+  return
+#endif
   registerOptimizerTests()
 }
 
