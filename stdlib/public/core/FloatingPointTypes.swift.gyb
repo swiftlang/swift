@@ -118,7 +118,11 @@ extension ${Self}: CustomDebugStringConvertible {
   /// This property has the same value as the `description` property, except
   /// that NaN values are printed in an extended format.
   public var debugDescription: String {
+    %if bits > 64:
     var buffer = _InlineArray<64, UTF8.CodeUnit>(repeating: 0x30)
+    %else:
+    var buffer = _InlineArray<32, UTF8.CodeUnit>(repeating: 0x30)
+    %end
     var span = buffer.mutableSpan
     let textRange = _Float${bits}ToASCII(value: self, buffer: &span)
     let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
