@@ -2679,6 +2679,38 @@ internal func parse_float64(_ span: Span<UInt8>) -> Optional<Float64> {
 
 #if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 
+// Caveat:  This function was called directly from inlineable
+// code until Feb 2020 (commit 4d0e2adbef4d changed this),
+// so it still needs to be exported with the same C-callable ABI
+// for as long as we support code compiled with Swift 5.3.
+
+@c(_swift_stdlib_strtold_clocale)
+@usableFromInline
+internal func _swift_stdlib_strtold_clocale(
+  _ cText: Optional<UnsafePointer<CChar>>,
+  _ output: Optional<UnsafeMutablePointer<Float80>>
+) -> Optional<UnsafePointer<CChar>>
+{
+  guard let cText = unsafe cText, let output = unsafe output else {
+    return unsafe cText
+  }
+
+  // i = strlen(cText)
+  var i = 0
+  while unsafe cText[i] != 0 {
+    i &+= 1
+  }
+
+  let charSpan = unsafe Span<UInt8>(_unchecked: cText, count: i)
+  let result = parse_float80(charSpan)
+  if let result {
+    unsafe output.pointee = result
+    return unsafe cText + i
+  } else {
+    return nil
+  }
+}
+
 internal func parse_float80(_ span: Span<UInt8>) -> Optional<Float80> {
   let targetFormat = TargetFormat(
     significandBits: 64,
