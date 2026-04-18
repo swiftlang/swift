@@ -2784,64 +2784,37 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
   }
 }
 
-bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
-  switch (platformKind) {
-  case PlatformKind::macOS:
-    return name == "macos";
-  case PlatformKind::macOSApplicationExtension:
-    return name == "macos" || name == "macos_app_extension";
+std::optional<PlatformKind>
+PlatformAvailability::platformKindIfRelevant(StringRef platformName) const {
+  auto result =
+      llvm::StringSwitch<std::optional<PlatformKind>>(platformName)
+          .Case("anyappleos", PlatformKind::anyAppleOS)
+          .Case("ios", PlatformKind::iOS)
+          .Case("macos", PlatformKind::macOS)
+          .Case("maccatalyst", PlatformKind::macCatalyst)
+          .Case("tvos", PlatformKind::tvOS)
+          .Case("watchos", PlatformKind::watchOS)
+          .Case("xros", PlatformKind::visionOS)
+          .Case("visionos", PlatformKind::visionOS)
+          .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
+          .Case("maccatalyst_app_extension",
+                PlatformKind::macCatalystApplicationExtension)
+          .Case("macos_app_extension", PlatformKind::macOSApplicationExtension)
+          .Case("tvos_app_extension", PlatformKind::tvOSApplicationExtension)
+          .Case("watchos_app_extension",
+                PlatformKind::watchOSApplicationExtension)
+          .Case("xros_app_extension",
+                PlatformKind::visionOSApplicationExtension)
+          .Case("android", PlatformKind::Android)
+          .Default(std::nullopt);
 
-  case PlatformKind::iOS:
-    return name == "ios";
-  case PlatformKind::iOSApplicationExtension:
-    return name == "ios" || name == "ios_app_extension";
-
-  case PlatformKind::macCatalyst:
-    return name == "ios" || name == "maccatalyst";
-  case PlatformKind::macCatalystApplicationExtension:
-    return name == "ios" || name == "ios_app_extension" ||
-           name == "maccatalyst" || name == "maccatalyst_app_extension";
-
-  case PlatformKind::tvOS:
-    return name == "tvos";
-  case PlatformKind::tvOSApplicationExtension:
-    return name == "tvos" || name == "tvos_app_extension";
-
-  case PlatformKind::watchOS:
-    return name == "watchos";
-  case PlatformKind::watchOSApplicationExtension:
-    return name == "watchos" || name == "watchos_app_extension";
-
-  case PlatformKind::visionOS:
-    return name == "xros" || name == "visionos";
-  case PlatformKind::visionOSApplicationExtension:
-    return name == "xros" || name == "xros_app_extension" ||
-           name == "visionos" || name == "visionos_app_extension";
-
-  case PlatformKind::DriverKit:
-    return name == "driverkit";
-
-  case PlatformKind::Swift:
-  case PlatformKind::anyAppleOS:
-    break; // Unexpected
-
-  case PlatformKind::FreeBSD:
-    return name == "freebsd";
-
-  case PlatformKind::OpenBSD:
-    return name == "openbsd";
-
-  case PlatformKind::Windows:
-    return name == "windows";
-
-  case PlatformKind::Android:
-    return name == "android";
-
-  case PlatformKind::none:
-    return false;
+  if (result) {
+    if (platformKind == *result ||
+        inheritsAvailabilityFromPlatform(platformKind, *result))
+      return result;
   }
 
-  llvm_unreachable("Unexpected platform");
+  return std::nullopt;
 }
 
 bool PlatformAvailability::treatDeprecatedAsUnavailable(

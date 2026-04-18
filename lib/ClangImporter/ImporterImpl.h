@@ -332,9 +332,16 @@ private:
   PlatformKind platformKind;
 
 public:
+  /// Returns a non-optional `PlatformKind` corresponding to the platform name
+  /// if the given platform should be considered for availability on imported
+  /// declarations.
+  std::optional<PlatformKind> platformKindIfRelevant(StringRef platform) const;
+
   /// Returns true when the given platform should be considered for
-  /// availabilityon imported declarations.
-  bool isPlatformRelevant(StringRef platform) const;
+  /// availability on imported declarations.
+  bool isPlatformRelevant(StringRef platform) const {
+    return platformKindIfRelevant(platform).has_value();
+  }
 
   /// Returns true when the given declaration with the given deprecation
   /// should be included in the cutoff of imported deprecated APIs marked

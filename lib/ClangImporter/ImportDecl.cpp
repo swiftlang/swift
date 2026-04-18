@@ -9678,31 +9678,7 @@ void ClangImporter::Implementation::importAttributes(
 
       // Does this availability attribute map to the platform we are
       // currently targeting?
-      if (!platformAvailability.isPlatformRelevant(Platform))
-        continue;
-
-      auto platformK =
-          llvm::StringSwitch<std::optional<PlatformKind>>(Platform)
-              .Case("ios", PlatformKind::iOS)
-              .Case("macos", PlatformKind::macOS)
-              .Case("maccatalyst", PlatformKind::macCatalyst)
-              .Case("tvos", PlatformKind::tvOS)
-              .Case("watchos", PlatformKind::watchOS)
-              .Case("xros", PlatformKind::visionOS)
-              .Case("visionos", PlatformKind::visionOS)
-              .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
-              .Case("maccatalyst_app_extension",
-                    PlatformKind::macCatalystApplicationExtension)
-              .Case("macos_app_extension",
-                    PlatformKind::macOSApplicationExtension)
-              .Case("tvos_app_extension",
-                    PlatformKind::tvOSApplicationExtension)
-              .Case("watchos_app_extension",
-                    PlatformKind::watchOSApplicationExtension)
-              .Case("xros_app_extension",
-                    PlatformKind::visionOSApplicationExtension)
-              .Case("android", PlatformKind::Android)
-              .Default(std::nullopt);
+      auto platformK = platformAvailability.platformKindIfRelevant(Platform);
       if (!platformK)
         continue;
 
