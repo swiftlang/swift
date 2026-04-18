@@ -1,7 +1,8 @@
-// RUN: %target-swift-emit-silgen -module-name test -enable-experimental-feature Lifetimes %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name test -enable-experimental-feature Lifetimes %s -sil-verify-all
+// RUN: %target-swift-emit-silgen -module-name test -enable-experimental-feature UnderscoreOwned -enable-experimental-feature Lifetimes %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name test -enable-experimental-feature UnderscoreOwned -enable-experimental-feature Lifetimes %s -sil-verify-all
 
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_UnderscoreOwned
 
 // Test that calling a consuming accessor on a noncopyable rvalue passes the owned value directly
 // instead of initiating a borrow scope and copying the value within it.
