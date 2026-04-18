@@ -363,10 +363,10 @@ $KnownPlatforms = @{
 }
 
 $WiX = @{
-  Version = "5.0.2";
-  URL = "https://www.nuget.org/api/v2/package/wix/5.0.2";
-  SHA256 = "f30ef0c74e2a986126539c5780be93ac24e8136eaf723b1937b26272703ae173";
-  Path = [IO.Path]::Combine("$BinaryCache\WiX-5.0.2", "tools", "net6.0", "any");
+  Version = "6.0.2";
+  URL = "https://www.nuget.org/api/v2/package/wix/6.0.2";
+  SHA256 = "13caed0aa86898c9952eb8ba82c6ac6b43d1575bb731ac848e5edf5490a10428";
+  Path = [IO.Path]::Combine("$BinaryCache\WiX-6.0.2", "tools", "net6.0", "any");
 }
 
 $KnownPythons = @{
