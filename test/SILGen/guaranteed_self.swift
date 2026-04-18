@@ -69,7 +69,7 @@ struct S: Fooable {
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
   // modify for prop1
-  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15guaranteed_self1SV5prop1SivM : $@yield_once @convention(method) (@inout S) -> @yields @inout Int
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15guaranteed_self1SV5prop1Sivx : $@yield_once_2 @convention(method) (@inout S) -> @yields @inout Int
   // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
   // CHECK-NOT:     load [[SELF_ADDR]]
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
@@ -80,7 +80,7 @@ struct S: Fooable {
     // CHECK-NOT:     destroy_value [[SELF]]
     get { return 0 }
     // CHECK-LABEL: sil hidden [ossa] @$s15guaranteed_self1SV5prop2Sivs : $@convention(method) (Int, @inout S) -> ()
-    // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15guaranteed_self1SV5prop2SivM : $@yield_once @convention(method) (@inout S) -> @yields @inout Int
+    // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15guaranteed_self1SV5prop2Sivx : $@yield_once_2 @convention(method) (@inout S) -> @yields @inout Int
     set { }
   }
 
@@ -92,7 +92,7 @@ struct S: Fooable {
     // CHECK-LABEL: sil hidden [ossa] @$s15guaranteed_self1SV5prop3Sivs : $@convention(method) (Int, @guaranteed S) -> ()
     // CHECK:       bb0({{.*}} [[SELF:%.*]] : @guaranteed $S):
     // CHECK-NOT:     destroy_value [[SELF]]
-    // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15guaranteed_self1SV5prop3SivM : $@yield_once @convention(method) (@guaranteed S) -> @yields @inout Int
+    // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15guaranteed_self1SV5prop3Sivx : $@yield_once_2 @convention(method) (@guaranteed S) -> @yields @inout Int
     // CHECK:       bb0([[SELF:%.*]] : @guaranteed $S):
     // CHECK-NOT:     destroy_value [[SELF]]
     nonmutating set { }
@@ -132,8 +132,8 @@ struct S: Fooable {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
-// Witness thunk for prop1 modify
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15guaranteed_self1SVAA7FooableA2aDP5prop1SivMTW :
+// Witness thunk for prop1 yielding mutate
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15guaranteed_self1SVAA7FooableA2aDP5prop1SivxTW :
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
@@ -149,8 +149,8 @@ struct S: Fooable {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
-// Witness thunk for prop2 modify
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15guaranteed_self1SVAA7FooableA2aDP5prop2SivMTW :
+// Witness thunk for prop2 yielding mutate
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15guaranteed_self1SVAA7FooableA2aDP5prop2SivxTW :
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
@@ -168,13 +168,13 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_value [[SELF]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
-// Witness thunk for prop3 nonmutating modify
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15guaranteed_self1SVAA7FooableA2aDP5prop3SivMTW :
+// Witness thunk for prop3 nonmutating yielding mutate
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15guaranteed_self1SVAA7FooableA2aDP5prop3SivxTW :
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF:%.*]] = load_borrow [[SELF_ADDR]]
 // CHECK-NOT:     destroy_value [[SELF]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-// CHECK:       } // end sil function '$s15guaranteed_self1SVAA7FooableA2aDP5prop3SivMTW'
+// CHECK:       } // end sil function '$s15guaranteed_self1SVAA7FooableA2aDP5prop3SivxTW'
 
 //
 // TODO: Expected output for the other cases
@@ -219,7 +219,7 @@ struct AO<T>: Fooable {
     // CHECK-LABEL: sil hidden [ossa] @$s15guaranteed_self2AOV5prop3Sivs : $@convention(method) <T> (Int, @in_guaranteed AO<T>) -> ()
     // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
     // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-    // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15guaranteed_self2AOV5prop3SivM : $@yield_once @convention(method) <T> (@in_guaranteed AO<T>) -> @yields @inout Int
+    // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15guaranteed_self2AOV5prop3Sivx : $@yield_once_2 @convention(method) <T> (@in_guaranteed AO<T>) -> @yields @inout Int
     // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
     // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
     // CHECK:       }

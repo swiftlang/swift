@@ -3,7 +3,6 @@
 // RUN:     -enable-callee-allocated-coro-abi\
 // RUN:     %s \
 // RUN:     -enable-sil-verify-all \
-// RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_CoroutineAccessors

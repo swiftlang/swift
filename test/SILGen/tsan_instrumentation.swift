@@ -46,18 +46,25 @@ func inoutGlobalStructStoredProperty() {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s20tsan_instrumentation30inoutGlobalClassStoredPropertyyyF : $@convention(thin) () -> () {
-// CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @$s20tsan_instrumentation6gClassAA02MyC0Cvp : $*MyClass
-// CHECK:  [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL_ADDR]] : $*MyClass
-// CHECK:  [[LOADED_CLASS:%.*]] = load [copy] [[READ]] : $*MyClass
-// CHECK:  end_access [[READ]]
-// CHECK:  [[BORROWED_CLASS:%.*]] = begin_borrow [[LOADED_CLASS]]
-// CHECK:  [[MODIFY:%.*]] = class_method [[BORROWED_CLASS]] : $MyClass, #MyClass.storedProperty!modify :
-// CHECK:  ([[BUFFER_ADDRESS:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[BORROWED_CLASS]]) : $@yield_once @convention(method) (@guaranteed MyClass) -> @yields @inout Int
-// CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[BUFFER_ADDRESS]] : $*Int) : $()
-// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @$s20tsan_instrumentation10takesInoutyySizF : $@convention(thin) (@inout Int) -> ()
-// CHECK:  {{%.*}} apply [[TAKES_INOUT_FUNC]]([[BUFFER_ADDRESS]]) : $@convention(thin) (@inout Int) -> ()
-// CHECK:  end_apply [[TOKEN]]
-// CHECK:  destroy_value [[LOADED_CLASS]]
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:  [[GLOBAL_ADDR:%.*]] = global_addr @$s20tsan_instrumentation6gClassAA02MyC0Cvp : $*MyClass
+// CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL_ADDR]] : $*MyClass
+// CHECK-NEXT:  [[LOADED_CLASS:%.*]] = load [copy] [[READ]] : $*MyClass
+// CHECK-NEXT:  end_access [[READ]]
+// CHECK-NEXT:  [[BORROWED_CLASS:%.*]] = begin_borrow [[LOADED_CLASS]]
+// CHECK-NEXT:  [[MODIFY:%.*]] = class_method [[BORROWED_CLASS]] : $MyClass, #MyClass.storedProperty!yielding_mutate :
+// CHECK-NEXT:  ([[BUFFER_ADDRESS:%.*]], [[TOKEN:%.*]], [[CORO_ALLOCATION:%.*]]) = begin_apply [[MODIFY]]([[BORROWED_CLASS]]) : $@yield_once_2 @convention(method) (@guaranteed MyClass) -> @yields @inout Int
+// CHECK-NEXT:  {{%.*}} = builtin "tsanInoutAccess"([[BUFFER_ADDRESS]] : $*Int) : $()
+// CHECK-NEXT:  // function_ref takesInout
+// CHECK-NEXT:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @$s20tsan_instrumentation10takesInoutyySizF : $@convention(thin) (@inout Int) -> ()
+// CHECK-NEXT:  {{%.*}} apply [[TAKES_INOUT_FUNC]]([[BUFFER_ADDRESS]]) : $@convention(thin) (@inout Int) -> ()
+// CHECK-NEXT:  end_apply [[TOKEN]]
+// CHECK-NEXT:  end_borrow [[BORROWED_CLASS]]
+// CHECK-NEXT:  destroy_value [[LOADED_CLASS]]
+// CHECK-NEXT:  dealloc_stack [[CORO_ALLOCATION]]
+// CHECK-NEXT:  [[VOID_RET:%.*]] = tuple ()
+// CHECK-NEXT:  return [[VOID_RET]]
+
 func inoutGlobalClassStoredProperty() {
   // This generates two TSan inout instrumentations. One for the value
   // buffer that is passed inout to materializeForSet and one for the

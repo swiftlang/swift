@@ -767,11 +767,11 @@ protocol Abstractable {
 class C : Abstractable {
   var storedFunction: () -> Int = { 0 }
 }
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20access_marker_verify1CCAA12AbstractableA2aDP14storedFunction6ResultQzycvMTW :
+// CHECK-LABEL:il private [transparent] [thunk] [ossa] @$s20access_marker_verify1CCAA12AbstractableA2aDP14storedFunction6ResultQzycvxTW
 // CHECK:      bb0(%0 : $*C):
 // CHECK-NEXT:   [[SELF:%.*]] = load_borrow %0 : $*C
-// CHECK-NEXT:   [[MODIFY:%.*]] = class_method [[SELF]] : $C, #C.storedFunction!modify
-// CHECK-NEXT:   ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[SELF]])
+// CHECK-NEXT:   [[MODIFY:%.*]] = class_method [[SELF]] : $C, #C.storedFunction!yielding_mutate
+// CHECK-NEXT:   ([[ADDR:%.*]], [[TOKEN:%.*]], [[STK:%.*]]) = begin_apply [[MODIFY]]([[SELF]])
 // CHECK-NEXT:   [[TEMP:%.*]] = alloc_stack
 // CHECK-NEXT:   [[OLD_FN:%.*]] = load [take] [[ADDR]]
 // CHECK-NEXT:   // function_ref thunk
@@ -792,6 +792,7 @@ class C : Abstractable {
 // CHECK-NEXT:   store [[THUNKED_NEW_FN]] to [init] [[ADDR]] :
 // CHECK-NEXT:   dealloc_stack [[TEMP]]
 // CHECK-NEXT:   end_apply [[TOKEN]]
+// CHECK-NEXT:   dealloc_stack [[STK]] : $*Builtin.SILToken
 // CHECK-NEXT:   [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:   end_borrow [[SELF]] : $C
 // CHECK-NEXT:   return [[TUPLE]]
@@ -804,7 +805,8 @@ class C : Abstractable {
 // CHECK-NEXT:   [[THUNKED_NEW_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NEW_FN_CONV]])
 // CHECK-NEXT:   store [[THUNKED_NEW_FN]] to [init] [[ADDR]] :
 // CHECK-NEXT:   dealloc_stack [[TEMP]]
-// CHECK-NEXT:   abort_apply [[TOKEN]]
+// CHECK-NEXT:   end_apply [[TOKEN]]
+// CHECK-NEXT:   dealloc_stack [[STK]] : $*Builtin.SILToken
 // CHECK-NEXT:   end_borrow [[SELF]] : $C
 // CHECK-NEXT:   unwind
 
@@ -852,7 +854,7 @@ class Container {
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify9ContainerC17testWritebackTempyyF : $@convention(method) (@guaranteed Container) -> () {
 // CHECK: bb0(%0 : @guaranteed $Container):
 // call storage.materializeForSet
-// CHECK: [[MODIFY:%.*]] = class_method %0 : $Container, #Container.storage!modify
+// CHECK: [[MODIFY:%.*]] = class_method %0 : $Container, #Container.storage!yielding_mutate
 // CHECK: begin_apply [[MODIFY]]
 // call MutableStorage.push()
 // CHECK: apply %{{.*}}(%{{.*}}) : $@convention(method) (@inout MutableStorage) -> ()

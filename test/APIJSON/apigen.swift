@@ -118,6 +118,20 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:     "introduced": "10.13"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule11myGlobalVarSivx",
+// CHECK-NEXT:     "access": "public",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule11myGlobalVarSivxTwc",
+// CHECK-NEXT:     "access": "public",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule15packageFunctionyyF",
 // CHECK-NEXT:     "access": "private",
 // CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
@@ -432,6 +446,27 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlySivsTq",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlySivxTj",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlySivxTjTwc",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlySivxTq",
 // CHECK-NEXT:     "access": "private",
 // CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
 // CHECK-NEXT:     "linkage": "exported",

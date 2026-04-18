@@ -75,11 +75,11 @@ package class Foo {
   // CHECK-COMMON-DAG: define internal swiftcc void @"$s4Core3FooC02myB0AA3PubCSgvsTm"({{i32|i64}} %0, ptr swiftself %1)
 
   // Core.Foo.myFoo.modify
-  // CHECK-RES-DAG: define hidden {{.*}}swiftcc { ptr, ptr } @"$s4Core3FooC02myB0AA3PubCSgvM"
-  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc { ptr, ptr } @"$s4Core3FooC02myB0AA3PubCSgvM"
+  // CHECK-RES-DAG: define hidden {{.*}}swift{{(coro)?}}cc { ptr, ptr } @"$s4Core3FooC02myB0AA3PubCSgvx"
+  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swift{{(coro)?}}cc { ptr, ptr } @"$s4Core3FooC02myB0AA3PubCSgvx"
 
   // Core.Foo.myFoo.modify
-  // CHECK-COMMON-DAG: define internal swiftcc void @"$s4Core3FooC02myB0AA3PubCSgvM.resume.0"
+  // CHECK-COMMON-DAG: define internal swift{{(coro)?}}cc void @"$s4Core3FooC02myB0AA3PubCSgvx.resume.0"
 
   // type metadata accessor for Core.Foo
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc %swift.metadata_response @"$s4Core3FooCMa"
@@ -94,7 +94,7 @@ package class Foo {
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core3FooC02myB0AA3PubCSgvsTj"({{i32|i64}} %0, ptr swiftself %1)
 
   // dispatch thunk of Core.Foo.myFoo.modify
-  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc { ptr, ptr } @"$s4Core3FooC02myB0AA3PubCSgvMTj"
+  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swift{{(coro)?}}cc { ptr, ptr } @"$s4Core3FooC02myB0AA3PubCSgvxTj"
 
   // Core.Foo.deinit
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3FooCfd"(ptr readonly returned swiftself{{.*}} %0)
@@ -110,8 +110,8 @@ final package class Bar {
   // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc{{.*}} {{i32|i64}} @"$s4Core3BarC02myB0AA3PubCSgvpfi"()
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc {{i32|i64}} @"$s4Core3BarC02myB0AA3PubCSgvg"(ptr swiftself %0)
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core3BarC02myB0AA3PubCSgvs"({{i32|i64}} %0, ptr swiftself %1)
-  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc { ptr, ptr } @"$s4Core3BarC02myB0AA3PubCSgvM"
-  // CHECK-COMMON-DAG: define internal swiftcc void @"$s4Core3BarC02myB0AA3PubCSgvM.resume.0"
+  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swift{{(coro)?}}cc { ptr, ptr } @"$s4Core3BarC02myB0AA3PubCSgvx"
+  // CHECK-COMMON-DAG: define internal swift{{(coro)?}}cc void @"$s4Core3BarC02myB0AA3PubCSgvx.resume.0"
 
   // type metadata accessor for Core.Bar
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc %swift.metadata_response @"$s4Core3BarCMa"({{i32|i64}} %0)
@@ -145,7 +145,7 @@ class UFIKlass {
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core8UFIKlassC6varUfiSSSgvsTj"
 
   // dispatch thunk of Core.UFIKlass.varUfi.modify
-  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc { ptr, ptr } @"$s4Core8UFIKlassC6varUfiSSSgvMTj"
+  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swift{{(coro)?}}cc { ptr, ptr } @"$s4Core8UFIKlassC6varUfiSSSgvxTj"
 
   // Core.UFIKlass.varUfi.getter
   // CHECK-RES-DAG: define hidden {{.*}}swiftcc {{.*}} @"$s4Core8UFIKlassC6varUfiSSSgvg"
@@ -156,8 +156,8 @@ class UFIKlass {
   // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core8UFIKlassC6varUfiSSSgvs"
 
   // Core.UFIKlass.varUfi.modify
-  // CHECK-RES-DAG: define hidden {{.*}}swiftcc { ptr, ptr } @"$s4Core8UFIKlassC6varUfiSSSgvM"
-  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc { ptr, ptr } @"$s4Core8UFIKlassC6varUfiSSSgvM"
+  // CHECK-RES-DAG: define hidden {{.*}}swift{{(coro)?}}cc { ptr, ptr } @"$s4Core8UFIKlassC6varUfiSSSgvx"
+  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swift{{(coro)?}}cc { ptr, ptr } @"$s4Core8UFIKlassC6varUfiSSSgvx"
 
   @usableFromInline
   var varUfi: String?
@@ -177,7 +177,7 @@ class InternalKlass {
 // method descriptor for Core.Foo.myFoo.setter
 // CHECK-TBD-COMMON-DAG: s4Core3FooC02myB0AA3PubCSgvsTq
 // method descriptor for Core.Foo.myFoo.modify
-// CHECK-TBD-COMMON-DAG: s4Core3FooC02myB0AA3PubCSgvMTq
+// CHECK-TBD-COMMON-DAG: s4Core3FooC02myB0AA3PubCSgvxTq
 // type metadata accessor for Core.Foo
 // CHECK-TBD-COMMON-DAG: s4Core3FooCMa
 // nominal type descriptor for Core.Foo
@@ -188,7 +188,7 @@ class InternalKlass {
 // dispatch thunk of Core.Foo.myFoo.setter
 // CHECK-TBD-COMMON-DAG: s4Core3FooC02myB0AA3PubCSgvsTj
 // dispatch thunk of Core.Foo.myFoo.modify
-// CHECK-TBD-COMMON-DAG: s4Core3FooC02myB0AA3PubCSgvMTj
+// CHECK-TBD-COMMON-DAG: s4Core3FooC02myB0AA3PubCSgvxTj
 // method lookup function for Core.Foo
 // CHECK-TBD-COMMON-DAG: s4Core3FooCMu
 // class metadata base offset for Core.Foo
@@ -208,7 +208,7 @@ class InternalKlass {
 // method descriptor for Core.UFIKlass.varUfi.setter
 // CHECK-TBD-COMMON-DAG: s4Core8UFIKlassC6varUfiSSSgvsTq
 // method descriptor for Core.UFIKlass.varUfi.modify
-// CHECK-TBD-COMMON-DAG: s4Core8UFIKlassC6varUfiSSSgvMTq
+// CHECK-TBD-COMMON-DAG: s4Core8UFIKlassC6varUfiSSSgvxTq
 // type metadata accessor for Core.UFIKlass
 // CHECK-TBD-COMMON-DAG: s4Core8UFIKlassCMa
 // nominal type descriptor for Core.UFIKlass
@@ -219,7 +219,7 @@ class InternalKlass {
 // dispatch thunk of Core.UFIKlass.varUfi.setter
 // CHECK-TBD-COMMON-DAG: s4Core8UFIKlassC6varUfiSSSgvsTj
 // dispatch thunk of Core.UFIKlass.varUfi.modify
-// CHECK-TBD-COMMON-DAG: s4Core8UFIKlassC6varUfiSSSgvMTj
+// CHECK-TBD-COMMON-DAG: s4Core8UFIKlassC6varUfiSSSgvxTj
 // method lookup function for Core.UFIKlass
 // CHECK-TBD-COMMON-DAG: s4Core8UFIKlassCMu
 // class metadata base offset for Core.UFIKlass
@@ -236,7 +236,7 @@ class InternalKlass {
 // CHECK-TBD-OPT-DAG: s4Core3BarC02myB0AA3PubCSgvpfi
 // CHECK-TBD-OPT-DAG: s4Core3BarC02myB0AA3PubCSgvg
 // CHECK-TBD-OPT-DAG: s4Core3BarC02myB0AA3PubCSgvs
-// CHECK-TBD-OPT-DAG: s4Core3BarC02myB0AA3PubCSgvM
+// CHECK-TBD-OPT-DAG: s4Core3BarC02myB0AA3PubCSgvx
 // CHECK-TBD-COMMON-DAG: s4Core3BarC02myB0AA3PubCSgvpMV
 // CHECK-TBD-COMMON-DAG: s4Core3BarCMa
 // CHECK-TBD-COMMON-DAG: s4Core3BarCMn

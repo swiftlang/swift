@@ -382,6 +382,21 @@ extension ASTGenVisitor {
     accessorSpecifier specifier: TokenSyntax,
     modifiers: DeclModifierListSyntax
   ) -> swift.AccessorKind? {
+
+    // `yielding borrow`/`yielding mutate`, but not `yielding get`
+    if modifiers.first(where: { $0.name.text == "yielding" }) != nil {
+      switch specifier.keywordKind {
+      case .borrow:
+	return .yielding_borrow
+      case .mutate:
+	return .yielding_mutate
+      default:
+        self.diagnose(.unknownAccessorSpecifier(specifier))
+	return nil
+      }
+    }
+
+
     switch specifier.keywordKind {
     case .get:
       return .get
@@ -401,20 +416,10 @@ extension ASTGenVisitor {
       return ._modify
     case .`init`:
       return .Init
-    case .read:
-      return .yielding_borrow
-    case .modify:
-      return .yielding_mutate
     case .borrow:
-      if modifiers.first(where: { $0.name.text == "yielding" }) != nil {
-        return .yielding_borrow
-      }
       precondition(ctx.langOpts.hasFeature(.BorrowAndMutateAccessors), "(compiler bug) 'borrow' accessor should only be parsed with 'BorrowAndMutateAccessors' feature")
       return .borrow
     case .mutate:
-      if modifiers.first(where: { $0.name.text == "yielding" }) != nil {
-        return .yielding_mutate
-      }
       precondition(ctx.langOpts.hasFeature(.BorrowAndMutateAccessors), "(compiler bug) 'mutate' accessor should only be parsed with 'BorrowAndMutateAccessors' feature")
       return .mutate
     default:
@@ -436,7 +441,8 @@ extension ASTGenVisitor {
 
     // The modifiers
     for m in node.modifiers {
-        if let g = self.generate(declModifier: m) {
+        if m.name.keywordKind != .yielding,
+          let g = self.generate(declModifier: m) {
             attrs.add(g)
         }
     }

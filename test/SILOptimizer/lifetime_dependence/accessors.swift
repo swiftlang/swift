@@ -53,12 +53,12 @@ struct NCNEHolder : ~Copyable, ~Escapable {
 
   // this cannot be public in order to synthesize the _read accessor.
   var ncneBorrow: NCNE {
-    // CHECK-LABEL: sil{{.*}} @$s9accessors10NCNEHolderV10ncneBorrowAA4NCNEVvr : $@yield_once @convention(method) (@guaranteed NCNEHolder) -> @lifetime(borrow 0) @yields @guaranteed NCNE {
+    // CHECK-LABEL: sil{{.*}} @$s9accessors10NCNEHolderV10ncneBorrowAA4NCNEVvy : $@yield_once_2 @convention(method) (@guaranteed NCNEHolder) -> @lifetime(borrow 0) @yields @guaranteed NCNE {
     @_lifetime(borrow self)
     borrowing get {
       _overrideLifetime(NCNE(p), borrowing: self)
     }
-    // CHECK-LABEL: sil{{.*}} @$s9accessors10NCNEHolderV10ncneBorrowAA4NCNEVvM : $@yield_once @convention(method) (@lifetime(copy 0) @inout NCNEHolder) -> @lifetime(borrow 0) @yields @inout NCNE {
+    // CHECK-LABEL: sil{{.*}} @$s9accessors10NCNEHolderV10ncneBorrowAA4NCNEVvx : $@yield_once_2 @convention(method) (@lifetime(copy 0) @inout NCNEHolder) -> @lifetime(borrow 0) @yields @inout NCNE {
     @_lifetime(self: copy self)
     set {
       p = newValue._p
@@ -67,12 +67,12 @@ struct NCNEHolder : ~Copyable, ~Escapable {
 
   // this cannot be public in order to synthesize the _read accessor.
   var ncneCopy: NCNE {
-    // CHECK-LABEL: sil{{.*}} @$s9accessors10NCNEHolderV8ncneCopyAA4NCNEVvr : $@yield_once @convention(method) (@guaranteed NCNEHolder) -> @lifetime(copy 0) @yields @guaranteed NCNE {
+    // CHECK-LABEL: sil{{.*}} @$s9accessors10NCNEHolderV8ncneCopyAA4NCNEVvy : $@yield_once_2 @convention(method) (@guaranteed NCNEHolder) -> @lifetime(copy 0) @yields @guaranteed NCNE {
     @_lifetime(copy self)
     borrowing get {
       _overrideLifetime(NCNE(p), copying: self)
     }
-    // CHECK-LABEL: sil{{.*}} @$s9accessors10NCNEHolderV8ncneCopyAA4NCNEVvM : $@yield_once @convention(method) (@lifetime(copy 0) @inout NCNEHolder) -> @lifetime(copy 0) @yields @inout NCNE {
+    // CHECK-LABEL: sil{{.*}} @$s9accessors10NCNEHolderV8ncneCopyAA4NCNEVvx : $@yield_once_2 @convention(method) (@lifetime(copy 0) @inout NCNEHolder) -> @lifetime(copy 0) @yields @inout NCNE {
     @_lifetime(self: copy self)
     set {
       p = newValue._p
