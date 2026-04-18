@@ -212,74 +212,6 @@ T _swift_strto(const char *nptr, char **endptr) {
 }
 #endif
 
-#if SWIFT_STDLIB_HAS_LOCALE
-
-#if defined(__OpenBSD__) || defined(_WIN32) || defined(__CYGWIN__) || defined(__HAIKU__)
-#define NEED_SWIFT_STRTOD_L
-#define strtod_l swift_strtod_l
-#define NEED_SWIFT_STRTOF_L
-#define strtof_l swift_strtof_l
-#define NEED_SWIFT_STRTOLD_L
-#define strtold_l swift_strtold_l
-#elif defined(__ANDROID__)
-#if __ANDROID_API__ < 21 // Introduced in Android API 21 - L
-#define NEED_SWIFT_STRTOLD_L
-#define strtold_l swift_strtold_l
-#endif
-
-#if __ANDROID_API__ < 26 // Introduced in Android API 26 - O
-#define NEED_SWIFT_STRTOD_L
-#define strtod_l swift_strtod_l
-#define NEED_SWIFT_STRTOF_L
-#define strtof_l swift_strtof_l
-#endif
-#endif
-
-#endif // SWIFT_STDLIB_HAS_LOCALE
-
-#if defined(NEED_SWIFT_STRTOD_L)
-static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
-#if defined(_WIN32)
-  return _strtod_l(nptr, endptr, getCLocale());
-#elif defined(__CYGWIN__) || defined(__HAIKU__)
-  return _swift_strto<double>(nptr, endptr);
-#else
-  return strtod(nptr, endptr);
-#endif
-}
-#endif
-
-#if defined(NEED_SWIFT_STRTOF_L)
-static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
-#if defined(_WIN32)
-  return _strtof_l(nptr, endptr, getCLocale());
-#elif defined(__CYGWIN__) || defined(__HAIKU__)
-  return _swift_strto<float>(nptr, endptr);
-#else
-  return strtof(nptr, endptr);
-#endif
-}
-#endif
-
-#if defined(NEED_SWIFT_STRTOLD_L)
-static long double swift_strtold_l(const char *nptr, char **endptr,
-                                   locale_t loc) {
-#if defined(_WIN32)
-  return _strtod_l(nptr, endptr, getCLocale());
-#elif defined(__ANDROID__)
-  return strtod(nptr, endptr);
-#elif defined(__CYGWIN__) || defined(__HAIKU__)
-  return _swift_strto<long double>(nptr, endptr);
-#else
-  return strtold(nptr, endptr);
-#endif
-}
-#endif
-
-#undef NEED_SWIFT_STRTOD_L
-#undef NEED_SWIFT_STRTOF_L
-#undef NEED_SWIFT_STRTOLD_L
-
 static inline void _swift_set_errno(int to) {
 #if defined(_WIN32)
   _set_errno(0);
@@ -288,50 +220,9 @@ static inline void _swift_set_errno(int to) {
 #endif
 }
 
-// We can't return Float80, but we can receive a pointer to one, so
-// switch the return type and the out parameter on strtold.
-template <typename T>
-#if SWIFT_STDLIB_HAS_LOCALE
-static const char *_swift_stdlib_strtoX_clocale_impl(
-    const char *nptr, T *outResult, T huge,
-    T (*posixImpl)(const char *, char **, locale_t))
-#else
-static const char *_swift_stdlib_strtoX_impl(
-    const char *nptr, T *outResult,
-    T (*posixImpl)(const char *, char **))
-#endif
-{
-  if (swift_stringIsSignalingNaN(nptr)) {
-    // TODO: ensure that the returned sNaN bit pattern matches that of sNaNs
-    // produced by Swift.
-    *outResult = std::numeric_limits<T>::signaling_NaN();
-    return nptr + std::strlen(nptr);
-  }
-
-  char *EndPtr;
-  _swift_set_errno(0);
-#if SWIFT_STDLIB_HAS_LOCALE
-  const auto result = posixImpl(nptr, &EndPtr, getCLocale());
-#else
-  const auto result = posixImpl(nptr, &EndPtr);
-#endif
-  *outResult = result;
-  return EndPtr;
-}
-
-const char *_swift_stdlib_strtold_clocale(const char *nptr, void *outResult) {
-#if SWIFT_STDLIB_HAS_LOCALE
-  return _swift_stdlib_strtoX_clocale_impl(
-      nptr, static_cast<long double *>(outResult), HUGE_VALL, strtold_l);
-#else
-  return _swift_stdlib_strtoX_impl(
-      nptr, static_cast<long double *>(outResult), strtold);
-#endif
-}
-
 // _swift_stdlib_strto{d,f,f16}_clocale were reimplemented in Swift
 // in December 2025.  See FloatingPointFromString.swift.
-// _swift_stdlib_strtold_clocale was not reimplemented in Swift at that time.
+// _swift_stdlib_strtold_clocale was reimplemented in Swift in May 2026.
 
 void _swift_stdlib_flockfile_stdout() {
 #if defined(_WIN32)
