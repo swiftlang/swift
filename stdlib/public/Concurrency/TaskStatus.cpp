@@ -314,13 +314,13 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
 // For when we are trying to remove a record but can only do
 // so if a certain condition of the active task status is true
 SWIFT_CC(swift)
-bool swift::removeStatusRecordIf(AsyncTask *task, TaskStatusRecord *record,
-    ActiveTaskStatus &oldStatus,
+bool swift::removeStatusRecordIf(
+    AsyncTask *task, TaskStatusRecord *record, ActiveTaskStatus &oldStatus,
     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)> fn,
     llvm::function_ref<bool(ActiveTaskStatus)> condition) {
 
-  SWIFT_TASK_DEBUG_LOG("remove status record = %p, from task = %p",
-                       record, task);
+  SWIFT_TASK_DEBUG_LOG("remove status record = %p, from task = %p", record,
+                       task);
 
   bool didRemove = false;
   while (true) {
@@ -499,10 +499,11 @@ void swift::removeStatusRecordFromSelf(TaskStatusRecord *record,
 }
 
 SWIFT_CC(swift)
-void swift::updateStatusRecord(AsyncTask *task, TaskStatusRecord *record,
-     llvm::function_ref<void(ActiveTaskStatus)>updateRecord,
-     ActiveTaskStatus& status,
-     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
+void swift::updateStatusRecord(
+    AsyncTask *task, TaskStatusRecord *record,
+    llvm::function_ref<void(ActiveTaskStatus)> updateRecord,
+    ActiveTaskStatus &status,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)> fn) {
 
   SWIFT_TASK_DEBUG_LOG("Updating status record %p of task %p", record, task);
   withStatusRecordLock(task, status, [&](ActiveTaskStatus lockedStatus) {
@@ -866,9 +867,8 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
   // though, just that it's not concurrently running.
   auto parent = child->childFragment()->getParent();
 
-  ::withStatusRecordLock(parent, [&](ActiveTaskStatus unused) {
-    group->removeChildTask(child);
-  });
+  ::withStatusRecordLock(
+      parent, [&](ActiveTaskStatus unused) { group->removeChildTask(child); });
 }
 
 /// Cancel the task group and all the child tasks that belong to `group`.
@@ -1008,8 +1008,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
 /**************************************************************************/
 
 /// Perform any escalation actions required by the given record.
-static void performEscalationAction(AsyncTask *task,
-                                    TaskStatusRecord *record,
+static void performEscalationAction(AsyncTask *task, TaskStatusRecord *record,
                                     JobPriority oldPriority,
                                     JobPriority newPriority) {
   switch (record->getKind()) {
@@ -1130,8 +1129,9 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     return newStatus.getStoredPriority();
   }
 
-  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which has status records from %#x to %#x",
-                       task, oldPriority, newPriority);
+  SWIFT_TASK_DEBUG_LOG(
+      "[Override] Escalating %p which has status records from %#x to %#x", task,
+      oldPriority, newPriority);
   // We must have at least one record - the task dependency one.
   assert(newStatus.getInnermostRecord() != NULL);
 
@@ -1169,8 +1169,10 @@ void TaskDependencyStatusRecord::performEscalationAction(
         this->DependentOn.TaskGroup, this);
       break;
     case EnqueuedOnExecutor:
-      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted in %p record from %#x to %#x",
-        (void*)this->DependentOn.Executor.getIdentity(), (void*)this, oldPriority, newPriority);
+      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted "
+                           "in %p record from %#x to %#x",
+                           (void *)this->DependentOn.Executor.getIdentity(),
+                           (void *)this, oldPriority, newPriority);
       swift_executor_escalate(this->DependentOn.Executor, task, newPriority);
       break;
   }

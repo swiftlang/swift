@@ -103,7 +103,7 @@ enum {
   // These are only relevant for the Dispatch executor
   SwiftJobDispatchHasLongObjectHeader = sizeof(void *) == sizeof(int),
   SwiftJobDispatchLinkageIndex = SwiftJobDispatchHasLongObjectHeader ? 1 : 0,
-  SwiftJobDispatchQueueIndex = SwiftJobDispatchHasLongObjectHeader? 0 : 1
+  SwiftJobDispatchQueueIndex = SwiftJobDispatchHasLongObjectHeader ? 0 : 1
 };
 
 /// Get the kind of a job, by directly accessing the flags field.

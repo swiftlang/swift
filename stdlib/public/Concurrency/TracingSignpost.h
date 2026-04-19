@@ -130,10 +130,10 @@ inline void actor_enqueue(HeapObject *actor, Job *job) {
   auto metadata = swift_getObjectType(actor);
   auto descriptor = (const void *)metadata->getTypeContextDescriptor();
   auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
-  os_signpost_event_emit(
-      ActorLog, id, SWIFT_LOG_ACTOR_ENQUEUE_NAME,
-      "actor=%p task=%" PRId64 " taskPointer=%p metadata=%p descriptor=%p",
-      actor, job->getJobTaskId(), job, metadata, descriptor);
+  os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_ENQUEUE_NAME,
+                         "actor=%p task=%" PRId64
+                         " taskPointer=%p metadata=%p descriptor=%p",
+                         actor, job->getJobTaskId(), job, metadata, descriptor);
 }
 
 inline void actor_dequeue(HeapObject *actor, Job *job) {
@@ -141,10 +141,10 @@ inline void actor_dequeue(HeapObject *actor, Job *job) {
   auto metadata = swift_getObjectType(actor);
   auto descriptor = (const void *)metadata->getTypeContextDescriptor();
   auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
-  os_signpost_event_emit(
-      ActorLog, id, SWIFT_LOG_ACTOR_DEQUEUE_NAME,
-      "actor=%p task=%" PRId64 " taskPointer=%p metadata=%p descriptor=%p",
-      actor, job->getJobTaskId(), job, metadata, descriptor);
+  os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_DEQUEUE_NAME,
+                         "actor=%p task=%" PRId64
+                         " taskPointer=%p metadata=%p descriptor=%p",
+                         actor, job->getJobTaskId(), job, metadata, descriptor);
 }
 
 inline void actor_state_changed(HeapObject *actor, Job *firstJob, uint8_t state,
@@ -307,17 +307,17 @@ inline void job_enqueue_global(Job *job) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, job);
   os_signpost_event_emit(TaskLog, id, SWIFT_LOG_JOB_ENQUEUE_GLOBAL_NAME,
-                         "task=%" PRId64 " taskPointer=%p",
-                          job->getJobTaskId(), job);
+                         "task=%" PRId64 " taskPointer=%p", job->getJobTaskId(),
+                         job);
 }
 
 inline void job_enqueue_global_with_delay(unsigned long long delay, Job *job) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, job);
-  os_signpost_event_emit(
-      TaskLog, id, SWIFT_LOG_JOB_ENQUEUE_GLOBAL_WITH_DELAY_NAME,
-      "task=%" PRId64 " delay=%llu taskPointer=%p",
-      job->getJobTaskId(), delay, job);
+  os_signpost_event_emit(TaskLog, id,
+                         SWIFT_LOG_JOB_ENQUEUE_GLOBAL_WITH_DELAY_NAME,
+                         "task=%" PRId64 " delay=%llu taskPointer=%p",
+                         job->getJobTaskId(), delay, job);
 }
 
 inline TracingExecutorKind classifyExecutor(SerialExecutorRef serialExecutor,
@@ -340,8 +340,8 @@ inline void job_enqueue_executor(Job *job, SerialExecutorRef serialExecutor,
       serialExecutor.isGeneric() ? nullptr : serialExecutor.getIdentity();
   auto metadata =
       executorIdentity ? swift_getObjectType(executorIdentity) : nullptr;
-  auto descriptor = metadata
-      ? (const void *)metadata->getTypeContextDescriptor() : nullptr;
+  auto descriptor =
+      metadata ? (const void *)metadata->getTypeContextDescriptor() : nullptr;
   auto executorKind = classifyExecutor(serialExecutor, taskExecutor);
   auto id = os_signpost_id_make_with_pointer(TaskLog, job);
   os_signpost_event_emit(TaskLog, id, SWIFT_LOG_JOB_ENQUEUE_EXECUTOR_NAME,

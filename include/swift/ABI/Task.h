@@ -469,7 +469,9 @@ public:
   /// executor or the caller of Task.immediate). When flagAsRunning succeeds,
   /// Dispatch is the default executor, and priority escalation is enabled,
   /// this value must be passed to swift_dispatch_thread_reset_override_self.
-  std::pair<bool, uint32_t> flagAsRunningFromEnqueued(uint8_t allowedExclusionValue, InvokeFlags invokeFlags = InvokeFlags::None);
+  std::pair<bool, uint32_t>
+  flagAsRunningFromEnqueued(uint8_t allowedExclusionValue,
+                            InvokeFlags invokeFlags = InvokeFlags::None);
 
   /// This variant of flagAsRunning may be called if you are resuming
   /// immediately after suspending. That is, you are on the same thread,

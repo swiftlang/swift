@@ -400,28 +400,28 @@ class TaskDependencyStatusRecord : public TaskStatusRecord {
   AsyncTask *NextWaitingTask;
 
 public:
-  TaskDependencyStatusRecord(AsyncTask *task) :
-    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+  TaskDependencyStatusRecord(AsyncTask *task)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
         DependencyKind(WaitingOnTask) {
-      DependentOn.Task = task;
+    DependentOn.Task = task;
   }
 
-  TaskDependencyStatusRecord(ContinuationAsyncContext *context) :
-    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+  TaskDependencyStatusRecord(ContinuationAsyncContext *context)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
         DependencyKind(WaitingOnContinuation) {
-      DependentOn.Continuation = context;
+    DependentOn.Continuation = context;
   }
 
-  TaskDependencyStatusRecord(TaskGroup *taskGroup) :
-    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+  TaskDependencyStatusRecord(TaskGroup *taskGroup)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
         DependencyKind(WaitingOnTaskGroup) {
-      DependentOn.TaskGroup = taskGroup;
+    DependentOn.TaskGroup = taskGroup;
   }
 
-  TaskDependencyStatusRecord(SerialExecutorRef executor) :
-    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+  TaskDependencyStatusRecord(SerialExecutorRef executor)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
         DependencyKind(EnqueuedOnExecutor) {
-      DependentOn.Executor = executor;
+    DependentOn.Executor = executor;
   }
 
   static bool classof(const TaskStatusRecord *record) {
@@ -433,8 +433,8 @@ public:
     DependentOn.Executor = executor;
   }
 
-  void performEscalationAction(
-      AsyncTask *task, JobPriority oldPriority, JobPriority newPriority);
+  void performEscalationAction(AsyncTask *task, JobPriority oldPriority,
+                               JobPriority newPriority);
 
   // Assumes that this record is of kind WaitingOnTask
   AsyncTask *&getNextWaitingTask();
