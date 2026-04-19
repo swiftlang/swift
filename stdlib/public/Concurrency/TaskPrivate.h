@@ -1240,7 +1240,7 @@ inline uint32_t AsyncTask::taskFlagAsRunningWithoutDependency(
     // Set self as executor and remove escalation bit if any - the task's
     // priority escalation has already been reflected on the thread.
     auto newStatus = oldStatus.withRunning(true);
-    if (!(invokeFlags & AsyncTask::InvokeFlags::InvokedFromStealer)) {
+    if (!(invokeFlags & AsyncTask::InvokeFlagsFromStealer)) {
       newStatus = newStatus.withoutIntrusivelyLinked();
     }
     newStatus = newStatus.withoutStoredPriorityEscalation();
@@ -1337,7 +1337,7 @@ AsyncTask::flagAsRunningFromEnqueued(uint8_t allowedExclusionValue,
   // Stealers are only enabled with priority escalation
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   if (oldStatus.getStealerExclusionValue() != allowedExclusionValue) {
-    if (!(invokeFlags & AsyncTask::InvokeFlags::InvokedFromStealer))
+    if (!(invokeFlags & AsyncTask::InvokeFlagsFromStealer))
       taskRemoveEnqueued();
     return {false, 0};
   }
@@ -1405,7 +1405,7 @@ AsyncTask::flagAsRunningFromEnqueued(uint8_t allowedExclusionValue,
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     threadPriorityManager.resetIfNeeded();
 #endif
-    if (!(invokeFlags & AsyncTask::InvokeFlags::InvokedFromStealer)) {
+    if (!(invokeFlags & AsyncTask::InvokeFlagsFromStealer)) {
       taskRemoveEnqueued();
     }
     SWIFT_TASK_DEBUG_LOG(
@@ -1422,7 +1422,7 @@ AsyncTask::flagAsRunningFromEnqueued(uint8_t allowedExclusionValue,
   swift_task_enterThreadLocalContext(
       (char *)&_private().ExclusivityAccessSet[0]);
 
-  if (!(invokeFlags & AsyncTask::InvokeFlags::InvokedFromStealer)) {
+  if (!(invokeFlags & AsyncTask::InvokeFlagsFromStealer)) {
     taskRemoveEnqueued();
   }
   SWIFT_TASK_DEBUG_LOG("flagAsRunningFromEnqueued succeeds for %p", this);
@@ -1544,15 +1544,15 @@ public:
 /// called if the Task is not yet running. However, that would make
 /// this function failable. I leave that as an exersise for the future.
 enum EnqueueFlags : uint32_t {
-  None = 0x0,
-  ForEscalation = 0x1,
+  EnqueueFlagsRegular = 0x0,
+  EnqueueFlagsForEscalation = 0x1,
 };
 static inline void
 swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
                                 EnqueueFlags flags) {
   // Feature flag to disable stealers
 #if HAS_OS_FEATURE
-  if ((flags & ForEscalation) &&
+  if ((flags & EnqueueFlagsForEscalation) &&
       os_feature_enabled_simple(Swift, enableTaskStealers, false)) {
     SWIFT_TASK_DEBUG_LOG("Task %p, skipping stealer enqueue from escalate due "
                          "to disabled feature flag",
@@ -1573,7 +1573,7 @@ swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
     // Async let tasks allocate within their parent's allocator so they
     // may not outlive their parent which is possible if a stealer is
     // introduced. Thus, if we are on the escalation path, return immediatly
-    if (flags & ForEscalation) {
+    if (flags & EnqueueFlagsForEscalation) {
       SWIFT_TASK_DEBUG_LOG(
           "AsyncLet Task %p, skipping stealer enqueue from escalate", task);
       return;
@@ -1603,7 +1603,7 @@ swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
       }
     }
 
-    if (flags & ForEscalation) {
+    if (flags & EnqueueFlagsForEscalation) {
       newStatus = newStatus.withActiveStealers();
     }
 
@@ -1714,7 +1714,7 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
           // may still enqueue a stealer because we may have previously
           // run from a stealer and the original Task is still enqueued.
           swift_task_enqueueSelfOrStealer(this, newExecutor,
-                                          EnqueueFlags::None);
+                                          EnqueueFlagsRegular);
         },
         oldStatus,
         [&](ActiveTaskStatus unused, ActiveTaskStatus &newStatus) {
@@ -1782,7 +1782,7 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
       // Even though we are not in the "enqueue stealer" path, this
       // may still enqueue a stealer because we may have previously
       // run from a stealer and the original Task is still enqueued.
-      swift_task_enqueueSelfOrStealer(this, newExecutor, EnqueueFlags::None);
+      swift_task_enqueueSelfOrStealer(this, newExecutor, EnqueueFlagsRegular);
     });
   }
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */

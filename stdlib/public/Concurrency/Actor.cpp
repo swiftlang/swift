@@ -222,7 +222,7 @@ SWIFT_ALWAYS_INLINE
 static inline void taskInvokeWithExclusionValue(
     AsyncTask *task, SerialExecutorRef serialExecutor,
     TaskExecutorRef taskExecutor, uint8_t allowedStealerExclusionValue,
-    AsyncTask::InvokeFlags invokeFlags = AsyncTask::InvokeFlags::None) {
+    AsyncTask::InvokeFlags invokeFlags = AsyncTask::InvokeFlagsFromTask) {
   // Update the task status to say that it's running on the current
   // thread.  If the task suspends somewhere, it should update the
   // task status appropriately; we don't need to update it afterwards.
@@ -261,7 +261,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job,
   if (auto task = dyn_cast<AsyncTask>(job)) {
     taskInvokeWithExclusionValue(task, serialExecutor, taskExecutor,
                                  task->_private().LocalStealerExclusionValue,
-                                 AsyncTask::InvokeFlags::None);
+                                 AsyncTask::InvokeFlagsFromTask);
   } else {
     // There's no extra bookkeeping to do for simple jobs besides swapping in
     // the voucher.
@@ -286,7 +286,7 @@ inline void AsyncTaskStealer::process(Job *_job) {
   taskInvokeWithExclusionValue(stealer->Task, trackingInfo->getActiveExecutor(),
                                trackingInfo->getTaskExecutor(),
                                stealer->ExclusionValue,
-                               AsyncTask::InvokeFlags::InvokedFromStealer);
+                               AsyncTask::InvokeFlagsFromStealer);
 
   swift_release(stealer->Task);
 
@@ -2529,12 +2529,14 @@ static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
     asImpl(executor.getDefaultActor())->unlock(true);
 }
 
+#if SWIFT_TASK_DEBUG_LOG_ENABLED
 static inline const char *safeGetIdentityDebugName(SerialExecutorRef exec) {
   if (exec.isGeneric())
     return exec.isForSynchronousStart() ? " (GenericExecutor/SynchronousStart)"
                                         : " (GenericExecutor)";
   return "";
 }
+#endif
 
 SWIFT_CC(swiftasync)
 static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
@@ -2854,7 +2856,7 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
   // enqueue the original Task if another stealer had previously
   // been enqueued and still is but the original Task did manage to
   // run at some point (while rare, this wouldn't be unexpected)
-  swift_task_enqueueSelfOrStealer(task, executor, EnqueueFlags::ForEscalation);
+  swift_task_enqueueSelfOrStealer(task, executor, EnqueueFlagsForEscalation);
 #endif
   return;
   //}

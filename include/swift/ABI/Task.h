@@ -419,25 +419,9 @@ public:
     return ResumeTask(ResumeContext); // 'return' forces tail call
   }
 
-  /// A task can have the following states:
-  ///   * suspended: In this state, a task is considered not runnable
-  ///   * enqueued: In this state, a task is considered runnable
-  ///   * running on a thread
-  ///   * completed
-  ///
-  /// The following state transitions are possible:
-  ///       suspended -> enqueued
-  ///       suspended -> running
-  ///       enqueued -> running
-  ///       running -> suspended
-  ///       running -> completed
-  ///       running -> enqueued
-  ///
-  /// The methods below are how a task switches from one state to another.
-
   enum InvokeFlags : uint32_t {
-    None = 0x00,
-    InvokedFromStealer = 0x01,
+    InvokeFlagsFromTask = 0x00,
+    InvokeFlagsFromStealer = 0x01,
   };
   /// Flag that this task is now running. This can update the priority
   /// stored in the job flags if the priority has been escalated.
@@ -471,7 +455,22 @@ public:
   /// this value must be passed to swift_dispatch_thread_reset_override_self.
   std::pair<bool, uint32_t>
   flagAsRunningFromEnqueued(uint8_t allowedExclusionValue,
-                            InvokeFlags invokeFlags = InvokeFlags::None);
+                            InvokeFlags invokeFlags = InvokeFlagsFromTask);
+  /// A task can have the following states:
+  ///   * suspended: In this state, a task is considered not runnable
+  ///   * enqueued: In this state, a task is considered runnable
+  ///   * running on a thread
+  ///   * completed
+  ///
+  /// The following state transitions are possible:
+  ///       suspended -> enqueued
+  ///       suspended -> running
+  ///       enqueued -> running
+  ///       running -> suspended
+  ///       running -> completed
+  ///       running -> enqueued
+  ///
+  /// The methods below are how a task switches from one state to another.
 
   /// This variant of flagAsRunning may be called if you are resuming
   /// immediately after suspending. That is, you are on the same thread,
@@ -480,7 +479,8 @@ public:
   /// cleanup work. This is intended for situations such as awaiting
   /// where you may mark yourself as suspended but find out during
   /// atomic state update that you may actually resume immediately.
-  void flagAsRunningFromSuspended(InvokeFlags invokeFlags = InvokeFlags::None);
+  void
+  flagAsRunningFromSuspended(InvokeFlags invokeFlags = InvokeFlagsFromTask);
 
   /// Flag that this task is now suspended with information about what it is
   /// waiting on.
