@@ -471,7 +471,7 @@ public:
   /// this value must be passed to swift_dispatch_thread_reset_override_self.
   std::pair<bool, uint32_t> flagAsRunningFromEnqueued(uint8_t allowedExclusionValue, InvokeFlags invokeFlags = InvokeFlags::None);
 
-  /// This variant of flagAsRunning may be called if you are resumming
+  /// This variant of flagAsRunning may be called if you are resuming
   /// immediately after suspending. That is, you are on the same thread,
   /// you have not enqueued onto any executor, and you have not called
   /// swift_dispatch_thread_reset_override_self or done any other

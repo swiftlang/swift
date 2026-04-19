@@ -1137,7 +1137,7 @@ inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
 /// Remove the enqueued bit in the ActiveTaskStatus atomically. This must be
 /// done when a Task's intrusive link is dequeued but after reading the local
 /// stealer exclusion value. This should not be called from any other context.
-void AsyncTask::taskRemoveEnqueued() {
+inline void AsyncTask::taskRemoveEnqueued() {
   SWIFT_TASK_DEBUG_LOG("Removing enqueued bit from Task %p", this);
   // In theory, we could do plumbing so that this happens as a part of a later
   // CAS when possible (and prevents a single forced CAS fail in some cases).
@@ -1421,92 +1421,130 @@ public:
   }
 };
 
-/// Enqueue this task on the provided executor either directly or with a
-/// stealer. Call this instead of swift_task_enqueue directly for Tasks in
-/// case the Task is already intrusively linked somewhere due to stealers.
+/// When this task has a valid dependent on executor record, and is
+/// holding the TaskStatusLock, this function will enqueue the Task on
+/// the provided executor either directly or with a steaaler if needed.
 ///
-/// This function needs to be syncronized with marking the Task as running
-/// in flagAsRunningFromSuspended and flagAsRunningFromEnqueued such that
-/// this function may not be called once the Task has sucessfully been
-/// marked as running. This is because once a Task is running, it must be
-/// escalated by escalating the thread it is running on rather than by
-/// enqueuing a stealer. Note that calls to this function may be concurrent.
+/// This is an internal function needed to support regular enqueues, and
+/// additional enqueues due to escalation while a Task is still enqueued
+/// on an executor. Most external callers shoud not be using this function
+/// and should instead call flagAsRunningFrom* on the Task instead.
 ///
-/// For the purposes of this comment, "enqueued" means that the Task is
-/// "runnable" and there is an object enqueued with the current exclusion value
-/// even if there are objects with older exclusion values still enqueued.
-///
-/// The current callers of this function are
+/// This function was designed to be called by
 /// swift_executor_escalate and flagAsAndEnqueueOnExecutor.
 ///
-/// The execution path of a Task includes the code which creates a Task
-/// an initially starts it running (whether immediatly or by enqueuing
-/// it). It also includes code running in the context of the Task which
-/// may suspend it and the code waking it up and enqueuing it again.
+/// In those cases, we call this instead of swift_task_enqueue
+/// directly for Tasks in case the Task is already
+/// intrusively linked somewhere due to stealers.
 ///
-/// While the execution path of a Task may happen on different
-/// threads, it always happens sequentially since none of these
-/// steps may overlap. Any function that can only be called on the
-/// execution path of the Task is thus mutually exclusive with any
-/// other function that may only be called on the execution path.
+/// This function has some important and complicated syncronization
+/// requirements. It must be syncronized with marking the Task as running in
+/// flagAsRunningFromSuspended and flagAsRunningFromEnqueued such that this
+/// function may not be called once the Task has sucessfully been marked as
+/// running. This is because once a Task is running, it must be escalated by
+/// escalating the thread it is running on rather than by enqueuing a stealer.
+/// Thus this function can only be called while there is an enqueued on executor
+/// dependency record which points to the executor we are escalating here.
 ///
-/// flagAsAndEnqueueOnExecutor and flagAsRunningFromSuspended may only be
-/// called on the execution path of the Task. Thus they are mutually exclusive.
+/// For the purposes of this comment, "enqueued" means that the Task
+/// is "runnable" (has a dependent on executor dependency record) and
+/// there is an object enqueued with the current exclusion value even
+/// if there are objects with older exclusion values still enqueued.
 ///
-/// flagAsAndEnqueueOnExecutor transitions the Task to enqueued and
-/// can't be called when the Task is already enqueued. The only cases
-/// where flagAsRunningFromEnqueued can be called when the Task isn't
-/// enqueued is in the initial portion of Task.immediate, which is
-/// on the execution path of the Task, and on an object with an older
-/// stealer value where it will fail to mark the Task as running. In
-/// these cases, these functions are entirely mutually exclusive.
+/// The possible intrusive link of this Task and any stealers that have old
+/// exclusion values will always fail flagAsRunningFromSuspended reguardless
+/// of this function so there is sufficient syncronization between them.
 ///
-/// Otherwise, flagAsAndEnqueueOnExecutor can't be called when the
-/// Task is already enqueued and the Task won't be enqueued until the
-/// completion of this function. Thus, flagAsRunningFromEnqueued must
-/// only be called successfully after this function has completed.
+/// flagAsAndEnqueueOnExecutor can only be called either on Task
+/// initialization, a running Task, or a Task being resumed.
+/// These are mutually exclusive between them by nature.
+///  * During Task initialization, there are no stealers, thus there
+///    is trivial syncronization with flagAsAndEnqueueOnExecutor
+///  * While running a Task (e.g. swapping executors),
+///    because the Task is running, all stealers must have old
+///    exclusion values because active stealers can't exist for
+///    Tasks without dependent on executor dependency records
+///  * Resuming a suspended Task, the Task must have a dependency
+///    record on something other than an executor so any stealers
+///    must have an old exclusion value for the same reason as above
+///
+/// An important note though is that flagAsAndEnqueueOnExecutor adds
+/// the dependent on executor record to the Task before calling this
+/// function. As soon as it does so, swift_task_escalate may attempt to
+/// call this function to add a stealer. To ensure that does not race,
+/// flagAsAndEnqueueOnExecutor must take the Task Status Lock, add the
+/// dependency record, then call this function before releasing the
+/// lock. swift_task_escalate calls all escalation actions including
+/// the one that calls this function under the lock so it can not call
+/// this function until flagAsAndEnqueueOnExecutor has finished its work.
 ///
 /// swift_executor_escalate is only called when there is a "dependent on
-/// executor" dependency record. flagAsRunningFromSuspended may only be called
-/// when there is no such record and thus these calls are mutually exclusive.
+/// executor" dependency record so it only needs to syncronize with itself and
+/// with flagAsRunningFrom*. It does this by holding the Task Status Lock which
+/// mutually excludes itself. The flagAsRunningFrom* functions will attempt
+/// to atomically remove the dependency record if there is no one else trying
+/// to hold the lock. So if there is contention, it will attempt to take the
+/// lock. This syncronizes access to the Task Status and dependency record.
+/// If flagAsRunningFrom* wins, it will remove the dependency record before
+/// swift_executor_escalate gets the lock so this function will never be called.
+/// If it looses, then this function will run, enqueue a stealer, and update the
+/// state which flagAsRunningFrom* will then observe in it's exclusive region.
 ///
-/// Inspecting the dependency record, calling swift_executor_escalate, and
-/// thus calling this function in that path is only done while the Task
-/// Status Lock is held. The critical section of flagAsRunningFromEnqueued
-/// that marks the Task as running will aquire this lock if it is held and
-/// thus will syncronize with this codepath. Either this one comes first, a
-/// stealer is enqueued, and flagAsRunningFromEnqueued fails, or that one
-/// comes first, marks the Task as running, and this path is never called.
+/// Once there are multiple active stealers, they will also have to syncronize
+/// against each other in flagAsRunningFrom*. Two stealers will both use
+/// atomics to syncronize if no one is holding / attempting to hold the lock.
+/// They will check that their exclusion value is still the most recent and
+/// check the bit that indicates if there are multiple stealers. If they
+/// see that bit, they know that they may be racing with other stealers
+/// so they clear the bit and update the exclusion value. Whoever wins
+/// doing that is able to run and all other racing stealers notice that the
+/// exclusion value is now different so they must fail to flag as running.
 ///
 /// Any new calls to this function need to be careful to ensure that
-/// they are only called in a way that satisfies this reqirement. It
-/// is likely possible to write this function in such a way that it
+/// they are only called in a way that syncronizes with all other uses.
+/// It is likely possible to write this function in such a way that it
 /// self-syncronizes with flagAsRunningFromEnqueued rather than relying
 /// on the Task Status Lock being held and this function only being
 /// called if the Task is not yet running. However, that would make
-/// thus function failable. I leave that as an exersise for the future.
+/// this function failable. I leave that as an exersise for the future.
+enum EnqueueFlags : uint32_t {
+  None = 0x0,
+  ForEscalation = 0x1,
+};
 static inline void
 swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
-                         bool updateStealerExclusionValue) {
+                         EnqueueFlags flags) {
+  // Feature flag to disable stealers
+#if HAS_OS_FEATURE
+  if ((flags & ForEscalation) &&
+    os_feature_enabled_simple(Swift, enableTaskStealers, false)) {
+    SWIFT_TASK_DEBUG_LOG("Task %p, skipping stealer enqueue from escalate due to disabled feature flag", task);
+    return;
+  }
+#endif
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-
-  // Assertions / Logging, this need not have strong syncronization
-  // with other callers as it is for debug perposes only
+  // Assertions / Logging, these intitial values need not have
+  // strong syncronization with other callers as it is for
+  // debug perposes only. They will be set again in the CAS loop
   SWIFT_TASK_DEBUG_LOG("Starting enqueue for %p on %p",
                        (void*)task, (void*)newExecutor.getIdentity());
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto needsStealer = oldStatus.isIntrusivelyLinked();
-  // Async let tasks allocate within their parent's allocator so they may
-  // not outlive their parent which is possible if a stealer is introduced
-  auto allowsStealer = !task->Flags.task_isAsyncLetTask();
-  SWIFT_TASK_DEBUG_LOG("needsStealer: %d, allowsStealer: %d",
-                       needsStealer, allowsStealer);
-  // Assert that needsStealer implies allowsStealer
-  // (i.e. if a stealer is needed, it must be allowed)
-  assert(!needsStealer || allowsStealer);
+  auto isAsyncLet = task->Flags.task_isAsyncLetTask();
+  if (isAsyncLet) {
+    // Async let tasks allocate within their parent's allocator so they
+    // may not outlive their parent which is possible if a stealer is
+    // introduced. Thus, if we are on the escalation path, return immediatly
+    if (flags & ForEscalation) {
+      SWIFT_TASK_DEBUG_LOG("AsyncLet Task %p, skipping stealer enqueue from escalate", task);
+      return;
+    }
+    // Assert that we didn't somehow get into a situation where
+    assert(!needsStealer);
+  }
+  SWIFT_TASK_DEBUG_LOG("needsStealer: %d", needsStealer);
 
   auto needsExtraRetain = false;
-
   // CAS loop to determine if the behaviour of this function
   // will be to use a stealer object or to enqueue the Task
   // directly. This syncronizes with concurrent callers
@@ -1526,13 +1564,13 @@ swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
       }
     }
 
-    if (updateStealerExclusionValue) {
+    if (flags & ForEscalation) {
       newStatus = newStatus.withActiveStealers();
     }
 
     SWIFT_TASK_DEBUG_LOG(
         "Needs to update based on %d || %d. Needs stealer %d. Exclusion value is %d. Setting active stealers from %d to %d",
-        updateStealerExclusionValue, !oldStatus.isIntrusivelyLinked(), needsStealer,
+        flags, !oldStatus.isIntrusivelyLinked(), needsStealer,
         newStatus.getStealerExclusionValue(), oldStatus.hasActiveStealers(), newStatus.hasActiveStealers());
     // This can always be relaxed because it only needs to be read
     // either by a thread syncronizing with the status lock or someone
@@ -1544,7 +1582,7 @@ swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
                /*failure*/ std::memory_order_relaxed));
 
   SWIFT_TASK_DEBUG_LOG("Update value: %d, needsStealer: %d",
-                       updateStealerExclusionValue, needsStealer);
+                       flags, needsStealer);
 
   if (needsStealer) {
     if (needsExtraRetain) {
@@ -1630,7 +1668,7 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
       // Even though we are not in the "enqueue stealer" path, this
       // may still enqueue a stealer because we may have previously
       // run from a stealer and the original Task is still enqueued.
-      swift_task_enqueueSelfOrStealer(this, newExecutor, false);
+      swift_task_enqueueSelfOrStealer(this, newExecutor, EnqueueFlags::None);
     }, oldStatus, [&](ActiveTaskStatus unused, ActiveTaskStatus &newStatus) {
 
       // Remove escalation bits + set enqueued bit
@@ -1689,7 +1727,7 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
       // Even though we are not in the "enqueue stealer" path, this
       // may still enqueue a stealer because we may have previously
       // run from a stealer and the original Task is still enqueued.
-      swift_task_enqueueSelfOrStealer(this, newExecutor, false);
+      swift_task_enqueueSelfOrStealer(this, newExecutor, EnqueueFlags::None);
     });
   }
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */

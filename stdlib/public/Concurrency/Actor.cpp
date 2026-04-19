@@ -2861,15 +2861,11 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
     SWIFT_TASK_DEBUG_LOG("Enqueuing stealer for %p on %p",
                          (void*)task, (void*)executor.getIdentity());
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    // See the comment in enqueueDirectOrSteal
-    // for why async let Tasks aren't supported
-    if (!task->Flags.task_isAsyncLetTask()) {
-      // Even though we are in the "enqueue stealer" path, this could
-      // enqueue the original Task if another stealer had previously
-      // been enqueued and still is but the original Task did manage to
-      // run at some point (while rare, this wouldn't be unexpected)
-      swift_task_enqueueSelfOrStealer(task, executor, true);
-    }
+    // Even though we are in the "enqueue stealer" path, this could
+    // enqueue the original Task if another stealer had previously
+    // been enqueued and still is but the original Task did manage to
+    // run at some point (while rare, this wouldn't be unexpected)
+    swift_task_enqueueSelfOrStealer(task, executor, EnqueueFlags::ForEscalation);
 #endif
     return;
   //}
