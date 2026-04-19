@@ -961,24 +961,10 @@ namespace {
     }
 
     void addAssociatedType(AssociatedTypeDecl *assocType) {
-      // In Embedded Swift witness tables don't have associated-types entries.
-      auto &langOpts = assocType->getASTContext().LangOpts;
-      if (langOpts.hasFeature(Feature::Embedded) &&
-          !langOpts.hasFeature(Feature::EmbeddedExistentials))
-        return;
       Entries.push_back(WitnessTableEntry::forAssociatedType(assocType));
     }
 
     void addAssociatedConformance(const AssociatedConformance &req) {
-      auto &langOpts = req.getAssociation()->getASTContext().LangOpts;
-      if (langOpts.hasFeature(Feature::Embedded) &&
-          !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
-          !req.getAssociatedRequirement()->requiresClass()) {
-        // If it's not a class protocol, the associated type can never be used to create
-        // an existential. Therefore this witness entry is never used at runtime
-        // in embedded swift.
-        return;
-      }
       Entries.push_back(WitnessTableEntry::forAssociatedConformance(req));
     }
 
@@ -1749,12 +1735,6 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
       auto &entry = SILEntries.front();
       SILEntries = SILEntries.slice(1);
 
-      // In Embedded Swift witness tables don't have associated-types entries.
-      auto &langOpts = IGM.Context.LangOpts;
-      if (langOpts.hasFeature(Feature::Embedded) &&
-          !langOpts.hasFeature(Feature::EmbeddedExistentials))
-        return;
-
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::AssociatedType
              && "sil witness table does not match protocol");
@@ -1812,15 +1792,6 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
       auto &entry = SILEntries.front();
       (void)entry;
       SILEntries = SILEntries.slice(1);
-      auto &langOpts = IGM.Context.LangOpts;
-      if (langOpts.hasFeature(Feature::Embedded) &&
-          !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
-          !requirement.getAssociatedRequirement()->requiresClass()) {
-        // If it's not a class protocol, the associated type can never be used to create
-        // an existential. Therefore this witness entry is never used at runtime
-        // in embedded swift.
-        return;
-      }
 
       ProtocolConformanceRef associatedConformance =
         ConformanceInContext.getAssociatedConformance(
@@ -2795,13 +2766,6 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 }
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
-  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-    // In Embedded Swift, only class-bound wtables are allowed.
-    if (!wt->getConformance()->getProtocol()->requiresClass() &&
-        !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))
-      return;
-  }
-
   // Don't emit a witness table if it is a declaration.
   if (wt->isDeclaration())
     return;
@@ -3817,13 +3781,6 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         llvm::Value **srcMetadataCache,
                                         ProtocolConformanceRef conformance) {
   auto proto = conformance.getProtocol();
-
-  // In Embedded Swift, only class-bound wtables are allowed.
-  auto &langOpts = srcType->getASTContext().LangOpts;
-  if (langOpts.hasFeature(Feature::Embedded) &&
-      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
-    assert(proto->requiresClass());
-  }
 
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
          && "protocol does not have witness tables?!");

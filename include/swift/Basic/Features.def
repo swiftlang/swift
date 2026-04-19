@@ -590,9 +590,6 @@ EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 /// that have a built-in Swift runtime. Implies 'SwiftRuntimeAvailability'.
 EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 
-/// Allow use of protocol typed values in Embedded mode (`Any` and friends)
-EXPERIMENTAL_FEATURE(EmbeddedExistentials, true)
-
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
 

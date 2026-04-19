@@ -396,8 +396,6 @@ GROUPED_ERROR(cannot_specialize_class,EmbeddedRestrictions,none,
       "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
 GROUPED_ERROR(embedded_swift_existential_type,EmbeddedRestrictions,none,
       "cannot use a value of protocol type %0 in embedded Swift", (Type))
-GROUPED_ERROR(embedded_swift_existential_protocol,EmbeddedRestrictions,none,
-      "cannot use a value of protocol type 'any %0' in embedded Swift", (StringRef))
 GROUPED_ERROR(embedded_swift_existential,EmbeddedRestrictions,none,
       "cannot use a value of protocol type in embedded Swift", ())
 GROUPED_ERROR(embedded_swift_value_deinit,EmbeddedRestrictions,none,

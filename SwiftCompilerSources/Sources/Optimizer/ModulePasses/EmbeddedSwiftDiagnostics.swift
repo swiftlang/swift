@@ -88,26 +88,21 @@ private struct FunctionChecker {
          is InitExistentialAddrInst,
          is InitExistentialValueInst,
          is ExistentialMetatypeInst:
-      if !context.options.enableEmbeddedSwiftExistentials {
-        throw Diagnostic(.embedded_swift_existential_type, instruction.operands[0].value.type, at: instruction.location)
-      } else if let ie = instruction as? InitExistentialAddrInst {
+      if let ie = instruction as? InitExistentialAddrInst {
         for conf in ie.conformances {
           try checkConformance(conf, location: ie.location)
         }
       } else if instruction is OpenExistentialAddrInst
              || instruction is OpenExistentialBoxInst
              || instruction is OpenExistentialBoxValueInst {
-          // okay in embedded with existentials
+          // okay
       } else {
           // not supported even in embedded with existentials
         throw Diagnostic(.embedded_swift_existential_type, instruction.operands[0].value.type, at: instruction.location)
       }
 
-    case let aeb as AllocExistentialBoxInst:
-      if !context.options.enableEmbeddedSwiftExistentials {
-        throw Diagnostic(.embedded_swift_existential_type, aeb.type, at: instruction.location)
-      }
-      // With EmbeddedExistentials enabled, error boxing is supported.
+    case is AllocExistentialBoxInst:
+      break
 
     case let ier as InitExistentialRefInst:
       for conf in ier.conformances {
@@ -130,20 +125,16 @@ private struct FunctionChecker {
 
     case is CheckedCastAddrBranchInst,
          is UnconditionalCheckedCastAddrInst:
-      if !context.options.enableEmbeddedSwiftExistentials {
-        throw Diagnostic(.embedded_swift_dynamic_cast, at: instruction.location)
-      } else {
-         if let checkedCast = instruction as? CheckedCastAddrBranchInst {
-           if !checkedCast.supportedInEmbeddedSwift {
-             throw Diagnostic(.embedded_swift_dynamic_cast, at: instruction.location)
-           }
-         } else {
-           let checkedCast = instruction as! UnconditionalCheckedCastAddrInst
-           if !checkedCast.supportedInEmbeddedSwift {
-             throw Diagnostic(.embedded_swift_dynamic_cast, at: instruction.location)
-           }
+       if let checkedCast = instruction as? CheckedCastAddrBranchInst {
+         if !checkedCast.supportedInEmbeddedSwift {
+           throw Diagnostic(.embedded_swift_dynamic_cast, at: instruction.location)
          }
-      }
+       } else {
+         let checkedCast = instruction as! UnconditionalCheckedCastAddrInst
+         if !checkedCast.supportedInEmbeddedSwift {
+           throw Diagnostic(.embedded_swift_dynamic_cast, at: instruction.location)
+         }
+       }
 
     case let abi as AllocBoxInst:
       // It needs a bit of work to support alloc_box of generic non-copyable structs/enums with deinit,
@@ -276,11 +267,6 @@ private struct FunctionChecker {
     else {
       return
     }
-    if !context.options.enableEmbeddedSwiftExistentials &&
-       !conformance.protocol.requiresClass {
-      throw Diagnostic(.embedded_swift_existential_protocol, conformance.protocol.name, at: location)
-    }
-
     for entry in witnessTable.entries {
       switch entry {
       case .invalid, .associatedType:

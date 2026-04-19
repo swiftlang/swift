@@ -1362,8 +1362,6 @@ void IRGenerator::emitLazyDefinitions() {
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     // In embedded Swift, the compiler cannot emit any metadata, etc.
     // Other than to support existentials.
-    assert(LazyTypeMetadata.empty() ||
-           SIL.getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials));
     assert(LazySpecializedTypeMetadataRecords.empty());
     assert(LazyTypeContextDescriptors.empty());
     assert(LazyOpaqueTypeDescriptors.empty());
@@ -1589,9 +1587,7 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   if (found != HasLazyMetadata.end())
     return found->second;
   auto &langOpts = SIL.getASTContext().LangOpts;
-  auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
-    langOpts.hasFeature(Feature::EmbeddedExistentials);
-  if (isEmbeddedWithExistentials &&
+  if (langOpts.hasFeature(Feature::Embedded) &&
       (isa<StructDecl>(type) || isa<EnumDecl>(type))) {
     bool isGeneric = cast<NominalTypeDecl>(type)->isGenericContext();
     HasLazyMetadata[type] = !isGeneric;
@@ -5316,7 +5312,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
     return cast<llvm::GlobalValue>(addr);
   }
-  bool hasEmbeddedExistentials = isEmbeddedWithExistentials();
+  bool hasEmbeddedExistentials = Context.LangOpts.hasFeature(Feature::Embedded);
   auto entity =
       (isPrespecialized &&
        !irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
@@ -5452,7 +5448,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-  auto hasEmbeddedExistentials = isEmbeddedWithExistentials();
+  auto hasEmbeddedExistentials = Context.LangOpts.hasFeature(Feature::Embedded);
   if (hasEmbeddedExistentials) {
     adjustmentIndex = 0;
     defaultVarTy = EmbeddedExistentialsMetadataStructTy;
