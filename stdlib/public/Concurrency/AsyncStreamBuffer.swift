@@ -92,7 +92,7 @@ func _unlock(_ ptr: UnsafeRawPointer)
 ///   - `call`: Only the `TerminationHandler` is called.
 ///   - `none`: No action is taken.
 @safe
-final class _Storage<Element, Failure: Error>: @unchecked Sendable {
+final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Sendable {
   struct Continuation {
     enum BufferingPolicy {
       case unbounded
@@ -238,7 +238,7 @@ final class _Storage<Element, Failure: Error>: @unchecked Sendable {
   }
 }
 
-extension _Storage._StateMachine {
+extension _AsyncStreamStorage._StateMachine {
   func getOnTermination() -> TerminationHandler? {
     switch unsafe self.state { // TODO: Return a TerminationHandler only in certain states
     case .idle(let idle):
@@ -498,7 +498,7 @@ extension _Storage._StateMachine {
   }
 }
 
-extension _Storage {
+extension _AsyncStreamStorage {
   func getOnTermination() -> _StateMachine.TerminationHandler? {
     withLock { state in
       return state.getOnTermination()
@@ -590,7 +590,7 @@ extension _Storage {
   }
 }
 
-extension _Storage {
+extension _AsyncStreamStorage {
   @safe
   private func withLock<Value: ~Copyable>(
     _ action: (inout _StateMachine) -> Value

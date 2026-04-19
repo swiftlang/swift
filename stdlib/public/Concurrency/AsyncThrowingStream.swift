@@ -205,7 +205,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       case bufferingNewest(Int)
     }
 
-    let storage: _Storage<Element, Failure>
+    let storage: _AsyncStreamStorage<Element, Failure>
 
     /// Resume the task awaiting the next iteration point by having it return
     /// normally from its suspension point with a given element.
@@ -264,11 +264,11 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   }
 
   final class _Context {
-    let storage: _Storage<Element, Failure>?
+    let storage: _AsyncStreamStorage<Element, Failure>?
     let produce: () async throws(Failure) -> Element?
 
     init(
-      storage: _Storage<Element, Failure>? = nil,
+      storage: _AsyncStreamStorage<Element, Failure>? = nil,
       produce: @escaping () async throws(Failure) -> Element?
     ) {
       self.storage = storage
@@ -341,7 +341,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
   ) where Failure == Error {
-    let storage: _Storage<Element, Failure> = .init(
+    let storage: _AsyncStreamStorage<Element, Failure> = .init(
       bufferingPolicy: limit.asStorageBufferingPolicy()
     )
     context = _Context(storage: storage, produce: storage.next)

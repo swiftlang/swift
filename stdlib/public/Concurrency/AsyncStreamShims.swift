@@ -20,7 +20,7 @@ import Swift
 
 extension AsyncStream.Continuation.BufferingPolicy {
   func asStorageBufferingPolicy()
-  -> _Storage<Element, Never>.Continuation.BufferingPolicy {
+  -> _AsyncStreamStorage<Element, Never>.Continuation.BufferingPolicy {
     switch self {
     case .unbounded:
       return .unbounded
@@ -36,7 +36,7 @@ extension AsyncStream.Continuation.BufferingPolicy {
 
 extension AsyncStream.Continuation.Termination {
   func asStorageTermination()
-  -> _Storage<Element, Never>.Continuation.Termination {
+  -> _AsyncStreamStorage<Element, Never>.Continuation.Termination {
     switch self {
     case .finished:
       return .finished(nil)
@@ -46,7 +46,7 @@ extension AsyncStream.Continuation.Termination {
   }
 }
 
-extension _Storage.Continuation.Termination {
+extension _AsyncStreamStorage.Continuation.Termination {
   func asStreamTermination()
   -> AsyncStream<Element>.Continuation.Termination {
     switch self {
@@ -62,7 +62,7 @@ extension _Storage.Continuation.Termination {
 
 extension AsyncStream.Continuation {
   internal typealias StorageTerminationHandler =
-  @Sendable (_Storage<Element, Never>.Continuation.Termination) -> Void
+  @Sendable (_AsyncStreamStorage<Element, Never>.Continuation.Termination) -> Void
 
   internal typealias StreamTerminationHandler =
   @Sendable (Termination) -> Void
@@ -94,7 +94,7 @@ extension AsyncStream.Continuation {
 
 // YieldResult
 
-extension _Storage.Continuation.YieldResult {
+extension _AsyncStreamStorage.Continuation.YieldResult {
   func asStreamYieldResult()
   -> AsyncStream<Element>.Continuation.YieldResult {
     switch self {
@@ -114,7 +114,7 @@ extension _Storage.Continuation.YieldResult {
 
 extension AsyncThrowingStream.Continuation.BufferingPolicy {
   func asStorageBufferingPolicy()
-  -> _Storage<Element, Failure>.Continuation.BufferingPolicy {
+  -> _AsyncStreamStorage<Element, Failure>.Continuation.BufferingPolicy {
     switch self {
     case .unbounded:
       return .unbounded
@@ -130,7 +130,7 @@ extension AsyncThrowingStream.Continuation.BufferingPolicy {
 
 extension AsyncThrowingStream.Continuation.Termination {
   func asStorageTermination()
-  -> _Storage<Element, Failure>.Continuation.Termination {
+  -> _AsyncStreamStorage<Element, Failure>.Continuation.Termination {
     switch self {
     case .finished:
       return .finished(nil)
@@ -140,7 +140,7 @@ extension AsyncThrowingStream.Continuation.Termination {
   }
 }
 
-extension _Storage.Continuation.Termination {
+extension _AsyncStreamStorage.Continuation.Termination {
   func asStreamTermination()
   -> AsyncThrowingStream<Element, Failure>.Continuation.Termination {
     switch self {
@@ -156,7 +156,7 @@ extension _Storage.Continuation.Termination {
 
 extension AsyncThrowingStream.Continuation {
   internal typealias StorageTerminationHandler =
-  @Sendable (_Storage<Element, Failure>.Continuation.Termination) -> Void
+  @Sendable (_AsyncStreamStorage<Element, Failure>.Continuation.Termination) -> Void
 
   internal typealias StreamTerminationHandler =
   @Sendable (Termination) -> Void
@@ -188,7 +188,7 @@ extension AsyncThrowingStream.Continuation {
 
 // YieldResult
 
-extension _Storage.Continuation.YieldResult {
+extension _AsyncStreamStorage.Continuation.YieldResult {
   func asStreamYieldResult()
   -> AsyncThrowingStream<Element, Failure>.Continuation.YieldResult {
     switch self {
