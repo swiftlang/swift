@@ -1336,7 +1336,9 @@ llvm::ArrayRef<ModuleDecl *>
 ASTBuilder::findPotentialModules(NodePointer node, ModuleDecl *&scratch) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
 
-  const auto moduleName = node->getText();
+  // Round-trip the module name through getIdentifier to normalize it if a raw
+  // identifier was passed to `-module-abi-name`.
+  const auto moduleName = getIdentifier(node->getText()).str();
 
   if (moduleName == CLANG_HEADER_MODULE_NAME) {
     auto *importer = Ctx.getClangModuleLoader();
