@@ -2787,6 +2787,22 @@ internal func parse_float80(_ span: Span<UInt8>) -> Optional<Float80> {
   }
 }
 
+#else
+
+// For "reasons known only to history", this symbol is exported
+// by the Swift runtime even on platforms where we
+// don't support Float80.  We should likely change that someday...
+
+@c(_swift_stdlib_strtold_clocale)
+@usableFromInline
+internal func _swift_stdlib_strtold_clocale(
+  _ cText: Optional<UnsafePointer<CChar>>,
+  _ output: Optional<UnsafeMutablePointer<CLongDouble>>
+) -> Optional<UnsafePointer<CChar>>
+{
+    fatalError("Float80 not supported on this platform")
+}
+
 #endif
 
 // ================================================================
