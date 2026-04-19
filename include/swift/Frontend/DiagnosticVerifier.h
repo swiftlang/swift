@@ -154,6 +154,10 @@ private:
   unsigned parseExpectedDiagInfo(unsigned BufferID, StringRef MatchStart,
                                  unsigned &PrevExpectedContinuationLine,
                                  ExpectedDiagnosticInfo &Expected);
+  void parseNestedExpectedDiagInfoBlock(unsigned BufferID,
+                                        StringRef MatchStartIn,
+                                        unsigned &PrevExpectedContinuationLine,
+                                        ExpectedDiagnosticInfo &Expected, size_t &End);
   void
   verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
                     unsigned BufferID);

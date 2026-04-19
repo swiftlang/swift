@@ -724,6 +724,44 @@ bool DiagnosticVerifier::parseTargetBufferName(StringRef &MatchStart,
   return true;
 }
 
+void DiagnosticVerifier::parseNestedExpectedDiagInfoBlock(
+    unsigned BufferID, StringRef MatchStartIn,
+    unsigned &PrevExpectedContinuationLine, ExpectedDiagnosticInfo &Expected,
+    size_t &End) {
+  size_t NestedMatch = MatchStartIn.find("expected-");
+  // Scan the memory buffer looking for expected-note/warning/error.
+  while (NestedMatch != StringRef::npos) {
+    StringRef NestedMatchStartIn = MatchStartIn.substr(NestedMatch);
+    ExpectedDiagnosticInfo NestedExpected(nullptr, nullptr, nullptr,
+                                          DiagnosticKind(-1));
+    unsigned NestedCount =
+        parseExpectedDiagInfo(BufferID, NestedMatchStartIn,
+                              PrevExpectedContinuationLine, NestedExpected);
+
+    size_t PrevMatchEnd = NestedMatch + 1;
+    if (NestedCount > 0) {
+      // Add the diagnostic the expected number of times.
+      for (; NestedCount; --NestedCount)
+        Expected.NestedDiags.push_back(NestedExpected);
+      size_t NestedMatchEnd =
+          NestedExpected.ExpectedEnd - NestedMatchStartIn.data();
+      assert(NestedMatchEnd > 0);
+      PrevMatchEnd = NestedMatch + NestedMatchEnd;
+    } else {
+      // Skip line if this an expected diagnostic with a prefix this invocation
+      // ignores, otherwise its }} will close the expansion.
+      PrevMatchEnd = MatchStartIn.find("\n", PrevMatchEnd);
+    }
+
+    size_t NextEnd = MatchStartIn.find("}}", PrevMatchEnd);
+    NestedMatch = MatchStartIn.find("expected-", PrevMatchEnd);
+    if (NextEnd < NestedMatch) {
+      End = NextEnd;
+      break;
+    }
+  }
+}
+
 unsigned DiagnosticVerifier::parseExpectedDiagInfo(
     unsigned BufferID, StringRef MatchStartIn,
     unsigned &PrevExpectedContinuationLine,
@@ -889,43 +927,12 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
 
   size_t End = StringRef::npos;
   if (Expected.Classification == DiagnosticKindExpansion) {
-    size_t NestedMatch = MatchStart.find("expected-");
-    // Scan the memory buffer looking for expected-note/warning/error.
-    while (NestedMatch != StringRef::npos) {
-      StringRef NestedMatchStart = MatchStart.substr(NestedMatch);
-      ExpectedDiagnosticInfo NestedExpected(nullptr, nullptr, nullptr,
-                                      DiagnosticKind(-1));
-      unsigned NestedCount =
-          parseExpectedDiagInfo(BufferID, NestedMatchStart,
-                                PrevExpectedContinuationLine, NestedExpected);
-
-      size_t PrevMatchEnd = NestedMatch + 1;
-      if (NestedCount > 0) {
-        // Add the diagnostic the expected number of times.
-        for (; NestedCount; --NestedCount)
-          Expected.NestedDiags.push_back(NestedExpected);
-        size_t NestedMatchEnd =
-            NestedExpected.ExpectedEnd - NestedMatchStart.data();
-        assert(NestedMatchEnd > 0);
-        PrevMatchEnd = NestedMatch + NestedMatchEnd;
-      } else {
-        // Skip line if this an expected diagnostic with a prefix this invocation ignores,
-        // otherwise its }} will close the expansion.
-        PrevMatchEnd = MatchStart.find("\n", PrevMatchEnd);
-      }
-
-      size_t NextEnd = MatchStart.find("}}", PrevMatchEnd);
-      NestedMatch = MatchStart.find("expected-", PrevMatchEnd);
-      if (NextEnd < NestedMatch) {
-        End = NextEnd;
-        break;
-      }
-    }
+    parseNestedExpectedDiagInfoBlock(
+        BufferID, MatchStart, PrevExpectedContinuationLine, Expected, End);
 
     if (End == StringRef::npos) {
-      addError(
-          DiagnosticLoc,
-          "didn't find '}}' to match '{{' in expected-expansion");
+      addError(DiagnosticLoc,
+               "didn't find '}}' to match '{{' in expected-expansion");
       return 0;
     }
     if (Expected.NestedDiags.size() == 0) {
