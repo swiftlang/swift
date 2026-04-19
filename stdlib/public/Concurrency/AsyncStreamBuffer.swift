@@ -91,6 +91,16 @@ func _unlock(_ ptr: UnsafeRawPointer)
 ///   - `callAndResume`: The `TerminationHandler` is called, and all consumers are resumed.
 ///   - `call`: Only the `TerminationHandler` is called.
 ///   - `none`: No action is taken.
+///
+/// Behavior:
+/// The state machine is single-consumer–based. However, instead of crashing on concurrent iteration,
+/// the consumer that “loses” the race to `next()` is enqueued in a FIFO queue and eventually resumed.
+///
+/// Furthermore, when the stream reaches its terminal state and an `onTermination` closure is set,
+/// that closure is invoked **once and then cleared**.
+///
+/// After the stream has reached its terminal state, all subsequent consumers will **immediately return `nil`**,
+/// and **any new value is rejected**.
 @safe
 final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Sendable {
   struct Continuation {
