@@ -373,44 +373,44 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     HelpText<"Disable requiring uses of @objc to require importing the "
              "Foundation module">;
 
-def enable_experimental_concurrency :
-  Flag<["-"], "enable-experimental-concurrency">,
-  HelpText<"Enable experimental concurrency model">;
+  def enable_experimental_concurrency :
+    Flag<["-"], "enable-experimental-concurrency">,
+    HelpText<"Enable experimental concurrency model">;
 
-def enable_experimental_move_only :
-  Flag<["-"], "enable-experimental-move-only">,
-  HelpText<"Enable experimental move only">;
+  def enable_experimental_move_only :
+    Flag<["-"], "enable-experimental-move-only">,
+    HelpText<"Enable experimental move only">;
 
-def enable_experimental_distributed :
-  Flag<["-"], "enable-experimental-distributed">,
-  HelpText<"Enable experimental 'distributed' actors and functions">;
+  def enable_experimental_distributed :
+    Flag<["-"], "enable-experimental-distributed">,
+    HelpText<"Enable experimental 'distributed' actors and functions">;
 
-def enable_experimental_flow_sensitive_concurrent_captures :
-  Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
-  HelpText<"Enable flow-sensitive concurrent captures">;
+  def enable_experimental_flow_sensitive_concurrent_captures :
+    Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
+    HelpText<"Enable flow-sensitive concurrent captures">;
 
-def disable_experimental_clang_importer_diagnostics :
-  Flag<["-"], "disable-experimental-clang-importer-diagnostics">,
-  HelpText<"Disable experimental diagnostics when importing C, C++, and Objective-C libraries">;
+  def disable_experimental_clang_importer_diagnostics :
+    Flag<["-"], "disable-experimental-clang-importer-diagnostics">,
+    HelpText<"Disable experimental diagnostics when importing C, C++, and Objective-C libraries">;
 
-def enable_experimental_eager_clang_module_diagnostics :
-  Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
-  HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
+  def enable_experimental_eager_clang_module_diagnostics :
+    Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
+    HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
 
-def enable_experimental_pairwise_build_block :
-  Flag<["-"], "enable-experimental-pairwise-build-block">,
-  HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
+  def enable_experimental_pairwise_build_block :
+    Flag<["-"], "enable-experimental-pairwise-build-block">,
+    HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
 
-def enable_resilience : Flag<["-"], "enable-resilience">,
-     HelpText<"Deprecated, use -enable-library-evolution instead">;
+  def enable_resilience : Flag<["-"], "enable-resilience">,
+       HelpText<"Deprecated, use -enable-library-evolution instead">;
 
-def enable_experimental_async_top_level :
-  Flag<["-"], "enable-experimental-async-top-level">,
-  HelpText<"Enable experimental concurrency in top-level code">;
+  def enable_experimental_async_top_level :
+    Flag<["-"], "enable-experimental-async-top-level">,
+    HelpText<"Enable experimental concurrency in top-level code">;
 
-def public_autolink_library :
-  Separate<["-"], "public-autolink-library">,
-  HelpText<"Add public dependent library">;
+  def public_autolink_library :
+    Separate<["-"], "public-autolink-library">,
+    HelpText<"Add public dependent library">;
 }
 
 // HIDDEN FLAGS
