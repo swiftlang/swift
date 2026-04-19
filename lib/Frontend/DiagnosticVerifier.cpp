@@ -1679,6 +1679,29 @@ processExpansions(SourceManager &SM, llvm::DenseMap<SourceLoc, unsigned> &Expans
   }
 }
 
+static void createDiagnosticInfo(const DiagnosticInfo &Info,
+                                 SourceManager &DiagSM,
+                                 SourceManager &VerifierSM,
+                                 std::vector<CapturedDiagnosticInfo> &Out) {
+  SmallVector<CapturedFixItInfo, 2> fixIts;
+  for (const auto &fixIt : Info.FixIts) {
+    fixIts.emplace_back(DiagSM, fixIt);
+  }
+
+  llvm::SmallString<128> message;
+  {
+    llvm::raw_svector_ostream Out(message);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
+  }
+
+  DiagLoc loc(DiagSM, VerifierSM, Info.Loc);
+  Out.emplace_back(
+      message, loc.bufferID, Info.Kind, loc.sourceLoc, loc.line, loc.column,
+      fixIts, llvm::sys::path::stem(Info.getCategoryDocumentationURL()).str());
+
+}
+
 //===----------------------------------------------------------------------===//
 // Main entrypoints
 //===----------------------------------------------------------------------===//
@@ -1694,23 +1717,8 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
     return;
   if (IgnoreMacroLocationNote && Info.ID == diag::in_macro_expansion.ID)
     return;
-  SmallVector<CapturedFixItInfo, 2> fixIts;
-  for (const auto &fixIt : Info.FixIts) {
-    fixIts.emplace_back(SM, fixIt);
-  }
 
-  llvm::SmallString<128> message;
-  {
-    llvm::raw_svector_ostream Out(message);
-    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
-                                           Info.FormatArgs);
-  }
-
-  DiagLoc loc(SM, this->SM, Info.Loc);
-  CapturedDiagnostics.emplace_back(message, loc.bufferID, Info.Kind,
-                                   loc.sourceLoc, loc.line, loc.column, fixIts,
-                                   llvm::sys::path::stem(
-                                      Info.getCategoryDocumentationURL()).str());
+  createDiagnosticInfo(Info, SM, this->SM, CapturedDiagnostics);
 }
 
 /// Once all diagnostics have been captured, perform verification.
