@@ -20,6 +20,13 @@ case none
 case some(T)
 }
 
+struct MyArray<Element> {
+  let buffer: MyArrayBuffer
+}
+
+final class MyArrayBuffer {
+}
+
 sil [ossa] @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 sil [ossa] @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil [ossa] @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
@@ -237,4 +244,26 @@ bb0:
   %10 = tuple ()
   return %10
 }
+
+// CHECK-LABEL: sil [ossa] @test_deinit_barrier :
+// CHECK:         copy_value
+// CHECK-LABEL: } // end sil function 'test_deinit_barrier'
+sil [ossa] @test_deinit_barrier : $@convention(thin) () -> @owned AnyObject {
+bb0:
+  %0 = apply undef() : $@convention(thin) () -> @owned MyArray<AnyObject>
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #MyArray.buffer
+  %3 = copy_value %2
+  %4 = ref_tail_addr %2, $AnyObject
+  %5 = address_to_pointer %4 to $Builtin.RawPointer
+  end_borrow %1
+  destroy_value %0
+  %8 = pointer_to_address %5 to [strict] $*AnyObject
+  // This is load is a deinit-barrier because it loads from a pointer.
+  // Therefore the array buffer must not be destroyed earlier which means that the `copy_value` must be kept.
+  %9 = load [copy] %8
+  destroy_value %3
+  return %9
+}
+
 

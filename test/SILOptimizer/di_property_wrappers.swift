@@ -151,6 +151,17 @@ final class GenericClass<T : IntInitializable> {
   }
 }
 
+struct TestDelegatingInitializer {
+  @Wrapper var x: Int? = nil
+
+  init() {}
+
+  // Just check that this compiles successfully
+  init(x: Int?) {
+    self.init()
+    self.x = x
+  }
+}
 
 func testIntStruct() {
   // CHECK: ## IntStruct
