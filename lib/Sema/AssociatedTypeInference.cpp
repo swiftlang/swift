@@ -2530,8 +2530,13 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
       [&](const LifetimeDependentInterface &witnessInterface,
           const LifetimeDependentInterface &reqInterface)
       -> std::optional<RequirementMatch> {
-    if (!witnessInterface.canConvertTo(reqInterface))
-      return RequirementMatch(witness, MatchKind::LifetimeConflict);
+    // Mismatched lifetime dependencies should not be necessary to rule out a
+    // candidate associated type, except in contrived cases.
+    //
+    // Matching lifetimes accurately requires a constraint system (see
+    // ConstraintSystem::matchFunctionLifetimes). This is performed during value
+    // witness matching, when it is necessary (see both overloads of
+    // swift::matchWitness in TypeCheckProtocol.cpp)
     return std::nullopt;
   };
 
