@@ -202,6 +202,13 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
             dyn_cast<StructElementAddrInst>(projectionDerivedFromRoot)) {
       SILType type = seai->getOperand()->getType();
 
+      // If this struct has unreferenceable storage, don't try to decompose it
+      // (e.g. C++ records with bases)
+      if (!getFullyReferenceableStruct(type)) {
+        projectionDerivedFromRoot = seai->getOperand();
+        continue;
+      }
+
       // Keep track of what subelement is being referenced.
       StructDecl *structDecl = seai->getStructDecl();
       for (auto *fieldDecl : structDecl->getStoredProperties()) {

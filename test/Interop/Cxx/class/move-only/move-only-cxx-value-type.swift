@@ -74,4 +74,12 @@ MoveOnlyCxxValueType.test("Test move only field in anonymous struct") {
   let a = FieldInAnonStructNC()
   let b = a
 }
+
+MoveOnlyCxxValueType.test("Test move only type with stored properties") {
+  var c = NonCopyableDerivedWithFields(2, -2, 42)
+  expectEqual(c.x, 2)
+  expectEqual(c.first, -2)
+  expectEqual(c.second, 42)
+}
+
 runAllTests()

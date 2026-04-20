@@ -29,6 +29,14 @@ struct NonCopyableDerivedDerived: public NonCopyableDerived {
     NonCopyableDerivedDerived(int x) : NonCopyableDerived(x) {}
 };
 
+struct NonCopyableDerivedWithFields : public NonCopyable {
+  int first;
+  int second;
+
+  NonCopyableDerivedWithFields(int x, int f, int s)
+      : NonCopyable(x), first(f), second(s) {}
+};
+
 struct NonCopyableHolder {
     inline NonCopyableHolder(int x) : x(x) {}
     inline NonCopyableHolder(const NonCopyableHolder &) = delete;
