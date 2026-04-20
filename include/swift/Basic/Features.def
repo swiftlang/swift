@@ -615,6 +615,11 @@ EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
 /// report references to implementation-only imported modules.
 EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
 
+/// Make @_implementationOnly safe by serializing hidden type layout information
+/// so that clients can correctly manipulate types from @_implementationOnly
+/// imports without access to the defining module.
+EXPERIMENTAL_FEATURE(SafeImplementationOnly, true)
+
 /// Check that use sites have the required @_spi import for operators.
 EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
 
