@@ -944,16 +944,6 @@ public:
            getNumIndirectSILErrorResults();
   }
 
-  std::optional<ActorIsolation> getActorIsolation() const {
-    if (auto isolation = getIsolationCrossing();
-        isolation && isolation->getCalleeIsolation())
-      return isolation->getCalleeIsolation();
-    auto *calleeFunction = getCalleeFunction();
-    if (!calleeFunction)
-      return {};
-    return calleeFunction->getActorIsolation();
-  }
-
   bool isCallerIsolationInheriting() const {
     return getSubstCalleeType()->hasNonisolatedNonsendingIsolation();
   }
