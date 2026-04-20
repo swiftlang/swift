@@ -24,6 +24,9 @@ Or upgrade all warnings except deprecated declaration to errors:
 -warnings-as-errors -Wwarning DeprecatedDeclaration
 ```
 
+For groups containing remarks, those remarks can be enabled using `-R <group>`.
+You can list the remark groups supported by your particular toolchain version using `-Rhelp`.
+
 ## Groups with warnings
 - <doc:always-available-domain>
 - <doc:trailing-closure-matching>
@@ -54,6 +57,20 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:unknown-warning-group>
 - <doc:untyped-throws>
 - <doc:use-any-apple-os-availability>
+
+
+## Groups with remarks
+- <doc:cross-import>
+- <doc:dependency-scan-cache>
+- <doc:dependency-scan>
+- <doc:indexing-system-module>
+- <doc:access-note>
+- <doc:macro-expansions>
+- <doc:macro-loading>
+- <doc:module-api-import>
+- <doc:module-interface-rebuild>
+- <doc:module-loading>
+- <doc:module-serialization>
 
 
 ## Topics
