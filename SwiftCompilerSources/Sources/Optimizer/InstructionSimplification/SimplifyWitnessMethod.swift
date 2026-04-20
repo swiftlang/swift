@@ -30,7 +30,7 @@ extension WitnessMethodInst : Simplifiable, SILCombineSimplifiable {
 ///   %3 = witness_method $ConcreteType, #P.foo, %2
 /// ```
 private func tryReplaceExistentialArchetype(of witnessMethod: WitnessMethodInst, _ context: SimplifyContext) -> Bool {
-  guard let concreteType = witnessMethod.concreteTypeOfDependentExistentialArchetype else {
+  guard let concreteType = witnessMethod.concreteTypeOfDependentOpenedType else {
     return false
   }
   let conf = concreteType.checkConformance(to: witnessMethod.lookupProtocol)

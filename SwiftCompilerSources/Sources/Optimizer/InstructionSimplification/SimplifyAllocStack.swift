@@ -451,7 +451,7 @@ private extension AllocStackInst {
     let concreteType: CanonicalType
     if let initExistential {
       assert(self.type.isExistential)
-      if let cft = initExistential.concreteTypeOfDependentExistentialArchetype {
+      if let cft = initExistential.concreteTypeOfDependentOpenedType {
         // Case 1: We will replace the alloc_stack of an existential with the concrete type.
         //         `alloc_stack $any P` -> `alloc_stack $ConcreteType`
         concreteType = cft
@@ -467,7 +467,7 @@ private extension AllocStackInst {
         //         `alloc_stack $any P` -> `alloc_stack $@opened("...")`
         concreteType = initExistential.type.canonicalType
       }
-    } else if self.type.isExistentialArchetype, let cft = self.concreteTypeOfDependentExistentialArchetype {
+    } else if self.type.isExistentialArchetype, let cft = self.concreteTypeOfDependentOpenedType {
       // Case 3: We will replace the alloc_stack of an existential archetype with the concrete type:
       //         `alloc_stack $@opened("...")` -> `alloc_stack $ConcreteType`
       concreteType = cft

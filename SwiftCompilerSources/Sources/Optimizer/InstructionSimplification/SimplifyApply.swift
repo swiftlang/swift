@@ -172,7 +172,7 @@ private func tryOptimizeEnumComparison(apply: ApplyInst, _ context: SimplifyCont
 ///   %5 = apply %1<ConcreteType>(%4) : <τ_0_0> (τ_0_0) -> ()
 /// ```
 private func tryReplaceExistentialArchetype(of apply: ApplyInst, _ context: SimplifyContext) -> Bool {
-  if let concreteType = apply.concreteTypeOfDependentExistentialArchetype,
+  if let concreteType = apply.concreteTypeOfDependentOpenedType,
      apply.canReplaceExistentialArchetype()
   {
     let newArgs = apply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context)
@@ -194,7 +194,7 @@ private func tryReplaceExistentialArchetype(of apply: ApplyInst, _ context: Simp
 
 // The same as the previous function, just for try_apply instructions.
 private func tryReplaceExistentialArchetype(of tryApply: TryApplyInst, _ context: SimplifyContext) -> Bool {
-  if let concreteType = tryApply.concreteTypeOfDependentExistentialArchetype,
+  if let concreteType = tryApply.concreteTypeOfDependentOpenedType,
      tryApply.canReplaceExistentialArchetype()
   {
     let newArgs = tryApply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context)
@@ -217,7 +217,7 @@ private func tryReplaceExistentialArchetype(of tryApply: TryApplyInst, _ context
 
 private extension FullApplySite {
   // Precondition: the apply uses only a single existential archetype.
-  // This is checked in `concreteTypeOfDependentExistentialArchetype`
+  // This is checked in `concreteTypeOfDependentOpenedType`
   func canReplaceExistentialArchetype() -> Bool {
     // Make sure that existential archetype _is_ a replacement type and not e.g. _contained_ in a
     // replacement type, like

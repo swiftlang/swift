@@ -575,21 +575,53 @@ extension Instruction {
     }
   }
 
-  /// If this instruction uses a (single) existential archetype, i.e. it has a type-dependent operand,
-  /// returns the concrete type if it is known.
-  var concreteTypeOfDependentExistentialArchetype: CanonicalType? {
+  /// If this instruction uses a (single) existential archetype or opened pack
+  /// element, i.e. it has a type-dependent operand, returns the concrete type
+  /// if it is known.
+  var concreteTypeOfDependentOpenedType: CanonicalType? {
     // For simplicity only support a single type dependent operand, which is true in most of the cases anyway.
-    if let openArchetypeOp = typeDependentOperands.singleElement,
-       // Match the sequence
-       //   %1 = metatype $T
-       //   %2 = init_existential_metatype %1, any P.Type
-       //   %3 = open_existential_metatype %2 to $@opened(...)
-       //   this_instruction_which_uses $@opened(...)  // type-defs: %3
-       let oemt = openArchetypeOp.value as? OpenExistentialMetatypeInst,
-       let iemt = oemt.operand.value as? InitExistentialMetatypeInst,
-       let mt = iemt.metatype as? MetatypeInst
-    {
-      return mt.type.canonicalType.instanceTypeOfMetatype
+    if let openArchetypeOp = typeDependentOperands.singleElement {
+      // Match the sequence
+      //   %1 = metatype $T
+      //   %2 = init_existential_metatype %1, any P.Type
+      //   %3 = open_existential_metatype %2 to $@opened(...)
+      //   this_instruction_which_uses $@opened(...)  // type-defs: %3
+      if let oemt = openArchetypeOp.value as? OpenExistentialMetatypeInst,
+        let iemt = oemt.operand.value as? InitExistentialMetatypeInst,
+        let mt = iemt.metatype as? MetatypeInst
+      {
+        return mt.type.canonicalType.instanceTypeOfMetatype
+      }
+
+      // Match the sequence
+      //  %1 = any_pack_index ...
+      //  %2 = open_pack_element %1 of <each ...> at <[[CONCRETE_PACK_TYPE]]>, shape $each T, uuid "[[UUID]]"
+      //  this_instruction_which_uses $@pack_element("[[UUID]]") // type-defs: %2
+      if let opet = openArchetypeOp.value as? OpenPackElementInst,
+         let opit = opet.operand.value as? AnyPackIndexInst,
+         let packIndex = opit.staticIndex
+      {
+        let environment = opet.openedGenericEnvironment
+
+        // TODO: Find a way to determine which opened pack type our type
+        // dependent operand corresponds to, which would allow us to get the
+        // concrete type even if there were multiple opened pack parameters.
+        if let genericPackTypeParam = environment.openedPackParams.singleElement
+        {
+          let packType = environment.mapTypeIntoEnvironment(genericPackTypeParam)
+          assert(packType.isPack)
+
+          let elementTypes = packType.elementTypesOfPackType
+          // If there is a pack expansion at or before packIndex, we can't
+          // statically determine what type is at the index.
+          if !elementTypes.indices.contains(packIndex) ||
+               elementTypes.prefix(packIndex).contains(where: { $0.isPackExpansion }) {
+            return nil
+          }
+
+          return elementTypes[packIndex].canonical
+        }
+      }
     }
     // TODO: also handle open_existential_addr and open_existential_ref.
     // Those cases are currently handled in SILCombine's `propagateConcreteTypeOfInitExistential`.
