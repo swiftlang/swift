@@ -2225,9 +2225,13 @@ UncheckedTakeEnumDataAddrInst::isDestructive(EnumDecl *forEnum, SILModule &M) {
   // We only potentially use spare bit optimization when an enum is always
   // loadable.
   auto sig = forEnum->getGenericSignature().getCanonicalSignature();
-  if (SILType::isAddressOnly(forEnum->getDeclaredInterfaceType()->getReducedType(sig),
-                             M.Types, sig,
-                             TypeExpansionContext::minimal())) {
+  if (SILType::isAddressOnly(
+      forEnum->getDeclaredInterfaceType()->getReducedType(sig),
+      M.Types, sig,
+      // "maximum" is the safe default because it makes enums "less" address-only.
+      // For example, an enum in an inlinable function is address-only before
+      // serialization. However it becomes loadable after the module is serialized.
+      TypeExpansionContext::maximalResilienceExpansionOnly())) {
     return false;
   }
   

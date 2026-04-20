@@ -2288,9 +2288,6 @@ void PatternMatchEmission::emitEnumElementDispatch(
   // After this point we now that we must have an address only type.
   assert(src.getType().isAddressOnly(SGF.F) &&
          "Should have an address only type here");
-  assert(!UncheckedTakeEnumDataAddrInst::isDestructive(src.getType().getEnumOrBoundGenericEnum(),
-                                                       SGF.getModule()) &&
-         "address only enum projection should never be destructive");
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
