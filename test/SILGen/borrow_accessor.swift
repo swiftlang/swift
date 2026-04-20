@@ -1120,15 +1120,16 @@ class KlassBorrowMutateUMBP<Element> {
 // CHECK:   [[REG2:%.*]] = ref_element_addr [[REG0]], #KlassBorrowMutateUMBP._storage
 // CHECK:   [[REG3:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
 // CHECK:   [[REG4:%.*]] = load [trivial] [[REG2]]
-// CHECK:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 :
+// ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK:   store [[REG6]] to [trivial] [[REG3]]
 // CHECK:   [[REG8:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
 // CHECK:   [[REG9:%.*]] = function_ref @$sSq17unsafelyUnwrappedxvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK:   [[REG10:%.*]] = apply [[REG9]]<UnsafeMutablePointer<Element>>([[REG8]], [[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK:   [[REG11:%.*]] = load [trivial] [[REG8]]
-// CHECK:   [[REG12:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
-// CHECK:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG12:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK:   [[REG14:%.*]] = struct_extract [[REG13]], #UnsafePointer._rawValue
 // CHECK:   [[REG15:%.*]] = pointer_to_address [[REG14]] to [strict] $*Element
 // CHECK:   [[REG16:%.*]] = mark_dependence [unresolved] [[REG15]] on [[REG11]]
@@ -1144,15 +1145,16 @@ class KlassBorrowMutateUMBP<Element> {
 // CHECK:   [[REG2:%.*]] = ref_element_addr [[REG0]], #KlassBorrowMutateUMBP._storage
 // CHECK:   [[REG3:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
 // CHECK:   [[REG4:%.*]] = load [trivial] [[REG2]]
-// CHECK:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 :
+// ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK:   store [[REG6]] to [trivial] [[REG3]]
 // CHECK:   [[REG8:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
 // CHECK:   [[REG9:%.*]] = function_ref @$sSq17unsafelyUnwrappedxvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK:   [[REG10:%.*]] = apply [[REG9]]<UnsafeMutablePointer<Element>>([[REG8]], [[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK:   [[REG11:%.*]] = load [trivial] [[REG8]]
-// CHECK:   [[REG12:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
-// CHECK:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG12:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK:   [[REG14:%.*]] = struct_extract [[REG13]], #UnsafePointer._rawValue
 // CHECK:   [[REG15:%.*]] = pointer_to_address [[REG14]] to [strict] $*Element
 // CHECK:   [[REG16:%.*]] = mark_dependence [unresolved] [[REG15]] on [[REG11]]
@@ -1182,15 +1184,15 @@ class KlassBorrowMutateUMBP<Element> {
 // CHECK-SIL:   [[REG2:%.*]] = ref_element_addr [[REG0]], #KlassBorrowMutateUMBP._storage
 // CHECK-SIL:   [[REG3:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
 // CHECK-SIL:   [[REG4:%.*]] = load [trivial] [[REG2]]
-// CHECK-SIL:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK-SIL:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK-SIL:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK-SIL:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK-SIL:   store [[REG6]] to [trivial] [[REG3]]
 // CHECK-SIL:   [[REG8:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
 // CHECK-SIL:   [[REG9:%.*]] = function_ref @$sSq17unsafelyUnwrappedxvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK-SIL:   [[REG10:%.*]] = apply [[REG9]]<UnsafeMutablePointer<Element>>([[REG8]], [[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK-SIL:   [[REG11:%.*]] = load [trivial] [[REG8]]
-// CHECK-SIL:   [[REG12:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
-// CHECK-SIL:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK-SIL:   [[REG12:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK-SIL:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK-SIL:   [[REG14:%.*]] = struct_extract [[REG13]], #UnsafePointer._rawValue
 // CHECK-SIL:   [[REG15:%.*]] = pointer_to_address [[REG14]] to [strict] $*Element
 // CHECK-SIL:   [[REG16:%.*]] = mark_dependence [unresolved] [[REG15]] on [[REG11]]
@@ -1206,15 +1208,15 @@ class KlassBorrowMutateUMBP<Element> {
 // CHECK-SIL:   [[REG2:%.*]] = ref_element_addr [[REG0]], #KlassBorrowMutateUMBP._storage
 // CHECK-SIL:   [[REG3:%.*]] = alloc_stack $Optional<UnsafeMutablePointer<Element>>
 // CHECK-SIL:   [[REG4:%.*]] = load [trivial] [[REG2]]
-// CHECK-SIL:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
-// CHECK-SIL:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK-SIL:   [[REG5:%.*]] = function_ref @$sSr11baseAddressSpyxGSgvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
+// CHECK-SIL:   [[REG6:%.*]] = apply [[REG5]]<Element>([[REG4]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutableBufferPointer<τ_0_0>) -> Optional<UnsafeMutablePointer<τ_0_0>>
 // CHECK-SIL:   store [[REG6]] to [trivial] [[REG3]]
 // CHECK-SIL:   [[REG8:%.*]] = alloc_stack $UnsafeMutablePointer<Element>
 // CHECK-SIL:   [[REG9:%.*]] = function_ref @$sSq17unsafelyUnwrappedxvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK-SIL:   [[REG10:%.*]] = apply [[REG9]]<UnsafeMutablePointer<Element>>([[REG8]], [[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>) -> @lifetime(copy 0) @out τ_0_0
 // CHECK-SIL:   [[REG11:%.*]] = load [trivial] [[REG8]]
-// CHECK-SIL:   [[REG12:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
-// CHECK-SIL:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK-SIL:   [[REG12:%.*]] = function_ref @$sSpsRi_zRi0_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK-SIL:   [[REG13:%.*]] = apply [[REG12]]<Element>([[REG11]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK-SIL:   [[REG14:%.*]] = struct_extract [[REG13]], #UnsafePointer._rawValue
 // CHECK-SIL:   [[REG15:%.*]] = pointer_to_address [[REG14]] to [strict] $*Element
 // CHECK-SIL:   [[REG16:%.*]] = mark_dependence [unresolved] [[REG15]] on [[REG11]]
