@@ -3070,6 +3070,11 @@ namespace {
       printRec(MED->getArgs(), Label::optional("args"));
       printFoot();
     }
+
+    void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *HTLD, Label label) {
+      printCommon(HTLD, "hidden_type_layout_info_decl", label);
+      printFoot();
+    }
   };
 } // end anonymous namespace
 

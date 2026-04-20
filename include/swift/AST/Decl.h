@@ -65,6 +65,9 @@ class PointerAuthQualifier;
 } // end namespace clang
 
 namespace swift {
+namespace irgen {
+  class HiddenTypeIRABIInfo;
+} // end namespace irgen
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
   class ApplyExpr;
@@ -10030,6 +10033,42 @@ public:
   }
   static bool classof(const FreestandingMacroExpansion *expansion) {
     return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Decl;
+  }
+};
+
+/// Represents a type which can't be resolved as its defining module is not available,
+/// but for which we still have layout information. This is expected to happen when
+/// a module @_implementationOnly imports a type, and that type contributes to the module's ABI.
+///
+/// Clients still need to be able to manipulate the type in memory, but may not have access
+/// to its complete definition. These are created when XREF resolution fails and a fallback
+/// hidden representation is included in the module.
+class HiddenTypeLayoutInfoDecl final : public TypeDecl {
+  friend class Decl;
+
+  irgen::HiddenTypeIRABIInfo *ABIInfo = nullptr;
+  TypeDecl *ParentDecl = nullptr;
+
+  HiddenTypeLayoutInfoDecl(DeclContext *DC)
+      : TypeDecl(DeclKind::HiddenTypeLayoutInfo, DC, Identifier(), SourceLoc(), {}) {
+    setImplicit();
+  }
+
+  SourceLoc getLocFromSource() const { return SourceLoc(); }
+
+public:
+  static HiddenTypeLayoutInfoDecl *create(ASTContext &ctx, DeclContext *DC);
+
+  irgen::HiddenTypeIRABIInfo *getABIInfo() const { return ABIInfo; }
+  void setABIInfo(irgen::HiddenTypeIRABIInfo *info) { ABIInfo = info; }
+
+  TypeDecl *getParentDecl() const { return ParentDecl; }
+  void setParentDecl(TypeDecl *parent) { ParentDecl = parent; }
+
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::HiddenTypeLayoutInfo;
   }
 };
 

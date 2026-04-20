@@ -319,6 +319,11 @@ final public class PostfixOperatorDecl: OperatorDecl {}
 
 final public class MacroExpansionDecl: Decl {}
 
+// HiddenTypeLayoutInfo declarations represent types whose definitions are hidden
+// (e.g., from @_implementationOnly imports) but whose layout information
+// is available for code generation.
+final public class HiddenTypeLayoutInfoDecl: TypeDecl {}
+
 // Bridging utilities
 
 extension BridgedDeclObj {

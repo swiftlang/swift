@@ -200,7 +200,9 @@ ABSTRACT_DECL(Operator, Decl)
 
 DECL(MacroExpansion, Decl)
 
-LAST_DECL(MacroExpansion)
+DECL(HiddenTypeLayoutInfo, TypeDecl)
+
+LAST_DECL(HiddenTypeLayoutInfo)
 
 #undef NOMINAL_TYPE_DECL
 #undef CONTEXT_DECL

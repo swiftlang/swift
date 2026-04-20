@@ -5541,6 +5541,8 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::MacroExpansion:
     case DeclKind::Using:
       break;
+    case DeclKind::HiddenTypeLayoutInfo:
+      llvm_unreachable("not implemented yet");
     };
   }
 }

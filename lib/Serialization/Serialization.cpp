@@ -2277,6 +2277,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
     llvm_unreachable("decl should never be a member");
@@ -5519,6 +5520,10 @@ public:
 
   void visitBuiltinTupleDecl(const BuiltinTupleDecl *) {
     llvm_unreachable("BuiltinTupleDecl are not serialized");
+  }
+
+  void visitHiddenTypeLayoutInfoDecl(const HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("Not implemented yet");
   }
 };
 
