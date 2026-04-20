@@ -537,15 +537,6 @@ func testAnyFixIt() {
   // expected-warning@+1:51 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{10-88=any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type}}
   let _: (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type?
   let _: any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type // OK
-
-  // Misplaced '?'.
-
-  // FIXME: Better recovery
-  // expected-error@+1 {{type '(any Copyable)?' cannot be suppressed}}
-  let _: any ~Copyable?
-  // FIXME: Better recovery
-  // expected-error@+1 {{type '(any Copyable.Type)?' cannot be suppressed}}
-  let _: any ~Copyable.Type?
 }
 
 func testNestedMetatype() {

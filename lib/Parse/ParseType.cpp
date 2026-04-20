@@ -980,6 +980,15 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     // Unwrap any layers of optionality, keeping track of what we peeled off.
     SmallVector<TypeRepr *, 2> optionals;
     TypeRepr *base = type;
+    InverseTypeRepr *inverseToReapply = nullptr;
+
+    if (opaqueLoc.isValid() || anyLoc.isValid()) {
+      if (auto *inv = dyn_cast<InverseTypeRepr>(base)) {
+        inverseToReapply = inv;
+        base = inv->getConstraint();
+      }
+    }
+
     while (true) {
       if (auto *opt = dyn_cast<OptionalTypeRepr>(base)) {
         optionals.push_back(base);
@@ -993,6 +1002,10 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
       }
     }
 
+    if (inverseToReapply) {
+      base = new (Context) InverseTypeRepr(inverseToReapply->getTildeLoc(), base);
+    }
+
     // If this was a composition with `some` or `any`, the optional sugar is
     // parsed as bound to the elements, not to the whole composition. Check the
     // last element so that if we have something like `some P & Q?`, we can
@@ -1001,8 +1014,12 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
       if (auto *comp = dyn_cast<CompositionTypeRepr>(base)) {
         if (!comp->getTypes().empty()) {
           auto *last = comp->getTypes().back();
-          if (isa<OptionalTypeRepr>(last) ||
-              isa<ImplicitlyUnwrappedOptionalTypeRepr>(last)) {
+          auto *lastForDiag = last;
+          if (auto *inv = dyn_cast<InverseTypeRepr>(lastForDiag)) {
+            lastForDiag = inv->getConstraint();
+          }
+          if (isa<OptionalTypeRepr>(lastForDiag) ||
+              isa<ImplicitlyUnwrappedOptionalTypeRepr>(lastForDiag)) {
             diagnose(last->getEndLoc(),
                     diag::confusing_some_any_optional_composition)
                 .fixItInsert(comp->getStartLoc(), "(")

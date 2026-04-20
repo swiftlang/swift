@@ -37,3 +37,6 @@ func f() -> some P? { S() }
 
 // CHECK:      (func_decl {{.*}}interface_type=" ((some P)?) -> ()"
 func g(_: some P?) {}
+
+// CHECK:      (func_decl {{.*}}interface_type="(borrowing (any ~Copyable)?) -> ()"
+func h(_: borrowing any ~Copyable?) {}

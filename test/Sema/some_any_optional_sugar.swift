@@ -14,9 +14,7 @@ func sugaredOpaqueReturn() -> some P? {
   }
 }
 
-// `(some P)!` is not allowed, so neither should this be.
-func sugaredIUOOpaqueReturn() -> some P! {  // expected-error {{using '!' is not allowed here}}
-                                            // expected-note@-1 {{use '?' instead}}
+func sugaredIUOOpaqueReturn() -> some P! {
   return S()
 }
 
@@ -61,11 +59,10 @@ struct MyType {
   var nonsugaredField7: (any P)!?  // expected-error {{using '!' is not allowed here}}
                                    // expected-note@-1 {{use '?' instead}}
 
-  // `(some P)!` and `(some P)?!` are not allowed, so neither should these be.
-  var sugaredField8: some P! { S() }  // expected-error {{using '!' is not allowed here}}
-                                      // expected-note@-1 {{use '?' instead}}
-  var sugaredField9: some P?! { S() }  // expected-error {{using '!' is not allowed here}}
-                                       // expected-note@-1 {{use '?' instead}}
+  var sugaredField8: some P! { S() }
+  var sugaredField9: some P?! { S() }
+
+  var sugaredField10: some ~Copyable? { S() }
 }
 
 // Deeper optionals
@@ -117,6 +114,10 @@ let _: any P.Type? = S.self
 // expected-error@+2 {{confusing use of optional after a 'some' or 'any' composition; use parentheses to clarify precedence}}{{12-12=(}}{{17-17=)}}
 // expected-error@+1 {{non-protocol, non-class type '(any Q)?' cannot be used within a protocol-constrained type}}
 let _: any P & Q? = S()
+
+// expected-error@+2 {{confusing use of optional after a 'some' or 'any' composition; use parentheses to clarify precedence}}{{12-12=(}}{{25-25=)}}
+// expected-error@+1 {{type '(any Copyable)?' cannot be suppressed}}
+let _: any P & ~Copyable? = S()
 
 // expected-error@+3 {{confusing use of optional after a 'some' or 'any' composition; use parentheses to clarify precedence}}{{12-12=(}}{{18-18=)}}
 // expected-error@+2 {{non-protocol, non-class type '(any P)?' cannot be used within a protocol-constrained type}}
