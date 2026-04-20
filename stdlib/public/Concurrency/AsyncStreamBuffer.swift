@@ -603,18 +603,25 @@ extension _UnfoldingStorage {
     }
 
     guard
-      case .producing(let producer, _) = state
+      case .producing(let produce, _) = state
     else { return nil }
 
-    switch try await producer() {
-    case .some(let element):
-      return element
+    do throws(Failure) {
+      switch try await produce() {
+      case .some(let element):
+        return element
 
-    case .none:
+      case .none:
+        withLock { state in
+          state = .terminated
+        }
+        return nil
+      }
+    } catch {
       withLock { state in
         state = .terminated
       }
-      return nil
+      throw error
     }
   }
 

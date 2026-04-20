@@ -996,14 +996,13 @@ class NotSendable {}
         await task.value
       }
 
-      /* // TODO: Remove or change
       tests.test("unfolding init throwing throws from closure") {
         var counter = 0
         let thrownError = SomeError()
         let stream = AsyncThrowingStream<Int, Error>(unfolding: { @MainActor in
           counter += 1
-          if counter == 3 { throw thrownError }
-          return counter < 3 ? counter : nil
+          if counter >= 3 { throw thrownError }
+          return counter
         })
         var iterator = stream.makeAsyncIterator()
         do {
@@ -1025,7 +1024,6 @@ class NotSendable {}
           expectUnreachable("expected nil after error, not another throw")
         }
       }
-      */
 
       // MARK: - onTermination
 
