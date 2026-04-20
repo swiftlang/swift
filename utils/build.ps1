@@ -3127,7 +3127,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
 function Write-SDKSettings([OS] $OS, [string] $Identifier = $OS.ToString()) {
   $SDKSettings = @{
-    CanonicalName = $OS.ToString().ToLowerInvariant()
+    CanonicalName = $Identifier.ToLowerInvariant()
     DisplayName = $OS.ToString()
     IsBaseSDK = "YES"
     Version = "${ProductVersion}"
