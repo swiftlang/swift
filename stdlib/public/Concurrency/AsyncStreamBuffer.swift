@@ -102,7 +102,7 @@ func _unlock(_ ptr: UnsafeRawPointer)
 /// After the stream has reached its terminal state, all subsequent consumers will **immediately return `nil`**,
 /// and **any new value is rejected**.
 @safe
-final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Sendable {
+internal final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Sendable {
   struct Continuation {
     enum BufferingPolicy {
       case unbounded
@@ -128,7 +128,7 @@ final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Sendable {
   }
 
   @safe
-  struct _StateMachine: ~Copyable {
+  struct StateMachine: ~Copyable {
     typealias Buffer = _Deque<Element>
     typealias Consumer = UnsafeContinuation<Result<Element?, Failure>, Never> // TODO: Switch to ~Copyable Continuation type
     typealias Consumers = _Deque<Consumer> // TODO: Switch to UniqueDeque
@@ -157,7 +157,7 @@ final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Sendable {
 
       struct Terminated: ~Copyable {
         var failure: Failure?
-        var terminationHandler: TerminationHandler?
+        var terminationHandler: TerminationHandler? // TODO: Remove this in a follow-up PR
       }
 
       case idle(Idle)
@@ -222,13 +222,12 @@ final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Sendable {
           buffer: [],
           bufferingPolicy: bufferingPolicy,
           terminationHandler: nil
-        )
-      )
+        ))
     }
   }
 
   private let lock: UnsafeMutableRawPointer
-  private var _stateMachine: _StateMachine
+  private var stateMachine: StateMachine
 
   init(bufferingPolicy: Continuation.BufferingPolicy) {
     unsafe self.lock = unsafe UnsafeMutableRawPointer.allocate(
@@ -237,7 +236,7 @@ final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Sendable {
     )
     unsafe _lockInit(self.lock)
 
-    self._stateMachine = _StateMachine(
+    self.stateMachine = StateMachine(
       bufferingPolicy: bufferingPolicy
     )
   }
@@ -248,7 +247,7 @@ final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Sendable {
   }
 }
 
-extension _AsyncStreamStorage._StateMachine {
+extension _AsyncStreamStorage.StateMachine {
   func getOnTermination() -> TerminationHandler? {
     switch unsafe self.state { // TODO: Return a TerminationHandler only in certain states
     case .idle(let idle):
@@ -336,10 +335,8 @@ extension _AsyncStreamStorage._StateMachine {
         unsafe self = .init(state: .idle(.init(
               buffer: [],
               bufferingPolicy: waiting.bufferingPolicy,
-              terminationHandler: waiting.terminationHandler
-            )
-          )
-        )
+              terminationHandler: waiting.terminationHandler.take()
+            )))
 
       case false:
         unsafe self = .init(state: .waiting(waiting))
@@ -379,10 +376,8 @@ extension _AsyncStreamStorage._StateMachine {
         unsafe self = .init(state: .waiting(.init(
               consumers: [consumer],
               bufferingPolicy: idle.bufferingPolicy,
-              terminationHandler: idle.terminationHandler
-            )
-          )
-        )
+              terminationHandler: idle.terminationHandler.take()
+            )))
         return unsafe .suspend
 
       case false:
@@ -405,10 +400,8 @@ extension _AsyncStreamStorage._StateMachine {
       else {
         unsafe self = .init(state: .terminated(.init(
               failure: nil,
-              terminationHandler: draining.terminationHandler
-            )
-          )
-        )
+              terminationHandler: draining.terminationHandler.take()
+            )))
 
         switch draining.failure {
         case .some(let failure):
@@ -429,10 +422,8 @@ extension _AsyncStreamStorage._StateMachine {
       case true:
         unsafe self = .init(state: .terminated(.init(
               failure: draining.failure,
-              terminationHandler: draining.terminationHandler
-            )
-          )
-        )
+              terminationHandler: draining.terminationHandler.take()
+            )))
         return unsafe .resume(
           consumer: consumer,
           element: element
@@ -450,9 +441,7 @@ extension _AsyncStreamStorage._StateMachine {
       unsafe self = .init(state: .terminated(.init(
             failure: nil,
             terminationHandler: nil
-          )
-        )
-      )
+          )))
 
       switch terminated.failure {
       case .some(let failure):
@@ -482,9 +471,7 @@ extension _AsyncStreamStorage._StateMachine {
         unsafe self = .init(state: .draining(.init(
               failure: failure,
               buffer: idle.buffer
-            )
-          )
-        )
+            )))
         return unsafe .call(terminationHandler: idle.terminationHandler.take())
       }
 
@@ -494,8 +481,7 @@ extension _AsyncStreamStorage._StateMachine {
           terminationHandler: waiting.terminationHandler.take(),
           consumers: waiting.consumers,
           failure: failure
-        )
-      )
+        ))
 
     case .draining(let draining):
       unsafe self = .init(state: .draining(draining))
@@ -509,13 +495,13 @@ extension _AsyncStreamStorage._StateMachine {
 }
 
 extension _AsyncStreamStorage {
-  func getOnTermination() -> _StateMachine.TerminationHandler? {
+  func getOnTermination() -> StateMachine.TerminationHandler? {
     withLock { state in
       return state.getOnTermination()
     }
   }
 
-  func setOnTermination(_ newValue: _StateMachine.TerminationHandler?) {
+  func setOnTermination(_ newValue: StateMachine.TerminationHandler?) {
     withLock { state in
       state.setOnTermination(newValue)
     }
@@ -536,7 +522,7 @@ extension _AsyncStreamStorage {
     }
   }
 
-  func next(_ consumer: consuming _StateMachine.Consumer) {
+  func next(_ consumer: consuming StateMachine.Consumer) {
     let action = withLock { state in
       unsafe state.next(consumer)
     }
@@ -603,13 +589,13 @@ extension _AsyncStreamStorage {
 extension _AsyncStreamStorage {
   @safe
   private func withLock<Value: ~Copyable>(
-    _ action: (inout _StateMachine) -> Value
+    _ body: (inout StateMachine) -> Value
   ) -> Value {
     unsafe _lock(self.lock)
 
     defer { unsafe _unlock(self.lock) }
 
-    return action(&self._stateMachine)
+    return body(&self.stateMachine)
   }
 }
 
