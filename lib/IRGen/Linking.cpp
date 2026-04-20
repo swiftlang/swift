@@ -633,7 +633,9 @@ static bool isLazyEmissionOfPublicSymbolInMultipleModulesPossible(CanType ty) {
   // In embedded existenitals mode we generate lazy public metadata on demand
   // which makes it non unique.
   auto &langOpts = ty->getASTContext().LangOpts;
-  if (langOpts.hasFeature(Feature::Embedded)) {
+  auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
+    langOpts.hasFeature(Feature::EmbeddedExistentials);
+  if (isEmbeddedWithExistentials) {
     if (auto nominal = ty->getAnyNominal()) {
       if (SILDeclRef::declHasNonUniqueDefinition(nominal)) {
         return true;
@@ -1147,7 +1149,9 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata: {
       auto &langOpts = IGM.Context.LangOpts;
-      if (langOpts.hasFeature(Feature::Embedded)) {
+      auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
+        langOpts.hasFeature(Feature::EmbeddedExistentials);
+      if (isEmbeddedWithExistentials) {
         return IGM.EmbeddedExistentialsMetadataStructTy;
       }
       if (getType().getClassOrBoundGenericClass())

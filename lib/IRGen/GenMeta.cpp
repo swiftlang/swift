@@ -6360,8 +6360,7 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 
   bool isPattern;
   bool canBeConstant;
-  bool hasEmbeddedExistentialFeature =
-      IGM.Context.LangOpts.hasFeature(Feature::Embedded);
+  bool hasEmbeddedExistentialFeature = IGM.isEmbeddedWithExistentials();
   if (structDecl->isGenericContext()) {
     assert(!hasEmbeddedExistentialFeature);
     GenericStructMetadataBuilder builder(IGM, structDecl, init);
@@ -6906,8 +6905,7 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   
   bool isPattern;
   bool canBeConstant;
-  bool hasEmbeddedExistentialFeature =
-      IGM.Context.LangOpts.hasFeature(Feature::Embedded);
+  bool hasEmbeddedExistentialFeature = IGM.isEmbeddedWithExistentials();
   if (theEnum->isGenericContext()) {
     assert(!hasEmbeddedExistentialFeature);
     GenericEnumMetadataBuilder builder(IGM, theEnum, init);
