@@ -34,6 +34,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DistributedDecl.h"
@@ -3677,8 +3678,15 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
 
       // If this requirement is a function, check that its parameters are Sendable as well
       if (isa<AbstractFunctionDecl>(requirement)) {
+        // Create substitutions based on the conformance that are in the
+        // requirements generic environment, so that protocol generic parameters
+        // and associated types within the conformance can both resolve.
+        auto reqGenEnv = requirement->getInnermostDeclContext()
+                             ->getGenericEnvironmentOfContext();
+        auto reqSubs = Conformance->getType()->getMemberSubstitutionMap(
+            requirement, reqGenEnv);
         diagnoseNonSendableTypesInReference(
-            /*base=*/nullptr, getDeclRefInContext(requirement),
+            /*base=*/nullptr, ConcreteDeclRef(requirement, reqSubs),
             requirement->getInnermostDeclContext(), requirement->getLoc(),
             SendableCheckReason::Conformance, getActorIsolation(witness),
             FunctionCheckKind::Params, loc);
