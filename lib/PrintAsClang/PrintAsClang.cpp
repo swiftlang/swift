@@ -293,7 +293,7 @@ static llvm::SmallString<128> normalizePath(const llvm::StringRef path) {
 // Augment requiredTextualIncludes with the set of headers required.
 static void collectClangModuleHeaderIncludes(
     const clang::Module *clangModule, clang::FileManager &fileManager,
-    llvm::SmallSet<llvm::SmallString<128>, 10> &requiredTextualIncludes,
+    llvm::SmallVector<llvm::SmallString<128>, 10> &requiredTextualIncludes,
     llvm::SmallSet<const clang::Module *, 10> &visitedModules,
     const llvm::SmallSet<llvm::SmallString<128>, 10> &includeDirs,
     const llvm::StringRef cwd) {
@@ -335,7 +335,7 @@ static void collectClangModuleHeaderIncludes(
                                            frameworkName);
     }
 
-    requiredTextualIncludes.insert(textualInclude);
+    requiredTextualIncludes.push_back(textualInclude);
   };
 
   if (std::optional<clang::Module::Header> umbrellaHeader =
@@ -436,7 +436,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
   clang::FileSystemOptions fileSystemOptions;
   clang::FileManager fileManager{fileSystemOptions};
 
-  llvm::SmallSet<llvm::SmallString<128>, 10>
+  llvm::SmallVector<llvm::SmallString<128>, 10>
       requiredTextualIncludes; // Only included without modules.
   llvm::SmallVector<StringRef, 1> textualIncludes; // always included.
   llvm::SmallSet<const clang::Module *, 10> visitedModules;
@@ -540,6 +540,11 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
   }
 
   if (useNonModularIncludes && !requiredTextualIncludes.empty()) {
+    // Sort and deduplicate includes
+    llvm::sort(requiredTextualIncludes);
+    requiredTextualIncludes.erase(std::unique(requiredTextualIncludes.begin(), requiredTextualIncludes.end()), 
+                    requiredTextualIncludes.end());
+
     out << "#elif defined(__OBJC__)\n";
     for (auto header : requiredTextualIncludes)
       out << "#import <" << header << ">\n";
