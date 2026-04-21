@@ -50,6 +50,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:semantic-copies>
 - <doc:strict-language-features>
 - <doc:strict-memory-safety>
+- <doc:unavailable-sendable-conformance>
 - <doc:unknown-warning-group>
 - <doc:untyped-throws>
 - <doc:use-any-apple-os-availability>
@@ -98,6 +99,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:strict-language-features>
 - <doc:strict-memory-safety>
 - <doc:temporary-pointers>
+- <doc:unavailable-sendable-conformance>
 - <doc:opaque-type-inference>
 - <doc:unknown-warning-group>
 - <doc:availability-unrecognized-name>

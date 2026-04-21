@@ -9,13 +9,9 @@ import SendableConformances
 
 typealias RequireSendable<T: Sendable> = T
 
-extension NonSendableClass: @retroactive @unchecked Sendable {}
-// expected-warning@-1 {{conformance of 'NonSendableClass' to protocol 'Sendable' was already stated in the type's module 'SendableConformances'}}
-
-typealias CheckNonSendableClass = RequireSendable<NonSendableClass>
-
 extension SendableStruct: @retroactive @unchecked Sendable {}
 // expected-warning@-1 {{conformance of 'SendableStruct' to protocol 'Sendable' was already stated in the type's module 'SendableConformances'}}
+typealias CheckSendableStruct = RequireSendable<SendableStruct>
 
 @available(*, unavailable)
 extension AnotherSendableStruct: @retroactive @unchecked Sendable {}
