@@ -7,13 +7,13 @@ protocol NoCopyReq: ~Copyable {}
 protocol P {
   associatedtype AT where Self: ~Copyable // expected-error {{constraint with subject type of 'Self' is not supported; consider adding requirement to protocol inheritance clause instead}}
 
-  associatedtype Bob where Alice: NoCopyReq & ~Copyable
-  associatedtype Alice where Bob: ~Copyable
+  associatedtype Bob where Alice: NoCopyReq & ~Copyable // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
+  associatedtype Alice where Bob: ~Copyable // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
 }
 
 protocol Q<Primary>: ~Copyable {
-  associatedtype Primary: ~Copyable
-  associatedtype Secondary: ~Copyable
+  associatedtype Primary: ~Copyable // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
+  associatedtype Secondary: ~Copyable // expected-warning {{experimental feature 'SuppressedAssociatedTypes' is deprecated}}
 }
 
 extension Q {

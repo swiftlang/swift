@@ -1574,8 +1574,6 @@ public:
       "__TEXT,__objc_methname,cstring_literals";
   static constexpr const char ObjCMethodTypeSectionName[] =
       "__TEXT,__objc_methtype,cstring_literals";
-  static constexpr const char OSLogStringSectionName[] =
-      "__TEXT,__oslogstring,cstring_literals";
 
   /// Returns the special builtin types that should be emitted in the stdlib
   /// module.
@@ -1797,7 +1795,8 @@ public:
   llvm::GlobalValue *defineTypeMetadata(
       CanType concreteType, bool isPattern, bool isConstant,
       ConstantInitFuture init, llvm::StringRef section = {},
-      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {},
+      unsigned numConformanceEntries = 0);
 
   TypeEntityReference
   getContextDescriptorEntityReference(const LinkEntity &entity);
@@ -2093,6 +2092,7 @@ private:
   void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
   bool isConcurrencyAvailable();
+  bool isTypedAllocationAvailable();
   void noteSwiftAsyncFunctionDef() {
     hasSwiftAsyncFunctionDef = true;
   }

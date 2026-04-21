@@ -14,9 +14,9 @@ public enum HasRawValue: Int {
   // CHECK-DAG: }
 } // CHECK: {{^}$}}
 
-// CHECK-LABEL: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK-LABEL: @available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
 // CHECK-NEXT: public enum HasRawValueAndAvailability : Swift::Int {
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+@available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
 public enum HasRawValueAndAvailability: Int {
   // CHECK-NEXT: case a, b, c
   case a, b, c
@@ -27,9 +27,9 @@ public enum HasRawValueAndAvailability: Int {
   // CHECK-DAG: }
 } // CHECK: {{^}$}}
 
-// CHECK-LABEL: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK-LABEL: @available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
 // CHECK-NEXT: public struct HasNestedTypesAndAvailability {
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+@available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
 public struct HasNestedTypesAndAvailability {
   // CHECK-LABEL: public enum HasRawValue : Swift::Int {
   public enum HasRawValue: Int {
@@ -57,6 +57,27 @@ public struct HasNestedTypesAndAvailability {
   // CHECK-NEXT: public enum HasRawValueAndAnyAppleOSAvailability : Swift::Int {
   @available(anyAppleOS 26, *)
   public enum HasRawValueAndAnyAppleOSAvailability: Int {
+    // CHECK-NEXT: case a
+    case a
+  }
+
+  // CHECK-LABEL: @available(*, deprecated, message: "Use something else")
+  // CHECK-NEXT: public enum HasRawValueUniversallyDeprecated : Swift::Int {
+  @available(*, deprecated, message: "Use something else")
+  public enum HasRawValueUniversallyDeprecated: Int {
+    // CHECK-NEXT: case a
+    case a
+  }
+}
+
+// CHECK-LABEL: @available(visionOS, unavailable)
+// CHECK-NEXT: public struct UnavailableOnVisionOS {
+@available(visionOS, unavailable)
+public struct UnavailableOnVisionOS {
+  // CHECK-LABEL: @available(iOS 18, *)
+  // CHECK-NEXT: public enum HasRawValueAndRefinediOSAvailability : Swift::Int {
+  @available(iOS 18, *)
+  public enum HasRawValueAndRefinediOSAvailability: Int {
     // CHECK-NEXT: case a
     case a
   }
@@ -97,18 +118,18 @@ extension NoRawValueWithExplicitHashable : Hashable {
 // CHECK: extension synthesized::HasRawValue : Swift::Hashable {}
 // CHECK: extension synthesized::HasRawValue : Swift::RawRepresentable {}
 
-// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK: @available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
 // CHECK-NEXT: extension synthesized::HasRawValueAndAvailability : Swift::Equatable {}
-// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK: @available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
 // CHECK-NEXT: extension synthesized::HasRawValueAndAvailability : Swift::Hashable {}
-// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK: @available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
 // CHECK-NEXT: extension synthesized::HasRawValueAndAvailability : Swift::RawRepresentable {}
 
-// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK: @available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
 // CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValue : Swift::Equatable {}
-// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK: @available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
 // CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValue : Swift::Hashable {}
-// CHECK: @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
+// CHECK: @available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
 // CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValue : Swift::RawRepresentable {}
 
 // CHECK: @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
@@ -118,11 +139,11 @@ extension NoRawValueWithExplicitHashable : Hashable {
 // CHECK: @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
 // CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndRefinedAvailability : Swift::RawRepresentable {}
 
-// CHECK: @available(macOS 10.15, watchOS 6, tvOS 13, visionOS 2.1, iOS 18, *)
+// CHECK: @available(macOS 14, watchOS 10, tvOS 17, visionOS 2.1, iOS 18, *)
 // CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndVisionOSAvailabilityFirst : Swift::Equatable {}
-// CHECK: @available(macOS 10.15, watchOS 6, tvOS 13, visionOS 2.1, iOS 18, *)
+// CHECK: @available(macOS 14, watchOS 10, tvOS 17, visionOS 2.1, iOS 18, *)
 // CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndVisionOSAvailabilityFirst : Swift::Hashable {}
-// CHECK: @available(macOS 10.15, watchOS 6, tvOS 13, visionOS 2.1, iOS 18, *)
+// CHECK: @available(macOS 14, watchOS 10, tvOS 17, visionOS 2.1, iOS 18, *)
 // CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndVisionOSAvailabilityFirst : Swift::RawRepresentable {}
 
 // CHECK: @available(anyAppleOS 26, *)
@@ -131,6 +152,26 @@ extension NoRawValueWithExplicitHashable : Hashable {
 // CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndAnyAppleOSAvailability : Swift::Hashable {}
 // CHECK: @available(anyAppleOS 26, *)
 // CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueAndAnyAppleOSAvailability : Swift::RawRepresentable {}
+
+// CHECK: @available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
+// CHECK-NEXT: @available(*, deprecated, message: "Use something else")
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueUniversallyDeprecated : Swift::Equatable {}
+// CHECK: @available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
+// CHECK-NEXT: @available(*, deprecated, message: "Use something else")
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueUniversallyDeprecated : Swift::Hashable {}
+// CHECK: @available(macOS 14, iOS 17, watchOS 10, tvOS 17, *)
+// CHECK-NEXT: @available(*, deprecated, message: "Use something else")
+// CHECK-NEXT: extension synthesized::HasNestedTypesAndAvailability.synthesized::HasRawValueUniversallyDeprecated : Swift::RawRepresentable {}
+
+// CHECK: @available(iOS 18, *)
+// CHECK-NEXT: @available(visionOS, unavailable)
+// CHECK-NEXT: extension synthesized::UnavailableOnVisionOS.synthesized::HasRawValueAndRefinediOSAvailability : Swift::Equatable {}
+// CHECK: @available(iOS 18, *)
+// CHECK-NEXT: @available(visionOS, unavailable)
+// CHECK-NEXT: extension synthesized::UnavailableOnVisionOS.synthesized::HasRawValueAndRefinediOSAvailability : Swift::Hashable {}
+// CHECK: @available(iOS 18, *)
+// CHECK-NEXT: @available(visionOS, unavailable)
+// CHECK-NEXT: extension synthesized::UnavailableOnVisionOS.synthesized::HasRawValueAndRefinediOSAvailability : Swift::RawRepresentable {}
 
 // CHECK: extension synthesized::ObjCEnum : Swift::Equatable {}
 // CHECK: extension synthesized::ObjCEnum : Swift::Hashable {}

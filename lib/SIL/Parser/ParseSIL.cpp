@@ -26,6 +26,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
@@ -690,7 +691,9 @@ static bool parseDeclSILOptional(
     OptimizationMode *optimizationMode, PerformanceConstraints *perfConstraints,
     bool *isPerformanceConstraint, bool *markedAsUsed, StringRef *asmName,
     StringRef *section,
-    bool *isLet, bool *isWeakImported, bool *needStackProtection,
+    bool *isLet, bool *isWeakImported,
+    std::optional<CodeGenerationModel> *codeGenerationModel,
+    bool *needStackProtection,
     bool *isSpecialized, AvailabilityRange *availability,
     bool *isWithoutActuallyEscapingThunk,
     SmallVectorImpl<std::string> *Semantics,
@@ -746,6 +749,8 @@ static bool parseDeclSILOptional(
       *isThunk = IsReabstractionThunk;
     else if (isThunk && SP.P.Tok.getText() == "back_deployed_thunk")
       *isThunk = IsBackDeployedThunk;
+    else if (isThunk && SP.P.Tok.getText() == "distributed_thunk")
+      *isThunk = IsDistributedThunk;
     else if (isWithoutActuallyEscapingThunk
              && SP.P.Tok.getText() == "without_actually_escaping")
       *isWithoutActuallyEscapingThunk = true;
@@ -762,6 +767,10 @@ static bool parseDeclSILOptional(
                       M.getASTContext().LangOpts.Target.str());
       else
         *isWeakImported = true;
+    } else if (codeGenerationModel && SP.P.Tok.getText() == "export_interface") {
+      *codeGenerationModel = CodeGenerationModel::Interface;
+    } else if (codeGenerationModel && SP.P.Tok.getText() == "export_implementation") {
+      *codeGenerationModel = CodeGenerationModel::Implementation;
     } else if (availability && SP.P.Tok.getText() == "available") {
       SP.P.consumeToken(tok::identifier);
 
@@ -810,7 +819,7 @@ static bool parseDeclSILOptional(
       // representation of an actor that can be parsed back. For now this is
       // just a quick hack so we can write tests.
       auto optIsolation = ActorIsolation::forSILString(
-          SP.P.Context.getIdentifier(rawString).str());
+          M, SP.P.Context.getIdentifier(rawString).str());
       if (!optIsolation) {
         SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
         return true;
@@ -5001,11 +5010,24 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
   case SILInstructionKind::AllocPackMetadataInst: {
+    auto isNested = StackAllocationIsNested;
+    StringRef attributeName;
+    SourceLoc attributeLoc;
+    while (parseSILOptional(attributeName, attributeLoc, *this)) {
+      if (attributeName == "non_nested")
+        isNested = StackAllocationIsNotNested;
+      else {
+        P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
+                   attributeName, "alloc_pack_metadata");
+        return true;
+      }
+    }
+
     SILType Ty;
     if (parseSILType(Ty))
       return true;
 
-    ResultVal = B.createAllocPackMetadata(InstLoc, Ty);
+    ResultVal = B.createAllocPackMetadata(InstLoc, Ty, isNested);
     break;
   }
   case SILInstructionKind::AllocStackInst: {
@@ -5076,6 +5098,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     bool IsObjC = false;
     bool OnStack = false;
     bool isBare = false;
+    auto isNested = StackAllocationIsNested;
     SmallVector<SILType, 2> ElementTypes;
     SmallVector<SILValue, 2> ElementCounts;
     while (P.consumeIf(tok::l_square)) {
@@ -5088,6 +5111,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         OnStack = true;
       } else if (Optional == "bare" && Opcode == SILInstructionKind::AllocRefInst) {
         isBare = true;
+      } else if (Optional == "non_nested") {
+        isNested = StackAllocationIsNotNested;
       } else if (Optional == "tail_elems") {
         SILType ElemTy;
         if (parseSILType(ElemTy) || !P.Tok.isAnyOperator() ||
@@ -5126,11 +5151,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     if (Opcode == SILInstructionKind::AllocRefDynamicInst) {
       ResultVal = B.createAllocRefDynamic(InstLoc, Metadata, ObjectType, IsObjC,
-                                          OnStack,
+                                          OnStack, isNested,
                                           ElementTypes, ElementCounts);
     } else {
       ResultVal = B.createAllocRef(InstLoc, ObjectType, IsObjC, OnStack, isBare,
-                                   ElementTypes, ElementCounts);
+                                   isNested, ElementTypes, ElementCounts);
     }
     break;
   }
@@ -6950,6 +6975,13 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       continue;
     }
 
+    if (AttrName == "nonisolated_nonsending") {
+      assert(!bool(AttrValue));
+      PartialApplyIsolation =
+          SILFunctionTypeIsolation::forNonisolatedNonsending();
+      continue;
+    }
+
     if (AttrName == "isolated_any") {
       assert(!bool(AttrValue));
       PartialApplyIsolation = SILFunctionTypeIsolation::forErased();
@@ -6969,8 +7001,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     if (AttrName == "callee_isolation") {
-      auto applyIsolation =
-          ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
+      auto applyIsolation = ActorIsolation::forSILString(
+          B.getModule(), std::get<StringRef>(*AttrValue));
       if (!applyIsolation) {
         P.diagnose(AttrValueLoc, diag::expected_in_attribute_list);
         return true;
@@ -6982,8 +7014,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     if (AttrName == "caller_isolation") {
-      auto applyIsolation =
-          ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
+      auto applyIsolation = ActorIsolation::forSILString(
+          B.getModule(), std::get<StringRef>(*AttrValue));
       if (!applyIsolation) {
         P.diagnose(AttrValueLoc, diag::expected_in_attribute_list);
         return true;
@@ -7147,17 +7179,12 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    auto PA = B.createPartialApply(
+    ResultVal = B.createPartialApply(
         InstLoc, FnVal, subs, Args, PartialApplyConvention,
         PartialApplyIsolation,
         IsNoEscape ? PartialApplyInst::OnStackKind::OnStack
-                   : PartialApplyInst::OnStackKind::NotOnStack);
-
-    if (isNested) {
-      PA->setStackAllocationIsNested(*isNested);
-    }
-
-    ResultVal = PA;
+                   : PartialApplyInst::OnStackKind::NotOnStack,
+        isNested ? *isNested : StackAllocationIsNested);
     break;
   }
   case SILInstructionKind::TryApplyInst: {
@@ -7411,6 +7438,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   IsThunk_t isThunk = IsNotThunk;
   SILFunction::Purpose specialPurpose = SILFunction::Purpose::None;
   bool isWeakImported = false;
+  std::optional<CodeGenerationModel> codeGenerationModel;
   bool needStackProtection = false;
   AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
   bool isWithoutActuallyEscapingThunk = false;
@@ -7439,7 +7467,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &objCReplacementFor, &specialPurpose, &inlineStrategy,
           &optimizationMode, &perfConstr, &isPerformanceConstraint,
           &markedAsUsed, &asmName, &section, nullptr, &isWeakImported,
-          &needStackProtection, nullptr, &availability,
+          &codeGenerationModel, &needStackProtection, nullptr, &availability,
           &isWithoutActuallyEscapingThunk, &Semantics, &SpecAttrs, &ClangDecl,
           &MRK, &actorIsolation, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
@@ -7487,6 +7515,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
       FunctionState.F->setObjCReplacement(objCReplacementFor);
     FunctionState.F->setSpecialPurpose(specialPurpose);
     FunctionState.F->setIsAlwaysWeakImported(isWeakImported);
+    FunctionState.F->setCodeGenerationModel(codeGenerationModel);
     FunctionState.F->setAvailabilityForLinkage(availability);
     FunctionState.F->setWithoutActuallyEscapingThunk(
       isWithoutActuallyEscapingThunk);
@@ -7708,7 +7737,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
                            nullptr, nullptr, nullptr, &isMarkedAsUsed, &asmName,
                            &section, &isLet, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           State, M) ||
+                           nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_value_name) ||
@@ -7765,7 +7794,8 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, SP, M))
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           SP, M))
     return true;
   
   ValueDecl *VD;
@@ -7819,6 +7849,27 @@ bool SILParserState::parseSILProperty(Parser &P) {
   return false;
 }
 
+static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
+  Identifier DeclName;
+  SourceLoc DeclLoc;
+  if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
+    return nullptr;
+
+  // Find the protocol decl. The protocol can be imported.
+  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res =
+    lookupTopDecl(P, DeclName, /*typeLookup=*/true);
+  assert(isa<ValueDecl *>(Res) && "Protocol look-up should return a Decl");
+  ValueDecl *VD = cast<ValueDecl *>(Res);
+  if (!VD) {
+    P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
+    return nullptr;
+  }
+  auto *proto = dyn_cast<ProtocolDecl>(VD);
+  if (!proto)
+    P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
+  return proto;
+}
+
 /// decl-sil-vtable: [[only in SIL mode]]
 ///   'sil_vtable' ClassName decl-sil-vtable-body
 /// decl-sil-vtable-body:
@@ -7835,7 +7886,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            VTableState, M))
     return true;
 
@@ -7881,8 +7932,28 @@ bool SILParserState::parseSILVTable(Parser &P) {
   Lexer::SILBodyRAII Tmp(*P.L);
   // Parse the entry list.
   std::vector<SILVTable::Entry> vtableEntries;
+  std::vector<SILVTable::ConformanceEntry> conformances;
   if (P.Tok.isNot(tok::r_brace)) {
     do {
+      if (P.Tok.is(tok::identifier)) {
+        SILParser witnessState(P);
+        if (P.Tok.getText() == "no_conformance") {
+          P.consumeToken();
+          ProtocolDecl *proto = parseProtocolDecl(P, witnessState);
+          if (!proto)
+            return true;
+          conformances.push_back(proto);
+          continue;
+        } else if (P.Tok.getText() == "conformance") {
+          P.consumeToken();
+          auto conf = witnessState.parseProtocolConformance();
+          if (conf.isInvalid() || !conf.isConcrete())
+            return true;
+          conformances.push_back(conf.getConcrete());
+          continue;
+        }
+      }
+
       SILDeclRef Ref;
       Identifier FuncName;
       SourceLoc FuncLoc;
@@ -7939,7 +8010,10 @@ bool SILParserState::parseSILVTable(Parser &P) {
   P.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                        LBraceLoc);
 
-  SILVTable::create(M, theClass, specializedClassTy, Serialized, vtableEntries);
+  auto *vT = SILVTable::create(M, theClass, specializedClassTy, Serialized, vtableEntries);
+  for (auto cEntry : conformances) {
+    vT->appendConformance(cEntry);
+  }
   return false;
 }
 
@@ -7959,7 +8033,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            moveOnlyDeinitTableState, M))
     return true;
 
@@ -8039,27 +8113,6 @@ static ClassDecl *parseClassDecl(Parser &P, SILParser &SP) {
   if (!decl)
     P.diagnose(DeclLoc, diag::sil_default_override_decl_not_class, DeclName);
   return decl;
-}
-
-static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
-  Identifier DeclName;
-  SourceLoc DeclLoc;
-  if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
-    return nullptr;
-
-  // Find the protocol decl. The protocol can be imported.
-  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res =
-    lookupTopDecl(P, DeclName, /*typeLookup=*/true);
-  assert(isa<ValueDecl *>(Res) && "Protocol look-up should return a Decl");
-  ValueDecl *VD = cast<ValueDecl *>(Res);
-  if (!VD) {
-    P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
-    return nullptr;
-  }
-  auto *proto = dyn_cast<ProtocolDecl>(VD);
-  if (!proto)
-    P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
-  return proto;
 }
 
 static AssociatedTypeDecl *parseAssociatedTypeDecl(Parser &P, SILParser &SP,
@@ -8504,7 +8557,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
           nullptr, &isSerialized, nullptr, nullptr, nullptr, nullptr, nullptr,
           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-          nullptr, nullptr, nullptr, nullptr, nullptr, &isSpecialized,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &isSpecialized,
           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
           WitnessState, M))
     return true;

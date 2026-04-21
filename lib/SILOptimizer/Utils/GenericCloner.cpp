@@ -81,6 +81,9 @@ SILFunction *GenericCloner::createDeclaration(
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }
+  if (auto isolation = Orig->getActorIsolation()) {
+    NewF->setActorIsolation(*isolation);
+  }
   NewF->setOptimizationMode(Orig->getOptimizationMode());
   if (!Orig->hasOwnership()) {
     NewF->setOwnershipEliminated();

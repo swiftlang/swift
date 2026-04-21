@@ -448,16 +448,20 @@ public:
   }
   AllocPackMetadataInst *
   createAllocPackMetadata(SILLocation loc,
-                          std::optional<SILType> elementType = std::nullopt) {
+                          std::optional<SILType> elementType = std::nullopt,
+                          StackAllocationIsNested_t isNested =
+                            StackAllocationIsNested) {
     return insert(new (getModule()) AllocPackMetadataInst(
         getSILDebugLocation(loc),
         elementType.value_or(
             SILType::getEmptyTupleType(getModule().getASTContext())
-                .getAddressType())));
+                .getAddressType()),
+        isNested));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
                                bool objc, bool canAllocOnStack, bool isBare,
+                               StackAllocationIsNested_t isNested,
                                ArrayRef<SILType> ElementTypes,
                                ArrayRef<SILValue> ElementCountOperands) {
     // AllocRefInsts expand to function calls and can therefore not be
@@ -465,12 +469,14 @@ public:
     ASSERT(!Loc.isInPrologue());
     return insert(AllocRefInst::create(getSILDebugLocation(Loc), getFunction(),
                                        ObjectType, objc, canAllocOnStack, isBare,
+                                       isNested,
                                        ElementTypes, ElementCountOperands));
   }
 
   AllocRefDynamicInst *createAllocRefDynamic(SILLocation Loc, SILValue operand,
                                              SILType type, bool objc,
                                              bool canAllocOnStack,
+                                             StackAllocationIsNested_t isNested,
                                     ArrayRef<SILType> ElementTypes,
                                     ArrayRef<SILValue> ElementCountOperands) {
     // AllocRefDynamicInsts expand to function calls and can therefore
@@ -478,7 +484,7 @@ public:
     ASSERT(!Loc.isInPrologue());
     return insert(AllocRefDynamicInst::create(
         getSILDebugLocation(Loc), *F, operand, type, objc, canAllocOnStack,
-        ElementTypes, ElementCountOperands));
+        isNested, ElementTypes, ElementCountOperands));
   }
 
   /// Helper function that calls \p createAllocBox after constructing a
@@ -572,6 +578,7 @@ public:
           SILFunctionTypeIsolation::forUnknown(),
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
+      StackAllocationIsNested_t IsNested = StackAllocationIsNested,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     ASSERT(OnStack == PartialApplyInst::OnStackKind::OnStack ||
            llvm::all_of(Args,
@@ -582,7 +589,7 @@ public:
                "Must have an owned compatible object");
     return insert(PartialApplyInst::create(
         getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention,
-        ResultIsolation, *F, SpecializationInfo, OnStack));
+        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested));
   }
 
   BeginApplyInst *createBeginApply(
@@ -1715,7 +1722,8 @@ public:
   TupleInst *createTuple(SILLocation Loc, SILType Ty,
                          ArrayRef<SILValue> Elements,
                          ValueOwnershipKind forwardingOwnershipKind) {
-    ASSERT(isLoadableOrOpaque(Ty));
+    ASSERT(isLoadableOrOpaque(Ty) ||
+           (isInsertingIntoGlobal() && getTypeLowering(Ty).isFixedABI()));
     return insert(TupleInst::create(getSILDebugLocation(Loc), Ty, Elements,
                                     getModule(), forwardingOwnershipKind));
   }

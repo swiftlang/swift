@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 987; // Serialize decl lifetimes instead of their their function types' lifetimes
+const uint16_t SWIFTMODULE_VERSION_MINOR = 994; // SIL code generation model
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -731,6 +731,14 @@ enum class FunctionTypeIsolation : uint8_t {
 };
 using FunctionTypeIsolationField = TypeIDField;
 
+enum class SILFunctionTypeIsolation : uint8_t {
+  Unknown,
+  NonisolatedNonsending,
+  Erased,
+};
+// An extra bit here to future-proof.
+using SILFunctionTypeIsolationField = BCFixed<3>;
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class GenericParamKind : uint8_t {
@@ -1001,7 +1009,10 @@ namespace options_block {
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
     STRICT_MEMORY_SAFETY,
-    DEFERRED_CODE_GEN,
+    CODE_GENERATION_MODEL,
+    OSLOG_STRING_SECTION_NAME,
+    AGGRESSIVE_CMO,
+    LIBRARY_LEVEL,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1102,8 +1113,13 @@ namespace options_block {
     STRICT_MEMORY_SAFETY
   >;
 
-  using DeferredCodeGenLayout = BCRecordLayout<
-    DEFERRED_CODE_GEN
+  using CodeGenerationModelLayout = BCRecordLayout<
+    CODE_GENERATION_MODEL,
+    BCFixed<2>
+  >;
+
+  using AggressiveCMOEnabledLayout = BCRecordLayout<
+    AGGRESSIVE_CMO
   >;
 
   using PublicModuleNameLayout = BCRecordLayout<
@@ -1111,9 +1127,19 @@ namespace options_block {
     BCBlob
   >;
 
+  using OSLogStringSectionNameLayout = BCRecordLayout<
+    OSLOG_STRING_SECTION_NAME,
+    BCBlob
+  >;
+
   using SwiftInterfaceCompilerVersionLayout = BCRecordLayout<
     SWIFT_INTERFACE_COMPILER_VERSION,
     BCBlob // version tuple
+  >;
+
+  using LibraryLevelLayout = BCRecordLayout<
+    LIBRARY_LEVEL,
+    BCFixed<2>
   >;
 }
 
@@ -1490,7 +1516,7 @@ namespace decls_block {
     BCFixed<1>,                         // pseudogeneric?
     BCFixed<1>,                         // noescape?
     BCFixed<1>,                         // unimplementable?
-    BCFixed<1>,                         // erased isolation?
+    SILFunctionTypeIsolationField,      // isolation
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
     BCVBR<6>,                           // number of parameters

@@ -1700,6 +1700,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftOverlayFile:
       case file_types::TY_JSONDependencies:
       case file_types::TY_JSONArguments:
+      case file_types::TY_JSONPolyglotAST:
       case file_types::TY_SwiftABIDescriptor:
       case file_types::TY_SwiftAPIDescriptor:
       case file_types::TY_ConstValues:

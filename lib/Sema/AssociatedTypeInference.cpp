@@ -2335,8 +2335,7 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
     return inferred;
   }
 
-  auto setup =
-      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type> {
+  auto setup = [&]() -> MatchWitnessTypes {
     // Compute the requirement and witness types we'll use for matching.
     witnessType = witness->getInterfaceType()->getReferenceStorageReferent();
     witnessType = getWitnessTypeForMatching(conformance, witness, witnessType);
@@ -2373,9 +2372,8 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
                                                      witnessThrownError);
     }
 
-    return std::make_tuple(std::nullopt,
-                           reqType, witnessType,
-                           reqThrownError, witnessThrownError);
+    return MatchWitnessTypes{reqType, witnessType, reqThrownError,
+                             witnessThrownError};
   };
 
   /// Visits a requirement type to match it to a potential witness for
@@ -2528,11 +2526,26 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
 
   };
 
+  const auto matchLifetimes =
+      [&](const LifetimeDependentInterface &witnessInterface,
+          const LifetimeDependentInterface &reqInterface)
+      -> std::optional<RequirementMatch> {
+    // Mismatched lifetime dependencies should not be necessary to rule out a
+    // candidate associated type, except in contrived cases.
+    //
+    // Matching lifetimes accurately requires a constraint system (see
+    // ConstraintSystem::matchFunctionLifetimes). This is performed during value
+    // witness matching, when it is necessary (see both overloads of
+    // swift::matchWitness in TypeCheckProtocol.cpp)
+    return std::nullopt;
+  };
+
   // Match the witness. If we don't succeed, throw away the inference
   // information.
   // FIXME: A renamed match might be useful to retain for the failure case.
-  if (!matchWitness(dc, req, witness, setup, matchTypes, finalize)
-          .isWellFormed()) {
+  if (!matchWitness(dc, req, witness, setup, matchTypes, matchLifetimes,
+                    finalize)
+           .isWellFormed()) {
     inferred.Inferred.clear();
   }
 

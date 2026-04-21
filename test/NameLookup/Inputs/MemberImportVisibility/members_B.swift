@@ -54,10 +54,15 @@ package enum EnumInB_package {
 open class DerivedClassInB: BaseClassInA {
   open func methodInB() {}
   open override func overriddenMethod() {}
+  open override func overriddenInBMethod() {}
 }
 
 extension ProtocolInA {
   public func defaultedRequirementInB() { }
+}
+
+extension StructWithWitnessesForProtocolWithAssociatedTypesInA {
+  public struct WitnessedInB { }
 }
 
 public struct EquatableInB: Equatable {

@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library -application-extension
-// REQUIRES: OS=macosx
+// RUN: %target-typecheck-verify-swift -parse-as-library -application-extension -parse-stdlib -target arm64-apple-macos11
 
 // Allow referencing unavailable API in situations where the caller is marked unavailable in the same circumstances.
 
@@ -67,11 +66,11 @@ func osx_func(
 @available(OSXApplicationExtension, unavailable)
 func osx_extension_func(
   _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
-  _: OSXUnavailable, // expected-error {{'OSXUnavailable' is unavailable in macOS}}
+  _: OSXUnavailable,
   _: OSXAppExtensionsUnavailable
 ) {
   never() // expected-error {{'never()' is unavailable}}
-  osx() // expected-error {{'osx()' is unavailable}}
+  osx()
   osx_extension()
 }
 
@@ -112,11 +111,11 @@ var osx_var: (
 @available(OSXApplicationExtension, unavailable)
 var osx_extension_var: (
   NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
-  OSXUnavailable, // expected-error {{'OSXUnavailable' is unavailable in macOS}}
+  OSXUnavailable,
   OSXAppExtensionsUnavailable
 ) = (
   never(), // expected-error {{'never()' is unavailable}}
-  osx(), // expected-error {{'osx()' is unavailable}}
+  osx(),
   osx_extension()
 )
 
@@ -139,7 +138,7 @@ struct NeverAvailableContainer { // expected-note 3 {{'NeverAvailableContainer' 
 }
 
 @available(OSX, unavailable)
-struct OSXUnavailableContainer { // expected-note 2 {{'OSXUnavailableContainer' has been explicitly marked unavailable here}}
+struct OSXUnavailableContainer { // expected-note {{'OSXUnavailableContainer' has been explicitly marked unavailable here}}
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   // expected-error@-1 {{'NeverAvailable' is unavailable}}
   let osx_var: OSXUnavailable = osx()
@@ -150,8 +149,7 @@ struct OSXUnavailableContainer { // expected-note 2 {{'OSXUnavailableContainer' 
 struct OSXAppExtensionsUnavailableContainer { // expected-note {{'OSXAppExtensionsUnavailableContainer' has been explicitly marked unavailable here}}
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   // expected-error@-1 {{'NeverAvailable' is unavailable}}
-  let osx_var: OSXUnavailable = osx() // expected-error {{'osx()' is unavailable}}
-  // expected-error@-1 {{'OSXUnavailable' is unavailable in macOS}}
+  let osx_var: OSXUnavailable = osx()
   let osx_extension_var: OSXAppExtensionsUnavailable = osx_extension()
 }
 
@@ -185,7 +183,7 @@ extension AlwaysAvailabileContainer {}
 @available(OSXApplicationExtension, unavailable)
 extension NeverAvailableContainer {} // expected-error {{'NeverAvailableContainer' is unavailable}}
 @available(OSXApplicationExtension, unavailable)
-extension OSXUnavailableContainer {} // expected-error {{'OSXUnavailableContainer' is unavailable in macOS}}
+extension OSXUnavailableContainer {}
 @available(OSXApplicationExtension, unavailable)
 extension OSXAppExtensionsUnavailableContainer {}
 
@@ -244,19 +242,19 @@ extension ExtendMe {
 
 @available(OSX, unavailable)
 extension ExtendMe {
-  func osx_extension_available_method() {} // expected-note 2 {{has been explicitly marked unavailable here}}
+  func osx_extension_available_method() {} // expected-note {{has been explicitly marked unavailable here}}
 
   @available(OSX 99, *)
-  func osx_extension_osx_future_method() {} // expected-note 2 {{has been explicitly marked unavailable here}}
+  func osx_extension_osx_future_method() {} // expected-note {{has been explicitly marked unavailable here}}
 
   @available(*, unavailable)
   func osx_extension_never_available_method() {} // expected-note 3 {{'osx_extension_never_available_method()' has been explicitly marked unavailable here}}
 
   @available(OSX, unavailable)
-  func osx_extension_osx_method() {} // expected-note 2 {{'osx_extension_osx_method()' has been explicitly marked unavailable here}}
+  func osx_extension_osx_method() {} // expected-note {{'osx_extension_osx_method()' has been explicitly marked unavailable here}}
 
   @available(OSXApplicationExtension, unavailable)
-  func osx_extension_osx_app_extension_method() {} // expected-note 2 {{'osx_extension_osx_app_extension_method()' has been explicitly marked unavailable here}}
+  func osx_extension_osx_app_extension_method() {} // expected-note {{'osx_extension_osx_app_extension_method()' has been explicitly marked unavailable here}}
 
   func osx_extension_available_method(
     _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
@@ -313,18 +311,18 @@ extension ExtendMe {
   func osx_app_extension_extension_never_available_method() {} // expected-note 3 {{'osx_app_extension_extension_never_available_method()' has been explicitly marked unavailable here}}
 
   @available(OSX, unavailable)
-  func osx_app_extension_extension_osx_method() {} // expected-note 2 {{'osx_app_extension_extension_osx_method()' has been explicitly marked unavailable here}}
+  func osx_app_extension_extension_osx_method() {} // expected-note {{'osx_app_extension_extension_osx_method()' has been explicitly marked unavailable here}}
 
   @available(OSXApplicationExtension, unavailable)
   func osx_app_extension_extension_osx_app_extension_method() {} // expected-note {{'osx_app_extension_extension_osx_app_extension_method()' has been explicitly marked unavailable here}}
 
   func osx_app_extension_extension_available_method(
     _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
-    _: OSXUnavailable, // expected-error {{'OSXUnavailable' is unavailable in macOS}}
+    _: OSXUnavailable,
     _: OSXAppExtensionsUnavailable
   ) {
     never() // expected-error {{'never()' is unavailable}}
-    osx() // expected-error {{'osx()' is unavailable}}
+    osx()
     osx_extension()
   }
 
@@ -353,11 +351,11 @@ extension ExtendMe {
   @available(OSXApplicationExtension, unavailable)
   func osx_app_extension_extension_osx_app_extension_method(
     _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
-    _: OSXUnavailable, // expected-error {{'OSXUnavailable' is unavailable in macOS}}
+    _: OSXUnavailable,
     _: OSXAppExtensionsUnavailable
   ) {
     never() // expected-error {{'never()' is unavailable}}
-    osx() // expected-error {{'osx()' is unavailable}}
+    osx()
     osx_extension()
   }
 }
@@ -398,18 +396,17 @@ func osx_func_call_extension_methods(_ e: ExtendMe) {
 @available(OSXApplicationExtension, unavailable)
 func osx_app_ext_func_call_extension_methods(_ e: ExtendMe) {
   e.never_available_extension_available_method() // expected-error {{'never_available_extension_available_method()' is unavailable}}
-  e.osx_extension_available_method() // expected-error {{'osx_extension_available_method()' is unavailable in macOS}}
+  e.osx_extension_available_method()
   e.osx_app_extension_extension_available_method()
-  e.osx_extension_never_available_method() // expected-error {{'osx_extension_never_available_method()' is unavailable in macOS}}
-  e.osx_extension_osx_method() // expected-error {{'osx_extension_osx_method()' is unavailable in macOS}}
-  e.osx_extension_osx_app_extension_method() // expected-error {{'osx_extension_osx_app_extension_method()' is unavailable in macOS}}
+  e.osx_extension_never_available_method() // expected-error {{'osx_extension_never_available_method()' is unavailable}}
+  e.osx_extension_osx_method()
+  e.osx_extension_osx_app_extension_method()
 
   e.never_available_extension_osx_future_method() // expected-error {{'never_available_extension_osx_future_method()' is unavailable}}
-  e.osx_extension_osx_future_method() // expected-error {{'osx_extension_osx_future_method()' is unavailable in macOS}}
-  e.osx_app_extension_extension_osx_future_method() // expected-error {{'osx_app_extension_extension_osx_future_method()' is only available in macOS 99 or newer}}
-  // expected-note@-1 {{add 'if #available' version check}}
+  e.osx_extension_osx_future_method()
+  e.osx_app_extension_extension_osx_future_method()
   e.osx_app_extension_extension_never_available_method() // expected-error {{'osx_app_extension_extension_never_available_method()' is unavailable}}
-  e.osx_app_extension_extension_osx_method() // expected-error {{'osx_app_extension_extension_osx_method()' is unavailable in macOS}}
+  e.osx_app_extension_extension_osx_method()
   e.osx_app_extension_extension_osx_app_extension_method()
 }
 

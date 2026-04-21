@@ -1127,20 +1127,39 @@ void PotentialThrowSite::print(SourceManager *sm,
 void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
                           raw_ostream &out) const {
   PrintOptions PO = PrintOptions::forDebugging();
-  out << " with ";
 
-  switch (getKind()) {
-  case OverloadChoiceKind::Decl:
-  case OverloadChoiceKind::DeclViaDynamic:
-  case OverloadChoiceKind::DeclViaBridge:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional:
-    getDecl()->dumpRef(out);
+  auto printDecl = [&]() {
+    auto *decl = getDecl();
+
+    decl->dumpRef(out);
     out << " as ";
     if (getBaseType())
       out << getBaseType()->getString(PO) << ".";
 
-    out << getDecl()->getBaseName() << ": "
-        << adjustedOpenedType->getString(PO);
+    auto type = (adjustedOpenedType
+                 ? adjustedOpenedType
+                 : decl->getInterfaceType());
+    out << type->getString(PO);
+  };
+
+  switch (getKind()) {
+  case OverloadChoiceKind::Decl:
+    printDecl();
+    break;
+
+  case OverloadChoiceKind::DeclViaDynamic:
+    printDecl();
+    out << " dynamic";
+    break;
+
+  case OverloadChoiceKind::DeclViaBridge:
+    printDecl();
+    out << " bridged";
+    break;
+
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    printDecl();
+    out << " unwrapped";
     break;
 
   case OverloadChoiceKind::KeyPathApplication:
@@ -1209,6 +1228,7 @@ void Solution::dump(raw_ostream &out, unsigned indent) const {
         ovl.first->dump(sm, out);
       }
 
+      out << " with ";
       auto choice = ovl.second.choice;
       choice.dump(ovl.second.adjustedOpenedType, sm, out);
     }

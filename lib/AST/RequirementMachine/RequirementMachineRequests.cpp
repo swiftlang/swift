@@ -878,15 +878,6 @@ InferredGenericSignatureRequest::evaluate(
   // extension must be made explicit.
   if (forExtension) {
     auto invertibleProtocol = forExtension->isAddingConformanceToInvertible();
-    // FIXME: to workaround a reverse condfail, always infer the requirements if
-    //  the extension is in a swiftinterface file. This is temporary and should
-    //  be removed soon. (rdar://130424971)
-    if (auto *sf = forExtension->getOutermostParentSourceFile()) {
-      if (sf->Kind == SourceFileKind::Interface
-          && !ctx.LangOpts.hasFeature(Feature::SE427NoInferenceOnExtension)) {
-        invertibleProtocol = std::nullopt;
-      }
-    }
     if (invertibleProtocol) {
       for (auto &def : defaults) {
         // Check whether a corresponding explicit requirement was provided.

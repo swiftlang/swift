@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -enable-experimental-feature Lifetimes \
-// RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 protocol P {
   associatedtype E: ~Escapable

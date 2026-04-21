@@ -18,10 +18,12 @@
 #include "swift/Sema/Subtyping.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 
 #define DEBUG_TYPE "Subtyping"
 #include "llvm/Support/Debug.h"
@@ -80,6 +82,7 @@ bool ConstraintSystem::isConformanceTransitiveForSupertype(
   case ConversionBehavior::Set:
   case ConversionBehavior::Optional:
   case ConversionBehavior::AnyHashable:
+  case ConversionBehavior::Tuple:
     break;
 
   case ConversionBehavior::String:
@@ -178,12 +181,19 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
   case ConversionBehavior::Array:
   case ConversionBehavior::Dictionary:
   case ConversionBehavior::Set:
-    // All subtypes of these have the same nominal type.
+    // All subtypes of these have the same nominal type,
+    // and conform to the same protocols.
+    return true;
+
+  case ConversionBehavior::Tuple:
+    // All subtypes of a tuple remain a tuple, and conform
+    // to the same protocols.
     return true;
 
   case ConversionBehavior::Class:
-    // If a subclass conforms, so does the superclass.
-    return true;
+    // A subclass might conform to more protocols than a
+    // superclass.
+    return false;
 
   case ConversionBehavior::Double: {
     auto key = std::make_pair(behavior, proto);
@@ -204,12 +214,10 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
       SmallVector<ProtocolConformance *, 1> results;
       decl->lookupConformance(proto, results);
       if (!results.empty()) {
-        result = false;
+        result = true;
         break;
       }
     }
-
-    result = true;
 
     // Cache the result.
     bool inserted =
@@ -230,11 +238,19 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
     return false;
 
   case ConversionBehavior::AnyHashable:
+    // All Hashable types are subtypes of AnyHashable, so
+    // we cannot conclude anything about protocol conformance
+    // in this case.
+    return false;
+
   case ConversionBehavior::Pointer:
     // FIXME: Check pointer types.
     return false;
 
   case ConversionBehavior::Structural:
+    // FIXME: Metatypes and functions.
+    return false;
+
   case ConversionBehavior::Unknown:
     return false;
   }
@@ -325,6 +341,21 @@ swift::constraints::getConversionBehavior(Type type) {
   if (type->isVoid())
     return ConversionBehavior::None;
 
+  // Only tuples with a known length are supported for now.
+  if (type->is<TupleType>()) {
+    if (type->hasParameterPack())
+      return ConversionBehavior::Unknown;
+
+    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+    type->getTypeVariables(referencedTypeVars);
+    for (auto *typeVar : referencedTypeVars) {
+      if (typeVar->getImpl().isPackExpansion())
+        return ConversionBehavior::Unknown;
+    }
+
+    return ConversionBehavior::Tuple;
+  }
+
   return ConversionBehavior::Unknown;
 }
 
@@ -351,6 +382,7 @@ bool swift::constraints::hasProperSubtypes(Type type) {
   case ConversionBehavior::Pointer:
   case ConversionBehavior::Optional:
   case ConversionBehavior::Structural:
+  case ConversionBehavior::Tuple:
   case ConversionBehavior::Unknown:
     return true;
   }
@@ -388,6 +420,7 @@ bool swift::constraints::hasProperSupertypes(Type type) {
   case ConversionBehavior::Pointer:
   case ConversionBehavior::Optional:
   case ConversionBehavior::Structural:
+  case ConversionBehavior::Tuple:
   case ConversionBehavior::Unknown:
     return true;
   }
@@ -530,6 +563,23 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
 
       break;
     }
+    case ConversionBehavior::Tuple: {
+      auto *lhsTuple = lhs->castTo<TupleType>();
+      auto *rhsTuple = rhs->castTo<TupleType>();
+
+      if (lhsTuple->getNumElements() != rhsTuple->getNumElements())
+        return ConflictFlag::TupleArity;
+
+      for (unsigned i : indices(lhsTuple->getElements())) {
+        auto lhsElt = lhsTuple->getElementType(i);
+        auto rhsElt = rhsTuple->getElementType(i);
+        auto result = canPossiblyConvertTo(cs, lhsElt, rhsElt, sig);
+        if (result)
+          return result | ConflictFlag::TupleElement;
+      }
+
+      break;
+    }
     case ConversionBehavior::Unknown:
       break;
     }
@@ -609,6 +659,7 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     case ConversionBehavior::Dictionary:
     case ConversionBehavior::Set:
     case ConversionBehavior::Structural:
+    case ConversionBehavior::Tuple:
       return ConflictFlag::Category;
 
     case ConversionBehavior::Unknown:
@@ -618,7 +669,9 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
 
   // FIXME: Move this into isLikelyExactMatch()
   if (sig) {
-    if (rhs->isTypeParameter()) {
+    // Skip this if lhs is a type variable, because then lookupConformance()
+    // always returns an abstract conformance for that type.
+    if (rhs->isTypeParameter() && !lhs->isTypeVariableOrMember()) {
       bool failed = llvm::any_of(
           sig->getRequiredProtocols(rhs),
           [&](ProtocolDecl *proto) {
@@ -628,7 +681,7 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
         return ConflictFlag::Conformance;
     }
 
-    if (lhs->isTypeParameter()) {
+    if (lhs->isTypeParameter() && !rhs->isTypeVariableOrMember()) {
       bool failed = llvm::any_of(
           sig->getRequiredProtocols(lhs),
           [&](ProtocolDecl *proto) {
@@ -643,6 +696,24 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
              lhs->dump(llvm::dbgs());
              rhs->dump(llvm::dbgs()));
   return std::nullopt;
+}
+
+bool swift::constraints::isPossibleSupertypeOfFunctionType(Type type) {
+  type = type->lookThroughAllOptionalTypes();
+
+  if (type->isTypeVariableOrMember()) {
+    return true;
+  } else if (type->is<FunctionType>()) {
+    return true;
+  } else if (type->isExistentialType()) {
+    auto layout = type->getExistentialLayout();
+
+    // Revisit this if functions ever conform to arbitrary protocols!
+    if (!layout.containsNonMarkerProtocols() && !layout.getSuperclass())
+      return true;
+  }
+
+  return false;
 }
 
 void swift::constraints::simple_display(llvm::raw_ostream &out,
@@ -674,4 +745,8 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " structural";
   if (reason.contains(ConflictFlag::Conformance))
     out << " conformance";
+  if (reason.contains(ConflictFlag::TupleArity))
+    out << " tuple_arity";
+  if (reason.contains(ConflictFlag::TupleElement))
+    out << " tuple_element";
 }

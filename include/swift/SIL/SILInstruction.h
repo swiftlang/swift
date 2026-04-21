@@ -2319,11 +2319,25 @@ class AllocPackMetadataInst final
           AllocationInst> {
   friend SILBuilder;
 
-  AllocPackMetadataInst(SILDebugLocation loc, SILType elementType)
+  USE_SHARED_UINT8;
+
+  AllocPackMetadataInst(SILDebugLocation loc, SILType elementType,
+                        StackAllocationIsNested_t isNested)
       : NullaryInstructionWithTypeDependentOperandsBase(
-            loc, {}, elementType.getAddressType()) {}
+            loc, {}, elementType.getAddressType()) {
+    sharedUInt8().AllocPackMetadataInst.isNested = bool(isNested);
+  }
 
 public:
+  StackAllocationIsNested_t isStackAllocationNested() const {
+    return StackAllocationIsNested_t(
+             sharedUInt8().AllocPackMetadataInst.isNested);
+  }
+
+  void setStackAllocationIsNested(StackAllocationIsNested_t isNested) {
+    sharedUInt8().AllocPackMetadataInst.isNested = bool(isNested);
+  }
+
   /// The instruction which may trigger on-stack pack metadata when IRGen
   /// lowering.
   SILInstruction *getIntroducer() { return getNextInstruction(); }
@@ -2341,6 +2355,7 @@ protected:
                    SILDebugLocation DebugLoc,
                    SILType ObjectType,
                    bool objc, bool canBeOnStack, bool isBare,
+                   StackAllocationIsNested_t isNested,
                    ArrayRef<SILType> ElementTypes);
 
   SILType *getTypeStorage();
@@ -2367,6 +2382,14 @@ public:
 
   void setStackAllocatable(bool OnStack = true) {
     sharedUInt8().AllocRefInstBase.onStack = OnStack;
+  }
+
+  StackAllocationIsNested_t isStackAllocationNested() const {
+    return StackAllocationIsNested_t(sharedUInt8().AllocRefInstBase.isNested);
+  }
+
+  void setStackAllocationIsNested(StackAllocationIsNested_t isNested) {
+    sharedUInt8().AllocRefInstBase.isNested = bool(isNested);
   }
 
   ArrayRef<SILType> getTailAllocatedTypes() const {
@@ -2428,10 +2451,11 @@ class AllocRefInst final
   AllocRefInst(SILDebugLocation DebugLoc, SILFunction &F,
                SILType ObjectType,
                bool objc, bool canBeOnStack, bool isBare,
+               StackAllocationIsNested_t isNested,
                ArrayRef<SILType> ElementTypes,
                ArrayRef<SILValue> AllOperands)
       : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ObjectType,
-                        objc, canBeOnStack, isBare, ElementTypes) {
+                        objc, canBeOnStack, isBare, isNested, ElementTypes) {
     assert(AllOperands.size() >= ElementTypes.size());
     std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
                             getTrailingObjects<SILType>());
@@ -2440,6 +2464,7 @@ class AllocRefInst final
   static AllocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
                               SILType ObjectType,
                               bool objc, bool canBeOnStack, bool isBare,
+                              StackAllocationIsNested_t isNested,
                               ArrayRef<SILType> ElementTypes,
                               ArrayRef<SILValue> ElementCountOperands);
 
@@ -2479,10 +2504,12 @@ class AllocRefDynamicInst final
                       SILType ty,
                       bool objc,
                       bool canBeOnStack,
+                      StackAllocationIsNested_t isNested,
                       ArrayRef<SILType> ElementTypes,
                       ArrayRef<SILValue> AllOperands)
       : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ty, objc,
-                                            canBeOnStack, /*isBare=*/ false, ElementTypes) {
+                                            canBeOnStack, /*isBare=*/ false,
+                                            isNested, ElementTypes) {
     assert(AllOperands.size() >= ElementTypes.size() + 1);
     std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
                             getTrailingObjects<SILType>());
@@ -2491,7 +2518,7 @@ class AllocRefDynamicInst final
   static AllocRefDynamicInst *
   create(SILDebugLocation DebugLoc, SILFunction &F,
          SILValue metatypeOperand, SILType ty, bool objc,
-         bool canBeOnStack,
+         bool canBeOnStack, StackAllocationIsNested_t isNested,
          ArrayRef<SILType> ElementTypes,
          ArrayRef<SILValue> ElementCountOperands);
 
@@ -2739,7 +2766,7 @@ protected:
         SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
         Substitutions(subs.getCanonical()) {
-    assert(!!subs == !!callee->getType().castTo<SILFunctionType>()
+    ASSERT(!!subs == !!callee->getType().castTo<SILFunctionType>()
         ->getInvocationGenericSignature());
 
     // Initialize the operands.
@@ -3263,6 +3290,7 @@ private:
                    ArrayRef<SILValue> Args,
                    ArrayRef<SILValue> TypeDependentOperands,
                    SILType ClosureType,
+                   StackAllocationIsNested_t IsNested,
                    const GenericSpecializationInformation *SpecializationInfo);
 
   static PartialApplyInst *
@@ -3270,7 +3298,7 @@ private:
          SubstitutionMap Substitutions, ParameterConvention CalleeConvention,
          SILFunctionTypeIsolation ResultIsolation, SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo,
-         OnStackKind onStack);
+         OnStackKind onStack, StackAllocationIsNested_t isNested);
 
 public:
   /// Return the result function type of this partial apply.
@@ -9840,6 +9868,7 @@ public:
   AllocPackMetadataInst *getAllocation() {
     return cast<AllocPackMetadataInst>(getOperand().getDefiningInstruction());
   }
+
   /// The instruction which may trigger on-stack pack metadata when IRGen
   /// lowering.
   SILInstruction *getIntroducer() { return getAllocation()->getIntroducer(); }

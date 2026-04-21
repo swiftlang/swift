@@ -31,6 +31,9 @@ struct Partition::PartitionTester {
   unsigned getRegion(unsigned elt) const {
     return unsigned(p.elementToRegionMap.at(Element(elt)));
   }
+
+  auto begin() const { return p.elementToRegionMap.begin(); }
+  auto end() const { return p.elementToRegionMap.end(); }
 };
 
 namespace {
@@ -100,10 +103,12 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
     case PartitionOpError::NonSendableIsolationCrossingResult:
     case PartitionOpError::InOutSendingReturned:
     case PartitionOpError::InOutSendingParametersInSameRegion:
+    case PartitionOpError::IncompatibleRegionMerge:
       llvm_unreachable("Unsupported");
     case PartitionOpError::LocalUseAfterSend: {
       auto state = std::move(error).getLocalUseAfterSendError();
       failureCallback(*state.op, state.sentElement, state.sendingOp);
+      break;
     }
     }
   }
@@ -258,22 +263,33 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
     expect_join_eq();
   };
 
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(1), Element(2)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(7), Element(8)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(2), Element(7)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(1), Element(3)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(3), Element(4)));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(1), Element(2), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(7), Element(8), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(2), Element(7), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(1), Element(3), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(3), Element(4), RegionMergeReason::Unknown));
 
   EXPECT_FALSE(Partition::equals(p1, p2));
   EXPECT_FALSE(Partition::equals(p2, p3));
   EXPECT_FALSE(Partition::equals(p1, p3));
 
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(2), Element(5)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(5), Element(6)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(1), Element(6)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(2), Element(6)));
-  apply_to_p2_and_p3(PartitionOp::Merge(Element(3), Element(7)));
-  apply_to_p1_and_p3(PartitionOp::Merge(Element(7), Element(8)));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(2), Element(5), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(5), Element(6), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(1), Element(6), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(2), Element(6), RegionMergeReason::Unknown));
+  apply_to_p2_and_p3(
+      PartitionOp::Merge(Element(3), Element(7), RegionMergeReason::Unknown));
+  apply_to_p1_and_p3(
+      PartitionOp::Merge(Element(7), Element(8), RegionMergeReason::Unknown));
 }
 
 TEST(PartitionUtilsTest, Join1) {
@@ -919,7 +935,8 @@ TEST(PartitionUtilsTest, TestHistory_BuildNewRegionRepIsMergee) {
                 PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignDirect(Element(3), Element(2)),
                 PartitionOp::AssignDirect(Element(10), Element(2)),
-                PartitionOp::Merge(Element(2), Element(0))});
+                PartitionOp::Merge(Element(2), Element(0),
+                                   RegionMergeReason::Unknown)});
   }
 
   Partition pSnapshot = p;
@@ -987,7 +1004,8 @@ TEST(PartitionUtilsTest, TestHistory_JoiningTwoEmpty) {
   Partition p2(historyFactory.get());
 
   auto result = Partition::join(p1, p2);
-  EXPECT_TRUE(result.begin() == result.end());
+  PartitionTester resultTester(result);
+  EXPECT_TRUE(resultTester.begin() == resultTester.end());
   EXPECT_FALSE(result.hasHistory());
 }
 
@@ -1010,7 +1028,8 @@ TEST(PartitionUtilsTest, TestHistory_JoiningNotEmptyAndEmpty) {
   EXPECT_TRUE(p1.historySize() == 2);
   EXPECT_TRUE(p2.historySize() == 0);
   auto result = Partition::join(p1, p2);
-  EXPECT_TRUE(std::next(result.begin()) == result.end());
+  PartitionTester resultTester(result);
+  EXPECT_TRUE(std::next(resultTester.begin()) == resultTester.end());
   // Since p2 doesn't have any history, we do not actually perform any join and
   // thus do not insert a CFGHistory change.
   EXPECT_TRUE(result.historySize() == 2);
@@ -1035,7 +1054,8 @@ TEST(PartitionUtilsTest, TestHistory_JoiningEmptyAndNotEmpty) {
   EXPECT_TRUE(p1.historySize() == 2);
   EXPECT_TRUE(p2.historySize() == 0);
   auto result = Partition::join(p1, p2);
-  EXPECT_TRUE(std::next(result.begin()) == result.end());
+  PartitionTester resultTester(result);
+  EXPECT_TRUE(std::next(resultTester.begin()) == resultTester.end());
   // Since p2 doesn't have any history, we do not actually perform any join and
   // thus do not insert a CFGHistory change.
   EXPECT_TRUE(result.historySize() == 2);

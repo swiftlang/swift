@@ -5,6 +5,35 @@
 
 ## Swift (next)
 
+* When building modules using library evolution, Swift now uses module selectors in module interface files by default,
+  improving their robustness against name collisions and ambiguity. Compiler flags previously used to work around these
+  issues are disabled in this configuration and can now be removed. If necessary, you can disable this new behavior by
+  adding `-Xfrontend -disable-module-selectors-in-module-interface` to `OTHER_SWIFT_FLAGS`.
+
+* [SE-0493][]: `defer` statements now support `async` calls. The isolation of the body of the `defer` statement is always the same as the isolation of its enclosing scope.
+  
+  ```
+  func example() async {
+    let resource = getResource()
+    defer { await resource.cleanup() }
+    try resource.doSomething()
+  }
+  ```
+
+* [SE-0518][]:
+  Introduced `~Sendable` conformance syntax to explicitly suppress a conformance to `Sendable`,
+  which prevents automatic `Sendable` inference on types, and provides an alternative way
+  to mark types as non-`Sendable` without inheritance impact.
+
+  ```swift
+  // The `Base` type has been audited and determined to be non-`Sendable`, sub-classes
+  // can introduce non-`Sendable` mutable state or protect their state / make everything
+  // constant and thus may be marked as `Sendable`.
+  public class Base: ~Sendable {
+    // ...
+  }
+  ```
+
 * The checking for illegal forward references to local variables is now consistent regardless of
   whether the reference appears in a closure. Previously the type-checker could incorrectly permit
   forward references within a closure that it would reject outside of the closure, however this
@@ -109,11 +138,6 @@
   }
   ```
 
-* Calling from Objective-C into into asynchronous Swift APIs will now attempt use `Task.immediate`
-  instead of `Task` when available. This reduces the initial enqueue delay which Task would incur
-  (by enqueueing on the global pool before calling the async target), and can improve performance
-  and ordering predictability of calling async code through these bridged APIs.
-
 * The raw span accessor properties of `Span` and `MutableSpan` (`bytes` and
   `mutableBytes`) as well as the two generic `append()` methods of
   `OutputRawSpan` are newly marked with `@unsafe`. These changes are corrections
@@ -216,7 +240,7 @@
   }
   ```
 
-* [SE-0471][]:
+* [SE-0371][]:
   Actor and global actor annotated types may now declare a synchronous `isolated deinit`, which allows such deinitializer
   to access actor isolated state while deinitializing the actor. This enables actor deinitializers to safely access
   and shut down or close resources during an actors deinitialization, without explicitly resorting to unstructured 
@@ -11059,6 +11083,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0365]: <https://github.com/apple/swift-evolution/blob/main/proposals/0365-implicit-self-weak-capture.md>
 [SE-0366]: <https://github.com/apple/swift-evolution/blob/main/proposals/0366-move-function.md>
 [SE-0370]: <https://github.com/apple/swift-evolution/blob/main/proposals/0370-pointer-family-initialization-improvements.md>
+[SE-0371]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0376]: <https://github.com/apple/swift-evolution/blob/main/proposals/0376-function-back-deployment.md>
 [SE-0377]: <https://github.com/apple/swift-evolution/blob/main/proposals/0377-parameter-ownership-modifiers.md>
 [SE-0380]: <https://github.com/apple/swift-evolution/blob/main/proposals/0380-if-switch-expressions.md>
@@ -11094,10 +11119,11 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0462]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0462-task-priority-escalation-apis.md
 [SE-0469]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0469-task-names.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
-[SE-0471]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
+[SE-0493]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0493-defer-async.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
+[SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

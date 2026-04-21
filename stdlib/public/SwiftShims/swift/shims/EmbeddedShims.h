@@ -220,6 +220,46 @@ _swift_embedded_existential_init_with_copy(void *dst, void *srcExist) {
   }
 }
 
+// Helpers for value-witness operations used by the embedded error runtime.
+static inline void
+_swift_embedded_metadata_initialize_with_copy(void *metadata, void *dst, void *src) {
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  fullmeta->vwt->initializeWithCopyFn(dst, src, metadata);
+}
+
+static inline void
+_swift_embedded_metadata_initialize_with_take(void *metadata, void *dst, void *src) {
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  fullmeta->vwt->initializeWithTakeFn(dst, src, metadata);
+}
+
+static inline void
+_swift_embedded_metadata_destroy(void *metadata, void *value) {
+  EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
+  fullmeta->vwt->destroyFn(value, metadata);
+}
+
+// Swift implementation of error box destroy logic (defined in EmbeddedRuntime.swift).
+// Takes the object as a regular swiftcc parameter (x0/rdi on arm64/x86_64).
+SWIFT_CC_swift extern void _swift_embedded_error_destroy_impl(void * _Nonnull object);
+
+// Calling convention bridge: HeapObjectDestroyer passes the object via swiftself
+// (x20 on arm64, r13 on x86_64), but @_silgen_name Swift functions receive it as a
+// regular parameter (x0/rdi). This wrapper receives via SWIFT_CONTEXT (swiftself)
+// and forwards as a regular parameter to the Swift implementation.
+// Named _swift_embedded_error_box_destroy (not _swift_embedded_error_destroy) to
+// avoid SIL name collision — Swift IRGen would otherwise shadow the clang-compiled
+// version, losing the swiftcall/swiftself attributes.
+SWIFT_CC_swift static inline void
+_swift_embedded_error_box_destroy(SWIFT_CONTEXT void * _Nonnull object) {
+  _swift_embedded_error_destroy_impl(object);
+}
+
+// Returns the address of the calling convention bridge for metadata storage init.
+static inline void * _Nonnull _swift_embedded_error_destroy_ptr(void) {
+  return (void *)_swift_embedded_error_box_destroy;
+}
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

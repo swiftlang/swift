@@ -20,6 +20,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/CFG.h"
@@ -269,6 +270,7 @@ void SILFunction::init(
   this->HasCReferences = false;
   this->MarkedAsUsed = false;
   this->IsAlwaysWeakImported = false;
+  this->CodeGenModel = 0; // none case
   this->IsDynamicReplaceable = isDynamic;
   this->ExactSelfClass = isExactSelfClass;
   this->IsDistributed = isDistributed;
@@ -359,6 +361,7 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->HasCReferences = HasCReferences;
   newSnapshot->MarkedAsUsed = MarkedAsUsed;
   newSnapshot->IsAlwaysWeakImported = IsAlwaysWeakImported;
+  newSnapshot->CodeGenModel = CodeGenModel;
   newSnapshot->HasOwnership = HasOwnership;
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
   newSnapshot->OptMode = OptMode;
@@ -493,6 +496,28 @@ void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &
 
 ASTContext &SILFunction::getASTContext() const {
   return getModule().getASTContext();
+}
+
+std::optional<CodeGenerationModel> SILFunction::codeGenerationModel() const {
+  if (CodeGenModel == 0)
+    return std::nullopt;
+
+  return static_cast<CodeGenerationModel>(CodeGenModel - 1);
+}
+
+void SILFunction::setCodeGenerationModel(std::optional<CodeGenerationModel> value) {
+  if (value)
+    CodeGenModel = static_cast<unsigned>(*value) + 1;
+  else
+    CodeGenModel = 0;
+}
+
+bool SILFunction::isAlwaysEmitIntoClient() const {
+  return codeGenerationModel() == CodeGenerationModel::Implementation;
+}
+
+bool SILFunction::isNeverEmitIntoClient() const {
+  return codeGenerationModel() == CodeGenerationModel::Interface;
 }
 
 OptimizationMode SILFunction::getEffectiveOptimizationMode() const {
@@ -1102,7 +1127,7 @@ SILFunction::isPossiblyUsedExternally() const {
   // Declaration marked as `@_alwaysEmitIntoClient` that
   // returns opaque result type with availability conditions
   // has to be kept alive to emit opaque type metadata descriptor.
-  if (markedAsAlwaysEmitIntoClient() &&
+  if (isAlwaysEmitIntoClient() &&
       hasOpaqueResultTypeWithAvailabilityConditions())
     return true;
 
@@ -1139,7 +1164,7 @@ bool SILFunction::shouldBePreservedForDebugger() const {
     return false;
 
   // Don't preserve anything markes as always emit into client.
-  if (markedAsAlwaysEmitIntoClient())
+  if (isAlwaysEmitIntoClient())
     return false;
 
   // Needed by lldb to print global variables which are propagated by the

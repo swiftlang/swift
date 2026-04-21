@@ -16,7 +16,7 @@
 // RUN: -enable-library-evolution \
 // RUN: -O -wmo
 
-// RUN: llvm-bcanalyzer %t/Lib.swiftmodule | %FileCheck %s -check-prefix=CHECK-BC
+// RUN: %llvm-bcanalyzer %t/Lib.swiftmodule | %FileCheck %s -check-prefix=CHECK-BC
 // CHECK-BC: SERIALIZE_PACKAGE_ENABLED
 
 // REQUIRES: swift_in_compiler

@@ -621,7 +621,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
       (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(),
       (unsigned)F.markedAsUsed(), (unsigned)F.getEffectsKind(),
-      (unsigned)numTrailingRecords, (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
+      (unsigned)numTrailingRecords, (unsigned)F.hasOwnership(),
+      F.isAlwaysWeakImported(),
+      F.codeGenerationModel() ? (static_cast<unsigned>(*F.codeGenerationModel()) + 1) : 0,
       LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
@@ -1318,7 +1320,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       isBare = ar->isBare();
     Args.push_back((unsigned)ARI->isObjC() |
                    ((unsigned)ARI->canAllocOnStack() << 1) |
-                   ((unsigned)isBare << 2));
+                   ((unsigned)isBare << 2) |
+                   ((unsigned)ARI->isStackAllocationNested() << 3));
     ArrayRef<SILType> TailTypes = ARI->getTailAllocatedTypes();
     ArrayRef<Operand> AllOps = ARI->getAllOperands();
     unsigned NumTailAllocs = TailTypes.size();
@@ -3334,6 +3337,22 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
                            S.addDeclRef(vt.getClass()),
                            (unsigned)vt.getSerializedKind());
 
+  for (auto confEntry : vt.getConformances()) {
+    if (confEntry.hasConformance()) {
+      auto confID = S.addConformanceRef(confEntry.getConformance());
+      VTableConformanceEntry::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[VTableConformanceEntry::Code],
+        confID);
+    } else {
+      auto protoID = S.addDeclRef(confEntry.getProtocol());
+      VTableNoConformanceEntry::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[VTableNoConformanceEntry::Code],
+        protoID);
+    }
+  }
+
   for (auto &entry : vt.getEntries()) {
     SmallVector<uint64_t, 4> ListOfValues;
     SILFunction *impl = entry.getImplementation();
@@ -3752,11 +3771,9 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   if (F->isAvailableExternally())
     return false;
 
-  if (F->getDeclRef().hasDecl()) {
-    if (auto decl = F->getDeclRef().getDecl())
-      if (decl->isNeverEmittedIntoClient())
-        return false;
-  }
+  // Don't serialize the body if the client can never see it.
+  if (F->isNeverEmitIntoClient())
+    return false;
 
   // If we are asked to serialize everything, go ahead and do it.
   if (Options.SerializeAllSIL)
@@ -3811,6 +3828,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();
+  registerSILAbbr<VTableConformanceEntry>();
+  registerSILAbbr<VTableNoConformanceEntry>();
   registerSILAbbr<MoveOnlyDeinitLayout>();
   registerSILAbbr<SILGlobalVarLayout>();
   registerSILAbbr<WitnessTableLayout>();

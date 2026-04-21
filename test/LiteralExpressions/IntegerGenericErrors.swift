@@ -1,6 +1,6 @@
 // Error cases for literal expressions in integer generic parameter values
 // REQUIRES: swift_feature_LiteralExpressions
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature LiteralExpressions -disable-experimental-parser-round-trip
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature LiteralExpressions
 
 let wrongCount1: InlineArray<(2 + 3), Int> = [1, 2, 3]
 // expected-error@-1 {{expected '5' elements in inline array literal, but got '3'}}

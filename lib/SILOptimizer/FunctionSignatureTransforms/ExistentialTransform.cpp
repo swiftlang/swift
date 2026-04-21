@@ -631,6 +631,9 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     for (auto &Attr : F->getSemanticsAttrs())
       NewF->addSemanticsAttr(Attr);
 
+    if (auto isolation = F->getActorIsolation())
+      NewF->setActorIsolation(*isolation);
+
     /// Set Unqualified ownership, if any.
     if (!F->hasOwnership()) {
       NewF->setOwnershipEliminated();

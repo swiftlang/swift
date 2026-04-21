@@ -174,3 +174,22 @@ multiLine(
   x: 1,
   y: 1 // expected-error {{missing argument for parameter 'z' in call}} {{7-7=, z: <#Int#>}}
 )
+
+// https://github.com/swiftlang/swift/issues/87818
+do {
+  struct Test {
+    var callback: ((Int) -> Void)? = nil
+    var multiArgCallback: ((Int, String) -> Void)? = nil
+  }
+
+  func test(t: inout Test, fn: @escaping () -> Void) {
+    t.callback = { }
+    // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{19-19= _ in}}
+    t.multiArgCallback = { _ in }
+    // expected-error@-1 {{closure type '(Int, String) -> Void' expects 2 arguments, but 1 was used in closure body}} {{29-29=,_ }}
+    t.callback = fn
+    // expected-error@-1 {{cannot assign value of type '() -> Void' to type '((Int) -> Void)?'}}
+    t.callback = Optional.some(fn)
+    // expected-error@-1 {{cannot convert value of type '() -> Void' to expected argument type '(Int) -> Void'}}
+  }
+}

@@ -20,7 +20,7 @@
 // MAKEDEP-CHECK: {{.*}}test{{/|\\}}ScanDependencies{{/|\\}}Inputs{{/|\\}}CHeaders{{/|\\}}A.h
 
 // Verify that Swift reference dependencies contain header files of transitive clang module dependency
-// RUN: llvm-bcanalyzer --dump %t/test.swiftdeps | %FileCheck %s -check-prefix=SWIFTDEPS-CHECK
+// RUN: %llvm-bcanalyzer --dump %t/test.swiftdeps | %FileCheck %s -check-prefix=SWIFTDEPS-CHECK
 // SWIFTDEPS-CHECK: <IDENTIFIER_NODE abbrevid=8/> blob data = '{{.*}}test{{/|\\}}ScanDependencies{{/|\\}}Inputs{{/|\\}}CHeaders{{/|\\}}A.h'
 
 

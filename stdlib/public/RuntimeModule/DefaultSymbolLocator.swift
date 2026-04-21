@@ -100,15 +100,22 @@ open class DefaultSymbolLocator: SymbolLocator {
     return peImage
   }
 
+  public func elfDebugSymSubPath(for uuidString: String) -> String {
+    let uuidSuffix = uuidString.dropFirst(2)
+    let uuidPrefix = uuidString.prefix(2)
+    return "\(uuidPrefix)\(sep)\(uuidSuffix).debug"
+  }
+
+  public func elfDebugSymSubPath(for uuid: [UInt8]) -> String {
+    return elfDebugSymSubPath(for: hex(uuid))
+  }
+
   private func elfDebugSymPath(for image: any Image) -> String? {
     guard let uuid = image.uuid else {
       return nil
     }
 
-    let uuidString = hex(uuid)
-    let uuidSuffix = uuidString.dropFirst(2)
-    let uuidPrefix = uuidString.prefix(2)
-    return "\(elfSymbolPath)\(sep)\(uuidPrefix)\(sep)\(uuidSuffix).debug"
+    return "\(elfSymbolPath)\(sep)\(elfDebugSymSubPath(for: uuid))"
   }
 
   private func findSymbolsForElf(image: any Image) -> (any SymbolSource)? {
@@ -132,7 +139,7 @@ open class DefaultSymbolLocator: SymbolLocator {
       return source
     }
 
-    if let uuid = image.uuid, let (imagePath, result) =
+    if let uuid = image.uuid, let (_, result) =
       findElf(image: image, paths: findElfSymbolPaths(image: image)) {
       let source = toSymbolSource(result)
       cache[.uuid(uuid)] = source
@@ -387,7 +394,7 @@ open class DefaultSymbolLocator: SymbolLocator {
     return result
   }
 
-  public func findSymbols(for image: any Image,
+  open func findSymbols(for image: any Image,
                           format: ImageFormat) -> (any SymbolSource)? {
     if format == .auto || format == .elf {
       if let source = findSymbolsForElf(image: image) {
@@ -460,7 +467,7 @@ open class DefaultSymbolLocator: SymbolLocator {
     return nil
   }
 
-  public func find(image: any Image) -> String? {
+  open func find(image: any Image) -> String? {
     if let elfImageInfo = findElf(
       image: image,
       paths: findImagePaths(image: image)) {

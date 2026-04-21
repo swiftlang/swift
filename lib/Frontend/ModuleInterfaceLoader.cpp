@@ -1803,7 +1803,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
 
   if (casOpts.EnableCaching) {
     genericSubInvocation.getCASOptions().EnableCaching = casOpts.EnableCaching;
-    genericSubInvocation.getCASOptions().CASOpts = casOpts.CASOpts;
+    genericSubInvocation.getCASOptions().Config = casOpts.Config;
     genericSubInvocation.getCASOptions().HasImmutableFileSystem =
         casOpts.HasImmutableFileSystem;
     casOpts.enumerateCASConfigurationFlags(
@@ -1856,8 +1856,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     StringRef moduleCachePath, StringRef prebuiltCachePath,
     StringRef backupModuleInterfaceDir,
     ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
-    bool serializeDependencyHashes, bool trackSystemDependencies)
-    : SM(SM), Diags(Diags), ArgSaver(Allocator) {
+    bool serializeDependencyHashes, bool trackSystemDependencies,
+    std::shared_ptr<llvm::cas::ObjectStore> CAS,
+    std::shared_ptr<llvm::cas::ActionCache> ActionCache)
+    : SM(SM), Diags(Diags), ArgSaver(Allocator),
+      CAS(std::move(CAS)), ActionCache(std::move(ActionCache)) {
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(LoaderOpts.requestedAction, searchPathOpts,
                                      langOpts, clangImporterOpts, casOpts,
@@ -2151,9 +2154,11 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.getFrontendOptions().InputsAndOutputs
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
-  CompilerInstance subInstance;
+  // Diagnostic consumers must outlive subInstance, since subInstance's
+  // DiagnosticEngine holds raw pointers to them.
   ForwardingDiagnosticConsumer FDC(*Diags);
   NullDiagnosticConsumer noopConsumer;
+  CompilerInstance subInstance;
   if (!silenceErrors) {
     subInstance.addDiagnosticConsumer(&FDC);
   } else {
@@ -2184,6 +2189,8 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInstance.getSourceMgr().setFileSystem(SM.getFileSystem());
 
   std::string InstanceSetupError;
+  if (CAS)
+    subInstance.setSharedCASInstances(CAS, ActionCache);
   if (subInstance.setup(subInvocation, InstanceSetupError)) {
     return std::make_error_code(std::errc::not_supported);
   }

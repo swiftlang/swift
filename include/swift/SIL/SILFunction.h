@@ -34,6 +34,7 @@
 namespace swift {
 
 class ASTContext;
+enum class CodeGenerationModel: uint8_t;
 class SILInstruction;
 class SILModule;
 class SILFunctionBuilder;
@@ -59,6 +60,7 @@ enum IsThunk_t {
   IsReabstractionThunk,
   IsSignatureOptimizedThunk,
   IsBackDeployedThunk,
+  IsDistributedThunk,
 };
 enum IsDynamicallyReplaceable_t {
   IsNotDynamic,
@@ -403,6 +405,11 @@ private:
   /// linking.
   unsigned IsAlwaysWeakImported : 1;
 
+  /// The code generation model used for this particular function. This is
+  /// zero in the case where it's using the default model, or 1 + the
+  /// CodeGenerationModel otherwise.
+  unsigned CodeGenModel : 2;
+
   /// Whether the implementation can be dynamically replaced.
   unsigned IsDynamicReplaceable : 1;
 
@@ -498,6 +505,7 @@ private:
     case IsThunk:
     case IsReabstractionThunk:
     case IsBackDeployedThunk:
+    case IsDistributedThunk:
       thunkCanHaveSubclassScope = false;
       break;
     }
@@ -980,6 +988,11 @@ public:
 
   bool isWeakImported(ModuleDecl *module) const;
 
+  /// Determine the explicit code generation model
+  std::optional<CodeGenerationModel> codeGenerationModel() const;
+
+  void setCodeGenerationModel(std::optional<CodeGenerationModel> value);
+
   /// Returns whether this function implementation can be dynamically replaced.
   IsDynamicallyReplaceable_t isDynamicallyReplaceable() const {
     return IsDynamicallyReplaceable_t(IsDynamicReplaceable);
@@ -1444,15 +1457,11 @@ public:
     return false;
   }
 
-  /// Returns true if this function belongs to a declaration that
-  /// has `@_alwaysEmitIntoClient` attribute.
-  bool markedAsAlwaysEmitIntoClient() const {
-    if (!hasLocation())
-      return false;
+  /// Whether this declaration is always emitted into the client.
+  bool isAlwaysEmitIntoClient() const;
 
-    auto *V = getLocation().getAsASTNode<ValueDecl>();
-    return V && V->isAlwaysEmittedIntoClient();
-  }
+  /// Whether this declaration is never emitted into the client.
+  bool isNeverEmitIntoClient() const;
 
   /// Return whether this function has attribute @used on it
   bool markedAsUsed() const { return MarkedAsUsed; }

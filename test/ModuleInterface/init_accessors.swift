@@ -107,7 +107,7 @@ func testTransparent() {
   _ = Transparent(x: 42)
 }
 
-// CHECK-LABEL: sil shared @$s1A11TransparentV1xACSi_tcfC : $@convention(method) (Int, @thin Transparent.Type) -> Transparent
+// CHECK-LABEL: sil shared [export_implementation] @$s1A11TransparentV1xACSi_tcfC : $@convention(method) (Int, @thin Transparent.Type) -> Transparent
 
 // CHECK-LABEL: sil hidden @$s6Client13testInlinableyyF : $@convention(thin) () -> ()
 // CHECK: [[X:%.*]] = struct $Int (%1 : $Builtin.Int{{[0-9]+}})
@@ -120,4 +120,4 @@ func testInlinable() {
 
 // CHECK-LABEL: sil @$s1A9InlinableV1xACSi_tcfC : $@convention(method) (Int, @thin Inlinable.Type) -> Inlinable
 
-// CHECK-LABEL: sil shared @$s1A11TransparentV1xSivi : $@convention(thin) (Int, @thin Transparent.Type) -> @out Int
+// CHECK-LABEL: sil shared [export_implementation] @$s1A11TransparentV1xSivi : $@convention(thin) (Int, @thin Transparent.Type) -> @out Int

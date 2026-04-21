@@ -1712,6 +1712,9 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));
 
+  if (auto isolation = original->getActorIsolation())
+    differential->setActorIsolation(*isolation);
+
   return differential;
 }
 

@@ -335,6 +335,19 @@ AsyncTask::~AsyncTask() {
     futureFragment()->destroy();
   }
 
+  // The initial task name record is special in that we allow it to stay until
+  // task destruction, since it is possible to read a name off a task handle,
+  // even after it completed; so drop it here:
+  if (hasInitialTaskNameRecord()) {
+    dropInitialTaskNameRecord();
+
+    #ifndef NDEBUG
+    auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+    assert(oldStatus.getInnermostRecord() == NULL &&
+         "Status records should have been removed by this time!");
+    #endif
+  }
+
   Private.destroy();
 
   concurrency::trace::task_destroy(this);
@@ -1109,6 +1122,16 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     task->Private.initialize(basePriority);
   }
 
+  // Task name
+  // This record MUST be the FIRST allocation on the task allocator stack.
+  //
+  // The task name is the only initial record we keep alive after the task completes,
+  // until it is destroyed, because `task.name` can be read off a completed task.
+  // All other records are released early, during task completion.
+  if (jobFlags.task_hasInitialTaskName()) {
+    task->pushInitialTaskName(taskName);
+  }
+
   // Perform additional linking between parent and child task.
   if (parent) {
     // If the parent was already cancelled, we carry this flag forward to the child.
@@ -1173,24 +1196,16 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     asyncLet_addImpl(task, asyncLet, !hasAsyncLetResultBuffer);
   }
 
-  // ==== Initial Task records
-  {
-    // Task executor preference
-    // If the task does not have a specific executor set already via create
-    // options, and there is a task executor preference set in the parent, we
-    // inherit it by deep-copying the preference record. if
-    // (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
-    if (jobFlags.task_hasInitialTaskExecutorPreference()) {
-      // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
-      // because the group takes a fast-path when attaching the child record.
-      task->pushInitialTaskExecutorPreference(taskExecutor,
-                                              /*owned=*/taskExecutorIsOwned);
-    }
-
-    // Task name
-    if (jobFlags.task_hasInitialTaskName()) {
-      task->pushInitialTaskName(taskName);
-    }
+  // Task executor preference
+  // If the task does not have a specific executor set already via create
+  // options, and there is a task executor preference set in the parent, we
+  // inherit it by deep-copying the preference record. if
+  // (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
+  if (jobFlags.task_hasInitialTaskExecutorPreference()) {
+    // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
+    // because the group takes a fast-path when attaching the child record.
+    task->pushInitialTaskExecutorPreference(taskExecutor,
+                                            /*owned=*/taskExecutorIsOwned);
   }
 
   // If we're supposed to enqueue the task, do so now.

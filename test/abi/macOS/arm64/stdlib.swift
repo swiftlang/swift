@@ -1191,7 +1191,6 @@ Added: _$s17BorrowingIterators0A8SequencePTl
 Added: _$s7Elements17BorrowingSequencePTl
 Added: _$s7Elements25BorrowingIteratorProtocolPTl
 Added: _$sSTss17BorrowingSequenceRzrlE04makeA8Iterators0aD7AdapterVy0D0STQzGyF
-Added: _$sSqsRi_zrlE5_spans4SpanVyxGvg
 Added: _$ss11InlineArrayVyxq_Gs17BorrowingSequencesRi__rlMc
 Added: _$ss11MutableSpanVyxGs17BorrowingSequencesRi_zrlMc
 Added: _$ss14MutableRawSpanVs17BorrowingSequencesMc
@@ -1269,6 +1268,20 @@ Added: _$ss6BorrowVsRi_zrlE7builtinxBWvg
 Added: _$ss5InoutVMa
 Added: _$ss5InoutVMn
 Added: _$ss5InoutVsRi_zrlE7pointerSpyxGvg
+
+// SE-0514 Hashable Conformance for Dictionary.Keys, CollectionOfOne and EmptyCollection
+Added: _$sSD4KeysV9hashValueSivpMV
+Added: _$sSD4KeysVyxq__GSHsMc
+Added: _$sSD4KeysVyxq__GSHsWP
+Added: _$ss15CollectionOfOneVsSHRzlE9hashValueSivpMV
+Added: _$ss15CollectionOfOneVyxGSHsSHRzlMc
+Added: _$ss15CollectionOfOneVyxGSQsSQRzlMc
+Added: _$ss15EmptyCollectionV9hashValueSivpMV
+Added: _$ss15EmptyCollectionVyxGSHsMc
+Added: _$ss15EmptyCollectionVyxGSHsWP
+
+// Wrapper for SWIFT_CONCURRENCY_TRACING_SUBSYSTEM environment variable
+Added: _concurrencyTracingSubsystem
 
 // CommandLine._executablePathCString
 Added: _$ss11CommandLineO22_executablePathCStrings15ContiguousArrayVys4Int8VGSgvpZMV

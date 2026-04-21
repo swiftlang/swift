@@ -24,7 +24,7 @@ public func test() {
   roundTripType(Array<@convention(c) () -> ()>.self)
 
   // @convention(block) requires Objective-C support
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(anyAppleOS)
   roundTripType(Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>.self)
   #endif
 
@@ -45,7 +45,7 @@ public func test() {
   roundTripType(Array<@convention(c) () -> ()>.Type.self)
 
   // @convention(block) requires Objective-C support
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(anyAppleOS)
   roundTripType(Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>.Type.self)
   #endif
 

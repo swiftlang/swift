@@ -201,7 +201,7 @@ WARNING(ignoring_option_requires_option,none,
         "ignoring %0 (requires %1)", (StringRef, StringRef))
 WARNING(warn_ignore_option_overridden_by,none,
         "ignoring %0 (overridden by %1)", (StringRef, StringRef))
-WARNING(ignoring_option_obsolete_module_selectors,none,
+GROUPED_WARNING(ignoring_option_obsolete_module_selectors,OptionObsoletedByModuleSelectors,none,
         "ignoring '%0'; this option has been obsoleted by module selectors "
         "(add '-disable-module-selectors-in-module-interface' to restore "
         "original behavior)",
@@ -507,6 +507,8 @@ REMARK(matching_output_produced,none,
 // Caching related diagnostics
 GROUPED_ERROR(error_caching_no_cas_fs, CompilationCaching, none,
     "caching is enabled without CAS file-system options, input is not immutable", ())
+GROUPED_ERROR(error_option_incompatible, CompilationCaching, none,
+    "'%0' is incompatible with '%1'", (StringRef, StringRef))
 
 REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
 REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
@@ -584,8 +586,6 @@ ERROR(layout_string_instantiation_without_layout_strings,none,
 
 ERROR(evolution_with_embedded,none,
       "Library evolution cannot be enabled with embedded Swift.", ())
-ERROR(embedded_existentials_without_embedded,none,
-      "EmbeddedExistentials requires enabling embedded Swift.", ())
 ERROR(wmo_with_embedded,none,
       "Whole module optimization (wmo) must be enabled with embedded Swift.", ())
 ERROR(objc_with_embedded,none,

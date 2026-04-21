@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "CodeSynthesis.h"
+#include "LiteralExpressionFolding.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
@@ -449,6 +450,42 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   }
 }
 
+void swift::handleOSLogStringSectionName(ModuleDecl &module) {
+  /// We only care about the OSLog module.
+  if (!module.getName().is("OSLog"))
+    return;
+
+  /// The name of the variable that defines the section name.
+  static const StringRef sectionVarName = "osLogStringSectionName";
+
+  ASTContext &ctx = module.getASTContext();
+  SmallVector<ValueDecl *, 1> results;
+  module.lookupValue(ctx.getIdentifier(sectionVarName), {}, results);
+  for (const auto& result: results) {
+    auto var = dyn_cast<VarDecl>(result);
+    if (!var)
+      continue;
+
+    if (auto init = var->getParentInitializer()) {
+      if (auto folded = foldLiteralExpression(init, &ctx)) {
+        if (auto literal = dyn_cast<StringLiteralExpr>(folded)) {
+          ctx.LangOpts.OSLogStringSectionName = literal->getValue().str();
+          return;
+        }
+      }
+
+      ctx.Diags.diagnose(init->getLoc(), diag::oslog_string_section_not_literal)
+        .highlight(init->getSourceRange());
+      return;
+    }
+
+    ctx.Diags.diagnose(var, diag::oslog_string_section_not_literal);
+    return;
+  }
+
+  ctx.Diags.diagnose(SourceLoc(), diag::oslog_missing_string_section);
+}
+
 bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
   auto &ctx = SF.getASTContext();
   // Return true if `AdditiveArithmetic` derived conformances are explicitly
@@ -478,11 +515,9 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
 
   return TypeResolution::forInterface(
              DC, GenericSig, options,
-             [](auto unboundTy) {
-               // FIXME: Don't let unbound generic types escape type resolution.
-               // For now, just return the unbound generic type.
-               return unboundTy;
-             },
+             // FIXME: Don't let unbound generic types escape type resolution.
+             // For now, just return the unbound generic type.
+             TypeResolution::defaultUnboundTypeOpener,
              // FIXME: Don't let placeholder types escape type resolution.
              // For now, just return the placeholder type.
              PlaceholderType::get,

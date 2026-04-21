@@ -105,4 +105,7 @@ KNOWN_STDLIB_TYPE_DECL(_InlineArray, NominalTypeDecl, 2)
 
 KNOWN_STDLIB_TYPE_DECL(MutableSpan, NominalTypeDecl, 1)
 
+KNOWN_STDLIB_TYPE_DECL(Borrow, NominalTypeDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(Inout, NominalTypeDecl, 1)
+
 #undef KNOWN_STDLIB_TYPE_DECL

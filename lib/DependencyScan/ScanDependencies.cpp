@@ -11,22 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift-c/DependencyScan/DependencyScan.h"
-#include "swift/AST/DiagnosticsCommon.h"
-#include "swift/Basic/PrettyStackTrace.h"
-
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsDriver.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
-#include "swift/AST/SourceFile.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
@@ -50,7 +43,6 @@
 #include "clang/CAS/IncludeTree.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
@@ -59,16 +51,12 @@
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
-#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <set>
-#include <sstream>
 #include <stack>
 #include <string>
 
@@ -505,6 +493,12 @@ private:
       if (!ConstProtocolFile.empty())
         tracker->trackFile(ConstProtocolFile);
 
+      // Profile Data.
+      tracker->trackFile(instance.getInvocation().getIRGenOptions().UseProfile);
+      tracker->trackFile(instance.getInvocation().getIRGenOptions().UseIRProfile);
+      tracker->trackFile(
+          instance.getInvocation().getIRGenOptions().UseSampleProfile);
+
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
@@ -937,6 +931,22 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
     moduleInfo->source_files = create_set(sourceFiles);
     moduleInfo->direct_dependencies = create_set(bridgeDependencyIDs(cache.getAllDependencies(moduleID)));
     moduleInfo->details = getModuleDetails();
+
+    // Set library level
+    switch (moduleDependencyInfo.getLibraryLevel()) {
+    case LibraryLevel::Other:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_OTHER;
+      break;
+    case LibraryLevel::IPI:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_IPI;
+      break;
+    case LibraryLevel::SPI:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_SPI;
+      break;
+    case LibraryLevel::API:
+      moduleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_API;
+      break;
+    }
 
     // Create a link libraries set for this module
     auto linkLibraries = moduleDependencyInfo.getLinkLibraries();
@@ -1407,8 +1417,9 @@ performModuleScanImpl(
                              ModuleDependencyKind::SwiftSource};
       incremental::validateInterModuleDependenciesCache(
           mainModuleID, cache, instance->getSharedCASInstance(),
-          serializedCacheTimeStamp, *instance->getSourceMgr().getFileSystem(),
-          ctx.Diags, opts.EmitDependencyScannerCacheRemarks);
+          instance->getSharedCacheInstance(), serializedCacheTimeStamp,
+          *instance->getSourceMgr().getFileSystem(), ctx.Diags,
+          opts.EmitDependencyScannerCacheRemarks);
     }
   }
 
@@ -1607,12 +1618,13 @@ llvm::ErrorOr<swiftscan_import_set_t> swift::dependencies::performModulePrescan(
 void swift::dependencies::incremental::validateInterModuleDependenciesCache(
     const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
     std::shared_ptr<llvm::cas::ObjectStore> cas,
+    std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks) {
   ModuleDependencyIDSet visited;
   ModuleDependencyIDSet modulesRequiringRescan;
-  outOfDateModuleScan(rootModuleID, cache, cas, cacheTimeStamp, fs, diags,
-                      emitRemarks, visited, modulesRequiringRescan);
+  outOfDateModuleScan(rootModuleID, cache, cas, actionCache, cacheTimeStamp, fs,
+                      diags, emitRemarks, visited, modulesRequiringRescan);
   for (const auto &outOfDateModID : modulesRequiringRescan)
     cache.removeDependency(outOfDateModID);
   // Regardless of invalidation, always re-scan main module.
@@ -1622,6 +1634,7 @@ void swift::dependencies::incremental::validateInterModuleDependenciesCache(
 void swift::dependencies::incremental::outOfDateModuleScan(
     const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
     std::shared_ptr<llvm::cas::ObjectStore> cas,
+    std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks, ModuleDependencyIDSet &visited,
     ModuleDependencyIDSet &modulesRequiringRescan) {
@@ -1630,8 +1643,8 @@ void swift::dependencies::incremental::outOfDateModuleScan(
   for (const auto &depID : cache.getAllDependencies(moduleID)) {
     // If we have not already visited this module, recurse.
     if (visited.find(depID) == visited.end())
-      outOfDateModuleScan(depID, cache, cas, cacheTimeStamp, fs, diags,
-                          emitRemarks, visited, modulesRequiringRescan);
+      outOfDateModuleScan(depID, cache, cas, actionCache, cacheTimeStamp, fs,
+                          diags, emitRemarks, visited, modulesRequiringRescan);
 
     // Even if we're not revisiting a dependency, we must check if it's
     // already known to be out of date.
@@ -1644,8 +1657,9 @@ void swift::dependencies::incremental::outOfDateModuleScan(
       diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_upstream,
                      moduleID.ModuleName);
     modulesRequiringRescan.insert(moduleID);
-  } else if (!verifyModuleDependencyUpToDate(
-                 moduleID, cache, cas, cacheTimeStamp, fs, diags, emitRemarks))
+  } else if (!verifyModuleDependencyUpToDate(moduleID, cache, cas, actionCache,
+                                             cacheTimeStamp, fs, diags,
+                                             emitRemarks))
     modulesRequiringRescan.insert(moduleID);
 
   visited.insert(moduleID);
@@ -1654,6 +1668,7 @@ void swift::dependencies::incremental::outOfDateModuleScan(
 bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
     const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
     std::shared_ptr<llvm::cas::ObjectStore> cas,
+    std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks) {
   const auto &moduleInfo = cache.findKnownDependency(moduleID);
@@ -1673,27 +1688,45 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
     return true;
   };
 
-  auto verifyCASID = [cas, &diags, emitRemarks](StringRef moduleName,
-                                                     const std::string &casID) {
+  auto emitMissingCASInputRemark = [&](StringRef casID) {
+    if (emitRemarks)
+      diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_missing_cas,
+                     moduleID.ModuleName, casID);
+  };
+
+  auto emitCASErrorRemark = [&](llvm::Error err) {
+    if (emitRemarks)
+      diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_cas_error,
+                     moduleID.ModuleName, toString(std::move(err)));
+    else
+      consumeError(std::move(err));
+  };
+
+  auto verifyAndGetCASID =
+      [&](const std::string &casID) -> std::optional<llvm::cas::CASID> {
     if (!cas) {
       // If the wrong cache is passed.
       if (emitRemarks)
         diags.diagnose(SourceLoc(),
                        diag::remark_scanner_invalidate_configuration,
-                       moduleName);
-      return false;
+                       moduleID.ModuleName);
+      return std::nullopt;
     }
     auto ID = cas->parseID(casID);
     if (!ID) {
-      if (emitRemarks)
-        diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_cas_error,
-                       moduleName, toString(ID.takeError()));
-      return false;
+      emitCASErrorRemark(ID.takeError());
+      return std::nullopt;
     }
+    return *ID;
+  };
+
+  auto verifyCASID = [&](const std::string &casID) {
+    auto ID = verifyAndGetCASID(casID);
+    if (!ID)
+      return false;
+
     if (!cas->getReference(*ID)) {
-      if (emitRemarks)
-        diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_missing_cas,
-                       moduleName, casID);
+      emitMissingCASInputRemark(casID);
       return false;
     }
     return true;
@@ -1701,11 +1734,28 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
 
   // Check CAS inputs exist
   if (const auto casID = moduleInfo.getClangIncludeTree())
-    if (!verifyCASID(moduleID.ModuleName, *casID))
+    if (!verifyCASID(*casID))
       return false;
   if (const auto casID = moduleInfo.getCASFSRootID())
-    if (!verifyCASID(moduleID.ModuleName, *casID))
+    if (!verifyCASID(*casID))
       return false;
+
+  // For swift binary module, the cache key and output is setup during scanning
+  // time. Need re-scan if the cache key and the cache result is not in CAS.
+  if (moduleInfo.isSwiftBinaryModule() && !moduleInfo.getModuleCacheKey().empty()) {
+    if (auto casID = verifyAndGetCASID(moduleInfo.getModuleCacheKey())) {
+      auto result = actionCache->get(*casID);
+      if (!result) {
+        emitCASErrorRemark(result.takeError());
+        return false;
+      }
+      if (!*result || !cas->getReference(**result)) {
+        emitMissingCASInputRemark(moduleInfo.getModuleCacheKey());
+        return false;
+      }
+    } else
+      return false;
+  }
 
   // Check interface file for Swift textual modules
   if (const auto &textualModuleDetails = moduleInfo.getAsSwiftInterfaceModule())

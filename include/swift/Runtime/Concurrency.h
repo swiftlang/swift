@@ -1098,6 +1098,10 @@ void swift_task_reportUnexpectedExecutor(
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority swift_task_getCurrentThreadPriority(void);
 
+// Runtime availability: Swift 6.4
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+const char *swift_task_getTaskName(AsyncTask* job);
+
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 const char *swift_task_getCurrentTaskName(void);
 

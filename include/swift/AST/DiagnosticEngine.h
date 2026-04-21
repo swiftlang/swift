@@ -628,6 +628,9 @@ namespace swift {
     /// Don't emit any remarks
     bool suppressRemarks = false;
 
+    /// Check for `@warn` diagnostic group behavior controls
+    bool checkSyntacticControls = false;
+
     /// A mapping from `DiagGroupID` identifiers to `WarningGroupBehaviorRule`
     /// values indicating how warnings belonging to the respective diagnostic groups
     /// should be emitted. While there is duplication between this data structure
@@ -671,6 +674,13 @@ namespace swift {
     }
     bool getShowDiagnosticsAfterFatalError() {
       return showDiagnosticsAfterFatalError;
+    }
+
+    void setCheckSyntacticControls(bool val = true) {
+      checkSyntacticControls = val;
+    }
+    bool getCheckSyntacticControls() const {
+      return checkSyntacticControls;
     }
 
     /// Whether to skip emitting warnings
@@ -881,6 +891,10 @@ namespace swift {
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
 
+    /// Path to toolchain-local diagnostic documentation directory
+    /// relative to the compiler executable.
+    std::string localDiagnosticDocumentationPath = "";
+
     /// The Swift language version. This is used to limit diagnostic behavior
     /// until a specific language version, e.g. Swift 6.
     version::Version languageVersion;
@@ -944,6 +958,14 @@ namespace swift {
       return state.getSuppressRemarks();
     }
 
+    /// Whether to check syntactic `@warn` controls
+    void setCheckSyntacticControls(bool val = true) {
+      state.setCheckSyntacticControls(val);
+    }
+    bool getCheckSyntacticControls() const {
+      return state.getCheckSyntacticControls();
+    }
+
     /// Apply rules specifing what warnings should or shouldn't be treated as
     /// errors. For group rules the string is a group name defined by
     /// DiagnosticGroups.def
@@ -978,6 +1000,13 @@ namespace swift {
     }
     StringRef getDiagnosticDocumentationPath() {
       return diagnosticDocumentationPath;
+    }
+
+    void setLocalDiagnosticDocumentationPath(std::string path) {
+      localDiagnosticDocumentationPath = path;
+    }
+    StringRef getLocalDiagnosticDocumentationPath() {
+      return localDiagnosticDocumentationPath;
     }
 
     bool isPrettyPrintingDecl() const { return IsPrettyPrintingDecl; }

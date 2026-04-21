@@ -1474,7 +1474,8 @@ public:
       return ParameterConvention::Indirect_In_Guaranteed;
     case ValueOwnership::Owned:
       if (kind == ConventionsKind::CFunction ||
-          kind == ConventionsKind::CFunctionType)
+          kind == ConventionsKind::CFunctionType ||
+          kind == ConventionsKind::CXXMethod)
         return getIndirectParameter(index, type, substTL);
       return ParameterConvention::Indirect_In;
     }
@@ -1519,23 +1520,15 @@ public:
     case ValueOwnership::Shared:
       return ParameterConvention::Direct_Guaranteed;
     case ValueOwnership::Owned:
+      if (kind == ConventionsKind::ObjCSelectorFamily ||
+          kind == ConventionsKind::ObjCMethod) {
+        if (forSelf)
+          return getDirectSelfParameter(type);
+        return getDirectParameter(index, type, substTL);
+      }
       return ParameterConvention::Direct_Owned;
     }
     llvm_unreachable("unhandled ownership");
-  }
-
-  // Determines the ownership ResultConvention (owned/unowned) of the return
-  // value using the SWIFT_RETURNS_(UN)RETAINED annotation on the C++ API; if
-  // not explicitly annotated, falls back to the
-  // SWIFT_RETURNED_AS_(UN)RETAINED_BY_DEFAULT annotation on the C++
-  // SWIFT_SHARED_REFERENCE type.
-  std::optional<ResultConvention>
-  getCxxRefConventionWithAttrs(const TypeLowering &tl,
-                               const clang::Decl *decl) const {
-    if (!tl.getLoweredType().isForeignReferenceType())
-      return std::nullopt;
-
-    return importer::getCxxRefConventionWithAttrs(decl);
   }
 };
 
@@ -2473,7 +2466,13 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       }
 
       if (isolatedParam == varDecl) {
-        options |= SILParameterInfo::Isolated;
+        auto isolation = function.getActorIsolation();
+        // The function has to be isolated to this capture for it to be marked
+        // as `isolated`. It's possible to i.e. have a `nonisolated(nonsending)`
+        // closure that captures and isolated parameter.
+        if (isolation.isActorInstanceIsolated() &&
+            isolation.getActorInstance() == isolatedParam)
+          options |= SILParameterInfo::Isolated;
         isolatedParam = nullptr;
       }
     }
@@ -2918,14 +2917,15 @@ static CanSILFunctionType getSILFunctionType(
   updateResultTypeForForeignInfo(foreignInfo, genericSig, origResultType,
                                  substFormalResultType);
 
+  auto actorIsolation = getSILFunctionTypeActorIsolation(
+      substFnInterfaceType, origConstant, constant);
+
   // Destructure the input tuple type.
   SmallVector<SILParameterInfo, 8> inputs;
   SmallVector<int, 8> parameterMap;
   SmallBitVector addressableParams;
   SmallBitVector conditionallyAddressableParams;
   {
-    auto actorIsolation = getSILFunctionTypeActorIsolation(
-        substFnInterfaceType, origConstant, constant);
     DestructureInputs destructurer(expansionContext, TC, conventions,
                                    foreignInfo, actorIsolation, inputs,
                                    parameterMap,
@@ -3099,12 +3099,18 @@ static CanSILFunctionType getSILFunctionType(
         params, substFnInterfaceType.getResult(),
         convertRepresentation(silRep).value());
   }
+
+  bool isNonisolatedNonsending =
+      actorIsolation && actorIsolation->isCallerIsolationInheriting() &&
+      conventions.hasCallerIsolationParameter();
+
   auto silExtInfo =
       extInfoBuilder.withClangFunctionType(clangType)
           .withIsPseudogeneric(pseudogeneric)
           .withSendable(isSendable)
           .withAsync(isAsync)
           .withUnimplementable(unimplementable)
+          .withNonisolatedNonsending(isNonisolatedNonsending)
           .withLifetimeDependencies(TC.Context.AllocateCopy(loweredLifetimes))
           .build();
 
@@ -3971,8 +3977,8 @@ public:
       return ResultConvention::Owned;
 
     if (tl.getLoweredType().isForeignReferenceType())
-      return getCxxRefConventionWithAttrs(tl, Method)
-          .value_or(ResultConvention::Unowned);
+      return importer::getOwnershipOfReturnedFRT(Method).value_or(
+          ResultConvention::Unowned);
 
     return ResultConvention::Autoreleased;
   }
@@ -4121,8 +4127,10 @@ public:
       return ResultConvention::Indirect;
     }
 
-    if (auto resultConventionOpt = getCxxRefConventionWithAttrs(tl, TheDecl))
-      return *resultConventionOpt;
+    if (tl.getLoweredType().isForeignReferenceType()) {
+      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl))
+        return convention.value();
+    }
 
     if (isCFTypedef(tl, TheDecl->getReturnType())) {
       // The CF attributes aren't represented in the type, so we need
@@ -4203,14 +4211,14 @@ public:
       return ResultConvention::Indirect;
     }
 
-    if (auto resultConventionOpt =
-            getCxxRefConventionWithAttrs(resultTL, TheDecl))
-      return *resultConventionOpt;
+    if (resultTL.getLoweredType().isForeignReferenceType()) {
+      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl))
+        return convention.value();
 
-    if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>() &&
-        resultTL.getLoweredType().isForeignReferenceType()) {
-      return ResultConvention::Owned;
+      if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>())
+        return ResultConvention::Owned;
     }
+
     return CFunctionTypeConventions::getResult(resultTL);
   }
   static bool classof(const Conventions *C) {
@@ -5515,6 +5523,9 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
     return ABICompatibilityCheckResult::DifferentErrorResultConventions;
   }
 
+  // `nonisolated(nonsending)` can be safely added and removed
+  // because isolation parameter is implicit and doesn't affect ABI.
+  
   // @isolated(any) imposes an additional requirement on the context
   // storage and cannot be added.  It can safely be removed, however.
   if (other->hasErasedIsolation() && !hasErasedIsolation())

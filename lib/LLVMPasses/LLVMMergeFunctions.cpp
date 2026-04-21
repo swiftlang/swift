@@ -673,6 +673,29 @@ static unsigned getBenefit(Function *F) {
   return Benefit;
 }
 
+/// musttail requires caller and callee signatures to match exactly;
+/// the merge trampoline would add parameters, breaking that contract.
+static bool containsMusttailCall(Function *F) {
+  for (BasicBlock &BB : *F) {
+    auto *Term = BB.getTerminator();
+    if (!isa<ReturnInst>(Term))
+      continue;
+    auto It = Term->getIterator();
+    if (It == BB.begin())
+      continue;
+    --It;
+    if (isa<BitCastInst>(&*It)) {
+      if (It == BB.begin())
+        continue;
+      --It;
+    }
+    if (auto *CI = dyn_cast<CallInst>(&*It))
+      if (CI->getTailCallKind() == CallInst::TCK_MustTail)
+        return true;
+  }
+  return false;
+}
+
 /// Returns true if function \p F is eligible for merging.
 static bool isEligibleFunction(Function *F) {
   if (F->isDeclaration())
@@ -687,6 +710,9 @@ static bool isEligibleFunction(Function *F) {
   if (F->getCallingConv() == CallingConv::SwiftTail)
     return false;
   
+  if (containsMusttailCall(F))
+    return false;
+
   unsigned Benefit = getBenefit(F);
   if (Benefit < FunctionMergeThreshold)
     return false;

@@ -3107,17 +3107,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   return hadError ? errorBody() : body;
 }
 
-bool TypeChecker::typeCheckTapBody(TapExpr *expr, DeclContext *DC) {
-  // We intentionally use typeCheckStmt instead of typeCheckBody here
-  // because we want to contextualize TapExprs with the body they're in.
-  BraceStmt *body = expr->getBody();
-  bool HadError = StmtChecker(DC).typeCheckStmt(body);
-  if (body) {
-    expr->setBody(body);
-  }
-  return HadError;
-}
-
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   BraceStmt *Body = TLCD->getBody();
   StmtChecker(TLCD).typeCheckBody(Body);
@@ -3440,7 +3429,8 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 }
 
 bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
-                                       bool isAsync, SourceLoc loc) {
+                                       bool isAsync, SourceLoc loc,
+                                       DeclContext *dc) {
   if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
     return false;
   }
@@ -3467,14 +3457,6 @@ bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
   auto seqConformanceRef = lookupConformance(seqTy, borrowingSeqProto);
   if (seqConformanceRef.isInvalid()) {
     return false;
-  }
-
-  if (auto *conformance = seqConformanceRef.getConcrete()) {
-    auto protoAvail = AvailabilityContext::forDeclSignature(borrowingSeqProto);
-    auto *dc = conformance->getDeclContext();
-    auto availability = AvailabilityContext::forLocation(loc, dc);
-    if (!availability.isContainedIn(protoAvail))
-      return false;
   }
 
   return true;
@@ -3513,7 +3495,7 @@ public:
       return nullptr;
 
     isBorrowing = shouldUseBorrowingSequence(ctx, seqType, isAsync,
-                                             sequence->getStartLoc());
+                                             sequence->getStartLoc(), dc);
 
     sequenceProto =
         isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
@@ -3522,6 +3504,12 @@ public:
                        : ctx.getProtocol(KnownProtocolKind::Sequence));
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
+
+    if (auto constraint = seqConformanceRef.getAvailabilityConstraint(
+            dc, stmt->getForLoc())) {
+      emitDiagnosticsForUnavailableConformance(seqType, constraint.value());
+      return nullptr;
+    }
 
     buildMakeIteratorVar();
 
@@ -3540,6 +3528,21 @@ public:
   }
 
 private:
+  void
+  emitDiagnosticsForUnavailableConformance(Type seqType,
+                                           AvailabilityConstraint constraint) {
+    auto loc = stmt->getForLoc();
+    auto protoDecl = seqConformanceRef.getProtocol();
+
+    auto domainAndRange = constraint.getDomainAndRange(ctx);
+    ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
+                       seqType, protoDecl,
+                       domainAndRange.getDomain().getNameForAttributePrinting(),
+                       domainAndRange.getRange().getVersionString());
+    fixAvailability(loc, dc, domainAndRange.getDomain(),
+                    domainAndRange.getRange(), ctx);
+  }
+
   void buildMakeIteratorVar() {
     std::string name;
     {

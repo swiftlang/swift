@@ -56,6 +56,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Statistic.h"
@@ -2296,31 +2297,83 @@ bool Decl::isObjCImplementation() const {
 }
 
 bool Decl::isAlwaysEmittedIntoClient() const {
-  // @export(implementation)
-  if (auto exportAttr = getAttrs().getAttribute<ExportAttr>()) {
-    if (exportAttr->exportKind == ExportKind::Implementation)
-      return true;
-  }
-
-  // @_alwaysEmitIntoClient
-  if (getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-    return true;
+  if (auto codeGenModel = getExplicitCodeGenerationModel())
+    return *codeGenModel == CodeGenerationModel::Implementation;
 
   return false;
 }
 
 bool Decl::isNeverEmittedIntoClient() const {
-  // @export(interface)
-  if (auto exportAttr = getAttrs().getAttribute<ExportAttr>()) {
-    if (exportAttr->exportKind == ExportKind::Interface)
-      return true;
-  }
-
-  // @_neverEmitIntoClient
-  if (getAttrs().hasAttribute<NeverEmitIntoClientAttr>())
-    return true;
+  if (auto codeGenModel = getExplicitCodeGenerationModel())
+    return *codeGenModel == CodeGenerationModel::Interface;
 
   return false;
+}
+
+std::optional<CodeGenerationModel>
+Decl::getExplicitCodeGenerationModel() const {
+  bool sawInlinable = false;
+  for (auto attr : getAttrs()) {
+    // @export
+    if (auto exportAttr = dyn_cast<ExportAttr>(attr)) {
+      switch (exportAttr->exportKind) {
+        case ExportKind::Interface:
+          return CodeGenerationModel::Interface;
+
+        case ExportKind::Implementation:
+          return CodeGenerationModel::Implementation;
+      }
+    }
+
+    // @_alwaysEmitIntoClient - historical spelling for @export(implementation)
+    if (isa<AlwaysEmitIntoClientAttr>(attr))
+      return CodeGenerationModel::Implementation;
+
+    // @_neverEmitIntoClient - historical spelling for @export(interface)
+    if (isa<NeverEmitIntoClientAttr>(attr))
+      return CodeGenerationModel::Interface;
+
+    // @inlinable
+    if (isa<InlinableAttr>(attr)) {
+      sawInlinable = true;
+      continue;
+    }
+
+    // @inline(always) implies @inlinable on "public"
+    // (open, public, package) declarations.
+    if (auto inlineAttr = dyn_cast<InlineAttr>(attr)) {
+      if (inlineAttr->getKind() == InlineKind::Always) {
+        if (auto valueDecl = dyn_cast<ValueDecl>(this)) {
+          AccessScope access =
+                valueDecl->getFormalAccessScope(
+                    nullptr, /*treatUsableFromInlineAsPublic*/false,
+                    /*ignoreImportAccessLevel*/false);
+          if (access.isPublicOrPackage()) {
+            sawInlinable = true;
+          }
+        }
+      }
+      continue;
+    }
+  }
+
+  // If we saw an inlinable attribute but no other explicit attribute,
+  // treat as inlinable.
+  if (sawInlinable)
+    return CodeGenerationModel::Inlinable;
+
+  return std::nullopt;
+}
+
+CodeGenerationModel
+Decl::getEffectiveCodeGenerationModel() const {
+  // If there is an explicit attribute that specifies the model for this
+  // declaration, use it.
+  if (auto explicitModel = getExplicitCodeGenerationModel())
+    return *explicitModel;
+
+  // Otherwise, apply the model-level defaults.
+  return getModuleContext()->codeGenerationModel();
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -2801,17 +2854,27 @@ Expr *PatternBindingDecl::getExecutableInit(unsigned i) const {
   return idxInit;
 }
 
-bool VarDecl::isInitExposedToClients() const {
+ExportedLevel VarDecl::getInitExposedLevel() const {
   // 'lazy' initializers are emitted inside the getter, which is never
   // @inlinable.
   if (getAttrs().hasAttribute<LazyAttr>())
-    return false;
+    return ExportedLevel::None;
 
-  return hasInitialValue() &&
-         isLayoutExposedToClients() == ExportedLevel::Exported;
+  if (!hasInitialValue())
+    return ExportedLevel::None;
+
+  return isLayoutExposedToClients(/*forceCheckClasses=*/true);
 }
 
-ExportedLevel VarDecl::isLayoutExposedToClients() const {
+bool VarDecl::isInitExposedToClients() const {
+  auto level = getInitExposedLevel();
+  auto minToBeExported = getASTContext().LangOpts.hasFeature(Feature::Embedded)
+                         ? ExportedLevel::ImplicitlyExported
+                         : ExportedLevel::Exported;
+  return level >= minToBeExported;
+}
+
+ExportedLevel VarDecl::isLayoutExposedToClients(bool forceCheckClasses) const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
   if (!parent) return ExportedLevel::None;
   if (isStatic()) return ExportedLevel::None;
@@ -2838,9 +2901,22 @@ ExportedLevel VarDecl::isLayoutExposedToClients() const {
     return ExportedLevel::None;
 
   // Class layouts are not exposed to clients, except for subclassing.
-  if (isa<ClassDecl>(parent) &&
-      !parent->hasOpenAccess(getDeclContext()))
-    return ExportedLevel::None;
+  auto parentClass = dyn_cast<ClassDecl>(parent);
+  if (parentClass && !forceCheckClasses &&
+      !parentClass->hasOpenAccess(getDeclContext())) {
+
+    if (!parent->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+      return ExportedLevel::None;
+
+    bool hasDeinit = false;
+    if (auto *destructor = parentClass->getDestructor())
+      if (destructor->isNeverEmittedIntoClient())
+        hasDeinit = true;
+
+    if (hasDeinit &&
+        getAttrs().hasAttribute<ImplementationOnlyAttr>())
+      return ExportedLevel::None;
+  }
 
   auto M = getDeclContext()->getParentModule();
   if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
@@ -5028,21 +5104,8 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
 }
 
 bool ValueDecl::hasAttributeWithInlinableSemantics() const {
-  if (getAttrs().hasAttribute<InlinableAttr>())
-    return true;
-
-  // @inline(always) implies @inlinable on "public" (open, public, package)
-  // declarations.
-  AccessScope access =
-        getFormalAccessScope(nullptr, /*treatUsableFromInlineAsPublic*/false,
-                             /*ignoreImportAccessLevel*/false);
-  if (!access.isPublicOrPackage())
-    return false;
-
-  if (auto *inlineAttr = getAttrs().getAttribute<InlineAttr>()) {
-    if (inlineAttr && inlineAttr->getKind() == InlineKind::Always)
-      return true;
-  }
+  if (auto codeGenModel = getExplicitCodeGenerationModel())
+    return *codeGenModel == CodeGenerationModel::Inlinable;
 
   return false;
 }
@@ -5390,7 +5453,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
 
       if (access > importAccessLevel && isVisible) {
         access = std::min(access, importAccessLevel);
-        resultDC = useDC->getParentSourceFile();
+        resultDC = useDC->getOutermostParentSourceFile();
       }
     }
   }
@@ -12574,15 +12637,8 @@ StringRef swift::getAccessorLabel(AccessorKind kind) {
 #define ACCESSOR(ID, KEYWORD)
 #include "swift/AST/AccessorKinds.def"
 
-    // Transitional terminology.  Let's use this for a little
-    // while to ease the transition.  (Both forms are parsed
-    // correctly, this just changes what gets written into
-    // .swiftinterface files.)
-    case AccessorKind::YieldingBorrow: return "read";
-    case AccessorKind::YieldingMutate: return "modify";
-    // TODO: Switch to the final terminology before shipping...
-    // case AccessorKind::YieldingBorrow: return "yielding borrow";
-    // case AccessorKind::YieldingMutate: return "yielding mutate";
+    case AccessorKind::YieldingBorrow: return "yielding borrow";
+    case AccessorKind::YieldingMutate: return "yielding mutate";
   }
   llvm_unreachable("bad accessor kind");
 }

@@ -164,6 +164,8 @@ namespace sil_block {
     SIL_INST_NO_OPERAND,
     SIL_VTABLE,
     SIL_VTABLE_ENTRY,
+    SIL_VTABLE_CONFORMANCE_ENTRY,
+    SIL_VTABLE_NO_CONFORMANCE_ENTRY,
     SIL_GLOBALVAR,
     SIL_INIT_EXISTENTIAL,
     SIL_WITNESS_TABLE,
@@ -223,6 +225,16 @@ namespace sil_block {
     SILVTableEntryKindField,  // Kind
     BCFixed<1>, // NonOverridden
     BCArray<ValueIDField> // SILDeclRef
+  >;
+
+  using VTableConformanceEntry = BCRecordLayout<
+    SIL_VTABLE_CONFORMANCE_ENTRY,
+    ProtocolConformanceIDField // ID of conformance
+  >;
+
+  using VTableNoConformanceEntry = BCRecordLayout<
+    SIL_VTABLE_NO_CONFORMANCE_ENTRY,
+    DeclIDField  // ProtocolDecl
   >;
 
   using MoveOnlyDeinitLayout = BCRecordLayout<
@@ -400,6 +412,7 @@ namespace sil_block {
                      BCVBR<8>,    // number of trailing records
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // force weak linking
+                     BCFixed<2>,  // code generation model
                      BC_AVAIL_TUPLE, // availability for weak linking
                      BCFixed<1>,  // is dynamically replacable
                      BCFixed<1>,  // exact self class

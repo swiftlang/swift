@@ -1695,10 +1695,12 @@ swift::swift_getFixedArrayTypeMetadata(MetadataRequest request,
                             MetadataState::Complete};
   }
   
-  // If the element type has no tail padding, then its metadata is good enough
+  // If the element type has no tail padding, and is already addressable-for-
+  // dependencies, then its metadata is good enough
   // to hold space for the vector.
   if (count == 1
-      && element->getValueWitnesses()->size == element->getValueWitnesses()->stride) {
+      && element->getValueWitnesses()->size == element->getValueWitnesses()->stride
+      && element->getValueWitnesses()->isAddressableForDependencies()) {
     return MetadataResponse{element, MetadataState::Complete};
   }
   
@@ -1889,12 +1891,14 @@ FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
   auto arraySize
     = Witnesses.size = Witnesses.stride = eltWitnesses->stride * count;
   // We take on most of the properties of the element type, except that an array
-  // of elements might end up larger than an inline buffer.
+  // of elements might end up larger than an inline buffer, and the array is
+  // always addressable for dependencies.
   Witnesses.flags = eltWitnesses->flags
     .withInlineStorage(
               ValueWitnessTable::isValueInline(eltWitnesses->isBitwiseTakable(),
                                                arraySize,
-                                               eltWitnesses->getAlignment()));
+                                               eltWitnesses->getAlignment()))
+    .withAddressableForDependencies(true);
   // We get extra inhabitants from the first element.
   Witnesses.extraInhabitantCount = eltWitnesses->extraInhabitantCount;
   

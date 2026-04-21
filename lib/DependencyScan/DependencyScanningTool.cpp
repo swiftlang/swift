@@ -12,19 +12,14 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/TargetInfo.h"
-#include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/Defer.h"
-#include "swift/DependencyScan/DependencyScanningTool.h"
+#include "swift/Basic/TargetInfo.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
+#include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
 #include "swift/DependencyScan/StringUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/VirtualOutputBackends.h"
-
-#include <sstream>
 
 namespace {
 llvm::ErrorOr<swift::CompilerInvocation>
@@ -58,7 +53,7 @@ ConstructInvocation(llvm::ArrayRef<const char *> CommandArgs,
     return std::make_error_code(std::errc::invalid_argument);
   return Invocation;
 }
-}
+} // anonymous namespace
 
 namespace swift {
 namespace dependencies {
@@ -265,6 +260,9 @@ static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
   hollowImportInfoSet->imports = nullptr;
   hollowMainModuleInfo->imports = hollowImportInfoSet;
 
+  // Default library level
+  hollowMainModuleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_OTHER;
+
   // Populate the diagnostic info
   hollowResult->diagnostics =
       mapCollectedDiagnosticsForOutput(diagnostics);
@@ -391,6 +389,12 @@ llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
                             Instance->getDiags());
     if (std::error_code EC = Invocation.getError())
       return EC;
+
+    // Setup the CAS instance from scanning service if applicable.
+    if (Invocation->requiresCAS())
+      Instance->setSharedCASInstances(
+          ScanningService->getClangScanningService().getCAS(),
+          ScanningService->getClangScanningService().getActionCache());
 
     // Setup the instance
     std::string InstanceSetupError;

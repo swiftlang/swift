@@ -42,6 +42,7 @@ namespace llvm {
     class ObjectRef;
   }
   namespace vfs {
+    class FileSystem;
     class OutputBackend;
   }
 }
@@ -186,6 +187,9 @@ namespace swift {
   /// those defined in non-primary sources).
   void loadDerivativeConfigurations(SourceFile &SF);
 
+  /// If this is the OSLog module, check for the log string section name.
+  void handleOSLogStringSectionName(ModuleDecl &module);
+
   /// Resolve the given \c TypeRepr to an interface type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,
@@ -288,6 +292,7 @@ namespace swift {
                                 llvm::sys::Mutex *DiagMutex,
                                 llvm::Module *Module,
                                 llvm::TargetMachine *TargetMachine,
+                                llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
                                 llvm::raw_pwrite_stream *out);
 
   /// Compiles and writes the given LLVM module into an output stream in the
@@ -324,6 +329,7 @@ namespace swift {
   ///                   was already compiled, may be null if not desired.
   /// \param Module LLVM module to code gen, required.
   /// \param TargetMachine target of code gen, required.
+  /// \param FS VirtualFileSystem used for LLVM passes.
   /// \param OutputFilename Filename for output.
   /// \param Backend OutputBackend for writing output.
   bool performLLVM(const IRGenOptions &Opts,
@@ -332,6 +338,7 @@ namespace swift {
                    llvm::GlobalVariable *HashGlobal,
                    llvm::Module *Module,
                    llvm::TargetMachine *TargetMachine,
+                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
                    StringRef OutputFilename,
                    llvm::vfs::OutputBackend &Backend,
                    UnifiedStatsReporter *Stats);

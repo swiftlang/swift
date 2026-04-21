@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/ThreadPool.h"
@@ -37,6 +38,7 @@ enum Actions {
   replay_result,
   scan_dependency,
   get_chained_bridging_header,
+  create_casfs,
 };
 
 llvm::cl::OptionCategory Category("swift-scan-test Options");
@@ -51,6 +53,11 @@ llvm::cl::opt<unsigned> Threads("threads",
                                 llvm::cl::cat(Category), cl::init(1));
 llvm::cl::opt<std::string> WorkingDirectory("cwd", llvm::cl::desc("<path>"),
                                             llvm::cl::cat(Category));
+llvm::cl::opt<bool>
+    NonRecursive("non-recursive",
+                 llvm::cl::desc("avoid recursing when ingesting a directory"),
+                 llvm::cl::cat(Category), cl::init(false));
+
 llvm::cl::opt<Actions>
     Action("action", llvm::cl::desc("<action>"),
            llvm::cl::values(clEnumVal(compute_cache_key, "compute cache key"),
@@ -60,7 +67,8 @@ llvm::cl::opt<Actions>
                             clEnumVal(replay_result, "replay result"),
                             clEnumVal(scan_dependency, "scan dependency"),
                             clEnumVal(get_chained_bridging_header,
-                                      "get cached bridging header")),
+                                      "get cached bridging header"),
+                            clEnumVal(create_casfs, "create CASFS root")),
            llvm::cl::cat(Category));
 llvm::cl::list<std::string>
     SwiftCommands(llvm::cl::Positional, llvm::cl::desc("<swift-frontend args>"),
@@ -203,6 +211,33 @@ static int action_replay_result(swiftscan_cas_t cas, const char *key,
   // Print both stdout and stderr from cache replay to output stream.
   os << toString(swiftscan_cache_replay_result_get_stdout(result));
   os << toString(swiftscan_cache_replay_result_get_stderr(result));
+  return EXIT_SUCCESS;
+}
+
+static int action_create_casfs(swiftscan_cas_t cas,
+                               std::vector<const char *> &Args,
+                               raw_ostream &os) {
+  swiftscan_cas_fs_builder_t builder = swiftscan_cas_fs_builder_create(cas);
+  SWIFT_DEFER { swiftscan_cas_fs_builder_dispose(builder); };
+
+  swiftscan_string_ref_t err_msg;
+  for (const auto &Arg : Args) {
+    if (sys::fs::exists(Arg)) {
+      if (swiftscan_cas_fs_builder_ingest_path(builder, Arg, !NonRecursive,
+                                               &err_msg))
+        return printError(err_msg);
+    } else {
+      if (swiftscan_cas_fs_builder_merge_root(builder, Arg, /*path*/ nullptr,
+                                              &err_msg))
+        return printError(err_msg);
+    }
+  }
+
+  auto casid = swiftscan_cas_fs_builder_finish(builder, &err_msg);
+  if (casid.length == 0)
+    return printError(err_msg);
+
+  os << toString(casid);
   return EXIT_SUCCESS;
 }
 
@@ -355,6 +390,9 @@ int main(int argc, char *argv[]) {
         Ret +=
             action_scan_dependency(scanner, Args, WorkingDirectory,
                                    Action == get_chained_bridging_header, os);
+        break;
+      case create_casfs:
+        Ret += action_create_casfs(cas, Args, os);
       }
     });
   }

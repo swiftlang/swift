@@ -47,14 +47,15 @@ public:
                         llvm::cas::ObjectRef BaseKey,
                         const FrontendInputsAndOutputs &InputsAndOutputs,
                         const FrontendOptions &Opts,
-                        FrontendOptions::ActionType Action);
+                        FrontendOptions::ActionType Action,
+                        bool WriteOutputHashXAttr);
   ~SwiftCASOutputBackend();
 
   llvm::Error storeCachedDiagnostics(unsigned InputIndex,
                                      llvm::StringRef Bytes);
 
-  llvm::Error storeMakeDependenciesFile(StringRef OutputFilename,
-                                        llvm::StringRef Bytes);
+  llvm::Error storeSupplementaryOutputFile(StringRef OutputFilename,
+                                           llvm::StringRef Bytes);
 
   /// Store the MCCAS CASID \p ID as the object file output for the input
   /// that corresponds to the \p OutputFilename

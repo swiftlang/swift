@@ -26,6 +26,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
@@ -221,10 +222,23 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
         bool isStrictMemorySafety =
             llvm::find(ArgsRefs, "-strict-memory-safety") != ArgsRefs.end();
 
+        LibraryLevel libraryLevel = LibraryLevel::Other;
+        auto libLevelIt = llvm::find(ArgsRefs, "-library-level");
+        if (libLevelIt != ArgsRefs.end() &&
+            (libLevelIt + 1) != ArgsRefs.end()) {
+          libraryLevel = llvm::StringSwitch<LibraryLevel>(*(libLevelIt + 1))
+                             .Case("api", LibraryLevel::API)
+                             .Case("spi", LibraryLevel::SPI)
+                             .Case("ipi", LibraryLevel::IPI)
+                             .Default(LibraryLevel::Other);
+        }
+
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
             InPath, compiledCandidatesRefs, ArgsRefs, {}, {}, linkLibraries,
             isFramework, isStatic, isStrictMemorySafety, {},
             /*module-cache-key*/ "", UserModVer);
+        if (libraryLevel == LibraryLevel::IPI)
+          Result->setLibraryLevel(libraryLevel);
 
         // Walk the source file to find the import declarations.
         llvm::StringSet<> alreadyAddedModules;
@@ -258,6 +272,7 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
                 getMatchingPackageOnlyImportsOfModule(
                     *adjacentBinaryModule, isFramework,
                     Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
+                    Ctx.LangOpts.hasFeature(Feature::Embedded),
                     ScannerPackageName, Ctx.SourceMgr.getFileSystem().get(),
                     Ctx.SearchPathOpts.DeserializedPathRecoverer);
 
@@ -280,6 +295,13 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
   if (code) {
     return code;
   }
+  // Use path heuristic for API/SPI; IPI was already set from the flags above.
+  if (Result->getLibraryLevel() != LibraryLevel::IPI) {
+    SmallString<256> modulePathBuf;
+    StringRef modulePath = moduleInterfacePath.toStringRef(modulePathBuf);
+    Result->setLibraryLevel(libraryLevelFromPath(
+        modulePath, Ctx.SearchPathOpts.getSDKPath(), Ctx.LangOpts.Target));
+  }
   return *Result;
 }
 
@@ -299,6 +321,7 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
       Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
+      Ctx.LangOpts.hasFeature(Feature::Embedded),
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
 
   if (Ctx.SearchPathOpts.ScannerModuleValidation) {
@@ -372,6 +395,19 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
       continue;
     dependencies.addMacroDependency(macro.ModuleName, deps->LibraryPath,
                                     deps->ExecutablePath);
+  }
+
+  // Use the stored value only for IPI; path heuristic handles API/SPI as
+  // before.
+  {
+    auto storedLevel = loadedModuleFile->getLibraryLevel();
+    if (storedLevel == LibraryLevel::IPI) {
+      dependencies.setLibraryLevel(storedLevel);
+    } else {
+      dependencies.setLibraryLevel(libraryLevelFromPath(
+          definingModulePath, Ctx.SearchPathOpts.getSDKPath(),
+          Ctx.LangOpts.Target));
+    }
   }
 
   return std::move(dependencies);

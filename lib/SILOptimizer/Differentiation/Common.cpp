@@ -553,8 +553,8 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
       // Witness for @_alwaysEmitIntoClient original function must be emitted,
       // otherwise a linker error would occur due to undefined reference to the
       // witness symbol.
-      original->markedAsAlwaysEmitIntoClient() ? SILLinkage::PublicNonABI
-                                               : SILLinkage::PublicExternal,
+      original->isAlwaysEmitIntoClient() ? SILLinkage::PublicNonABI
+                                         : SILLinkage::PublicExternal,
       original, kind, minimalConfig->parameterIndices,
       minimalConfig->resultIndices, minimalConfig->derivativeGenericSignature);
 }

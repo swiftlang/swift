@@ -1346,6 +1346,10 @@ SILInstruction::getStackAllocation() const {
       BUILTIN_CASE(StackAlloc, StackAlloc)
       BUILTIN_CASE(UnprotectedStackAlloc, UnprotectedStackAlloc)
       BUILTIN_CASE(StartAsyncLetWithLocalBuffer, StartAsyncLet)
+      BUILTIN_CASE(AddTaskLocalValue, AddTaskLocalValue)
+      BUILTIN_CASE(TaskAddPriorityEscalationHandler,
+                   TaskAddPriorityEscalationHandler)
+      BUILTIN_CASE(TaskAddCancellationHandler, TaskAddCancellationHandler)
 #undef BUILTIN_CASE
 
       default:
@@ -1363,6 +1367,10 @@ StackAllocationIsNested_t SILInstruction::isStackAllocationNested() const {
     return ASI->isStackAllocationNested();
   } else if (auto PAI = dyn_cast<PartialApplyInst>(this)) {
     return PAI->isStackAllocationNested();
+  } else if (auto ARI = dyn_cast<AllocRefInstBase>(this)) {
+    return ARI->isStackAllocationNested();
+  } else if (auto API = dyn_cast<AllocPackMetadataInst>(this)) {
+    return API->isStackAllocationNested();
   } else {
     // TODO: implement for all remaining allocations
     return StackAllocationIsNested;
@@ -1375,8 +1383,13 @@ void SILInstruction::setStackAllocationIsNested(
     ASI->setStackAllocationIsNested(nested);
   } else if (auto PAI = dyn_cast<PartialApplyInst>(this)) {
     PAI->setStackAllocationIsNested(nested);
+  } else if (auto ARI = dyn_cast<AllocRefInstBase>(this)) {
+    ARI->setStackAllocationIsNested(nested);
+  } else if (auto API = dyn_cast<AllocPackMetadataInst>(this)) {
+    API->setStackAllocationIsNested(nested);
   } else if (!nested) {
-    llvm_unreachable("unimplemented");
+    verificationFailure("setStackAllocationIsNested unimplemented for instruction",
+                        this, [](SILPrintContext &ctx) {});
   }
 }
 
@@ -1437,11 +1450,19 @@ SILInstruction::getStackDeallocation() const {
                    : StackAllocationKind::BuiltinUnprotectedStackAlloc);
       }
 
-      case BuiltinValueKind::FinishAsyncLet: {
-        auto alloc = StackDeallocation::getAllocationOperand(BI);
-        return StackDeallocation::getUnchecked(alloc, BI,
-                             StackAllocationKind::BuiltinStartAsyncLet);
+#define BUILTIN_CASE(FINISH_BUILTIN_ID, ID)                              \
+      case BuiltinValueKind::FINISH_BUILTIN_ID: {                        \
+        auto alloc = StackDeallocation::getAllocationOperand(BI);        \
+        return StackDeallocation::getUnchecked(alloc, BI,                \
+                                               StackAllocationKind::ID); \
       }
+      BUILTIN_CASE(FinishAsyncLet, BuiltinStartAsyncLet)
+      BUILTIN_CASE(RemoveTaskLocalValue, BuiltinAddTaskLocalValue)
+      BUILTIN_CASE(TaskRemovePriorityEscalationHandler,
+                   BuiltinTaskAddPriorityEscalationHandler)
+      BUILTIN_CASE(TaskRemoveCancellationHandler,
+                   BuiltinTaskAddCancellationHandler)
+#undef BUILTIN_CASE
 
       default:
         return std::nullopt;
@@ -2005,15 +2026,14 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   SSAPrunedLiveness liveness(function, &discoveredBlocks);
   liveness.initializeDef(this);
 
-  StackList<SILValue> values(function);
-  values.push_back(this);
+  ValueWorklist values(function);
+  values.push(this);
 
-  while (!values.empty()) {
-    auto value = values.pop_back_val();
+  while (auto value = values.pop()) {
     for (auto *use : value->getUses()) {
       if (!use->isConsuming()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
-          values.push_back(cvi);
+          values.pushIfNotVisited(cvi);
         }
         continue;
       }
@@ -2051,7 +2071,7 @@ PartialApplyInst::visitOnStackLifetimeEnds(
                                  "forwarded to a destroy_value");
       }
       forward.visitForwardedValues([&values](auto value) {
-        values.push_back(value);
+        values.pushIfNotVisited(value);
         return true;
       });
     }

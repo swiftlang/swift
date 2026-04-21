@@ -83,6 +83,28 @@ int _swift_alignedAllocate(void * EMBEDDED_SWIFT_NULLABLE * EMBEDDED_SWIFT_NONNU
 void _swift_alignedFree(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size);
 
 /**
+ * Allocates memory and places the resulting pointer in `*memptr`.
+ *
+ * Parameters:
+ *   - `memptr`: the resulting pointer will be written into *memptr on success.
+ *   - `size`: the minimum number of bytes to allocate.
+ *   - `alignment`: the minimum alignment of the resulting pointer, which must
+ *     be a power of at least as large as `sizeof(void *)`.
+ *   - `typeId`: an identifier used by a typed allocator to e.g. place the
+ *     allocation in a particular bucket.
+ *
+ * This function is required when using any Embedded Swift facility that
+ * requires typed memory allocation from the heap, e.g. class instance
+ * allocations when the TypedAllocation feature is enabled.
+ *
+ * This function can be implemented as a direct call to `posix_memalign`,
+ * if the target platform does not support typed allocations.
+ */
+void _swift_typedAllocate(
+    void *EMBEDDED_SWIFT_NULLABLE *EMBEDDED_SWIFT_NONNULL ptr,
+    __swift_size_t size, __swift_size_t alignment, unsigned long long typeId);
+
+/**
  * Writes a single character to standard output.
  *
  * Parameters:

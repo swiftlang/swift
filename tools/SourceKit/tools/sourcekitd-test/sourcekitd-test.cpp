@@ -1208,6 +1208,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestIndexToStore);
     addRequestOptionsDirect(Req, Opts);
     break;
+
+  case SourceKitRequest::PolyglotAST:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestPolyglotAST);
+    break;
   }
 
   if (!Opts.SourceFile.empty()) {
@@ -1630,6 +1634,13 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       case SourceKitRequest::IndexToStore:
         printRawResponse(Resp);
         break;
+      case SourceKitRequest::PolyglotAST: {
+        const char *value =
+            sourcekitd_variant_dictionary_get_string(Info, KeyFilePath);
+        if (value)
+          llvm::outs() << value << '\n';
+        break;
+      }
     }
   }
 

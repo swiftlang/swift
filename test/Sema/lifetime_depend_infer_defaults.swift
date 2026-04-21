@@ -1,12 +1,12 @@
 // RUN: %target-swift-emit-silgen -primary-file %s \
 // RUN:   -enable-experimental-feature Lifetimes \
-// RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN:  | %FileCheck %s
 //
 // -primary-file is required to synthesize accessors.
 
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 // Check that all the DEFAULT cases in Sema/lifetime_depend_infer_defaults.swift generate the correct function
 // signature. Checking the SILGen output seems like the easiest way.

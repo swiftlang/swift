@@ -126,12 +126,19 @@ set(LLVM_OPTIONAL_SOURCES
   ${backtracing_sources}
 )
 
-# Make the minimum build version for macOS 26.0, so we don't need to
-# add extra annotations.
-if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "26.0")
-  set(osx_deployment_target "26.0")
+# Force the minimum deployment target to 15.0
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "15.0")
+  set(osx_deployment_target "15.0")
 else()
   set(osx_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
+endif()
+
+# Generate BacktracingDT 6.2
+set(backtracing_availability)
+if(NOT SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY AND SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "26.0")
+  list(APPEND backtracing_availability "-Xfrontend" "-define-availability" "-Xfrontend" "BacktracingDT 6.2:macOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
+else()
+  list(APPEND backtracing_availability "-Xfrontend" "-define-availability" "-Xfrontend" "BacktracingDT 6.2:macOS 26.0")
 endif()
 
 add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
@@ -154,6 +161,7 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+    ${backtracing_availability}
     ${runtime_compile_flags}
     -parse-stdlib
 

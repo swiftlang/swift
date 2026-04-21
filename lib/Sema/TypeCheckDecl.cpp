@@ -2549,6 +2549,16 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       SmallVector<AnyFunctionType::Param, 4> argTy;
       AFD->getParameters()->getParams(argTy);
 
+      // If we don't have the concurrency library, reject the use of 'async'.
+      ASTContext &ctx = AFD->getASTContext();
+      if (AFD->hasAsync() &&
+          AFD->getLoc(/*SerializedOK=*/false).isValid() &&
+          !ctx.getLoadedModule(ctx.Id_Concurrency) &&
+          !ctx.SILOpts.ParseStdlib) {
+        ctx.Diags.diagnose(
+            AFD->getAsyncLoc(), diag::no_concurrency_module, "async");
+      }
+
       maybeAddParameterIsolation(infoBuilder, argTy);
       infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
       infoBuilder = infoBuilder.withSendable(AFD->isSendable());

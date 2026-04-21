@@ -260,8 +260,8 @@ extension ApplySite {
                                                 capturedArguments: newArguments,
                                                 calleeConvention: partialAp.calleeConvention,
                                                 hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
-                                                isOnStack: partialAp.isOnStack)
-      newApply.isNested = partialAp.isNested
+                                                isOnStack: partialAp.isOnStack,
+                                                isNested:  partialAp.isNested)
       partialAp.replace(with: newApply, context)
 
     case let tryApply as TryApplyInst:

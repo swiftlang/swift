@@ -21,11 +21,11 @@
 // RUN: not %target-swift-frontend -typecheck %s -diagnostic-style llvm -Werror ReturnTypeImplicitCopy &> %t/output_err.txt
 // RUN: cat %t/output_err.txt | %FileCheck %s -check-prefix CHECK-ERR
 
-// CHECK-ERR: error: Performance: 'foo()' returns an array, leading to implicit copies. Consider using an 'inout' parameter instead. [#ReturnTypeImplicitCopy]
-// CHECK-ERR: error: Performance: closure returns an array, leading to implicit copies. Consider using an 'inout' parameter instead. [#ReturnTypeImplicitCopy]
+// CHECK-ERR: error: Performance: 'foo()' returns an array, leading to implicit copies. Consider using an 'inout' parameter instead. [#PerformanceHints::ReturnTypeImplicitCopy]
+// CHECK-ERR: error: Performance: closure returns an array, leading to implicit copies. Consider using an 'inout' parameter instead. [#PerformanceHints::ReturnTypeImplicitCopy]
 
-// CHECK-WARN: warning: Performance: 'foo()' returns an array, leading to implicit copies. Consider using an 'inout' parameter instead. [#ReturnTypeImplicitCopy]
-// CHECK-WARN: warning: Performance: closure returns an array, leading to implicit copies. Consider using an 'inout' parameter instead. [#ReturnTypeImplicitCopy]
+// CHECK-WARN: warning: Performance: 'foo()' returns an array, leading to implicit copies. Consider using an 'inout' parameter instead. [#PerformanceHints::ReturnTypeImplicitCopy]
+// CHECK-WARN: warning: Performance: closure returns an array, leading to implicit copies. Consider using an 'inout' parameter instead. [#PerformanceHints::ReturnTypeImplicitCopy]
 
 func foo() -> [Int] {
     return [1,2,3,4,5,6]

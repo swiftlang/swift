@@ -81,6 +81,7 @@ FEATURE(IsolatedDeinit,                                 (6, 1))
 FEATURE(ValueGenericType,                               (6, 2))
 FEATURE(InitRawStructMetadata2,                         (6, 2))
 FEATURE(TaskExecutor,                                   (6, 2))
+FEATURE(TaskPriorityEscalationHandlers,                 (6, 2))
 FEATURE(TypedCoroAlloc,                                 (6, 2))
 
 FEATURE(CustomGlobalExecutors,                          FUTURE)
@@ -89,6 +90,5 @@ FEATURE(ClearSensitive,                                 FUTURE)
 FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
 // TODO: CoroutineAccessors: Change to correct version number.
 FEATURE(CoroutineAccessors,                             FUTURE)
-
 #undef FEATURE
 #undef FUTURE

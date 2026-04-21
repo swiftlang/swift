@@ -114,6 +114,13 @@ struct ArgumentDescriptor {
   /// Returns true if all function signature opt passes are able to process
   /// this.
   bool canOptimizeLiveArg() const {
+    if (PInfo.has_value()) {
+      // Skip implicit isolation parameter for `nonisolated(nonsending)`
+      // functions because removing it would also change isolation.
+      if (PInfo->hasOption(SILParameterInfo::Flag::ImplicitLeading))
+        return false;
+    }
+
     if (Arg->getType().isObject()) {
       return true;
     }

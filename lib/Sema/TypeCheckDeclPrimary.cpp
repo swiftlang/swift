@@ -124,14 +124,6 @@ public:
       return Type();
     }
 
-    if (rpk == RepressibleProtocolKind::Sendable) {
-      if (!ctx.LangOpts.hasFeature(Feature::TildeSendable)) {
-        diagnoseInvalid(repr, repr.getLoc(),
-                        diag::tilde_sendable_requires_feature_flag);
-        return Type();
-      }
-    }
-
     if (auto *TD = dyn_cast<const TypeDecl *>(decl)) {
       if (rpk == RepressibleProtocolKind::Sendable) {
         auto *C = dyn_cast<ClassDecl>(TD);
@@ -484,6 +476,29 @@ static void checkInheritanceClause(
       }
 
       if (canHaveSuperclass) {
+        // Check for self-referential generic superclass in Embedded Swift.
+        // A class like `class Tree: ManagedBuffer<Int, Tree>` creates a
+        // circular metadata dependency that cannot be resolved statically.
+        if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+          if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+                  classDecl, inherited.getSourceRange().Start,
+                  /*wasAlwaysEmbeddedError=*/true)) {
+            if (auto superBGT = inheritedTy->getAs<BoundGenericClassType>()) {
+              for (auto arg : superBGT->getGenericArgs()) {
+                if (auto *nominal = arg->getAnyNominal()) {
+                  if (nominal == classDecl) {
+                    diags.diagnose(
+                        inherited.getSourceRange().Start,
+                        diag::self_referential_superclass_in_embedded_swift,
+                        classDecl->getDeclaredInterfaceType(), inheritedTy)
+                      .limitBehavior(*behavior);
+                  }
+                }
+              }
+            }
+          }
+        }
+
         // Record the superclass.
         superclassTy = inheritedTy;
         superclassRange = inherited.getSourceRange();
@@ -1838,9 +1853,15 @@ static void diagnoseRetroactiveConformances(
 
   for (auto *conformance : ext->getLocalConformances()) {
     auto *proto = conformance->getProtocol();
+    bool isRetroactive = conformance->isRetroactive();
     bool inserted = protocols.insert(std::make_pair(
-        proto, conformance->isRetroactive())).second;
+        proto, isRetroactive)).second;
     ASSERT(inserted);
+
+    if (isRetroactive && proto->isEligibleForFastCasting()) {
+      ext->diagnose(diag::retroactive_fast_cast, proto);
+      return;
+    }
 
     if (proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype)) {
       protocolsWithRetroactiveAttr.insert(proto);
@@ -2018,6 +2039,20 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
                     diag::replace_placeholder_with_inferred_type, initTy)
           .fixItReplace(PTR->getSourceRange(), initTy.getString());
     }
+  }
+}
+
+static void checkDeprecatedSuppressedAssociatedTypes(ProtocolDecl *proto) {
+  auto &ctx = proto->getASTContext();
+
+  if (!ctx.LangOpts.hasFeature(SuppressedAssociatedTypes))
+    return;
+
+  for (auto req : proto->getInverseRequirements()) {
+    if (req.subject->getCanonicalType() == ctx.TheSelfType)
+      continue;
+
+    ctx.Diags.diagnose(req.loc, diag::legacy_suppressed_assoc_types);
   }
 }
 
@@ -2286,6 +2321,15 @@ public:
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
+    }
+    // Report import of an IPI module from a non-IPI module.
+    if (target && target->getLibraryLevel() == LibraryLevel::IPI &&
+        Ctx.LangOpts.LibraryLevel > LibraryLevel::IPI &&
+        !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+        ID->getAccessLevel() == AccessLevel::Public) {
+      auto importer = ID->getModuleContext();
+      Ctx.Diags.diagnose(ID, diag::error_import_of_ipi_module,
+                         target->getName(), importer->getName());
     }
 
     // Preconcurrency imports aren't strictly memory-safe when we have strict
@@ -3314,6 +3358,13 @@ public:
       }
     }
 
+    // Actors require the concurrency module.
+    if (CD->isActor() && !Ctx.getLoadedModule(Ctx.Id_Concurrency)) {
+      auto sourceFile = CD->getParentSourceFile();
+      if (sourceFile && sourceFile->Kind != SourceFileKind::SIL)
+        CD->diagnose(diag::no_concurrency_module, "actor");
+    }
+
     // Check distributed actors
     TypeChecker::checkDistributedActor(SF, CD);
 
@@ -3517,6 +3568,8 @@ public:
     // Copyable that will appear as if deserialized, so skip checking those.
     if (PD->getParentSourceFile())
       TypeChecker::checkConformancesInContext(PD);
+
+    checkDeprecatedSuppressedAssociatedTypes(PD);
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -3554,6 +3607,13 @@ public:
     TypeChecker::checkDeclAttributes(FD);
     TypeChecker::checkDistributedFunc(FD);
     checkEmbeddedRestrictionsInSignature(FD);
+
+    // Untyped throws might need to be diagnosed.
+    SourceLoc throwsLoc = FD->getThrowsLoc();
+    if (throwsLoc.isValid() && !FD->getThrownTypeRepr() &&
+        !FD->hasPolymorphicEffect(EffectKind::Throws)) {
+      diagnoseUntypedThrows(FD, throwsLoc);
+    }
 
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
@@ -3941,6 +4001,13 @@ public:
 
     if (CD->getAsyncLoc().isValid())
       TypeChecker::checkConcurrencyAvailability(CD->getAsyncLoc(), CD);
+
+    // Untyped throws might need to be diagnosed.
+    SourceLoc throwsLoc = CD->getThrowsLoc();
+    if (throwsLoc.isValid() && !CD->getThrownTypeRepr() &&
+        !CD->hasPolymorphicEffect(EffectKind::Throws)) {
+      diagnoseUntypedThrows(CD, throwsLoc);
+    }
 
     // Check whether this initializer overrides an initializer in its
     // superclass.

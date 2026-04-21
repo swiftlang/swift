@@ -127,13 +127,13 @@
 // CHECK: SWIFT_INLINE_THUNK uint8_t operator [](const __StringNested::Index& i) const SWIFT_SYMBOL({{.*}});
 // CHECK:   SWIFT_INLINE_THUNK String getDescription() const SWIFT_SYMBOL({{.*}});
 // CHECK:   SWIFT_INLINE_THUNK swift::Int getCount() const SWIFT_SYMBOL({{.*}});
-// CHECK:   SWIFT_INLINE_THUNK bool isTriviallyIdenticalTo(const __StringNested::UTF8View& other) const SWIFT_SYMBOL({{.*}}) {{.*}};
+// CHECK:   SWIFT_INLINE_THUNK bool isTriviallyIdenticalTo(const __StringNested::UTF8View& other) const SWIFT_SYMBOL({{.*}}){{.*}};
 // CHECK-NEXT: private:
 
 // CHECK: class AnyKeyPath { } SWIFT_UNAVAILABLE_MSG("class 'AnyKeyPath' is not yet exposed to C++");
 // CHECK: class Comparable { } SWIFT_UNAVAILABLE_MSG("protocol 'Comparable' can not yet be represented in C++");
 // CHECK: class FloatingPointSign { } SWIFT_UNAVAILABLE_MSG("enum 'FloatingPointSign' is not yet exposed to C++");
-// CHECK: // Unavailable in C++: Swift global function 'abs(_:)'.
+// CHECK: // Unavailable in C++: Swift global function 'abs(_:)'.{{.*}}can not yet be {{.*}} in C++.
 
 // CHECK: #pragma clang diagnostic push
 // CHECK: #pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"

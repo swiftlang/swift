@@ -2707,6 +2707,31 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   bool PrintAbstract =
     Options.AbstractAccessors && !Options.FunctionDefinitions;
 
+  // For var decls, if it has an initializer, the parser only expects observing
+  // accessors. But sometimes for example in '.swiftinterface', we want to print
+  // both the initializer and the accessors. So when we print the initializer
+  // *and* the accessor block not starting with willSet/didSet, print an
+  // attribute as a disambiguation marker.
+  auto printDisambiguationMarkerIfNeeded = [&]() {
+    auto *VD = dyn_cast<VarDecl>(ASD);
+    if (!VD)
+      return;
+    auto *PBD = VD->getParentPatternBinding();
+    if (!PBD)
+      return;
+    auto i = PBD->getPatternEntryIndexForVarDecl(VD);
+
+    bool needsDisambiguationAttr = false;
+    if (Options.PrintExprs) {
+      needsDisambiguationAttr |= bool(PBD->getInit(i));
+    } else if (Options.VarInitializers) {
+      needsDisambiguationAttr |= bool(PBD->hasInitStringRepresentation(i) &&
+                                      VD->isInitExposedToClients());
+    }
+    if (needsDisambiguationAttr)
+      Printer << " @_accessorBlock";
+  };
+
   // Don't print accessors for trivially stored properties...
   if (impl.isSimpleStored()) {
     // ...unless we're printing for SIL, which expects a { get set? } on
@@ -2718,10 +2743,11 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     // ...or you're private/internal(set), at which point we'll print
     //    @_hasStorage var x: T { get }
     else if (ASD->isSettable(nullptr) && hasLessAccessibleSetter(ASD)) {
+      Printer << " {";
+      printDisambiguationMarkerIfNeeded();
       if (PrintAbstract) {
-        Printer << " { get }";
+        Printer << " get }";
       } else {
-        Printer << " {";
         {
           IndentRAII indentMore(*this);
           indent();
@@ -2928,28 +2954,9 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 
   Printer << " {";
 
-  // For var decls, if it has an initializer, the parser only expects observing
-  // accessors. But sometimes for example in '.swiftinterface', we want to print
-  // both the initializer and the accessors. So when we print the initializer
-  // *and* the accessor block not starting with willSet/didSet, print an
-  // attribute as a disambiguation marker.
-  bool needsDisambiguationAttr = false;
-  if (auto *VD = dyn_cast<VarDecl>(ASD)) {
-    if (auto *PBD = VD->getParentPatternBinding()) {
-      if (accessorsToPrint.empty() ||
-          !accessorsToPrint.front()->isObservingAccessor()) {
-        const auto i = PBD->getPatternEntryIndexForVarDecl(VD);
-        if (Options.PrintExprs) {
-          needsDisambiguationAttr |= bool(PBD->getInit(i));
-        } else if (Options.VarInitializers) {
-          needsDisambiguationAttr |= bool(PBD->hasInitStringRepresentation(i) &&
-                                          VD->isInitExposedToClients());
-        }
-      }
-    }
-  }
-  if (needsDisambiguationAttr) {
-    Printer << " @_accessorBlock";
+  if (accessorsToPrint.empty() ||
+      !accessorsToPrint.front()->isObservingAccessor()) {
+    printDisambiguationMarkerIfNeeded();
   }
 
   // If we're not printing the accessor bodies and none of the accessors have
@@ -3800,6 +3807,19 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
   });
 }
 
+// Returns true if the given declaration is CxxBorrowingSequence,
+// CxxBorrowingIterator or an extension of one of these.
+static bool isCxxBorrowingSequenceOrIterator(Decl *decl) {
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+    decl = ext->getExtendedNominal();
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl))
+    return proto->getNameStr() == "CxxBorrowingSequence";
+  if (auto *sd = dyn_cast<StructDecl>(decl))
+    return sd->getNameStr() == "CxxBorrowingIterator";
+  return false;
+}
+
 /// Generate the appropriate #if block(s) necessary to protect the use
 /// of compiler-version-dependent features in the given function.
 ///
@@ -3826,6 +3846,19 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
   // it should go around the whole decl.
   if (isa<AccessorDecl>(decl)) {
     printBody();
+    return;
+  }
+
+  // CxxBorrowingSequence and CxxBorrowingIterator, defined in the Cxx overlay,
+  // conform to BorrowingSequence and BorrowingIteratorProtocol. When a newer
+  // compiler is used with an older SDK, the Cxx module interface may reference
+  // these Swift stdlib protocols even though they don't exist in the SDK's
+  // stdlib. To handle this, we guard them behind a Swift version.
+  if (isCxxBorrowingSequenceOrIterator(decl)) {
+    printer << "#if canImport(Swift, _version: 6.4.0.12)\n";
+    printBody();
+    printer.printNewline();
+    printer << "#endif";
     return;
   }
 
@@ -7249,6 +7282,10 @@ public:
       Printer << " ";
     }
 
+    if (info.hasNonisolatedNonsendingIsolation()) {
+      Printer.printSimpleAttr("@caller_isolated") << " ";
+    }
+
     if (info.hasErasedIsolation()) {
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@isolated");
@@ -8164,6 +8201,16 @@ public:
     }
 
     Printer << "_";
+  }
+
+  void visitJoinType(JoinType *T,
+                     NonRecursivePrintOptions nrOptions) {
+    Printer << "∨";
+  }
+
+  void visitMeetType(MeetType *T,
+                     NonRecursivePrintOptions nrOptions) {
+    Printer << "∧";
   }
 
   void visitIntegerType(IntegerType *T, NonRecursivePrintOptions nrOptions) {

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_operator.swift
-// RUN: llvm-bcanalyzer %t/def_operator.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer %t/def_operator.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -typecheck -I%t %s
 //
 // Run with the interpreter using the proper filecheck pattern.

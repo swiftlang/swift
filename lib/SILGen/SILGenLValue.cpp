@@ -986,6 +986,32 @@ namespace {
     }
   };
 
+  /// A physical path component which force-projects the address of
+  /// the value of an optional address l-value. Always pure.
+  class ForceOptionalAddressComponent : public PhysicalPathComponent {
+    bool isImplicitUnwrap;
+
+  public:
+    ForceOptionalAddressComponent(LValueTypeData typeData,
+                                  bool isImplicitUnwrap)
+        : PhysicalPathComponent(typeData, OptionalAddressKind,
+                                /*actorIsolation=*/std::nullopt),
+          isImplicitUnwrap(isImplicitUnwrap) {}
+
+    virtual bool isLoadingPure() const override { return true; }
+
+    ManagedValue project(SILGenFunction &SGF, SILLocation loc,
+                         ManagedValue base) &&
+        override {
+      return SGF.emitPreconditionOptionalHasValue(loc, base, isImplicitUnwrap);
+    }
+
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "ForceOptionalAddressComponent(" << isImplicitUnwrap
+                        << ")\n";
+    }
+  };
+
   /// A physical path component which projects out an opened archetype
   /// from an existential.
   class OpenOpaqueExistentialComponent : public PhysicalPathComponent {
@@ -1277,6 +1303,18 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+void LValue::addForceValueComponent(bool isObject, bool isImplicitOptional) {
+  auto substFormalType = getSubstFormalType();
+  LValueTypeData typeData = {
+      getAccessKind(), AbstractionPattern(substFormalType), substFormalType,
+      substFormalType.getOptionalObjectType()};
+
+  if (isObject)
+    add<ForceOptionalObjectComponent>(typeData, isImplicitOptional);
+  else
+    add<ForceOptionalAddressComponent>(typeData, isImplicitOptional);
+}
 
 static bool isReadNoneFunction(const Expr *e) {
   // If this is a curried call to an integer literal conversion operations, then
@@ -2965,6 +3003,7 @@ LValue SILGenFunction::emitLValue(Expr *e, SGFAccessKind accessKind,
     assert(r.isLastComponentPhysical());
     r.addOrigToSubstComponent(loweredSubstType);
   }
+
   return r;
 }
 
@@ -4252,13 +4291,24 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   CanType substFormalRValueType = getSubstFormalRValueType(e);
   CanType baseTy = getBaseFormalType(e->getBase());
   AbstractionPattern orig = AbstractionPattern::getInvalid();
+
+  AccessorDecl *calleeAccessor = strategy.hasAccessor()
+    ? var->getAccessor(strategy.getAccessor())
+    : nullptr;
+  ParamDecl *calleeAccessorSelfParam = calleeAccessor
+    ? calleeAccessor->getImplicitSelfDecl()
+    : nullptr;
+  
   bool addressable = false;
-  // If the access produces a dependent value, and the base is addressable-for-
-  // dependencies, then request an addressable base.
-  if (!substFormalRValueType->isEscapable()
-      && SGF.getTypeProperties(baseTy).isAddressableForDependencies()) {
-    addressable = true;
-    orig = AbstractionPattern::getOpaque();
+  // If the access produces a dependent value, and the base is addressable,
+  // then request an addressable base.
+  if (!substFormalRValueType->isEscapable()) {
+    addressable = SGF.getTypeProperties(baseTy).isAddressableForDependencies()
+      || (calleeAccessorSelfParam && calleeAccessorSelfParam->isAddressable());
+      
+    if (addressable) {
+      orig = AbstractionPattern::getOpaque();
+    }
   }
   
   LValue lv = visitRec(e->getBase(),
@@ -5638,6 +5688,38 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
     } else {
       // If the last component is logical, emit a get.
       result = std::move(component.asLogical()).get(*this, loc, addr, C);
+    }
+
+    // Check if we have an ignored read. If we do, insert the relevant uses to
+    // end the lifetime (if noncopyable) and or ignored_use to provide a use for
+    // diagnostic passes and set result to be an empty RValue. We do not want to
+    // allow for our caller to use the RValue since the RValue could contain
+    // things whose lifetimes are scoped to within the formal evaluation scope.
+    if (src.getAccessKind() == SGFAccessKind::IgnoredRead && !result.isNull()) {
+      SmallVector<ManagedValue, 16> values;
+      std::move(result).getAll(values);
+
+      for (auto mv : values) {
+        // If we have a move only type, we need to perform a move on each
+        // element to ensure we consume our arguments as part of the
+        // assignment.
+        if (mv.getType().isMoveOnly()) {
+          mv = mv.ensurePlusOne(*this, loc);
+          // If we have an address, then ensure plus one will create a temporary
+          // copy which will act as a consume of the address value. If we have
+          // an object, we need to insert our own move though.
+          if (mv.getType().isObject())
+            mv = B.createMoveValue(loc, mv);
+        }
+
+        // Then regardless if we are noncopyable or copyable, then we insert
+        // an ignored_use for diagnostics.
+        B.createIgnoredUse(loc, mv.getValue());
+      }
+
+      // Then set result to be an empty RValue so that our caller cannot use the
+      // RValue.
+      result = RValue();
     }
   } // End the evaluation scope before any hop back to the current executor.
 

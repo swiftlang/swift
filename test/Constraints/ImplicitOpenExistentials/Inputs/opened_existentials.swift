@@ -39,6 +39,10 @@ extension Array: P where Element: P {
 extension Double: Q { }
 extension String: Q { }
 
+@_marker
+protocol Marker {
+}
+
 func acceptAnyGeneric(_: some Any) {}
 func acceptGeneric<T: P>(_: T) -> T.A? { nil }
 func acceptCollection<C: Collection>(_ c: C) -> C.Element { c.first! }
@@ -202,11 +206,18 @@ func passesInOut(i: Int) {
 
 func takesOptional<T: P>(_ value: T?) { }
 // expected-note@-1{{required by global function 'takesOptional' where 'T' = 'any P'}}
+// expected-note@-2{{'takesOptional' where 'T' = 'any Marker & P'}}
+// expected-note@-3{{'takesOptional' where 'T' = 'any Marker'}}
 
-func passesToOptional(p: any P, pOpt: (any P)?) {
+
+func passesToOptional(p: any P, pOpt: (any P)?, withMarker: (any P & Marker)?, markerOnly: (any Marker)?) {
   // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   takesOptional(p) // okay
   takesOptional(pOpt) // expected-error{{type 'any P' cannot conform to 'P'}}
+  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+  takesOptional(withMarker) // expected-error{{type 'any Marker & P' cannot conform to 'P'}}
+  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+  takesOptional(markerOnly) // expected-error{{type 'any Marker' cannot conform to 'P'}}
   // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
 }
 

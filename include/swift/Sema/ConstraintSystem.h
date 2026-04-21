@@ -1086,11 +1086,11 @@ public:
   llvm::DenseMap<NominalTypeDecl *, DynamicCallableMethods>
       DynamicCallableCache;
 
-  /// A cache of implicitly generated dot-member expressions used as roots
+  /// A cache of implicitly generated dot-member expressions and argument lists
   /// for some `.callAsFunction` calls. The key here is "base" locator for
   /// the `.callAsFunction` member reference.
-  llvm::SmallDenseMap<ConstraintLocator *, UnresolvedDotExpr *, 2>
-      ImplicitCallAsFunctionRoots;
+  llvm::SmallDenseMap<ConstraintLocator *, ImplicitCallAsFunctionInfo, 2>
+      ImplicitCallAsFunctions;
 
   /// The set of conformances synthesized during solving (i.e. for
   /// ad-hoc distributed `SerializationRequirement` conformances).
@@ -2069,8 +2069,15 @@ public:
   void recordMatchCallArgumentResult(ConstraintLocator *locator,
                                      MatchCallArgumentResult result);
 
-  void recordImplicitCallAsFunctionRoot(
-      ConstraintLocator *locator, UnresolvedDotExpr *root);
+  /// Record a new implicit `callAsFunction` call for a split argument list
+  /// e.g `T(...) {}` -> `T(...).callAsFunction {}`
+  ///
+  /// \param root The member access to \c callAsFunction
+  /// \param baseArgs The new arguments for the base \c T(...) call. The
+  /// arguments for the \c callAsFunction call are recorded on the \c root
+  void recordImplicitCallAsFunction(ConstraintLocator *locator,
+                                    UnresolvedDotExpr *root,
+                                    ArgumentList *baseArgs);
 
   /// Record root, value, and declContext of keypath expression for use across
   /// constraint system, and add a change to the trail.
@@ -2102,10 +2109,6 @@ public:
           return false;
         });
   }
-
-  /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
-  /// constraint system, return the decl that it references.
-  ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
 
   /// Try to salvage the constraint system by applying (speculative)
   /// fixes.
@@ -2983,7 +2986,6 @@ public:
   /// Retrieve the type that will be used when matching the given overload.
   Type getEffectiveOverloadType(ConstraintLocator *locator,
                                 const OverloadChoice &overload,
-                                bool allowMembers,
                                 DeclContext *useDC);
 
   /// Add a new overload set to the list of unresolved overload
@@ -3206,6 +3208,11 @@ public:
   bool matchFunctionIsolations(FunctionType *func1, FunctionType *func2,
                                ConstraintKind kind, TypeMatchOptions flags,
                                ConstraintLocatorBuilder locator);
+
+  /// Subroutine of \c matchTypes()
+  bool matchFunctionLifetimes(const LifetimeDependentInterface &func1,
+                              const LifetimeDependentInterface &func2,
+                              ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
@@ -4546,6 +4553,11 @@ unsigned getNumApplications(bool hasAppliedSelf,
 /// Determine whether the debug output is enabled for the given target.
 bool debugConstraintSolverForTarget(ASTContext &C,
                                     SyntacticElementTarget target);
+
+/// Determine whether the given declaration is only generic because it
+/// adopted typed throws.
+bool isGenericOnlyOverThrownType(AbstractFunctionDecl *func);
+
 } // end namespace constraints
 
 /// If the expression has the effect of a forced downcast, find the

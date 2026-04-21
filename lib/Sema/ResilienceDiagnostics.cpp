@@ -297,6 +297,10 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   case ExportabilityReason::ResultBuilder:
   case ExportabilityReason::PropertyWrapper:
   case ExportabilityReason::ImplicitlyPublicVarDecl:
+  case ExportabilityReason::ImplicitlyPublicVarDeclOpenClass:
+  case ExportabilityReason::ImplicitlyPublicVarDeclMissingAttribute:
+  case ExportabilityReason::ImplicitlyPublicVarDeclMissingDeinit:
+  case ExportabilityReason::ImplicitlyPublicVarDeclMissingAttributeAndDeinit:
   case ExportabilityReason::ImplicitlyPublicAssociatedValue:
     return isInternalBridgingHeader &&
            where.getExportedLevel() == ExportedLevel::ImplicitlyExported;
@@ -397,6 +401,35 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
         .limitBehavior(limit.merge(commonBehavior));
 
     D->diagnose(diag::kind_declared_here, D->getDescriptiveKind());
+
+    // Suggest fixes for references from class properties in embedded mode.
+    if (reason == ExportabilityReason::
+            ImplicitlyPublicVarDeclMissingAttribute ||
+        reason == ExportabilityReason::
+            ImplicitlyPublicVarDeclMissingAttributeAndDeinit) {
+      // Require @_implementationOnly on the property.
+      ctx.Diags.diagnose(loc,
+          diag::embedded_class_property_requires_implementation_only);
+    }
+
+    if (reason == ExportabilityReason::
+            ImplicitlyPublicVarDeclMissingDeinit ||
+        reason == ExportabilityReason::
+            ImplicitlyPublicVarDeclMissingAttributeAndDeinit) {
+      // Require @export(interface) deinit on the class.
+      auto *parentClass = dyn_cast_or_null<ClassDecl>(DC->getAsDecl());
+      if (parentClass) {
+        auto inFlight = parentClass->diagnose(
+            diag::embedded_classes_require_export_interface_deinit);
+
+        auto insertLoc = parentClass->getBraces().End;
+        StringRef insertIndent =
+          Lexer::getIndentationForLine(ctx.SourceMgr, insertLoc);
+        std::string fixit = (insertIndent + "@export(interface)\n" +
+                             insertIndent + "deinit {}\n").str();
+        inFlight.fixItInsert(insertLoc, fixit);
+      }
+    }
   } else {
     ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module, D,
                        fragileKind.getSelector(), definingModule->getName(),

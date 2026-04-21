@@ -58,11 +58,12 @@ class Git:
     ) -> Tuple[str, int, List[str]]:
         command = Git._build_command(args)
         output = ""
+        stderr_output = ""
         try:
             result = subprocess.run(
                 command,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                stderr=subprocess.PIPE,
                 universal_newlines=True,
                 encoding="utf-8",
                 env=env,
@@ -70,8 +71,9 @@ class Git:
                 **kwargs,
             )
             output = result.stdout
+            stderr_output = result.stderr
             if echo:
-                Git._echo_command(command, output, env, prefix)
+                Git._echo_command(command, output + stderr_output, env, prefix)
             if not allow_non_zero_exit:
                 result.check_returncode()
         except subprocess.CalledProcessError as e:
@@ -80,7 +82,7 @@ class Git:
                     f"command `{command}` terminated with a non-zero exit "
                     f"status {str(e.returncode)}, aborting"
                 )
-            raise GitException(e.returncode, command, repo_path.name, output)
+            raise GitException(e.returncode, command, repo_path.name, output + stderr_output)
         except OSError as e:
             if fatal:
                 sys.exit(

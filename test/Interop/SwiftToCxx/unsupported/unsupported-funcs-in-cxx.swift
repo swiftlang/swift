@@ -45,6 +45,6 @@ public struct HasMethods {
 // CHECK: HasMethods
 // CHECK: supported
 
-// CHECK: // Unavailable in C++: Swift global function 'unsupportedAEIC()'.
+// CHECK: // Unavailable in C++: Swift global function 'unsupportedAEIC()'.{{.*}}can not be exposed to C++ as it requires code to be emitted into client.
 // CHECK-EMPTY:
-// CHECK-NEXT: // Unavailable in C++: Swift global function 'unsupportedThrows()'.
+// CHECK-NEXT: // Unavailable in C++: Swift global function 'unsupportedThrows()'.{{.*}}can not yet be represented in C++ as it may throw an error.

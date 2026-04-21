@@ -17,6 +17,8 @@ from . import swiftdocc
 from . import swiftdoccrender
 from .. import shell
 
+from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
+
 class StdlibDocs(product.Product):
     @classmethod
     def is_build_script_impl_product(cls):
@@ -42,6 +44,13 @@ class StdlibDocs(product.Product):
             f'swift-{host_target}'
         )
 
+        docc_catalog_path = os.path.join(
+            SWIFT_SOURCE_ROOT,
+            "swift",
+            "stdlib",
+            "stdlib.docc"
+        )
+
         symbol_graph_dir = os.path.join(swift_build_dir, "lib", "symbol-graph")
         output_path = os.path.join(swift_build_dir, "Swift.doccarchive")
 
@@ -52,6 +61,7 @@ class StdlibDocs(product.Product):
         docc_cmd = [
             docc_path,
             docc_action,
+            docc_catalog_path,
             "--additional-symbol-graph-dir",
             symbol_graph_dir,
             "--output-path",

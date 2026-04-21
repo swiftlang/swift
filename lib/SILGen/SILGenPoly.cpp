@@ -705,9 +705,22 @@ ManagedValue Transform::transform(ManagedValue v,
 
   //  - existentials
   if (outputSubstType->isAnyExistentialType()) {
-    // We have to re-abstract payload if its a metatype or a function
-    v = SGF.emitSubstToOrigValue(Loc, v, AbstractionPattern::getOpaque(),
-                                 inputSubstType);
+    // We might have to re-abstract the payload if its a metatype, function,
+    // tuple, or optional.
+
+    auto loweredTy = v.getType();
+    auto inputLoweredTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                             inputSubstType);
+    // FIXME: Gross workaround for incorrect opaque type erasure
+    if (loweredTy.getNominalOrBoundGenericNominal() &&
+        inputLoweredTy.is<OpaqueTypeArchetypeType>()) {
+      // Woohoo!
+      inputSubstType = loweredTy.getASTType();
+    } else {
+      v = SGF.emitSubstToOrigValue(Loc, v, AbstractionPattern::getOpaque(),
+                                   inputSubstType);
+    }
+
     return SGF.emitTransformExistential(Loc, v,
                                         inputSubstType, outputSubstType,
                                         ctxt);
@@ -6046,6 +6059,9 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
 
+  using ThunkGenFlag = SILGenFunction::ThunkGenFlag;
+  auto options = SILGenFunction::ThunkGenOptions();
+
   SmallVector<ManagedValue, 8> params;
   SmallVector<ManagedValue, 8> indirectResults;
   SmallVector<ManagedValue, 1> indirectErrorResults;
@@ -6075,10 +6091,11 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
   // Forward the implicit isolation parameter.
   if (implicitIsolationParam.isValid()) {
     argValues.push_back(implicitIsolationParam.getValue());
+    options |= ThunkGenFlag::CalleeHasImplicitIsolatedParam;
   }
 
    // Add the rest of the arguments.
-  forwardFunctionArguments(SGF, loc, fnType, params, argValues);
+  forwardFunctionArguments(SGF, loc, fnType, params, argValues, options);
 
   auto fun = fnType->isCalleeGuaranteed() ? fnValue.borrow(SGF, loc).getValue()
                                           : fnValue.forward(SGF);
@@ -6595,7 +6612,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   // linkage of derivative thunks so we can serialize them (the original
   // function itself might be HiddenExternal in this case if we only have
   // declaration without definition).
-  auto linkage = originalFn->markedAsAlwaysEmitIntoClient()
+  auto linkage = originalFn->isAlwaysEmitIntoClient()
                      ? SILLinkage::PublicNonABI
                      : stripExternalFromLinkage(originalFn->getLinkage());
 

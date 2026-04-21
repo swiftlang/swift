@@ -1,4 +1,4 @@
-// {"kind":"emit-silgen","original":"91fe640b","signature":"swift::Lowering::TypeConverter::makeConstantInterfaceType(swift::SILDeclRef)","signatureAssert":"Assertion failed: (Ptr && \"Cannot dereference a null Type!\"), function operator->"}
+// {"kind":"emit-silgen","original":"91fe640b","signature":"swift::Lowering::TypeConverter::makeConstantInterfaceType(swift::SILDeclRef)","signatureAssert":"Assertion failed: (Ptr && \"Cannot dereference a null Type!\"), function operator->","signatureNext":"Lowering::TypeConverter::getConstantInfo"}
 // RUN: not --crash %target-swift-frontend -emit-silgen %s
 @propertyWrapper struct a<b> {
   init(wrappedValue: b...) {

@@ -956,7 +956,7 @@ if(SWIFT_PATH_TO_CMARK_BUILD)
     OUTPUT_VARIABLE _CMARK_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   message(STATUS "CMark Version: ${_CMARK_VERSION}")
-elseif(SWIFT_INCLUDE_TOOLS)
+elseif(SWIFT_INCLUDE_TOOLS AND NOT "cmark" IN_LIST LLVM_EXTERNAL_PROJECTS)
   find_package(cmark-gfm CONFIG REQUIRED)
 endif()
 message(STATUS "")
@@ -1542,6 +1542,28 @@ endif()
 add_subdirectory(include)
 if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(lib)
+endif()
+
+# NOTE(compnerd) we cannot use `LLVM_HAVE_LIBXML2` as the basis for this check
+# as we require RelaxNG support which is not guaranteed by the LLVM check.
+option(SWIFT_ENABLE_LIBXML2 "Use libxml2 to validate the comment schema via swift-ide-test" TRUE)
+set(SWIFT_HAVE_LIBXML2 FALSE)
+if(SWIFT_ENABLE_LIBXML2)
+  find_package(LibXml2)
+  if(LibXml2_FOUND)
+    # Check if libxml2 we found is usable; for example, we may have found a
+    # 32-bit library on a 64-bit system which would result in a link-time
+    # failure.
+    cmake_push_check_state()
+    list(APPEND CMAKE_REQUIRED_INCLUDES ${LIBXML2_INCLUDE_DIRS})
+    list(APPEND CMAKE_REQUIRED_LIBRARIES ${LIBXML2_LIBRARIES})
+    list(APPEND CMAKE_REQUIRED_DEFINITIONS ${LIBXML2_DEFINITIONS})
+    check_symbol_exists(xmlRelaxNGParse libxml/relaxng.h HAVE_LIBXML2_RELAXNG)
+    cmake_pop_check_state()
+    if(HAVE_LIBXML2_RELAXNG)
+      set(SWIFT_HAVE_LIBXML2 TRUE)
+    endif()
+  endif()
 endif()
 
 ###############

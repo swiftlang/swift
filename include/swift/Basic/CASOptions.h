@@ -20,6 +20,7 @@
 
 #include "clang/CAS/CASOptions.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/CAS/CASConfiguration.h"
 
 namespace swift {
 
@@ -34,11 +35,15 @@ public:
   /// Skip replaying outputs from cache.
   bool CacheSkipReplay = false;
 
+  /// When using EnableCaching, write the output file's hash (as determined by
+  /// the CAS hashing schema) as a file extended attribute (xattr).
+  bool WriteOutputHashXAttr = false;
+
   /// Import modules from CAS.
   bool ImportModuleFromCAS = false;
 
-  /// CASOptions
-  clang::CASOptions CASOpts;
+  /// CAS Configuration.
+  llvm::cas::CASConfiguration Config;
 
   /// Clang Include Trees.
   std::string ClangIncludeTree;

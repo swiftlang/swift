@@ -1,8 +1,7 @@
-// RUN:%target-swift-frontend -emit-silgen %s -enable-experimental-feature BorrowAndMutateAccessors | %FileCheck %s
-// RUN:%target-swift-frontend -c %s -enable-experimental-feature BorrowAndMutateAccessors -Xllvm -sil-print-after=SILGenCleanup 2>&1 | %FileCheck %s --check-prefixes=CHECK-SIL
-// RUN:%target-swift-frontend -emit-silgen %s -enable-experimental-feature BorrowAndMutateAccessors -enable-library-evolution | %FileCheck %s --check-prefixes=CHECK-EVO
+// RUN:%target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN:%target-swift-frontend -c %s -Xllvm -sil-print-after=SILGenCleanup 2>&1 | %FileCheck %s --check-prefixes=CHECK-SIL
+// RUN:%target-swift-frontend -emit-silgen %s -enable-library-evolution | %FileCheck %s --check-prefixes=CHECK-EVO
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 public protocol P {
   var id: NonTrivial { borrow mutate }

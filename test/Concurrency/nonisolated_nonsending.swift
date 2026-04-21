@@ -21,11 +21,12 @@ func testPartialApplication(p: [any P]) async {
   _ = p.map { $0.f }
 }
 // CHECK-LABEL: sil private @$s22nonisolated_nonsending22testPartialApplication1pySayAA1P_pG_tYaFyyYaYbYCcAaD_pXEfU_ :
-// CHECK: function_ref @$sBAIeghHgIL_BAytIeghHgILr_TR :
+// CHECK: function_ref @$sBAIeNghHgIL_BAytIeNghHgILr_TR :
 
 //   Reabstraction thunk from caller-isolated () -> () to caller-isolated () -> T
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @$sBAIeghHgIL_BAytIeghHgILr_TR : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> @out () {
-// CHECK:       bb0(%0 : $*(), %1 : $Builtin.ImplicitActor, %2 : $@Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @$sBAIeNghHgIL_BAytIeNghHgILr_TR : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @caller_isolated @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> @out () {
+// CHECK:       bb0(%0 : $*(), %1 : $Builtin.ImplicitActor, %2 : $@caller_isolated @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
+// CHECK-NEXT:    hop_to_executor %1
 // CHECK-NEXT:    apply %2(%1) :
 
 func takesGenericAsyncFunction<T>(_ fn: nonisolated(nonsending) (T) async -> Void) {}
@@ -38,12 +39,13 @@ func testReabstractionPreservingCallerIsolation(fn: nonisolated(nonsending) (Int
   takesGenericAsyncFunction(fn)
 }
 // CHECK-LABEL: sil hidden @$s22nonisolated_nonsending42testReabstractionPreservingCallerIsolation2fnyySiYaYCXE_tF :
-// CHECK:       bb0(%0 : $@noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()):
-// CHECK:         [[THUNK:%.*]] = function_ref @$sBASiIgHgILy_BASiIegHgILn_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed Int, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()) -> ()
+// CHECK:       bb0(%0 : $@caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()):
+// CHECK:         [[THUNK:%.*]] = function_ref @$sBASiINgHgILy_BASiIeNgHgILn_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed Int, @guaranteed @caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()) -> ()
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @$sBASiIgHgILy_BASiIegHgILn_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed Int, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()) -> () {
-// CHECK:       bb0(%0 : $Builtin.ImplicitActor, %1 : $*Int, %2 : $@noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()):
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @$sBASiINgHgILy_BASiIeNgHgILn_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed Int, @guaranteed @caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()) -> () {
+// CHECK:       bb0(%0 : $Builtin.ImplicitActor, %1 : $*Int, %2 : $@caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()):
 // CHECK-NEXT:    %3 = load %1
+// CHECK-NEXT:    hop_to_executor %0
 // CHECK-NEXT:    apply %2(%0, %3)
 
 func takesAsyncIsolatedAnyFunction(_ fn: @isolated(any) () async -> Void) {}

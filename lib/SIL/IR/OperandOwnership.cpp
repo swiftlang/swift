@@ -435,10 +435,26 @@ OperandOwnershipClassifier::visitBeginBorrowInst(BeginBorrowInst *borrow) {
   return OperandOwnership::Borrow;
 }
 
-// A make_borrow is nested in the referent's scope.
+// A make_borrow is nested in the referent's scope. It creates a value with no
+// ownership, which cannot be tracked by OSSA utilities. Normally, we
+// conservatively declare such untracked uses as PointerEscape. But, if we
+// treated make_borrow as an escape, then liveness would bailout causing
+// diagnostic errors, particularly in the move-checker. That would render
+// Builtin.makeBorrow useless, So instead, we optimistically treat make_borrow
+// like an InstantaneousUse. This assumes, without verification, that all uses
+// are already guarded by a mark_dependence.
+//
+// TODO: Correctness currently relies on cooperation by the programmer to
+// correctly use Builtin.makeBorrow with no compiler checking. Instead, we
+// should treat the result of make_borrow like a non-Escapable value. It's
+// operand ownership should be `Borrow`, it should produce an `Owned`
+// non-Escapable value, OSSA liveness should find all dependent uses (just like
+// mark_dependence), and LifetimeDependenceDiagnostics should verify that all
+// dependent uses are within the original borrow scope. To do this, it will need
+// to look through stores into the field of a wrapper type (Borrow<T>).
 OperandOwnership
 OperandOwnershipClassifier::visitMakeBorrowInst(MakeBorrowInst *borrow) {
-  return OperandOwnership::Borrow;
+  return OperandOwnership::InstantaneousUse;
 }
 
 OperandOwnership
@@ -1079,6 +1095,9 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemovePriorityEscalationHandler)
 // This is a trivial use since our first operand is a Builtin.RawPointer and our
 // second is an address to our generic Value.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskLocalValuePush)
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AddTaskLocalValue)
+// Trivial use of the token result of AddTaskLocalValue.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, RemoveTaskLocalValue)
 
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPush)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)

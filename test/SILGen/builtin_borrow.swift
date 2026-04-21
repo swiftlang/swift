@@ -1,12 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -module-name ResilientTypes -emit-module-path %t/ResilientTypes.swiftmodule -enable-library-evolution %S/Inputs/builtin_borrow_ResilientTypes.swift
-// RUN: %target-swift-emit-silgen -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature RawLayout -I %t %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature RawLayout -I %t %s | %FileCheck --check-prefix=CHECK-POST-CLEANUP %s
+// RUN: %target-swift-emit-silgen -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature RawLayout -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature RawLayout -I %t %s | %FileCheck --check-prefix=CHECK-POST-CLEANUP %s
 
 // REQUIRES: swift_feature_BuiltinModule
 // REQUIRES: swift_feature_AddressableTypes
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 // REQUIRES: swift_feature_RawLayout
 
 import Builtin

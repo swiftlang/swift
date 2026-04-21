@@ -1,8 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -module-name borrow_accessor_container -enable-experimental-feature BorrowAndMutateAccessors -o %t %S/Inputs/borrow_accessor_container.swift
+// RUN: %target-swift-frontend -emit-module -module-name borrow_accessor_container -o %t %S/Inputs/borrow_accessor_container.swift
 // RUN: %target-swift-frontend -I %t -emit-sil %s -verify | %FileCheck %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 import borrow_accessor_container
 

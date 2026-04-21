@@ -15,59 +15,23 @@ import SIL
 extension CondFailInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
+    if let literal = condition as? IntegerLiteralInst, let value = literal.value {
+      if value == 0 {
+        // Eliminates
+        // ```
+        //   %0 = integer_literal 0
+        //   cond_fail %0, "message"
+        // ```
+        context.erase(instruction: self)
+      }
+      // Even if `shouldRemoveCondFail` is true, we don't want to remove unconditioal fails,
+      // i.e. `cond_fail` with a non-zero condition, because this would prevent removing dead
+      // code after such a `cond_fail` in a later optimization.
+      return
+    }
+
     if context.options.shouldRemoveCondFail(withMessage: message, inFunction: parentFunction.name) {
       context.erase(instruction: self)
-      return
-    }
-
-    guard let literal = condition as? IntegerLiteralInst,
-          let value = literal.value
-    else {
-      return
-    }
-
-    if value == 0 {
-      // Eliminates
-      // ```
-      //   %0 = integer_literal 0
-      //   cond_fail %0, "message"
-      // ```
-      context.erase(instruction: self)
-    } else {
-
-      // Inserts an unreachable after an unconditional fail:
-      // ```
-      //   %0 = integer_literal 1
-      //   cond_fail %0, "message"
-      //   // following instructions
-      // ```
-      // ->
-      // ```
-      //   %0 = integer_literal 1
-      //   cond_fail %0, "message"
-      //   unreachable
-      // deadblock:
-      //   // following instructions
-      // ```
-      if InstructionList(first: self.next).allSatisfy({ $0.isUnreachableOrEndingLifetime }) {
-        // Don't remove instructions which would be re-inserted by lifetime completion.
-        return
-      }
-      let builder = Builder(after: self, context)
-      let unreachable = builder.createUnreachable()
-      _ = context.splitBlock(after: unreachable)
-    }
-  }
-}
-
-private extension Instruction {
-  var isUnreachableOrEndingLifetime: Bool {
-    switch self {
-    case is EndBorrowInst, is DestroyValueInst, is EndLifetimeInst, is DeallocStackInst, is EndAccessInst,
-         is UnreachableInst:
-      return true
-    default:
-      return false
     }
   }
 }

@@ -163,7 +163,7 @@ extension AvailableOnMacCatalystButUnavailableOniOS { } // ok
 @available(macCatalyst, unavailable)
 extension UnavailableOnMacCatalyst {
   func extensionMethod() {
-    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+    takesAnything(UnavailableOniOS())
     takesAnything(UnavailableOnMacCatalyst())
     takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
   }
@@ -177,7 +177,7 @@ extension UnavailableOnMacCatalyst {
 
   @available(iOS, introduced: 15)
   func extensionMethodIntroducedOniOS() {
-    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+    takesAnything(UnavailableOniOS())
     takesAnything(UnavailableOnMacCatalyst())
     takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
   }
@@ -218,7 +218,7 @@ extension AvailableOnMacCatalystButUnavailableOniOS {
 
   @available(macCatalyst, unavailable)
   func extensionMethodUnavailableOnMacCatalyst() {
-    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+    takesAnything(UnavailableOniOS())
     takesAnything(UnavailableOnMacCatalyst())
     takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
   }

@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::GenericSignatureImpl::lookupNestedType(swift::Type, swift::Identifier) const"}
+// {"kind":"typecheck","signature":"swift::GenericSignatureImpl::lookupNestedType(swift::Type, swift::Identifier) const","signatureNext":"TypeResolver::resolveDependentMemberType"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 a.b
 protocol c where a.d == Self

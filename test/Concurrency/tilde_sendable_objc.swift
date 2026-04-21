@@ -5,11 +5,9 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/src/main.swift \
 // RUN:   -import-objc-header %t/src/Test.h \
 // RUN:   -swift-version 6 \
-// RUN:   -enable-experimental-feature TildeSendable \
 // RUN:   -module-name main -I %t -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_TildeSendable
 
 //--- Test.h
 #define SWIFT_SENDABLE __attribute__((__swift_attr__("@Sendable")))

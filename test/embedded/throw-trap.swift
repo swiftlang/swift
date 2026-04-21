@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded 2>&1 | %FileCheck %s --check-prefix CHECK-EXISTENTIALS
+// RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s --check-prefix CHECK-EXISTENTIALS-IR
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s -enable-experimental-feature Embedded -throws-as-traps | %FileCheck %s --check-prefix CHECK-TRAPS-SIL
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded -throws-as-traps | %FileCheck %s --check-prefix CHECK-TRAPS-IR
 
@@ -23,7 +23,7 @@ public func catching1() {
   }
 }
 
-// CHECK-EXISTENTIALS: error: cannot use a value of protocol type 'any Error' in embedded Swift
+// CHECK-EXISTENTIALS-IR: call swiftcc { ptr, ptr } @swift_allocError(
 
 // CHECK-TRAPS-SIL:      sil @$e4main9throwing1SiyKF : $@convention(thin) () -> (Int, @error any Error) {
 // CHECK-TRAPS-SIL-NEXT: bb0:

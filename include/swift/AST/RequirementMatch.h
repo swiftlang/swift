@@ -109,6 +109,10 @@ enum class MatchKind : uint8_t {
   /// The witness did not match because it cannot satisy borrow/mutate
   /// requirement.
   BorrowMutateConflict,
+
+  /// The witness did not match because it has lifetime dependencies that do not
+  /// match those of the requirement.
+  LifetimeConflict,
 };
 
 // Describes the kind of optional adjustment performed when
@@ -241,6 +245,9 @@ enum class CheckKind : unsigned {
   /// The witness is a deprecated default implementation provided by the
   /// protocol.
   DefaultWitnessDeprecated,
+
+  /// The witness is defined in a module that hasn't been imported.
+  RequiresMissingImport,
 };
 
 /// Describes the suitability of the chosen witness for
@@ -415,6 +422,7 @@ struct RequirementMatch {
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
     case MatchKind::BorrowMutateConflict:
+    case MatchKind::LifetimeConflict:
       return false;
     }
 
@@ -453,6 +461,7 @@ struct RequirementMatch {
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
     case MatchKind::BorrowMutateConflict:
+    case MatchKind::LifetimeConflict:
       return false;
     }
 
@@ -490,6 +499,7 @@ struct RequirementMatch {
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
     case MatchKind::BorrowMutateConflict:
+    case MatchKind::LifetimeConflict:
       return false;
     }
 

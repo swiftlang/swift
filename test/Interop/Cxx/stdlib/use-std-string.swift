@@ -281,6 +281,15 @@ StdStringTestSuite.test("std::string as Hashable") {
     expectNotEqual(h0, h3)
     expectNotEqual(h1, h2)
     expectNotEqual(h2, h3)
+
+    var stringSet: Set<std.string> = ["something"]
+    expectEqual(stringSet.count, 1)
+    stringSet.insert(s1)
+    expectEqual(stringSet.count, 1)
+    stringSet.insert(s2)
+    expectEqual(stringSet.count, 2)
+    stringSet.insert(s0)
+    expectEqual(stringSet.count, 3)
 }
 
 StdStringTestSuite.test("std::u16string as Hashable") {
@@ -302,6 +311,15 @@ StdStringTestSuite.test("std::u16string as Hashable") {
     expectNotEqual(h0, h3)
     expectNotEqual(h1, h2)
     expectNotEqual(h2, h3)
+
+    var stringSet: Set<std.u16string> = ["something"]
+    expectEqual(stringSet.count, 1)
+    stringSet.insert(s1)
+    expectEqual(stringSet.count, 1)
+    stringSet.insert(s2)
+    expectEqual(stringSet.count, 2)
+    stringSet.insert(s0)
+    expectEqual(stringSet.count, 3)
 }
 
 StdStringTestSuite.test("std::u32string as Hashable") {
@@ -323,6 +341,15 @@ StdStringTestSuite.test("std::u32string as Hashable") {
     expectNotEqual(h0, h3)
     expectNotEqual(h1, h2)
     expectNotEqual(h2, h3)
+
+    var stringSet: Set<std.u32string> = ["something"]
+    expectEqual(stringSet.count, 1)
+    stringSet.insert(s1)
+    expectEqual(stringSet.count, 1)
+    stringSet.insert(s2)
+    expectEqual(stringSet.count, 2)
+    stringSet.insert(s0)
+    expectEqual(stringSet.count, 3)
 }
 
 StdStringTestSuite.test("std::wstring as Hashable") {
@@ -344,6 +371,15 @@ StdStringTestSuite.test("std::wstring as Hashable") {
     expectNotEqual(h0, h3)
     expectNotEqual(h1, h2)
     expectNotEqual(h2, h3)
+
+    var stringSet: Set<std.wstring> = ["something"]
+    expectEqual(stringSet.count, 1)
+    stringSet.insert(s1)
+    expectEqual(stringSet.count, 1)
+    stringSet.insert(s2)
+    expectEqual(stringSet.count, 2)
+    stringSet.insert(s0)
+    expectEqual(stringSet.count, 3)
 }
 
 StdStringTestSuite.test("std::u16string <=> Swift.String") {

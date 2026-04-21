@@ -384,6 +384,7 @@ void addSimplifyCFGSILCombinePasses(SILPassPipelinePlan &P) {
   // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
   // cond_br).
   P.addSILCombine();
+  P.addCondFailOptimization();
   // Which can expose opportunity for simplifycfg.
   P.addSimplifyCFG();
 }
@@ -778,8 +779,7 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // take advantage of static dispatch.
   P.addConstantCapturePropagation();
 
-  // TODO: replace this with the new ClosureSpecialization pass once we have OSSA at this point in the pipeline
-  P.addClosureSpecializer();
+  P.addClosureSpecialization();
 
   // Do the second stack promotion on low-level SIL.
   P.addStackPromotion();
@@ -802,6 +802,12 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
 
   // Should be after FunctionSignatureOpts and before the last inliner.
   P.addReleaseDevirtualizer();
+
+  // In OSSA we cannot do all kind of redundant load elimination, yet.
+  // Therefore do it now at the beginning of the non-OSSA pipeline.
+  // TODO: we should be able to remove this RLE run once we can represent all kind
+  //       of eliminated redundant loads in OSSA.
+  P.addRedundantLoadElimination();
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);
 
@@ -996,6 +1002,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   P.addCopyToBorrowOptimization();
 
   P.addCrossModuleOptimization();
+  P.addConformanceCheckOptimization();
 
   // It is important to serialize before any of the @_semantics
   // functions are inlined, because otherwise the information about
@@ -1012,8 +1019,6 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   }
   P.addAutodiffClosureSpecialization();
 
-  P.addOwnershipModelEliminator();
-
   // After serialization run the function pass pipeline to iteratively lower
   // high-level constructs like @_semantics calls.
   addMidLevelFunctionPipeline(P);
@@ -1022,6 +1027,8 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
 
   // Perform optimizations that specialize.
   addClosureSpecializePassPipeline(P);
+
+  P.addOwnershipModelEliminator();
 
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches and constants propagated into closures

@@ -761,6 +761,12 @@ public:
   /// promises to return non-null.
   bool hasArrayLiteralIntrinsics() const;
 
+  /// Retrieve the declaration of Swift.CGFloat.init(_: Double).
+  ConcreteDeclRef getCGFloatInitDecl() const;
+
+  /// Retrieve the declaration of Swift.Double.init(_: CGFloat).
+  ConcreteDeclRef getDoubleInitDecl() const;
+
   /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
   ConcreteDeclRef getBoolBuiltinInitDecl() const;
 
@@ -1080,6 +1086,12 @@ public:
 
   ExplicitSwiftModuleMap *getExplicitSwiftModuleMap();
   ExplicitClangModuleMap *getExplicitClangModuleMap();
+
+  /// Look up the library level for a module from the explicit module map.
+  /// \param isClang Whether to look in the Clang module map (true) or the
+  ///                Swift module map (false).
+  std::optional<LibraryLevel>
+  getExplicitModuleLibraryLevel(StringRef moduleName, bool isClang);
 
   /// Adds a module loader to this AST context.
   ///

@@ -236,3 +236,11 @@ extension Function {
     bridged.setIsSerialized(isSerialized)
   }
 }
+
+extension ClassDecl {
+  /// True if the class has a fixed metadata layout. This means that IRGen generates the
+  /// full class metadata at compile time.
+  func hasFixedMetadataLayout(_ context: ModulePassContext) -> Bool {
+    context.bridgedPassContext.hasClassFixedMetadataLayout(self.bridged)
+  }
+}

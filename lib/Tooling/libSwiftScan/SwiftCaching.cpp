@@ -37,6 +37,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
+#include "llvm/CAS/CASFSBuilder.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Allocator.h"
@@ -57,6 +58,8 @@ class SwiftScanCAS {
 public:
   llvm::cas::ObjectStore &getCAS() const { return *CAS; }
   llvm::cas::ActionCache &getCache() const { return *Cache; }
+  std::shared_ptr<llvm::cas::ObjectStore> getSharedCAS() const { return CAS; }
+  std::shared_ptr<llvm::cas::ActionCache> getSharedCache() const { return Cache; }
 
   // Construct SwiftScanCAS.
   static llvm::Expected<SwiftScanCAS *>
@@ -134,6 +137,15 @@ DEFINE_SIMPLE_CONVERSION_FUNCTIONS(SwiftScanReplayInstance,
                                    swiftscan_cache_replay_instance_t)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(SwiftCachedReplayResult,
                                    swiftscan_cache_replay_result_t)
+
+template <typename ResT>
+static ResT failure(llvm::Error &&E, swiftscan_string_ref_t *error,
+                    ResT Result = ResT()) {
+  if (error)
+    *error =
+        swift::c_string_utils::create_clone(toString(std::move(E)).c_str());
+  return Result;
+}
 
 //=== CAS Functions ----------------------------------------------------------//
 
@@ -244,6 +256,75 @@ bool swiftscan_cas_prune_ondisk_data(swiftscan_cas_t cas,
   }
   *error = swift::c_string_utils::create_null();
   return false;
+}
+
+namespace {
+struct SwiftScanCASFSBuilder {
+  SwiftScanCASFSBuilder(SwiftScanCAS *ScanCAS)
+      : ScanCAS(ScanCAS), Builder(ScanCAS->getCAS()) {}
+
+  SwiftScanCAS *ScanCAS;
+  llvm::cas::CASFSBuilder Builder;
+};
+} // namespace
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(SwiftScanCASFSBuilder,
+                                   swiftscan_cas_fs_builder_t)
+
+swiftscan_cas_fs_builder_t
+swiftscan_cas_fs_builder_create(swiftscan_cas_t cas) {
+  return wrap(new SwiftScanCASFSBuilder(unwrap(cas)));
+}
+
+void swiftscan_cas_fs_builder_dispose(swiftscan_cas_fs_builder_t builder) {
+  delete unwrap(builder);
+}
+
+bool swiftscan_cas_fs_builder_ingest_path(swiftscan_cas_fs_builder_t builder,
+                                          const char *path, bool recursive,
+                                          swiftscan_string_ref_t *error) {
+  auto Builder = unwrap(builder);
+  if (llvm::Error E = Builder->Builder.ingestFileSystemPath(path, recursive))
+    return failure(std::move(E), error, true);
+
+  return false;
+}
+
+bool swiftscan_cas_fs_builder_merge_root(swiftscan_cas_fs_builder_t builder,
+                                         const char *root_id, const char *path,
+                                         swiftscan_string_ref_t *error) {
+  auto failure = [error](llvm::Error &&E) -> bool {
+    return ::failure(std::move(E), error, true);
+  };
+
+  auto Builder = unwrap(builder);
+  auto &CAS = Builder->ScanCAS->getCAS();
+  auto ID = CAS.parseID(root_id);
+  if (!ID)
+    return failure(ID.takeError());
+  if (std::optional<llvm::cas::ObjectRef> Ref = CAS.getReference(*ID)) {
+    llvm::StringRef Path;
+    if (path)
+      Path = path;
+    Builder->Builder.mergeCASFSRoot(*Ref, Path);
+  } else
+    return failure(
+        llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                "unknown node with id: " + ID->toString()));
+  return false;
+}
+
+swiftscan_string_ref_t
+swiftscan_cas_fs_builder_finish(swiftscan_cas_fs_builder_t builder,
+                                swiftscan_string_ref_t *error) {
+  auto Builder = unwrap(builder);
+  auto Result = Builder->Builder.finish();
+  if (!Result)
+    return failure(Result.takeError(), error,
+                   swift::c_string_utils::create_null());
+
+  *error = swift::c_string_utils::create_null();
+  return swift::c_string_utils::create_clone(
+      Result->getID().toString().c_str());
 }
 
 /// Expand the invocation if there is responseFile into Args that are passed in
@@ -910,7 +991,8 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
 
   std::string InstanceSetupError;
   if (Inst.setupForReplay(Instance.Invocation, InstanceSetupError,
-                          Instance.Args))
+                          Instance.Args,
+                          Comp.DB.getSharedCAS(), Comp.DB.getSharedCache()))
     return createStringError(inconvertibleErrorCode(), InstanceSetupError);
 
   auto *CDP = Inst.getCachingDiagnosticsProcessor();
@@ -928,7 +1010,8 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
   if (!replayCachedCompilerOutputsForInput(
           CAS, Comp.Output, Input, Comp.InputIndex, Inst.getDiags(), DH,
           Backend, Instance.Invocation.getFrontendOptions(), *CDP, Remarks,
-          UseCASBackend)) {
+          UseCASBackend,
+          Instance.Invocation.getCASOptions().WriteOutputHashXAttr)) {
     Inst.getDiags().diagnose(SourceLoc(), diag::cache_replay_failed,
                              "failed to load all outputs");
   }
@@ -990,7 +1073,7 @@ SwiftScanCAS::createSwiftScanCAS(llvm::StringRef Path) {
 
 llvm::Expected<SwiftScanCAS *>
 SwiftScanCAS::createSwiftScanCAS(clang::CASOptions &CASOpts) {
-  auto DB = CASOpts.getOrCreateDatabases();
+  auto DB = CASOpts.CASConfiguration::createDatabases();
   if (!DB)
     return DB.takeError();
 

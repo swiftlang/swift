@@ -50,3 +50,44 @@ takesLargeStructWithRefCountedFieldNested(getNestedStruct())
 // CHECK-NEXT: RefCount: 1, message: release
 // CHECK-NEXT: RefCount: 0, message: release
 // CHECK-NEXT: RefCount: 0, message: Dtor
+
+struct MaybeSwiftStruct {
+    var x: SwiftStruct?
+}
+
+func goMaybe() {
+    let frt = SharedFRT()
+    let token = MyToken()
+    let x = SwiftStruct(frt: frt, token: token)
+    let _ = MaybeSwiftStruct(x: x)
+}
+
+goMaybe()
+
+// CHECK:      RefCount: 1, message: Ctor
+// CHECK-NEXT: RefCount: 2, message: retain
+// CHECK-NEXT: RefCount: 3, message: retain
+// CHECK-NEXT: RefCount: 2, message: release
+// CHECK-NEXT: RefCount: 1, message: release
+// CHECK-NEXT: RefCount: 0, message: release
+// CHECK-NEXT: RefCount: 0, message: Dtor
+
+struct FailableInit {
+    var frt: SharedFRT
+
+    init?() {
+        self.frt = SharedFRT()
+    }
+}
+
+func goFailableInit() {
+    let _ = FailableInit()
+}
+
+goFailableInit()
+
+// CHECK:      RefCount: 1, message: Ctor
+// CHECK-NEXT: RefCount: 2, message: retain
+// CHECK-NEXT: RefCount: 1, message: release
+// CHECK-NEXT: RefCount: 0, message: release
+// CHECK-NEXT: RefCount: 0, message: Dtor

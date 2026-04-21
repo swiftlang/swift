@@ -76,6 +76,7 @@ namespace swift {
   class ASTPrinter;
   class ASTWalker;
   enum class BuiltinMacroKind: uint8_t;
+  enum class CodeGenerationModel: uint8_t;
   class ConstructorDecl;
   class DestructorDecl;
   class DiagnosticEngine;
@@ -778,7 +779,7 @@ protected:
     HasLazyUnderlyingSubstitutions : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+2+8+1+2,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -849,8 +850,15 @@ protected:
     /// Whether this module has enabled strict memory safety checking.
     StrictMemorySafety : 1,
 
-    /// Whether this module uses deferred code generation in Embedded Swift.
-    DeferredCodeGen : 1
+    /// The code generation model used by this module.
+    CodeGenModel : 2,
+
+    /// Whether this module was compile with "aggressive" CMO i.e
+    /// the flag: -cross-module-optimization.
+    AggressiveCMOEnabled : 1,
+
+    /// The stored library level from deserialized module data (LibraryLevel).
+    StoredLibraryLevel : 2
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1119,6 +1127,21 @@ public:
   /// This can be spelled with @export(interface) or the historical
   /// @_neverEmitIntoClient.
   bool isNeverEmittedIntoClient() const;
+
+  /// Compute the code generation model that was explicitly requested for
+  /// this declaration.
+  ///
+  /// This function queries attributes relevant to the code generation
+  /// model (@export, @inlinable, etc.) but does not apply defaults based
+  /// on Embedded Swift or feature flags.
+  std::optional<CodeGenerationModel>
+  getExplicitCodeGenerationModel() const;
+
+  /// Compute the code generation model for the declaration, combining the
+  /// explicitly-specified information from attributes with defaults
+  /// based on Embedded Swift or feature flags.
+  CodeGenerationModel
+  getEffectiveCodeGenerationModel() const;
 
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
@@ -5754,6 +5777,14 @@ public:
   /// list of function decls.
   ObjCRequirementMap getObjCRequiremenMap() const;
 
+  /// True if this protocol is marked for fast casting, i.e. fast conformance
+  /// lookup via the vtable of a conforming class.
+  /// See also SILVTable::ConformanceEntry
+  bool isEligibleForFastCasting() const {
+    // TODO: make this a real attribute
+    return hasSemanticsAttr("fast_cast");
+  }
+
 private:
   void computeKnownProtocolKind() const;
 
@@ -6789,12 +6820,19 @@ public:
   /// @frozen and resides in a resilient module.
   bool isInitExposedToClients() const;
 
+  /// Returns the export level of this var initializer expression.
+  ExportedLevel getInitExposedLevel() const;
+
   /// Determines if this var is exposed as part of the layout of a
-  /// @frozen struct.
+  /// @frozen struct or implicitly in non-library-evolution mode.
   ///
   /// From the standpoint of access control and exportability checking, this
   /// var will behave as if it was public, even if it is internal or private.
-  ExportedLevel isLayoutExposedToClients() const;
+  ///
+  /// If \p forceCheckClasses, don't exclude non-open classes. We use this
+  /// to look at properties with a default value in embedded mode, otherwise
+  /// we can mostly ignore stored properties in classes.
+  ExportedLevel isLayoutExposedToClients(bool forceCheckClasses = false) const;
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
@@ -7995,6 +8033,8 @@ public:
   /// Returns true if the function is marked as `async`. The
   /// type of the function will be `async` as well.
   bool hasAsync() const { return Bits.AbstractFunctionDecl.Async; }
+
+  void setHasAsync(bool async) { Bits.AbstractFunctionDecl.Async = async; }
 
   /// Determine whether the given function is concurrent.
   ///

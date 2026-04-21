@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -package-name myPkg -enable-upcoming-feature StrictAccessControl
+// RUN: %target-typecheck-verify-swift -package-name myPkg -enable-experimental-feature StrictAccessControl
 
 // REQUIRES: swift_feature_StrictAccessControl
 

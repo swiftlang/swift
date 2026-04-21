@@ -17,10 +17,10 @@
 //===----------------------------------------------------------------------===//
 #include "swift/Sema/ConstraintSystem.h"
 #include "CSDiagnostics.h"
+#include "MiscDiagnostics.h"
 #include "OpenedExistentials.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
-#include "TypeCheckEmbedded.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -186,11 +186,12 @@ void ConstraintSystem::startExpressionTimer() {
   const auto &opts = getASTContext().TypeCheckerOpts;
   unsigned timeout = opts.ExpressionTimeoutThreshold;
 
-  // If either the timeout is set, or we're asked to emit warnings,
-  // start the timer. Otherwise, don't start the timer, it's needless
-  // overhead.
+  // If either the timeout is set, we're asked to emit warnings, or we're
+  // asked to debug expression type-checking times, start the timer.
+  // Otherwise, don't start the timer, it's needless overhead.
   if (timeout == 0) {
-    if (opts.WarnLongExpressionTypeChecking == 0)
+    if (opts.WarnLongExpressionTypeChecking == 0 &&
+        !opts.DebugTimeExpressions)
       return;
 
     timeout = ExpressionTimer::NoLimit;
@@ -1077,7 +1078,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
 
   if (auto depMemType = type->getAs<DependentMemberType>()) {
     auto baseTy = depMemType->getBase();
-    if (!baseTy->hasTypeVariable() && !baseTy->hasDependentMember())
+    if (!baseTy->hasTypeVariable())
       return type;
 
     // FIXME: Perform a more limited simplification?
@@ -1415,7 +1416,16 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
 
   if (throws || async) {
     if (expr->getThrowsLoc().isValid() && !expr->getExplicitThrownTypeRepr())
-      diagnoseUntypedThrowsInEmbedded(expr, expr->getThrowsLoc());
+      diagnoseUntypedThrows(expr, expr->getThrowsLoc());
+
+    // If we don't have the concurrency library, reject the use of 'async'.
+    ASTContext &ctx = expr->getASTContext();
+    if (async &&
+        !ctx.getLoadedModule(ctx.Id_Concurrency) &&
+        !ctx.SILOpts.ParseStdlib) {
+      ctx.Diags.diagnose(expr->getAsyncLoc(),
+                         diag::no_concurrency_module, "async");
+    }
 
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
@@ -1927,7 +1937,7 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(resultBuilderTransformed) +
          size_in_bytes(appliedPropertyWrappers) +
          size_in_bytes(argumentLists) +
-         size_in_bytes(ImplicitCallAsFunctionRoots) +
+         size_in_bytes(ImplicitCallAsFunctions) +
          size_in_bytes(SynthesizedConformances);
   // clang-format on
 
@@ -1970,6 +1980,16 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
   auto *decl = getDeclOrNull();
   if (!decl || !decl->isImplicitlyUnwrappedOptional())
     return std::nullopt;
+
+  // A variable or parameter spelled with an IUO type (`x: T!`) is always an
+  // IUO value; only functions and subscripts can carry an IUO on the return.
+  // Short-circuit here so we don't force the declaration's interface type.
+  // Doing so while the solver is mid-closure can re-enter
+  // `typeCheckPatternBinding` from outside the closure's own type-check
+  // context and trip the assertion in `TypeChecker::typeCheckBinding` (see
+  // https://github.com/swiftlang/swift/issues/88530).
+  if (isa<VarDecl>(decl))
+    return IUOReferenceKind::Value;
 
   // If this isn't an IUO return () -> T!, it's an IUO value.
   if (!decl->getInterfaceType()->is<AnyFunctionType>())
@@ -2686,7 +2706,7 @@ static bool diagnoseAmbiguity(
 
       auto emitGeneralFoundCandidateNote = [&]() {
         // Emit a general "found candidate" note
-        if (decl->getLoc().isInvalid()) {
+        if (decl->getLoc(/*SerializedOK=*/false).isInvalid()) {
           if (candidateTypes.insert(type->getCanonicalType()).second)
             DE.diagnose(getLoc(commonAnchor), diag::found_candidate_type, type);
         } else {
@@ -4684,22 +4704,6 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
       ctx, TypeExpr::createImplicit(typeEraser, ctx), argList);
 }
 
-/// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
-/// constraint system, return the decl that it references.
-ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
-  // See if we have a resolution for this member.
-  auto overload = findSelectedOverloadFor(locator);
-  if (!overload)
-    return nullptr;
-
-  // We only want to handle the simplest decl binding.
-  auto choice = overload->choice;
-  if (choice.getKind() != OverloadChoiceKind::Decl)
-    return nullptr;
-
-  return choice.getDecl();
-}
-
 void SyntacticElementTargetKey::dump() const { dump(llvm::errs()); }
 
 void SyntacticElementTargetKey::dump(raw_ostream &OS) const {
@@ -5354,4 +5358,24 @@ bool constraints::isResultBuilderMethodReference(ASTContext &ctx,
   return llvm::any_of(builderMethods, [&](const Identifier &methodId) {
     return UDE->getName().compare(DeclNameRef(methodId)) == 0;
   });
+}
+
+bool constraints::isGenericOnlyOverThrownType(AbstractFunctionDecl *func) {
+  // If a function has been converted to typed throws, let's ignore it
+  // when it's generic only over a thrown type now just like we would
+  // regular `throws` version.
+  auto thrownType = func->getThrownInterfaceType();
+  if (!thrownType || !thrownType->hasTypeParameter())
+    return false;
+
+  // If there is only one generic parameter, check if it appears
+  // inside of thrown type i.e. `throws(E)` or `throws(MyError<E>)`.
+
+  auto genericParams = func->getGenericParams();
+  if (genericParams->size() != 1)
+    return false;
+
+  auto paramTy = genericParams->getParams().front()->getDeclaredInterfaceType();
+  return thrownType.findIf(
+      [&paramTy](Type type) { return type->isEqual(paramTy); });
 }

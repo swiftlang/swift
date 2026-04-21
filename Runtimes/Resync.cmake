@@ -174,6 +174,22 @@ copy_files(public/Platform Overlay/Linux/glibc
     TiocConstants.swift
     tgmath.swift.gyb)
 
+# WASI Overlay
+message(STATUS "WASI[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/WASI/WASILibc")
+copy_files(public/Platform Overlay/WASI/WASILibc
+  FILES
+    Platform.swift
+    POSIXError.swift
+    tgmath.swift.gyb
+    TiocConstants.swift
+    WASILibc.swift.gyb)
+
+message(STATUS "WASI modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/WASI/clang")
+copy_files(public/Platform Overlay/WASI/clang
+  FILES
+    SwiftWASILibc.apinotes
+    wasi-libc.modulemap)
+
 # Windows Overlay
 message(STATUS "WinSDK[${StdlibSources}/public/Windows] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK")
 copy_files(public/Windows Overlay/Windows/WinSDK FILES WinSDK.swift)

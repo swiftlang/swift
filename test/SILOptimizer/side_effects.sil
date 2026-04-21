@@ -1065,7 +1065,7 @@ bb3(%12 : $List):
 
 // CHECK-LABEL: sil [ossa] @testStructPhiCommon
 // CHECK-NEXT:  [%0: write s0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @testStructPhiCommon : $@convention(thin) (@inout Ptr) -> () {
 bb0(%0 : $*Ptr):

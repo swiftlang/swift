@@ -34,6 +34,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DistributedDecl.h"
@@ -49,6 +50,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RequirementMatch.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
@@ -762,12 +764,15 @@ bool swift::TypeChecker::witnessStructureMatches(ValueDecl *req,
       == std::nullopt;
 }
 
+static PossibleEffects getEffects(ValueDecl *value);
+
 RequirementMatch swift::matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-    llvm::function_ref<
-        std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type>(void)>
-        setup,
+    llvm::function_ref<MatchWitnessTypes(void)> setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
+    llvm::function_ref<std::optional<RequirementMatch>(
+        const LifetimeDependentInterface &, const LifetimeDependentInterface &)>
+        matchLifetimes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
         finalize) {
   bool decomposeFunctionType = false;
@@ -782,11 +787,11 @@ RequirementMatch swift::matchWitness(
   // in the process.
   Type reqType, witnessType, reqThrownError, witnessThrownError;
   {
-    std::optional<RequirementMatch> result;
-    std::tie(result, reqType, witnessType, reqThrownError, witnessThrownError) = setup();
-    if (result) {
-      return std::move(result.value());
-    }
+    auto types = setup();
+    reqType = types.requirement;
+    witnessType = types.witness;
+    reqThrownError = types.requirementThrows;
+    witnessThrownError = types.witnessThrows;
   }
 
   SmallVector<OptionalAdjustment, 2> optionalAdjustments;
@@ -908,6 +913,13 @@ RequirementMatch swift::matchWitness(
         return RequirementMatch(witness, MatchKind::AsyncConflict);
       }
 
+      // Check that lifetime dependencies match
+      if (auto result = matchLifetimes(
+              LifetimeDependentInterface::fromValueDecl(witness, witnessFnType),
+              LifetimeDependentInterface::fromValueDecl(req, reqFnType))) {
+        return std::move(result.value());
+      }
+
       if (!reqThrownError) {
         // Save the thrown error types of the requirement and witness so we
         // can check them later.
@@ -950,6 +962,26 @@ RequirementMatch swift::matchWitness(
 
     if (auto result = matchTypes(reqType, witnessType)) {
       return std::move(result.value());
+    }
+  }
+
+  {
+    // The witness must have the same or fewer effects than the requirement.
+    auto reqEff = getEffects(req);
+    auto witnessEff = getEffects(witness);
+    if (auto invalidEffects = witnessEff - reqEff) {
+      for (auto kind : EffectKinds::all()) {
+        if (invalidEffects.contains(kind)) {
+          switch (kind) {
+          case EffectKind::Unsafe:
+            continue;  // This is diagnosed as a warning elsewhere.
+          case EffectKind::Throws:
+            return RequirementMatch(witness, MatchKind::ThrowsConflict);
+          case EffectKind::Async:
+            return RequirementMatch(witness, MatchKind::AsyncConflict);
+          }
+        }
+      }
     }
   }
 
@@ -1231,7 +1263,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
   // Set up the constraint system for matching.
   auto setup =
-      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type> {
+      [&]() -> MatchWitnessTypes {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
@@ -1295,8 +1327,19 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
     Type witnessThrownError = openWitnessTypeInfo.thrownErrorTypeOnAccess;
 
-    return std::make_tuple(std::nullopt, reqType, openWitnessType,
-                           reqThrownError, witnessThrownError);
+    return MatchWitnessTypes{reqType, openWitnessType, reqThrownError,
+                             witnessThrownError};
+  };
+
+  // Attempt to add constraints to make the supplied function types match.
+  auto matchLifetimes = [&](const LifetimeDependentInterface &witnessInterface,
+                            const LifetimeDependentInterface &reqInterface)
+      -> std::optional<RequirementMatch> {
+    if (!cs->matchFunctionLifetimes(witnessInterface, reqInterface,
+                                    witnessLocator)) {
+      return RequirementMatch(witness, MatchKind::LifetimeConflict);
+    }
+    return std::nullopt;
   };
 
   // Match a type in the requirement to a type in the witness.
@@ -1389,7 +1432,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     return result;
   };
 
-  return matchWitness(dc, req, witness, setup, matchTypes, finalize);
+  return matchWitness(dc, req, witness, setup, matchTypes, matchLifetimes,
+                      finalize);
 }
 
 bool
@@ -1463,13 +1507,16 @@ WitnessChecker::WitnessChecker(ASTContext &ctx, ProtocolDecl *proto,
     : Context(ctx), Proto(proto), Adoptee(adoptee), DC(dc) {}
 
 static void
-lookupValueWitnessesViaImplementsAttr(
-    DeclContext *DC, ValueDecl *req, SmallVector<ValueDecl *, 4> &witnesses) {
+lookupValueWitnessesViaImplementsAttr(DeclContext *DC, ValueDecl *req,
+                                      SmallVector<ValueDecl *, 4> &witnesses,
+                                      bool ignoreMissingImports) {
 
   auto name = req->createNameRef();
   auto *nominal = DC->getSelfNominalTypeDecl();
 
   NLOptions subOptions = (NL_ProtocolMembers | NL_IncludeAttributeImplements);
+  if (ignoreMissingImports)
+    subOptions |= NL_IgnoreMissingImports;
 
   nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
 
@@ -1514,7 +1561,8 @@ static bool contextMayExpandOperator(
 }
 
 SmallVector<ValueDecl *, 4>
-swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames) {
+swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req,
+                            bool *ignoringNames, bool ignoreMissingImports) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
   assert(req->isProtocolRequirement() || isa<AccessorDecl>(req));
 
@@ -1522,7 +1570,8 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
 
   // Do an initial check to see if there are any @_implements remappings
   // for this requirement.
-  lookupValueWitnessesViaImplementsAttr(DC, req, witnesses);
+  lookupValueWitnessesViaImplementsAttr(DC, req, witnesses,
+                                        ignoreMissingImports);
 
   auto reqName = req->createNameRef();
   auto reqBaseName = reqName.withoutArgumentLabels(DC->getASTContext());
@@ -1558,8 +1607,10 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
     // extensions, including those that match only by base name. Take care not
     // to restate them in the resulting list, or else an otherwise valid
     // conformance will become ambiguous.
-    const NLOptions options =
-        doUnqualifiedLookup ? NLOptions(0) : NL_ProtocolMembers;
+    NLOptions options = doUnqualifiedLookup ? NLOptions(0) : NL_ProtocolMembers;
+
+    if (ignoreMissingImports)
+      options |= NL_IgnoreMissingImports;
 
     SmallVector<ValueDecl *, 4> lookupResults;
     bool addedAny = false;
@@ -1619,9 +1670,15 @@ bool WitnessChecker::findBestWitness(
                                bool &doNotDiagnoseMatches) {
   enum Attempt {
     Regular,
+    IgnoreMissingImports,
     OperatorsFromOverlay,
     Done
   };
+
+  const bool ignoreMissingImportsDuringRegularLookup =
+      DC->getAsDecl()->isImplicit() ||
+      !Context.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                   /*allowMigration=*/true);
 
   bool anyFromUnconstrainedExtension;
   numViable = 0;
@@ -1630,7 +1687,16 @@ bool WitnessChecker::findBestWitness(
     SmallVector<ValueDecl *, 4> witnesses;
     switch (attempt) {
     case Regular:
-      witnesses = lookupValueWitnesses(DC, requirement, ignoringNames);
+      witnesses = lookupValueWitnesses(DC, requirement, ignoringNames,
+                                       ignoreMissingImportsDuringRegularLookup);
+      break;
+    case IgnoreMissingImports:
+      if (ignoreMissingImportsDuringRegularLookup)
+        continue;
+
+      // Try again, this time ignoring missing imports to find more candidates.
+      witnesses = lookupValueWitnesses(DC, requirement, ignoringNames,
+                                       /*ignoreMissingImports=*/true);
       break;
     case OperatorsFromOverlay: {
       // If we have a Clang declaration, the matching operator might be in the
@@ -1981,6 +2047,10 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
       return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
     }
   }
+
+  // Check whether the witness has been imported appropriately.
+  if (shouldDiagnoseMissingImportForMember(match.Witness, DC))
+    return CheckKind::RequiresMissingImport;
 
   return CheckKind::Success;
 }
@@ -3326,6 +3396,10 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     }
     break;
   }
+  case MatchKind::LifetimeConflict: {
+    diags.diagnose(match.Witness, diag::protocol_witness_lifetime_conflict);
+    break;
+  }
   }
 }
 
@@ -3604,8 +3678,15 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
 
       // If this requirement is a function, check that its parameters are Sendable as well
       if (isa<AbstractFunctionDecl>(requirement)) {
+        // Create substitutions based on the conformance that are in the
+        // requirements generic environment, so that protocol generic parameters
+        // and associated types within the conformance can both resolve.
+        auto reqGenEnv = requirement->getInnermostDeclContext()
+                             ->getGenericEnvironmentOfContext();
+        auto reqSubs = Conformance->getType()->getMemberSubstitutionMap(
+            requirement, reqGenEnv);
         diagnoseNonSendableTypesInReference(
-            /*base=*/nullptr, getDeclRefInContext(requirement),
+            /*base=*/nullptr, ConcreteDeclRef(requirement, reqSubs),
             requirement->getInnermostDeclContext(), requirement->getLoc(),
             SendableCheckReason::Conformance, getActorIsolation(witness),
             FunctionCheckKind::Params, loc);
@@ -4675,6 +4756,21 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                            requirement);
           });
         break;
+
+      case CheckKind::RequiresMissingImport: {
+        // In migrate mode the conformance is still valid (it's just a warning
+        // to add the import), so don't mark it as an error.
+        bool isError = !Context.LangOpts.isMigratingToFeature(
+            Feature::MemberImportVisibility);
+        getASTContext().addDelayedConformanceDiag(
+            Conformance, isError,
+            [witness](NormalProtocolConformance *conformance) {
+              maybeDiagnoseMissingImportForConformanceWitness(
+                  witness, conformance->getProtocol(),
+                  conformance->getDeclContext(), conformance->getLoc());
+            });
+        break;
+      }
     }
 
     if (auto *classDecl = DC->getSelfClassDecl()) {
@@ -4993,6 +5089,25 @@ static bool isolationsMatch(
   return false;
 }
 
+/// Whether a witness declaration could be marked 'nonisolated'.
+static bool couldApplyNonisolated(WitnessIsolationError const &witnessError) {
+  if (hasExplicitGlobalActorAttr(witnessError.witness) ||
+      witnessError.witness->getLoc().isInvalid())
+    return false;
+  if (auto *var = dyn_cast<VarDecl>(witnessError.witness)) {
+    if (var->hasStorage()) {
+      // Mutable VarDecl with storage, for an immutable requirement, can be
+      // converted to 'let nonisolated'.
+      return !var->isLet() && isa<VarDecl>(witnessError.requirement) &&
+             !cast<VarDecl>(witnessError.requirement)
+                  ->isSettable(/*useDC=*/nullptr);
+    }
+    // Computed VarDecl can be converted if no property wrapper is present.
+    return !var->hasAttachedPropertyWrapper();
+  }
+  return isa<AbstractFunctionDecl, SubscriptDecl>(witnessError.witness);
+}
+
 static void diagnoseConformanceIsolationErrors(
     const NormalProtocolConformance *conformance
 ) {
@@ -5054,10 +5169,7 @@ static void diagnoseConformanceIsolationErrors(
       }
 
       // If this is an entity where `nonisolated` would make sense, suggest it.
-      if ((isa<AbstractFunctionDecl>(witnessError.witness) ||
-           isa<SubscriptDecl>(witnessError.witness)) &&
-          !hasExplicitGlobalActorAttr(witnessError.witness) &&
-          witnessError.witness->getLoc().isValid()) {
+      if (couldApplyNonisolated(witnessError)) {
         potentialNonisolated.push_back(witnessError.witness);
       }
 
@@ -5135,18 +5247,6 @@ static void diagnoseConformanceIsolationErrors(
                                              "@" + globalActorTypeStr.str());
     }
 
-    // If marking witnesses as 'nonisolated' could work, suggest that.
-    if (!potentialNonisolated.empty() && !hasIsolatedConformances) {
-      auto diag = ctx.Diags.diagnose(
-          conformance->getLoc(),
-          diag::note_make_witnesses_nonisolated);
-      for (auto witness: potentialNonisolated) {
-        diag.fixItInsert(
-            witness->getAttributeInsertionLoc(/*forModifier=*/true),
-            "nonisolated ");
-      }
-    }
-
     // If the conformance could be @preconcurrency, suggest it.
     if (!conformance->isIsolated() && !conformance->isPreconcurrency() &&
         !hasIsolatedConformances) {
@@ -5176,6 +5276,29 @@ static void diagnoseConformanceIsolationErrors(
 
         if (!witnessError.isMissingDistributed)
           witnessError.diagnose(conformance);
+      }
+    }
+
+    // If marking a witness as 'nonisolated' could work, suggest that.
+    if (!hasIsolatedConformances) {
+      for (auto witness : potentialNonisolated) {
+        auto var = dyn_cast<VarDecl>(witness);
+        // Not a variable, or a computed property.
+        if (!var || !var->hasStorage()) {
+          ctx.Diags
+              .diagnose(witness, diag::note_make_witness_nonisolated, witness)
+              .fixItInsert(
+                  witness->getAttributeInsertionLoc(/*forModifier=*/true),
+                  "nonisolated ");
+          continue;
+        }
+        // Mutable variables (since we didn't add let witnesses), which can be
+        // converted to 'nonisolated let'.
+        auto loc = getFixItLocForVarToLet(var);
+        if (loc.isValid()) {
+          ctx.Diags.diagnose(var, diag::note_make_witness_immutable, var)
+              .fixItReplace(loc, "nonisolated let");
+        }
       }
     }
   }

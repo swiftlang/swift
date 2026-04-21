@@ -549,8 +549,6 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                            Type builderType);
 
-bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
-
 void collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced);
 
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
@@ -1154,7 +1152,6 @@ void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkCallerSideDefaultArgumentEffects(DeclContext *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 
 /// Whether the given expression can throw, and if so, the thrown type.
 std::optional<Type> canThrow(ASTContext &ctx, Expr *expr);
@@ -1547,6 +1544,11 @@ void recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 
+/// Returns true if a diagnostic ought to be emitted for any explicit reference
+/// to decl made from within the given DeclContext.
+bool shouldDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                          const DeclContext *dc);
+
 /// Emit or delay a diagnostic that suggests adding a missing import that is
 /// necessary to bring \p decl into scope in the containing source file. If
 /// delayed, the diagnostic will instead be emitted after type checking the
@@ -1556,6 +1558,16 @@ bool maybeDiagnoseMissingImportForMember(
     const ValueDecl *decl, const DeclContext *dc, SourceLoc loc,
     DiagnosticBehavior limit = DiagnosticBehavior::Unspecified);
 
+/// Emit or delay a diagnostic that suggests adding a missing import that is
+/// necessary to bring \p decl into scope in the containing source file so that
+/// a conformance to \p protocol is valid. If delayed, the diagnostic will
+/// instead be emitted after type checking the entire file and will include an
+/// appropriate fix-it. Returns true if a diagnostic was emitted (and not
+/// delayed).
+bool maybeDiagnoseMissingImportForConformanceWitness(
+    const ValueDecl *decl, const ProtocolDecl *protocol, const DeclContext *dc,
+    SourceLoc loc, DiagnosticBehavior limit = DiagnosticBehavior::Unspecified);
+
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
@@ -1564,7 +1576,7 @@ void diagnoseMissingImports(SourceFile &sf);
 // protocol should be used, thus enabling Borrowing iteration for a given
 // sequence type.
 bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync,
-                                SourceLoc loc);
+                                SourceLoc loc, DeclContext *dc);
 
 } // end namespace swift
 

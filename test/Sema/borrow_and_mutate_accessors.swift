@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature CoroutineAccessors
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature CoroutineAccessors
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 // REQUIRES: swift_feature_CoroutineAccessors
 
 public class Klass {

@@ -28,6 +28,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -1494,8 +1495,8 @@ void writeNominalTypeKind(llvm::json::OStream &JSON,
 }
 
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
-                       llvm::raw_ostream &OS) {
-  llvm::json::OStream JSON(OS, 2);
+                       llvm::raw_ostream &OS, bool Compact) {
+  llvm::json::OStream JSON(OS, Compact ? 0 : 2);
   JSON.array([&] {
     for (const auto &TypeInfo : ConstValueInfos) {
       assert(isa<NominalTypeDecl>(TypeInfo.TypeDecl) &&
@@ -1522,6 +1523,80 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
     }
   });
   JSON.flush();
+  return false;
+}
+
+/// Remap the "file" field in a single JSON object using the given
+/// PrefixMapper, if present.
+static void remapLocationInObject(llvm::json::Object &Obj,
+                                  llvm::PrefixMapper &Mapper) {
+  auto FilePath = Obj.getString("file");
+  if (FilePath)
+    Obj["file"] = Mapper.mapToString(*FilePath);
+}
+
+/// Iterate the "propertyWrappers" array and remap locations in each element.
+static void remapPropertyWrappers(llvm::json::Object &Property,
+                                  llvm::PrefixMapper &Mapper) {
+  auto *Wrappers = Property.getArray("propertyWrappers");
+  if (!Wrappers)
+    return;
+  for (auto &Wrapper : *Wrappers) {
+    if (auto *WrapperObj = Wrapper.getAsObject())
+      remapLocationInObject(*WrapperObj, Mapper);
+  }
+}
+
+/// Iterate the "properties" array and remap locations in each element and
+/// its nested propertyWrappers.
+static void remapProperties(llvm::json::Object &TypeEntry,
+                            llvm::PrefixMapper &Mapper) {
+  auto *Properties = TypeEntry.getArray("properties");
+  if (!Properties)
+    return;
+  for (auto &Prop : *Properties) {
+    if (auto *PropObj = Prop.getAsObject()) {
+      remapLocationInObject(*PropObj, Mapper);
+      remapPropertyWrappers(*PropObj, Mapper);
+    }
+  }
+}
+
+bool remapConstValuesJSON(
+    llvm::StringRef Input, llvm::raw_ostream &OS,
+    llvm::ArrayRef<std::pair<std::string, std::string>> PrefixMap) {
+  if (PrefixMap.empty()) {
+    OS << Input;
+    return false;
+  }
+
+  llvm::SmallVector<llvm::MappedPrefix, 4> Prefixes;
+  llvm::MappedPrefix::transformPairs(PrefixMap, Prefixes);
+  llvm::PrefixMapper Mapper;
+  Mapper.addRange(Prefixes);
+  Mapper.sort();
+
+  auto ParsedJSON = llvm::json::parse(Input);
+  if (!ParsedJSON) {
+    llvm::consumeError(ParsedJSON.takeError());
+    return true;
+  }
+
+  auto *TopLevel = ParsedJSON->getAsArray();
+  if (!TopLevel) {
+    OS << Input;
+    return false;
+  }
+
+  for (auto &Entry : *TopLevel) {
+    if (auto *TypeEntry = Entry.getAsObject()) {
+      remapLocationInObject(*TypeEntry, Mapper);
+      remapProperties(*TypeEntry, Mapper);
+    }
+  }
+
+  llvm::json::OStream JSONOut(OS, 2);
+  JSONOut.value(*ParsedJSON);
   return false;
 }
 

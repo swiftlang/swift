@@ -160,6 +160,12 @@ def update_single_repository(pool_args: UpdateArguments):
         if verbose:
             print(f"{prefix}Updating '{repo_path}'")
 
+        fetch_extra_args = []
+        if pool_args.skip_history:
+            fetch_extra_args.extend(["--depth", "1"])
+        if pool_args.partial_clone:
+            fetch_extra_args.extend(["--filter", "blob:none"])
+
         cross_repo = False
         checkout_target = None
         if pool_args.tag:
@@ -223,12 +229,70 @@ def update_single_repository(pool_args: UpdateArguments):
                     repo_path, ["rev-parse", "--verify", checkout_target], echo=verbose
                 )
             except Exception:
-                Git.run(
+                # The target isn't known locally. This can happen when the
+                # repo was cloned with --single-branch (e.g. via
+                # --skip-history) and we now need a different branch or tag.
+                # Fetch the ref explicitly.
+                is_tag, _, _ = Git.run(
                     repo_path,
-                    ["fetch", "--recurse-submodules=yes", "--tags"],
-                    echo=verbose,
-                    prefix=prefix,
+                    ["ls-remote", "--tags", "origin", checkout_target],
                 )
+                if is_tag:
+                    Git.run(
+                        repo_path,
+                        [
+                            "fetch",
+                            "--recurse-submodules=yes",
+                            "origin",
+                            f"+refs/tags/{checkout_target}"
+                            f":refs/tags/{checkout_target}",
+                        ]
+                        + fetch_extra_args,
+                        echo=verbose,
+                        prefix=prefix,
+                    )
+                elif not is_commit_hash(checkout_target):
+                    Git.run(
+                        repo_path,
+                        [
+                            "fetch",
+                            "--recurse-submodules=yes",
+                            "--tags",
+                            "origin",
+                            f"+refs/heads/{checkout_target}"
+                            f":refs/remotes/origin/{checkout_target}",
+                        ]
+                        + fetch_extra_args,
+                        echo=verbose,
+                        prefix=prefix,
+                    )
+                    # Shallow clones do not auto-create a local tracking branch
+                    # on checkout. Check if it exists if not set up tracking.
+                    # --list output is empty string if the branch doesn't exist,
+                    # non-empty if it does.
+                    existing_branch, _, _ = Git.run(
+                        repo_path,
+                        ["branch", "--list", checkout_target],
+                    )
+                    if not existing_branch:
+                        Git.run(
+                            repo_path,
+                            [
+                                "branch",
+                                checkout_target,
+                                f"refs/remotes/origin/{checkout_target}",
+                            ],
+                            echo=verbose,
+                            prefix=prefix,
+                        )
+                else:
+                    Git.run(
+                        repo_path,
+                        ["fetch", "--recurse-submodules=yes", "--tags"]
+                        + fetch_extra_args,
+                        echo=verbose,
+                        prefix=prefix,
+                    )
 
             try:
                 Git.run(
@@ -251,7 +315,7 @@ def update_single_repository(pool_args: UpdateArguments):
         # which branch was checked out during the fetch.
         Git.run(
             repo_path,
-            ["fetch", "--recurse-submodules=yes", "--tags"],
+            ["fetch", "--recurse-submodules=yes", "--tags"] + fetch_extra_args,
             echo=verbose,
             prefix=prefix,
         )
@@ -495,6 +559,8 @@ def update_all_repositories(
             clean=args.clean,
             stash=args.stash,
             cross_repos_pr=cross_repos_pr,
+            skip_history=args.skip_history,
+            partial_clone=args.partial_clone,
             output_prefix="Updating",
             verbose=args.verbose,
         )
@@ -528,6 +594,7 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
         print("Cloning '" + pool_args.repo_name + "'")
 
     if args.skip_history:
+        filter_args = ["--filter", "blob:none"] if args.partial_clone else []
         if is_commit_hash(repo_branch):
             Git.run(
                 args.source_root,
@@ -542,6 +609,7 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
                     remote,
                     repo_name,
                 ]
+                + filter_args
                 + (["--no-tags"] if skip_tags else []),
                 env=env,
                 echo=verbose,
@@ -549,7 +617,7 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
             repo_path = args.source_root.joinpath(repo_name)
             Git.run(
                 repo_path,
-                ["fetch", "--depth", "1", "origin", repo_branch],
+                ["fetch", "--depth", "1", "origin", repo_branch] + filter_args,
                 env=env,
                 echo=verbose,
             )
@@ -566,11 +634,13 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
                     "--recursive",
                     "--depth",
                     "1",
+                    "--single-branch",
                     "--branch",
                     repo_branch,
                     remote,
                     repo_name,
                 ]
+                + filter_args
                 + (["--no-tags"] if skip_tags else []),
                 env=env,
                 echo=verbose,
@@ -584,6 +654,7 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
             echo=verbose,
         )
     else:
+        filter_args = ["--filter", "blob:none"] if args.partial_clone else []
         Git.run(
             args.source_root,
             [
@@ -596,6 +667,7 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
                 remote,
                 repo_name,
             ]
+            + filter_args
             + (["--no-tags"] if skip_tags else []),
             env=env,
             echo=verbose,
@@ -966,11 +1038,11 @@ def main() -> int:
 
         if args.dump_hashes:
             dump_repo_hashes(args, config)
-            sys.exit(0)
+            return 0
 
         if args.dump_hashes_config:
             dump_repo_hashes(args, config, args.dump_hashes_config)
-            sys.exit(0)
+            return 0
 
         _check_missing_clones(args=args, config=config, scheme_map=scheme_map)
 
@@ -987,7 +1059,7 @@ def main() -> int:
     fail_count = do_checkout()
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
-    else:
+    elif not args.dump_hashes and not args.dump_hashes_config:
         print("update-checkout succeeded")
         print_repo_hashes(args, config)
     sys.exit(fail_count)

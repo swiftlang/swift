@@ -142,7 +142,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
       Worklist.push_back(F);
     }
 
-    if (F->markedAsAlwaysEmitIntoClient()) {
+    if (F->isAlwaysEmitIntoClient()) {
       // For @_alwaysEmitIntoClient functions, we need to lookup its
       // differentiability witness and, if present, ask SILLoader to obtain its
       // definition. Otherwise, a linker error would occur due to undefined
@@ -175,7 +175,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
   // So try deserializing HiddenExternal functions too.
   if (linkage == SILLinkage::HiddenExternal) {
     deserializeAndPushToWorklist(F);
-    if (!F->markedAsAlwaysEmitIntoClient())
+    if (!F->isAlwaysEmitIntoClient())
       return;
     // For @_alwaysEmitIntoClient functions, we need to lookup its
     // differentiability witness and, if present, ask SILLoader to obtain its

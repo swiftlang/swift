@@ -1715,6 +1715,12 @@ public:
         auto globalActor = newFnTy->getGlobalActor();
         auto addedActor = oldFnTy->getExtInfo().withGlobalActor(globalActor);
 
+        // With `GlobalActorIsolatedTypesUsability` enabled `@MainActor` always
+        // implies `@Sendable`.
+        if (oldFnTy->getASTContext().LangOpts.hasFeature(
+                Feature::GlobalActorIsolatedTypesUsability))
+          addedActor = addedActor.withSendable();
+
         return oldFnTy->withExtInfo(addedActor) == newFnTy;
       }
     }
@@ -2100,10 +2106,18 @@ static void emitRawApply(SILGenFunction &SGF,
     else
       errorAddrOrType = substFnConv.getSILErrorType(SGF.getTypeExpansionContext());
 
-    SILBasicBlock *errorBB =
-      SGF.getTryApplyErrorDest(loc, substFnType, prevExecutor,
-                                *errorAddrOrType,
-                               options.contains(ApplyFlags::DoesNotThrow));
+    bool suppressErrorPath = options.contains(ApplyFlags::DoesNotThrow);
+
+    // If we're constructing a no-throw function and emitting a throws(Never)
+    // try_apply, we also want to emit the error branch as unreachable.
+    if (!suppressErrorPath &&
+        !SGF.F.getLoweredFunctionType()->hasErrorResult() &&
+        substFnType->getErrorResult().getInterfaceType()->isNever()) {
+      suppressErrorPath = true;
+    }
+
+    SILBasicBlock *errorBB = SGF.getTryApplyErrorDest(
+        loc, substFnType, prevExecutor, *errorAddrOrType, suppressErrorPath);
 
     options -= ApplyFlags::DoesNotThrow;
     SGF.B.createTryApply(loc, fnValue, subs, argValues, normalBB, errorBB,
@@ -3485,6 +3499,11 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     return ManagedValue();
   };
   
+  // See through opaque value placeholders, e.g. the for-each sequence.
+  if (auto *OV = dyn_cast<OpaqueValueExpr>(expr)) {
+    if (auto *underlying = OpaqueExprs.lookup(OV))
+      expr = underlying;
+  }
   if (auto le = dyn_cast<LoadExpr>(expr)) {
     expr = le->getSubExpr();
   }
@@ -5793,10 +5812,17 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     }
   }
 
-  SILValue rawResult = SGF.B.createBuiltin(
+  auto rawResult = SGF.B.createBuiltin(
       loc, builtinName,
       substConv.getSILResultType(SGF.getTypeExpansionContext()),
       callee.getSubstitutions(), rawArgs);
+
+  // Handle some special cases for specific builtins.
+  if (builtinName.is(getBuiltinName(BuiltinValueKind::AddTaskLocalValue))) {
+    SGF.addEmissionFinalizer([rawResult](SILGenFunction &SGF) {
+      SGF.finalizeAddTaskLocalValue(rawResult);
+    });
+  }
 
   if (argScope.has_value())
     std::move(argScope)->pop();
@@ -6397,8 +6423,15 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   SILBasicBlock *normalBB = createBasicBlock();
   B.createTryApply(loc, fn, subs, args, normalBB, errorBB);
 
-  // Emit the rethrow logic.
-  {
+  if (!F.getLoweredFunctionType()->hasErrorResult()) {
+    // Thunks to convert from throws(Never) to non-throwing functions
+    // can end up here. Since the callee cannot actually throw, emit
+    // an unreachable in the error branch.
+    ASSERT(silFnType->getErrorResult().getInterfaceType()->isNever());
+    B.emitBlock(errorBB);
+    B.createUnreachable(loc);
+  } else {
+    // Emit the rethrow logic.
     B.emitBlock(errorBB);
 
     Scope scope(Cleanups, CleanupLocation(loc));

@@ -22,11 +22,11 @@
 // RUN: %FileCheck %s -check-prefix=CHECK-OTHERINTERFACE <%t/OtherModule.swiftinterface
 // CHECK-OTHERINTERFACE: OtherFunc
 // RUN: test -f %t/modulecache/LeafModule-*.swiftmodule
-// RUN: llvm-bcanalyzer -dump %t/modulecache/LeafModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-LEAFMODULE
+// RUN: %llvm-bcanalyzer -dump %t/modulecache/LeafModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-LEAFMODULE
 // CHECK-LEAFMODULE: {{MODULE_NAME.*blob data = 'LeafModule'}}
 // CHECK-LEAFMODULE: {{FILE_DEPENDENCY.*LeafModule.swiftinterface'}}
 // CHECK-LEAFMODULE: FUNC_DECL
-// RUN: llvm-bcanalyzer -dump %t/modulecache/LeafModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-LEAFMODULE-NEGATIVE
+// RUN: %llvm-bcanalyzer -dump %t/modulecache/LeafModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-LEAFMODULE-NEGATIVE
 // CHECK-LEAFMODULE-NEGATIVE-NOT: {{FILE_DEPENDENCY.*Swift.swiftmodule([/\\].+[.]swiftmodule)?'}}
 //
 //
@@ -36,7 +36,7 @@
 // RUN: test -f %t/TestModule.swiftmodule
 // RUN: test -f %t/modulecache/OtherModule-*.swiftmodule
 // RUN: test -f %t/TestModule.d
-// RUN: llvm-bcanalyzer -dump %t/modulecache/OtherModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-OTHERMODULE
+// RUN: %llvm-bcanalyzer -dump %t/modulecache/OtherModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-OTHERMODULE
 // CHECK-OTHERMODULE: {{MODULE_NAME.*blob data = 'OtherModule'}}
 // CHECK-OTHERMODULE-NOT: {{FILE_DEPENDENCY.*Swift.swiftmodule([/\\].+[.]swiftmodule)?'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*LeafModule.swiftinterface'}}

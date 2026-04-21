@@ -1,8 +1,19 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature BorrowingForLoop) \
+// FIXME: This test contains unconditional CHECKs that require all of the
+// test logic to run, but then also contain if #available(SwiftStdlib 6.4, *) 
+// conditionals that mean that the test cannot actually execute on all test runners.
+// This is why disabling availability checking is the best tool available to
+// make this test consistent. This test is thus unspported on the configurations
+// cited below, where the stdlib symbols will not be present, to avoid crashes.
+// Make sure to update this test accordingly when a more appropriate tool is added.
+
+// RUN: %target-run-simple-swift(-enable-experimental-feature BorrowingForLoop \
+// RUN: -Xfrontend -disable-availability-checking) \
 // RUN: %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BorrowingForLoop
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 struct NoncopyableInt: ~Copyable {
   var value: Int

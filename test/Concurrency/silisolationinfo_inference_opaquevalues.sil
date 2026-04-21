@@ -1,0 +1,51 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -module-name infer --test-runner %s 2>&1 | %FileCheck %s
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// PLEASE READ THIS!
+//
+// This test is specifically meant to test how we infer isolation for specific
+// values.
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+class NonSendableKlass {}
+
+actor CustomActorInstance {}
+
+@globalActor
+struct CustomActor {
+  static let shared = CustomActorInstance()
+}
+
+protocol MyProtocol {
+}
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_addr_get_conformance_test: sil_isolation_info_get_conformance_isolation_inferrence with: @trace[0]
+// CHECK-NEXT: Input Value:   %3 = init_existential_value %2 : $Self, $Self, $any MyProtocol // user: %4
+// CHECK-NEXT: Isolation: global actor 'CustomActor'-isolated isolated-conformance-to(MyProtocol)
+// CHECK-NEXT: end running test 1 of 1 on init_existential_addr_get_conformance_test: sil_isolation_info_get_conformance_isolation_inferrence with: @trace[0]
+sil [isolation "global_actor(CustomActor)"] [ossa] @init_existential_addr_get_conformance_test : $@convention(method) <Self where Self : MyProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : @guaranteed $Self):
+  specify_test "sil_isolation_info_get_conformance_isolation_inferrence @trace[0]"
+  debug_value %0, let, name "self", argno 1
+  %1 = copy_value %0
+  %addr = init_existential_value %1 : $Self, $Self, $MyProtocol
+  debug_value [trace] %addr
+  destroy_value %addr
+  %8 = tuple ()
+  return %8
+}

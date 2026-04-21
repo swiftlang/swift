@@ -191,7 +191,7 @@ extension MyActor {
     set { }
   }
 
-  // expected-warning@+1{{'nonisolated(unsafe)' has no effect on instance method 'nonisolatedUnsafe(otherActor:)', consider using 'nonisolated'}}{{3-14=nonisolated}}
+  // expected-warning@+1{{'nonisolated(unsafe)' has no effect on instance method 'nonisolatedUnsafe(otherActor:)', consider using 'nonisolated'}}{{3-22=nonisolated}}
   nonisolated(unsafe) func nonisolatedUnsafe(otherActor: MyActor) -> Int { }
 
   nonisolated func actorIndependentFunc(otherActor: MyActor) -> Int {
@@ -863,7 +863,6 @@ actor SomeActorWithInits {
   // expected-note@+1 4 {{mutation of this property is only permitted within the actor}}
   var mutableState: Int = 17
   var otherMutableState: Int
-  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
   let nonSendable: SomeClass
 
   // Sema should not complain about referencing non-Sendable members
@@ -935,7 +934,7 @@ actor SomeActorWithInits {
   @MainActor init(i5 x: SomeClass) {
     self.mutableState = 42
     self.otherMutableState = 17
-    self.nonSendable = x // expected-warning {{actor-isolated property 'nonSendable' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.nonSendable = x
 
     self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
     self.nonisolated()
@@ -1528,7 +1527,8 @@ actor DeinitMutatingAsync {
 
   deinit {
     s.doWork() // expected-error {{cannot call mutating async function 'doWork()' on actor-isolated property 's'}}
-    // expected-error@-1 {{'async' call in a function that does not support concurrency}}
+    // expected-note@-1 {{'s' can be concurrently accessed during mutation, risking data races}}
+    // expected-error@-2 {{'async' call in a function that does not support concurrency}}
   }
 }
 
@@ -1546,12 +1546,12 @@ protocol SGA_Proto {
 // try to override a MA method with inferred isolation from a protocol requirement
 // expected-warning@+1{{conformance of 'SGA_MA' to protocol 'SGA_Proto' involves isolation mismatches and can cause data races}}
 class SGA_MA: MA, SGA_Proto {
-  // expected-note@-1{{mark all declarations used in the conformance 'nonisolated'}}
-  // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
-  
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+
   // expected-error@+2 {{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
   // expected-note@+1 {{main actor-isolated instance method 'method()' cannot satisfy global actor 'SomeGlobalActor'-isolated requirement}}
   override func method() { onions_sga() }
+  // expected-note@-1{{mark instance method 'method()' 'nonisolated'}}{{3-3=nonisolated }}
 }
 
 class None_MA: MA {
@@ -1665,13 +1665,12 @@ actor ActorWithNonSendableLet: NonisolatedProtocol {
 }
 
 actor ProtectNonSendable {
-  // expected-note@+1 2 {{property declared here}}
+  // expected-note@+1 {{property declared here}}
   let ns = NonSendable()
 
   init() {}
 
   @MainActor init(fromMain: Void) {
-    // expected-warning@+1 {{actor-isolated property 'ns' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
     _ = self.ns
   }
 }
@@ -1766,8 +1765,7 @@ struct ReferenceSelfDotMethods {
   nonisolated
   private func testCurry() -> (Self) -> (@MainActor () -> Void) {
     let functionRef = Self.mainActorAffinedFunction
-    // warning goes away with InferSendableFromCaptures, see actor_isolation_swift6.swift
-    return functionRef // expected-warning {{converting non-Sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
+    return functionRef // Ok
   }
 
   @MainActor

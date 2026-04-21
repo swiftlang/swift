@@ -61,6 +61,27 @@ SILDebugLocation SILGenBuilder::getSILDebugLocation(SILLocation Loc,
 }
 
 //===----------------------------------------------------------------------===//
+//                             SILValue APIs
+//===----------------------------------------------------------------------===//
+
+PartialApplyInst *SILGenBuilder::createPartialApply(
+    SILLocation Loc, SILValue Fn, SubstitutionMap Subs, ArrayRef<SILValue> Args,
+    ParameterConvention CalleeConvention,
+    SILFunctionTypeIsolation ResultIsolation,
+    PartialApplyInst::OnStackKind OnStack, StackAllocationIsNested_t IsNested,
+    const GenericSpecializationInformation *SpecializationInfo) {
+
+  // We completely drop the generic signature if all generic parameters were
+  // concrete. Similar to emitRawApply.
+  if (Subs && Subs.getGenericSignature()->areAllParamsConcrete())
+    Subs = SubstitutionMap();
+
+  return SILBuilder::createPartialApply(Loc, Fn, Subs, Args, CalleeConvention,
+                                        ResultIsolation, OnStack, IsNested,
+                                        SpecializationInfo);
+}
+
+//===----------------------------------------------------------------------===//
 //                             Managed Value APIs
 //===----------------------------------------------------------------------===//
 
@@ -268,6 +289,7 @@ ManagedValue SILGenBuilder::createAllocRef(
                   [](ManagedValue mv) -> SILValue { return mv.getValue(); });
 
   AllocRefInst *i = createAllocRef(loc, refType, objc, false, false,
+                                   StackAllocationIsNested,
                                    elementTypes, elementCountOperands);
   return SGF.emitManagedRValueWithCleanup(i);
 }
@@ -285,6 +307,7 @@ ManagedValue SILGenBuilder::createAllocRefDynamic(
 
   AllocRefDynamicInst *i =
       createAllocRefDynamic(loc, operand.getValue(), refType, objc, false,
+                            StackAllocationIsNested,
                             elementTypes, elementCountOperands);
   return SGF.emitManagedRValueWithCleanup(i);
 }

@@ -36,6 +36,18 @@
 // RUN: diff %t/Test.swiftmodule %t/Test2.swiftmodule
 // RUN: diff %t/test.o %t/test2.o
 
+// RUN: %{python} %S/../Inputs/getmtime.py %t/Test.swiftmodule > %t/before.module.mtime
+// RUN: %{python} %S/../Inputs/getmtime.py %t/test.o > %t/before.object.mtime
+// RUN: %swift-scan-test -action replay_result -cas-path %t/cas -id @%t/key.casid -- \
+// RUN:   %target-swift-frontend-plain -cache-compile-job -Rcache-compile-job %s \
+// RUN:   -emit-module -emit-module-path %t/Test.swiftmodule -c -emit-dependencies -module-name Test -o %t/test.o -cas-path %t/cas \
+// RUN:   @%t/MyApp.cmd
+// RUN: %{python} %S/../Inputs/getmtime.py %t/Test.swiftmodule > %t/after.module.mtime
+// RUN: %{python} %S/../Inputs/getmtime.py %t/test.o > %t/after.object.mtime
+
+// RUN: diff %t/before.module.mtime %t/after.module.mtime
+// RUN: diff %t/before.object.mtime %t/after.object.mtime
+
 // CHECK-QUERY-NOT-FOUND: cached output not found
 // CHECK-QUERY: Cached Compilation for key "llvmcas://{{.*}}" has 4 outputs:
 // CHECK-QUERY-NEXT: object: llvmcas://

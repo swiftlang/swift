@@ -6,9 +6,12 @@
 // contiguous iterators.
 //
 // RUN: %if !(LinuxDistribution=ubuntu-20.04 || LinuxDistribution=amzn-2) %{ \
-// RUN:   %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++20 -DCPP20 -verify-additional-prefix cpp20- \
+// RUN:   %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++20 -enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature BorrowingSequence -DCPP20 -verify-additional-prefix cpp20- \
 // RUN: %}
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature BorrowingSequence
+
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
+// REQUIRES: swift_feature_BorrowingSequence
 
 import CustomIterator
 
@@ -18,6 +21,8 @@ func checkContiguous<It: UnsafeCxxContiguousIterator>(_ _: It) {}
 func checkMutableInput<It: UnsafeCxxMutableInputIterator>(_ _: It) {}
 func checkMutableRandomAccess<It: UnsafeCxxMutableRandomAccessIterator>(_ _: It) {}
 func checkMutableContiguous<It: UnsafeCxxMutableContiguousIterator>(_ _: It) {}
+@available(SwiftStdlib 6.4, *)
+func checkBorrowingIterator<It: BorrowingIteratorProtocol>(_ _: It) {}
 
 func check(it: ConstIterator) {
   checkInput(it)
@@ -26,6 +31,7 @@ func check(it: ConstIterator) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: ConstRACIterator) {
@@ -35,6 +41,7 @@ func check(it: ConstRACIterator) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: ConstRACIteratorRefPlusEq) {
@@ -44,6 +51,7 @@ func check(it: ConstRACIteratorRefPlusEq) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: ConstIteratorOutOfLineEq) {
@@ -53,6 +61,7 @@ func check(it: ConstIteratorOutOfLineEq) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: MinimalIterator) {
@@ -62,6 +71,7 @@ func check(it: MinimalIterator) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: ForwardIterator) {
@@ -71,6 +81,7 @@ func check(it: ForwardIterator) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasCustomIteratorTag) {
@@ -80,6 +91,7 @@ func check(it: HasCustomIteratorTag) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasCustomRACIteratorTag) {
@@ -89,6 +101,7 @@ func check(it: HasCustomRACIteratorTag) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasCustomInheritedRACIteratorTag) {
@@ -98,6 +111,7 @@ func check(it: HasCustomInheritedRACIteratorTag) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasCustomIteratorTagInline) {
@@ -107,6 +121,7 @@ func check(it: HasCustomIteratorTagInline) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasTypedefIteratorTag) {
@@ -116,6 +131,7 @@ func check(it: HasTypedefIteratorTag) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: MutableRACIterator) {
@@ -125,15 +141,27 @@ func check(it: MutableRACIterator) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
-func check(it: NonReferenceDereferenceOperator) {
+func check(it: HasNestedIterator.NestedIterator) {
   checkInput(it)
   checkRandomAccess(it)         // expected-error {{requires}}
   checkContiguous(it)           // expected-error {{requires}}
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
+}
+
+func check(it: DifferentResultsDereferenceOperator) {
+  checkInput(it)
+  checkRandomAccess(it)         // expected-error {{requires}}
+  checkContiguous(it)           // expected-error {{requires}}
+  checkMutableInput(it)
+  checkMutableRandomAccess(it)  // expected-error {{requires}}
+  checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 #if CPP20
@@ -145,6 +173,7 @@ func check(it: ConstContiguousIterator) {
   checkMutableInput(it)         // expected-cpp20-error {{requires}}
   checkMutableRandomAccess(it)  // expected-cpp20-error {{requires}}
   checkMutableContiguous(it)    // expected-cpp20-error {{requires}}
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 func check(it: HasCustomContiguousIteratorTag) {
@@ -154,6 +183,7 @@ func check(it: HasCustomContiguousIteratorTag) {
   checkMutableInput(it)         // expected-cpp20-error {{requires}}
   checkMutableRandomAccess(it)  // expected-cpp20-error {{requires}}
   checkMutableContiguous(it)    // expected-cpp20-error {{requires}}
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 func check(it: MutableContiguousIterator) {
@@ -163,6 +193,7 @@ func check(it: MutableContiguousIterator) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)
   checkMutableContiguous(it)
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 func check(it: HasNoContiguousIteratorConcept) {
@@ -172,9 +203,51 @@ func check(it: HasNoContiguousIteratorConcept) {
   checkMutableInput(it)         // expected-cpp20-error {{requires}}
   checkMutableRandomAccess(it)  // expected-cpp20-error {{requires}}
   checkMutableContiguous(it)    // expected-cpp20-error {{requires}}
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 #endif
+
+func check(it: NonInlineDereferenceOperator) {
+  checkInput(it)                // expected-error {{requires}}
+  checkRandomAccess(it)         // expected-error {{requires}}
+  checkContiguous(it)           // expected-error {{requires}}
+  checkMutableInput(it)         // expected-error {{requires}}
+  checkMutableRandomAccess(it)  // expected-error {{requires}}
+  checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
+}
+
+func check(it: NonReferenceDereferenceOperator) {
+  checkInput(it)
+  checkRandomAccess(it)         // expected-error {{requires}}
+  checkContiguous(it)           // expected-error {{requires}}
+  checkMutableInput(it)         // expected-error {{requires}}
+  checkMutableRandomAccess(it)  // expected-error {{requires}}
+  checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
+}
+
+func check(it: NoConstDereferenceOperator) {
+  checkInput(it)                // expected-error {{requires}}
+  checkRandomAccess(it)         // expected-error {{requires}}
+  checkContiguous(it)           // expected-error {{requires}}
+  checkMutableInput(it)         // expected-error {{requires}}
+  checkMutableRandomAccess(it)  // expected-error {{requires}}
+  checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
+}
+
+func check(it: ConstRACButNotBorrowingIterator) {
+  checkInput(it)
+  checkRandomAccess(it)
+  checkContiguous(it)           // expected-error {{requires}}
+  checkMutableInput(it)         // expected-error {{requires}}
+  checkMutableRandomAccess(it)  // expected-error {{requires}}
+  checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
+}
+
 
 func check(it: HasNoIteratorCategory) {
   checkInput(it)                // expected-error {{requires}}
@@ -183,6 +256,7 @@ func check(it: HasNoIteratorCategory) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasInvalidIteratorCategory) {
@@ -192,6 +266,7 @@ func check(it: HasInvalidIteratorCategory) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasNoEqualEqual) {
@@ -201,6 +276,7 @@ func check(it: HasNoEqualEqual) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasInvalidEqualEqual) {
@@ -210,6 +286,7 @@ func check(it: HasInvalidEqualEqual) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasNoIncrementOperator) {
@@ -219,6 +296,7 @@ func check(it: HasNoIncrementOperator) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasNoPreIncrementOperator) {
@@ -228,6 +306,7 @@ func check(it: HasNoPreIncrementOperator) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasNoDereferenceOperator) {
@@ -237,6 +316,7 @@ func check(it: HasNoDereferenceOperator) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: TemplatedIteratorInt) {
@@ -246,6 +326,7 @@ func check(it: TemplatedIteratorInt) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 
@@ -256,6 +337,7 @@ func check(it: TemplatedIteratorOutOfLineEqInt) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 
@@ -266,6 +348,7 @@ func check(it: TemplatedRACIteratorOutOfLineEqInt) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: BaseIntIterator) {
@@ -275,6 +358,7 @@ func check(it: BaseIntIterator) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: InheritedConstIterator) {
@@ -284,6 +368,7 @@ func check(it: InheritedConstIterator) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: InheritedTemplatedConstIteratorInt) {
@@ -293,6 +378,7 @@ func check(it: InheritedTemplatedConstIteratorInt) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: InheritedTemplatedConstRACIteratorInt) {
@@ -302,6 +388,7 @@ func check(it: InheritedTemplatedConstRACIteratorInt) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: InheritedTemplatedConstRACIteratorOutOfLineOpsInt) {
@@ -311,6 +398,7 @@ func check(it: InheritedTemplatedConstRACIteratorOutOfLineOpsInt) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: InputOutputIterator) {
@@ -320,6 +408,7 @@ func check(it: InputOutputIterator) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: InputOutputConstIterator) {
@@ -329,6 +418,7 @@ func check(it: InputOutputConstIterator) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: ProtectedIteratorBase) {
@@ -338,6 +428,7 @@ func check(it: ProtectedIteratorBase) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: HasInheritedProtectedCopyConstructor) {
@@ -347,6 +438,7 @@ func check(it: HasInheritedProtectedCopyConstructor) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: TaglessNewPtr) {
@@ -356,6 +448,7 @@ func check(it: TaglessNewPtr) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: InputCategoryNewPtr) {
@@ -365,6 +458,7 @@ func check(it: InputCategoryNewPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: ForwardCategoryNewPtr) {
@@ -374,6 +468,7 @@ func check(it: ForwardCategoryNewPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: RandomAccessCategoryNewPtr) {
@@ -383,6 +478,7 @@ func check(it: RandomAccessCategoryNewPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 #if CPP20
@@ -394,6 +490,7 @@ func check(it: ContiguousCategoryNewPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)
   checkMutableContiguous(it)
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 func check(it: InputConceptNewPtr) {
@@ -403,6 +500,7 @@ func check(it: InputConceptNewPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)  // expected-cpp20-error {{requires}}
   checkMutableContiguous(it)    // expected-cpp20-error {{requires}}
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 func check(it: ForwardConceptNewPtr) {
@@ -421,6 +519,7 @@ func check(it: RandomAccessConceptNewPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)
   checkMutableContiguous(it)    // expected-cpp20-error {{requires}}
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 func check(it: ContiguousConceptNewPtr) {
@@ -430,6 +529,7 @@ func check(it: ContiguousConceptNewPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)
   checkMutableContiguous(it)
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 func check(it: InvalidContiguousCategoryNewPtr) {
@@ -439,6 +539,7 @@ func check(it: InvalidContiguousCategoryNewPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)
   checkMutableContiguous(it)    // expected-cpp20-error {{requires}}
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 #endif // CPP20
@@ -450,6 +551,7 @@ func check(it: IteratorTagOfMemberTypedef) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: IteratorTagOfNonMemberTypedef) {
@@ -459,6 +561,7 @@ func check(it: IteratorTagOfNonMemberTypedef) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: BasicLegacyPtr) {
@@ -468,6 +571,7 @@ func check(it: BasicLegacyPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: NotALegacyPtr) {
@@ -477,6 +581,7 @@ func check(it: NotALegacyPtr) {
   checkMutableInput(it)         // expected-error {{requires}}
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 func check(it: InputCategoryLegacyPtr) {
@@ -486,6 +591,7 @@ func check(it: InputCategoryLegacyPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)  // expected-error {{requires}}
   checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
 #if CPP20
@@ -497,6 +603,7 @@ func check(it: InputConceptLegacyPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)  // expected-cpp20-error {{requires}}
   checkMutableContiguous(it)    // expected-cpp20-error {{requires}}
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 func check(it: ContiguousConceptLegacyPtr) {
@@ -506,6 +613,7 @@ func check(it: ContiguousConceptLegacyPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)
   checkMutableContiguous(it)
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 func check(it: InputCategoryContiguousConceptLegacyPtr) {
@@ -515,6 +623,7 @@ func check(it: InputCategoryContiguousConceptLegacyPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)
   checkMutableContiguous(it)
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
 #endif // CPP20

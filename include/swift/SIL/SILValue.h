@@ -372,7 +372,7 @@ struct ValueOwnershipKind {
         return OwnershipKind::Owned;
       case OwnershipKind::Guaranteed:
       case OwnershipKind::Unowned:
-        ABORT("Cannot initialize a nonCopyable type with a guaranteed value");
+        return *this;
       }
     }
     return *this;

@@ -15,6 +15,10 @@ var _ = NSEvent.SpecialKey.enter.rawValue
 var _ = NSUpArrowFunctionKey
 var _ = NSEnterCharacter
 
+#if swift(>=4.2)
+var _ = NSTextAttachment.character
+#endif
+
 #elseif canImport(UIKit)
 import UIKit
 

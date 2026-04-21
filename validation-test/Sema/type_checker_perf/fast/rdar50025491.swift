@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=200 -solver-enable-performance-hacks -solver-enable-prune-disjunctions
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=30000 -solver-disable-performance-hacks -solver-enable-prune-disjunctions
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=200
 
 import Foundation
 

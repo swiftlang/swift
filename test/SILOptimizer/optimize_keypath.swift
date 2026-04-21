@@ -323,10 +323,8 @@ func testNestedModify<T : P>(_ s: inout GenStruct<GenClass<GenClass<T>>>) {
 // CHECK-LABEL: sil {{.*}}testTuple
 // CHECK: [[E:%[0-9]+]] = struct_element_addr
 // CHECK: [[T1:%[0-9]+]] = tuple_element_addr [[E]]
-// CHECK1: [[I:%[0-9]+]] = load [[T1]]
-// CHECK1: [[T2:%[0-9]+]] = tuple_element_addr [[E]]
-// CHECK2: [[T2:%[0-9]+]] = tuple_element_addr [[E]]
-// CHECK2: [[I:%[0-9]+]] = load [[T1]]
+// CHECK: [[T2:%[0-9]+]] = tuple_element_addr [[E]]
+// CHECK: [[I:%[0-9]+]] = load [[T1]]
 // CHECK: store [[I]] to [[T2]]
 // CHECK: return
 @inline(never)
@@ -473,11 +471,9 @@ func testOptionalChain(_ s: SimpleStruct) -> Int? {
 // CHECK: switch_enum [[O:%[0-9]+]]
 // CHECK: bb{{.*}}:
 //         Unwrap value
-//     CHECK1: [[U:%[0-9]+]] = unchecked_enum_data [[O]]
-//     CHECK1: [[I:%[0-9]+]] = struct_extract [[U]]
-//     CHECK2: [[U:%[0-9]+]] = unchecked_take_enum_data_addr [[E2]]
-//     CHECK2: [[SE:%[0-9]+]] = struct_element_addr [[U]]
-//     CHECK2: [[I:%[0-9]+]] = load [[SE]]
+//     CHECK: [[U:%[0-9]+]] = unchecked_take_enum_data_addr [[E2]]
+//     CHECK: [[SE:%[0-9]+]] = struct_element_addr [[U]]
+//     CHECK: [[I:%[0-9]+]] = load [[SE]]
 //     CHECK: [[R1:%[0-9]+]] = enum $Optional<Int>, #Optional.some!enumelt, [[I]]
 //     CHECK: br [[CONTINUATION:bb.]]([[R1]] : $Optional<Int>)
 // CHECK: {{bb.}}:

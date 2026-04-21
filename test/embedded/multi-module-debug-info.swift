@@ -2,7 +2,7 @@
 // RUN: %{python} %utils/split_file.py -o %t %s
 
 // RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -enable-experimental-feature Embedded -parse-as-library
-// RUN: %target-swift-frontend -c -I %t %t/Main.swift -enable-experimental-feature Embedded -verify -verify-ignore-unrelated -o /dev/null
+// RUN: %target-swift-frontend -c -I %t %t/Main.swift -enable-experimental-feature Embedded -o /dev/null
 
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
@@ -14,7 +14,7 @@ public struct MyError: Error {
 
 @inline(never)
 public func foo<T>(_ t: T) throws {
-  throw MyError() // expected-error {{cannot use a value of protocol type 'any Error' in embedded Swift}}
+  throw MyError()
 }
 
 @inline(never)
@@ -30,6 +30,6 @@ public func callit<T>(_ t: T) {
 import MyModule
 
 public func testit() {
-  callit(27) // expected-note {{generic specialization called here}}
+  callit(27)
 }
 

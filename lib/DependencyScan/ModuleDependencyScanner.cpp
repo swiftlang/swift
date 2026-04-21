@@ -10,33 +10,27 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsCommon.h"
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/Frontend/CompileJobCacheKey.h"
+#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/ScanningLoaders.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
 #include "clang/CAS/IncludeTree.h"
-#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/SetOperations.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -45,9 +39,7 @@
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/VirtualFileSystem.h"
-#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputBackends.h"
-#include "llvm/Support/VirtualOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <optional>
@@ -226,6 +218,12 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
           getClangScanningFS(globalScanningService, CAS, ScanASTContext)),
       CAS(CAS), ActionCache(ActionCache),
       diagnosticReporter(DiagnosticReporter) {
+  assert(globalScanningService.ClangScanningService->getCAS() == CAS &&
+         "Need to be the same CAS instance");
+  assert(globalScanningService.ClangScanningService->getActionCache() ==
+             ActionCache &&
+         "Need to be the same ActionCache instance");
+
   // Instantiate a worker-specific diagnostic engine and copy over
   // the scanner's diagnostic consumers (expected to be thread-safe).
   workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(ScanASTContext.SourceMgr);
@@ -259,7 +257,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       workerCompilerInvocation->getFrontendOptions()
           .SerializeModuleInterfaceDependencyHashes,
       workerCompilerInvocation->getFrontendOptions()
-          .shouldTrackSystemDependencies()
+          .shouldTrackSystemDependencies(),
+      CAS, ActionCache
       );
 
   auto loader = std::make_unique<PluginLoader>(
@@ -541,7 +540,6 @@ ModuleDependencyScanner::create(SwiftDependencyScanningService &service,
       std::unique_ptr<ModuleDependencyScanner>(new ModuleDependencyScanner(
           service, cache, instance->getInvocation(), instance->getSILOptions(),
           instance->getASTContext(), *instance->getDependencyTracker(),
-          instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
           instance->getDiags(),
           instance->getInvocation().getFrontendOptions().ParallelDependencyScan,
           instance->getInvocation()
@@ -567,24 +565,22 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     ModuleDependenciesCache &Cache,
     const CompilerInvocation &ScanCompilerInvocation,
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
-    swift::DependencyTracker &DependencyTracker,
-    std::shared_ptr<llvm::cas::ObjectStore> CAS,
-    std::shared_ptr<llvm::cas::ActionCache> ActionCache,
-    DiagnosticEngine &Diagnostics, bool ParallelScan,
-    bool EmitScanRemarks)
+    swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics,
+    bool ParallelScan, bool EmitScanRemarks)
     : ScanCompilerInvocation(ScanCompilerInvocation),
       ScanASTContext(ScanASTContext),
       ScanDiagnosticReporter(Diagnostics, EmitScanRemarks),
       ModuleOutputPath(ScanCompilerInvocation.getFrontendOptions()
-                       .ExplicitModulesOutputPath),
+                           .ExplicitModulesOutputPath),
       SDKModuleOutputPath(ScanCompilerInvocation.getFrontendOptions()
-                          .ExplicitSDKModulesOutputPath),
+                              .ExplicitSDKModulesOutputPath),
       DependencyCache(Cache),
       NumThreads(ParallelScan
                      ? llvm::hardware_concurrency().compute_thread_count()
                      : 1),
-      ScanningThreadPool(llvm::hardware_concurrency(NumThreads)), CAS(CAS),
-      ActionCache(ActionCache) {
+      ScanningThreadPool(llvm::hardware_concurrency(NumThreads)),
+      CAS(ScanningService.ClangScanningService->getCAS()),
+      ActionCache(ScanningService.ClangScanningService->getActionCache()) {
   // Setup prefix mapping.
   auto &ScannerPrefixMapper =
       ScanCompilerInvocation.getSearchPathOptions().ScannerPrefixMapper;
@@ -672,6 +668,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
 
   auto mainDependencies =
       ModuleDependencyInfo::forSwiftSourceModule({}, buildCommands, {}, {}, {});
+  mainDependencies.setLibraryLevel(ScanASTContext.LangOpts.LibraryLevel);
 
   llvm::StringSet<> alreadyAddedModules;
   // Compute Implicit dependencies of the main module
@@ -1494,29 +1491,32 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
         }
       };
 
-  // Enque asynchronous lookup tasks
-  for (const auto &dependsOn : moduleDependencyInfo.getModuleImports()) {
-    // Avoid querying the underlying Clang module here
-    if (moduleID.ModuleName == dependsOn.importIdentifier)
-      continue;
+  llvm::StringSet<> enquedIdentifiers;
+  auto enqueIfNeeded = [&](const ScannerImportStatementInfo &importInfo) {
+    // Avoid querying the underlying Clang module
+    if (moduleID.ModuleName == importInfo.importIdentifier)
+      return;
     // Avoid querying Swift module dependencies previously looked up
-    if (DependencyCache.hasQueriedSwiftDependency(dependsOn.importIdentifier))
-      continue;
+    if (DependencyCache.hasQueriedSwiftDependency(importInfo.importIdentifier))
+      return;
+    // If we have already enqued this module here, avoid doing it
+    // again. For example, if there's an optional import with the
+    // same identifier as a non-optional import
+    if (!enquedIdentifiers.insert(importInfo.importIdentifier).second)
+      return;
+
     ScanningThreadPool.async(
         scanForSwiftModuleDependency,
-        getModuleImportIdentifier(dependsOn.importIdentifier),
-        moduleDependencyInfo.isTestableImport(dependsOn.importIdentifier));
-  }
-  for (const auto &dependsOn :
-       moduleDependencyInfo.getOptionalModuleImports()) {
-    // Avoid querying the underlying Clang module here
-    if (moduleID.ModuleName == dependsOn.importIdentifier)
-      continue;
-    ScanningThreadPool.async(
-        scanForSwiftModuleDependency,
-        getModuleImportIdentifier(dependsOn.importIdentifier),
-        moduleDependencyInfo.isTestableImport(dependsOn.importIdentifier));
-  }
+        getModuleImportIdentifier(importInfo.importIdentifier),
+        moduleDependencyInfo.isTestableImport(importInfo.importIdentifier));
+  };
+
+  // Enque asynchronous lookup tasks
+  for (const auto &dependsOn : moduleDependencyInfo.getModuleImports())
+    enqueIfNeeded(dependsOn);
+  for (const auto &dependsOn : moduleDependencyInfo.getOptionalModuleImports())
+    enqueIfNeeded(dependsOn);
+
   ScanningThreadPool.wait();
 
   auto recordResolvedModuleImport =
@@ -1887,37 +1887,37 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
   // a path-relative component into dependency scanning and defeat the purpose
   // of prefix mapping. Additionally, if everything is prefix mapped, the
   // embedded header path is also prefix mapped, thus it can't be found anyway.
-  bool useImportHeader = !hasPathMapping();
   auto FS = ScanASTContext.SourceMgr.getFileSystem();
 
   auto chainBridgingHeader = [&](StringRef moduleName, StringRef headerPath,
-                                 StringRef binaryModulePath,
-                                 bool useHeader) -> llvm::Error {
-    if (useHeader) {
-      if (auto buffer = FS->getBufferForFile(headerPath)) {
-        outOS << "#include \"" << headerPath << "\"\n";
-        return llvm::Error::success();
-      }
+                                 StringRef binaryModulePath) -> llvm::Error {
+    auto remapped = remapPath(headerPath);
+    outOS << "#if __has_include(\"" << remapped << "\")\n";
+    outOS << "#import \"" << remapped << "\"\n";
+    outOS << "#else\n";
+
+    if (binaryModulePath.empty()) {
+      outOS << "#error failed to find bridging header for module " << moduleName
+            << "\n";
+    } else {
+      // Extract the embedded bridging header
+      auto moduleBuf = FS->getBufferForFile(binaryModulePath);
+      if (!moduleBuf)
+        return llvm::errorCodeToError(moduleBuf.getError());
+
+      auto content = extractEmbeddedBridgingHeaderContent(
+          std::move(*moduleBuf), /*headerPath=*/"", ScanASTContext);
+      if (!content)
+        return llvm::createStringError("can't load embedded header from " +
+                                       binaryModulePath);
+
+      outOS << "# 1 \"<module-" << moduleName
+            << "-embedded-bridging-header>\" 1\n";
+      outOS << content->getBuffer() << "\n";
     }
 
-    if (binaryModulePath.empty())
-      return llvm::createStringError("failed to load bridging header " +
-                                     headerPath);
+    outOS << "#endif\n";
 
-    // Extract the embedded bridging header
-    auto moduleBuf = FS->getBufferForFile(binaryModulePath);
-    if (!moduleBuf)
-      return llvm::errorCodeToError(moduleBuf.getError());
-
-    auto content = extractEmbeddedBridgingHeaderContent(
-        std::move(*moduleBuf), /*headerPath=*/"", ScanASTContext);
-    if (!content)
-      return llvm::createStringError("can't load embedded header from " +
-                                     binaryModulePath);
-
-    outOS << "# 1 \"<module-" << moduleName
-          << "-embedded-bridging-header>\" 1\n";
-    outOS << content->getBuffer() << "\n";
     return llvm::Error::success();
   };
 
@@ -1934,9 +1934,9 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
       if (binaryMod->headerImport.empty())
         continue;
 
-      if (auto E = chainBridgingHeader(
-              moduleID.ModuleName, binaryMod->headerImport,
-              binaryMod->compiledModulePath, useImportHeader))
+      if (auto E =
+              chainBridgingHeader(moduleID.ModuleName, binaryMod->headerImport,
+                                  binaryMod->compiledModulePath))
         return E;
     }
   }
@@ -1966,8 +1966,7 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
     if (mainModule->textualModuleDetails.bridgingHeaderFile) {
       if (auto E = chainBridgingHeader(
               rootModuleID.ModuleName,
-              *mainModule->textualModuleDetails.bridgingHeaderFile, "",
-              /*useHeader=*/true))
+              *mainModule->textualModuleDetails.bridgingHeaderFile, ""))
         return E;
     }
 
@@ -2106,6 +2105,33 @@ std::string ModuleDependencyScanner::remapPath(StringRef Path) const {
   return PrefixMapper->mapToString(Path);
 }
 
+LibraryLevel swift::libraryLevelFromPath(StringRef modulePath,
+                                         StringRef sdkPath,
+                                         const llvm::Triple &target) {
+  if (!target.isOSDarwin())
+    return LibraryLevel::API;
+
+  namespace path = llvm::sys::path;
+
+  auto hasSDKPrefix = [&](const Twine &a, const Twine &b = "",
+                          const Twine &c = "", const Twine &d = "",
+                          const Twine &e = "") -> bool {
+    SmallString<128> prefix(sdkPath);
+    path::append(prefix, a, b, c, d);
+    path::append(prefix, e);
+    return modulePath.starts_with(prefix);
+  };
+
+  if (hasSDKPrefix("AppleInternal", "Library", "Frameworks") ||
+      hasSDKPrefix("System", "Library", "PrivateFrameworks") ||
+      hasSDKPrefix("System", "iOSSupport", "System", "Library",
+                   "PrivateFrameworks") ||
+      hasSDKPrefix("usr", "local", "include"))
+    return LibraryLevel::SPI;
+
+  return LibraryLevel::API;
+}
+
 ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
     const clang::tooling::dependencies::ModuleDeps &clangModuleDep) {
   // File dependencies for this module.
@@ -2203,6 +2229,12 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
       pcmPath, mappedPCMPath, clangModuleDep.ClangModuleMapFile,
       clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, LinkLibraries,
       IncludeTree, /*module-cache-key*/ "", clangModuleDep.IsSystem);
+  bridgedDependencyInfo.setLibraryLevel(
+      clangModuleDep.ModuleMapIsPrivate
+          ? LibraryLevel::SPI
+          : libraryLevelFromPath(clangModuleDep.ClangModuleMapFile,
+                                 ScanASTContext.SearchPathOpts.getSDKPath(),
+                                 ScanASTContext.LangOpts.Target));
 
   std::vector<ModuleDependencyID> directDependencyIDs;
   for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {

@@ -28,21 +28,21 @@ if #available(SwiftStdlib 6.0, *) {
 
 // CHECK-NEXT: foo - withTaskExecutorPreference
 
-// CHECK: foo - withTaskExecutorPreference - withCheckedContinuation
+// After each continuation resumes, hop_to_executor targets the generic executor.
+// Since the task has a preferred task executor whose identity matches the current
+// serial executor, mustSwitchToRun elides the hop — no enqueue needed.
+
+// CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedContinuation
 // CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedContinuation done
 
-// CHECK: foo - withTaskExecutorPreference - withUnsafeContinuation
+// CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeContinuation
 // CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeContinuation done
 
-// CHECK: foo - withTaskExecutorPreference - withCheckedThrowingContinuation
+// CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedThrowingContinuation
 // CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedThrowingContinuation done
 
-// CHECK: foo - withTaskExecutorPreference - withUnsafeThrowingContinuation
+// CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeThrowingContinuation
 // CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeThrowingContinuation done
-
-// By checking that this is the second enqueue here,
-// we check that there was no stray enqueues between with... invocations:
-// CHECK-NEXT: [executor][task-executor] Enqueue (2)
 
 // CHECK-NEXT: foo - withTaskExecutorPreference done
 
@@ -50,6 +50,11 @@ if #available(SwiftStdlib 6.0, *) {
 // CHECK-NEXT: ---------------------------------------
 // CHECK-NEXT: [executor][actor-executor] Enqueue (1)
 // CHECK-NEXT: actor.foo
+
+// Coming back to the origin executor,
+// which is the same actor as we just executed the continuation body on,
+// is triggering task_switch's fast path and we don't need to enqueue the again.
+// I.e. The "hop back" with hop_to_executor exists, but is optimized at runtime.
 
 // CHECK: actor.foo - withCheckedContinuation
 // CHECK-NEXT: actor.foo - withCheckedContinuation done

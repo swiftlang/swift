@@ -41,8 +41,8 @@ struct CrashInfo {
 
 /// A set of known signatures for a given crasher.
 struct KnownSignatures: Hashable {
-  let primary: Signature
-  var sigs: Set<Signature> = []
+  private(set) var primary: Signature
+  private(set) var sigs: Set<Signature> = []
 
   init(_ sig: Signature) {
     self.primary = sig
@@ -54,6 +54,10 @@ struct KnownSignatures: Hashable {
   }
 
   mutating func add(_ sig: Signature) {
+    // Prefer a non-assertion over assertion signature.
+    if !sig.isAssertion && primary.isAssertion {
+      primary = sig
+    }
     sigs.insert(sig)
   }
 

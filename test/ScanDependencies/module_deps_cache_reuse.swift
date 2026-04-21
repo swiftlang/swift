@@ -37,6 +37,7 @@ import SubE
 
 /// --------Main module
 // CHECK-LABEL: "modulePath": "FooReuse.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: sourceFiles
 // CHECK-NEXT: module_deps_cache_reuse.swift
 // CHECK-NEXT: ],
@@ -96,6 +97,7 @@ import SubE
 /// --------Clang module B
 // CHECK-LABEL: "modulePath": "{{.*}}/B-{{.*}}.pcm",
 
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: sourceFiles
 // CHECK-DAG: module.modulemap
 // CHECK-DAG: B.h
@@ -107,6 +109,7 @@ import SubE
 
 /// --------Swift module F
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: "sourceFiles": [
 // CHECK-NEXT: ],
 // CHECK-NEXT: "directDependencies": [

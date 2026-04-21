@@ -45,6 +45,17 @@ extension Context {
   func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
     bridgedPassContext.canMakeStaticObjectReadOnly(objectType.bridged)
   }
+
+  /// True if the current compilation is in whole-module mode, i.e. the SIL of all source files
+  /// of the module is available.
+  var isWholeModule: Bool {
+    bridgedPassContext.isWholeModule()
+  }
+
+  /// The ModuleDecl of the currently compiled module.
+  var moduleDecl: ModuleDecl {
+    bridgedPassContext.getModuleDecl().getAs(ModuleDecl.self)
+  }
 }
 
 extension MutatingContext {

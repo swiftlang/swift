@@ -46,7 +46,7 @@ public func unnecessary() -> Int { 5 }
 
 // LIBRARY-IR: define linkonce_odr hidden swiftcc { ptr, ptr } @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
 
-// LIBRARY-SIL: sil @$e7Library5helloSaySiGyF
+// LIBRARY-SIL: sil [export_interface] @$e7Library5helloSaySiGyF
 // LIBRARY-SIL: sil @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {
 
 //--- Application.swift
@@ -61,7 +61,7 @@ public func testMe() {
 // Note: "hello" is emitted only into the object file, so there is no definition
 // here.
 
-// APPLICATION-SIL: sil @$e7Library5helloSaySiGyF : $@convention(thin) () -> @owned Array<Int>{{$}}
+// APPLICATION-SIL: sil [export_interface] @$e7Library5helloSaySiGyF : $@convention(thin) () -> @owned Array<Int>{{$}}
 // APPLICATION-IR: declare swiftcc ptr @"$e7Library5helloSaySiGyF"()
 
 // Note: "getArray" is not prohibited from being emitted into the client, so

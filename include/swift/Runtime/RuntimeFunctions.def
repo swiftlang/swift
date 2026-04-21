@@ -96,6 +96,14 @@ FUNCTION(AllocObject, Swift, swift_allocObject, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::Allocating),
          UNKNOWN_MEMEFFECTS)
 
+// RefCounted *swift_allocObjectTyped(Metadata *type, size_t size, size_t alignMask, uint64_t typeId);
+FUNCTION(AllocObjectTyped, Swift, swift_allocObjectTyped, C_CC, AlwaysAvailable,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int64Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Allocating),
+         UNKNOWN_MEMEFFECTS)
+
 // HeapObject *swift_initStackObject(HeapMetadata const *metadata,
 //                                   HeapObject *object);
 FUNCTION(InitStackObject, Swift, swift_initStackObject, C_CC, AlwaysAvailable,
@@ -2698,7 +2706,7 @@ FUNCTION(TaskRemoveCancellationHandler,
 //     void *context);
 FUNCTION(TaskAddPriorityEscalationHandler,
         _Concurrency, swift_task_addPriorityEscalationHandler, SwiftCC,
-        ConcurrencyAvailability,
+        TaskPriorityEscalationHandlersAvailability,
         RETURNS(Int8PtrTy),
         ARGS(Int8PtrTy, Int8PtrTy),
         ATTRS(NoUnwind),
@@ -2709,7 +2717,7 @@ FUNCTION(TaskAddPriorityEscalationHandler,
 //   EscalationNotificationStatusRecord *record);
 FUNCTION(TaskRemovePriorityEscalationHandler,
          _Concurrency, swift_task_removePriorityEscalationHandler, SwiftCC,
-         ConcurrencyAvailability,
+         TaskPriorityEscalationHandlersAvailability,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),

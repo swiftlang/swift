@@ -178,3 +178,9 @@ module SuppressibleProtocols {
   requires cplusplus
   export *
 }
+
+module FriendFunction {
+  header "friend-function.h"
+  requires cplusplus
+  export *
+}

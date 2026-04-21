@@ -284,6 +284,9 @@ public:
   /// Use self key as swift module cacke key
   bool DebugModuleSelfKey = false;
 
+  /// The cache key for PCH.
+  std::string BridgingPCHCacheKey;
+
   /// The compilation directory for the debug info.
   std::string DebugCompilationDir;
 

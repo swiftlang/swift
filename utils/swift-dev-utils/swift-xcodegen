@@ -1,2 +1,2 @@
 #!/bin/zsh
-exec swift run -c release --package-path "$0:A:h" swift-xcodegen "$@"
+exec "$0:A:h/run" swift-xcodegen "$@"

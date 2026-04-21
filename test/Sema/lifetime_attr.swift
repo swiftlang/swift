@@ -310,3 +310,19 @@ func baz1() -> @_lifetime(copy span) (_ span: Span<Int>) -> Span<Int> {
 func baz2() -> @_lifetime(copy span) (_ span: Span<Int>) -> Span<Int> {
   return Holder.incorrect  // expected-error{{cannot convert return expression of type '@_lifetime(borrow 0) (Span<Int>) -> Span<Int>' to return type '@_lifetime(copy span) (_ span: Span<Int>) -> Span<Int>'}}
 }
+
+struct StaticIOMethods {
+  @_lifetime(ne0: copy ne0)
+  static func staticInoutCopying0(ne0: inout NE, ne1: borrowing NE)  {}
+  @_lifetime(ne0: copy ne0, borrow ne1)
+  static func staticInoutCopying0Borrowing1(ne0: inout NE, ne1: borrowing NE)  {}
+  @_lifetime(ne0: copy ne0, copy ne1)
+  static func staticInoutCopying0Copying1(ne0: inout NE, ne1: borrowing NE)  {}
+}
+
+do {
+  typealias IOTransfer = @_lifetime(ne0: copy ne0, borrow ne1) (_ ne0: inout NE, _ ne1: borrowing NE) -> ()
+  let _: IOTransfer = StaticIOMethods.staticInoutCopying0 // OK
+  let _: IOTransfer = StaticIOMethods.staticInoutCopying0Borrowing1 // OK
+  let _: IOTransfer = StaticIOMethods.staticInoutCopying0Copying1 // expected-error {{cannot convert value of type '@_lifetime(0: copy 0, copy 1) (inout NE, borrowing NE) -> ()' to specified type 'IOTransfer' (aka '@_lifetime(ne0: copy ne0, borrow ne1) (_ ne0: inout NE, _ ne1: borrowing NE) -> ()')}}
+}

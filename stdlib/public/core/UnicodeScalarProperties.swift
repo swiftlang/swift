@@ -1203,13 +1203,12 @@ extension Unicode.Scalar.Properties {
     case (0x3400 ... 0x4DBF),
          (0x4E00 ... 0x9FFF),
          (0x20000 ... 0x2A6DF),
-         (0x2A700 ... 0x2B739),
-         (0x2B740 ... 0x2B81D),
-         (0x2B820 ... 0x2CEA1),
+         (0x2A700 ... 0x2B81D),
+         (0x2B820 ... 0x2CEAD),
          (0x2CEB0 ... 0x2EBE0),
          (0x2EBF0 ... 0x2EE5D),
          (0x30000 ... 0x3134A),
-         (0x31350 ... 0x323AF):
+         (0x31350 ... 0x33479):
       return "CJK UNIFIED IDEOGRAPH-\(scalarName)"
 
     case (0xF900 ... 0xFA6D),
@@ -1217,8 +1216,8 @@ extension Unicode.Scalar.Properties {
          (0x2F800 ... 0x2FA1D):
       return "CJK COMPATIBILITY IDEOGRAPH-\(scalarName)"
 
-    case (0x17000 ... 0x187F7),
-         (0x18D00 ... 0x18D08):
+    case (0x17000 ... 0x187FF),
+         (0x18D00 ... 0x18D1E):
       return "TANGUT IDEOGRAPH-\(scalarName)"
 
     case (0x18B00 ... 0x18CD5):

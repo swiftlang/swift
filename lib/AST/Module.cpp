@@ -46,6 +46,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -781,7 +782,9 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
   Bits.ModuleDecl.StrictMemorySafety = 0;
-  Bits.ModuleDecl.DeferredCodeGen = 0;
+  Bits.ModuleDecl.CodeGenModel =
+      static_cast<unsigned>(CodeGenerationModel::Interface);
+  Bits.ModuleDecl.AggressiveCMOEnabled = 0;
 
   // Populate the module's files.
   SmallVector<FileUnit *, 2> files;
@@ -3285,6 +3288,13 @@ LibraryLevel
 ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
                                     const ModuleDecl *module) const {
   auto &ctx = module->getASTContext();
+
+  // Check if the library level was explicitly provided via the explicit
+  // module map (e.g. from the dependency scanner).
+  if (auto level = ctx.getExplicitModuleLibraryLevel(
+          module->getName().str(), module->isNonSwiftModule()))
+    return *level;
+
   namespace path = llvm::sys::path;
   SmallString<128> scratch;
 
@@ -3323,8 +3333,13 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
     return ctx.LangOpts.LibraryLevel;
 
   } else {
-    // Other Swift modules are SPI if they are from the PrivateFrameworks
-    // folder in the SDK.
+    // IPI is never returned by the path heuristic, so the stored value
+    // is the only way to detect it.
+    auto stored = module->getStoredLibraryLevel();
+    if (stored == LibraryLevel::IPI)
+      return stored;
+
+    // For API/SPI, use the path heuristic as before.
     auto modulePath = module->getModuleFilename();
     return fromPrivateFrameworks(modulePath) ?
       LibraryLevel::SPI : LibraryLevel::API;

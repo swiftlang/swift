@@ -163,6 +163,23 @@ set(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES "" CACHE STRING
     "List of SDKs to use for target triples, in the form triple@sdkpath.
     Using this variable precludes setting directly the value for  SWIFT_SDK_embedded_ARCH_\$\{ARCH\}_PATH")
 
+set(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/llvm-ar;crsU"
+    CACHE STRING
+    "Archiver to use when building static archives for non Darwin platform targeting the macOS SDK.
+    This is required when using Xcode 26.4 beta 1 and later.")
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_HOST_VARIANT STREQUAL "macosx")
+  list(GET SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS 0 ARCHIVER_EXECUTABLE)
+  if(NOT EXISTS "${ARCHIVER_EXECUTABLE}" OR IS_DIRECTORY "${ARCHIVER_EXECUTABLE}")
+    message(WARNING "'${ARCHIVER_EXECUTABLE}' is not a valid program, unsetting SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS to be able to pick up a different value at next run.")
+    unset(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS CACHE)
+  endif()
+endif()
+
+option(SWIFT_EMBEDDED_STDLIB_BUILD_EXTRA_TARGET_TRIPLES_ONLY
+       "Whether to skip building the Embedded Swift triples hardcoded in the build system"
+       FALSE)
+
 if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "wasi") AND
@@ -180,10 +197,12 @@ set(EMBEDDED_STDLIB_TARGET_TRIPLES)
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
   if(SWIFT_WASI_SYSROOT_PATH)
-    # Don't attempt to build any other Embedded Swift stdlib triples
-    # when building for WASI.
+    # Also include none-wasm triples, which don't require a sysroot.
+    # Skip non-Wasm targets.
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "wasm32    wasm32-unknown-wasip1  wasm32-unknown-wasip1"
+      "wasm32    wasm32-unknown-wasip1    wasm32-unknown-wasip1"
+      "wasm32    wasm32-unknown-none-wasm  wasm32-unknown-none-wasm"
+      "wasm64    wasm64-unknown-none-wasm  wasm64-unknown-none-wasm"
     )
   else()
     if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
@@ -270,6 +289,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND NOT SWIFT_WASI_SYSROOT_PATH)
       "x86_64  x86_64-unknown-windows-msvc x86_64-unknown-windows-msvc"
     )
   endif()
+endif()
+
+if(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES 
+   AND SWIFT_EMBEDDED_STDLIB_BUILD_EXTRA_TARGET_TRIPLES_ONLY)
+  set(EMBEDDED_STDLIB_TARGET_TRIPLES "")
 endif()
 
 foreach(triple ${SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES})

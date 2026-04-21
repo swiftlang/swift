@@ -414,8 +414,9 @@ void InstructionDeleter::recursivelyForceDeleteUsersAndFixLifetimes(
 }
 
 void swift::eliminateDeadInstruction(SILInstruction *inst,
-                                     InstModCallbacks callbacks) {
-  InstructionDeleter deleter(std::move(callbacks));
+                                     InstModCallbacks callbacks,
+                                     bool assumeFixedLifetimes) {
+  InstructionDeleter deleter(std::move(callbacks), assumeFixedLifetimes);
   deleter.trackIfDead(inst);
   deleter.cleanupDeadInstructions();
 }

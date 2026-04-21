@@ -3,7 +3,7 @@
 // RUN: -enable-experimental-feature Lifetimes \
 // RUN: -disable-lifetime-dependence-diagnostics
 
-// RUN: llvm-bcanalyzer %t/def_implicit_lifetime_dependence.swiftmodule 
+// RUN: %llvm-bcanalyzer %t/def_implicit_lifetime_dependence.swiftmodule 
 
 // RUN: %target-swift-frontend -module-name lifetime-dependence -emit-sil -I %t %s \
 // RUN: -enable-experimental-feature Lifetimes \

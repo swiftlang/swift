@@ -856,3 +856,31 @@ bb0(%0 : $*NC):
   return %r
 }
 
+// CHECK-LABEL: sil @unknown_last_use_on_liverange_exit
+// CHECK:         copy_addr %1 to [init] %3
+// CHECK-LABEL: } // end sil function 'unknown_last_use_on_liverange_exit'
+sil @unknown_last_use_on_liverange_exit : $@convention(thin) (@in_guaranteed (AnyObject, Klass), @inout Klass) -> @out AnyObject {
+bb0(%0 : $*AnyObject, %1 : $*(AnyObject, Klass), %2 : $*Klass):
+  %3 = alloc_stack [lexical] [var_decl] $(AnyObject, Klass)
+  copy_addr %1 to [init] %3
+  %5 = tuple_element_addr %3, 0
+  %6 = tuple_element_addr %3, 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %8 = load %6
+  copy_addr [take] %5 to [init] %0
+  store %8 to %2
+  br bb3
+
+bb2:
+  destroy_addr %3
+  br bb3
+
+bb3:
+  dealloc_stack %3
+  %15 = tuple ()
+  return %15
+}
+
+

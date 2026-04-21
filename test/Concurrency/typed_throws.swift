@@ -21,3 +21,20 @@ func testAsyncFor<S: AsyncSequence>(seq: S) async throws(MyError)
   for try await _ in seq {
   }
 }
+
+do {
+  struct Test {
+    func compute(_: () async throws -> Void) async rethrows {} // expected-note {{found this candidate}}
+    func compute<E>(_: () throws(E) -> Void) throws(E) {} // expected-note {{found this candidate}}
+  }
+
+  func test(_: @Sendable (Test) async throws -> Void) {}
+
+  func unrelated() async {}
+
+  // The solutions are incomparable because rethrows version cannot be called through typed throws one.
+  test {
+    await unrelated()
+    $0.compute {} // expected-error {{ambiguous use of 'compute'}}
+  }
+}

@@ -1,6 +1,6 @@
 // Complex literal expressions in integer generic parameter values with AST verification
 // REQUIRES: swift_feature_LiteralExpressions
-// RUN: %target-swift-frontend -typecheck -dump-ast %s -disable-availability-checking -enable-experimental-feature LiteralExpressions -disable-experimental-parser-round-trip | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -dump-ast %s -disable-availability-checking -enable-experimental-feature LiteralExpressions | %FileCheck %s
 
 let foldAdd: InlineArray<(2 + 3), Int> = [1, 2, 3, 4, 5]
 // CHECK-LABEL: (pattern_named type="InlineArray<5, Int>" "foldAdd")

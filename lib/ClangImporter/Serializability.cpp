@@ -63,7 +63,7 @@ public:
   }
 
 private:
-  Identifier getIdentifier(const clang::IdentifierInfo *clangIdent) {
+  Identifier getIdentifier(const clang::IdentifierInfo *clangIdent) const {
     return Impl.SwiftContext.getIdentifier(clangIdent->getName());
   }
 

@@ -26,7 +26,7 @@ internal import Glibc
 internal import Musl
 #endif
 
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 final class BacktracerThreadLocals {
   lazy var elfImageCache = ElfImageCache()
   lazy var peImageCache = PeImageCache()

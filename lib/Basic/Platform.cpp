@@ -463,13 +463,8 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
                         triple.getOSName(), environment);
   }
 
-  if (triple.isOSFreeBSD()) {
+  if (triple.isOSFreeBSD() || triple.isOSOpenBSD()) {
     return swift::getUnversionedTriple(triple);
-  }
-
-  if (triple.isOSOpenBSD()) {
-    StringRef arch = swift::getMajorArchitectureName(triple);
-    return llvm::Triple(arch, triple.getVendorName(), triple.getOSName());
   }
 
   // Other platforms get no normalization.
@@ -478,15 +473,20 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
 llvm::Triple swift::getUnversionedTriple(const llvm::Triple &triple) {
   StringRef unversionedOSName = triple.getOSName().take_until(llvm::isDigit);
+  StringRef arch = triple.getArchName();
+  if (triple.isOSOpenBSD()) {
+    arch = swift::getMajorArchitectureName(triple);
+  }
+
   if (triple.getEnvironment()) {
     StringRef environment =
         llvm::Triple::getEnvironmentTypeName(triple.getEnvironment());
 
-    return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+    return llvm::Triple(arch, triple.getVendorName(),
                         unversionedOSName, environment);
   }
 
-  return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+  return llvm::Triple(arch, triple.getVendorName(),
                       unversionedOSName);
 }
 
