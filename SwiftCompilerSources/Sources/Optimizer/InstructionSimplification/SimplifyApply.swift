@@ -32,7 +32,7 @@ extension ApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
       return
     }
     if !context.preserveDebugInfo {
-      _ = tryReplaceExistentialArchetype(of: self, context)
+      _ = tryReplaceLocalArchetype(of: self, context)
     }
   }
 }
@@ -43,7 +43,7 @@ extension TryApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
       return
     }
     if !context.preserveDebugInfo {
-      _ = tryReplaceExistentialArchetype(of: self, context)
+      _ = tryReplaceLocalArchetype(of: self, context)
     }
   }
 }
@@ -158,8 +158,8 @@ private func tryOptimizeEnumComparison(apply: ApplyInst, _ context: SimplifyCont
   return true
 }
 
-/// If the apply uses an existential archetype (`@opened("...")`) and the concrete type is known,
-/// replace the existential archetype with the concrete type
+/// If the apply uses a local archetype (`@opened("...")` or `@pack_element("...")`) and the
+/// concrete type is known, replace the local archetype with the concrete type
 ///   1. in the apply's substitution map
 ///   2. in the arguments, e.g. by inserting address casts
 /// For example:
@@ -171,17 +171,17 @@ private func tryOptimizeEnumComparison(apply: ApplyInst, _ context: SimplifyCont
 ///   %4 = unchecked_addr_cast %2 to $*ConcreteType
 ///   %5 = apply %1<ConcreteType>(%4) : <τ_0_0> (τ_0_0) -> ()
 /// ```
-private func tryReplaceExistentialArchetype(of apply: ApplyInst, _ context: SimplifyContext) -> Bool {
+private func tryReplaceLocalArchetype(of apply: ApplyInst, _ context: SimplifyContext) -> Bool {
   if let concreteType = apply.concreteTypeOfDependentOpenedType,
-     apply.canReplaceExistentialArchetype()
+     apply.canReplaceLocalArchetype()
   {
-    let newArgs = apply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context)
+    let newArgs = apply.replaceLocalArchetypeInArguments(withConcreteType: concreteType, context)
 
     let builder = Builder(after: apply, context)
 
     let newApply = builder.createApply(
       function: apply.callee,
-      apply.replaceOpenedArchetypeInSubstitutions(withConcreteType: concreteType, context),
+      apply.replaceLocalArchetypeInSubstitutions(withConcreteType: concreteType, context),
       arguments: newArgs,
       isNonThrowing: apply.isNonThrowing, isNonAsync: apply.isNonAsync,
       specializationInfo: apply.specializationInfo)
@@ -193,17 +193,17 @@ private func tryReplaceExistentialArchetype(of apply: ApplyInst, _ context: Simp
 }
 
 // The same as the previous function, just for try_apply instructions.
-private func tryReplaceExistentialArchetype(of tryApply: TryApplyInst, _ context: SimplifyContext) -> Bool {
+private func tryReplaceLocalArchetype(of tryApply: TryApplyInst, _ context: SimplifyContext) -> Bool {
   if let concreteType = tryApply.concreteTypeOfDependentOpenedType,
-     tryApply.canReplaceExistentialArchetype()
+     tryApply.canReplaceLocalArchetype()
   {
-    let newArgs = tryApply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context)
+    let newArgs = tryApply.replaceLocalArchetypeInArguments(withConcreteType: concreteType, context)
 
     let builder = Builder(before: tryApply, context)
 
     builder.createTryApply(
       function: tryApply.callee,
-      tryApply.replaceOpenedArchetypeInSubstitutions(withConcreteType: concreteType, context),
+      tryApply.replaceLocalArchetypeInSubstitutions(withConcreteType: concreteType, context),
       arguments: newArgs,
       normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock,
       isNonAsync: tryApply.isNonAsync,
@@ -216,20 +216,20 @@ private func tryReplaceExistentialArchetype(of tryApply: TryApplyInst, _ context
 }
 
 private extension FullApplySite {
-  // Precondition: the apply uses only a single existential archetype.
+  // Precondition: the apply uses only a single local archetype.
   // This is checked in `concreteTypeOfDependentOpenedType`
-  func canReplaceExistentialArchetype() -> Bool {
-    // Make sure that existential archetype _is_ a replacement type and not e.g. _contained_ in a
+  func canReplaceLocalArchetype() -> Bool {
+    // Make sure that local archetype _is_ a replacement type and not e.g. _contained_ in a
     // replacement type, like
     //    apply %1<Array<@opened("...")>()
-    // TODO: support non-root existential archetypes
-    guard substitutionMap.replacementTypes.contains(where: { $0.isRootExistentialArchetype }),
-          substitutionMap.replacementTypes.allSatisfy({ $0.isRootExistentialArchetype || !$0.hasLocalArchetype })
+    // TODO: support non-root local archetypes
+    guard substitutionMap.replacementTypes.contains(where: { $0.isRootLocalArchetype }),
+          substitutionMap.replacementTypes.allSatisfy({ $0.isRootLocalArchetype || !$0.hasLocalArchetype })
     else {
       return false
     }
 
-    // Don't allow existential archetypes in direct results and error results.
+    // Don't allow local archetypes in direct results and error results.
     // Note that an opened existential value is address only, so it cannot be a direct result anyway
     // (but it can be once we have opaque values).
     // Also don't support things like direct `Array<@opened("...")>` return values.
@@ -243,23 +243,23 @@ private extension FullApplySite {
     return arguments.allSatisfy { value in
       let type = value.type
       // Allow three cases:
-             // case 1. the argument _is_ the existential archetype
-      return type.isRootExistentialArchetype ||
-             // case 2. the argument _is_ a metatype of the existential archetype
-             (type.isMetatype && type.canonicalType.instanceTypeOfMetatype.isRootExistentialArchetype) ||
-             // case 3. the argument has nothing to do with the existential archetype (or any other local archetype)
+             // case 1. the argument _is_ the local archetype
+      return type.isRootLocalArchetype ||
+             // case 2. the argument _is_ a metatype of the local archetype
+             (type.isMetatype && type.canonicalType.instanceTypeOfMetatype.isRootLocalArchetype) ||
+             // case 3. the argument has nothing to do with the local archetype (or any other local archetype)
              !type.hasLocalArchetype
     }
   }
 
-  func replaceExistentialArchetypeInArguments(
+  func replaceLocalArchetypeInArguments(
     withConcreteType concreteType: CanonicalType,
     _ context: SimplifyContext
   ) -> [Value] {
     let newArgs = argumentOperands.map { (argOp) -> Value in
       let arg = argOp.value
-      if arg.type.isExistentialArchetype {
-        // case 1. the argument _is_ the existential archetype:
+      if arg.type.isLocalArchetype {
+        // case 1. the argument _is_ the local archetype:
         //         just insert an address cast to satisfy type equivalence.
         let builder = Builder(before: self, context)
         let concreteSILType = concreteType.loweredType(in: self.parentFunction)
@@ -277,26 +277,26 @@ private extension FullApplySite {
           }
         }
       }
-      if arg.type.isMetatype, arg.type.canonicalType.instanceTypeOfMetatype.isExistentialArchetype {
-        // case 2. the argument _is_ a metatype of the existential archetype:
+      if arg.type.isMetatype, arg.type.canonicalType.instanceTypeOfMetatype.isLocalArchetype {
+        // case 2. the argument _is_ a metatype of the local archetype:
         //         re-create the metatype with the concrete type.
         let builder = Builder(before: self, context)
         return builder.createMetatype(ofInstanceType: concreteType, representation: arg.type.representationOfMetatype)
       }
-      // case 3. the argument has nothing to do with the existential archetype (or any other local archetype)
+      // case 3. the argument has nothing to do with the local archetype (or any other local archetype)
       return arg
     }
     return Array(newArgs)
   }
 
-  func replaceOpenedArchetypeInSubstitutions(
+  func replaceLocalArchetypeInSubstitutions(
     withConcreteType concreteType: CanonicalType,
     _ context: SimplifyContext
   ) -> SubstitutionMap {
-    let openedArcheType = substitutionMap.replacementTypes.first(where: { $0.isExistentialArchetype })!
+    let localArchetype = substitutionMap.replacementTypes.first(where: { $0.isLocalArchetype })!
 
     let newReplacementTypes = substitutionMap.replacementTypes.map {
-      return $0 == openedArcheType ? concreteType.rawType : $0
+      return $0 == localArchetype ? concreteType.rawType : $0
     }
     let genSig = callee.type.invocationGenericSignatureOfFunction
     return SubstitutionMap(genericSignature: genSig, replacementTypes: newReplacementTypes)
