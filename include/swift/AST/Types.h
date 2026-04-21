@@ -3740,6 +3740,8 @@ protected:
     this->NumYields = NumYields;
     assert(this->NumYields == NumYields && "Yields dropped!");
 
+    // TODO: Extend if / when we'll support lifetime dependencies
+    // for both yields and results at the same time.
     if (Info && CONDITIONAL_ASSERT_enabled()) {
       unsigned maxLifetimeTarget = NumParams + 1;
       if (auto outputFn = Output->getAs<AnyFunctionType>()) {
@@ -3773,6 +3775,10 @@ public:
   /// The internal parameter labels remain the same.
   static void relabelParams(MutableArrayRef<Param> params,
                             ArgumentList *argList);
+
+  /// Given two arrays of yields determine if they are equal in their
+  /// canonicalized form. Yype sugar is *not* taken into account.
+  static bool equalYields(ArrayRef<Yield> a, ArrayRef<Yield> b);
 
   Type getResult() const { return Output; }
   ArrayRef<Param> getParams() const;
@@ -4032,7 +4038,7 @@ public:
 
   bool isThrowing() const { return getExtInfo().isThrowing(); }
 
-  bool isCoroutine() const { return getExtInfo().isCoroutine(); }
+  bool isCoroutine() const { return hasExtInfo() && getExtInfo().isCoroutine(); }
 
   bool hasSendingResult() const { return getExtInfo().hasSendingResult(); }
 

@@ -23,6 +23,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/AvailabilityScope.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
@@ -566,6 +567,7 @@ void checkDeclAttributes(Decl *D);
 void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
+void checkYieldList(YieldList *yields, AbstractFunctionDecl *AFD);
 
 void diagnoseDuplicateBoundVars(Pattern *pattern);
 

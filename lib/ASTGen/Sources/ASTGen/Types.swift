@@ -263,7 +263,28 @@ extension ASTGenVisitor {
   }
 
   func generate(functionType node: FunctionTypeSyntax) -> BridgedFunctionTypeRepr {
-    .createParsed(
+    var yieldsType : BridgedTypeRepr? = nil
+    if let yields = node.yieldClause?.yields {
+      yieldsType = BridgedTupleTypeRepr.createParsed(
+        self.ctx,
+        elements: yields.lazy.map { element in
+          let type = generate(type: element.type)
+          return BridgedTupleTypeElement(
+            Name: nil,
+            NameLoc: nil,
+            SecondName: nil,
+            SecondNameLoc: nil,
+            UnderscoreLoc: nil,
+            ColonLoc: nil,
+            Type: type,
+            TrailingCommaLoc: self.generateSourceLoc(element.trailingComma)
+          )
+        }.bridgedArray(in: self),
+        leftParenLoc: self.generateSourceLoc(node.yieldClause?.leftParen),
+        rightParenLoc: self.generateSourceLoc(node.yieldClause?.rightParen)
+      ).asTypeRepr
+    }  
+    return BridgedFunctionTypeRepr.createParsed(
       self.ctx,
       // FIXME: Why does `FunctionTypeSyntax` not have a `TupleTypeSyntax` child?
       argsType: BridgedTupleTypeRepr.createParsed(
@@ -275,8 +296,7 @@ extension ASTGenVisitor {
       asyncLoc: self.generateSourceLoc(node.effectSpecifiers?.asyncSpecifier),
       throwsLoc: self.generateSourceLoc(node.effectSpecifiers?.throwsClause?.throwsSpecifier),
       thrownType: self.generate(type: node.effectSpecifiers?.thrownError),
-      yieldsLoc: self.generateSourceLoc(node.yieldsClause?.yieldsKeyword),
-      yieldType: generate(type: node.yieldsClause?.type),
+      yieldsType: yieldsType.asNullable,
       arrowLoc: self.generateSourceLoc(node.returnClause.arrow),
       resultType: generate(type: node.returnClause.type)
     )

@@ -1490,7 +1490,7 @@ void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
 SWIFT_NAME("BridgedFuncDecl.createParsed(_:declContext:staticLoc:"
            "staticSpelling:funcKeywordLoc:"
            "name:nameLoc:genericParamList:parameterList:asyncSpecifierLoc:"
-           "throwsSpecifierLoc:thrownType:yieldsKeywordLoc:yieldType:"
+           "throwsSpecifierLoc:thrownType:yieldList:"
            "returnType:genericWhereClause:)")
 BridgedFuncDecl BridgedFuncDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
@@ -1499,8 +1499,7 @@ BridgedFuncDecl BridgedFuncDecl_createParsed(
     swift::SourceLoc nameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedParameterList parameterList, swift::SourceLoc asyncLoc,
     swift::SourceLoc throwsLoc, BridgedNullableTypeRepr thrownType,
-    swift::SourceLoc yieldsLoc, BridgedNullableTypeRepr yieldType,
-    BridgedNullableTypeRepr returnType,
+    BridgedNullableYieldList yieldList, BridgedNullableTypeRepr returnType,
     BridgedNullableTrailingWhereClause opaqueGenericWhereClause);
 
 SWIFT_NAME(
@@ -2682,13 +2681,12 @@ BridgedErrorTypeRepr BridgedErrorTypeRepr_create(BridgedASTContext cContext,
                                                  swift::SourceRange range);
 
 SWIFT_NAME("BridgedFunctionTypeRepr.createParsed(_:argsType:asyncLoc:throwsLoc:"
-           "thrownType:yieldsLoc:yieldType:arrowLoc:resultType:)")
+           "thrownType:yieldsType:arrowLoc:resultType:)")
 BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr argsTy,
     swift::SourceLoc asyncLoc, swift::SourceLoc throwsLoc,
-    BridgedNullableTypeRepr thrownType, swift::SourceLoc yieldsLoc,
-    BridgedNullableTypeRepr yieldType, swift::SourceLoc arrowLoc,
-    BridgedTypeRepr resultType);
+    BridgedNullableTypeRepr thrownType, BridgedNullableTypeRepr yieldsType,
+    swift::SourceLoc arrowLoc, BridgedTypeRepr resultType);
 
 SWIFT_NAME("BridgedUnqualifiedIdentTypeRepr.createParsed(_:name:nameLoc:"
            "genericArgs:leftAngleLoc:rightAngleLoc:)")
@@ -3012,6 +3010,13 @@ size_t BridgedParameterList_size(BridgedParameterList cParameterList);
 SWIFT_NAME("BridgedParameterList.get(self:_:)")
 BridgedParamDecl BridgedParameterList_get(BridgedParameterList cParameterList,
                                           size_t i);
+
+SWIFT_NAME("BridgedYieldList.createParsed(_:leftParenLoc:yieldTypes:"
+           "rightParenLoc:)")
+BridgedYieldList BridgedYieldList_createParsed(BridgedASTContext cContext,
+                                               swift::SourceLoc leftParenLoc,
+                                               BridgedArrayRef cYieldTypes,
+                                               swift::SourceLoc rightParenLoc);
 
 //===----------------------------------------------------------------------===//
 // MARK: Misc

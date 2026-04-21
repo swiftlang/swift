@@ -5026,6 +5026,20 @@ void AnyFunctionType::relabelParams(MutableArrayRef<Param> params,
   }
 }
 
+bool AnyFunctionType::equalYields(ArrayRef<AnyFunctionType::Yield> a,
+                                  ArrayRef<AnyFunctionType::Yield> b) {
+  if (a.size() != b.size())
+    return false;
+
+  for (unsigned i = 0, n = a.size(); i != n; ++i) {
+    if (a[i] != b[i])
+      return false;
+  }
+
+  return true;
+}
+
+
 /// Profile \p params into \p ID. In contrast to \c == on \c Param, the profile
 /// *does* take the internal label into account and *does not* canonicalize
 /// the param's type.

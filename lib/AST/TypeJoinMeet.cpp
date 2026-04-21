@@ -348,6 +348,10 @@ CanType TypeJoin::visitFunctionType(CanType second) {
                                     secondFnTy->getParams()))
     return Unimplemented;
 
+  if (!AnyFunctionType::equalYields(firstFnTy->getYields(),
+                                    secondFnTy->getYields()))
+    return Unimplemented;
+
   auto firstResult = firstFnTy->getResult()->getCanonicalType();
   auto secondResult = secondFnTy->getResult()->getCanonicalType();
 

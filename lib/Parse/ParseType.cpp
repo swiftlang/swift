@@ -25,6 +25,7 @@
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/ParserResult.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -410,32 +411,45 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   return makeParserResult(attrs.applyAttributesToType(*this, repr));
 }
 
-ParserStatus Parser::parseYield(SourceLoc &yieldLoc, TypeRepr *&yieldType) {
-  ParserStatus status;
-
+ParserStatus Parser::parseYieldTypes(TupleTypeRepr *&yieldTypes) {
   if (!Tok.isContextualKeyword("yields"))
     return makeParserSuccess();
 
-  if (!Context.LangOpts.hasFeature(Feature::CoroutineFunctions))
+  if (!Context.LangOpts.hasFeature(Feature::CoroutineFunctions)) {
     diagnose(Tok, diag::yields_requires_coroutine_functions);
-  
-  yieldLoc = consumeToken();
-
-  // Parse the yield type.
-  SourceLoc lParenLoc;
-  if (consumeIf(tok::l_paren, lParenLoc)) {
-    ParserResult<TypeRepr> parsedYieldTy = parseType(diag::expected_yield_type);
-    yieldType = parsedYieldTy.getPtrOrNull();
-    status |= parsedYieldTy;
-
-    // TODO: Validate parsed yield type.
-    
-    SourceLoc rParenLoc;
-    parseMatchingToken(tok::r_paren, rParenLoc,
-                       diag::expected_rparen_after_yield_type,
-                       lParenLoc);
+    return makeParserError();
   }
 
+  consumeToken();
+
+  Parser::StructureMarkerRAII ParsingYieldTypes(*this, Tok);
+  SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
+
+  SmallVector<TupleTypeReprElement, 8> ElementsR;
+  ParserStatus status =
+      parseList(tok::r_paren, LPLoc, RPLoc,
+                /*AllowSepAfterLast=*/true,
+                diag::expected_rparen_tuple_type_list, [&]() -> ParserStatus {
+                  TupleTypeReprElement element;
+
+                  // Parse the type annotation.
+                  auto type = parseType(diag::expected_yield_type);
+                  if (type.hasCodeCompletion())
+                    return makeParserCodeCompletionStatus();
+                  if (type.isNull())
+                    return makeParserError();
+                  element.Type = type.get();
+
+                  // Record the ',' location.
+                  if (Tok.is(tok::comma))
+                    element.TrailingCommaLoc = Tok.getLoc();
+
+                  ElementsR.push_back(element);
+                  return makeParserSuccess();
+                });
+
+  yieldTypes =
+      TupleTypeRepr::create(Context, ElementsR, SourceRange(LPLoc, RPLoc));
   return status;
 }
 
@@ -509,14 +523,13 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
   TypeRepr *thrownTy = nullptr;
-  SourceLoc yieldsLoc;
-  TypeRepr *yieldTy = nullptr;
+  TupleTypeRepr *yieldsTy = nullptr;
   if (isAtFunctionTypeArrow()) {
     status |= parseEffectsSpecifiers(SourceLoc(),
                                      asyncLoc, /*reasync=*/nullptr,
                                      throwsLoc, /*rethrows=*/nullptr,
                                      thrownTy);
-    status |= parseYield(yieldsLoc, yieldTy);
+    status |= parseYieldTypes(yieldsTy);
   }
 
   // Handle type-function if we have an arrow.
@@ -611,10 +624,10 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
       }
     }
 
-    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
-                                         thrownTy, yieldsLoc, yieldTy, arrowLoc,
-                                         SecondHalf.get(), patternGenerics,
-                                         patternSubsTypes, invocationSubsTypes);
+    tyR = new (Context)
+        FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc, thrownTy,
+                         yieldsTy, arrowLoc, SecondHalf.get(), patternGenerics,
+                         patternSubsTypes, invocationSubsTypes);
   } else if (auto firstGenerics = generics ? generics : patternGenerics) {
     // Only function types may be generic.
     auto brackets = firstGenerics->getSourceRange();

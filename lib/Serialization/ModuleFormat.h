@@ -1837,8 +1837,6 @@ namespace decls_block {
     BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
     TypeIDField,  // thrown error
-    TypeIDField,  // yield value type
-    BCFixed<1>,   // inout yield?
     GenericSignatureIDField, // generic environment
     TypeIDField,  // result interface type
     BCFixed<1>,   // IUO result?

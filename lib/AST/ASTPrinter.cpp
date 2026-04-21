@@ -4718,15 +4718,34 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       });
 
     if (decl->isCoroutine()) {
-      TypeLoc YieldTyLoc(decl->getResultTypeRepr(),
-                         decl->getYieldsInterfaceType());
+      SmallVector<AnyFunctionType::Yield, 1> yields;
+      decl->getYieldInterfaceTypes(yields);
+      auto *bodyYields = decl->getYields();
 
       Printer.printStructurePre(PrintStructureKind::CoroutineYieldsTypes);
       SWIFT_DEFER {
         Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
       };
-      Printer << " " << tok::kw_yield << " ";
-      printTypeLoc(YieldTyLoc, getNonRecursiveOptions(decl));
+      Printer << " " << tok::kw_yield << " (";
+
+      for (auto [idx, yield] : llvm::enumerate(yields)) {
+        if (idx > 0)
+          Printer << ", ";
+
+        Type interfaceTy = yield.getType();
+        TypeLoc TheTypeLoc;
+        if (bodyYields) {
+          TheTypeLoc = TypeLoc(bodyYields->get(idx).getTypeRepr(), interfaceTy);
+        } else {
+          TheTypeLoc = TypeLoc::withoutLoc(interfaceTy);
+        }
+
+        if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options))
+          printParameterFlags(Printer, Options, nullptr,
+                              yield.getFlags().asParamFlags(), false);
+
+        printTypeLoc(TheTypeLoc, getNonRecursiveOptions(decl));
+      }
     }
 
     Type ResultTy = decl->getResultInterfaceType();

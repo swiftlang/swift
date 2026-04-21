@@ -223,8 +223,8 @@ BridgedFuncDecl BridgedFuncDecl_createParsed(
     SourceLoc funcKeywordLoc, swift::Identifier name, SourceLoc nameLoc,
     BridgedNullableGenericParamList genericParamList,
     BridgedParameterList parameterList, SourceLoc asyncLoc, SourceLoc throwsLoc,
-    BridgedNullableTypeRepr thrownType, SourceLoc yieldsLoc,
-    BridgedNullableTypeRepr yieldType, BridgedNullableTypeRepr returnType,
+    BridgedNullableTypeRepr thrownType, BridgedNullableYieldList yieldList,
+    BridgedNullableTypeRepr returnType,
     BridgedNullableTrailingWhereClause genericWhereClause) {
   ASTContext &context = cContext.unbridged();
 
@@ -235,9 +235,8 @@ BridgedFuncDecl BridgedFuncDecl_createParsed(
   auto *decl = FuncDecl::create(
       context, staticLoc, unbridged(cStaticSpelling), funcKeywordLoc, declName,
       nameLoc, asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(), throwsLoc,
-      thrownType.unbridged(), yieldsLoc, yieldType.unbridged(),
-      genericParamList.unbridged(), paramList, returnType.unbridged(),
-      cDeclContext.unbridged());
+      thrownType.unbridged(), genericParamList.unbridged(), paramList,
+      yieldList.unbridged(), returnType.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
 
   return decl;
@@ -694,4 +693,17 @@ size_t BridgedParameterList_size(BridgedParameterList cParameterList) {
 BridgedParamDecl BridgedParameterList_get(BridgedParameterList cParameterList,
                                           size_t i) {
   return cParameterList.unbridged()->get(i);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedYieldList
+//===----------------------------------------------------------------------===//
+
+BridgedYieldList BridgedYieldList_createParsed(BridgedASTContext cContext,
+                                               SourceLoc leftParenLoc,
+                                               BridgedArrayRef cYieldTypes,
+                                               SourceLoc rightParenLoc) {
+  ASTContext &context = cContext.unbridged();
+  return YieldList::create(context, leftParenLoc,
+                           cYieldTypes.unbridged<TypeRepr *>(), rightParenLoc);
 }

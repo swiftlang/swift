@@ -139,6 +139,7 @@ add_swift_host_library(swiftAST STATIC
   TypeWalker.cpp
   UnqualifiedLookup.cpp
   USRGeneration.cpp
+  Yield.cpp
 
   LLVM_LINK_COMPONENTS
   ${SWIFTAST_LLVM_LINK_COMPONENTS}
