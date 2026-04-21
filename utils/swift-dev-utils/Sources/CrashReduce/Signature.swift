@@ -56,6 +56,14 @@ public final class Signature: Sendable {
   public var isAssertion: Bool {
     assertion != nil && symbol == nil
   }
+
+  static var unknown: Signature {
+    Signature(symbols: ["unknown"], assertion: nil)
+  }
+
+  public var isUnknown: Bool {
+    symbol == "unknown"
+  }
 }
 
 extension Signature: Hashable {
