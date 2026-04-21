@@ -165,7 +165,7 @@ param
 
   # Dependencies
   [ValidatePattern('^\d+(\.\d+)*$')]
-  [string] $PythonVersion = "3.10.1",
+  [string] $PythonVersion = "3.11.9",
 
   # Toolchain Version Info
   [string] $ProductVersion = "0.0.0",
@@ -427,6 +427,24 @@ $KnownPythons = @{
     ARM64_Embedded = @{
       URL = "https://www.python.org/ftp/python/3.10.1/python-3.10.1-embed-arm64.zip";
       SHA256 = "1f9e215fe4e8f22a8e8fba1859efb1426437044fb3103ce85794630e3b511bc2";
+    };
+  };
+  "3.11.9" = @{
+    AMD64 = @{
+      URL = "https://www.nuget.org/api/v2/package/python/3.11.9";
+      SHA256 = "9283876d58c017e0e846f95b490da3bca0fc0a6ee1134b2870677cfb7eec3c67";
+    };
+    AMD64_Embedded = @{
+      URL = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip";
+      SHA256 = "009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b";
+    };
+    ARM64 = @{
+      URL = "https://www.nuget.org/api/v2/package/pythonarm64/3.11.9";
+      SHA256 = "2f5b3bee38850fdde1b44227a23b8130d329839558376d2eb11099ce2b2cc33c";
+    };
+    ARM64_Embedded = @{
+      URL = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-arm64.zip";
+      SHA256 = "1a6dae49d15320270a7141f93b574ff7686a7a526efa65e63ddbebf9b409929a";
     };
   };
 }
