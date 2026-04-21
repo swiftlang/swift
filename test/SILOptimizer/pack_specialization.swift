@@ -52,3 +52,31 @@ public func zipAddPacksCaller(x: Int32, y: UInt32, a: Int8, b: Int16)
   -> ((Int32, Int8), (UInt32, Int16)) {
   return zipPacks(xs: x, y, zs: a, b)
 }
+
+// When applying a generic function to each element of a pack, the callee can be
+// specialized if the (variadic generic) caller is specialized.
+func numericOp<T: BinaryInteger>(_ x: T) -> T {
+  if x <= 1 {
+    return x
+  } else {
+    let (p, q) = numericLoop(x - 1, x - 2)
+    return p + q
+  }
+}
+
+// CHECK: define {{.*}} i64 @"$s19pack_specialization11numericLoopyxxQp_txxQpRvzSzRzlFs5Int32V_ADQP_Tg5Tf8xx_n"(i32 %0, i32 %1)
+// CHECK: [[SP1:%[0-9]+]] = add nsw i32 %0, -1
+// CHECK: [[SP2:%[0-9]+]] = add nsw i32 %0, -2
+// CHECK: [[SP_RESULT:%[0-9]+]] = tail call {{.*}} @"$s19pack_specialization11numericLoopyxxQp_txxQpRvzSzRzlFs5Int32V_ADQP_Tg5Tf8xx_n"(i32 [[SP1]], i32 [[SP2]])
+// CHECK-NEXT: [[SP_RESULT1:%[^ ]+]] = trunc i64 [[SP_RESULT]] to i32
+// CHECK-NEXT: [[SP_RESULT2_64:%[^ ]+]] = lshr i64 [[SP_RESULT]], 32
+// CHECK-NEXT: [[SP_RESULT2:%[^ ]+]] = trunc nuw i64 [[SP_RESULT2_64]] to i32
+// CHECK: tail call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 [[SP_RESULT1]], i32 [[SP_RESULT2]])
+@inline(never)
+func numericLoop<each T: BinaryInteger>(_ xs: repeat each T) -> (repeat each T) {
+  return (repeat numericOp(each xs))
+}
+
+public func callNumericLoop() -> (Int32, Int32) {
+  numericLoop(39, 39)
+}

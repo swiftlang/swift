@@ -62,6 +62,7 @@ sil_vtable Bar {
 sil @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (@out τ_0_0, @error any Error)
 sil @returnGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (GenS<τ_0_0>, @error any Error)
 sil @throwGenError : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ((), @error GenError<τ_0_0>)
+sil @use_p_throwing : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ((), @error any Error)
 
 // CHECK-LABEL: sil [ossa] @replace_archetype :
 // CHECKO:        [[E:%.*]] = init_existential_addr %0
@@ -158,4 +159,23 @@ bb3:
   destroy_value %5
   %9 = tuple ()
   return %9
+}
+
+// CHECK-LABEL: sil [ossa] @replace_pack_element_archetype :
+// CHECKONONE:    apply %{{.*}}<@pack_element
+// CHECKO:        try_apply %{{.*}}<S>(
+// CHECK:       } // end sil function 'replace_pack_element_archetype'
+sil [ossa] @replace_pack_element_archetype : $@convention(thin) (@in_guaranteed S) -> ((), @error any Error) {
+bb0(%s : $*S):
+  %idx = scalar_pack_index 0 of $Pack{S}
+  open_pack_element %idx of <each T where repeat each T : P> at <Pack{S}>, shape $each T, uuid "44444444-0000-0000-0000-000000000000"
+  %s_cast = unchecked_addr_cast %s to $*@pack_element("44444444-0000-0000-0000-000000000000") each T
+  %fn = function_ref @use_p_throwing : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ((), @error any Error)
+  try_apply %fn<@pack_element("44444444-0000-0000-0000-000000000000") each T>(%s_cast) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ((), @error any Error), normal bb1, error bb2
+
+bb1(%r : $()):
+  return %r : $()
+
+bb2(%err : $any Error):
+  throw %err : $any Error
 }

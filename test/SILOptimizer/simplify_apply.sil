@@ -323,14 +323,11 @@ bb0:
   return %9
 }
 
-// TODO: replace pack element archetypes once canReplaceExistentialArchetype() handles them.
-// The canReplaceExistentialArchetype() guard checks isRootExistentialArchetype, which is
-// false for @pack_element types, so the apply is not simplified.
-
-// CHECK-LABEL: sil [ossa] @dont_replace_pack_element_archetype :
-// CHECK:         apply %{{.*}}<@pack_element
-// CHECK:       } // end sil function 'dont_replace_pack_element_archetype'
-sil [ossa] @dont_replace_pack_element_archetype : $@convention(thin) (@in_guaranteed S) -> () {
+// CHECK-LABEL: sil [ossa] @replace_pack_element_archetype :
+// CHECKONONE:    apply %{{.*}}<@pack_element
+// CHECKO:        apply %{{.*}}<S>(
+// CHECK:       } // end sil function 'replace_pack_element_archetype'
+sil [ossa] @replace_pack_element_archetype : $@convention(thin) (@in_guaranteed S) -> () {
 bb0(%s : $*S):
   %idx = scalar_pack_index 0 of $Pack{S}
   open_pack_element %idx of <each T where repeat each T : P> at <Pack{S}>, shape $each T, uuid "44444444-0000-0000-0000-000000000000"
