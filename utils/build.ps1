@@ -4114,32 +4114,23 @@ function Build-TestingMacros([Hashtable] $Platform) {
     }
 }
 
-function Install-HostToolchain() {
-  # We've already special-cased $HostPlatform.ToolchainInstallRoot to point to $ToolchainInstallRoot.
-  # There are only a few extra restructuring steps we need to take care of.
-
+function Install-HostToolchain([string] $ToolchainInstallRoot) {
   # Restructure _InternalSwiftScan (keep the original one for the installer)
   Copy-Item -Force `
-    -Path "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\_InternalSwiftScan" `
-    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\include"
+    -Path "$ToolchainInstallRoot\usr\lib\swift\_InternalSwiftScan" `
+    -Destination "$ToolchainInstallRoot\usr\include"
   Copy-Item -Force `
-    -Path "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\windows\_InternalSwiftScan.lib" `
-    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\lib"
+    -Path "$ToolchainInstallRoot\usr\lib\swift\windows\_InternalSwiftScan.lib" `
+    -Destination "$ToolchainInstallRoot\usr\lib"
 
   # Switch to swift-driver
   $SwiftDriver = ([IO.Path]::Combine((Get-ProjectBinaryCache $HostPlatform Driver), "bin", "swift-driver.exe"))
   Copy-Item -Force `
     -Path $SwiftDriver `
-    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swift.exe"
+    -Destination "$ToolchainInstallRoot\usr\bin\swift.exe"
   Copy-Item -Force `
     -Path $SwiftDriver `
-    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
-
-  # Copy embeddable Python
-  New-Item -Type Directory -Path "$(Get-EmbeddedPythonInstallDir)" -ErrorAction Ignore | Out-Null
-  Copy-Item -Force -Recurse `
-    -Path "$(Get-EmbeddedPythonPath $HostPlatform)\*" `
-    -Destination "$(Get-EmbeddedPythonInstallDir)"
+    -Destination "$ToolchainInstallRoot\usr\bin\swiftc.exe"
 }
 
 function Build-Inspect([Hashtable] $Platform) {
@@ -4263,13 +4254,13 @@ function Build-NoAssertsToolchain() {
 
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts"
 
-  # Only compilers have NoAsserts enabled. Copy the rest of the Toolcahin binaries from the Asserts output
+  # Only compilers have NoAsserts enabled. Copy the rest of the Toolchain binaries from the Asserts output
   # Use robocopy for efficient copying
   #   /E : Copies subdirectories, including empty ones.
   #   /XC: Excludes existing files with the same timestamp but different file sizes.
   #   /XN: Excludes existing files that are newer than the copy in the source directory.
   #   /XO: Excludes existing files that are older than the copy in the source directory.
-  #   /NFL: Do not list coppied files in output
+  #   /NFL: Do not list copied files in output
   #   /NDL: Do not list directories in output
   #   /NJH: Do not write a job header
   #   /NC: Do not write file classes
@@ -4277,7 +4268,9 @@ function Build-NoAssertsToolchain() {
   #   /NP: Do not show progress indicator
   &robocopy $HostPlatform.ToolchainInstallRoot $HostPlatform.NoAssertsToolchainInstallRoot /E /XC /XN /XO /NS /NC /NFL /NDL /NJH
 
-  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building Instalting NoAsserts Toolchain in $($Stopwatch.Elapsed)"
+  Install-HostToolchain $HostPlatform.NoAssertsToolchainInstallRoot
+
+  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished installing NoAsserts Toolchain in $($Stopwatch.Elapsed)"
   Write-Host ""
 }
 
@@ -4547,7 +4540,13 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Inspect $HostPlatform
 }
 
-Install-HostToolchain
+Install-HostToolchain $HostPlatform.ToolchainInstallRoot
+
+# Copy embeddable Python
+New-Item -Type Directory -Path "$(Get-EmbeddedPythonInstallDir)" -ErrorAction Ignore | Out-Null
+Copy-Item -Force -Recurse `
+  -Path "$(Get-EmbeddedPythonPath $HostPlatform)\*" `
+  -Destination "$(Get-EmbeddedPythonInstallDir)"
 
 if (-not $SkipBuild -and -not $IsCrossCompiling) {
   Invoke-BuildStep Build-DocC $HostPlatform
