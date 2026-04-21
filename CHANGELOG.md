@@ -34,6 +34,13 @@
   }
   ```
 
+* Upcoming feature flag `ObjCAsyncBridgeImmediateTask` (enabled via
+  `-enable-upcoming-feature ObjCAsyncBridgeImmediateTask`) which opts into
+  using `Task.immediate` when bridging calls from Objective-C to Swift async functions.
+  `Task.immediate` has preferable scheduling guarantees as it does not incur an immediate hop
+  to the global executor, however this is a behavior change your application needs to verify
+  it can handle appropriately as it may violate previously invisible threading assumptions.
+
 * The checking for illegal forward references to local variables is now consistent regardless of
   whether the reference appears in a closure. Previously the type-checker could incorrectly permit
   forward references within a closure that it would reject outside of the closure, however this

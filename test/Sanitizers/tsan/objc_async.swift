@@ -14,8 +14,8 @@
 
 @main struct Main {
   static func main() async {
-      let butt = Butt()
-      let result = await butt.butt(1738)
+      let obj = MyNSInterfaceWithCallbackFunc()
+      let result = await obj.compute(1738)
       print("finishing \(result)")
   }
 }

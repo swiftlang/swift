@@ -1586,8 +1586,13 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
                                       closureArgs,
                                       ParameterConvention::Direct_Guaranteed);
   auto closureMV = emitManagedRValueWithCleanup(closureVal);
-  // Pass the closure on to the intrinsic to spawn it on a task.
-  auto spawnTask = SGM.getRunTaskForBridgedAsyncMethod();
+  // Select task creation mode for ObjC-to-Swift async bridging
+  FuncDecl *spawnTask;
+  if (getASTContext().LangOpts.hasFeature(Feature::ObjCAsyncBridgeImmediateTask)) {
+    spawnTask = SGM.getRunTaskImmediateForBridgedAsyncMethod();
+  } else {
+    spawnTask = SGM.getRunTaskForBridgedAsyncMethod();
+  }
   emitApplyOfLibraryIntrinsic(loc, spawnTask, {}, closureMV, SGFContext());
   
   scope.pop();

@@ -697,6 +697,7 @@ static bool usesFeatureBorrowInout(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BorrowingSequence)
+UNINTERESTING_FEATURE(ObjCAsyncBridgeImmediateTask)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

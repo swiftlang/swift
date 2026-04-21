@@ -544,6 +544,8 @@ public:
   FuncDecl *getResumeUnsafeThrowingContinuationWithError();
   /// Retrieve the _Concurrency._runTaskForBridgedAsyncMethod intrinsic.
   FuncDecl *getRunTaskForBridgedAsyncMethod();
+  /// Retrieve the _Concurrency._runTaskImmediateForBridgedAsyncMethod intrinsic.
+  FuncDecl *getRunTaskImmediateForBridgedAsyncMethod();
   /// Retrieve the _Concurrency._checkExpectedExecutor intrinsic.
   FuncDecl *getCheckExpectedExecutor();
 
