@@ -17,6 +17,7 @@
 #include "TypeCheckDecl.h"
 #include "CodeSynthesis.h"
 #include "DerivedConformance/DerivedConformance.h"
+#include "LiteralExpressionFolding.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
@@ -26,7 +27,6 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
-#include "LiteralExpressionFolding.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -52,6 +52,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/YieldList.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
@@ -2130,11 +2131,14 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       .resolveType(resultTyRepr);
 }
 
-Type YieldsTypeRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
+Type YieldsTypeRequest::evaluate(Evaluator &evaluator, FuncDecl *decl,
+                                 unsigned idx) const {
   auto &ctx = decl->getASTContext();
 
   //  Accessors always inherit their yield type from their storage.
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+    ASSERT(idx == 0 && "invalid accessor decl yield");
+
     auto *storage = accessor->getStorage();
 
     auto kind = accessor->getAccessorKind();
@@ -2162,13 +2166,13 @@ Type YieldsTypeRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
     }
   }
 
-  TypeRepr *yieldTyRepr = nullptr;
-  if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
-    yieldTyRepr = funcDecl->getYieldTypeRepr();
+  if (auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
+    YieldList *YL = funcDecl->getYields();
 
-    if (funcDecl->isCoroutine() && !yieldTyRepr)
+    if (!funcDecl->isCoroutine() || !YL || idx >= YL->size())
       return ErrorType::get(ctx);
 
+    TypeRepr *yieldTyRepr = YL->get(idx).getTypeRepr();
     assert(funcDecl->isCoroutine() && yieldTyRepr);
 
     auto options = TypeResolutionOptions(TypeResolverContext::FunctionResult);
@@ -2183,7 +2187,7 @@ Type YieldsTypeRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
         .resolveType(yieldTyRepr);
   }
 
-  assert(0 && "unexpected coroutine decl");
+  ASSERT(false && "unexpected coroutine decl");
   return ErrorType::get(ctx); // TupleType::getEmpty(ctx);
 }
 
@@ -2602,14 +2606,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     // Yields
     SmallVector<AnyFunctionType::Yield, 1> yields;
-    if (AFD->isCoroutine()) {
-      auto yieldTy = cast<FuncDecl>(AFD)->getYieldsInterfaceType();
-      if (auto inOutType = yieldTy->getAs<InOutType>()) {
-        yields.emplace_back(inOutType->getObjectType(), ParamSpecifier::InOut);
-      } else {
-        yields.emplace_back(yieldTy, ParamSpecifier::Default);
-      }
-    }
+    if (auto fn = dyn_cast<FuncDecl>(D); fn && fn->isCoroutine())
+      fn->getYieldInterfaceTypes(yields);
 
     auto lifetimeDependenceInfo = AFD->getLifetimeDependencies();
 

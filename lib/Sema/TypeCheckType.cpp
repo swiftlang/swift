@@ -4698,21 +4698,24 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     auto yieldsOptions = options.withoutContext();
     yieldsOptions.setContext(TypeResolverContext::FunctionResult);
     yieldsOptions |= TypeResolutionFlags::Coroutine;
-    assert(repr->getYieldTypeRepr());
-    auto yieldTy = resolveType(repr->getYieldTypeRepr(), yieldsOptions);
-    if (yieldTy->hasError())
-      return ErrorType::get(ctx);
-    // TODO: Do something wrt tuple of yields
-    if (auto inOutType = yieldTy->getAs<InOutType>()) {
-      yields.emplace_back(inOutType->getObjectType(), ParamSpecifier::InOut);
-    } else {
-      yields.emplace_back(yieldTy, ParamSpecifier::Default);
+    assert(repr->getYieldsTypeRepr());
+
+    auto yieldTypes = cast<TupleTypeRepr>(repr->getYieldsTypeRepr());
+    for (auto elt : yieldTypes->getElements()) {
+      auto yieldTy = resolveType(elt.Type, yieldsOptions);
+      if (yieldTy->hasError())
+        return ErrorType::get(ctx);
+      if (auto inOutType = yieldTy->getAs<InOutType>()) {
+        yields.emplace_back(inOutType->getObjectType(), ParamSpecifier::InOut);
+      } else {
+        yields.emplace_back(yieldTy, ParamSpecifier::Default);
+      }
     }
   }
 
   auto resultOptions = options.withoutContext();
   resultOptions.setContext(TypeResolverContext::FunctionResult);
-  // TODO: Do we need this here?
+  // TODO: Do we still need this here?
   if (coroutine)
     resultOptions |= TypeResolutionFlags::Coroutine;
   auto outputTy = resolveType(repr->getResultTypeRepr(), resultOptions);

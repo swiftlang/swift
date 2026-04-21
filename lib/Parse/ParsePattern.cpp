@@ -803,7 +803,7 @@ ParserStatus Parser::parseFunctionSignature(
     DeclBaseName SimpleName, DeclName &FullName, ParameterList *&bodyParams,
     DefaultArgumentInfo &defaultArgs, SourceLoc &asyncLoc, bool &reasync,
     SourceLoc &throwsLoc, bool &rethrows, TypeRepr *&thrownType,
-    SourceLoc &yieldsLoc, TypeRepr *&yieldType, TypeRepr *&retType) {
+    YieldList *&bodyYields, TypeRepr *&retType) {
   SmallVector<Identifier, 4> NamePieces;
   ParserStatus Status;
 
@@ -825,7 +825,15 @@ ParserStatus Parser::parseFunctionSignature(
                                    throwsLoc, &rethrows, thrownType);
 
   // Check for `yields`
-  Status |= parseYield(yieldsLoc, yieldType);
+  if (paramContext == ParameterContextKind::Function) {
+    TupleTypeRepr *yieldTypes = nullptr;
+    Status |= parseYieldTypes(yieldTypes);
+    if (yieldTypes) {
+      SmallVector<TypeRepr *, 1> yields;
+      yieldTypes->getElementTypes(yields);
+      bodyYields = YieldList::create(Context, yields);
+    }
+  }
 
   // If there's a trailing arrow, parse the rest as the result type.
   SourceLoc arrowLoc;

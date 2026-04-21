@@ -12,6 +12,7 @@
 
 #include "SemaFixture.h"
 #include "swift/AST/GenericParamList.h"
+#include "swift/AST/YieldList.h"
 #include "swift/Sema/ConstraintSystem.h"
 
 using namespace swift;
@@ -56,8 +57,7 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
   auto genericFnDecl = FuncDecl::create(
       Context, SourceLoc(), StaticSpellingKind::None, SourceLoc(), declName,
       SourceLoc(), /*async=*/false, SourceLoc(), /*throws=*/false, SourceLoc(),
-      nullptr, /*YieldsLoc=*/SourceLoc(), /*YieldTyR*/ nullptr,
-      genericParamList, genericFnParamList, nullptr, DC);
+      nullptr, genericParamList, genericFnParamList, nullptr, nullptr, DC);
   auto genericFnParam = AnyFunctionType::Param(genericFnParamTy);
   llvm::SmallVector<GenericTypeParamType *, 2> genericTypeParams = {
       genericType1, genericType2};
@@ -78,12 +78,10 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
   concreteFnParamDecl->setSpecifier(ParamSpecifier::Default);
   auto *concreteFnParamList =
       ParameterList::createWithoutLoc(concreteFnParamDecl);
-  auto concreteFnDecl =
-      FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
-                       SourceLoc(), declName, SourceLoc(), /*async=*/false,
-                       SourceLoc(), /*throws=*/false, SourceLoc(), nullptr,
-                       /*YieldsLoc=*/SourceLoc(), /*YieldTyR*/ nullptr, nullptr,
-                       concreteFnParamList, nullptr, DC);
+  auto concreteFnDecl = FuncDecl::create(
+      Context, SourceLoc(), StaticSpellingKind::None, SourceLoc(), declName,
+      SourceLoc(), /*async=*/false, SourceLoc(), /*throws=*/false, SourceLoc(),
+      nullptr, nullptr, concreteFnParamList, nullptr, nullptr, DC);
   auto concreteFnParam = AnyFunctionType::Param(concreteFnParamTy);
   auto concreteFnTy =
       FunctionType::get({concreteFnParam}, {}, Context.TheEmptyTupleType)

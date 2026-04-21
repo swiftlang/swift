@@ -539,6 +539,26 @@ getActualClangDeclPathComponentKind(uint64_t raw) {
   return std::nullopt;
 }
 
+/// Translate from the serialization VarDeclSpecifier enumerators, which are
+/// guaranteed to be stable, to the AST ones.
+static std::optional<swift::ParamDecl::Specifier>
+getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
+  switch (raw) {
+#define CASE(ID) \
+  case serialization::ParamDeclSpecifier::ID: \
+    return swift::ParamDecl::Specifier::ID;
+  CASE(Default)
+  CASE(InOut)
+  CASE(Borrowing)
+  CASE(Consuming)
+  CASE(LegacyShared)
+  CASE(LegacyOwned)
+  CASE(ImplicitlyCopyableConsuming)
+  }
+#undef CASE
+  return std::nullopt;
+}
+
 Expected<ParameterList *> ModuleFile::readParameterList() {
   using namespace decls_block;
 
@@ -561,6 +581,46 @@ Expected<ParameterList *> ModuleFile::readParameterList() {
   }
 
   return ParameterList::create(getContext(), params);
+}
+
+Expected<SmallVector<AnyFunctionType::Yield, 1>> ModuleFile::readYieldList() {
+  SmallVector<AnyFunctionType::Yield, 1> yields;
+  SmallVector<uint64_t, 8> scratch;
+  
+  while (true) {
+    BCOffsetRAII restoreOffset(DeclTypeCursor);
+    llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned recordID = fatalIfUnexpected(
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+    if (recordID != decls_block::FUNCTION_YIELD)
+      break;
+
+    restoreOffset.reset();
+
+    TypeID typeID;
+    unsigned rawOwnership;
+    decls_block::FunctionYieldLayout::readRecord(
+        scratch, typeID, rawOwnership);
+
+    auto ownership = getActualParamDeclSpecifier(
+      (serialization::ParamDeclSpecifier)rawOwnership);
+    if (!ownership)
+      return diagnoseFatal();
+
+    auto yieldTy = getTypeChecked(typeID);
+    if (!yieldTy)
+      return yieldTy.takeError();
+
+    yields.emplace_back(yieldTy.get(), *ownership);
+  }
+
+  return yields;
 }
 
 static std::optional<swift::VarDecl::Introducer>
@@ -3230,26 +3290,6 @@ getActualSelfAccessKind(uint8_t raw) {
   return std::nullopt;
 }
 
-/// Translate from the serialization VarDeclSpecifier enumerators, which are
-/// guaranteed to be stable, to the AST ones.
-static std::optional<swift::ParamDecl::Specifier>
-getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
-  switch (raw) {
-#define CASE(ID) \
-  case serialization::ParamDeclSpecifier::ID: \
-    return swift::ParamDecl::Specifier::ID;
-  CASE(Default)
-  CASE(InOut)
-  CASE(Borrowing)
-  CASE(Consuming)
-  CASE(LegacyShared)
-  CASE(LegacyOwned)
-  CASE(ImplicitlyCopyableConsuming)
-  }
-#undef CASE
-  return std::nullopt;
-}
-
 static std::optional<swift::OpaqueReadOwnership>
 getActualOpaqueReadOwnership(unsigned rawKind) {
   switch (serialization::OpaqueReadOwnership(rawKind)) {
@@ -4386,7 +4426,6 @@ public:
     uint8_t rawAccessorKind;
     bool isObjC, hasForcedStaticDispatch, async, throws;
     TypeID thrownTypeID;
-    TypeID yieldTypeID; bool isInoutYield = false;
     unsigned numNameComponentsBiased;
     GenericSignatureID genericSigID;
     TypeID resultInterfaceTypeID;
@@ -4407,7 +4446,6 @@ public:
                                           rawMutModifier,
                                           hasForcedStaticDispatch,
                                           async, throws, thrownTypeID,
-                                          yieldTypeID, isInoutYield,
                                           genericSigID,
                                           resultInterfaceTypeID,
                                           isIUO,
@@ -4551,17 +4589,10 @@ public:
       return thrownTypeOrError.takeError();
     const auto thrownType = thrownTypeOrError.get();
 
-    auto yieldTypeOrError = MF.getTypeChecked(yieldTypeID);
-    if (!yieldTypeOrError)
-      return yieldTypeOrError.takeError();
-    auto yieldType = yieldTypeOrError.get();
-    if (isInoutYield)
-      yieldType = InOutType::get(yieldType);
-
     FuncDecl *fn;
     if (!isAccessor) {
       fn = FuncDecl::createDeserialized(ctx, staticSpelling.value(), name,
-                                        async, throws, thrownType, yieldType,
+                                        async, throws, thrownType,
                                         genericParams, resultType, DC);
     } else {
       auto *accessor =
@@ -4607,6 +4638,18 @@ public:
     ParameterList *paramList;
     SET_OR_RETURN_ERROR(paramList, MF.readParameterList());
     fn->setParameters(paramList);
+    {
+      SmallVector<AnyFunctionType::Yield, 1> yields;
+      SET_OR_RETURN_ERROR(yields, MF.readYieldList());
+
+      // Sanity check: non-coroutines should have empty yields and
+      // coroutines shoud have non-empty yields.
+      if (fn->isCoroutine() != !yields.empty())
+        return MF.diagnoseFatal();
+
+      if (yields.size())
+        fn->setYields(YieldList::create(ctx, yields));
+    }
 
     SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
     while (auto info = MF.maybeReadLifetimeDependence()) {
@@ -7517,37 +7560,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   }
 
   SmallVector<AnyFunctionType::Yield, 1> yields;
-  while (true) {
-    BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
-    llvm::BitstreamEntry entry =
-        MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      break;
-
-    scratch.clear();
-    unsigned recordID = MF.fatalIfUnexpected(
-        MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
-    if (recordID != decls_block::FUNCTION_YIELD)
-      break;
-
-    restoreOffset.reset();
-
-    TypeID typeID;
-    unsigned rawOwnership;
-    decls_block::FunctionYieldLayout::readRecord(
-        scratch, typeID, rawOwnership);
-
-    auto ownership = getActualParamDeclSpecifier(
-      (serialization::ParamDeclSpecifier)rawOwnership);
-    if (!ownership)
-      return MF.diagnoseFatal();
-
-    auto yieldTy = MF.getTypeChecked(typeID);
-    if (!yieldTy)
-      return yieldTy.takeError();
-
-    yields.emplace_back(yieldTy.get(), *ownership);
-  }
+  if (coro)
+    SET_OR_RETURN_ERROR(yields, MF.readYieldList());
 
   SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
 

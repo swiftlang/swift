@@ -2583,7 +2583,7 @@ public:
 
 /// Determines the yield type of a coroutine
 class YieldsTypeRequest
-    : public SimpleRequest<YieldsTypeRequest, Type(FuncDecl *),
+    : public SimpleRequest<YieldsTypeRequest, Type(FuncDecl *, unsigned),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2592,7 +2592,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, FuncDecl *decl) const;
+  Type evaluate(Evaluator &evaluator, FuncDecl *decl, unsigned idx) const;
 
 public:
   // Separate caching.

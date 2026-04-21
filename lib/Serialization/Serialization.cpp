@@ -3976,6 +3976,19 @@ private:
     ParameterListLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, paramIDs);
   }
 
+  void WriteYieldList(const SmallVector<AnyFunctionType::Yield, 1> &yields) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionYieldLayout::Code];
+    for (auto &yield : yields) {
+      auto paramFlags = yield.getFlags();
+      auto rawOwnership =
+          getRawStableParamDeclSpecifier(paramFlags.getOwnershipSpecifier());
+      FunctionYieldLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                      S.addTypeRef(yield.getType()),
+                                      rawOwnership);
+    }
+  }
+
   /// Writes an array of members for a decl context.
   ///
   /// \param parentID The DeclID of the context.
@@ -4957,13 +4970,6 @@ public:
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
 
-    bool isInoutYield = false;
-    auto yieldType = fn->getYieldsInterfaceType();
-    if (auto inoutYieldType = yieldType->getAs<InOutType>()) {
-      isInoutYield = true;
-      yieldType = inoutYieldType->getObjectType();
-    }
-    
     Type ty = fn->getInterfaceType();
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(S.addTypeRef(dependency));
@@ -4980,7 +4986,6 @@ public:
                            fn->hasAsync(),
                            fn->hasThrows(),
                            S.addTypeRef(fn->getThrownInterfaceType()),
-                           S.addTypeRef(yieldType), isInoutYield,
                            S.addGenericSignatureRef(
                                                   fn->getGenericSignature()),
                            S.addTypeRef(fn->getResultInterfaceType()),
@@ -5002,6 +5007,14 @@ public:
 
     // Write the body parameters.
     writeParameterList(fn->getParameters());
+
+    // Write the body yields
+    {
+      SmallVector<AnyFunctionType::Yield, 1> yields;
+      fn->getYieldInterfaceTypes(yields);
+      assert(yields.empty() == !fn->isCoroutine());
+      WriteYieldList(yields);
+    }
 
     writeLifetimeDependenciesIfNeeded(fn);
 
@@ -5139,6 +5152,14 @@ public:
 
     // Write the body parameters.
     writeParameterList(fn->getParameters());
+
+    // Write the body yields
+    {
+      SmallVector<AnyFunctionType::Yield, 1> yields;
+      fn->getYieldInterfaceTypes(yields);
+      assert(yields.empty() == !fn->isCoroutine());
+      WriteYieldList(yields);
+    }
 
     writeLifetimeDependenciesIfNeeded(fn);
 

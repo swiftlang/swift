@@ -3740,6 +3740,8 @@ protected:
     this->NumYields = NumYields;
     assert(this->NumYields == NumYields && "Yields dropped!");
 
+    // TODO: Extend if / when we'll support lifetime dependencies
+    // for both yields and results at the same time.
     if (Info && CONDITIONAL_ASSERT_enabled()) {
       unsigned maxLifetimeTarget = NumParams + 1;
       if (auto outputFn = Output->getAs<AnyFunctionType>()) {

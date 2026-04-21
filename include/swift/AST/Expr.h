@@ -5536,31 +5536,29 @@ public:
 class ArrowExpr : public Expr {
   SourceLoc AsyncLoc;
   SourceLoc ThrowsLoc;
-  SourceLoc YieldsLoc;
   SourceLoc ArrowLoc;
   Expr *Args;
-  Expr *Yield;
+  Expr *Yields;
   Expr *Result;
   Expr *ThrownType;
 
 public:
   ArrowExpr(Expr *Args, SourceLoc AsyncLoc, SourceLoc ThrowsLoc,
-            Expr *ThrownType, SourceLoc YieldsLoc, Expr *Yield,
-            SourceLoc ArrowLoc, Expr *Result)
+            Expr *ThrownType, Expr *Yields, SourceLoc ArrowLoc, Expr *Result)
       : Expr(ExprKind::Arrow, /*implicit=*/false, Type()), AsyncLoc(AsyncLoc),
-        ThrowsLoc(ThrowsLoc), YieldsLoc(YieldsLoc), ArrowLoc(ArrowLoc),
-        Args(Args), Yield(Yield), Result(Result), ThrownType(ThrownType) {}
+        ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args), Yields(Yields),
+        Result(Result), ThrownType(ThrownType) {}
 
   ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, Expr *ThrownType,
             SourceLoc ArrowLoc)
       : Expr(ExprKind::Arrow, /*implicit=*/false, Type()), AsyncLoc(AsyncLoc),
-        ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(nullptr), Yield(nullptr),
-        Result(nullptr), ThrownType(ThrownType) {}
+        ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(nullptr),
+        Yields(nullptr), Result(nullptr), ThrownType(ThrownType) {}
 
   Expr *getArgsExpr() const { return Args; }
   void setArgsExpr(Expr *E) { Args = E; }
-  Expr *getYieldExpr() const { return Yield; }
-  void setYieldExpr(Expr *E) { Yield = E; }
+  Expr *getYieldsExpr() const { return Yields; }
+  void setYieldsExpr(Expr *E) { Yields = E; }
   Expr *getResultExpr() const { return Result; }
   void setResultExpr(Expr *E) { Result = E; }
   Expr *getThrownTypeExpr() const { return ThrownType; }
@@ -5568,7 +5566,6 @@ public:
 
   SourceLoc getAsyncLoc() const { return AsyncLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
-  SourceLoc getYieldsLoc() const { return YieldsLoc; }
   SourceLoc getArrowLoc() const { return ArrowLoc; }
   bool isFolded() const { return Args != nullptr && Result != nullptr; }
 
