@@ -483,9 +483,7 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
     Printer << " ";
     Printer.printKeyword("yields", Opts);
     // FIXME: Do we need a PrintStructureKind for this?
-    Printer << "(";
-    printTypeRepr(YieldTy, Printer, Opts);
-    Printer << ")";
+    printTypeRepr(YieldsTy, Printer, Opts);
   }
 
   Printer << " -> ";
@@ -725,6 +723,10 @@ SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
   auto mem = C.Allocate(size, alignof(SILBoxTypeRepr));
   return new (mem) SILBoxTypeRepr(GenericParams, LBraceLoc, Fields, RBraceLoc,
                                   ArgLAngleLoc, GenericArgs, ArgRAngleLoc);
+}
+
+bool FunctionTypeRepr::isCoroutine() const {
+  return YieldsTy && YieldsTy->getParens().isValid();
 }
 
 SourceLoc FunctionTypeRepr::getStartLocImpl() const {

@@ -34,8 +34,8 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
-#include "swift/AST/InlinableText.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/MacroDefinition.h"
@@ -55,6 +55,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/YieldList.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Defer.h"
@@ -1454,13 +1455,13 @@ bool AbstractFunctionDecl::isTransparent() const {
 }
 
 bool AbstractFunctionDecl::isCoroutine() const {
-  // Check if the declaration had the attribute.
-  if (getAttrs().hasAttribute<CoroutineAttr>())
-    return true;
-
   // If this is an accessor, then check if its a coroutine.
   if (const auto *AD = dyn_cast<AccessorDecl>(this))
     return AD->isCoroutine();
+
+  // Check if the declaration had the attribute.
+  if (getAttrs().hasAttribute<CoroutineAttr>())
+    return true;
 
   return false;
 }
@@ -11533,6 +11534,10 @@ void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
   BodyParams->setDeclContextOfParamDecls(this);
 }
 
+void AbstractFunctionDecl::setYields(YieldList *BodyYields) {
+  Yields = BodyYields;
+}
+
 bool AbstractFunctionDecl::isValidKeyPathComponent() const {
   // Check whether we're an ABI compatible override of another method. If we
   // are, then the key path should refer to the base decl instead.
@@ -11875,11 +11880,6 @@ void FuncDecl::setResultInterfaceType(Type type) {
                                         std::move(type));
 }
 
-void FuncDecl::setYieldInterfaceType(Type type) {
-  getASTContext().evaluator.cacheOutput(YieldsTypeRequest{this},
-                                        std::move(type));
-}
-
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,
@@ -11912,11 +11912,10 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
 FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        StaticSpellingKind StaticSpelling,
                                        DeclName Name, bool Async, bool Throws,
-                                       Type ThrownType, Type YieldType,
+                                       Type ThrownType,
                                        GenericParamList *GenericParams,
                                        Type FnRetType, DeclContext *Parent) {
   assert(FnRetType && "Deserialized result type must not be null");
-  assert(YieldType && "Deserialized yield type must not be null");
   auto *const FD =
       FuncDecl::createImpl(Context, SourceLoc(), StaticSpelling, SourceLoc(),
                            Name, SourceLoc(), Async, SourceLoc(), Throws,
@@ -11924,7 +11923,6 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                            GenericParams, Parent,
                            ClangNode());
   FD->setResultInterfaceType(FnRetType);
-  FD->setYieldInterfaceType(YieldType);
   return FD;
 }
 
@@ -11932,17 +11930,16 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
                            DeclName Name, SourceLoc NameLoc, bool Async,
                            SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
-                           TypeRepr *ThrownTyR, SourceLoc YieldsLoc,
-                           TypeRepr *YieldTyR, GenericParamList *GenericParams,
-                           ParameterList *BodyParams, TypeRepr *ResultTyR,
-                           DeclContext *Parent) {
+                           TypeRepr *ThrownTyR, GenericParamList *GenericParams,
+                           ParameterList *BodyParams, YieldList *BodyYields,
+                           TypeRepr *ResultTyR, DeclContext *Parent) {
   auto *const FD = FuncDecl::createImpl(
       Context, StaticLoc, StaticSpelling, FuncLoc, Name, NameLoc, Async,
       AsyncLoc, Throws, ThrowsLoc, ThrownTyR, GenericParams, Parent,
       ClangNode());
   FD->setParameters(BodyParams);
+  FD->setYields(BodyYields);
   FD->FnRetType = TypeLoc(ResultTyR);
-  FD->FnYieldType = TypeLoc(YieldTyR);
   if (llvm::isa_and_nonnull<SendingTypeRepr>(ResultTyR))
     FD->setSendingResult();
   return FD;
@@ -11963,6 +11960,7 @@ FuncDecl *FuncDecl::createImplicit(ASTContext &Context,
   FD->setImplicit();
   FD->setSynthesized(isSynthesized);
   FD->setParameters(BodyParams);
+  assert(!FD->isCoroutine() && "not expecting implicit coroutine decls");
   FD->setResultInterfaceType(FnRetType);
   return FD;
 }
@@ -11980,6 +11978,7 @@ FuncDecl *FuncDecl::createImported(ASTContext &Context, SourceLoc FuncLoc,
       Async, SourceLoc(), Throws, SourceLoc(), TypeLoc::withoutLoc(ThrownType),
       GenericParams, Parent, ClangN);
   FD->setParameters(BodyParams);
+  assert(!FD->isCoroutine() && "not expecting imported coroutine decls");
   FD->setResultInterfaceType(FnRetType);
   return FD;
 }
@@ -12055,12 +12054,11 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx, SourceLoc declLoc,
   D->setParameters(bodyParams);
   D->setResultInterfaceType(fnRetType);
   if (isYieldingAccessor(accessorKind)) {
-    auto yieldType = storage->getValueInterfaceType();
-    if (isYieldingMutableAccessor(accessorKind))
-      yieldType = InOutType::get(yieldType);
-    D->setYieldInterfaceType(yieldType);
+    YieldTypeFlags flags;
+    flags = flags.withInOut(isYieldingMutableAccessor(accessorKind));
+    D->setYields(
+        YieldList::create(ctx, Yield(storage->getValueInterfaceType(), flags)));
   }
-
   return D;
 }
 
@@ -12081,10 +12079,10 @@ AccessorDecl *AccessorDecl::createImplicit(ASTContext &ctx,
   D->setImplicit();
   D->setResultInterfaceType(fnRetType);
   if (isYieldingAccessor(accessorKind)) {
-    auto yieldType = storage->getValueInterfaceType();
-    if (isYieldingMutableAccessor(accessorKind))
-      yieldType = InOutType::get(yieldType);
-    D->setYieldInterfaceType(yieldType);
+    YieldTypeFlags flags;
+    flags = flags.withInOut(isYieldingMutableAccessor(accessorKind));
+    D->setYields(
+        YieldList::create(ctx, Yield(storage->getValueInterfaceType(), flags)));
   }
 
   return D;
@@ -12145,6 +12143,13 @@ AccessorDecl *AccessorDecl::createParsed(
   }
   accessor->setParameters(
       ParameterList::create(ctx, paramsStart, newParams, paramsEnd));
+  if (isYieldingAccessor(accessorKind)) {
+    YieldTypeFlags flags;
+    flags = flags.withInOut(isYieldingMutableAccessor(accessorKind));
+    accessor->setYields(
+        YieldList::create(ctx, Yield(storage->getResultTypeRepr(), flags)));
+  }
+
   return accessor;
 }
 
@@ -12323,22 +12328,26 @@ std::optional<Type> FuncDecl::getCachedResultInterfaceType() const {
   return ResultTypeRequest{mutableThis}.getCachedResult();
 }
 
-Type FuncDecl::getYieldsInterfaceType() const {
-  auto &ctx = getASTContext();
-
+void FuncDecl::getYieldInterfaceTypes(
+    SmallVectorImpl<AnyFunctionType::Yield> &yields) const {
   if (!isCoroutine())
-    return TupleType::getEmpty(getASTContext());
+    return;
 
+  auto &ctx = getASTContext();
   auto mutableThis = const_cast<FuncDecl *>(this);
-  if (auto type = evaluateOrDefault(ctx.evaluator,
-                                    YieldsTypeRequest{mutableThis}, Type()))
-    return type;
-  return ErrorType::get(ctx);
-}
+  auto *yieldList = getYields();
+  ASSERT(yieldList && "coroutines should specify yield list");
+  for (auto [idx, yield] : llvm::enumerate(*yieldList)) {
+    auto type = ctx.evaluator(YieldsTypeRequest{mutableThis, unsigned(idx)},
+                              [&ctx]() { return ErrorType::get(ctx); });
+    YieldTypeFlags flags;
+    if (auto *inoutType = type->getAs<InOutType>()) {
+      type = inoutType->getObjectType();
+      flags = flags.withInOut(true);
+    }
 
-std::optional<Type> FuncDecl::getCachedYieldsInterfaceType() const {
-  auto mutableThis = const_cast<FuncDecl *>(this);
-  return YieldsTypeRequest{mutableThis}.getCachedResult();
+    yields.emplace_back(type, flags);
+  }
 }
 
 bool FuncDecl::isUnaryOperator() const {
