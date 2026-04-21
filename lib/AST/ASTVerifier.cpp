@@ -1969,7 +1969,7 @@ public:
         Out << "\n";
         abort();
       }
-      if (FT->hasExtInfo() && FT->isCoroutine()) {
+      if (FT->isCoroutine()) {
         Out << "cannot apply a coroutine yet:";
         E->getFn()->getType().print(Out);
         Out << "\n";

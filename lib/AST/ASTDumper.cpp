@@ -1312,6 +1312,32 @@ namespace {
       printFoot();
     }
 
+    /// Print a yield list as a child node.
+    void printRec(const YieldList *yields, Label label,
+                  const ASTContext *ctx = nullptr) {
+      if (!yields) {
+        printHead("<<NULL yields>>", ParameterColor, label);
+      } else {
+        printRecArbitrary(
+            [&](Label label) { visitYieldList(yields, label, ctx); }, label);
+      }
+    }
+
+    /// Print a yield list node.
+    void visitYieldList(const YieldList *yields, Label label,
+                        const ASTContext *ctx = nullptr) {
+      printHead("yield_list", ParameterColor, label);
+
+      printSourceRange(yields->getSourceRange(), ctx);
+
+      printList(
+          *yields,
+          [&](auto &Y, Label label) { printRec(Y.getTypeRepr(), label); },
+          Label::optional("yields"));
+
+      printFoot();
+    }
+
     /// Print an \c IfConfigClause as a child node.
     void printRec(const IfConfigClause &Clause, Label label,
                   const ASTContext *Ctx = nullptr) {
@@ -2889,8 +2915,8 @@ namespace {
         }
 
         if (FD->isCoroutine()) {
-          printTypeOrTypeRepr(FD->getCachedYieldsInterfaceType(),
-                              FD->getYieldTypeRepr(), Label::always("yields"));
+          printRec(D->getYields(), Label::optional("yields"),
+                   &D->getASTContext());
         }
       }
 
@@ -6823,9 +6849,8 @@ namespace {
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
                         Label::optional("clang_type_info"));
       printAnyFunctionParamsRec(T->getParams(), Label::always("input"));
-      if (T->isCoroutine()) {
+      if (T->isCoroutine())
         printAnyFunctionYieldsRec(T->getYields(), Label::always("yields"));
-      }
       printRec(T->getResult(), Label::always("output"));
       if (Type thrownError = T->getThrownError()) {
         printRec(thrownError, Label::always("thrown_error"));

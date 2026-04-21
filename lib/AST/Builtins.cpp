@@ -1722,8 +1722,8 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
 static ValueDecl *getTaskRunInline(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
-      _parameters(_function(_async(_noescape(_thick)), _typeparam(0),
-                            _parameters())),
+      _parameters(
+        _function(_async(_noescape(_thick)), _typeparam(0), _parameters())),
       _typeparam(0));
 }
 

@@ -9498,16 +9498,15 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
   ParameterList *BodyParams;
+  YieldList *BodyYields = nullptr;
   SourceLoc asyncLoc;
   bool reasync;
   SourceLoc throwsLoc;
   bool rethrows;
   TypeRepr *thrownTy = nullptr;
-  SourceLoc yieldsLoc;
-  TypeRepr *yieldTy = nullptr;
-  Status |= parseFunctionSignature(
-      SimpleName, FullName, BodyParams, DefaultArgs, asyncLoc, reasync,
-      throwsLoc, rethrows, thrownTy, yieldsLoc, yieldTy, FuncRetTy);
+  Status |= parseFunctionSignature(SimpleName, FullName, BodyParams,
+                                   DefaultArgs, asyncLoc, reasync, throwsLoc,
+                                   rethrows, thrownTy, BodyYields, FuncRetTy);
   if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {
     // Trigger delayed parsing, no need to continue.
     return Status;
@@ -9532,8 +9531,8 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   auto *FD = FuncDecl::create(
       Context, StaticLoc, StaticSpelling, FuncLoc, FullName, NameLoc,
       /*Async=*/isAsync, asyncLoc,
-      /*Throws=*/throwsLoc.isValid(), throwsLoc, thrownTy, yieldsLoc, yieldTy,
-      GenericParams, BodyParams, FuncRetTy, CurDeclContext);
+      /*Throws=*/throwsLoc.isValid(), throwsLoc, thrownTy, GenericParams,
+      BodyParams, BodyYields, FuncRetTy, CurDeclContext);
 
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
@@ -10543,18 +10542,17 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
   ParameterList *BodyParams;
+  YieldList *bodyYields = nullptr;
   SourceLoc asyncLoc;
   bool reasync;
   SourceLoc throwsLoc;
   bool rethrows;
   TypeRepr *thrownTy = nullptr;
-  SourceLoc yieldsLoc;
-  TypeRepr *yieldTy = nullptr;
-  Status |= parseFunctionSignature(DeclBaseName::createConstructor(), FullName,
-                                   BodyParams, DefaultArgs, asyncLoc, reasync,
-                                   throwsLoc, rethrows, thrownTy, yieldsLoc,
-                                   yieldTy, FuncRetTy);
-  // TODO: check that yieldTy is null
+  // TODO: Decide what to do if/when constructor could yield
+  Status |= parseFunctionSignature(
+      DeclBaseName::createConstructor(), FullName, BodyParams, DefaultArgs,
+      asyncLoc, reasync, throwsLoc, rethrows, thrownTy, bodyYields, FuncRetTy);
+  // TODO: check that bodyYields are empty
 
   if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {
     // Trigger delayed parsing, no need to continue.
