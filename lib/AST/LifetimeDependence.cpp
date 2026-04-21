@@ -461,10 +461,6 @@ class LifetimeDependenceChecker {
   // environment.
   Type resultTy;
 
-  // The yield type of the function being checked in its generic
-  // environemnt.
-  Type yieldTy;
-
   SourceLoc returnLoc;
 
   // A parameter corresponding to the implicit self declaration of
@@ -487,36 +483,25 @@ public:
     return paramList ? (unsigned)(paramList->size() + 1) : 1;
   }
 
-  static Type getResultInterface(DeclContext *functionDC) {
+  static Type getResultOrYieldInterface(DeclContext *functionDC) {
     Type resultType;
     if (auto fn = dyn_cast<FuncDecl>(functionDC)) {
       resultType = fn->getResultInterfaceType();
-      if (fn->isCoroutine() &&
-          resultType->isEqual(fn->getASTContext().TheEmptyTupleType))
-        resultType = ErrorType::get(fn->getASTContext());
+      if (fn->isCoroutine()) {
+        SmallVector<AnyFunctionType::Yield, 1> yields;
+        fn->getYieldInterfaceTypes(yields);
+
+        // TODO: Extend tracking to coroutines with multiple yields and / or
+        // yields and results.
+        ASSERT(/*resultType->isEqual(fn->getASTContext().TheEmptyTupleType) &&*/
+               yields.size() == 1);
+        resultType = yields.front().getType();
+      }
     } else {
       auto ctor = cast<ConstructorDecl>(functionDC);
       resultType =  ctor->getResultInterfaceType();
     }
     return resultType;
-  }
-
-  Type getYieldsInterface(DeclContext *functionDC) const {
-    if (auto fn = dyn_cast<FuncDecl>(functionDC)) {
-      auto yieldType = fn->getYieldsInterfaceType();
-      if (yieldType->isEqual(fn->getASTContext().TheEmptyTupleType))
-        return ErrorType::get(fn->getASTContext());
-
-      if (yieldType->hasError())
-        return yieldType;
-
-      if (auto inOutType = yieldType->getAs<InOutType>())
-        return inOutType->getObjectType();
-
-      return yieldType;
-    }
-    
-    return ErrorType::get(afd->getASTContext());
   }
 
   static SourceLoc getReturnLoc(AbstractFunctionDecl *afd) {
@@ -620,11 +605,7 @@ public:
             swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
         genericEnv(afd->getGenericEnvironment()),
         resultIndex(afd->getLifetimeDependenceResultIndex()),
-        resultTy(afd->mapTypeIntoEnvironment(getResultInterface(afd))),
-        // We decompose result and yield type, but for now assume that
-        // only one of these is non-trivial. Adding lifetime inference
-        // for functions with both yields and results it TBD.
-        yieldTy(afd->mapTypeIntoEnvironment(getYieldsInterface(afd))),
+        resultTy(afd->mapTypeIntoEnvironment(getResultOrYieldInterface(afd))),
         returnLoc(getReturnLoc(afd)),
         implicitSelfParamInfo(getSelfParamInfo(afd)),
         depBuilder(resultIndex),
@@ -646,24 +627,20 @@ public:
             swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
         genericEnv(env),
         resultIndex(funcType->getParams().size()),
-        resultTy(
-          GenericEnvironment::mapTypeIntoEnvironment(env,
-                                                     funcType->getResult())),
         returnLoc(funcRepr->getResultTypeRepr()->getLoc()),
         implicitSelfParamInfo(std::nullopt),
         depBuilder(resultIndex),
         isImplicit(false),
         isInit(false),
         hasUnsafeNonEscapableResult(false) {
-    // We decompose result and yield type, but for now assume that
-    // only one of these is non-trivial. Adding lifetime inference
-    // for functions with both yields and results it TBD.
     if (funcType->isCoroutine()) {
       assert(funcType->getYields().size() == 1);
-      yieldTy = GenericEnvironment::mapTypeIntoEnvironment(
+      resultTy = GenericEnvironment::mapTypeIntoEnvironment(
         env, funcType->getYields().front().getType());
     } else {
-      yieldTy = ErrorType::get(ctx);
+      resultTy = 
+          GenericEnvironment::mapTypeIntoEnvironment(env,
+                                                     funcType->getResult());
     }
   }
 
@@ -912,8 +889,7 @@ protected:
   // needs one. Always runs before the checker completes if no other diagnostics
   // were issued.
   void diagnoseMissingResultDependencies(DiagID diagID) {
-    if (!isDiagnosedNonEscapable(resultTy) &&
-        !isDiagnosedNonEscapable(yieldTy)) {
+    if (!isDiagnosedNonEscapable(resultTy)) {
       return;
     }
     if (!depBuilder.hasTargetDeps(resultIndex)) {
@@ -1372,9 +1348,6 @@ protected:
         if (isDiagnosedEscapable(resultTy)) {
           diagnose(entry->getLoc(), diag::lifetime_target_requires_nonescapable,
                    "result");
-        } else if (isDiagnosedEscapable(yieldTy)) {
-          diagnose(entry->getLoc(), diag::lifetime_target_requires_nonescapable,
-                   "yield");
         }
         targetIndex = resultIndex;
       }
@@ -1551,13 +1524,13 @@ protected:
     }
 
     // Infer non-Escapable results / yields
-    if (isDiagnosedNonEscapable(resultTy) || isDiagnosedNonEscapable(yieldTy)) {
+    if (isDiagnosedNonEscapable(resultTy)) {
       if (isInit && isImplicitOrSIL()) {
         inferImplicitInit();
       } else {
         // Apply the same-type rule before the single parameter rule. The
         // same-type rule does not trigger any diagnostics.
-      inferNonEscapableResultOnSameTypeParam(resultTy->hasError() ? yieldTy : resultTy);
+        inferNonEscapableResultOnSameTypeParam(resultTy);
 
         if (hasImplicitSelfParam()) {
           // Methods that return a non-Escapable value - single parameter
@@ -1729,8 +1702,7 @@ protected:
   // error.
   std::optional<LifetimeDependenceKind>
   getImplicitAccessorResultDependence(AccessorDecl *accessor) {
-    if (!isDiagnosedNonEscapable(resultTy) &&
-        !isDiagnosedNonEscapable(yieldTy))
+    if (!isDiagnosedNonEscapable(resultTy))
       return std::nullopt;
 
     std::optional<AccessorKind> wrappedAccessorKind = std::nullopt;

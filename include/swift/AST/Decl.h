@@ -44,6 +44,7 @@
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/YieldList.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
@@ -8156,7 +8157,10 @@ public:
   };
 
 private:
-  ParameterList *Params;
+  ParameterList *Params = nullptr;
+  // Yield list is nullable: it is non-null only for coroutines (functions and
+  // coroutine accessors) and then cannot be empty.
+  YieldList *Yields = nullptr;
 
 private:
   /// The generation at which we last loaded derivative function configurations.
@@ -8707,6 +8711,13 @@ public:
 
   void setParameters(ParameterList *Params);
 
+  /// Retrieve the function's explicit (as spelled in the source code) yield
+  /// list
+  YieldList *getYields() { return Yields; }
+  const YieldList *getYields() const { return Yields; }
+
+  void setYields(YieldList *Yields);
+
   bool hasImplicitSelfDecl() const {
     return Bits.AbstractFunctionDecl.HasImplicitSelfDecl;
   }
@@ -8847,7 +8858,6 @@ class FuncDecl : public AbstractFunctionDecl {
   SourceLoc FuncLoc;    // Location of the 'func' token.
 
   TypeLoc FnRetType;
-  TypeLoc FnYieldType;
 
 protected:
   FuncDecl(DeclKind Kind,
@@ -8880,7 +8890,6 @@ protected:
   }
 
   void setResultInterfaceType(Type type);
-  void setYieldInterfaceType(Type type);
 
 private:
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
@@ -8913,7 +8922,7 @@ public:
   static FuncDecl *createDeserialized(ASTContext &Context,
                                       StaticSpellingKind StaticSpelling,
                                       DeclName Name, bool Async, bool Throws,
-                                      Type ThrownType, Type YieldType,
+                                      Type ThrownType,
                                       GenericParamList *GenericParams,
                                       Type FnRetType, DeclContext *Parent);
 
@@ -8921,10 +8930,9 @@ public:
                           StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
                           DeclName Name, SourceLoc NameLoc, bool Async,
                           SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
-                          TypeRepr *ThrownTyR, SourceLoc YieldsLoc,
-                          TypeRepr *YieldTyR, GenericParamList *GenericParams,
-                          ParameterList *BodyParams, TypeRepr *ResultTyR,
-                          DeclContext *Parent);
+                          TypeRepr *ThrownTyR, GenericParamList *GenericParams,
+                          ParameterList *BodyParams, YieldList *BodyYields,
+                          TypeRepr *ResultTyR, DeclContext *Parent);
 
   static FuncDecl *
   createImplicit(ASTContext &Context, StaticSpellingKind StaticSpelling,
@@ -8978,7 +8986,6 @@ public:
   SourceRange getSourceRange() const;
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
-  TypeRepr *getYieldTypeRepr() const { return FnYieldType.getTypeRepr(); }
 
   SourceRange getResultTypeSourceRange() const {
     return FnRetType.getSourceRange();
@@ -8988,13 +8995,12 @@ public:
   Type getResultInterfaceType() const;
 
   /// Same as above, but only yields
-  Type getYieldsInterfaceType() const;
+  void
+  getYieldInterfaceTypes(SmallVectorImpl<AnyFunctionType::Yield> &yields) const;
 
   /// Returns the result interface type of this function if it has already been
   /// computed, otherwise `nullopt`. This should only be used for dumping.
   std::optional<Type> getCachedResultInterfaceType() const;
-
-  std::optional<Type> getCachedYieldsInterfaceType() const;
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation.  This check is a syntactic rather than type-based check,

@@ -3702,6 +3702,7 @@ public:
       }
 
       TypeChecker::checkParameterList(FD->getParameters(), FD);
+      TypeChecker::checkYieldList(FD->getYields(), FD);
     }
 
     checkDeclCommon(FD);
@@ -4447,6 +4448,10 @@ void TypeChecker::checkParameterList(ParameterList *params,
     // Check for duplicate parameter names.
     diagnoseDuplicateDecls(*params);
   }
+}
+
+void TypeChecker::checkYieldList(YieldList *yields, AbstractFunctionDecl *AFD) {
+  // TODO: Reject yields on non-coroutines
 }
 
 std::optional<unsigned>
