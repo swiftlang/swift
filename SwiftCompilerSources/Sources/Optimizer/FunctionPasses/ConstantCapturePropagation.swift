@@ -98,6 +98,19 @@ private func constantPropagateCaptures(of partialApply: PartialApplyInst, _ cont
     return
   }
 
+  // When the specialized closure would still be generic, bail out if any constant argument's
+  // callee parameter type involves archetypes. Cloning without type substitutions (to avoid
+  // ODR violations) would leave archetype types in the body, but the injected constant has
+  // concrete types, producing ill-typed SIL.
+  if partialApply.wouldSpecializationBeGeneric(nonConstantArguments: nonConstArgs) {
+    for constArgOp in constArgs {
+      let calleeArgIdx = partialApply.calleeArgumentIndex(of: constArgOp)!
+      if callee.arguments[calleeArgIdx].type.hasArchetype {
+        return
+      }
+    }
+  }
+
   let specializedName = context.mangle(withConstantCaptureArguments: constArgs.map {
                                            (partialApply.calleeArgumentIndex(of: $0)!, $0.value)
                                          },
@@ -151,13 +164,8 @@ private func specializeClosure(specializedName: String,
                                _ context: FunctionPassContext
 ) -> Function {
   let callee = partialApply.referencedFunction!
-  var newParams = [ParameterInfo]()
-  newParams.append(contentsOf: callee.convention.parameters.dropLast(partialApply.numArguments))
-  newParams.append(contentsOf: nonConstantArguments.map { partialApply.parameter(for: $0)! })
-
-  let isGeneric = newParams.contains { $0.type.hasTypeParameter } ||
-                  callee.convention.results.contains { $0.type.hasTypeParameter } ||
-                  callee.convention.errorResult?.type.hasTypeParameter ?? false
+  let newParams = partialApply.specializedParams(nonConstantArguments: nonConstantArguments)
+  let isGeneric = partialApply.wouldSpecializationBeGeneric(params: newParams)
 
   let representation = partialApply.callee.type.functionTypeRepresentation
   // We are removing arguments from the original function. If the removed argument is the
@@ -272,6 +280,26 @@ private func rewritePartialApply(_ partialApply: PartialApplyInst, withSpecializ
 }
 
 private extension PartialApplyInst {
+
+  func specializedParams(nonConstantArguments: [Operand]) -> [ParameterInfo] {
+    let callee = referencedFunction!
+    var newParams = [ParameterInfo]()
+    newParams.append(contentsOf: callee.convention.parameters.dropLast(numArguments))
+    newParams.append(contentsOf: nonConstantArguments.map { parameter(for: $0)! })
+    return newParams
+  }
+
+  func wouldSpecializationBeGeneric(params: [ParameterInfo]) -> Bool {
+    let callee = referencedFunction!
+    return params.contains { $0.type.hasTypeParameter } ||
+           callee.convention.results.contains { $0.type.hasTypeParameter } ||
+           callee.convention.errorResult?.type.hasTypeParameter ?? false
+  }
+
+  func wouldSpecializationBeGeneric(nonConstantArguments: [Operand]) -> Bool {
+    guard substitutionMap.hasAnySubstitutableParams else { return false }
+    return wouldSpecializationBeGeneric(params: specializedParams(nonConstantArguments: nonConstantArguments))
+  }
 
   /// Returns the callee if this is a `partial_apply` of a thunk which directly forwards all arguments
   /// to the callee and has no other side-effects.
