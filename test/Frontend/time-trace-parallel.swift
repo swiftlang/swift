@@ -4,7 +4,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -time-trace-granularity=0 \
-// RUN:   -time-trace-path %t/trace.json \
+// RUN:   -emit-time-trace-path %t/trace.json \
 // RUN:   -c %t/A.swift %t/B.swift -num-threads 2 -wmo \
 // RUN:   -module-name TestModule -o %t/A.o -o %t/B.o
 
@@ -23,7 +23,7 @@
 // workers must NOT appear. Use 8 files and 4 threads to ensure workers
 // participate in codegen.
 // RUN: %target-swift-frontend -time-trace-granularity=999999999 \
-// RUN:   -time-trace-path %t/trace-high-granularity.json \
+// RUN:   -emit-time-trace-path %t/trace-high-granularity.json \
 // RUN:   -c %t/A.swift %t/B.swift %t/C.swift %t/D.swift \
 // RUN:      %t/E.swift %t/F.swift %t/G.swift %t/H.swift \
 // RUN:   -num-threads 4 -wmo \

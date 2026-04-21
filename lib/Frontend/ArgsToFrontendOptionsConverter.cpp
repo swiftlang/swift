@@ -525,7 +525,7 @@ void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
 
 void ArgsToFrontendOptionsConverter::computeTimeTraceOptions() {
   using namespace options;
-  if (const Arg *A = Args.getLastArg(OPT_time_trace_path)) {
+  if (const Arg *A = Args.getLastArg(OPT_emit_time_trace_path)) {
     Opts.TimeTracePath = A->getValue();
   }
 
