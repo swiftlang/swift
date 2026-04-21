@@ -813,3 +813,20 @@ bb0(%0 : $*V, %1 : $@thick V.Type, %2 : @owned $C2):
   %137 = tuple ()
   return %137
 }
+
+// TODO: replace pack element archetypes once the isExistentialArchetype check (Case 3) is
+// extended to also cover @pack_element types. For now, the alloc_stack is not simplified.
+
+// CHECK-LABEL: sil [ossa] @dont_replace_pack_element_archetype :
+// CHECK:         alloc_stack $@pack_element
+// CHECK:       } // end sil function 'dont_replace_pack_element_archetype'
+sil [ossa] @dont_replace_pack_element_archetype : $@convention(thin) () -> () {
+bb0:
+  %idx = scalar_pack_index 0 of $Pack{T1}
+  open_pack_element %idx of <each E where repeat each E : P> at <Pack{T1}>, shape $each E, uuid "55555555-0000-0000-0000-000000000000"
+  %stk = alloc_stack $@pack_element("55555555-0000-0000-0000-000000000000") each E
+  dealloc_stack %stk
+  %r = tuple ()
+  return %r : $()
+}
+

@@ -98,6 +98,7 @@ sil @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type
 sil @create2 : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (Int) -> @out τ_0_0
 sil @useGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (GenS<τ_0_0>) -> ()
 sil @returnGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> GenS<τ_0_0>
+sil @use_p : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
 
 // CHECK-LABEL: sil [ossa] @replace_archetype :
 // CHECKO:        [[E:%.*]] = init_existential_addr %0
@@ -321,4 +322,23 @@ bb0:
   %9 = tuple ()
   return %9
 }
+
+// TODO: replace pack element archetypes once canReplaceExistentialArchetype() handles them.
+// The canReplaceExistentialArchetype() guard checks isRootExistentialArchetype, which is
+// false for @pack_element types, so the apply is not simplified.
+
+// CHECK-LABEL: sil [ossa] @dont_replace_pack_element_archetype :
+// CHECK:         apply %{{.*}}<@pack_element
+// CHECK:       } // end sil function 'dont_replace_pack_element_archetype'
+sil [ossa] @dont_replace_pack_element_archetype : $@convention(thin) (@in_guaranteed S) -> () {
+bb0(%s : $*S):
+  %idx = scalar_pack_index 0 of $Pack{S}
+  open_pack_element %idx of <each T where repeat each T : P> at <Pack{S}>, shape $each T, uuid "44444444-0000-0000-0000-000000000000"
+  %s_cast = unchecked_addr_cast %s to $*@pack_element("44444444-0000-0000-0000-000000000000") each T
+  %fn = function_ref @use_p : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  apply %fn<@pack_element("44444444-0000-0000-0000-000000000000") each T>(%s_cast) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
 
