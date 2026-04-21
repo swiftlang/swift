@@ -3813,8 +3813,17 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   // If we're in an inheritance clause, check for a global actor.
   if (options.is(TypeResolverContext::Inherited)) {
     CustomAttr *customAttr = nullptr;
-    (void)resolveGlobalActor(repr->getLoc(), options,
-                             customAttr, attrs);
+    Type globalActor = resolveGlobalActor(repr->getLoc(), options,
+                                          customAttr, attrs);
+    // A global actor attribute in an inheritance clause marks an isolated
+    // conformance, so it's only meaningful when applied to a protocol.
+    if (customAttr && globalActor && !globalActor->hasError() &&
+        !ty->hasError() && !ty->isConstraintType()) {
+      diagnoseInvalid(repr, customAttr->AtLoc,
+                      diag::global_actor_attr_inheritance_non_protocol,
+                      customAttr->getTypeRepr(), ty);
+      ty = ErrorType::get(getASTContext());
+    }
   }
 
   if (handleInheritedOnly(claim<UncheckedTypeAttr>(attrs)) ||

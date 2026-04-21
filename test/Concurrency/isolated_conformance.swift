@@ -353,3 +353,16 @@ class ComputedGetSetWitness: HasMutableVar {
     set { }
   }
 }
+
+// https://github.com/swiftlang/swift/issues/86693
+// A global actor is only meaningful on a protocol in an inheritance clause,
+// since it designates an isolated conformance.
+class Base {}
+
+class DerivedFromBase: @MainActor Base {}
+// expected-error@-1 {{global actor 'MainActor' cannot apply to non-protocol type 'Base'}}
+
+class DerivedFromBaseAndP: @MainActor Base, P {
+  // expected-error@-1 {{global actor 'MainActor' cannot apply to non-protocol type 'Base'}}
+  func f() {}
+}

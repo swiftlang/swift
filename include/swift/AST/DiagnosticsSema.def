@@ -6200,6 +6200,9 @@ ERROR(typeattr_reparented_requires_reparentable_protocol,none,
 ERROR(typeattr_invalid_for_objc_protocol,none,
       "@objc protocol %1 cannot be %0",
       (const TypeAttribute *, const TypeDecl *))
+ERROR(global_actor_attr_inheritance_non_protocol,none,
+      "global actor %0 cannot apply to non-protocol type %1",
+      (TypeRepr *, Type))
 
 WARNING(unchecked_conformance_not_special,none,
       "'@unchecked' conformance to %0 has no meaning", (Type))
