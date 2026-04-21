@@ -972,10 +972,6 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
 
     case clang::DeclarationName::Identifier:
       if (auto *md = dyn_cast<clang::CXXMethodDecl>(fn)) {
-        // Import virtual functions eagerly for now, those are synthesized
-        if (md->isVirtual())
-          return true;
-
         // Name lookup doesn't know about these renamed methods, import eagerly
         if (LangOpts.CxxInteropGettersSettersAsProperties ||
             hasComputedPropertyAttr(fn)) {
