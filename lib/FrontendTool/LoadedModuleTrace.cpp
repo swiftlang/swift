@@ -897,8 +897,17 @@ bool swift::emitLoadedModuleTraceIfNeeded(const ModuleDependencyID &mainModule,
   // compute the full set of swift module dependencies.
   auto *info = cache.findKnownDependency(mainModule).getAsSwiftSourceModule();
   assert(info && "main module is not source module");
+
   std::set<ModuleDependencyID> directDeps;
-  for (auto &dep : cache.getAllSwiftDependencies(mainModule)) {
+  // Add directly imported swift modules.
+  for (auto &dep : cache.getImportedSwiftDependencies(mainModule)) {
+    if (llvm::find(info->dependencyOnlyImports, dep.ModuleName) ==
+        info->dependencyOnlyImports.end())
+      directDeps.insert(dep);
+  }
+  // Add swift cross module overlay since cross module overlay requires direct
+  // import of both parent modules.
+  for (auto &dep : cache.getCrossImportOverlayDependencies(mainModule)) {
     if (llvm::find(info->dependencyOnlyImports, dep.ModuleName) ==
         info->dependencyOnlyImports.end())
       directDeps.insert(dep);

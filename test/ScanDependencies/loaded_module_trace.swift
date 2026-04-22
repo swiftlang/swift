@@ -6,12 +6,12 @@
 // RUN: split-file %s %t
 // RUN: ln -s %t/C_real.swiftinterface %t/C.swiftinterface
 
-// RUN: %target-build-swift -emit-module -module-name Module %S/../Driver/Inputs/loaded_module_trace_empty.swift \
-// RUN:   -o %t/Module.swiftmodule -module-cache-path %t/cache
-// RUN: %target-build-swift -emit-module -module-name Module2 %S/../Driver/Inputs/loaded_module_trace_imports_module.swift \
-// RUN:   -o %t/Module2.swiftmodule -I %t -module-cache-path %t/cache -strict-memory-safety
+// RUN: %target-swift-frontend -emit-module -module-name Module %S/../Driver/Inputs/loaded_module_trace_empty.swift \
+// RUN:   -o %t/Module.swiftmodule
+// RUN: %target-swift-frontend -emit-module -module-name Module2 %S/../Driver/Inputs/loaded_module_trace_imports_module.swift \
+// RUN:   -o %t/Module2.swiftmodule -I %t -strict-memory-safety
 // RUN: %target-build-swift -emit-library -module-name Plugin %S/../Driver/Inputs/loaded_module_trace_compiler_plugin.swift \
-// RUN:   -o %t/%target-library-name(Plugin) -module-cache-path %t/cache
+// RUN:   -o %t/%target-library-name(Plugin)
 
 // RUN: %target-swift-frontend -scan-dependencies %t/test.swift -emit-loaded-module-trace -emit-loaded-module-trace-path %t/trace.json \
 // RUN:   -enable-upcoming-feature RegionBasedIsolation -strict-memory-safety -module-name Test -dependency-only-import B \
@@ -34,6 +34,9 @@
 // CHECK-DAG: {"name":"Module","path":"{{[^"]*\\[/\\]}}Module.swiftmodule","isImportedDirectly":false,"supportsLibraryEvolution":false,"strictMemorySafety":false}
 // CHECK-DAG: {"name":"A","path":"{{[^"]*\\[/\\]}}A.swiftinterface","isImportedDirectly":true,"supportsLibraryEvolution":true,"strictMemorySafety":true}
 // CHECK-DAG: {"name":"C","path":"{{[^"]*\\[/\\]}}C_real.swiftinterface","isImportedDirectly":true,"supportsLibraryEvolution":true,"strictMemorySafety":false}
+// CHECK-DAG: {"name":"_C_A","path":"{{[^"]*\\[/\\]}}_C_A.swiftinterface","isImportedDirectly":true,"supportsLibraryEvolution":true,"strictMemorySafety":false}
+// CHECK-DAG: {"name":"D","path":"{{[^"]*\\[/\\]}}D.swiftinterface","isImportedDirectly":true,"supportsLibraryEvolution":true,"strictMemorySafety":false}
+// CHECK-DAG: {"name":"F","path":"{{[^"]*\\[/\\]}}F.swiftinterface","isImportedDirectly":false,"supportsLibraryEvolution":true,"strictMemorySafety":false}
 // CHECK: ],
 // CHECK: "swiftmacros":[
 // CHECK-DAG: {"name":"Plugin","path":"{{[^"]*\\[/\\]}}{{libPlugin.dylib|libPlugin.so|Plugin.dll}}"}
@@ -45,6 +48,7 @@
 import Module2
 import C
 import A
+import D
 
 @freestanding(expression) macro echo<T>(_: T) -> T = #externalMacro(module: "Plugin", type: "EchoMacro")
 
@@ -64,14 +68,35 @@ public func funcB() { }
 // swift-module-flags: -module-name C
 public func funcC() { }
 
+//--- _C_A.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name _C_A
+
+//--- D.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name D
+@_exported import D
+
+//--- F.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name F
+@_exported import F
+
+//--- D.h
+#import <F.h>
+
+//--- F.h
+
 //--- module.modulemap
-module _C_A {
-  header "c_a.h"
+module D {
+  header "D.h"
   export *
 }
 
-//--- c_a.h
-void c_a(void);
+module F {
+  header "F.h"
+  export *
+}
 
 //--- C.swiftcrossimport/A.swiftoverlay
 %YAML 1.2
