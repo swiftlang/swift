@@ -330,6 +330,25 @@ public:
     return forwardingInst->getAllOperands();
   }
 
+  /// Return true if this forwarding operation destructures an owned operand,
+  /// extracting sub-components from an aggregate or enum value.
+  bool isOwnedValueDestructure() const {
+    if (auto *op = getSingleForwardingOperand()) {
+      if (op->get()->getOwnershipKind() != OwnershipKind::Owned) {
+        return false;
+      }
+    }
+    switch (forwardingInst->getKind()) {
+    case SILInstructionKind::DestructureStructInst:
+    case SILInstructionKind::DestructureTupleInst:
+    case SILInstructionKind::UncheckedEnumDataInst:
+    case SILInstructionKind::UncheckedValueCastInst:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   bool canForwardOwnedCompatibleValuesOnly() {
     switch (forwardingInst->getKind()) {
     case SILInstructionKind::MarkUninitializedInst:

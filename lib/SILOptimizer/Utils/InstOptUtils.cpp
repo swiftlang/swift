@@ -141,6 +141,23 @@ bool swift::canTriviallyDeleteOSSAEndScopeInst(SILInstruction *i) {
          !opValue->getType().isMoveOnly();
 }
 
+/// Return true if \p inst is a forwarding operation that destructures an owned
+/// move-only value. Such instructions must not be deleted because they end
+/// the lifetime of their operand.
+bool swift::canDeleteDeadMoveOnlyOwnedDestructureInst(SILInstruction *inst) {
+  auto forwardingOperation = ForwardingOperation(inst);
+  if (!forwardingOperation || !forwardingOperation.isOwnedValueDestructure()) {
+    return true;
+  }
+  auto *singleForwardingOp = forwardingOperation.getSingleForwardingOperand();
+  ASSERT(singleForwardingOp);
+  if (!singleForwardingOp->get()->getType().isMoveOnly()) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
@@ -180,11 +197,7 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   if (isa<BorrowedFromInst>(inst))
     return false;
 
-  // A dead `destructure_struct` with an owned argument can appear for a non-copyable or
-  // non-escapable struct which has only trivial elements. The instruction is not trivially
-  // dead because it ends the lifetime of its operand.
-  if (isa<DestructureStructInst>(inst) &&
-      inst->getOperand(0)->getOwnershipKind() == OwnershipKind::Owned) {
+  if (!canDeleteDeadMoveOnlyOwnedDestructureInst(inst)) {
     return false;
   }
 
