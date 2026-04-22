@@ -597,7 +597,7 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
       // so unwrap it to an UnsafeMutableBufferPointer that we can cast
       let unwrappedCall = ExprSyntax(
         """
-        unsafe \(name).withUnsafeMutableBufferPointer { \(unwrappedName) in
+        \(name).withUnsafeMutableBufferPointer { \(unwrappedName) in
           return \(call)
         }
         """)
@@ -916,7 +916,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
         }
       let unwrappedCall = ExprSyntax(
         """
-        unsafe \(raw: name)\(raw: questionMark).\(raw: funcName) { unsafe $0 }
+        \(raw: name)\(raw: questionMark).\(raw: funcName) { unsafe $0 }
         """)
       res.append(CodeBlockItemSyntax.Item(try VariableDeclSyntax("let \(unwrappedName) = \(unwrappedCall)")))
       let lifetimeFix = ExprSyntax("_fixLifetime(\(raw: name))")

@@ -438,7 +438,7 @@ extension DistributedActorSystem {
 
     // Gen the generic environment (if any) associated with the target.
     let genericEnv =
-      unsafe targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
         unsafe _getGenericEnvironmentOfDistributedTarget(
           targetNameUTF8.baseAddress!,
           UInt(targetNameUTF8.endIndex))
@@ -478,7 +478,7 @@ extension DistributedActorSystem {
     }
 
     let paramCount =
-      unsafe targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
         unsafe __getParameterCount(
           targetNameUTF8.baseAddress!,
           UInt(targetNameUTF8.endIndex))
@@ -501,7 +501,7 @@ extension DistributedActorSystem {
     }
 
     // Demangle and write all parameter types into the prepared buffer
-    let decodedNum = unsafe targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+    let decodedNum = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
       unsafe __getParameterTypeInfo(
         targetNameUTF8.baseAddress!,
         UInt(targetNameUTF8.endIndex),
@@ -536,7 +536,7 @@ extension DistributedActorSystem {
     }
 
     let maybeReturnTypeFromTypeInfo =
-      unsafe targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
         unsafe __getReturnTypeInfo(
           /*targetName:*/targetNameUTF8.baseAddress!,
           /*targetLength:*/UInt(targetNameUTF8.endIndex),

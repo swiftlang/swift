@@ -139,7 +139,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   internal func _uncheckedIndex(before i: Index) -> Index {
     // TODO(String performance): isASCII fast-path
     if _fastPath(_guts.isFastUTF8) {
-      let len = unsafe _guts.withFastUTF8 { utf8 in
+      let len = _guts.withFastUTF8 { utf8 in
         unsafe _utf8ScalarLength(utf8, endingAt: i._encodedOffset)
       }
       _internalInvariant(len <= 4, "invalid UTF8")

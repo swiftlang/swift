@@ -1702,7 +1702,7 @@ extension BinaryInteger {
     let safetyMargin = radix >= 10 ? 21 : 65
     let capacity =
       (radix >= 10 ? (bitWidth * 5 + 15) &>> 4 : bitWidth) + safetyMargin
-    return unsafe withUnsafeTemporaryAllocation(
+    return withUnsafeTemporaryAllocation(
       of: UTF8.CodeUnit.self,
       capacity: capacity
     ) {

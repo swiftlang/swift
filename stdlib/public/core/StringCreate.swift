@@ -296,7 +296,7 @@ extension String {
       into: { contents.append($0) })
     _internalInvariant(!repaired, "Error present")
 
-    return unsafe contents.withUnsafeBufferPointer {
+    return contents.withUnsafeBufferPointer {
       unsafe String._uncheckedFromUTF8($0, precalculatedUTF16Count: input.count)
     }
   }
@@ -329,12 +329,12 @@ extension String {
 
     let str:String
     if Encoding.self == UTF16.self {
-      str = unsafe contents.withUnsafeBufferPointer {
+      str = contents.withUnsafeBufferPointer {
         unsafe String._uncheckedFromUTF8(
           $0, precalculatedUTF16Count: input.count)
       }
     } else {
-      str = unsafe contents.withUnsafeBufferPointer {
+      str = contents.withUnsafeBufferPointer {
         unsafe String._uncheckedFromUTF8($0)
       }
     }
@@ -393,7 +393,7 @@ extension String {
       return resultOrSlow(strOpt)
     }
 
-    return unsafe resultOrSlow(Array(input).withUnsafeBufferPointer {
+    return resultOrSlow(Array(input).withUnsafeBufferPointer {
         let buffer = unsafe UnsafeRawBufferPointer($0).bindMemory(to: UInt8.self)
         return unsafe String._fromASCIIValidating(buffer)
       })
@@ -426,7 +426,7 @@ extension String {
   @inline(never) // slow-path
   internal static func _copying(_ str: Substring) -> String {
     if _fastPath(str._wholeGuts.isFastUTF8) {
-      var new = unsafe str._wholeGuts.withFastUTF8(range: str._offsetRange) {
+      var new = str._wholeGuts.withFastUTF8(range: str._offsetRange) {
         unsafe String._uncheckedFromUTF8($0)
       }
 #if os(watchOS) && _pointerBitWidth(_32)
@@ -440,7 +440,7 @@ extension String {
 #endif
       return new
     }
-    return unsafe Array(str.utf8).withUnsafeBufferPointer {
+    return Array(str.utf8).withUnsafeBufferPointer {
       unsafe String._uncheckedFromUTF8($0)
     }
   }

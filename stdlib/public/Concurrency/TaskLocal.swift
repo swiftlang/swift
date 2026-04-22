@@ -428,7 +428,7 @@ func _taskLocalsCopy(
 @available(*, deprecated, message: "The situation diagnosed by this is not handled gracefully rather than by crashing")
 func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) {
   if _taskHasTaskGroupStatusRecord() {
-    unsafe file.withCString { _fileStart in
+    file.withCString { _fileStart in
       unsafe _reportIllegalTaskLocalBindingWithinWithTaskGroup(
           _fileStart, file.count, true, line)
     }

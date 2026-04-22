@@ -285,7 +285,7 @@ extension ${Self}: LosslessStringConvertible {
     let success = unsafe _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
       // Make a copy of `text` to ensure we have a null-terminated C string
       // to pass to the libc API:
-      unsafe text.withCString { chars -> Bool in
+      text.withCString { chars -> Bool in
         switch unsafe chars[0] {
         case 9, 10, 11, 12, 13, 32:
           return false // Reject leading whitespace

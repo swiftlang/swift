@@ -317,7 +317,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
       % if HAS_TASK_EXECUTOR:
       #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
       task =
-        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             % if HAS_ISOLATED_ANY:
@@ -334,7 +334,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
       let executorBuiltin: Builtin.Executor =
         taskExecutor.asUnownedTaskExecutor().executor
       task =
-        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             % if HAS_ISOLATED_ANY:
@@ -347,7 +347,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
       #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
       % else: # if no TASK_EXECUTOR
       task =
-        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             % if HAS_ISOLATED_ANY:

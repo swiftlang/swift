@@ -21,13 +21,13 @@ public func myFunc(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt, _ ptr2: Unsa
 public func myFunc(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
     let len = CInt(exactly: ptr?.count ?? 0)!
     let len2 = CInt(exactly: ptr2?.count ?? 0)!
-    let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
+    let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
         _fixLifetime(ptr)
     }
-    let _ptr2Ptr = unsafe ptr2?.withUnsafeMutableBufferPointer {
+    let _ptr2Ptr = ptr2?.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {

@@ -124,9 +124,9 @@ extension String {
   public func hasPrefix(_ prefix: String) -> Bool {
     if _fastPath(self._guts.isNFCFastUTF8 && prefix._guts.isNFCFastUTF8) {
       guard prefix._guts.count <= self._guts.count else { return false }
-      let isPrefix = unsafe prefix._guts.withFastUTF8 { nfcPrefix in
+      let isPrefix = prefix._guts.withFastUTF8 { nfcPrefix in
         let prefixEnd = nfcPrefix.count
-        return unsafe self._guts.withFastUTF8(range: 0..<prefixEnd) { nfcSlicedSelf in
+        return self._guts.withFastUTF8(range: 0..<prefixEnd) { nfcSlicedSelf in
           return unsafe _binaryCompare(nfcSlicedSelf, nfcPrefix) == 0
         }
       }
@@ -143,8 +143,8 @@ extension String {
     if _fastPath(self._guts.isNFCFastUTF8 && suffix._guts.isNFCFastUTF8) {
       let suffixStart = self._guts.count - suffix._guts.count
       guard suffixStart >= 0 else { return false }
-      let isSuffix = unsafe suffix._guts.withFastUTF8 { nfcSuffix in
-        return unsafe self._guts.withFastUTF8(range: suffixStart..<self._guts.count) {
+      let isSuffix = suffix._guts.withFastUTF8 { nfcSuffix in
+        return self._guts.withFastUTF8(range: suffixStart..<self._guts.count) {
           nfcSlicedSelf in return unsafe _binaryCompare(nfcSlicedSelf, nfcSuffix) == 0
         }
       }

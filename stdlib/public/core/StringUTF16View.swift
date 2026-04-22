@@ -767,7 +767,7 @@ extension String.UTF16View {
   internal func _utf16Distance(from start: Index, to end: Index) -> Int {
     _internalInvariant(end.transcodedOffset == 0 || end.transcodedOffset == 1)
         
-    return unsafe (end.transcodedOffset - start.transcodedOffset) + _guts.withFastUTF8(
+    return (end.transcodedOffset - start.transcodedOffset) + _guts.withFastUTF8(
       range: start._encodedOffset ..< end._encodedOffset
     ) { utf8 in
       let rawBuffer = UnsafeRawBufferPointer(utf8)
@@ -924,7 +924,7 @@ extension String.UTF16View {
     _internalInvariant(crumb._canBeUTF8 && crumb._encodedOffset <= _guts.count)
     if remaining == 0 { return crumb }
 
-    return unsafe _guts.withFastUTF8 { utf8 in
+    return _guts.withFastUTF8 { utf8 in
       var readIdx = crumb._encodedOffset
       let readEnd = utf8.count
       _internalInvariant(readIdx < readEnd)
@@ -996,7 +996,7 @@ extension String.UTF16View {
     if _slowPath(range.isEmpty) { return }
     
     let isASCII = _guts.isASCII
-    return unsafe _guts.withFastUTF8 { utf8 in
+    return _guts.withFastUTF8 { utf8 in
       var writeIdx = 0
       let writeEnd = buffer.count
       var readIdx = range.lowerBound._encodedOffset

@@ -139,7 +139,7 @@ func _stdlib_atomicInitializeARCRef(
   let desiredPtr = unsafe unmanaged.toOpaque()
   let rawTarget = unsafe UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
-  let wonRace = unsafe withUnsafeMutablePointer(to: &expected) {
+  let wonRace = withUnsafeMutablePointer(to: &expected) {
     unsafe _stdlib_atomicCompareExchangeStrongPtr(
       object: rawTarget, expected: $0, desired: desiredPtr
     )

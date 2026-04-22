@@ -21,7 +21,7 @@ extension std.string {
   ///   Swift string.
   @_alwaysEmitIntoClient
   public init(_ string: String) {
-    self = unsafe string.withCString(encodedAs: UTF8.self) { buffer in
+    self = string.withCString(encodedAs: UTF8.self) { buffer in
       // MSVC STL has a enable_if template guard on the 3-parameter constructor,
       // and thus it's not imported into Swift.
       // libc++ provides both 2-parameter and 3-parameter constructors.

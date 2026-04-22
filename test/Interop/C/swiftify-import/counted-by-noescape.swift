@@ -18,7 +18,7 @@
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func simple(_ p: inout MutableSpan<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -33,7 +33,7 @@ void simple(int len, int * __counted_by(len) __noescape p);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func swiftAttr(_ p: inout MutableSpan<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -52,13 +52,13 @@ void swiftAttr(int len, int *p) __attribute__((
 //   expected-remark@4{{macro content: |    if p2.count != len {|}}
 //   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p2.count)")|}}
 //   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    let _p1Ptr = unsafe p1.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@7{{macro content: |    let _p1Ptr = p1.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@8{{macro content: |        unsafe $0|}}
 //   expected-remark@9{{macro content: |    }|}}
 //   expected-remark@10{{macro content: |    defer {|}}
 //   expected-remark@11{{macro content: |        _fixLifetime(p1)|}}
 //   expected-remark@12{{macro content: |    }|}}
-//   expected-remark@13{{macro content: |    let _p2Ptr = unsafe p2.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@13{{macro content: |    let _p2Ptr = p2.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@14{{macro content: |        unsafe $0|}}
 //   expected-remark@15{{macro content: |    }|}}
 //   expected-remark@16{{macro content: |    defer {|}}
@@ -76,7 +76,7 @@ void shared(int len, int * __counted_by(len) __noescape p1, int * __counted_by(l
 //   expected-remark@4{{macro content: |    if _pCount != len - offset {|}}
 //   expected-remark@5{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(_pCount)")|}}
 //   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@7{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@8{{macro content: |        unsafe $0|}}
 //   expected-remark@9{{macro content: |    }|}}
 //   expected-remark@10{{macro content: |    defer {|}}
@@ -91,7 +91,7 @@ void complexExpr(int len, int offset, int * __counted_by(len - offset) __noescap
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func nullUnspecified(_ p: inout MutableSpan<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -106,7 +106,7 @@ void nullUnspecified(int len, int * __counted_by(len) _Null_unspecified __noesca
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func nonnull(_ p: inout MutableSpan<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -121,7 +121,7 @@ void nonnull(int len, int * __counted_by(len) _Nonnull __noescape p);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func nullable(_ p: inout MutableSpan<Int32>?) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p?.count ?? 0)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p?.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p?.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -144,7 +144,7 @@ int * __counted_by(len) __noescape returnPointer(int len);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_anonymous_param1: copy _anonymous_param1) @_disfavoredOverload public func anonymous(_ _anonymous_param1: inout MutableSpan<Int32>?) {|}}
 //   expected-remark@3{{macro content: |    let _anonymous_param0 = Int32(exactly: _anonymous_param1?.count ?? 0)!|}}
-//   expected-remark@4{{macro content: |    let __anonymous_param1Ptr = unsafe _anonymous_param1?.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let __anonymous_param1Ptr = _anonymous_param1?.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -168,7 +168,7 @@ void keyword(int len, int * __counted_by(len) _Nullable func __noescape,
     //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
     //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(`func`: copy `func`) @_disfavoredOverload public func keyword(_ `func`: inout MutableSpan<Int32>?, _ `extension`: Int32, _ `init`: Int32, _ open: Int32, _ `var`: Int32, _ `is`: Int32, _ `as`: Int32, _ `in`: Int32, _ `guard`: Int32, _ `where`: Int32) {|}}
     //   expected-remark@3{{macro content: |    let len = Int32(exactly: `func`?.count ?? 0)!|}}
-    //   expected-remark@4{{macro content: |    let _funcPtr = unsafe `func`?.withUnsafeMutableBufferPointer {|}}
+    //   expected-remark@4{{macro content: |    let _funcPtr = `func`?.withUnsafeMutableBufferPointer {|}}
     //   expected-remark@5{{macro content: |        unsafe $0|}}
     //   expected-remark@6{{macro content: |    }|}}
     //   expected-remark@7{{macro content: |    defer {|}}
@@ -184,7 +184,7 @@ void keyword(int len, int * __counted_by(len) _Nullable func __noescape,
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_pointerName_param1: copy _pointerName_param1) @_disfavoredOverload public func pointerName(_ _pointerName_param1: inout MutableSpan<Int32>?) {|}}
 //   expected-remark@3{{macro content: |    let _pointerName_param0 = Int32(exactly: _pointerName_param1?.count ?? 0)!|}}
-//   expected-remark@4{{macro content: |    let __pointerName_param1Ptr = unsafe _pointerName_param1?.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let __pointerName_param1Ptr = _pointerName_param1?.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -202,7 +202,7 @@ void pointerName(int len, int * __counted_by(len) _Nullable pointerName __noesca
 //   expected-remark@4{{macro content: |    if __lenName_param2Count != _lenName_param0 * _lenName_param1 {|}}
 //   expected-remark@5{{macro content: |      fatalError("bounds check failure in lenName: expected \\(_lenName_param0 * _lenName_param1) but got \\(__lenName_param2Count)")|}}
 //   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    let __lenName_param2Ptr = unsafe _lenName_param2?.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@7{{macro content: |    let __lenName_param2Ptr = _lenName_param2?.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@8{{macro content: |        unsafe $0|}}
 //   expected-remark@9{{macro content: |    }|}}
 //   expected-remark@10{{macro content: |    defer {|}}
@@ -217,7 +217,7 @@ void lenName(int lenName, int size, int * __counted_by(lenName * size) _Nullable
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_func_param1: copy _func_param1) @_disfavoredOverload public func `func`(_ _func_param1: inout MutableSpan<Int32>?) {|}}
 //   expected-remark@3{{macro content: |    let _func_param0 = Int32(exactly: _func_param1?.count ?? 0)!|}}
-//   expected-remark@4{{macro content: |    let __func_param1Ptr = unsafe _func_param1?.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let __func_param1Ptr = _func_param1?.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -241,7 +241,7 @@ void *funcRenameKeyword(int len, int * __counted_by(len) _Nullable func __noesca
     //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
     //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(`func`: copy `func`) @_disfavoredOverload public func funcRenamed(`func`: inout MutableSpan<Int32>?, `extension`: Int32, `init`: Int32, open: Int32, `var`: Int32, `is`: Int32, `as`: Int32, `in`: Int32, `guard`: Int32, `where`: Int32) -> UnsafeMutableRawPointer! {|}}
     //   expected-remark@3{{macro content: |    let len = Int32(exactly: `func`?.count ?? 0)!|}}
-    //   expected-remark@4{{macro content: |    let _funcPtr = unsafe `func`?.withUnsafeMutableBufferPointer {|}}
+    //   expected-remark@4{{macro content: |    let _funcPtr = `func`?.withUnsafeMutableBufferPointer {|}}
     //   expected-remark@5{{macro content: |        unsafe $0|}}
     //   expected-remark@6{{macro content: |    }|}}
     //   expected-remark@7{{macro content: |    defer {|}}
@@ -265,7 +265,7 @@ void *funcRenameKeywordAnonymous(int len, int * __counted_by(len) _Nullable __no
     //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
     //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_funcRenamedAnon_param1: copy _funcRenamedAnon_param1) @_disfavoredOverload public func funcRenamedAnon(`func` _funcRenamedAnon_param1: inout MutableSpan<Int32>?, `extension` _funcRenamedAnon_param2: Int32, `init` _funcRenamedAnon_param3: Int32, open _funcRenamedAnon_param4: Int32, `var` _funcRenamedAnon_param5: Int32, `is` _funcRenamedAnon_param6: Int32, `as` _funcRenamedAnon_param7: Int32, `in` _funcRenamedAnon_param8: Int32, `guard` _funcRenamedAnon_param9: Int32, `where` _funcRenamedAnon_param10: Int32) -> UnsafeMutableRawPointer! {|}}
     //   expected-remark@3{{macro content: |    let _funcRenamedAnon_param0 = Int32(exactly: _funcRenamedAnon_param1?.count ?? 0)!|}}
-    //   expected-remark@4{{macro content: |    let __funcRenamedAnon_param1Ptr = unsafe _funcRenamedAnon_param1?.withUnsafeMutableBufferPointer {|}}
+    //   expected-remark@4{{macro content: |    let __funcRenamedAnon_param1Ptr = _funcRenamedAnon_param1?.withUnsafeMutableBufferPointer {|}}
     //   expected-remark@5{{macro content: |        unsafe $0|}}
     //   expected-remark@6{{macro content: |    }|}}
     //   expected-remark@7{{macro content: |    defer {|}}
@@ -280,7 +280,7 @@ void *funcRenameKeywordAnonymous(int len, int * __counted_by(len) _Nullable __no
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(`func`: copy `func`) @_disfavoredOverload public func clash(`func`: inout MutableSpan<Int32>?, clash `where`: Int32) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: `func`?.count ?? 0)!|}}
-//   expected-remark@4{{macro content: |    let _funcPtr = unsafe `func`?.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let _funcPtr = `func`?.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -296,7 +296,7 @@ void funcRenameClash(int len, int * __counted_by(len) _Nullable func __noescape,
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(`func`: copy `func`) @_disfavoredOverload public func open(`func`: inout MutableSpan<Int32>?, open `where`: Int32) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: `func`?.count ?? 0)!|}}
-//   expected-remark@4{{macro content: |    let _funcPtr = unsafe `func`?.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let _funcPtr = `func`?.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -312,7 +312,7 @@ void funcRenameClashKeyword(int len, int * __counted_by(len) _Nullable func __no
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_clash2_param1: copy _clash2_param1) @_disfavoredOverload public func clash2(`func` _clash2_param1: inout MutableSpan<Int32>?, clash2 _clash2_param2: Int32) {|}}
 //   expected-remark@3{{macro content: |    let _clash2_param0 = Int32(exactly: _clash2_param1?.count ?? 0)!|}}
-//   expected-remark@4{{macro content: |    let __clash2_param1Ptr = unsafe _clash2_param1?.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let __clash2_param1Ptr = _clash2_param1?.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -328,7 +328,7 @@ void funcRenameClashAnonymous(int len, int * __counted_by(len) _Nullable func __
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_in_param1: copy _in_param1) @_disfavoredOverload public func `in`(`func` _in_param1: inout MutableSpan<Int32>?, `in` _in_param2: Int32) {|}}
 //   expected-remark@3{{macro content: |    let _in_param0 = Int32(exactly: _in_param1?.count ?? 0)!|}}
-//   expected-remark@4{{macro content: |    let __in_param1Ptr = unsafe _in_param1?.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let __in_param1Ptr = _in_param1?.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -346,7 +346,7 @@ typedef struct actor_ *actor;
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func keywordType(_ p: inout MutableSpan<actor?>, _ p2: actor) -> actor {|}}
 //   expected-warning@3{{expression uses unsafe constructs but is not marked with 'unsafe'}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}

@@ -233,7 +233,7 @@ extension String.UTF8View: BidirectionalCollection {
   @_alwaysEmitIntoClient @inline(__always)
   internal subscript(_unchecked i: Index) -> UTF8.CodeUnit {
     if _fastPath(_guts.isFastUTF8) {
-      return unsafe _guts.withFastUTF8 { utf8 in unsafe utf8[_unchecked: i._encodedOffset] }
+      return _guts.withFastUTF8 { utf8 in unsafe utf8[_unchecked: i._encodedOffset] }
     }
 
     return _foreignSubscript(position: i)
@@ -677,11 +677,12 @@ extension String.Index {
 
 extension String.UTF8View {
   @inlinable
+  @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     guard _guts.isFastUTF8 else { return nil }
-    return unsafe try _guts.withFastUTF8(body)
+    return try _guts.withFastUTF8(body)
   }
 }
 

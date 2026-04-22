@@ -27,7 +27,7 @@ extension ExecutorJob {
   fileprivate var cooperativeExecutorTimestampPointer: UnsafeMutablePointer<CooperativeExecutor.Timestamp> {
     get {
       assert(cooperativeExecutorTimestampIsIndirect)
-      return unsafe withUnsafeExecutorPrivateData {
+      return withUnsafeExecutorPrivateData {
         unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<CooperativeExecutor.Timestamp>.self) {
           return unsafe $0[0]
         }
@@ -35,7 +35,7 @@ extension ExecutorJob {
     }
     set {
       assert(cooperativeExecutorTimestampIsIndirect)
-      unsafe withUnsafeExecutorPrivateData {
+      withUnsafeExecutorPrivateData {
         unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<CooperativeExecutor.Timestamp>.self) {
           unsafe $0[0] = newValue
         }
@@ -49,7 +49,7 @@ extension ExecutorJob {
         let ptr = unsafe cooperativeExecutorTimestampPointer
         return unsafe ptr.pointee
       } else {
-        return unsafe withUnsafeExecutorPrivateData {
+        return withUnsafeExecutorPrivateData {
           return unsafe $0.assumingMemoryBound(
             to: CooperativeExecutor.Timestamp.self
           )[0]
@@ -61,7 +61,7 @@ extension ExecutorJob {
         let ptr = unsafe cooperativeExecutorTimestampPointer
         unsafe ptr.pointee = newValue
      } else {
-        unsafe withUnsafeExecutorPrivateData {
+        withUnsafeExecutorPrivateData {
           unsafe $0.withMemoryRebound(to: CooperativeExecutor.Timestamp.self) {
             unsafe $0[0] = newValue
           }

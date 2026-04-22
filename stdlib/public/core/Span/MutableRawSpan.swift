@@ -154,6 +154,7 @@ extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
   @_transparent
+  @safe
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -163,6 +164,7 @@ extension MutableRawSpan {
   @_alwaysEmitIntoClient
   @_transparent
   @lifetime(self: copy self)
+  @safe
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {

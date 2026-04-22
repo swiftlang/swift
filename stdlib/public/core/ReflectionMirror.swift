@@ -79,7 +79,7 @@ internal func _getQuickLookObject<T>(_: T) -> AnyObject?
 internal func _isImpl(_ object: AnyObject, kindOf: UnsafePointer<CChar>) -> Bool
 
 internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
-  return unsafe `class`.withCString {
+  return `class`.withCString {
     return unsafe _isImpl(object, kindOf: $0)
   }
 }

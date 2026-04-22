@@ -296,6 +296,7 @@ extension OutputRawSpan {
   @_alwaysEmitIntoClient
   @_transparent
   @lifetime(self: copy self)
+  @unsafe
   public mutating func withUnsafeMutableBytes<E: Error, R: ~Copyable>(
     _ body: (
       UnsafeMutableRawBufferPointer,

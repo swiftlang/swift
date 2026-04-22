@@ -178,7 +178,7 @@ extension _StringGuts {
       return foreignIdx
     }
 
-    return unsafe String.Index(_encodedOffset:
+    return String.Index(_encodedOffset:
       self.withFastUTF8 { unsafe _scalarAlign($0, idx._encodedOffset) }
     )
   }
@@ -186,7 +186,7 @@ extension _StringGuts {
   @inlinable
   internal func fastUTF8ScalarLength(startingAt i: Int) -> Int {
     _internalInvariant(isFastUTF8)
-    let len = unsafe _utf8ScalarLength(self.withFastUTF8 { unsafe $0[_unchecked: i] })
+    let len = _utf8ScalarLength(self.withFastUTF8 { unsafe $0[_unchecked: i] })
     _internalInvariant((1...4) ~= len)
     return len
   }
@@ -195,7 +195,7 @@ extension _StringGuts {
   internal func fastUTF8ScalarLength(endingAt i: Int) -> Int {
     _internalInvariant(isFastUTF8)
 
-    return unsafe self.withFastUTF8 { utf8 in
+    return self.withFastUTF8 { utf8 in
       unsafe _internalInvariant(i == utf8.count || !UTF8.isContinuation(utf8[i]))
       var len = 1
       while unsafe UTF8.isContinuation(utf8[i &- len]) {
@@ -210,7 +210,7 @@ extension _StringGuts {
   @inlinable @inline(__always)
   internal func fastUTF8Scalar(startingAt i: Int) -> Unicode.Scalar {
     _internalInvariant(isFastUTF8)
-    return unsafe self.withFastUTF8 { unsafe _decodeScalar($0, startingAt: i).0 }
+    return self.withFastUTF8 { unsafe _decodeScalar($0, startingAt: i).0 }
   }
 
   @_alwaysEmitIntoClient
@@ -230,7 +230,7 @@ extension _StringGuts {
     if i == self.startIndex || i == self.endIndex { return true }
 
     if _fastPath(isFastUTF8) {
-      return unsafe self.withFastUTF8 {
+      return self.withFastUTF8 {
         return unsafe !UTF8.isContinuation($0[_unchecked: i._encodedOffset])
       }
     }
@@ -383,7 +383,7 @@ extension _StringGuts {
       ).0))
     }
 
-    return unsafe withUnsafeTemporaryAllocation(
+    return withUnsafeTemporaryAllocation(
       of: UInt16.self, capacity: count
     ) { buffer in
       self._object.withCocoaObject {
@@ -410,7 +410,7 @@ extension _StringGuts {
     startingAt i: Int
   ) -> (Unicode.Scalar, scalarLength: Int) {
     if _fastPath(isFastUTF8) {
-      return unsafe withFastUTF8 { unsafe _decodeScalar($0, startingAt: i) }
+      return withFastUTF8 { unsafe _decodeScalar($0, startingAt: i) }
     }
     return foreignErrorCorrectedScalar(
       startingAt: String.Index(_encodedOffset: i))
@@ -420,7 +420,7 @@ extension _StringGuts {
     startingAt start: Int, endingAt end: Int
   ) -> Character {
     if _fastPath(isFastUTF8) {
-      return unsafe withFastUTF8(range: start..<end) { utf8 in
+      return withFastUTF8(range: start..<end) { utf8 in
         return unsafe Character(unchecked: String._uncheckedFromUTF8(utf8))
       }
     }
