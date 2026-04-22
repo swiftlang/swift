@@ -87,11 +87,14 @@ extension Contract: @reparented Identity // (7)
 6. All other requirements of the new parent must have default implementations within scope of the reparented extension. Thus, if there are methods only conditionally available (i.e., within other extensions constrained by a `where` clause), they cannot be used to implement the requirements.
 7. Reparentable protocols can only inherit from marker protocols like `Sendable`.
 8. You cannot conditionalize a reparented extension based on conformance requirements, e.g., `where ID: Equatable` is not permitted.
-9. Adding another reparented extension to a protocol that has already been reparented once before is not currently supported. Thus, all reparented extensions need to be added for the protocol within the same release.
 
 ## Gotchas
 
 There are a few subtle aspects of reparenting to keep in mind.
+
+### Overhead
+
+For any type conforming to a reparentable protocol, accessing the witness table for that reparentable protocol is less efficient; a relative offset amounting to an extra subtraction of two addresses must be computed. This has more overhead than a normal protocol, which uses a fixed offset.   
 
 ### Default Type Witnesses
 

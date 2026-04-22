@@ -30,6 +30,7 @@
 #include "swift/SIL/TypeLowering.h"
 
 #include "Callee.h"
+#include "ComputedWitnessIndex.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenPointerAuth.h"
@@ -310,27 +311,36 @@ llvm::StructType *IRGenModule::getEnumValueWitnessTableTy() {
 
 Address irgen::slotForLoadOfOpaqueWitness(IRGenFunction &IGF,
                                           llvm::Value *table,
-                                          WitnessIndex index,
+                                          ComputedWitnessIndex index,
                                           bool areEntriesRelative) {
   assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
 
-  // Are we loading from a relative protocol witness table.
+  llvm::Value *slot = table;
+  llvm::Type *elementTy = table->getType();
+  Alignment align = IGF.IGM.getPointerAlignment();
+
+  // Are we loading from a relative protocol witness table?
   if (areEntriesRelative) {
-    llvm::Value *slot =
-      IGF.Builder.CreateBitOrPointerCast(table, IGF.IGM.RelativeAddressPtrTy);
-    if (index.getValue() != 0)
-      slot = IGF.Builder.CreateConstInBoundsGEP1_32(IGF.IGM.RelativeAddressTy,
-                                                    slot, index.getValue());
-    return Address(slot, IGF.IGM.RelativeAddressTy, Alignment(4));
+    slot =
+        IGF.Builder.CreateBitOrPointerCast(table, IGF.IGM.RelativeAddressPtrTy);
+    elementTy = IGF.IGM.RelativeAddressTy;
+    align = Alignment(4);
   }
 
-  // GEP to the appropriate index, avoiding spurious IR in the trivial case.
-  llvm::Value *slot = table;
-  if (index.getValue() != 0)
-    slot = IGF.Builder.CreateConstInBoundsGEP1_32(IGF.IGM.WitnessTableTy, table,
-                                                  index.getValue());
+  // Is the index statically known?
+  if (auto staticIdx = index.getStaticIndex()) {
+    // GEP to the appropriate index, avoiding spurious IR in the trivial case.
+    if (staticIdx->getValue() != 0)
+      slot = IGF.Builder.CreateConstInBoundsGEP1_32(elementTy, slot,
+                                                    staticIdx->getValue());
 
-  return Address(slot, IGF.IGM.WitnessTableTy, IGF.IGM.getPointerAlignment());
+    return Address(slot, elementTy, align);
+  }
+
+  // For a non-static index, we can't avoid a GEP.
+  slot =
+      IGF.Builder.CreateInBoundsGEP(elementTy, slot, index.getDynamicIndex());
+  return Address(slot, elementTy, align);
 }
 
 /// Load a specific witness from a known table.  The result is
@@ -338,7 +348,7 @@ Address irgen::slotForLoadOfOpaqueWitness(IRGenFunction &IGF,
 llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
                                                      bool isProtocolWitness,
                                                      llvm::Value *table,
-                                                     WitnessIndex index,
+                                                     ComputedWitnessIndex index,
                                                      llvm::Value **slotPtr) {
   // Is this is a load of a relative protocol witness table entry.
   auto isRelativeTable = IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables &&

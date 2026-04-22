@@ -4106,6 +4106,26 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
     auto existing = cast<llvm::GlobalValue>(existingGlobal);
     auto castVar = llvm::ConstantExpr::getBitCast(var, existing->getType());
     existing->replaceAllUsesWith(castVar);
+
+    // Sometimes, two extension descriptors with different LinkEntity's
+    // may refer to the same llvm::Constant* within the GlobalVars map;
+    // their mangled names would be the same. It's suspected to have to
+    // do with `getAddrOfSharedContextDescriptor`'s shenanigans, but not proven.
+    // This is currently only ben observed for extension descriptors created for
+    // protocol-to-protocol conformances. In that case, we check for additional
+    // references in the GlobalVars map to prevent a dangling pointer.
+    if (entity.hasExtension()) {
+      for (auto otherExt : IRGen.AllConformanceOfProtocolExtensionDescriptors) {
+        auto otherEntity = LinkEntity::forExtensionDescriptor(otherExt);
+        auto &entry = GlobalVars[otherEntity];
+        if (entry == existing) {
+          assert(otherExt->getExtendedNominal() ==
+                 entity.getExtension()->getExtendedNominal());
+          entry = var;
+        }
+      }
+    }
+
     existing->eraseFromParent();
   }
 
