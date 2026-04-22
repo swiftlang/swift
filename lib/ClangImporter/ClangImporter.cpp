@@ -824,6 +824,20 @@ void importer::getNormalInvocationArguments(
 
   if (!LangOpts.DisableSafeInteropWrappers)
     invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
+
+  if (ctx.SILOpts.Sanitizers & SanitizerKind::Address)
+    invocationArgStrs.push_back("-fsanitize=address");
+  if (ctx.SILOpts.Sanitizers & SanitizerKind::Thread)
+    invocationArgStrs.push_back("-fsanitize=thread");
+  if (ctx.SILOpts.Sanitizers & SanitizerKind::Undefined)
+    invocationArgStrs.push_back("-fsanitize=undefined");
+  if (ctx.SILOpts.Sanitizers & SanitizerKind::MemTagStack) {
+    invocationArgStrs.push_back("-fsanitize=memtag-stack");
+    invocationArgStrs.push_back("-Xclang");
+    invocationArgStrs.push_back("-target-feature");
+    invocationArgStrs.push_back("-Xclang");
+    invocationArgStrs.push_back("+mte");
+  }
 }
 
 static void
