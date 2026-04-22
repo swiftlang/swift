@@ -43,7 +43,8 @@ let commonSubexpressionElimination = FunctionPass(name: "common-subexpression-el
     domTree: domTree,
     map: &map,
     &lazyPropertyGetters,
-    context
+    context,
+    calleeAnalysis: context.calleeAnalysis
   )
   processLazyPropertyGetters(lazyPropertyGetters, function: function, context)
   if context.hasChanged(.Branches) {
@@ -68,7 +69,8 @@ let highLevelCSE = FunctionPass(name: "high-level-common-subexpression-eliminati
     map: &map,
     &lazyPropertyGetters,
     context,
-    runsOnHighLevelSil: true
+    runsOnHighLevelSil: true,
+    calleeAnalysis: context.calleeAnalysis
   )
   processLazyPropertyGetters(lazyPropertyGetters, function: function, context)
   if context.hasChanged(.Branches) {
@@ -91,10 +93,12 @@ private func processFunction(
   map: inout ScopedHashMap,
   _ lazyPropertyGetters: inout [ApplyInst],
   _ context: FunctionPassContext,
-  runsOnHighLevelSil: Bool = false
+  runsOnHighLevelSil: Bool = false,
+  calleeAnalysis: CalleeAnalysis? = nil
 ) {
   // Process the entry block, then drive the DFS.
-  processBlock(startBlock, map: &map, &lazyPropertyGetters, context, runsOnHighLevelSil: runsOnHighLevelSil)
+  processBlock(startBlock, map: &map, &lazyPropertyGetters, context,
+               runsOnHighLevelSil: runsOnHighLevelSil, calleeAnalysis: calleeAnalysis)
 
   // Each stack frame holds the block being visited and an index into its
   // dominator-tree children so we can resume after processing each child.
@@ -108,7 +112,8 @@ private func processFunction(
       // Advance the child pointer for this frame, then visit the next child.
       dfsStack[dfsStack.count - 1].childIndex += 1
       let child = children[childIndex]
-      processBlock(child, map: &map, &lazyPropertyGetters, context, runsOnHighLevelSil: runsOnHighLevelSil)
+      processBlock(child, map: &map, &lazyPropertyGetters, context,
+                   runsOnHighLevelSil: runsOnHighLevelSil, calleeAnalysis: calleeAnalysis)
       dfsStack.append((child, 0))
     } else {
       // All children exhausted — pop this block's entries from the map
@@ -134,7 +139,8 @@ private func processBlock(
   map: inout ScopedHashMap,
   _ lazyPropertyGetters: inout [ApplyInst],
   _ context: FunctionPassContext,
-  runsOnHighLevelSil: Bool = false
+  runsOnHighLevelSil: Bool = false,
+  calleeAnalysis: CalleeAnalysis? = nil
 ) {
   // `block.instructions` skips deleted instructions automatically, so it is
   // safe to erase the current instruction while iterating.
@@ -145,7 +151,8 @@ private func processBlock(
     }
 
     // getHash returns nil for ineligible instructions.
-    guard let ref = InstructionReference(inst: inst, runsOnHighLevelSil: runsOnHighLevelSil) else { continue }
+    guard let ref = InstructionReference(inst: inst, runsOnHighLevelSil: runsOnHighLevelSil,
+                                         calleeAnalysis: calleeAnalysis) else { continue }
     // If an instruction can be handled here, then it must also be handled
     // in isIdenticalTo, otherwise looking up a key in the map will fail to
     // match itself.
@@ -178,6 +185,23 @@ private func canHandleArraySemanticsCall(_ ai: ApplyInst) -> Bool {
   default:
     return false
   }
+}
+
+private func canHandleApply(_ ai: ApplyInst, calleeAnalysis: CalleeAnalysis?) -> Bool {
+  if !ai.mayReadOrWriteMemory { return true }
+
+  if let ca = calleeAnalysis {
+    let effects = ca.getSideEffects(ofApply: ai)
+    if effects.getMemBehavior(observeRetains: false) == .None {
+      return true
+    }
+  }
+
+  if let callee = ai.referencedFunction, callee.isGlobalInitFunction {
+    return true
+  }
+
+  return false
 }
 
 private func isLazyPropertyGetter(_ ai: ApplyInst) -> Bool {
@@ -274,7 +298,8 @@ private func tryCSEReplace(
 /// The hash must satisfy: if `a.isIdenticalTo(b)` then `getHash(a) == getHash(b)`.
 /// It covers instruction kind, result type(s), operand SSA values, and any
 /// instruction-specific attributes (field indices, literal values, etc.).
-private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false) -> Int? {
+private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
+                     calleeAnalysis: CalleeAnalysis? = nil) -> Int? {
   // In OSSA, skip instructions that produce an owned result: replacing them
   // would require inserting copies to maintain ownership correctness, which
   // defeats the purpose of CSE. Trivial (none) and guaranteed results are
@@ -521,8 +546,9 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false) -> 
     for op in x.operands { hasher.combine(op.value.hashable) }
 
   // CSE applies that are lazy property getter calls (side-effect-free once
-  // the property is set) or, when running on high-level SIL, array semantic
-  // calls with a guaranteed self parameter.
+  // the property is set), array semantic calls on high-level SIL, pure
+  // functions, functions with no side effects per callee analysis, or
+  // global initializers.
   // isLazyPropertyGetter guarantees referencedFunction is non-nil.
   case let x as ApplyInst:
     if isLazyPropertyGetter(x) {
@@ -533,6 +559,9 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false) -> 
       hasher.combine(ObjectIdentifier(ApplyInst.self))
       hasher.combine(x.referencedFunction)
       for arg in x.arguments { hasher.combine(arg.hashable) }
+    } else if canHandleApply(x, calleeAnalysis: calleeAnalysis) {
+      hasher.combine(ObjectIdentifier(ApplyInst.self))
+      for op in x.operands { hasher.combine(op.value.hashable) }
     } else {
       return nil
     }
@@ -559,8 +588,9 @@ struct InstructionReference: Hashable {
   let hash: Int
 
   /// Returns `nil` if `inst` is not eligible for CSE.
-  init?(inst: Instruction, runsOnHighLevelSil: Bool = false) {
-    guard let h = getHash(of: inst, runsOnHighLevelSil: runsOnHighLevelSil) else { return nil }
+  init?(inst: Instruction, runsOnHighLevelSil: Bool = false, calleeAnalysis: CalleeAnalysis? = nil) {
+    guard let h = getHash(of: inst, runsOnHighLevelSil: runsOnHighLevelSil,
+                          calleeAnalysis: calleeAnalysis) else { return nil }
     self.inst = inst
     self.hash = h
   }
