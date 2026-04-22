@@ -406,7 +406,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   // Cleanup.
   P.addDCE();
   // Also CSE semantic calls.
-  P.addHighLevelCSE();
+  P.addHighLevelCommonSubexpressionElimination();
   P.addSILCombine();
   P.addSimplifyCFG();
   // Optimize access markers for better LICM: might merge accesses

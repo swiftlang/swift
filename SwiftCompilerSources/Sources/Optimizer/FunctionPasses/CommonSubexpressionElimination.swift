@@ -15,12 +15,11 @@
 //
 // It is invoked using the flag:
 //   "common-subexpression-elimination"   — post-inlining, runs on canonical SIL
+//   "high-level-common-subexpression-elimination" — pre-inlining, also CSEs
+//                                                   semantic array calls
 //
 // Lazy property getter applies are CSE-ed: two calls to the same getter on the
 // same `self` value in a dominator relationship can share the first call's result.
-//
-// TODO: A "swift-high-level-cse" variant (pre-inlining, CSEs semantic array calls)
-// will be added later.
 //
 //===----------------------------------------------------------------------===//
 
@@ -55,6 +54,31 @@ let commonSubexpressionElimination = FunctionPass(name: "common-subexpression-el
   }
 }
 
+let highLevelCSE = FunctionPass(name: "high-level-common-subexpression-elimination") {
+  (function: Function, context: FunctionPassContext) in
+  guard let entryBlock = function.blocks.first else { return }
+
+  let domTree = context.dominatorTree
+  var map = ScopedHashMap()
+  var lazyPropertyGetters: [ApplyInst] = []
+
+  processFunction(
+    startBlock: entryBlock,
+    domTree: domTree,
+    map: &map,
+    &lazyPropertyGetters,
+    context,
+    runsOnHighLevelSil: true
+  )
+  processLazyPropertyGetters(lazyPropertyGetters, function: function, context)
+  if context.hasChanged(.Branches) {
+    _ = context.removeDeadBlocks(in: function)
+  }
+  if context.needBreakInfiniteLoops {
+    breakInfiniteLoops(in: function, context)
+  }
+}
+
 // -----------------------------------------------------------------------
 // DFS over the dominator tree
 // -----------------------------------------------------------------------
@@ -66,10 +90,11 @@ private func processFunction(
   domTree: DominatorTree,
   map: inout ScopedHashMap,
   _ lazyPropertyGetters: inout [ApplyInst],
-  _ context: FunctionPassContext
+  _ context: FunctionPassContext,
+  runsOnHighLevelSil: Bool = false
 ) {
   // Process the entry block, then drive the DFS.
-  processBlock(startBlock, map: &map, &lazyPropertyGetters, context)
+  processBlock(startBlock, map: &map, &lazyPropertyGetters, context, runsOnHighLevelSil: runsOnHighLevelSil)
 
   // Each stack frame holds the block being visited and an index into its
   // dominator-tree children so we can resume after processing each child.
@@ -83,7 +108,7 @@ private func processFunction(
       // Advance the child pointer for this frame, then visit the next child.
       dfsStack[dfsStack.count - 1].childIndex += 1
       let child = children[childIndex]
-      processBlock(child, map: &map, &lazyPropertyGetters, context)
+      processBlock(child, map: &map, &lazyPropertyGetters, context, runsOnHighLevelSil: runsOnHighLevelSil)
       dfsStack.append((child, 0))
     } else {
       // All children exhausted — pop this block's entries from the map
@@ -108,7 +133,8 @@ private func processBlock(
   _ block: BasicBlock,
   map: inout ScopedHashMap,
   _ lazyPropertyGetters: inout [ApplyInst],
-  _ context: FunctionPassContext
+  _ context: FunctionPassContext,
+  runsOnHighLevelSil: Bool = false
 ) {
   // `block.instructions` skips deleted instructions automatically, so it is
   // safe to erase the current instruction while iterating.
@@ -119,14 +145,14 @@ private func processBlock(
     }
 
     // getHash returns nil for ineligible instructions.
-    guard let ref = InstructionReference(inst: inst) else { continue }
+    guard let ref = InstructionReference(inst: inst, runsOnHighLevelSil: runsOnHighLevelSil) else { continue }
     // If an instruction can be handled here, then it must also be handled
     // in isIdenticalTo, otherwise looking up a key in the map will fail to
     // match itself.
     assert(inst.isIdenticalTo(inst), "inst must match itself for map to work")
 
     if let availInst = map.lookup(ref) {
-      if let ai = inst as? ApplyInst {
+      if let ai = inst as? ApplyInst, isLazyPropertyGetter(ai) {
         lazyPropertyGetters.append(ai)
       } else {
         tryCSEReplace(inst: inst, with: availInst, context)
@@ -138,6 +164,21 @@ private func processBlock(
   }
 }
 
+
+private func hasGuaranteedSelf(_ ai: ApplyInst) -> Bool {
+  let conventions = ai.calleeArgumentConventions
+  guard let selfIdx = conventions.selfIndex else { return false }
+  return conventions[selfIdx] == .directGuaranteed
+}
+
+private func canHandleArraySemanticsCall(_ ai: ApplyInst) -> Bool {
+  switch ai.arraySemanticsCallKind {
+  case .getCount, .getCapacity, .checkIndex, .checkSubscript:
+    return hasGuaranteedSelf(ai)
+  default:
+    return false
+  }
+}
 
 private func isLazyPropertyGetter(_ ai: ApplyInst) -> Bool {
   guard let callee = ai.referencedFunction,
@@ -233,7 +274,7 @@ private func tryCSEReplace(
 /// The hash must satisfy: if `a.isIdenticalTo(b)` then `getHash(a) == getHash(b)`.
 /// It covers instruction kind, result type(s), operand SSA values, and any
 /// instruction-specific attributes (field indices, literal values, etc.).
-private func getHash(of inst: Instruction) -> Int? {
+private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false) -> Int? {
   // In OSSA, skip instructions that produce an owned result: replacing them
   // would require inserting copies to maintain ownership correctness, which
   // defeats the purpose of CSE. Trivial (none) and guaranteed results are
@@ -479,15 +520,22 @@ private func getHash(of inst: Instruction) -> Int? {
     hasher.combine(x.indexedPackType)
     for op in x.operands { hasher.combine(op.value.hashable) }
 
-  // Only CSE applies that are lazy property getter calls: they are
-  // side-effect-free once the property is set, and the getter is
-  // structurally verified by isLazyPropertyGetter.
+  // CSE applies that are lazy property getter calls (side-effect-free once
+  // the property is set) or, when running on high-level SIL, array semantic
+  // calls with a guaranteed self parameter.
   // isLazyPropertyGetter guarantees referencedFunction is non-nil.
   case let x as ApplyInst:
-    guard isLazyPropertyGetter(x) else { return nil }
-    hasher.combine(ObjectIdentifier(ApplyInst.self))
-    hasher.combine(x.referencedFunction)
-    hasher.combine(x.arguments.first!.hashable)  // `self` is the only argument
+    if isLazyPropertyGetter(x) {
+      hasher.combine(ObjectIdentifier(ApplyInst.self))
+      hasher.combine(x.referencedFunction)
+      hasher.combine(x.arguments.first!.hashable)
+    } else if runsOnHighLevelSil, canHandleArraySemanticsCall(x) {
+      hasher.combine(ObjectIdentifier(ApplyInst.self))
+      hasher.combine(x.referencedFunction)
+      for arg in x.arguments { hasher.combine(arg.hashable) }
+    } else {
+      return nil
+    }
 
   default:
     return nil
@@ -511,8 +559,8 @@ struct InstructionReference: Hashable {
   let hash: Int
 
   /// Returns `nil` if `inst` is not eligible for CSE.
-  init?(inst: Instruction) {
-    guard let h = getHash(of: inst) else { return nil }
+  init?(inst: Instruction, runsOnHighLevelSil: Bool = false) {
+    guard let h = getHash(of: inst, runsOnHighLevelSil: runsOnHighLevelSil) else { return nil }
     self.inst = inst
     self.hash = h
   }
