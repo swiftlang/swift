@@ -2105,13 +2105,13 @@ function Build-BuildTools([Hashtable] $Platform) {
     }
 }
 
-function Build-EarlySwiftDriver {
+function Build-EarlySwiftDriver([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\swift-driver `
     -Bin (Get-ProjectBinaryCache $Platform EarlySwiftDriver) `
-    -Platform $BuildPlatform `
+    -Platform $Platform `
     -UsePinnedCompilers C,CXX,Swift `
-    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS -Identifier "$($BuildPlatform.OS)Experimental") `
+    -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental") `
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
@@ -2246,7 +2246,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     SWIFT_TOOLCHAIN_VERSION = "${ToolchainIdentifier}";
     SWIFT_BUILD_SWIFT_SYNTAX = "YES";
     SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
-    SWIFT_EARLY_SWIFT_DRIVER_BUILD = "$(Get-ProjectBinaryCache $BuildPlatform EarlySwiftDriver)\bin";
+    SWIFT_EARLY_SWIFT_DRIVER_BUILD = $(if ($Platform -eq $BuildPlatform) { "$(Get-ProjectBinaryCache $BuildPlatform EarlySwiftDriver)\bin" } else { "" })
     SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING = "YES";
@@ -2280,6 +2280,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
 }
 
 function Build-Compilers([Hashtable] $Platform, [string] $Variant) {
+  New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore
   New-Item -ItemType SymbolicLink -Path "$BinaryCache\$($HostPlatform.Triple)\compilers" -Target "$BinaryCache\5" -ErrorAction Ignore
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\llvm `
@@ -4114,27 +4115,29 @@ function Build-TestingMacros([Hashtable] $Platform) {
     }
 }
 
-function Install-HostToolchain() {
+function Install-HostToolchain([string] $ToolchainInstallRoot) {
   # We've already special-cased $HostPlatform.ToolchainInstallRoot to point to $ToolchainInstallRoot.
   # There are only a few extra restructuring steps we need to take care of.
 
   # Restructure _InternalSwiftScan (keep the original one for the installer)
   Copy-Item -Force `
-    -Path "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\_InternalSwiftScan" `
-    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\include"
+    -Path "$ToolchainInstallRoot\usr\lib\swift\_InternalSwiftScan" `
+    -Destination "$ToolchainInstallRoot\usr\include"
   Copy-Item -Force `
-    -Path "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\windows\_InternalSwiftScan.lib" `
-    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\lib"
+    -Path "$ToolchainInstallRoot\usr\lib\swift\windows\_InternalSwiftScan.lib" `
+    -Destination "$ToolchainInstallRoot\usr\lib"
 
   # Switch to swift-driver
   $SwiftDriver = ([IO.Path]::Combine((Get-ProjectBinaryCache $HostPlatform Driver), "bin", "swift-driver.exe"))
   Copy-Item -Force `
     -Path $SwiftDriver `
-    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swift.exe"
+    -Destination "$ToolchainInstallRoot\usr\bin\swift.exe"
   Copy-Item -Force `
     -Path $SwiftDriver `
-    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
+    -Destination "$ToolchainInstallRoot\usr\bin\swiftc.exe"
+}
 
+function Install-EmbeddablePython() {
   # Copy embeddable Python
   New-Item -Type Directory -Path "$(Get-EmbeddedPythonInstallDir)" -ErrorAction Ignore | Out-Null
   Copy-Item -Force -Recurse `
@@ -4262,6 +4265,8 @@ function Build-NoAssertsToolchain() {
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts"
+
+  Install-HostToolchain $HostPlatform.NoAssertsToolchainInstallRoot
 
   # Only compilers have NoAsserts enabled. Copy the rest of the Toolcahin binaries from the Asserts output
   # Use robocopy for efficient copying
@@ -4547,7 +4552,8 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Inspect $HostPlatform
 }
 
-Install-HostToolchain
+Install-HostToolchain $HostPlatform.ToolchainInstallRoot
+Install-EmbeddablePython
 
 if (-not $SkipBuild -and -not $IsCrossCompiling) {
   Invoke-BuildStep Build-DocC $HostPlatform
