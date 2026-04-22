@@ -122,6 +122,9 @@ case TypeKind::Id:
     case TypeKind::Meet:
       return t;
 
+    case TypeKind::HiddenTypeLayoutInfo:
+      llvm_unreachable("not implemented yet");
+
     // BuiltinGenericType subclasses
     case TypeKind::BuiltinBorrow:
     case TypeKind::BuiltinFixedArray: {

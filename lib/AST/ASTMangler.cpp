@@ -1427,6 +1427,9 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       appendOperator("Xe");
       return;
 
+    case TypeKind::HiddenTypeLayoutInfo:
+      llvm_unreachable("not implemented yet");
+
       // We don't care about these types being a bit verbose because we
       // don't expect them to come up that often in API names.
     case TypeKind::BuiltinFloat:

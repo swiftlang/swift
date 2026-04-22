@@ -5820,6 +5820,10 @@ public:
     ABORT("should not serialize an ErrorType");
   }
 
+  void visitHiddenTypeLayoutInfoType(const HiddenTypeLayoutInfoType *) {
+    llvm_unreachable("not implemented yet");
+  }
+
   void visitPlaceholderType(const PlaceholderType *) {
     // If for some reason we have a placeholder type while compiling with
     // errors, just serialize an ErrorType and continue.

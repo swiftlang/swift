@@ -235,6 +235,9 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::SILFunction:
     return functionsCount;
 
+  case TypeKind::HiddenTypeLayoutInfo:
+    llvm_unreachable("not implemented yet");
+
   // Nothing else is statically just a class reference.
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
@@ -1882,6 +1885,7 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::SILFunction:
   case TypeKind::SILToken:
   case TypeKind::SILMoveOnlyWrapped:
+  case TypeKind::HiddenTypeLayoutInfo:
   case TypeKind::Join:
   case TypeKind::Meet:
     ABORT([&](llvm::raw_ostream &out) {
@@ -4739,6 +4743,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::Function:
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:
+  case TypeKind::HiddenTypeLayoutInfo:
+    llvm_unreachable("not implemented yet");
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
   case TypeKind::BuiltinInteger:

@@ -646,6 +646,12 @@ namespace {
                                     getTrivialSILTypeProperties(isSensitive));
     }
 
+    RetTy visitHiddenTypeLayoutInfoType(CanHiddenTypeLayoutInfoType type,
+                                AbstractionPattern origType,
+                                IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("not implemented yet");
+    }
+
     // Dependent types can be lowered according to their corresponding
     // abstraction pattern.
 

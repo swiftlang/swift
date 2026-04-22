@@ -3802,6 +3802,14 @@ Type ErrorType::get(Type originalType) {
   return entry = new (mem) ErrorType(ctx, originalType);
 }
 
+Type HiddenTypeLayoutInfoType::get(HiddenTypeLayoutInfoDecl *decl,
+                                   const ASTContext &ctx) {
+  RecursiveTypeProperties properties;
+  auto arena = getArena(properties);
+  return new (ctx, arena)
+      HiddenTypeLayoutInfoType(decl, ctx, properties);
+}
+
 void ErrorUnionType::Profile(llvm::FoldingSetNodeID &id, ArrayRef<Type> terms) {
   id.AddInteger(terms.size());
   for (auto term : terms) {

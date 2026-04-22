@@ -2138,6 +2138,10 @@ private:
     return pass(ty, /*found=*/true);
   }
 
+  Result visitHiddenTypeLayoutInfoType(HiddenTypeLayoutInfoType *ty) {
+    llvm_unreachable("hidden types should never reach here");
+  }
+
   NEVER_VISIT(PlaceholderType)
   NEVER_VISIT(BuiltinType)
   NEVER_VISIT(BuiltinTupleType)

@@ -6684,6 +6684,11 @@ public:
     }
   }
 
+  void visitHiddenTypeLayoutInfoType(HiddenTypeLayoutInfoType *T,
+                             NonRecursivePrintOptions nrOptions) {
+    Printer << "<<hidden layout type>>";
+  }
+
   void visitErrorUnionType(ErrorUnionType *T,
                            NonRecursivePrintOptions nrOptions) {
     Printer << "error_union(";

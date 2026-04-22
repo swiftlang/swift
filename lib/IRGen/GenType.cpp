@@ -2450,6 +2450,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
                      " arbitrary type positions");
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
+  case TypeKind::HiddenTypeLayoutInfo:
+    llvm_unreachable("not implemented yet");
   case TypeKind::Integer:
     llvm_unreachable("should not be asking for the type info an IntegerType");
   case TypeKind::Hidden: {

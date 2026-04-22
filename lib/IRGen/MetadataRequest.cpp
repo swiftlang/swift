@@ -2287,6 +2287,7 @@ namespace {
     UNSUPPORTED_METADATA(ReferenceStorage)
     UNSUPPORTED_METADATA(SILFunction)
     UNSUPPORTED_METADATA(SILToken)
+    UNSUPPORTED_METADATA(HiddenTypeLayoutInfo) // We will add support later
     UNSUPPORTED_METADATA(SILMoveOnlyWrapped)
     UNSUPPORTED_METADATA(GenericTypeParam)
     UNSUPPORTED_METADATA(DependentMember)

@@ -2378,9 +2378,14 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::OpaqueType:
   case DeclKind::MacroExpansion:
   case DeclKind::Using:
-  case DeclKind::HiddenTypeLayoutInfo:
     llvm_unreachable("should not get here");
     return Type();
+
+  case DeclKind::HiddenTypeLayoutInfo: {
+    auto *hiddenDecl = cast<HiddenTypeLayoutInfoDecl>(D);
+    auto hiddenType = HiddenTypeLayoutInfoType::get(hiddenDecl, Context);
+    return MetatypeType::get(hiddenType, Context);
+  }
 
   case DeclKind::GenericTypeParam: {
     auto *paramDecl = cast<GenericTypeParamDecl>(D);
