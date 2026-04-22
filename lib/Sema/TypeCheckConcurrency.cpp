@@ -4564,13 +4564,17 @@ namespace {
       checkIsolatedConformancesInContext(declRef, loc, getDeclContext(),
                                          RefineConformances{*this});
 
-      // If this declaration is a callee from the enclosing application,
-      // it's already been checked via the call.
+      // If this declaration is a callee from the enclosing application and not
+      // a global VarDecl, it's already been checked via the call. VarDecls may
+      // be isolated and store a function type with erased isolation, so the
+      // reference must still be checked in addition to the call.
       if (auto *apply = getImmediateApply()) {
         auto immediateCallee =
             apply->getCalledValue(/*skipFunctionConversions=*/true);
-        if (decl == immediateCallee)
-          return false;
+        if (decl == immediateCallee) {
+          if (!(isa<VarDecl>(decl) && cast<VarDecl>(decl)->isGlobalStorage()))
+            return false;
+        }
       }
 
       std::optional<ReferencedActor> isolatedActor;
