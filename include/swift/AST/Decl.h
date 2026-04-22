@@ -8093,6 +8093,12 @@ public:
   ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
 
+  /// Detect whether this function declaration is an unstructured task
+  /// factory: a `Task` initializer or one of the `detached`,
+  /// `immediate`, or `immediateDetached` factory methods from the
+  /// `_Concurrency` module.
+  bool isUnstructuredTaskFactory() const;
+
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
   // FIXME: Hack that provides names with keyword arguments for accessors.

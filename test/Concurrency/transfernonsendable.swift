@@ -2421,7 +2421,7 @@ struct IndirectAssignTests {
 @MainActor
 class rdar169803154_Klass {
   init() {
-    Task.detached { @MainActor in
+    _ = Task.detached { @MainActor in
       _ = self
       for try await x in rdar169803154_Seq.seq { _ = x }
     }

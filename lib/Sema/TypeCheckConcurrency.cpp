@@ -9179,8 +9179,7 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
 
       ctx.Diags
           .diagnose(loc, diag::isolated_conformance_may_cross_isolation,
-                    genericParamName, proto->getName().str(), targetIsolation)
-          .warnUntilLanguageMode(LanguageMode::v6);
+                    genericParamName, proto->getName().str(), targetIsolation);
       diagnosed = true;
     }
   }

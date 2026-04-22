@@ -34,6 +34,20 @@
   }
   ```
 
+* Throwing unstructured task initializers (`Task.init`, `Task.immediate`, `Task.detached`, etc) 
+  now use typed-throws and will warn if an operation is throwing and the result of the task is not
+  stored or ignored. This addresses a long standing issue where it was too easy to miss that an 
+  operation was throwing:
+
+  ```swift
+  Task { // Unstructured throwing task created by 'init(priority:operation:)' is unused [#NoUseUnstructuredThrowingTask]
+    try example()
+  }
+  Task { // no warning, as previously
+    example()
+  }
+  ```
+
 * The checking for illegal forward references to local variables is now consistent regardless of
   whether the reference appears in a closure. Previously the type-checker could incorrectly permit
   forward references within a closure that it would reject outside of the closure, however this

@@ -53,6 +53,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:unavailable-sendable-conformance>
 - <doc:unknown-warning-group>
 - <doc:untyped-throws>
+- <doc:no-use-throwing-unstructured-task>
 - <doc:use-any-apple-os-availability>
 
 
@@ -105,5 +106,6 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:availability-unrecognized-name>
 - <doc:mutable-global-variable>
 - <doc:untyped-throws>
+- <doc:no-use-throwing-unstructured-task>
 - <doc:use-any-apple-os-availability>
 - <doc:existential-member-access-limitations>
