@@ -106,9 +106,9 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
   @_preInverseGenerics
-  public mutating func appendInterpolation<T>(_ value: borrowing T)
-    where T: TextOutputStreamable, T: CustomStringConvertible, T: ~Copyable
-  {
+  public mutating func appendInterpolation<
+    T: TextOutputStreamable & CustomStringConvertible & ~Copyable
+  >(_ value: borrowing T) {
     value.write(to: &self)
   }
   
@@ -129,9 +129,9 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
   @_preInverseGenerics
-  public mutating func appendInterpolation<T>(_ value: borrowing T)
-    where T: TextOutputStreamable & ~Copyable
-  {
+  public mutating func appendInterpolation<T: TextOutputStreamable & ~Copyable>(
+    _ value: borrowing T
+  ) {
     value.write(to: &self)
   }
   
@@ -154,9 +154,9 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
   @_preInverseGenerics
-  public mutating func appendInterpolation<T>(_ value: borrowing T)
-    where T: CustomStringConvertible, T: ~Copyable
-  {
+  public mutating func appendInterpolation<T: CustomStringConvertible & ~Copyable>(
+    _ value: borrowing T
+  ) {
     value.description.write(to: &self)
   }
   
@@ -220,11 +220,12 @@ extension DefaultStringInterpolation {
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
   @_alwaysEmitIntoClient
-  @_preInverseGenerics
-  public mutating func appendInterpolation<T>(
+  public mutating func appendInterpolation<
+    T: TextOutputStreamable & CustomStringConvertible & ~Copyable
+  >(
     _ value: borrowing T?,
     default: @autoclosure () -> some StringProtocol
-  ) where T: TextOutputStreamable, T: CustomStringConvertible, T: ~Copyable {
+  ) {
     switch value {
     case let value?:
       self.appendInterpolation(value)
@@ -252,11 +253,10 @@ extension DefaultStringInterpolation {
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
   @_alwaysEmitIntoClient
-  @_preInverseGenerics
-  public mutating func appendInterpolation<T>(
+  public mutating func appendInterpolation<T: TextOutputStreamable & ~Copyable>(
     _ value: borrowing T?,
     default: @autoclosure () -> some StringProtocol
-  ) where T: TextOutputStreamable & ~Copyable {
+  ) {
     switch value {
     case let value?:
       self.appendInterpolation(value)
@@ -284,11 +284,10 @@ extension DefaultStringInterpolation {
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
   @_alwaysEmitIntoClient
-  @_preInverseGenerics
-  public mutating func appendInterpolation<T>(
+  public mutating func appendInterpolation<T: CustomStringConvertible & ~Copyable>(
     _ value: borrowing T?, 
     default: @autoclosure () -> some StringProtocol
-  ) where T: CustomStringConvertible, T: ~Copyable {
+  ) {
     switch value {
     case let value?:
       self.appendInterpolation(value)
