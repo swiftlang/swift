@@ -107,7 +107,6 @@ final class K : @preconcurrency Initializable {
 @MainActor
 final class MainActorK: Initializable {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{25-25=@preconcurrency }}
-  // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
   init() { } // expected-note{{main actor-isolated initializer 'init()' cannot satisfy nonisolated requirement}}
   // expected-note@-1{{mark initializer 'init()' 'nonisolated'}}{{3-3=nonisolated }}
 }
@@ -236,7 +235,6 @@ do {
   @MainActor struct S4: @preconcurrency P3, P2 {
     // expected-warning@-1:21 {{'@preconcurrency' on conformance to 'P3' has no effect}}
     // expected-note@-2:45 {{turn data races into runtime errors with '@preconcurrency'}}
-    // expected-note@-3{{isolate this conformance to the main actor with '@MainActor'}}
     func foo() {}
     // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot satisfy nonisolated requirement}}
     // expected-note@-2{{mark instance method 'foo()' 'nonisolated'}}{{5-5=nonisolated }}
@@ -245,7 +243,6 @@ do {
   @MainActor struct S5: P2, @preconcurrency P3 {
     // expected-warning@-1:21 {{'@preconcurrency' on conformance to 'P3' has no effect}}
     // expected-note@-2:25 {{turn data races into runtime errors with '@preconcurrency'}}
-    // expected-note@-3{{isolate this conformance to the main actor with '@MainActor'}}
     func foo() {}
     // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot satisfy nonisolated requirement}}
     // expected-note@-2{{mark instance method 'foo()' 'nonisolated'}}{{5-5=nonisolated }}
@@ -306,7 +303,6 @@ do {
   @MainActor struct S4: P6, @preconcurrency P5 {
     // expected-warning@-1:21 {{'@preconcurrency' on conformance to 'P5' has no effect}}
     // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
-    // expected-note@-3{{isolate this conformance to the main actor with '@MainActor'}}
     func foo() {}
     // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot satisfy nonisolated requirement}}
     // expected-note@-2{{mark instance method 'foo()' 'nonisolated'}}{{5-5=nonisolated }}
