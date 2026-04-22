@@ -13,7 +13,6 @@
 import Swift
 @_implementationOnly import SwiftConcurrencyInternalShims
 
-
 @available(SwiftStdlib 5.1, *)
 extension Result where Success: ~Copyable {
   /// Creates a new result by evaluating an async throwing closure, capturing the
@@ -21,7 +20,9 @@ extension Result where Success: ~Copyable {
   ///
   /// - Parameter body: A potentially throwing async closure to evaluate.
   @_alwaysEmitIntoClient
-  public nonisolated(nonsending) init(catching body: nonisolated(nonsending) () async throws(Failure) -> Success) async {
+  public nonisolated(nonsending) init(
+    catching body: nonisolated(nonsending) () async throws(Failure) -> Success
+  ) async {
     // FIXME: this may also require similar changes as the synchronous Result.init(catching:) support non-escapable types.
     do {
       self = .success(try await body())
