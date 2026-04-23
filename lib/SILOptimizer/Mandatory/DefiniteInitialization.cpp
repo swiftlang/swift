@@ -17,11 +17,13 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/SmallBitVector.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/BasicBlockBits.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -44,14 +46,18 @@
 using namespace swift;
 using namespace ownership;
 
-STATISTIC(NumInstScansDuringLivenessQueries,
-          "# of instructions scanned while computing `getLivenessAtInst()`");
+STATISTIC(NumInstsScannedForLivenessQueries,
+          "# of instructions scanned to compute intra block liveness");
 
 llvm::cl::opt<bool> TriggerUnreachableOnFailure(
     "sil-di-assert-on-failure", llvm::cl::init(false),
     llvm::cl::desc("After emitting a DI error, assert instead of continuing. "
                    "Meant for debugging ONLY!"),
     llvm::cl::Hidden);
+
+//llvm::cl::opt<bool> DICaching("di-caching", llvm::cl::init(true),
+//                              llvm::cl::desc("pre-compute & cache DI info"));
+const bool DICaching = true;
 
 template<typename ...ArgTypes>
 static InFlightDiagnostic diagnose(SILModule &M, SILLocation loc,
@@ -286,6 +292,13 @@ namespace {
     /// plus the information merged-in from the predecessor blocks.
     std::optional<DIKind> OutSelfInitialized;
 
+    /// A cache from instructions to a bitvector of memory locations known to
+    /// have had a "non-load use" affecting them prior to the instruction
+    /// withing its basic block. Computed only for blocks which contain non-load
+    /// uses.
+    std::optional<llvm::SmallMapVector<SILInstruction *, SmallBitVector, 8>>
+        StoredEltsBeforeInst;
+
     LiveOutBlockState() { init(0); }
 
     void init(unsigned NumElements) {
@@ -295,6 +308,7 @@ namespace {
       OutAvailability.init(NumElements);
       LocalSelfInitialized = std::nullopt;
       OutSelfInitialized = std::nullopt;
+      StoredEltsBeforeInst = std::nullopt;
     }
 
     /// Sets all unknown elements to not-available.
@@ -382,6 +396,20 @@ namespace {
     bool containsUndefinedValues() {
       return (!OutSelfInitialized.has_value() ||
               OutAvailability.containsUnknownElements());
+    }
+
+    /// Look up the cached stored-elements bitvector for \p Inst.
+    /// Returns nullptr if the cache wasn't computed, \p Inst isn't in it,
+    /// or \p Inst was marked as deleted.
+    const SmallBitVector *getStoredEltsBeforeInst(SILInstruction *Inst) const {
+      if (!DICaching)
+        return nullptr;
+      if (!StoredEltsBeforeInst.has_value() || Inst->isDeleted())
+        return nullptr;
+      auto it = StoredEltsBeforeInst->find(Inst);
+      if (it == StoredEltsBeforeInst->end())
+        return nullptr;
+      return &it->second;
     }
   };
 
@@ -543,6 +571,13 @@ namespace {
     void diagnoseBadExplicitStore(SILInstruction *Inst);
     
     bool isBlockIsReachableFromEntry(const SILBasicBlock *BB);
+
+    /// Utility function to populate a cache to speed up repeated liveness
+    /// queries Performs a forward walk through the block and for each
+    /// instruction in the set maps it to a bitvector of memory elements that
+    /// were stored to before it.
+    void populateLivenessCache(SILBasicBlock *BB,
+                               const SmallPtrSetImpl<SILInstruction *> &Insts);
   };
 } // end anonymous namespace
 
@@ -554,11 +589,24 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
       StoresToSelf(UseInfo.StoresToSelf), Destroys(UseInfo.Releases),
       blockStates(blockStates), blockStateInitialized(&F) {
 
+  // Store a map from blocks to "interesting" instructions. These are
+  // instructions expected to be queried for liveness, so we will eagerly
+  // compute and cache some local liveness info before the core processing loop.
+  llvm::SmallDenseMap<SILBasicBlock *, llvm::SmallPtrSet<SILInstruction *, 8>>
+      BlocksToInsts;
+
+  auto rememberInterestingInst = [&BlocksToInsts](SILInstruction *I) {
+    if (DICaching)
+      BlocksToInsts[I->getParent()].insert(I);
+  };
+
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
   for (unsigned ui = 0, e = Uses.size(); ui != e; ++ui) {
     auto &Use = Uses[ui];
     assert(Use.Inst && "No instruction identified?");
+
+    rememberInterestingInst(Use.Inst);
 
     // Keep track of all the uses that aren't loads or escapes.  These are
     // important uses that we'll visit, but we don't consider them definition
@@ -612,10 +660,88 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   // available.
   MemBBInfo.setUnknownToNotAvailable();
 
-  // Finally, check if we need to emit compatibility diagnostics for cross-module
-  // non-delegating struct initializers.
+  // Eagerly pre-compute and cache info regarding which elements are written to
+  // within each block. Calculating and caching this information helps avoid
+  // quadratic scaling when many memory elements are initialized within a small
+  // number of basic blocks.
+  // N.B. This must be run only after all HasNonLoadUse bits have been set.
+  if (DICaching) {
+    // Destroys are tracked separately from Uses, but we want to cache info
+    // about them because they are expected to be queried for liveness.
+    for (auto &I : Destroys) {
+      rememberInterestingInst(I);
+    }
+
+    // Also cache the memory instruction itself
+    rememberInterestingInst(TheMemory.getUninitializedValue());
+
+    for (auto &[BB, InstsForBlock] : BlocksToInsts) {
+      populateLivenessCache(BB, InstsForBlock);
+    }
+  }
+
+  // Finally, check if we need to emit compatibility diagnostics for
+  // cross-module non-delegating struct initializers.
   if (TheMemory.isCrossModuleStructInitSelf())
     WantsCrossModuleStructInitializerDiagnostic = true;
+}
+
+void LifetimeChecker::populateLivenessCache(
+    SILBasicBlock *BB, const SmallPtrSetImpl<SILInstruction *> &Insts) {
+  auto &BBInfo = getBlockInfo(BB);
+
+  // If there are not local stores, there's nothing to cache.
+  if (!BBInfo.HasNonLoadUse)
+    return;
+
+  BBInfo.StoredEltsBeforeInst.emplace();
+
+  SmallBitVector LocallyStoredElts(TheMemory.getNumElements());
+
+  const unsigned NumInterestingInstsExpected = Insts.size();
+  unsigned NumInterestingInstsSeen = 0;
+
+  // Walk the block and cache info about local element stores.
+  for (auto &TheInst : *BB) {
+    ++NumInstsScannedForLivenessQueries;
+
+    // We saw everything we expected, so we're done.
+    if (NumInterestingInstsSeen == NumInterestingInstsExpected)
+      break;
+
+    // If the instruction isn't interesting to us, ignore it.
+    if (!Insts.contains(&TheInst))
+      continue;
+
+    // Otherwise, update our book-keeping.
+    ++NumInterestingInstsSeen;
+
+    // Record the elements locally stored-to before this inst.
+    BBInfo.StoredEltsBeforeInst->try_emplace(&TheInst, LocallyStoredElts);
+
+    // If this instruction doesn't write to the memory, continue.
+    auto It = NonLoadUses.find(&TheInst);
+    if (It == NonLoadUses.end())
+      continue;
+
+    // Otherwise, update our running computation of stored-to elements.
+    for (unsigned TheUse : It->second) {
+      auto &TheInstUse = Uses[TheUse];
+      LocallyStoredElts.set(TheInstUse.FirstElement,
+                            TheInstUse.FirstElement + TheInstUse.NumElements);
+    }
+  }
+
+  // Implies at least one instruction in the set wasn't in the block.
+  ASSERT(NumInterestingInstsSeen == NumInterestingInstsExpected &&
+         "Did not find all expected instructions!");
+
+  LLVM_DEBUG({
+    for (const auto &[inst, bits] : BBInfo.StoredEltsBeforeInst.value()) {
+      llvm::dbgs() << *inst;
+      swift::dumpBits(bits);
+    }
+  });
 }
 
 /// Determine whether the specified block is reachable from the entry of the
@@ -3525,7 +3651,7 @@ void LifetimeChecker::
 computePredsLiveOut(SILBasicBlock *BB) {
   LLVM_DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID()
                           << "\n");
-  
+
   // Collect blocks for which we have to calculate the out-availability.
   // These are the paths from blocks with known out-availability to the BB.
   WorkListType WorkList;
@@ -3616,45 +3742,85 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
   // keep track of which ones are still needed in the NeededElements set.
   SmallBitVector NeededElements(TheMemory.getNumElements());
   NeededElements.set(FirstElt, FirstElt+NumElts);
-  
+
+  // When true, we can skip performing dataflow. This occurs in the following
+  // cases:
+  //   1. The block contains the memory definition.
+  //   2. A local store to each element precedes the instruction.
+  bool IsResultLocallyDetermined = false;
+
+  auto &BBInfo = getBlockInfo(InstBB);
+
   // If there is a store in the current block, scan the block to see if the
   // store is before or after the load.  If it is before, it may produce some of
   // the elements we are looking for.
-  if (getBlockInfo(InstBB).HasNonLoadUse) {
-    for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
-      ++NumInstScansDuringLivenessQueries;
-      --BBI;
-      SILInstruction *TheInst = &*BBI;
+  if (BBInfo.HasNonLoadUse) {
+    // First, check our cache to see if we've already computed which elements
+    // are store to before this instruction.
+    if (auto StoresBeforeInst = BBInfo.getStoredEltsBeforeInst(Inst)) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "  cache hit; stored elts before inst: ";
+        swift::dumpBits(*StoresBeforeInst);
+      });
 
-      // If we found the allocation itself, then we are loading something that
-      // is not defined at all yet.  Scan no further.
-      if (TheInst == TheMemory.getUninitializedValue()) {
-        // The result is perfectly decided locally.
-        for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i)
-          Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
-        return Result;
+      // Unset the elements that were locally written to before this inst.
+      NeededElements.reset(*StoresBeforeInst);
+
+      if (InstBB == TheMemory.getUninitializedValue()->getParent() ||
+          NeededElements.none()) {
+        IsResultLocallyDetermined = true;
       }
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "  cache miss\n");
 
-      // If this instruction is unrelated to the memory, ignore it.
-      auto It = NonLoadUses.find(TheInst);
-      if (It == NonLoadUses.end())
-        continue;
+      // Otherwise, fall back to a local scan within the block.
+      for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
+        ++NumInstsScannedForLivenessQueries;
 
-      // Check to see which tuple elements this instruction defines.  Clear them
-      // from the set we're scanning from.
-      for (unsigned TheUse : It->second) {
-        auto &TheInstUse = Uses[TheUse];
-        NeededElements.reset(TheInstUse.FirstElement,
-                             TheInstUse.FirstElement+TheInstUse.NumElements);
-      }
+        --BBI;
+        SILInstruction *TheInst = &*BBI;
 
-      // If that satisfied all of the elements we're looking for, then we're
-      // done.  Otherwise, keep going.
-      if (NeededElements.none()) {
-        Result.changeUnsetElementsTo(DIKind::Yes);
-        return Result;
+        // TODO: remove this
+        // just to see if there are patterns in the test suite etc. that do.
+        ASSERT(!BBInfo.getStoredEltsBeforeInst(TheInst) &&
+               "unexpected cache hit");
+
+        // If we found the allocation itself, then we are loading something that
+        // is not defined at all yet.  Scan no further.
+        if (TheInst == TheMemory.getUninitializedValue()) {
+          // The result is perfectly decided locally.
+          IsResultLocallyDetermined = true;
+          break;
+        }
+
+        // If this instruction is unrelated to the memory, ignore it.
+        auto It = NonLoadUses.find(TheInst);
+        if (It == NonLoadUses.end())
+          continue;
+
+        // Check to see which tuple elements this instruction defines.  Clear
+        // them from the set we're scanning from.
+        for (unsigned TheUse : It->second) {
+          auto &TheInstUse = Uses[TheUse];
+          NeededElements.reset(TheInstUse.FirstElement,
+                               TheInstUse.FirstElement +
+                                   TheInstUse.NumElements);
+        }
+
+        // If that satisfied all of the elements we're looking for, then we're
+        // done.  Otherwise, keep going.
+        if (NeededElements.none()) {
+          IsResultLocallyDetermined = true;
+          break;
+        }
       }
     }
+  }
+
+  if (IsResultLocallyDetermined) {
+    for (unsigned i = FirstElt, e = i + NumElts; i != e; ++i)
+      Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
+    return Result;
   }
 
   // Compute the liveness of each element according to our predecessors.
