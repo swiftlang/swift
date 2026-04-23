@@ -23,8 +23,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SIL
 import OptimizerBridging
+import SIL
 
 // -----------------------------------------------------------------------
 // Pass entry points
@@ -32,47 +32,38 @@ import OptimizerBridging
 
 let commonSubexpressionElimination = FunctionPass(name: "common-subexpression-elimination") {
   (function: Function, context: FunctionPassContext) in
-  guard let entryBlock = function.blocks.first else { return }
-
-  let domTree = context.dominatorTree
-  var map = ScopedHashMap()
-  var lazyPropertyGetters : [ApplyInst] = []
-
-  processFunction(
-    startBlock: entryBlock,
-    domTree: domTree,
-    map: &map,
-    &lazyPropertyGetters,
-    context,
-    calleeAnalysis: context.calleeAnalysis
-  )
-  processLazyPropertyGetters(lazyPropertyGetters, function: function, context)
-  if context.hasChanged(.Branches) {
-    _ = context.removeDeadBlocks(in: function)
-  }
-  if context.needBreakInfiniteLoops {
-    breakInfiniteLoops(in: function, context)
-  }
+  runCSE(function, context, false)
 }
 
 let highLevelCSE = FunctionPass(name: "high-level-common-subexpression-elimination") {
   (function: Function, context: FunctionPassContext) in
-  guard let entryBlock = function.blocks.first else { return }
+  runCSE(function, context, true)
+}
 
-  let domTree = context.dominatorTree
+func runCSE(
+  _ function: Function,
+  _ context: FunctionPassContext,
+  _ runsOnHighLevelSil: Bool
+) {
+  guard let entryBlock = function.blocks.first else {
+    return
+  }
+
   var map = ScopedHashMap()
+
+  // This will contain lazy property getter calls which can be optimized since
+  // they are dominated by an equivalent call, meaning the switch_enum call in
+  // the getter can be eliminated.
   var lazyPropertyGetters: [ApplyInst] = []
 
   processFunction(
     startBlock: entryBlock,
-    domTree: domTree,
-    map: &map,
+    &map,
+    runsOnHighLevelSil,
     &lazyPropertyGetters,
-    context,
-    runsOnHighLevelSil: true,
-    calleeAnalysis: context.calleeAnalysis
+    context
   )
-  processLazyPropertyGetters(lazyPropertyGetters, function: function, context)
+  processLazyPropertyGetters(lazyPropertyGetters, function, context)
   if context.hasChanged(.Branches) {
     _ = context.removeDeadBlocks(in: function)
   }
@@ -89,16 +80,13 @@ let highLevelCSE = FunctionPass(name: "high-level-common-subexpression-eliminati
 /// `startBlock`, processing each block's instructions for CSE opportunities.
 private func processFunction(
   startBlock: BasicBlock,
-  domTree: DominatorTree,
-  map: inout ScopedHashMap,
+  _ map: inout ScopedHashMap,
+  _ runsOnHighLevelSil: Bool = false,
   _ lazyPropertyGetters: inout [ApplyInst],
-  _ context: FunctionPassContext,
-  runsOnHighLevelSil: Bool = false,
-  calleeAnalysis: CalleeAnalysis? = nil
+  _ context: FunctionPassContext
 ) {
   // Process the entry block, then drive the DFS.
-  processBlock(startBlock, map: &map, &lazyPropertyGetters, context,
-               runsOnHighLevelSil: runsOnHighLevelSil, calleeAnalysis: calleeAnalysis)
+  processBlock(startBlock, &map, runsOnHighLevelSil, &lazyPropertyGetters, context)
 
   // Each stack frame holds the block being visited and an index into its
   // dominator-tree children so we can resume after processing each child.
@@ -106,14 +94,13 @@ private func processFunction(
 
   while !dfsStack.isEmpty {
     let (block, childIndex) = dfsStack[dfsStack.count - 1]
-    let children = domTree.getChildren(of: block)
+    let children = context.dominatorTree.getChildren(of: block)
 
     if childIndex < children.count {
       // Advance the child pointer for this frame, then visit the next child.
       dfsStack[dfsStack.count - 1].childIndex += 1
       let child = children[childIndex]
-      processBlock(child, map: &map, &lazyPropertyGetters, context,
-                   runsOnHighLevelSil: runsOnHighLevelSil, calleeAnalysis: calleeAnalysis)
+      processBlock(child, &map, runsOnHighLevelSil, &lazyPropertyGetters, context)
       dfsStack.append((child, 0))
     } else {
       // All children exhausted — pop this block's entries from the map
@@ -136,11 +123,10 @@ private func processFunction(
 ///   - Otherwise, insert `inst` into `map` so dominated blocks can find it.
 private func processBlock(
   _ block: BasicBlock,
-  map: inout ScopedHashMap,
+  _ map: inout ScopedHashMap,
+  _ runsOnHighLevelSil: Bool = false,
   _ lazyPropertyGetters: inout [ApplyInst],
-  _ context: FunctionPassContext,
-  runsOnHighLevelSil: Bool = false,
-  calleeAnalysis: CalleeAnalysis? = nil
+  _ context: FunctionPassContext
 ) {
   // `block.instructions` skips deleted instructions automatically, so it is
   // safe to erase the current instruction while iterating.
@@ -151,15 +137,22 @@ private func processBlock(
     }
 
     // getHash returns nil for ineligible instructions.
-    guard let ref = InstructionReference(inst: inst, runsOnHighLevelSil: runsOnHighLevelSil,
-                                         calleeAnalysis: calleeAnalysis) else { continue }
+    guard
+      let ref = InstructionReference(
+        inst: inst,
+        runsOnHighLevelSil: runsOnHighLevelSil,
+        calleeAnalysis: context.calleeAnalysis
+      )
+    else {
+      continue
+    }
     // If an instruction can be handled here, then it must also be handled
     // in isIdenticalTo, otherwise looking up a key in the map will fail to
     // match itself.
     assert(inst.isIdenticalTo(inst), "inst must match itself for map to work")
 
     if let availInst = map.lookup(ref) {
-      if let ai = inst as? ApplyInst, isLazyPropertyGetter(ai) {
+      if let ai = inst as? ApplyInst, isOptimizableLazyPropertyGetter(ai) {
         lazyPropertyGetters.append(ai)
       } else {
         tryCSEReplace(inst: inst, with: availInst, context)
@@ -171,10 +164,11 @@ private func processBlock(
   }
 }
 
-
 private func hasGuaranteedSelf(_ ai: ApplyInst) -> Bool {
   let conventions = ai.calleeArgumentConventions
-  guard let selfIdx = conventions.selfIndex else { return false }
+  guard let selfIdx = conventions.selfIndex else {
+    return false
+  }
   return conventions[selfIdx] == .directGuaranteed
 }
 
@@ -187,8 +181,10 @@ private func canHandleArraySemanticsCall(_ ai: ApplyInst) -> Bool {
   }
 }
 
-private func canHandleApply(_ ai: ApplyInst, calleeAnalysis: CalleeAnalysis?) -> Bool {
-  if !ai.mayReadOrWriteMemory { return true }
+private func isPureOrGlobalInit(_ ai: ApplyInst, calleeAnalysis: CalleeAnalysis?) -> Bool {
+  if !ai.mayReadOrWriteMemory {
+    return true
+  }
 
   if let ca = calleeAnalysis {
     let effects = ca.getSideEffects(ofApply: ai)
@@ -204,22 +200,28 @@ private func canHandleApply(_ ai: ApplyInst, calleeAnalysis: CalleeAnalysis?) ->
   return false
 }
 
-private func isLazyPropertyGetter(_ ai: ApplyInst) -> Bool {
+private func isOptimizableLazyPropertyGetter(_ ai: ApplyInst) -> Bool {
   guard let callee = ai.referencedFunction,
-        callee.isDefinition,
-        callee.isLazyPropertyGetter
-  else { return false }
+    callee.isDefinition,
+    callee.isLazyPropertyGetter
+  else {
+    return false
+  }
 
   // We cannot inline a non-ossa function into an ossa function
-  if ai.parentFunction.hasOwnership && !callee.hasOwnership { return false }
+  if ai.parentFunction.hasOwnership && !callee.hasOwnership {
+    return false
+  }
 
   // Only handle classes, but not structs.
   // Lazy property getters of structs have an indirect inout self parameter.
   // We don't know if the whole struct is overwritten between two getter calls.
   // In such a case, the lazy property could be reset to an Optional.none.
-  if ai.arguments[0].type.isAddress { return false }
+  if ai.arguments[0].type.isAddress {
+    return false
+  }
 
-  // Check if the first block has a switch_enum of an Optional.
+  // Does the entry block check if the property has already been initialized?
   // We don't handle getters of generic types, which have a switch_enum_addr.
   // This will be obsolete with opaque values anyway.
   guard let sei = callee.entryBlock.terminator as? SwitchEnumInst else {
@@ -236,11 +238,13 @@ private func isLazyPropertyGetter(_ ai: ApplyInst) -> Bool {
 /// by a direct load of the value.
 private func processLazyPropertyGetters(
   _ lazyPropertyGetters: [ApplyInst],
-  function: Function,
+  _ function: Function,
   _ context: FunctionPassContext
 ) {
   for ai in lazyPropertyGetters {
-    guard let callee = ai.referencedFunction else { continue }
+    guard let callee = ai.referencedFunction else {
+      continue
+    }
     assert(callee.isLazyPropertyGetter)
     let callBlock = ai.parentBlock
 
@@ -248,26 +252,29 @@ private func processLazyPropertyGetters(
       context.notifyInvalidatedStackNesting()
     }
 
-    guard context.loadFunction(function: callee, loadCalleesRecursively:false)
-        else {continue}
+    assert(callee.isDefinition)
     context.inlineFunction(apply: ai, mandatoryInline: false)
 
     // After inlining the getter, the call block's terminator is the
     // switch_enum from the getter's entry block.
     guard let sei = callBlock.terminator as? SwitchEnumInst,
-          let someDest = sei.getUniqueSuccessor(forCaseIndex: Builder.optionalSomeCaseIndex),
-          someDest.arguments.count == 1 else { continue }
+      let someDest = sei.getUniqueSuccessor(forCaseIndex: Builder.optionalSomeCaseIndex),
+      someDest.arguments.count == 1
+    else {
+      continue
+    }
 
     let builder = Builder(before: sei, context)
     let ued = builder.createUncheckedEnumData(
       enum: sei.enumOp,
       caseIndex: Builder.optionalSomeCaseIndex,
-      resultType: someDest.arguments[0].type)
+      resultType: someDest.arguments[0].type
+    )
     _ = builder.createBranch(to: someDest, arguments: [ued])
     context.erase(instruction: sei)
   }
 
-  if (context.needFixStackNesting){
+  if (context.needFixStackNesting) {
     context.fixStackNesting(in: function)
   }
 }
@@ -298,14 +305,16 @@ private func tryCSEReplace(
 /// The hash must satisfy: if `a.isIdenticalTo(b)` then `getHash(a) == getHash(b)`.
 /// It covers instruction kind, result type(s), operand SSA values, and any
 /// instruction-specific attributes (field indices, literal values, etc.).
-private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
-                     calleeAnalysis: CalleeAnalysis? = nil) -> Int? {
+private func getHash(
+  of inst: Instruction,
+  runsOnHighLevelSil: Bool = false,
+  calleeAnalysis: CalleeAnalysis? = nil
+) -> Int? {
   // In OSSA, skip instructions that produce an owned result: replacing them
   // would require inserting copies to maintain ownership correctness, which
   // defeats the purpose of CSE. Trivial (none) and guaranteed results are
   // safe to replace without any fixup. Same goes for no-result instructions.
-  if inst.parentFunction.hasOwnership &&
-     inst.results.contains(where: { $0.ownership == .owned }) {
+  if inst.parentFunction.hasOwnership && inst.results.contains(where: { $0.ownership == .owned }) {
     return nil
   }
 
@@ -316,7 +325,9 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
   func hashTypeOps(_ i: SingleValueInstruction) {
     hasher.combine(ObjectIdentifier(type(of: i)))
     hasher.combine(i.type)
-    for op in i.operands { hasher.combine(op.value.hashable) }
+    for op in i.operands {
+      hasher.combine(op.value.hashable)
+    }
   }
 
   switch inst {
@@ -324,20 +335,26 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
   case let bi as BuiltinInst:
     switch bi.id {
     case .OnFastPath:
-      return nil   // must not be moved or removed even though side-effect-free
+      return nil  // must not be moved or removed even though side-effect-free
     case .Once, .OnceWithContext:
-      break        // always eligible; fall through to hash below
+      break  // always eligible; fall through to hash below
     default:
-      if bi.mayReadOrWriteMemory { return nil }
+      if bi.mayReadOrWriteMemory {
+        return nil
+      }
     }
     hasher.combine(ObjectIdentifier(BuiltinInst.self))
     hasher.combine(bi.name._bridged.data)
     hasher.combine(bi.substitutionMap.hasAnySubstitutableParams)
-    for op in bi.operands { hasher.combine(op.value.hashable) }
+    for op in bi.operands {
+      hasher.combine(op.value.hashable)
+    }
 
   case let emi as ExistentialMetatypeInst:
     // Only CSE the value-operand form; the address form is not safe.
-    if emi.operand.value.type.isAddress { return nil }
+    if emi.operand.value.type.isAddress {
+      return nil
+    }
     hasher.combine(ObjectIdentifier(ExistentialMetatypeInst.self))
     hasher.combine(emi.type)
 
@@ -345,32 +362,32 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
   // (ClassifyBridgeObjectInst, ValueToBridgeObjectInst, RefTailAddrInst,
   // ProjectBoxInst, RefToRawPointerInst, and the LOADABLE_REF_STORAGE
   // family — RefToUnowned/UnownedToRef/RefToUnmanaged/UnmanagedToRef).
-  case let x as UpcastInst:                          hashTypeOps(x)
-  case let x as UncheckedRefCastInst:                hashTypeOps(x)
-  case let x as UncheckedAddrCastInst:               hashTypeOps(x)
-  case let x as UncheckedTrivialBitCastInst:         hashTypeOps(x)
-  case let x as UncheckedBitwiseCastInst:            hashTypeOps(x)
-  case let x as RefToRawPointerInst:                 hashTypeOps(x)
-  case let x as RawPointerToRefInst:                 hashTypeOps(x)
-  case let x as BridgeObjectToRefInst:               hashTypeOps(x)
-  case let x as BridgeObjectToWordInst:              hashTypeOps(x)
-  case let x as ClassifyBridgeObjectInst:            hashTypeOps(x)
-  case let x as ValueToBridgeObjectInst:             hashTypeOps(x)
-  case let x as RefToBridgeObjectInst:               hashTypeOps(x)
-  case let x as ThickToObjCMetatypeInst:             hashTypeOps(x)
-  case let x as ObjCToThickMetatypeInst:             hashTypeOps(x)
-  case let x as ObjCMetatypeToObjectInst:            hashTypeOps(x)
+  case let x as UpcastInst: hashTypeOps(x)
+  case let x as UncheckedRefCastInst: hashTypeOps(x)
+  case let x as UncheckedAddrCastInst: hashTypeOps(x)
+  case let x as UncheckedTrivialBitCastInst: hashTypeOps(x)
+  case let x as UncheckedBitwiseCastInst: hashTypeOps(x)
+  case let x as RefToRawPointerInst: hashTypeOps(x)
+  case let x as RawPointerToRefInst: hashTypeOps(x)
+  case let x as BridgeObjectToRefInst: hashTypeOps(x)
+  case let x as BridgeObjectToWordInst: hashTypeOps(x)
+  case let x as ClassifyBridgeObjectInst: hashTypeOps(x)
+  case let x as ValueToBridgeObjectInst: hashTypeOps(x)
+  case let x as RefToBridgeObjectInst: hashTypeOps(x)
+  case let x as ThickToObjCMetatypeInst: hashTypeOps(x)
+  case let x as ObjCToThickMetatypeInst: hashTypeOps(x)
+  case let x as ObjCMetatypeToObjectInst: hashTypeOps(x)
   case let x as ObjCExistentialMetatypeToObjectInst: hashTypeOps(x)
-  case let x as AddressToPointerInst:                hashTypeOps(x)
-  case let x as RefTailAddrInst:                     hashTypeOps(x)
-  case let x as ProjectBoxInst:                      hashTypeOps(x)
-  case let x as MarkDependenceInst:                  hashTypeOps(x)
-  case let x as RefToUnownedInst:                    hashTypeOps(x)
-  case let x as UnownedToRefInst:                    hashTypeOps(x)
-  case let x as RefToUnmanagedInst:                  hashTypeOps(x)
-  case let x as UnmanagedToRefInst:                  hashTypeOps(x)
-  case let x as SelectEnumInst:                      hashTypeOps(x)
-  case let x as TuplePackElementAddrInst:            hashTypeOps(x)
+  case let x as AddressToPointerInst: hashTypeOps(x)
+  case let x as RefTailAddrInst: hashTypeOps(x)
+  case let x as ProjectBoxInst: hashTypeOps(x)
+  case let x as MarkDependenceInst: hashTypeOps(x)
+  case let x as RefToUnownedInst: hashTypeOps(x)
+  case let x as UnownedToRefInst: hashTypeOps(x)
+  case let x as RefToUnmanagedInst: hashTypeOps(x)
+  case let x as UnmanagedToRefInst: hashTypeOps(x)
+  case let x as SelectEnumInst: hashTypeOps(x)
+  case let x as TuplePackElementAddrInst: hashTypeOps(x)
 
   // PointerToAddressInst also hashes isStrict to distinguish strict vs
   // non-strict pointer dereferences.
@@ -378,7 +395,9 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
     hasher.combine(ObjectIdentifier(PointerToAddressInst.self))
     hasher.combine(x.type)
     hasher.combine(x.isStrict)
-    for op in x.operands { hasher.combine(op.value.hashable) }
+    for op in x.operands {
+      hasher.combine(op.value.hashable)
+    }
 
   case let x as FunctionRefInst:
     hasher.combine(ObjectIdentifier(FunctionRefInst.self))
@@ -396,7 +415,7 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
   case let x as IntegerLiteralInst:
     hasher.combine(ObjectIdentifier(IntegerLiteralInst.self))
     hasher.combine(x.type)
-    hasher.combine(x.value)   // Int? — nil for literals that don't fit in Int
+    hasher.combine(x.value)  // Int? — nil for literals that don't fit in Int
 
   // FloatLiteralInst: hash the actual bit pattern via the bridge.
   // If bits is nil, we fall back to type-only, which is a safe hash collision.
@@ -411,10 +430,10 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
     // has no rawValue.
     let enc: Int
     switch x.encoding {
-    case .Bytes:        enc = 0
-    case .UTF8:         enc = 1
+    case .Bytes: enc = 0
+    case .UTF8: enc = 1
     case .ObjCSelector: enc = 2
-    case .UTF8_OSLOG:   enc = 3
+    case .UTF8_OSLOG: enc = 3
     }
     hasher.combine(enc)
     hasher.combine(x.value.string)
@@ -479,12 +498,16 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
   case let x as StructInst:
     hasher.combine(ObjectIdentifier(StructInst.self))
     hasher.combine(x.type)
-    for op in x.operands { hasher.combine(op.value.hashable) }
+    for op in x.operands {
+      hasher.combine(op.value.hashable)
+    }
 
   case let x as TupleInst:
     hasher.combine(ObjectIdentifier(TupleInst.self))
     hasher.combine(x.type)
-    for op in x.operands { hasher.combine(op.value.hashable) }
+    for op in x.operands {
+      hasher.combine(op.value.hashable)
+    }
 
   // CondFailInst has no result value, so we only hash the condition operand.
   case let x as CondFailInst:
@@ -494,12 +517,16 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
   case let x as IndexAddrInst:
     hasher.combine(ObjectIdentifier(IndexAddrInst.self))
     hasher.combine(x.type)
-    for op in x.operands { hasher.combine(op.value.hashable) }
+    for op in x.operands {
+      hasher.combine(op.value.hashable)
+    }
 
   case let x as IndexRawPointerInst:
     hasher.combine(ObjectIdentifier(IndexRawPointerInst.self))
     hasher.combine(x.type)
-    for op in x.operands { hasher.combine(op.value.hashable) }
+    for op in x.operands {
+      hasher.combine(op.value.hashable)
+    }
 
   case let x as ClassMethodInst:
     hasher.combine(ObjectIdentifier(ClassMethodInst.self))
@@ -517,7 +544,9 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
     hasher.combine(x.lookupType)
     hasher.combine(x.member)
     hasher.combine(x.conformance)
-    for op in x.operands { hasher.combine(op.value.hashable) }
+    for op in x.operands {
+      hasher.combine(op.value.hashable)
+    }
 
   case let x as ObjCProtocolInst:
     hasher.combine(ObjectIdentifier(ObjCProtocolInst.self))
@@ -533,7 +562,9 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
     hasher.combine(ObjectIdentifier(InitExistentialMetatypeInst.self))
     hasher.combine(x.type)
     hasher.combine(x.operands[0].value.hashable)
-    for c in x.conformances { hasher.combine(c) }
+    for c in x.conformances {
+      hasher.combine(c)
+    }
 
   case let x as ScalarPackIndexInst:
     hasher.combine(ObjectIdentifier(ScalarPackIndexInst.self))
@@ -543,25 +574,18 @@ private func getHash(of inst: Instruction, runsOnHighLevelSil: Bool = false,
   case let x as DynamicPackIndexInst:
     hasher.combine(ObjectIdentifier(DynamicPackIndexInst.self))
     hasher.combine(x.indexedPackType)
-    for op in x.operands { hasher.combine(op.value.hashable) }
+    for op in x.operands {
+      hasher.combine(op.value.hashable)
+    }
 
-  // CSE applies that are lazy property getter calls (side-effect-free once
-  // the property is set), array semantic calls on high-level SIL, pure
-  // functions, functions with no side effects per callee analysis, or
-  // global initializers.
-  // isLazyPropertyGetter guarantees referencedFunction is non-nil.
   case let x as ApplyInst:
-    if isLazyPropertyGetter(x) {
+    if isOptimizableLazyPropertyGetter(x) || (runsOnHighLevelSil && canHandleArraySemanticsCall(x))
+      || (isPureOrGlobalInit(x, calleeAnalysis: calleeAnalysis))
+    {
       hasher.combine(ObjectIdentifier(ApplyInst.self))
-      hasher.combine(x.referencedFunction)
-      hasher.combine(x.arguments.first!.hashable)
-    } else if runsOnHighLevelSil, canHandleArraySemanticsCall(x) {
-      hasher.combine(ObjectIdentifier(ApplyInst.self))
-      hasher.combine(x.referencedFunction)
-      for arg in x.arguments { hasher.combine(arg.hashable) }
-    } else if canHandleApply(x, calleeAnalysis: calleeAnalysis) {
-      hasher.combine(ObjectIdentifier(ApplyInst.self))
-      for op in x.operands { hasher.combine(op.value.hashable) }
+      for op in x.operands {
+        hasher.combine(op.value.hashable)
+      }
     } else {
       return nil
     }
@@ -589,8 +613,15 @@ struct InstructionReference: Hashable {
 
   /// Returns `nil` if `inst` is not eligible for CSE.
   init?(inst: Instruction, runsOnHighLevelSil: Bool = false, calleeAnalysis: CalleeAnalysis? = nil) {
-    guard let h = getHash(of: inst, runsOnHighLevelSil: runsOnHighLevelSil,
-                          calleeAnalysis: calleeAnalysis) else { return nil }
+    guard
+      let h = getHash(
+        of: inst,
+        runsOnHighLevelSil: runsOnHighLevelSil,
+        calleeAnalysis: calleeAnalysis
+      )
+    else {
+      return nil
+    }
     self.inst = inst
     self.hash = h
   }
@@ -638,7 +669,9 @@ struct ScopedHashMap {
   /// Return the previously inserted instruction that is semantically
   /// equivalent to `ref.inst`, or `nil` if none exists.
   func lookup(_ ref: InstructionReference) -> Instruction? {
-    guard let idx = map[ref] else { return nil }
+    guard let idx = map[ref] else {
+      return nil
+    }
     return stack[idx].inst
   }
 
@@ -671,10 +704,14 @@ extension ScopedHashMap: CustomStringConvertible {
 /// (duplicates are skipped via lookup), then print the map contents.
 /// Used to verify that semantically identical instructions are deduplicated.
 let scopedHashTableTest = FunctionTest("scoped-hash-table") {
-  function, arguments, context in
+  function,
+  arguments,
+  context in
   var map = ScopedHashMap()
   for inst in function.blocks.first!.instructions {
-    guard let ref = InstructionReference(inst: inst) else { continue }
+    guard let ref = InstructionReference(inst: inst) else {
+      continue
+    }
     if map.lookup(ref) == nil {
       map.insert(ref)
     }
@@ -685,7 +722,9 @@ let scopedHashTableTest = FunctionTest("scoped-hash-table") {
 /// Insert `inst1` and then look up `inst2`.
 /// Prints "hit" if the lookup succeeds, "miss" otherwise.
 let scopedHashTableInsertLookupTest = FunctionTest("scoped-hash-table-insert-lookup") {
-  function, arguments, context in
+  function,
+  arguments,
+  context in
   let inst1 = arguments.takeInstruction()
   let inst2 = arguments.takeInstruction()
   var map = ScopedHashMap()
@@ -695,30 +734,34 @@ let scopedHashTableInsertLookupTest = FunctionTest("scoped-hash-table-insert-loo
 
 /// Takes `@instruction` (expected to be an apply), prints "true" if it is a
 /// call to a lazy property getter that the CSE pass can handle, "false" otherwise.
-let isLazyPropertyGetterTest = FunctionTest("is-lazy-property-getter") {
-  function, arguments, context in
+let isOptimizableLazyPropertyGetterTest = FunctionTest("is-optimizable-lazy-property-getter") {
+  function,
+  arguments,
+  context in
   let inst = arguments.takeInstruction()
   guard let ai = inst as? ApplyInst else {
     print("not an apply")
     return
   }
-  print(isLazyPropertyGetter(ai) ? "true" : "false")
+  print(isOptimizableLazyPropertyGetter(ai) ? "true" : "false")
 }
 
 /// Insert `keepInst` (in a block other than `popBlock`) and `popInst` (in
 /// `popBlock`), then call `pop(block: popBlock)`.
 /// Prints whether each instruction remains in the map afterwards.
 let scopedHashTablePopTest = FunctionTest("scoped-hash-table-pop") {
-  function, arguments, context in
+  function,
+  arguments,
+  context in
   let keepInst = arguments.takeInstruction()
-  let popInst  = arguments.takeInstruction()
+  let popInst = arguments.takeInstruction()
   let popBlock = arguments.takeBlock()
-  let keepRef  = InstructionReference(inst: keepInst)!
-  let popRef   = InstructionReference(inst: popInst)!
+  let keepRef = InstructionReference(inst: keepInst)!
+  let popRef = InstructionReference(inst: popInst)!
   var map = ScopedHashMap()
   map.insert(keepRef)
   map.insert(popRef)
   map.pop(block: popBlock)
   print(map.lookup(keepRef) != nil ? "keep: hit" : "keep: miss")
-  print(map.lookup(popRef)  != nil ? "pop: hit"  : "pop: miss")
+  print(map.lookup(popRef) != nil ? "pop: hit" : "pop: miss")
 }

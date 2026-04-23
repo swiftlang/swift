@@ -79,7 +79,7 @@ public func registerOptimizerTests() {
     scopedHashTableTest,
     scopedHashTableInsertLookupTest,
     scopedHashTablePopTest,
-    isLazyPropertyGetterTest
+    isOptimizableLazyPropertyGetterTest
   )
 
   registerModuleTest(functionUsesTest, { functionUsesTest.pass.run($0) })

@@ -1012,7 +1012,7 @@ bb0:
 }
 
 // -----------------------------------------------------------------------
-// is-lazy-property-getter tests
+// is-optimizable-lazy-property-getter tests
 // -----------------------------------------------------------------------
 
 // Positive (non-OSSA): class self, switch_enum on Optional, .some dest has 1 arg.
@@ -1109,7 +1109,7 @@ bb3(%ret : $Builtin.Int64):
 // TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_class
 sil @is_lazy_property_getter_class : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
 bb0(%self : $Builtin.NativeObject):
-  specify_test "is-lazy-property-getter @instruction[+1]"
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
   %fn     = function_ref @lazy_class_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
   %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
   return %result : $Builtin.Int64
@@ -1120,7 +1120,7 @@ bb0(%self : $Builtin.NativeObject):
 // TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_struct
 sil @is_lazy_property_getter_struct : $@convention(thin) (@inout Builtin.Int64) -> Builtin.Int64 {
 bb0(%self : $*Builtin.Int64):
-  specify_test "is-lazy-property-getter @instruction[+1]"
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
   %fn     = function_ref @lazy_struct_getter : $@convention(method) (@inout Builtin.Int64) -> Builtin.Int64
   %result = apply %fn(%self) : $@convention(method) (@inout Builtin.Int64) -> Builtin.Int64
   return %result : $Builtin.Int64
@@ -1131,7 +1131,7 @@ bb0(%self : $*Builtin.Int64):
 // TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_not_lazy
 sil @is_lazy_property_getter_not_lazy : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
 bb0(%self : $Builtin.NativeObject):
-  specify_test "is-lazy-property-getter @instruction[+1]"
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
   %fn     = function_ref @plain_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
   %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
   return %result : $Builtin.Int64
@@ -1142,7 +1142,7 @@ bb0(%self : $Builtin.NativeObject):
 // TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_switch_enum_addr
 sil @is_lazy_property_getter_switch_enum_addr : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
 bb0(%self : $Builtin.NativeObject):
-  specify_test "is-lazy-property-getter @instruction[+1]"
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
   %fn     = function_ref @lazy_switch_enum_addr_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
   %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
   return %result : $Builtin.Int64
@@ -1154,7 +1154,7 @@ bb0(%self : $Builtin.NativeObject):
 // TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_ossa_ossa
 sil [ossa] @is_lazy_property_getter_ossa_ossa : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
 bb0(%self : @guaranteed $Builtin.NativeObject):
-  specify_test "is-lazy-property-getter @instruction[+1]"
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
   %fn     = function_ref @lazy_class_getter_ossa : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
   %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
   return %result : $Builtin.Int64
@@ -1166,7 +1166,7 @@ bb0(%self : @guaranteed $Builtin.NativeObject):
 // TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_ossa_nonossa
 sil [ossa] @is_lazy_property_getter_ossa_nonossa : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
 bb0(%self : @guaranteed $Builtin.NativeObject):
-  specify_test "is-lazy-property-getter @instruction[+1]"
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
   %fn     = function_ref @lazy_class_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
   %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
   return %result : $Builtin.Int64
