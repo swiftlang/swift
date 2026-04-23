@@ -1954,6 +1954,69 @@ unsigned AllowArgumentMismatch::getParamIdx() const {
   return elt.getParamIdx();
 }
 
+bool AllowArgumentMismatch::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  if (ContextualMismatch::diagnoseForAmbiguity(commonFixes))
+    return true;
+
+  auto *locator = getLocator();
+  auto argConv = locator->getLastElementAs<LocatorPathElt::ApplyArgToParam>();
+  if (!argConv)
+    return false;
+
+  auto getExpectedType =
+      [](const std::pair<const Solution *, const ConstraintFix *> &entry)
+      -> Type {
+    auto &solution = *entry.first;
+    auto *fix = static_cast<const AllowArgumentMismatch *>(entry.second);
+    return solution.simplifyType(fix->getToType());
+  };
+
+  auto expectedType = getExpectedType(commonFixes.front());
+  // Only collapse this ambiguity when every solution is trying to satisfy the
+  // same outer argument expectation e.g. `degrees(open)`. If candidate
+  // overloads have different parameter types, a single diagnostic would be
+  // misleading and the generic ambiguity path should handle it instead.
+  if (!llvm::all_of(
+          commonFixes,
+          [&](const std::pair<const Solution *, const ConstraintFix *> &entry) {
+            return expectedType->isEqual(getExpectedType(entry));
+          })) {
+    return false;
+  }
+
+  auto &cs = getConstraintSystem();
+  auto &DE = cs.getASTContext().Diags;
+  auto &solution = *commonFixes.front().first;
+
+  auto *argLoc = cs.getConstraintLocator(simplifyLocatorToAnchor(locator));
+  auto overload =
+      solution.getOverloadChoiceIfAvailable(solution.getCalleeLocator(argLoc));
+  if (!overload)
+    return false;
+
+  auto name = overload->choice.getName().getBaseName();
+  DE.diagnose(getLoc(getAnchor()), diag::no_candidates_match_argument_type,
+              name.userFacingName(), expectedType, argConv->getParamIdx());
+
+  for (const auto &entry : commonFixes) {
+    auto &solution = *entry.first;
+    auto overload =
+        solution.getOverloadChoiceIfAvailable(solution.getCalleeLocator(argLoc));
+
+    if (!(overload && overload->choice.isDecl()))
+      continue;
+
+    auto *decl = overload->choice.getDecl();
+    if (decl->getLoc().isValid()) {
+      DE.diagnose(decl, diag::found_candidate_type,
+                  solution.simplifyType(overload->adjustedOpenedType));
+    }
+  }
+
+  return true;
+}
+
 bool AllowArgumentMismatch::diagnose(const Solution &solution,
                                      bool asNote) const {
   ArgumentMismatchFailure failure(solution, getFromType(), getToType(),
