@@ -2181,20 +2181,29 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
   return SILUndef::get(insertionPoint->getFunction(), ty);
 }
 
+static bool findUnreferenceableStorageInType(SILType ty, SILFunction *func) {
+  if (auto *structDecl = ty.getStructOrBoundGenericStruct()) {
+    return swift::findUnreferenceableStorage(structDecl, ty, func);
+  }
+  if (auto tupleTy = ty.getAs<TupleType>()) {
+    for (unsigned i = 0, e = tupleTy->getNumElements(); i < e; ++i) {
+      if (findUnreferenceableStorageInType(ty.getTupleElementType(i), func))
+        return true;
+    }
+  }
+  return false;
+}
+
 bool swift::findUnreferenceableStorage(StructDecl *decl, SILType structType,
                                        SILFunction *func) {
   if (decl->hasUnreferenceableStorage()) {
     return true;
   }
-  // Check if any fields have unreferenceable stoage
   for (auto *field : decl->getStoredProperties()) {
     TypeExpansionContext tec = *func;
     auto fieldTy = structType.getFieldType(field, func->getModule(), tec);
-    if (auto *fieldStructDecl = fieldTy.getStructOrBoundGenericStruct()) {
-      if (findUnreferenceableStorage(fieldStructDecl, fieldTy, func)) {
-        return true;
-      }
-    }
+    if (findUnreferenceableStorageInType(fieldTy, func))
+      return true;
   }
   return false;
 }
