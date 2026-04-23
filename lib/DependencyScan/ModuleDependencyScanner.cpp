@@ -1889,11 +1889,21 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
   // embedded header path is also prefix mapped, thus it can't be found anyway.
   auto FS = ScanASTContext.SourceMgr.getFileSystem();
 
+  // Use #import to make sure the file only imported once, unless it is on
+  // Windows which will produce an error.
+  const auto &ClangLangOpts =
+      ScanASTContext.getClangModuleLoader()->getClangASTContext().getLangOpts();
+  bool supportImport = ClangLangOpts.ObjC || !ClangLangOpts.MSVCCompat;
+
   auto chainBridgingHeader = [&](StringRef moduleName, StringRef headerPath,
                                  StringRef binaryModulePath) -> llvm::Error {
     auto remapped = remapPath(headerPath);
     outOS << "#if __has_include(\"" << remapped << "\")\n";
-    outOS << "#import \"" << remapped << "\"\n";
+    if (supportImport)
+      outOS << "#import";
+    else
+      outOS << "#include";
+    outOS << " \"" << remapped << "\"\n";
     outOS << "#else\n";
 
     if (binaryModulePath.empty()) {
