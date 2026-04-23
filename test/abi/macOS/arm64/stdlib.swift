@@ -1282,3 +1282,6 @@ Added: _$ss15EmptyCollectionVyxGSHsWP
 
 // Wrapper for SWIFT_CONCURRENCY_TRACING_SUBSYSTEM environment variable
 Added: _concurrencyTracingSubsystem
+
+// SPI for finding subclasses of a class.
+Added: __swift_copyNongenericSubclasses
