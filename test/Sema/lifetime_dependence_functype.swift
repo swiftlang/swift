@@ -50,7 +50,7 @@ func applyBorrow(nc: borrowing NC, borrow: (borrowing NC) -> NE) -> NE {
 }
 
 func testBorrow(nc: consuming NC) {
-  let borrowed = applyBorrow(nc: nc, borrow: borrow) // expected-error{{cannot convert value of type '@_lifetime(borrow 0) (borrowing NC) -> NE' to expected argument type '@_lifetime(captures) (borrowing NC) -> NE'}}
+  let borrowed = applyBorrow(nc: nc, borrow: borrow) // OK
   _ = consume nc
   _ = transfer(borrowed)
 }

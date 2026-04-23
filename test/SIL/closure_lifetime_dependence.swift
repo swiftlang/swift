@@ -11,6 +11,9 @@ struct NE : ~Escapable {
     }
 }
 
+struct NC: ~Copyable {
+}
+
 func takePicker(picker: @_lifetime(copy ne0, copy ne1) (_ ne0: NE, _ ne1: NE) -> NE) {
     let x = NE()
     let y = NE()
@@ -101,3 +104,7 @@ func callContextAndArgDependentPicker() {
 // The captures dependence here is technically unnecessary, but causes no harm, since the closure is only called in one place.
 // CHECK-LABEL: sil private @$s27closure_lifetime_dependence32callContextAndArgDependentPickeryyFAA2NEVADXEfU0_ : $@convention(thin) (@guaranteed NE) -> @lifetime(captures, copy 0) @owned NE {
 // CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence32callContextAndArgDependentPickeryyFAA2NEVADXEfU0_'
+
+// CHECK-LABEL: sil hidden @$s27closure_lifetime_dependence12takeBorrower6borrowyAA2NEVAA2NCVXE_tF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed NC) -> @lifetime(captures, borrow 0) @owned NE) -> () {
+// CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence12takeBorrower6borrowyAA2NEVAA2NCVXE_tF'
+func takeBorrower(borrow: (borrowing NC) -> NE) {}

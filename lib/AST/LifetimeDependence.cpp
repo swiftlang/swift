@@ -1520,13 +1520,14 @@ protected:
           // Methods that return a non-Escapable value - single parameter
           // default rule.
           inferNonEscapableResultOnSelf();
-        } else if (isLifetimeForDecl()) {
+        } else {
           // Regular functions and initializers that return a non-Escapable
           // value - single parameter default rule.
           inferNonEscapableResultOnParam();
-        } else {
+
           // Function types - closure context default rule
-          inferNonEscapingResultOnClosureContext();
+          if (!isLifetimeForDecl())
+            inferNonEscapingResultOnClosureContext();
         }
       }
     }
@@ -1867,11 +1868,15 @@ protected:
     // Strict inference only handles a single escapable parameter,
     // which is an unambiguous borrow dependence.
     if (parameterInfos.size() == 0) {
-      diagnose(returnLoc,
-               diag::lifetime_dependence_cannot_infer_return_no_param,
-               diagnosticQualifier());
-      diagnose(returnLoc,
-               diag::lifetime_dependence_cannot_infer_return_immortal);
+      // Only diagnose for declarations: for types we, will infer a dependence
+      // on the closure context.
+      if (isLifetimeForDecl()) {
+        diagnose(returnLoc,
+                 diag::lifetime_dependence_cannot_infer_return_no_param,
+                 diagnosticQualifier());
+        diagnose(returnLoc,
+                 diag::lifetime_dependence_cannot_infer_return_immortal);
+      }
       return;
     }
     if (parameterInfos.size() > 1) {
