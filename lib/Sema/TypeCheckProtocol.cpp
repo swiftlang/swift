@@ -1695,6 +1695,14 @@ bool WitnessChecker::findBestWitness(
       if (ignoreMissingImportsDuringRegularLookup)
         continue;
 
+      // Conformance checking in swiftinterfaces is lenient and can recover
+      // from missing witnesses by assuming that the protocol witness table
+      // will have an entry for the requirement at runtime. As a result,
+      // diagnosing missing imports for witnesses here could break source
+      // compatibility for existing interface files and must be skipped.
+      if (DC->isInSwiftinterface())
+        continue;
+
       // Try again, this time ignoring missing imports to find more candidates.
       witnesses = lookupValueWitnesses(DC, requirement, ignoringNames,
                                        /*ignoreMissingImports=*/true);
