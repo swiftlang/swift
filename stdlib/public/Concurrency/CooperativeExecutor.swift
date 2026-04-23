@@ -247,10 +247,6 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
 @available(StdlibDeploymentTarget 6.3, *)
 extension CooperativeExecutor: SchedulingExecutor {
 
-  public var asScheduling: (any SchedulingExecutor)? {
-    return self
-  }
-
   func currentTime(clock: _ClockID) -> Timestamp {
     var now: Timestamp = .zero
     unsafe _getTime(seconds: &now.seconds,
@@ -273,8 +269,7 @@ extension CooperativeExecutor: SchedulingExecutor {
       let duration = Duration(from: suspendingDuration)
       suspendingWaitQueue.enqueue(job, after: duration)
     } else {
-      clock.enqueue(job, on: self, at: clock.now.advanced(by: delay),
-                    tolerance: tolerance)
+      fatalError("Sorry, cannot schedule on an unknown clock")
       return
     }
   }
