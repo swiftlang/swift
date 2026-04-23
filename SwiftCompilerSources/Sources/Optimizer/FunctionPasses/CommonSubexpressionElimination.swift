@@ -86,7 +86,9 @@ private func processFunction(
   _ context: FunctionPassContext
 ) {
   // Process the entry block, then drive the DFS.
-  processBlock(startBlock, &map, runsOnHighLevelSil, &lazyPropertyGetters, context)
+  if !processBlock(startBlock, &map, runsOnHighLevelSil, &lazyPropertyGetters, context) {
+    return
+  }
 
   // Each stack frame holds the block being visited and an index into its
   // dominator-tree children so we can resume after processing each child.
@@ -100,7 +102,9 @@ private func processFunction(
       // Advance the child pointer for this frame, then visit the next child.
       dfsStack[dfsStack.count - 1].childIndex += 1
       let child = children[childIndex]
-      processBlock(child, &map, runsOnHighLevelSil, &lazyPropertyGetters, context)
+      if !processBlock(child, &map, runsOnHighLevelSil, &lazyPropertyGetters, context) {
+        return
+      }
       dfsStack.append((child, 0))
     } else {
       // All children exhausted — pop this block's entries from the map
@@ -127,7 +131,7 @@ private func processBlock(
   _ runsOnHighLevelSil: Bool = false,
   _ lazyPropertyGetters: inout [ApplyInst],
   _ context: FunctionPassContext
-) {
+) -> Bool {
   // `block.instructions` skips deleted instructions automatically, so it is
   // safe to erase the current instruction while iterating.
   for inst in block.instructions {
@@ -152,6 +156,9 @@ private func processBlock(
     assert(inst.isIdenticalTo(inst), "inst must match itself for map to work")
 
     if let availInst = map.lookup(ref) {
+      if !context.continueWithNextSubpassRun(for: inst) {
+        return false
+      }
       if let ai = inst as? ApplyInst, isOptimizableLazyPropertyGetter(ai) {
         lazyPropertyGetters.append(ai)
       } else {
@@ -162,6 +169,7 @@ private func processBlock(
 
     map.insert(ref)
   }
+  return true
 }
 
 private func hasGuaranteedSelf(_ ai: ApplyInst) -> Bool {
