@@ -22,7 +22,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include <array>
 #include <string_view>
-#include <unordered_map>
 
 namespace swift {
 enum class DiagnosticGroupOptions {
@@ -36,6 +35,9 @@ enum class DiagnosticGroupOptions {
   /// The documentation file for this diagnostic group is distributed in the toolchain
   /// directly.
   ToolchainLocalDocumentation = 1 << 1,
+
+  /// This diagnostic group is not accessible through the compiler driver.
+  FrontendOnly = 1 << 2,
 };
 
 enum class DiagID : uint32_t;
@@ -61,6 +63,7 @@ struct DiagGroupInfo {
   llvm::ArrayRef<DiagID> diagnostics;
   bool defaultIgnoreWarnings : 1;
   bool toolchainLocalDocumentation : 1;
+  bool frontendOnly : 1;
 
   constexpr DiagGroupInfo(DiagGroupID groupID, std::string_view name,
                           std::string_view documentationFile,
@@ -68,11 +71,13 @@ struct DiagGroupInfo {
                           llvm::ArrayRef<DiagGroupID> subgroups,
                           llvm::ArrayRef<DiagID> diagnostics,
                           bool defaultIgnoreWarnings,
-                          bool toolchainLocalDocumentation)
+                          bool toolchainLocalDocumentation,
+                          bool frontendOnly)
   : id(groupID), name(name), documentationFile(documentationFile),
     supergroups(supergroups), subgroups(subgroups), diagnostics(diagnostics),
     defaultIgnoreWarnings(defaultIgnoreWarnings),
-    toolchainLocalDocumentation(toolchainLocalDocumentation) {}
+    toolchainLocalDocumentation(toolchainLocalDocumentation),
+    frontendOnly(frontendOnly) {}
 
   constexpr DiagGroupInfo(DiagGroupID groupID, std::string_view name,
                           OptionSet<DiagnosticGroupOptions> options,
@@ -83,10 +88,24 @@ struct DiagGroupInfo {
   : DiagGroupInfo(groupID, name, documentationFile, supergroups,
                   subgroups, diagnostics,
                   options.contains(DiagnosticGroupOptions::DefaultIgnoreWarnings),
-                  options.contains(DiagnosticGroupOptions::ToolchainLocalDocumentation)) {}
+                  options.contains(DiagnosticGroupOptions::ToolchainLocalDocumentation),
+                  options.contains(DiagnosticGroupOptions::FrontendOnly)) {}
 
   void traverseDepthFirst(
       llvm::function_ref<void(const DiagGroupInfo &)> func) const;
+
+  /// Returns the documentation URL for a diagnostic group, using the local
+  /// toolchain path for toolchain-local groups or the remote URL otherwise.
+  std::string getDocumentationURL(llvm::StringRef docsPath,
+                                  llvm::StringRef localDocsPath) const;
+
+  /// Returns true if this group contains GROUPED_REMARK diagnostics. Does NOT
+  /// consider subgroups (see hasTransitiveRemarks).
+  bool hasDirectRemarks() const;
+
+  /// Returns true if this group or any of its subgroups contain GROUPED_REMARK
+  /// diagnostics.
+  bool hasTransitiveRemarks() const;
 };
 
 // Add OptionSet aliases so that the '|' operator in the `DiagnosticGroups.def`
@@ -94,9 +113,11 @@ struct DiagGroupInfo {
 static constexpr OptionSet<DiagnosticGroupOptions> none = DiagnosticGroupOptions::none;
 static constexpr OptionSet<DiagnosticGroupOptions> DefaultIgnoreWarnings = DiagnosticGroupOptions::DefaultIgnoreWarnings;
 static constexpr OptionSet<DiagnosticGroupOptions> ToolchainLocalDocumentation = DiagnosticGroupOptions::ToolchainLocalDocumentation;
+static constexpr OptionSet<DiagnosticGroupOptions> FrontendOnly = DiagnosticGroupOptions::FrontendOnly;
 extern const std::array<DiagGroupInfo, DiagGroupsCount> diagnosticGroupsInfo;
 const DiagGroupInfo &getDiagGroupInfoByID(DiagGroupID id);
 std::optional<DiagGroupID> getDiagGroupIDByName(std::string_view name);
+std::optional<llvm::StringRef> getCustomRemarkOptionForGroup(DiagGroupID id);
 
 } // end namespace swift
 

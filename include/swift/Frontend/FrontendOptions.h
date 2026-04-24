@@ -337,6 +337,13 @@ public:
   /// exit.
   bool PrintSupportedFeatures = false;
 
+  /// Indicates that the frontend should list all diagnostic groups with remark
+  /// diagnostics and then exit.
+  bool PrintRemarkHelp = false;
+
+  /// Like PrintRemarkHelp but excludes FrontendOnly groups.
+  bool PrintRemarkHelpForDriver = false;
+
   /// See the \ref SILOptions.EmitVerboseSIL flag.
   bool EmitVerboseSIL = false;
 

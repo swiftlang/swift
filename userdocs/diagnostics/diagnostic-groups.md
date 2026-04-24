@@ -24,6 +24,9 @@ Or upgrade all warnings except deprecated declaration to errors:
 -warnings-as-errors -Wwarning DeprecatedDeclaration
 ```
 
+For groups containing remarks, those remarks can be enabled using `-R <group>`.
+You can list the remark groups supported by your particular toolchain version using `-Rhelp`.
+
 ## Groups with warnings
 - <doc:always-available-domain>
 - <doc:trailing-closure-matching>
@@ -46,6 +49,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:module-version-missing>
 - <doc:oslog>
 - <doc:option-obsoleted-by-module-selectors>
+- <doc:weak-mutability>
 - <doc:result-builder-methods>
 - <doc:semantic-copies>
 - <doc:strict-language-features>
@@ -57,8 +61,23 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:use-any-apple-os-availability>
 
 
+## Groups with remarks
+- <doc:cross-import>
+- <doc:dependency-scan-cache>
+- <doc:dependency-scan>
+- <doc:indexing-system-module>
+- <doc:access-note>
+- <doc:macro-expansions>
+- <doc:macro-loading>
+- <doc:module-api-import>
+- <doc:module-interface-rebuild>
+- <doc:module-loading>
+- <doc:module-serialization>
+
+
 ## Topics
 - <doc:dynamic-callable-requirements>
+- <doc:cross-import>
 - <doc:always-available-domain>
 - <doc:trailing-closure-matching>
 - <doc:actor-isolated-mutating-async>
@@ -66,6 +85,8 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:sendable-closure-captures>
 - <doc:compilation-caching>
 - <doc:string-interpolation-conformance>
+- <doc:dependency-scan-cache>
+- <doc:dependency-scan>
 - <doc:deprecated-declaration>
 - <doc:implementation-only-deprecated>
 - <doc:dynamic-exclusivity>
@@ -77,11 +98,19 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:return-type-implicit-copy>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
+- <doc:indexing-system-module>
+- <doc:access-note>
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
+- <doc:macro-expansions>
+- <doc:macro-loading>
 - <doc:old-suppressed-associatedtypes>
 - <doc:missing-module-on-known-paths>
 - <doc:module-version-missing>
+- <doc:modularization-issue>
+- <doc:module-api-import>
+- <doc:module-interface-rebuild>
+- <doc:module-loading>
 - <doc:module-not-testable>
 - <doc:multiple-inheritance>
 - <doc:nominal-types>
@@ -92,11 +121,14 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:property-wrapper-requirements>
 - <doc:conformance-isolation>
 - <doc:protocol-type-non-conformance>
+- <doc:weak-mutability>
+- <doc:region-isolation>
 - <doc:result-builder-methods>
 - <doc:semantic-copies>
 - <doc:sendable-metatypes>
 - <doc:sending-closure-risks-data-race>
 - <doc:sending-risks-data-race>
+- <doc:module-serialization>
 - <doc:strict-language-features>
 - <doc:strict-memory-safety>
 - <doc:temporary-pointers>

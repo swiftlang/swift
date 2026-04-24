@@ -31,6 +31,7 @@
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
@@ -53,6 +54,7 @@ namespace swift {
   class SourceFile;
   class ParamDecl;
   class AnyPattern;
+  class DiagnosticOptions;
 
   /// Enumeration describing all of possible diagnostics.
   ///
@@ -639,6 +641,9 @@ namespace swift {
     /// values of this map to Swift clients.
     WarningGroupBehaviorMap warningGroupBehaviorMap;
 
+    /// Groups with remarks enabled. All remarks are disabled by default.
+    llvm::SmallSet<swift::DiagGroupID, 4> enabledRemarkGroups;
+
     /// For compiler-internal purposes only, track which diagnostics should
     /// be ignored completely. For example, this is used by LLDB to
     /// suppress certain errors in expression evaluation.
@@ -721,6 +726,17 @@ namespace swift {
       return ruleRefArray;
     }
 
+    void enableRemarkGroup(DiagGroupID Group) {
+      if (!enabledRemarkGroups.insert(Group).second)
+        return;
+      for (auto SubGroup : getDiagGroupInfoByID(Group).subgroups)
+        enableRemarkGroup(SubGroup);
+    }
+
+    bool isRemarkGroupEnabled(DiagGroupID Group) const {
+      return enabledRemarkGroups.contains(Group);
+    }
+
     void resetHadAnyError() {
       anyErrorOccurred = false;
       fatalErrorOccurred = false;
@@ -742,6 +758,7 @@ namespace swift {
       std::swap(suppressNotes, other.suppressNotes);
       std::swap(suppressRemarks, other.suppressRemarks);
       std::swap(warningGroupBehaviorMap, other.warningGroupBehaviorMap);
+      std::swap(enabledRemarkGroups, other.enabledRemarkGroups);
       std::swap(fatalErrorOccurred, other.fatalErrorOccurred);
       std::swap(anyErrorOccurred, other.anyErrorOccurred);
       std::swap(previousBehavior, other.previousBehavior);
@@ -985,6 +1002,14 @@ namespace swift {
     const std::vector<const WarningGroupBehaviorRule*>
     getWarningGroupBehaviorControlRefArray() const {
       return state.getWarningGroupBehaviorControlRefArray();
+    }
+
+    void enableRemarkGroup(DiagGroupID Group) {
+      state.enableRemarkGroup(Group);
+    }
+
+    bool isRemarkGroupEnabled(DiagGroupID Group) const {
+      return state.isRemarkGroupEnabled(Group);
     }
 
     /// Whether to print diagnostic names after their messages
@@ -1282,7 +1307,17 @@ namespace swift {
     void forwardTentativeDiagnosticsTo(DiagnosticEngine &targetEngine);
 
   public:
-    DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
+    static DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
+
+    /// Returns diagnostic documentation path, using the user-provided path if
+    /// explicitly set, or falling back to the docs.swift.org URL.
+    static std::string
+    resolveDiagnosticDocumentationPath(const DiagnosticOptions &opts);
+
+    /// Returns the local diagnostic documentation path derived from the
+    /// compiler's executable path.
+    static std::string
+    resolveLocalDiagnosticDocumentationPath(llvm::StringRef mainExecutablePath);
 
     /// Get a localized format string for the given `DiagID`. If no localization
     /// is available, returns the default string.

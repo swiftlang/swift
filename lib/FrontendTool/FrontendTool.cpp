@@ -27,6 +27,8 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -80,6 +82,8 @@
 
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringMap.h"
@@ -94,6 +98,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualOutputBackend.h"
@@ -2488,6 +2493,47 @@ collectSupplementaryOutputPaths(ArrayRef<const char *> Args,
   return paths;
 }
 
+static void printRemarkHelp(const CompilerInvocation &Invocation) {
+  bool excludeFrontendOnly = Invocation.getFrontendOptions().PrintRemarkHelpForDriver;
+  std::string docsPath = DiagnosticEngine::resolveDiagnosticDocumentationPath(
+      Invocation.getDiagnosticOptions());
+  std::string localDocsPath =
+      DiagnosticEngine::resolveLocalDiagnosticDocumentationPath(
+          Invocation.getFrontendOptions().MainExecutablePath);
+
+  const auto remarkGroups = llvm::filter_to_vector(
+      diagnosticGroupsInfo, [excludeFrontendOnly](const auto &group) {
+        if (group.documentationFile.empty())
+          return false;
+        if (excludeFrontendOnly && group.frontendOnly)
+          return false;
+        return group.hasDirectRemarks();
+      });
+
+  constexpr StringLiteral columnSep = " | ";
+  StringRef docsHeading = "Documentation";
+  StringRef groupHeading = "Group with remarks";
+  size_t maxLenGroup = groupHeading.size();
+  size_t maxLenDocs = docsHeading.size();
+  SmallVector<std::string, 16> urls;
+  urls.reserve(remarkGroups.size());
+  for (const auto &group : remarkGroups) {
+    urls.push_back(group.getDocumentationURL(docsPath, localDocsPath));
+    maxLenGroup = std::max(maxLenGroup, group.name.size());
+    maxLenDocs = std::max(maxLenDocs, urls.back().size());
+  }
+
+  llvm::outs() << llvm::left_justify(groupHeading, maxLenGroup) << columnSep
+               << docsHeading << "\n";
+  llvm::outs() << std::string(maxLenGroup + maxLenDocs + columnSep.size(), '-')
+               << "\n";
+
+  for (const auto &[group, url] : llvm::zip_equal(remarkGroups, urls)) {
+    llvm::outs() << llvm::left_justify(group.name, maxLenGroup) << columnSep
+                 << url << "\n";
+  }
+}
+
 int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
                            FrontendObserver *observer) {
@@ -2630,6 +2676,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   if (Invocation.getFrontendOptions().PrintSupportedFeatures) {
     swift::features::printSupportedFeatures(llvm::outs());
+    return finishDiagProcessing(0, /*verifierEnabled*/ false);
+  }
+
+  if (Invocation.getFrontendOptions().PrintRemarkHelp ||
+      Invocation.getFrontendOptions().PrintRemarkHelpForDriver) {
+    printRemarkHelp(Invocation);
     return finishDiagProcessing(0, /*verifierEnabled*/ false);
   }
 

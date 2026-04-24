@@ -1,0 +1,24 @@
+# RUN: %target-swift-ide-test -list-diagnostic-groups > %t.txt
+# RUN: %{python} %s %t.txt %swift_src_root/userdocs/diagnostics
+
+"""
+If this test fails you've forgotten to create documentation for the diagnostic
+group you added. Don't forget to mark your diagnostic group as
+ToolchainLocalDocumentation if the documentation is not available at
+https://docs.swift.org/compiler/documentation/diagnostics/diagnostic-groups/
+"""
+
+import sys, os
+
+groups_file, docs_dir = sys.argv[1], sys.argv[2]
+missing = []
+with open(groups_file) as f:
+    for line in f:
+        doc_file = line.split()[1]
+        target = os.path.join(docs_dir, doc_file + ".md")
+        if not os.path.isfile(target):
+            missing.append(target)
+if missing:
+    for f in missing:
+        print("missing: " + f, file=sys.stderr)
+    sys.exit(1)

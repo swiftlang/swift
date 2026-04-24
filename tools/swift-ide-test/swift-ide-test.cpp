@@ -21,6 +21,7 @@
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PluginRegistry.h"
@@ -120,6 +121,7 @@ enum class ActionType {
   TypeContextInfo,
   ConformingMethodList,
   SignatureHelp,
+  ListDiagnosticGroups,
 };
 
 class NullDebuggerClient : public DebuggerClient {
@@ -256,7 +258,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
 	                    "conforming-methods",
                       "Perform conforming method analysis for expression"),
            clEnumValN(ActionType::SignatureHelp, "signature-help",
-                      "Perform signature help")));
+                      "Perform signature help"),
+           clEnumValN(ActionType::ListDiagnosticGroups,
+                      "list-diagnostic-groups",
+                      "List all diagnostic groups and their documentation files")));
 
 static llvm::cl::opt<std::string>
 SourceFilename("source-filename", llvm::cl::desc("Name of the source file"),
@@ -4561,6 +4566,15 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
+  if (options::Action == ActionType::ListDiagnosticGroups) {
+    for (const auto &group : diagnosticGroupsInfo) {
+      if (group.documentationFile.empty())
+        continue;
+      llvm::outs() << group.name << " " << group.documentationFile << "\n";
+    }
+    return 0;
+  }
+
   if (options::SourceFilename.empty()) {
     llvm::errs() << "source file required\n";
     llvm::cl::PrintHelpMessage();
@@ -4966,6 +4980,9 @@ int main(int argc, char *argv[]) {
         InitInvok, options::SourceFilename, options::SecondSourceFilename,
         options::CodeCompletionToken, options::CodeCompletionDiagnostics);
     break;
+
+  case ActionType::ListDiagnosticGroups:
+    llvm_unreachable("handled earlier");
 
   case ActionType::SyntaxColoring:
     ExitCode = doSyntaxColoring(InitInvok,

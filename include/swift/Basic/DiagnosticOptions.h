@@ -16,9 +16,12 @@
 #include "swift/Basic/PrintDiagnosticNamesMode.h"
 #include "swift/Basic/WarningGroupBehaviorRule.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallVector.h"
 #include <vector>
 
 namespace swift {
+
+enum class DiagGroupID : uint32_t;
 
 /// Options for controlling diagnostics.
 class DiagnosticOptions {
@@ -84,6 +87,9 @@ public:
   /// Unknown warning group names specified via -Werror or -Wwarning.
   /// These will be diagnosed when the DiagnosticEngine is configured.
   llvm::SmallVector<std::string, 1> UnknownWarningGroups;
+
+  /// Remark groups enabled via -R <group>.
+  llvm::SmallVector<DiagGroupID, 4> EnabledRemarkGroups;
 
   /// When printing diagnostics, include either the diagnostic name
   /// (diag::whatever) at the end or the associated diagnostic group.

@@ -645,6 +645,8 @@ bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
   // regular compilation.
   Invocation = Invoke;
 
+  setUpDiagnosticOptions();
+
   setSharedCASInstances(CAS, Cache);
   if (setupCASIfNeeded(Args)) {
     Error = "Setting up CAS failed";

@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/Driver/Driver.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Frontend/Frontend.h"
@@ -22,6 +24,7 @@
 #include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Version.h"
+#include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
@@ -30,6 +33,7 @@
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
@@ -41,6 +45,7 @@
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/TargetParser/Triple.h"
+#include <optional>
 
 using namespace swift;
 using namespace llvm::opt;
@@ -834,7 +839,6 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   using namespace options;
   Opts.EnableCaching |= Args.hasFlag(
       OPT_cache_compile_job, OPT_no_cache_compile_job, /*Default=*/false);
-  Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks);
   Opts.CacheSkipReplay |= Args.hasArg(OPT_cache_disable_replay);
   Opts.WriteOutputHashXAttr |= Args.hasArg(OPT_write_output_hash_xattr);
   if (const Arg *A = Args.getLastArg(OPT_cas_path))
@@ -1086,6 +1090,92 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_library_evolution, OPT_enable_resilience))
     Opts.enableFeature(Feature::LibraryEvolution);
+
+  return HadError;
+}
+
+static bool ParseEnabledRemarks(LangOptions &Opts, ArgList &Args,
+                                DiagnosticEngine &Diags,
+                                DiagnosticOptions &DiagOpts,
+                                FrontendOptions &FrontendOpts,
+                                CASOptions &CASOpts) {
+  bool HadError = false;
+  for (const llvm::opt::Arg *RemarkOpt : Args.filtered(
+           options::OPT_enable_remark, options::OPT_enable_remark_swiftc)) {
+    StringRef GroupName = RemarkOpt->getValue();
+    std::optional<DiagGroupID> GroupID = getDiagGroupIDByName(GroupName);
+    if (!GroupID) {
+      Diags.diagnose({}, diag::error_remark_group_not_found, GroupName);
+      HadError = true;
+      continue;
+    }
+    const DiagGroupInfo &Group = getDiagGroupInfoByID(*GroupID);
+    const bool includeFrontendOnly =
+        RemarkOpt->getOption().getID() == options::OPT_enable_remark;
+    if (Group.frontendOnly && !includeFrontendOnly) {
+      Diags.diagnose({}, diag::error_remark_group_not_found, GroupName);
+      HadError = true;
+      continue;
+    }
+
+    // Set the legacy boolean flags so that existing call-site checks continue
+    // to work until the diagnostic engine checks isRemarkGroupEnabled directly.
+    switch (*GroupID) {
+    case DiagGroupID::CompilationCaching:
+      CASOpts.EnableCachingRemarks = true;
+      break;
+    case DiagGroupID::CrossImport:
+      Opts.EnableCrossImportRemarks = true;
+      break;
+    case DiagGroupID::ModuleLoading:
+      Opts.EnableModuleLoadingRemarks = true;
+      break;
+    case DiagGroupID::ModularizationIssue:
+      Opts.EnableModuleRecoveryRemarks = true;
+      break;
+    case DiagGroupID::ModuleSerialization:
+      Opts.EnableModuleSerializationRemarks = true;
+      break;
+    case DiagGroupID::ModuleAPIImport:
+      Opts.EnableModuleApiImportRemarks = true;
+      break;
+    case DiagGroupID::MacroLoading:
+      Opts.EnableMacroLoadingRemarks = true;
+      break;
+    case DiagGroupID::IndexingSystemModule:
+      Opts.EnableIndexingSystemModuleRemarks = true;
+      break;
+    case DiagGroupID::MacroExpansions:
+      Opts.RemarkMacroExpansions = true;
+      break;
+    case DiagGroupID::ModuleInterfaceRebuild:
+      FrontendOpts.RemarkOnRebuildFromModuleInterface = true;
+      break;
+    case DiagGroupID::DependencyScan:
+      FrontendOpts.EmitDependencyScannerRemarks = true;
+      FrontendOpts.EmitDependencyScannerCacheRemarks = true;
+      break;
+    case DiagGroupID::DependencyScanCache:
+      FrontendOpts.EmitDependencyScannerCacheRemarks = true;
+      break;
+    default:
+      if (auto customOption = getCustomRemarkOptionForGroup(*GroupID)) {
+        Diags.diagnose({}, diag::error_remark_option_redirect, GroupName,
+                       *customOption);
+        HadError = true;
+        continue;
+      }
+      break;
+    }
+
+    if (!Group.hasTransitiveRemarks()) {
+      Diags.diagnose({}, diag::error_remarkless_group, GroupName);
+      HadError = true;
+      continue;
+    }
+
+    DiagOpts.EnabledRemarkGroups.push_back(*GroupID);
+  }
 
   return HadError;
 }
@@ -1545,16 +1635,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    OPT_disable_cross_import_overlays,
                    Opts.EnableCrossImportOverlays);
 
-  Opts.EnableCrossImportRemarks = Args.hasArg(OPT_emit_cross_import_remarks);
-
-  Opts.EnableModuleLoadingRemarks = Args.hasArg(OPT_remark_loading_module);
-  Opts.EnableModuleRecoveryRemarks = Args.hasArg(OPT_remark_module_recovery);
-  Opts.EnableModuleSerializationRemarks =
-      Args.hasArg(OPT_remark_module_serialization);
-  Opts.EnableModuleApiImportRemarks = Args.hasArg(OPT_remark_module_api_import);
-  Opts.EnableMacroLoadingRemarks = Args.hasArg(OPT_remark_macro_loading);
-  Opts.EnableIndexingSystemModuleRemarks = Args.hasArg(OPT_remark_indexing_system_module);
-
   if (Args.hasArg(OPT_experimental_skip_non_exportable_decls)) {
     // Only allow -experimental-skip-non-exportable-decls if either library
     // evolution is enabled (in which case the module's ABI is independent of
@@ -1826,9 +1906,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DumpMacroExpansions = Args.hasArg(
       OPT_dump_macro_expansions);
-
-  Opts.RemarkMacroExpansions = Args.hasArg(
-      OPT_expansion_remarks);
 
   Opts.DumpSourceFileImports = Args.hasArg(
       OPT_dump_source_file_imports);
@@ -2926,18 +3003,15 @@ static void configureDiagnosticEngine(
   Diagnostics.setWarningGroupControlRules(Options.WarningGroupControlRules);
   Diagnostics.setPrintDiagnosticNamesMode(Options.PrintDiagnosticNames);
 
-  std::string docsPath = Options.DiagnosticDocumentationPath;
-  if (docsPath.empty()) {
-    // Point at the latest Markdown documentation on GitHub.
-    docsPath = "https://docs.swift.org/compiler/documentation/diagnostics";
-  }
-  Diagnostics.setDiagnosticDocumentationPath(docsPath);
+  for (auto groupID : Options.EnabledRemarkGroups)
+    Diagnostics.enableRemarkGroup(groupID);
 
-  llvm::SmallString<128> localDocsPath(mainExecutablePath);
-  llvm::sys::path::remove_filename(localDocsPath); // Remove /swift-frontend
-  llvm::sys::path::remove_filename(localDocsPath); // Remove /bin
-  llvm::sys::path::append(localDocsPath, "share", "doc", "swift", "diagnostics");
-  Diagnostics.setLocalDiagnosticDocumentationPath(std::string(localDocsPath));
+  Diagnostics.setDiagnosticDocumentationPath(
+      DiagnosticEngine::resolveDiagnosticDocumentationPath(Options));
+
+  Diagnostics.setLocalDiagnosticDocumentationPath(
+      DiagnosticEngine::resolveLocalDiagnosticDocumentationPath(
+          mainExecutablePath));
 
   if (!Options.LocalizationCode.empty()) {
     std::string locPath = Options.LocalizationPath;
@@ -4380,6 +4454,11 @@ bool CompilerInvocation::parseArgs(
 
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, ModuleInterfaceOpts,
                     FrontendOpts)) {
+    return true;
+  }
+
+  if (ParseEnabledRemarks(LangOpts, ParsedArgs, Diags, DiagnosticOpts,
+                          FrontendOpts, CASOpts)) {
     return true;
   }
 

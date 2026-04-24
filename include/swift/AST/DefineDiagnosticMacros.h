@@ -18,8 +18,8 @@
 #ifdef DEFINE_DIAGNOSTIC_MACROS
 
 #if !(defined(DIAG) || (defined(GROUPED_ERROR) && defined(GROUPED_WARNING) &&  \
-                        defined(NOTE) && defined(REMARK)))
-#error Must define either DIAG or the set {GROUPED_ERROR,GROUPED_WARNING,NOTE,REMARK}
+                        defined(NOTE) && defined(GROUPED_REMARK)))
+#error Must define either DIAG or the set {GROUPED_ERROR,GROUPED_WARNING,NOTE,GROUPED_REMARK}
 #endif
 
 #ifndef GROUPED_ERROR
@@ -47,9 +47,14 @@
   DIAG(NOTE, ID, no_group, Options, Text, Signature)
 #endif
 
+#ifndef GROUPED_REMARK
+#define GROUPED_REMARK(ID, Group, Options, Text, Signature)                    \
+  DIAG(REMARK, ID, Group, Options, Text, Signature)
+#endif
+
 #ifndef REMARK
 #define REMARK(ID, Options, Text, Signature)                                   \
-  DIAG(REMARK, ID, no_group, Options, Text, Signature)
+  GROUPED_REMARK(ID, no_group, Options, Text, Signature)
 #endif
 
 #ifndef FIXIT
@@ -69,6 +74,7 @@
 #endif
 
 #undef REMARK
+#undef GROUPED_REMARK
 #undef NOTE
 #undef WARNING
 #undef GROUPED_WARNING

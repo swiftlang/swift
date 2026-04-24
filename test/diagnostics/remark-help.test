@@ -1,0 +1,24 @@
+RUN: %target-swift-frontend -Rhelp | %FileCheck %s --check-prefixes BOTH,FRONTEND-ONLY
+
+RUN: %target-swift-frontend -Rhelp-swiftc | %FileCheck %s --check-prefix BOTH
+RUN: %target-swiftc_driver -Rhelp | %FileCheck %s --check-prefix BOTH
+
+RUN: %target-swiftc_driver -driver-print-jobs -Rhelp %s 2>&1 | %FileCheck %s
+CHECK: BUILD_DIR/bin/swift-frontend -frontend -Rhelp-swiftc
+
+BOTH:               Group with remarks     | Documentation
+BOTH-NEXT:          -----------------------------------{{-+}}
+BOTH-NEXT:          AccessNote             | BUILD_DIR/share/doc/swift/diagnostics/access-note.md
+BOTH-NEXT:          CompilationCaching     | https://docs.swift.org/compiler/documentation/diagnostics/compilation-caching
+BOTH-NEXT:          CrossImport            | BUILD_DIR/share/doc/swift/diagnostics/cross-import.md
+FRONTEND-ONLY-NEXT: DependencyScan         | BUILD_DIR/share/doc/swift/diagnostics/dependency-scan.md
+FRONTEND-ONLY-NEXT: DependencyScanCache    | BUILD_DIR/share/doc/swift/diagnostics/dependency-scan-cache.md
+BOTH-NEXT:          IndexingSystemModule   | BUILD_DIR/share/doc/swift/diagnostics/indexing-system-module.md
+FRONTEND-ONLY-NEXT: MacroExpansions        | BUILD_DIR/share/doc/swift/diagnostics/macro-expansions.md
+BOTH-NEXT:          MacroLoading           | BUILD_DIR/share/doc/swift/diagnostics/macro-loading.md
+BOTH-NEXT:          ModularizationIssue    | BUILD_DIR/share/doc/swift/diagnostics/modularization-issue.md
+BOTH-NEXT:          ModuleAPIImport        | BUILD_DIR/share/doc/swift/diagnostics/module-api-import.md
+FRONTEND-ONLY-NEXT: ModuleInterfaceRebuild | BUILD_DIR/share/doc/swift/diagnostics/module-interface-rebuild.md
+BOTH-NEXT:          ModuleLoading          | BUILD_DIR/share/doc/swift/diagnostics/module-loading.md
+BOTH-NEXT:          ModuleSerialization    | BUILD_DIR/share/doc/swift/diagnostics/module-serialization.md
+

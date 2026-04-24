@@ -16,7 +16,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticGroups.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticList.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Path.h"
+#include <optional>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace swift {
@@ -233,5 +239,62 @@ CHECK_NOT_EMPTY(UnknownWarningGroup)
 #undef CHECK_NOT_EMPTY
 
 } // end namespace validation
+
+std::string
+DiagGroupInfo::getDocumentationURL(llvm::StringRef docsPath, llvm::StringRef localDocsPath) const {
+  if (toolchainLocalDocumentation) {
+    if (!localDocsPath.empty()) {
+      llvm::SmallString<128> localPath(localDocsPath);
+      llvm::sys::path::append(localPath, documentationFile);
+      localPath += ".md";
+      return std::string(localPath);
+    }
+    return "";
+  }
+
+  std::string docURL(docsPath);
+  if (!docURL.empty() && docURL.back() != '/')
+    docURL += "/";
+  docURL += documentationFile;
+  return docURL;
+}
+
+static bool hasDynamicRemarks(DiagGroupID id) {
+  // ModularizationIssue has no GROUPED_REMARK diagnostics — its errors have
+  // their diagnostic level overriden to Remark at the call site when
+  // EnableModuleRecoveryRemarks is set, so we won't find any remarks
+  // statically.
+  return DiagGroupID::ModularizationIssue == id;
+}
+
+bool DiagGroupInfo::hasDirectRemarks() const {
+  if (hasDynamicRemarks(id))
+    return true;
+  for (DiagID diag : diagnostics) {
+    if (DiagnosticEngine::declaredDiagnosticKindFor(diag) ==
+        DiagnosticKind::Remark)
+      return true;
+  }
+  return false;
+}
+
+bool DiagGroupInfo::hasTransitiveRemarks() const {
+  if (hasDirectRemarks())
+    return true;
+  for (auto subGroupID : subgroups) {
+    if (getDiagGroupInfoByID(subGroupID).hasTransitiveRemarks())
+      return true;
+  }
+  return false;
+}
+
+std::optional<llvm::StringRef> getCustomRemarkOptionForGroup(DiagGroupID id) {
+  // Not worth adding this to DiagnosticGroups.def for 1 group, but if more
+  // groups need a custom option in the future we should probably add a
+  // CUSTOM_REMARK_OPTION macro there.
+  if (id == DiagGroupID::AccessNote)
+    return "-Raccess-note=<none|failures|all|all-validate>";
+  return std::nullopt;
+}
 
 } // end namespace swift

@@ -38,6 +38,9 @@ Or upgrade all warnings except deprecated declaration to errors:
 ```sh
 -warnings-as-errors -Wwarning DeprecatedDeclaration
 ```
+
+For groups containing remarks, those remarks can be enabled using `-R <group>`.
+You can list the remark groups supported by your particular toolchain version using `-Rhelp`.
 """
 
 let featuresDocFileName = "upcoming-language-features.md"
@@ -96,7 +99,8 @@ do {
 
 func generateIndex() throws {
   let groupsWithWarnings = try groupNamesWithWarnings()
-  let docs = try retrieveDocs(groupsWithWarnings).sorted { a, b in
+  let groupsWithRemarks = try groupNamesWithRemarks()
+  let docs = try retrieveDocs(groupsWithWarnings, groupsWithRemarks).sorted { a, b in
     return a.title < b.title
   }
 
@@ -112,13 +116,19 @@ func generateIndex() throws {
     try groupsHandle.write(contentsOf: ref.data(using: .utf8)!)
   }
 
+  try groupsHandle.write(contentsOf: "\n\n## Groups with remarks\n".data(using: .utf8)!)
+  for doc in docs where doc.kind == .groupWithRemarks {
+    let ref = "- <doc:\(doc.name.dropLast(3))>\n"
+    try groupsHandle.write(contentsOf: ref.data(using: .utf8)!)
+  }
+
   try groupsHandle.write(contentsOf: topicsHeader.data(using: .utf8)!)
   try featuresHandle.write(contentsOf: topicsHeader.data(using: .utf8)!)
 
   for doc in docs {
     let handle: FileHandle
     switch doc.kind {
-    case .group, .groupWithWarnings:
+    case .group, .groupWithWarnings, .groupWithRemarks:
       handle = groupsHandle
     case .feature:
       handle = featuresHandle
@@ -142,7 +152,7 @@ func createIndex(name: String, header: String) throws -> FileHandle {
   return handle
 }
 
-func retrieveDocs(_ groupsWithWarnings: Set<String>) throws -> [UserDoc] {
+func retrieveDocs(_ groupsWithWarnings: Set<String>, _ groupsWithRemarks: Set<String>) throws -> [UserDoc] {
   let groups = Dictionary(try matches(in: "\(swiftSourceDir)/\(groupsFileName)", with: groupRegex) {
     (file: String($0.file), name: String($0.name))
   }, uniquingKeysWith: { a, b in a })
@@ -180,6 +190,8 @@ func retrieveDocs(_ groupsWithWarnings: Set<String>) throws -> [UserDoc] {
       kind = .feature
     } else if groupsWithWarnings.contains(groupName) {
       kind = .groupWithWarnings
+    } else if groupsWithRemarks.contains(groupName) {
+      kind = .groupWithRemarks
     } else {
       kind = .group
     }
@@ -190,7 +202,23 @@ func retrieveDocs(_ groupsWithWarnings: Set<String>) throws -> [UserDoc] {
   return docs
 }
 
+enum DiagKind {
+  case warning, remark
+
+  var asString: String {
+    switch (self) {
+      case .warning: "WARNING"
+      case .remark: "REMARK"
+    }
+  }
+}
 func groupNamesWithWarnings() throws -> Set<String> {
+  return try groupNames(with: .warning)
+}
+func groupNamesWithRemarks() throws -> Set<String> {
+  return try groupNames(with: .remark)
+}
+func groupNames(with kind: DiagKind) throws -> Set<String> {
   let includePath = "\(swiftSourceDir)/\(swiftIncludeDir)"
   let defPaths = try FileManager.default.subpathsOfDirectory(atPath: includePath)
     .compactMap { subpath in
@@ -200,7 +228,7 @@ func groupNamesWithWarnings() throws -> Set<String> {
       return nil
     }
 
-  enum WarningGroupState {
+  enum GroupState {
     case outside, inside, name
   }
 
@@ -208,13 +236,13 @@ func groupNamesWithWarnings() throws -> Set<String> {
   for path in defPaths {
     let file = try String(contentsOfFile: path, encoding: .utf8)
 
-    var state = WarningGroupState.outside
+    var state = GroupState.outside
     for line in file.components(separatedBy: .newlines) {
       var line = Substring(line)
 
       switch state {
       case .outside:
-        if !line.hasPrefix("GROUPED_WARNING") {
+        if !line.hasPrefix("GROUPED_"+kind.asString) {
           continue
         }
 
@@ -266,6 +294,7 @@ struct UserDoc {
   enum Kind {
     case group
     case groupWithWarnings
+    case groupWithRemarks
     case feature
   }
 

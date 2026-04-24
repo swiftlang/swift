@@ -16,6 +16,7 @@
 #include "ModuleInterfaceBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
@@ -2001,6 +2002,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     LoaderOpts.remarkOnRebuildFromInterface;
   if (LoaderOpts.remarkOnRebuildFromInterface) {
     GenericArgs.push_back("-Rmodule-interface-rebuild");
+    genericSubInvocation.getDiagnosticOptions().EnabledRemarkGroups.push_back(
+        DiagGroupID::ModuleInterfaceRebuild);
   }
   // This flag only matters when we are verifying an textual interface.
   frontendOpts.DowngradeInterfaceVerificationError =

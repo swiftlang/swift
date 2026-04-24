@@ -36,6 +36,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Config.h"
@@ -57,7 +58,7 @@ static_assert(IsTriviallyDestructible<ZeroArgDiagnostic>::value,
               "ZeroArgDiagnostic is meant to be trivially destructable");
 
 namespace {
-enum class DiagnosticOptions {
+enum class DiagnosticProperties {
   /// No options.
   none,
 
@@ -98,14 +99,14 @@ struct StoredDiagnosticInfo {
         isAPIDigesterBreakage(isAPIDigesterBreakage),
         isDeprecation(deprecation), isNoUsage(noUsage),
         groupID(groupID) {}
-  constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts,
+  constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticProperties opts,
                                  DiagGroupID groupID)
       : StoredDiagnosticInfo(k,
-                             opts == DiagnosticOptions::PointsToFirstBadToken,
-                             opts == DiagnosticOptions::Fatal,
-                             opts == DiagnosticOptions::APIDigesterBreakage,
-                             opts == DiagnosticOptions::Deprecation,
-                             opts == DiagnosticOptions::NoUsage,
+                             opts == DiagnosticProperties::PointsToFirstBadToken,
+                             opts == DiagnosticProperties::Fatal,
+                             opts == DiagnosticProperties::APIDigesterBreakage,
+                             opts == DiagnosticProperties::Deprecation,
+                             opts == DiagnosticProperties::NoUsage,
                              groupID) {}
 };
 } // end anonymous namespace
@@ -113,17 +114,17 @@ struct StoredDiagnosticInfo {
 // TODO: categorization
 static const constexpr StoredDiagnosticInfo storedDiagnosticInfos[] = {
 #define GROUPED_ERROR(ID, Group, Options, Text, Signature)                     \
-  StoredDiagnosticInfo(DiagnosticKind::Error, DiagnosticOptions::Options,      \
+  StoredDiagnosticInfo(DiagnosticKind::Error, DiagnosticProperties::Options,      \
                        DiagGroupID::Group),
 #define GROUPED_WARNING(ID, Group, Options, Text, Signature)                   \
-  StoredDiagnosticInfo(DiagnosticKind::Warning, DiagnosticOptions::Options,    \
+  StoredDiagnosticInfo(DiagnosticKind::Warning, DiagnosticProperties::Options,    \
                        DiagGroupID::Group),
 #define NOTE(ID, Options, Text, Signature)                                     \
-  StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticOptions::Options,       \
+  StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticProperties::Options,       \
                        DiagGroupID::no_group),
-#define REMARK(ID, Options, Text, Signature)                                   \
-  StoredDiagnosticInfo(DiagnosticKind::Remark, DiagnosticOptions::Options,     \
-                       DiagGroupID::no_group),
+#define GROUPED_REMARK(ID, Group, Options, Text, Signature)                    \
+  StoredDiagnosticInfo(DiagnosticKind::Remark, DiagnosticProperties::Options,     \
+                       DiagGroupID::Group),
 #include "swift/AST/DiagnosticsAll.def"
 };
 static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
@@ -1451,6 +1452,15 @@ DiagnosticState::determineBehavior(const Diagnostic &diag,
     if (suppressRemarks)
       lvl = DiagnosticBehavior::Ignore;
   }
+
+  if (lvl == DiagnosticBehavior::Remark) {
+    auto groupID = diag.getGroupID();
+    if (groupID != DiagGroupID::no_group &&
+        !getCustomRemarkOptionForGroup(groupID) &&
+        !isRemarkGroupEnabled(groupID))
+      lvl = DiagnosticBehavior::Ignore;
+  }
+
   return lvl;
 }
 
@@ -1533,6 +1543,8 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   if (behavior == DiagnosticBehavior::Ignore)
     return std::nullopt;
 
+  auto groupID = diagnostic.getGroupID();
+
   // Figure out the source location.
   SourceLoc loc = diagnostic.getLocOrDeclLoc();
   if (loc.isInvalid() && diagnostic.getDecl()) {
@@ -1548,7 +1560,6 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
       loc = evaluateOrDefault(eval, req, SourceLoc());
   }
 
-  auto groupID = diagnostic.getGroupID();
   StringRef CategoryName;
   if (auto wrapped = diagnostic.getWrappedDiagnostic())
     CategoryName = wrapped.value()->getCategoryName();
@@ -1741,29 +1752,11 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     if (groupID != DiagGroupID::no_group) {
       const auto &diagGroup = getDiagGroupInfoByID(groupID);
 
-      auto getDiagnosticGroupDocURL =
-          [&](const DiagGroupInfo &diagGroup) -> std::string {
-        if (diagGroup.toolchainLocalDocumentation) {
-          std::string localPath(getLocalDiagnosticDocumentationPath());
-          if (!localPath.empty()) {
-            if (localPath.back() != '/')
-              localPath += "/";
-            localPath += diagGroup.documentationFile;
-            localPath += ".md";
-            return localPath;
-          }
-          return "";
-        }
-
-        std::string docURL(getDiagnosticDocumentationPath());
-        if (!docURL.empty() && docURL.back() != '/')
-          docURL += "/";
-        docURL += diagGroup.documentationFile;
-        return docURL;
-      };
-
       // Set the leaf category's documentation URL.
-      info->setCategoryDocumentationURL(getDiagnosticGroupDocURL(diagGroup));
+      std::string docURL =
+          diagGroup.getDocumentationURL(getDiagnosticDocumentationPath(),
+                                        getLocalDiagnosticDocumentationPath());
+      info->setCategoryDocumentationURL(docURL);
 
       // Append parent groups by walking up supergroups.
       auto currentID = groupID;
@@ -1773,10 +1766,9 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
           break;
         auto parentID = current.supergroups[0];
         const auto &parent = getDiagGroupInfoByID(parentID);
-        std::string parentDocURL(getDiagnosticDocumentationPath());
-        if (!parentDocURL.empty() && parentDocURL.back() != '/')
-          parentDocURL += "/";
-        parentDocURL += parent.documentationFile;
+        std::string parentDocURL =
+            parent.getDocumentationURL(getDiagnosticDocumentationPath(),
+                                       getLocalDiagnosticDocumentationPath());
         info->CategoryChain.push_back(
             {StringRef(parent.name), std::move(parentDocURL)});
         currentID = parentID;
@@ -1797,6 +1789,24 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
 
 DiagnosticKind DiagnosticEngine::declaredDiagnosticKindFor(const DiagID id) {
   return storedDiagnosticInfos[(unsigned)id].kind;
+}
+
+std::string
+DiagnosticEngine::resolveDiagnosticDocumentationPath(const DiagnosticOptions &opts) {
+  if (opts.DiagnosticDocumentationPath.empty())
+    return "https://docs.swift.org/compiler/documentation/diagnostics";
+  return opts.DiagnosticDocumentationPath;
+}
+
+std::string
+DiagnosticEngine::resolveLocalDiagnosticDocumentationPath(
+    llvm::StringRef mainExecutablePath) {
+  llvm::SmallString<128> localDocsPath(mainExecutablePath);
+  llvm::sys::path::remove_filename(localDocsPath); // Remove /swift-frontend
+  llvm::sys::path::remove_filename(localDocsPath); // Remove /bin
+  llvm::sys::path::append(localDocsPath, "share", "doc", "swift",
+                          "diagnostics");
+  return std::string(localDocsPath);
 }
 
 llvm::StringRef DiagnosticEngine::getFormatStringForDiagnostic(DiagID id) {

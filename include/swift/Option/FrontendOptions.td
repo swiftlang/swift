@@ -191,7 +191,8 @@ def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   HelpText<"Verify the generic signatures in the given module">;
 
 def expansion_remarks:  Flag<["-"], "Rmacro-expansions">,
-  HelpText<"Show remarks for each line in macro expansions">;
+  HelpText<"Show remarks for each line in macro expansions">,
+  Alias<enable_remark>, AliasArgs<["MacroExpansions"]>;
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
@@ -294,10 +295,12 @@ def dependency_scan_cache_path : Separate<["-"], "dependency-scan-cache-path">,
   HelpText<"The path to output the dependency scanner's internal state.">;
 
 def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
-  HelpText<"Emit remarks indicating use of the serialized module dependency scanning cache.">;
+  HelpText<"Emit remarks indicating use of the serialized module dependency scanning cache.">,
+  Alias<enable_remark>, AliasArgs<["DependencyScanCache"]>;
 
 def dependency_scan_remarks : Flag<["-"], "Rdependency-scan">,
-  HelpText<"Emit remarks for various steps taken by the dependency scanner.">;
+  HelpText<"Emit remarks for various steps taken by the dependency scanner.">,
+  Alias<enable_remark>, AliasArgs<["DependencyScan"]>;
 
 def parallel_scan : Flag<["-"], "parallel-scan">,
    HelpText<"Perform dependency scanning in-parallel.">;
@@ -912,7 +915,17 @@ def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-
   Alias<warn_long_expression_type_checking>;
 
 def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
-  HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
+  HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">,
+  Alias<enable_remark>, AliasArgs<["ModuleInterfaceRebuild"]>;
+
+def Rhelp_swiftc : Flag<["-"], "Rhelp-swiftc">,
+  Flags<[HelpHidden]>,
+  HelpText<"List diagnostic groups that support remark output, excluding frontend-only groups">;
+
+def enable_remark_swiftc : Separate<["-"], "Rswiftc">,
+  Flags<[HelpHidden, CacheInvariant]>,
+  HelpText<"Enable remarks in diagnostic group <group>, excluding frontend-only groups">,
+  MetaVarName<"<group>">;
 
 def downgrade_typecheck_interface_error : Flag<["-"], "downgrade-typecheck-interface-error">,
   HelpText<"Downgrade error to warning when typechecking emitted module interfaces">;
