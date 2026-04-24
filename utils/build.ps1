@@ -2496,6 +2496,8 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
 
   $InstallRoot = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
 
+  $CompilerRTCache = "$SourceCache\swift\cmake\caches\CompilerRuntime-MSVC.cmake"
+
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt\lib\builtins `
     -Bin "$(Get-ProjectBinaryCache $Platform ClangBuiltins)" `
@@ -2503,6 +2505,7 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
     -Platform $Platform `
     -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
+    -CacheScript $CompilerRTCache `
     -Defines @{
       LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
@@ -2516,6 +2519,7 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
     -Platform $Platform `
     -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
+    -CacheScript $CompilerRTCache `
     -Defines @{
       LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
