@@ -161,7 +161,7 @@ void CompilerInvocation::setDefaultBlocklistsIfNecessary() {
     for (llvm::sys::fs::directory_iterator F(blocklistDir, EC), FE;
          F != FE; F.increment(EC)) {
       StringRef ext = llvm::sys::path::extension(F->path());
-      if (ext == "yml" || ext == "yaml") {
+      if (ext.ends_with(".yml") || ext.ends_with(".yaml")) {
         LangOpts.BlocklistConfigFilePaths.push_back(F->path());
       }
     }
