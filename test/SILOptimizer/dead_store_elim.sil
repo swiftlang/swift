@@ -163,6 +163,25 @@ bb0(%0 : $AB, %1 : $Int):
   return %18 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dead_store_across_borrow_scopes :
+// CHECK-NOT:     store
+// CHECK:         end_borrow
+// CHECK:         begin_borrow
+// CHECK:         store %1
+// CHECK:       end sil function 'dead_store_across_borrow_scopes'
+sil [ossa] @dead_store_across_borrow_scopes : $@convention(thin) (@owned AB, Int) -> @owned AB {
+bb0(%0 : @owned $AB, %1 : $Int):
+  %2 = begin_borrow %0
+  %3 = ref_element_addr %2, #AB.value
+  store %1 to [trivial] %3
+  end_borrow %2
+  %6 = begin_borrow %0
+  %7 = ref_element_addr %6, #AB.value
+  store %1 to [trivial] %7
+  end_borrow %6
+  return %0
+}
+
 // We should be able to remove the local store that is not read.
 //
 // CHECK-LABEL: trivial_local_dead_store

@@ -232,7 +232,10 @@ private struct InstructionScanner {
         if ds.isStackDeallocation(of: storePath.base) {
           return .dead
         }
-      case is FixLifetimeInst, is EndAccessInst:
+      case is FixLifetimeInst, is EndAccessInst, is EndBorrowInst:
+        // The memory effects of `end_access` and `end_borrow` are primarily there to prevent moving
+        // memory operations _out_ of the scope. Therefore those instructions are not relevant for
+        // dead-store-elimination.
         break
       case let term as TermInst:
         if term.isFunctionExiting {
