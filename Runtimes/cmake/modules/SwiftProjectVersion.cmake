@@ -17,7 +17,10 @@ block(PROPAGATE SWIFT_RUNTIME_VERSION)
     # Microsoft build numbers limit each version number component to [0 - 65535]
     # https://learn.microsoft.com/en-us/windows/win32/sbscs/assembly-versions
     math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
-    set(BUILD_NUMBER ".${BUILD_NUMBER}")
+  else()
+    message(WARNING "`BUILD_NUMBER` is not set in the environment, defaulting to 0")
+    # Ensure that we add a path version to enable SxS for developer builds.
+    set(BUILD_NUMBER 0)
   endif()
-  set(SWIFT_RUNTIME_VERSION 6.4.0${BUILD_NUMBER})
+  set(SWIFT_RUNTIME_VERSION 6.4.0.${BUILD_NUMBER})
 endblock()
