@@ -1895,10 +1895,7 @@ func mutableLocalCaptureDataRace() async {
   _ = x
 
   Task.detached { x = 1 }
-  // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-  // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
-  // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-  // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+  // expected-warning @-1 {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'x' which is accessed later by code in the current task}}
 
   x = 2 // expected-note {{access can happen concurrently}}
 }
@@ -1907,11 +1904,7 @@ func mutableLocalCaptureDataRace2() async {
   var x = 0
   x = 0
 
-  Task.detached { x = 1 }
-  // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-  // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
-  // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-  // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+  Task.detached { x = 1 } // expected-warning {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'x' which is accessed later by code in the current task}}
 
   print(x) // expected-note {{access can happen concurrently}}
 }
@@ -2043,22 +2036,16 @@ func avoidThinkingClosureParameterIsSending() {
 enum RequireSrcWhenStoringEvenWhenSendable {
   func test<T: Sendable>(t: T) {
     var result: T = t
-    Task { // expected-ni-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-      // expected-ni-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      // expected-ni-ns-warning @-2 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-      // expected-ni-ns-note @-3 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      result = t
+    Task {
+      result = t // expected-warning {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'result' which is accessed later by code in the current task}}
     }
     useValue(result) // expected-note {{access can happen concurrently}}
   }
 
   func test2() {
     var result: Any = 0
-    Task { // expected-ni-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-      // expected-ni-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      // expected-ni-ns-warning @-2 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-      // expected-ni-ns-note @-3 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      result = 0
+    Task {
+      result = 0 // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'result' which is accessed later by code in the current task}}
     }
     useValue(result) // expected-note {{access can happen concurrently}}
   }
@@ -2069,11 +2056,8 @@ enum RequireSrcWhenStoringEvenWhenSendable {
 
   func test3<T: Initializable & SendableMetatype>(type: T.Type) {
     var result = type.init()
-    Task { // expected-ni-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-      // expected-ni-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      // expected-ni-ns-warning @-2 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-      // expected-ni-ns-note @-3 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      result = type.init()
+    Task {
+      result = type.init() // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'result' which is accessed later by code in the current task}}
     }
     useValue(result) // expected-note {{access can happen concurrently}}
   }
