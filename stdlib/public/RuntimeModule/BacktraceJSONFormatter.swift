@@ -388,6 +388,10 @@ internal extension BacktraceJSONFormatter {
             "endOfText": "\(image.endOfText)"
             """, flush: false)
 
+    if let peImageId = image.peImageId {
+      write(", \"peImageId\": \"\(peImageId)\"", flush: false)
+    }
+
     write(" }", flush: false)
   }
 }

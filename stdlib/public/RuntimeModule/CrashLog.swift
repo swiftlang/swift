@@ -160,18 +160,21 @@ public struct CrashLog<Address: FixedWidthInteger>: Codable {
         public var path: String?
         public var baseAddress: String
         public var endOfText: String
+        public var peImageId: String?
 
         public init(
             name: String?,
             buildId: String?,
             path: String?,
             baseAddress: String,
-            endOfText: String) {
+            endOfText: String,
+            peImageId: String? = nil) {
                 self.name = name
                 self.buildId = buildId
                 self.path = path
                 self.baseAddress = baseAddress
                 self.endOfText = endOfText
+                self.peImageId = peImageId
             }
     }
 
@@ -381,6 +384,14 @@ extension CrashLog.Image {
         self.path = image.path
         self.baseAddress = hex(image.baseAddress)
         self.endOfText = hex(image.endOfText)
+        #if os(Windows)
+        if image.timeDateStamp != 0 || image.sizeOfImage != 0 {
+            let stamp = String(image.timeDateStamp, radix: 16, uppercase: true)
+            let stampPadded = String(repeating: "0", count: max(0, 8 - stamp.count)) + stamp
+            let size = String(image.sizeOfImage, radix: 16)
+            self.peImageId = "\(stampPadded)\(size)"
+        }
+        #endif
     }
 }
 
