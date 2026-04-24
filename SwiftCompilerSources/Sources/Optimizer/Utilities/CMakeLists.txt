@@ -18,5 +18,6 @@ swift_compiler_sources(Optimizer
   LocalVariableUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
+  OwnershipUtilities.swift
   Test.swift
 )
