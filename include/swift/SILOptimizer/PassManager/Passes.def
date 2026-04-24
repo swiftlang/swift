@@ -108,6 +108,8 @@ PASS(LifetimeDependenceInsertion,
 PASS(LifetimeDependenceScopeFixup,
      "lifetime-dependence-scope-fixup",
      "Fixup scope for lifetime dependence")
+PASS(MergeBorrowScopes, "merge-borrow-scopes",
+     "Merge borrow scopes")
 PASS(MergeCondFails, "merge-cond_fails",
      "Merge SIL cond_fail to Eliminate Redundant Overflow Checks")
 PASS(ObjCBridgingOptimization, "objc-bridging-opt",
