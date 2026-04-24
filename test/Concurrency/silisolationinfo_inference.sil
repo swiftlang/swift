@@ -2081,7 +2081,7 @@ bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass)
 // CHECK-LABEL: begin running test 1 of 1 on unapplied_isolated_any_test: sil_isolation_info_inference with: @trace[0]
 // CHECK-NEXT: Input Value:   // function_ref unappliedIsolatedAnyParameter
 // CHECK-NEXT:   %0 = function_ref @unappliedIsolatedAnyParameter : $@convention(method) @async (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
-// CHECK-NEXT: Isolation: actor-isolated: unapplied_isolated_any_parameter
+// CHECK-NEXT: Isolation: disconnected
 // CHECK-NEXT: end running test 1 of 1 on unapplied_isolated_any_test: sil_isolation_info_inference with: @trace[0]
 sil [ossa] @unapplied_isolated_any_test : $@convention(thin) () -> () {
 bb0:
@@ -2095,7 +2095,7 @@ bb0:
 // CHECK-LABEL: begin running test 1 of 1 on unapplied_isolated_any_merge_test: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
 // CHECK-NEXT: First Value:   // function_ref unappliedIsolatedAnyParameter
 // CHECK-NEXT:   %2 = function_ref @unappliedIsolatedAnyParameter : $@convention(method) @async (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
-// CHECK-NEXT: First Isolation: actor-isolated: unapplied_isolated_any_parameter
+// CHECK-NEXT: First Isolation: disconnected
 // CHECK-NEXT: Second Value: %1 = argument of bb0 : $NonSendableKlass
 // CHECK-NEXT: Second Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
 // CHECK-NEXT: Merged Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter

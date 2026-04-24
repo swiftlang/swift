@@ -3440,11 +3440,11 @@ bb0:
 // MARK: Dynamic Replacement Operations
 //===----------------------------------------------------------------------===//
 
+// This isn't tracked b/c it is Sendable now.
+//
 // CHECK-LABEL: begin running test {{.*}} on test_dynamic_function_ref: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
-// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
 // CHECK-NEXT:     Rep Value:   // dynamic_function_ref dynamic_func
-// CHECK-NEXT:   %0 = dynamic_function_ref @dynamic_func : $@convention(thin) () -> ()
-// CHECK-NEXT: assign_fresh %%0:   // dynamic_function_ref dynamic_func
 // CHECK-NEXT:   %0 = dynamic_function_ref @dynamic_func : $@convention(thin) () -> ()
 // CHECK-NEXT: end running test {{.*}} on test_dynamic_function_ref: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_dynamic_function_ref : $@convention(thin) () -> () {

@@ -1,0 +1,1349 @@
+// RUN: %target-sil-opt -send-non-sendable -swift-version 6 %s -verify -o /dev/null
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// PLEASE READ THIS!
+//
+// This test is specifically meant to test how we handle function_ref and
+// partial_apply with isolated parameters in the send-non-sendable pass
+// (region-based isolation checker).
+//
+// ===== Test Organization =====
+//
+// Group A: Basic function_ref and thick function sends
+//   Test  1: thin_to_thick send + use-after-send
+//   Test  2: Direct function_ref crossing isolation (nonisolated caller)
+//   Test  3: Reverse ordering — use locally first, then send
+//   Test  4: copy_value thick — send copy, use original (region sharing)
+//   Test  5: convert_function tracking
+//
+// Group B: partial_apply isolation tracking
+//   Test  6: BUG — Captures actor field, apply with different actor (not tracked)
+//   Test  7: Captures actor field, apply with same actor (correct: no error)
+//   Test  8: BUG — Region merge with non-@sil_isolated actor (not tracked)
+//   Test  9: 3param merge two klass + actor (correctly caught)
+//   Test 10: BUG — Send closure via partial_apply (not flagged)
+//   Test 11: Independent values not tainted (correct: no false positive)
+//   Test 12: Cross-domain captures ('pattern not understood' error)
+//   Test 13: BUG — @callee_owned same capture bug
+//   Test 14: BUG — Nested closure same capture bug
+//   Test 15: Sendable-only captures, local apply (correct: no error)
+//
+// Group C: Thick vs thin function params and callees
+//   Test 16: Thick closure param as task-isolated callee (correct: error)
+//   Test 17: Thick function param is task-isolated (correct: error)
+//   Test 18: BUG — Thin function param falsely treated as task-isolated
+//   Test 19: Thick callee applied with two actors (correct: callee not tainted)
+//   Test 20: Thin callee applied with two actors (correct: callee not tainted)
+//
+// Group D: Global actor isolation
+//   Test 21: Task-isolated to global actor (correct: error)
+//   Test 22: BUG — Nonisolated to nonisolated falsely flagged as crossing
+//   Test 23: BUG — Actor-isolated to global actor crossing not detected
+//   Test 24: Same global actor (correct: no error)
+//   Test 25: BUG — Global actor A to global actor B crossing not detected
+//
+// Group E: Unannotated applies, crossings, and chains
+//   Test 26: BUG — Apply without [callee_isolation] not detected
+//   Test 27: BUG — Actor-isolated to nonisolated crossing not detected
+//   Test 28: Multiple sends to different domains (correct: all flagged)
+//   Test 29: Chain — receive from actor, send to global actor (correct: errors)
+//
+// ===== Bug Summary =====
+//
+// Tests marked with '// BUG!' document incorrect behavior:
+//   - partial_apply capture isolation not tracked (tests 6, 8, 10, 13, 14)
+//   - Thin function params should be Sendable/disconnected (test 18)
+//   - Nonisolated to nonisolated false positive (test 22)
+//   - Global actor crossings not detected (tests 23, 25)
+//   - Missing [callee_isolation] means no detection (test 34)
+//   - Actor to nonisolated crossing not detected (test 35)
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+class NonSendableKlass {} // expected-note {{class 'NonSendableKlass' does not conform to the 'Sendable' protocol}}
+
+actor MyActor {
+  var field: NonSendableKlass
+}
+
+actor CustomActorInstance {}
+
+@globalActor
+struct CustomActor {
+  static let shared = CustomActorInstance()
+}
+
+actor CustomActorInstance2 {}
+
+@globalActor
+struct CustomActor2 {
+  static let shared = CustomActorInstance2()
+}
+
+struct NonSendableWrapper {
+  var klass: NonSendableKlass
+}
+
+sil @sync_function_with_isolated : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> ()
+sil @async_function_with_isolated : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> ()
+
+sil @sync_function_2param_with_isolated : $@convention(thin) (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+sil @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+sil @async_function_2param_isolated_first : $@convention(thin) @async (@sil_isolated @guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+
+sil @async_function_actor_and_klass : $@convention(thin) @async (@guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+
+sil @sync_function_3param_with_isolated : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+sil @async_function_3param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+sil @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+
+sil @use : $@convention(thin) <T> (@guaranteed T, @sil_isolated @guaranteed MyActor) -> ()
+
+sil @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+
+sil @take_closure_nsk : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass) -> (), @sil_isolated @guaranteed MyActor) -> ()
+
+sil [isolation "global_actor(CustomActor)"] @global_actor_function_with_nsk : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+sil [isolation "global_actor(CustomActor2)"] @global_actor2_function_with_nsk : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+sil @nonisolated_function_with_nsk : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+sil @async_throwing_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (@error any Error)
+sil @get_bool : $@convention(thin) () -> Builtin.Int1
+sil @get_wrapper : $@convention(thin) () -> @owned NonSendableWrapper
+
+sil @async_return_nsk_isolated : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+sil @take_noescape_closure : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+
+sil @take_thin_fn_isolated : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+sil @get_thin_fn : $@convention(thin) () -> @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+sil [isolation "global_actor(CustomActor)"] @get_thin_fn_from_global_actor : $@convention(thin) @async () -> @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+sil [isolation "global_actor(CustomActor)"] @take_thin_fn_global_actor : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> ()
+sil [isolation "global_actor(CustomActor2)"] @take_thin_fn_global_actor2 : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> ()
+
+sil @get_thick_fn : $@convention(thin) () -> @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+sil [isolation "global_actor(CustomActor)"] @get_thick_fn_from_global_actor : $@convention(thin) @async () -> @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+sil [isolation "global_actor(CustomActor)"] @take_thick_fn_global_actor : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> ()
+sil [isolation "global_actor(CustomActor2)"] @take_thick_fn_global_actor2 : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> ()
+
+sil [isolation "global_actor(CustomActor)"] @get_thin_fn_from_global_actor_sending : $@convention(thin) @async () -> @sil_sending @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+sil [isolation "global_actor(CustomActor)"] @get_thick_fn_from_global_actor_sending : $@convention(thin) @async () -> @sil_sending @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+sil @take_sending_thick_fn_isolated : $@convention(thin) @async (@sil_sending @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+
+///////////////////////////////
+// MARK: Thin Function Tests //
+///////////////////////////////
+
+// Make sure that a non-thick function is sendable. Check for both locally created non-thick functions and functions passed in and returned from functions. Ensure that each thing you are going to error on has a name via debug_value. As part of this, I want you to also pass the non-thick function as an argument to a function that takes an actor isolated parameter and make sure that the function ref is still able to be used locally.
+
+// Test Thin1: Locally created function_ref sent as argument to an actor-isolated
+// function, then used locally as a callee. Thin functions are sendable, so
+// passing one as an argument across isolation should not error, and the
+// function_ref remains usable locally afterward.
+sil [ossa] @test_thin_fn_sent_as_arg_then_used_locally : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %fn : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "fn"
+
+  // Send thin function as argument to %0's isolation domain.
+  %take = function_ref @take_thin_fn_isolated : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%fn, %0) : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use the same function_ref locally as callee with a fresh klass.
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %b = begin_borrow %klass : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %fn(%b, %1) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b : $NonSendableKlass
+
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thin2: Locally created function_ref used as callee with two different
+// actors, each with a fresh independent klass. The thin function_ref is
+// trivial and not tainted by either use.
+sil [ossa] @test_thin_fn_callee_two_actors_fresh_klass : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass1 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  debug_value %klass1 : $NonSendableKlass, let, name "klass1"
+  %klass2 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  debug_value %klass2 : $NonSendableKlass, let, name "klass2"
+
+  // Apply with klass1 to %0 (different actor).
+  %b1 = begin_borrow %klass1 : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %fn(%b1, %0) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b1 : $NonSendableKlass
+
+  // Apply with klass2 to %1 (local actor). function_ref reused without issue.
+  %b2 = begin_borrow %klass2 : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %fn(%b2, %1) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b2 : $NonSendableKlass
+
+  destroy_value %klass2 : $NonSendableKlass
+  destroy_value %klass1 : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thin3: Thin function received as a parameter. Pass it as an argument
+// to an actor-isolated function, then use it locally as a callee. The thin
+// function parameter is disconnected/sendable.
+sil [ossa] @test_thin_fn_param_sent_to_actor_then_used_locally : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor, @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()):
+  debug_value %2 : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "thinFn"
+
+  // Send thin function param to %0's isolation domain.
+  %take = function_ref @take_thin_fn_isolated : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%2, %0) : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use locally as callee with fresh klass.
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %b = begin_borrow %klass : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %2(%b, %1) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b : $NonSendableKlass
+
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thin4: Thin function returned from a function call. The returned thin
+// function is sendable regardless of how it was obtained. Send it to an
+// actor, then use locally.
+sil [ossa] @test_thin_fn_returned_sent_to_actor_then_used_locally : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %getter = function_ref @get_thin_fn : $@convention(thin) () -> @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %fn = apply %getter() : $@convention(thin) () -> @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %fn : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "returnedFn"
+
+  // Send to %0's isolation domain.
+  %take = function_ref @take_thin_fn_isolated : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%fn, %0) : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use locally as callee.
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %b = begin_borrow %klass : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %fn(%b, %1) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b : $NonSendableKlass
+
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thin5: Thin function returned from a global-actor-isolated function.
+// Despite originating from a different isolation domain, the thin function
+// is sendable and can be used freely afterward.
+sil [ossa] @test_thin_fn_from_global_actor_used_locally : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  %getter = function_ref @get_thin_fn_from_global_actor : $@convention(thin) @async () -> @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %fn = apply [callee_isolation=global_actor] %getter() : $@convention(thin) @async () -> @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %fn : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "fnFromGlobalActor"
+
+  // Use locally with %0.
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %b = begin_borrow %klass : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %fn(%b, %0) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b : $NonSendableKlass
+
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thin6: Locally created thin function passed as argument to a
+// global-actor-isolated function. The thin function crosses into the global
+// actor's domain but is sendable. It remains usable locally afterward.
+sil [ossa] @test_thin_fn_passed_to_global_actor : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  %fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %fn : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "fn"
+
+  // Pass thin function to global actor.
+  %take = function_ref @take_thin_fn_global_actor : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> ()
+  apply [callee_isolation=global_actor] %take(%fn) : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> ()
+
+  // Use locally as callee.
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %b = begin_borrow %klass : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %fn(%b, %0) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b : $NonSendableKlass
+
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thin7: Thin function returned from global actor A (CustomActor), then
+// passed as argument to global actor B (CustomActor2). The thin function
+// crosses two global actor boundaries but remains sendable throughout.
+sil [ossa] @test_thin_fn_global_actor_a_to_global_actor_b : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  // Get thin function from CustomActor.
+  %getter = function_ref @get_thin_fn_from_global_actor : $@convention(thin) @async () -> @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %fn = apply [callee_isolation=global_actor] %getter() : $@convention(thin) @async () -> @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %fn : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "fnFromActorA"
+
+  // Pass to CustomActor2.
+  %take = function_ref @take_thin_fn_global_actor2 : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> ()
+  apply [callee_isolation=global_actor] %take(%fn) : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> ()
+
+  // Use locally as callee.
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %b = begin_borrow %klass : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %fn(%b, %0) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b : $NonSendableKlass
+
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// Test Thin8: Thin function returned via @sil_sending from a global-actor-isolated
+// function. The @sil_sending disconnects the value from the callee's isolation.
+// Since thin functions are already sendable, this should definitely not error
+// (contrast with Thin5 which has a BUG without @sil_sending).
+sil [ossa] @test_thin_fn_sil_sending_from_global_actor : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  %getter = function_ref @get_thin_fn_from_global_actor_sending : $@convention(thin) @async () -> @sil_sending @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %fn = apply [callee_isolation=global_actor] %getter() : $@convention(thin) @async () -> @sil_sending @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %fn : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "fnFromGlobalActorSending"
+
+  // Send to %0's isolation domain — no error.
+  %take = function_ref @take_thin_fn_isolated : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%fn, %0) : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use locally as callee — no error.
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %b = begin_borrow %klass : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %fn(%b, %0) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b : $NonSendableKlass
+
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thin9: Callee receives thin function via @sil_sending parameter.
+// Thin functions are already sendable, so @sil_sending is redundant. The
+// callee should be able to send it to an actor and use it locally without error.
+sil [ossa] @test_thin_fn_sil_sending_param : $@convention(thin) @async (@sil_sending @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
+  debug_value %0 : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "sendingThinFn"
+
+  // Send to %1 (different actor).
+  %take = function_ref @take_thin_fn_isolated : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%0, %1) : $@convention(thin) @async (@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use locally as callee with %2 — no error.
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %b = begin_borrow %klass : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %0(%b, %2) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b : $NonSendableKlass
+
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+////////////////////////////////
+// MARK: Thick Function Tests //
+////////////////////////////////
+
+// Make sure that a thick function is non-Sendable. Check for both locally
+// created thick functions (via thin_to_thick_function), thick functions passed
+// in as parameters, and thick functions returned from functions. Ensure that
+// each thing you are going to error on has a name via debug_value. Verify that
+// passing a thick function as an argument to a function that takes an actor
+// isolated parameter produces an error, and that the thick function cannot be
+// used locally afterward.
+
+// Test Thick1: Locally created thick function (via thin_to_thick_function) sent
+// as argument to an actor-isolated function, then sent again locally. The
+// thick function is non-Sendable, so sending it should error, and sending
+// it again afterward should be flagged as concurrent access.
+sil [ossa] @test_thick_fn_sent_as_arg_then_used_locally : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %fn_ref = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = thin_to_thick_function %fn_ref : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () to $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "thickFn"
+
+  // Send thick function as argument to %0's isolation domain.
+  %borrow1 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take1 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take1(%borrow1, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to actor-isolated callee risks causing data races between actor-isolated and local nonisolated uses}}
+  end_borrow %borrow1 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use the thick function locally as argument again.
+  %borrow2 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take2 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take2(%borrow2, %1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow2 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thick2: Locally created thick function used as callee with two different
+// actors, each with a fresh independent klass. Using a thick function as a
+// callee does not send it, so no errors are expected.
+sil [ossa] @test_thick_fn_callee_two_actors_fresh_klass : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %fn_ref = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = thin_to_thick_function %fn_ref : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () to $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass1 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  debug_value %klass1 : $NonSendableKlass, let, name "klass1"
+  %klass2 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  debug_value %klass2 : $NonSendableKlass, let, name "klass2"
+
+  %borrow1 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %b1 = begin_borrow %klass1 : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %borrow1(%b1, %0) : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b1 : $NonSendableKlass
+  end_borrow %borrow1 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  %borrow2 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %b2 = begin_borrow %klass2 : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %borrow2(%b2, %1) : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b2 : $NonSendableKlass
+  end_borrow %borrow2 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %klass2 : $NonSendableKlass
+  destroy_value %klass1 : $NonSendableKlass
+  destroy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thick3: Thick function received as a parameter. Pass it as an argument
+// to an actor-isolated function, then use it locally as an argument. The thick
+// function is non-Sendable, so sending it should error.
+sil [ossa] @test_thick_fn_param_sent_to_actor_then_used_locally : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor, @guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()):
+  debug_value %2 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "thickFn"
+
+  %take1 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take1(%2, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to actor-isolated callee risks causing data races between actor-isolated and local nonisolated uses}}
+
+  %take2 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take2(%2, %1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thick4: Thick function returned from a function call. The returned thick
+// function is non-Sendable. Send it to an actor, then use locally as argument.
+sil [ossa] @test_thick_fn_returned_sent_to_actor_then_used_locally : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %getter = function_ref @get_thick_fn : $@convention(thin) () -> @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = apply %getter() : $@convention(thin) () -> @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "thickFn"
+
+  %borrow1 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take1 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take1(%borrow1, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to actor-isolated callee risks causing data races between actor-isolated and local nonisolated uses}}
+  end_borrow %borrow1 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  %borrow2 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take2 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take2(%borrow2, %1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow2 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thick5: Thick function returned from a global-actor-isolated function.
+// The return itself crosses isolation with a non-Sendable value.
+sil [ossa] @test_thick_fn_from_global_actor_used_locally : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  %getter = function_ref @get_thick_fn_from_global_actor : $@convention(thin) @async () -> @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = apply [callee_isolation=global_actor] %getter() : $@convention(thin) @async () -> @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-error {{non-Sendable '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()'-typed result can not be returned from global actor '<null>'-isolated function to nonisolated context}}
+  debug_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "thickFn"
+
+  %borrow = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%borrow, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending global actor '<null>'-isolated value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to actor-isolated callee risks causing races in between global actor '<null>'-isolated and actor-isolated uses}}
+  end_borrow %borrow : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thick6: Locally created thick function passed as argument to a
+// global-actor-isolated function, then used locally. The thick function is
+// non-Sendable, so crossing into the global actor's domain should error.
+sil [ossa] @test_thick_fn_passed_to_global_actor : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  %fn_ref = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = thin_to_thick_function %fn_ref : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () to $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "thickFn"
+
+  %borrow1 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take_ga = function_ref @take_thick_fn_global_actor : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> ()
+  apply [callee_isolation=global_actor] %take_ga(%borrow1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to global actor '<null>'-isolated callee risks causing data races between global actor '<null>'-isolated and local nonisolated uses}}
+  end_borrow %borrow1 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  %borrow2 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%borrow2, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow2 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thick7: Thick function returned from global actor A (CustomActor), then
+// passed as argument to global actor B (CustomActor2). The thick function is
+// non-Sendable, so both the return crossing and the send should be flagged.
+sil [ossa] @test_thick_fn_global_actor_a_to_global_actor_b : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  %getter = function_ref @get_thick_fn_from_global_actor : $@convention(thin) @async () -> @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = apply [callee_isolation=global_actor] %getter() : $@convention(thin) @async () -> @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-error {{non-Sendable '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()'-typed result can not be returned from global actor '<null>'-isolated function to nonisolated context}}
+  debug_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "thickFn"
+
+  %borrow1 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take_ga2 = function_ref @take_thick_fn_global_actor2 : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> ()
+  apply [callee_isolation=global_actor] %take_ga2(%borrow1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> ()
+  end_borrow %borrow1 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  %borrow2 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%borrow2, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending global actor '<null>'-isolated value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to actor-isolated callee risks causing races in between global actor '<null>'-isolated and actor-isolated uses}}
+  end_borrow %borrow2 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// Test Thick8: Thick function returned via @sil_sending from a global-actor-isolated
+// function. The @sil_sending disconnects the value from the callee's isolation,
+// so unlike Thick5 (which errors on return), this should NOT error on the return.
+// The thick function is disconnected and can be used locally.
+sil [ossa] @test_thick_fn_sil_sending_from_global_actor : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  %getter = function_ref @get_thick_fn_from_global_actor_sending : $@convention(thin) @async () -> @sil_sending @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = apply [callee_isolation=global_actor] %getter() : $@convention(thin) @async () -> @sil_sending @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "thickFn"
+
+  // Use locally with %0 as argument — no error (value is disconnected).
+  %borrow = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%borrow, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %borrow : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thick9: Thick function returned via @sil_sending from a global-actor-isolated
+// function, then sent to an actor and used locally. The return is fine (@sil_sending
+// disconnects it), but sending to %0 then using locally with %0 again should error
+// (same as Thick1 pattern — send-then-use on a non-Sendable value).
+sil [ossa] @test_thick_fn_sil_sending_from_global_actor_send_then_use : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %getter = function_ref @get_thick_fn_from_global_actor_sending : $@convention(thin) @async () -> @sil_sending @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = apply [callee_isolation=global_actor] %getter() : $@convention(thin) @async () -> @sil_sending @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "thickFn"
+
+  // Send to %0's isolation domain.
+  %borrow1 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take1 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take1(%borrow1, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to actor-isolated callee risks causing data races between actor-isolated and local nonisolated uses}}
+  end_borrow %borrow1 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use locally — error expected (use after send).
+  %borrow2 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take2 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take2(%borrow2, %1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow2 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thick10: Callee receives thick function via @sil_sending @owned parameter.
+// The value is disconnected. Using it locally should not error.
+sil [ossa] @test_thick_fn_sil_sending_param_use_locally : $@convention(thin) @async (@sil_sending @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @owned $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), %1 : @guaranteed $MyActor):
+  debug_value %0 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "sendingThickFn"
+
+  // Use locally as argument — no error (disconnected via @sil_sending).
+  %borrow = begin_borrow %0 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%borrow, %1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %borrow : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %0 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thick11: Callee receives thick function via @sil_sending @owned parameter.
+// The value starts disconnected, but sending to %1 (different actor) then using
+// locally with %2 is the standard send-then-use pattern — error expected.
+sil [ossa] @test_thick_fn_sil_sending_param_send_then_use : $@convention(thin) @async (@sil_sending @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @owned $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
+  debug_value %0 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "sendingThickFn"
+
+  // Send to %1 (different actor).
+  %borrow1 = begin_borrow %0 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take1 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take1(%borrow1, %1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to actor-isolated callee risks causing data races between actor-isolated and local nonisolated uses}}
+  end_borrow %borrow1 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use locally with %2 — error expected (use after send).
+  %borrow2 = begin_borrow %0 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take2 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take2(%borrow2, %2) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow2 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %0 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test Thick12: Caller creates a thick function, sends it via @sil_sending @owned
+// parameter to an actor-isolated function. The value is consumed by the call.
+// A copy made before sending shares the same region, so using the copy locally
+// after the send should be flagged.
+sil [ossa] @test_thick_fn_caller_sends_via_sil_sending_param : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %fn_ref = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = thin_to_thick_function %fn_ref : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () to $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %copy = copy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  debug_value %copy : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), let, name "thickFnCopy"
+
+  // Send original via @sil_sending @owned to %0.
+  %take_sending = function_ref @take_sending_thick_fn_isolated : $@convention(thin) @async (@sil_sending @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take_sending(%thick, %0) : $@convention(thin) @async (@sil_sending @owned @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{Passing value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' as a 'sending' argument risks causing races in between local and caller code}}
+
+  // Use copy locally with %1 — the copy shares the original's region.
+  %borrow = begin_borrow %copy : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%borrow, %1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %copy : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+//////////////////////////////////////
+// MARK: Group A — function_ref sends
+//////////////////////////////////////
+
+// Test 1: thin_to_thick send + use-after-send
+//
+// This test makes sure that if we send a thin_to_thick function. We can pass it
+// to MyActor and then if we use it again locally, we emit an error. So it is
+// disconnected, but is not sendable.
+sil [ossa] @test_async_2param_functionref_send_to_nonisolated_actor : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = thin_to_thick_function %fn : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () to $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Send thick function to %0's isolation domain - error expected
+  %borrow1 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take(%borrow1, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to actor-isolated callee risks causing data races between actor-isolated and local nonisolated uses}}
+  end_borrow %borrow1 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Since we use it here locally after transfer
+  %borrow2 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take2 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take2(%borrow2, %1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow2 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 2: Direct function_ref apply crossing isolation from nonisolated context.
+//
+// This makes sure that we properly merge the isolation of MyActor.
+sil [ossa] @test_direct_functionref_apply_crossing_isolation : $@convention(thin) @async (@guaranteed MyActor, @guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $NonSendableKlass):
+  %fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %fn(%1, %0) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending task-isolated value of non-Sendable type 'NonSendableKlass' to actor-isolated callee risks causing races in between task-isolated and actor-isolated uses}}
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 3: Send twice and make sure we catch this.
+//
+// Tests whether the analysis catches the send regardless of ordering.
+sil [ossa] @test_thick_use_locally_then_send : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = thin_to_thick_function %fn : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () to $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use locally first with %1 (our actor)
+  %borrow1 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take1 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take1(%borrow1, %1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to actor-isolated callee risks causing data races between actor-isolated and local nonisolated uses}}
+  end_borrow %borrow1 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Then send to %0
+  %borrow2 = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take2 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take2(%borrow2, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow2 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 4: copy_value on thick closure, send copy to %0, use original locally.
+// copy and original should share the same region, so original use should error.
+sil [ossa] @test_copy_thick_send_copy_use_original : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = thin_to_thick_function %fn : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () to $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %copy = copy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Send copy to %0
+  %borrow_copy = begin_borrow %copy : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take1 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take1(%borrow_copy, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to actor-isolated callee risks causing data races between actor-isolated and local nonisolated uses}}
+  end_borrow %borrow_copy : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use original locally - should error (same region as copy)
+  %borrow_orig = begin_borrow %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take2 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take2(%borrow_orig, %1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow_orig : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %copy : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  destroy_value %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 5: convert_function tracking. Create a thick function, convert it,
+// then send the converted value and use locally. The analysis should track
+// through the conversion.
+sil [ossa] @test_convert_function_tracking : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %thick = thin_to_thick_function %fn : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () to $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %converted = convert_function %thick : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () to $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Send converted to %0
+  %borrow1 = begin_borrow %converted : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take1 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take1(%borrow1, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type '@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()' to actor-isolated callee risks causing data races between actor-isolated and local nonisolated uses}}
+  end_borrow %borrow1 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use converted locally - should error (use after send)
+  %borrow2 = begin_borrow %converted : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %take2 = function_ref @take_function : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %take2(%borrow2, %1) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow2 : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %converted : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %r4 = tuple ()
+  return %r4 : $()
+}
+
+//////////////////////////////////////////////
+// MARK: Group B — partial_apply isolation
+//////////////////////////////////////////////
+
+// Test 6: BUG — Captures actor field, apply with different actor (not tracked)
+sil [ossa] @test_async_2param_partial_apply_isolated_field : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  // Load %1's field - this NonSendableKlass is in %1's isolation domain.
+  %field_addr = ref_element_addr %1 : $MyActor, #MyActor.field
+  %field = load [copy] %field_addr : $*NonSendableKlass
+
+  // partial_apply closing over the field. The isolated param stays free.
+  %fn = function_ref @async_function_2param_isolated_first : $@convention(thin) @async (@sil_isolated @guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+  %closure = partial_apply [callee_guaranteed] %fn(%field) : $@convention(thin) @async (@sil_isolated @guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+
+  // BUG! Should error here - closure captures NonSendableKlass from %1's
+  // isolation domain but is applied with %0 (different actor). The analysis
+  // does not track that partial_apply captures carry their isolation domain.
+  %borrow = begin_borrow %closure : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %borrow(%0) : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %borrow : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %closure : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+  %r2 = tuple ()
+  return %r2 : $()
+}
+
+// Test 7: Captures actor field, apply with same actor (correct: no error)
+// No error expected - the closure captures %1's field and we apply with %1,
+// so the captured NonSendableKlass stays in the same isolation domain.
+sil [ossa] @test_async_2param_partial_apply_isolated_field_same_actor : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %field_addr = ref_element_addr %1 : $MyActor, #MyActor.field
+  %field = load [copy] %field_addr : $*NonSendableKlass
+
+  %fn = function_ref @async_function_2param_isolated_first : $@convention(thin) @async (@sil_isolated @guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+  %closure = partial_apply [callee_guaranteed] %fn(%field) : $@convention(thin) @async (@sil_isolated @guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+
+  %borrow = begin_borrow %closure : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %borrow(%1) : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %borrow : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %closure : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 8: BUG — Region merge with non-@sil_isolated actor (not tracked)
+// The partial_apply closes over %0 (non-isolated actor) and a copy of the
+// klass, merging their regions. Using the original klass locally should error
+// since its region is now associated with %0.
+sil [ossa] @test_partial_apply_nonisolated_actor_use_klass_locally : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %klass_copy = copy_value %klass : $NonSendableKlass
+  %actor_copy = copy_value %0 : $MyActor
+
+  %fn = function_ref @async_function_actor_and_klass : $@convention(thin) @async (@guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+  %closure = partial_apply [callee_guaranteed] %fn(%actor_copy, %klass_copy) : $@convention(thin) @async (@guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+
+  // BUG! Should error here - klass's region was merged with %0 via
+  // partial_apply, but the analysis does not track region merging through
+  // partial_apply when the actor param is not @sil_isolated.
+  %klass_borrow = begin_borrow %klass : $NonSendableKlass
+  %use_fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %use_fn(%klass_borrow, %1) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %klass_borrow : $NonSendableKlass
+
+  destroy_value %closure : $@async @callee_guaranteed () -> ()
+  destroy_value %klass : $NonSendableKlass
+  %r2 = tuple ()
+  return %r2 : $()
+}
+
+// Test 9: 3param partial_apply merging two klass values with actor.
+// Both klass copies are captured with %0, merging all regions. Using
+// either original locally should error.
+sil [ossa] @test_3param_partial_apply_merge_two_klass_with_actor : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass1 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %klass2 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %klass1_copy = copy_value %klass1 : $NonSendableKlass
+  %klass2_copy = copy_value %klass2 : $NonSendableKlass
+  %actor_copy = copy_value %0 : $MyActor
+
+  %fn = function_ref @async_function_3param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %closure = partial_apply [callee_guaranteed] %fn(%klass1_copy, %klass2_copy, %actor_copy) : $@convention(thin) @async (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Use klass1 locally - error expected (merged with %0).
+  %borrow1 = begin_borrow %klass1 : $NonSendableKlass
+  %use1 = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %use1(%borrow1, %1) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type 'NonSendableKlass' to actor-isolated callee risks causing data races between actor-isolated and local nonisolated uses}}
+  end_borrow %borrow1 : $NonSendableKlass
+
+  // Use klass2 locally - also error expected (also merged with %0).
+  %borrow2 = begin_borrow %klass2 : $NonSendableKlass
+  %use2 = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %use2(%borrow2, %1) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow2 : $NonSendableKlass
+
+  destroy_value %closure : $@async @callee_guaranteed () -> ()
+  destroy_value %klass2 : $NonSendableKlass
+  destroy_value %klass1 : $NonSendableKlass
+  %r2 = tuple ()
+  return %r2 : $()
+}
+
+// Test 10: partial_apply captures our isolated actor, send the closure to %0.
+// The closure is non-Sendable and in %1's region. Sending to %0 should error.
+sil [ossa] @test_partial_apply_captures_isolated_actor_send_closure : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %actor_copy = copy_value %1 : $MyActor
+  %fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %closure = partial_apply [callee_guaranteed] %fn(%actor_copy) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  %borrow = begin_borrow %closure : $@async @callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+  %take = function_ref @take_closure_nsk : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  // BUG! Should error here - closure captures %1 (our isolated actor) and is
+  // non-Sendable, so sending it to %0's domain should be flagged. The analysis
+  // does not flag sending a non-Sendable closure created via partial_apply.
+  apply [callee_isolation=actor_instance] %take(%borrow, %0) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass) -> (), @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %borrow : $@async @callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+
+  destroy_value %closure : $@async @callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 11: Two independent klass values, only one merged with %0 via
+// partial_apply. The un-merged klass should be safe to use locally.
+sil [ossa] @test_partial_apply_independent_klass_not_tainted : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass1 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %klass2 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+
+  // Only klass1 is captured with %0. klass2 is independent.
+  %klass1_copy = copy_value %klass1 : $NonSendableKlass
+  %actor_copy = copy_value %0 : $MyActor
+
+  %fn = function_ref @async_function_actor_and_klass : $@convention(thin) @async (@guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+  %closure = partial_apply [callee_guaranteed] %fn(%actor_copy, %klass1_copy) : $@convention(thin) @async (@guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+
+  // Use klass2 locally - no error expected (independent region).
+  %borrow2 = begin_borrow %klass2 : $NonSendableKlass
+  %use = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %use(%borrow2, %1) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %borrow2 : $NonSendableKlass
+
+  destroy_value %closure : $@async @callee_guaranteed () -> ()
+  destroy_value %klass2 : $NonSendableKlass
+  destroy_value %klass1 : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 12: Capture values from two different isolation domains via
+// partial_apply. field0 is from %0's domain, field1 from %1's. After
+// merging, using field1 locally should error since its region now spans %0.
+sil [ossa] @test_partial_apply_captures_from_two_domains : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %field0_addr = ref_element_addr %0 : $MyActor, #MyActor.field
+  %field0 = load [copy] %field0_addr : $*NonSendableKlass
+
+  %field1_addr = ref_element_addr %1 : $MyActor, #MyActor.field
+  %field1 = load [copy] %field1_addr : $*NonSendableKlass
+
+  %field0_copy = copy_value %field0 : $NonSendableKlass
+  %field1_copy = copy_value %field1 : $NonSendableKlass
+  %actor_copy = copy_value %0 : $MyActor
+
+  %fn = function_ref @async_function_3param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %closure = partial_apply [callee_guaranteed] %fn(%field0_copy, %field1_copy, %actor_copy) : $@convention(thin) @async (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-error {{pattern that the region-based isolation checker does not understand how to check. Please file a bug}}
+
+  // Use field1 locally - error expected (region merged with %0).
+  %borrow = begin_borrow %field1 : $NonSendableKlass
+  %use = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %use(%borrow, %1) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending actor-isolated value of non-Sendable type 'NonSendableKlass' to actor-isolated callee risks causing races in between actor-isolated and actor-isolated uses}}
+  end_borrow %borrow : $NonSendableKlass
+
+  destroy_value %closure : $@async @callee_guaranteed () -> ()
+  destroy_value %field1 : $NonSendableKlass
+  destroy_value %field0 : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 13: partial_apply without [callee_guaranteed] producing @callee_owned.
+// Captures %1's field. Apply with %0 - error expected.
+sil [ossa] @test_partial_apply_callee_owned_isolated_field : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %field_addr = ref_element_addr %1 : $MyActor, #MyActor.field
+  %field = load [copy] %field_addr : $*NonSendableKlass
+
+  %fn = function_ref @async_function_2param_isolated_first : $@convention(thin) @async (@sil_isolated @guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+  %closure = partial_apply %fn(%field) : $@convention(thin) @async (@sil_isolated @guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+
+  // BUG! Should error here - same as test 2 (partial_apply captures field from
+  // %1's isolation, applied with %0). @callee_owned has the same bug as
+  // [callee_guaranteed] - the analysis doesn't track captures' isolation.
+  apply [callee_isolation=actor_instance] %closure(%0) : $@async @callee_owned (@sil_isolated @guaranteed MyActor) -> ()
+
+  %r6 = tuple ()
+  return %r6 : $()
+}
+
+// Test 14: Nested closure captures. The inner closure captures %1's field.
+// The outer closure captures the inner closure. Apply the outer with %0.
+// The analysis should track that the inner's non-Sendable capture propagates.
+sil [ossa] @test_nested_closure_captures : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  // Create inner closure capturing %1's field.
+  %field_addr = ref_element_addr %1 : $MyActor, #MyActor.field
+  %field = load [copy] %field_addr : $*NonSendableKlass
+
+  %inner_fn = function_ref @async_function_2param_isolated_first : $@convention(thin) @async (@sil_isolated @guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+  %inner = partial_apply [callee_guaranteed] %inner_fn(%field) : $@convention(thin) @async (@sil_isolated @guaranteed MyActor, @guaranteed NonSendableKlass) -> ()
+
+  // Apply the inner closure with %0. The inner carries %1's field.
+  %inner_borrow = begin_borrow %inner : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+
+  // BUG! Should error here - the inner closure captures %1's field (non-Sendable)
+  // and is applied with %0 (different actor). Same class of bug as test 2 -
+  // partial_apply captures' isolation domain is not tracked.
+  apply [callee_isolation=actor_instance] %inner_borrow(%0) : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %inner_borrow : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+
+  destroy_value %inner : $@async @callee_guaranteed (@sil_isolated @guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 15: partial_apply capturing only Sendable values (the actor). The
+// closure object itself is a thick function (non-Sendable type), but all
+// captures are Sendable. Test whether applying with a different actor is safe.
+// This is the converse of test 2 - no non-Sendable captures means no taint.
+sil [ossa] @test_partial_apply_only_sendable_captures : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %actor_copy = copy_value %1 : $MyActor
+
+  // Capture only the actor (Sendable). No NonSendableKlass captured.
+  %fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %closure = partial_apply [callee_guaranteed] %fn(%actor_copy) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  // Create a local klass and apply the closure with it and %0.
+  // The closure was created locally (in %1's domain). Even though its captures
+  // are Sendable, the closure object itself is non-Sendable. Sending it to
+  // %0's domain should still be flagged if the analysis tracks the closure value.
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %borrow_klass = begin_borrow %klass : $NonSendableKlass
+
+  // Apply locally with %1 - this is safe.
+  %borrow_closure = begin_borrow %closure : $@async @callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+  apply %borrow_closure(%borrow_klass) : $@async @callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+  end_borrow %borrow_closure : $@async @callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+
+  end_borrow %borrow_klass : $NonSendableKlass
+  destroy_value %klass : $NonSendableKlass
+  destroy_value %closure : $@async @callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+///////////////////////////////////////////////////
+// MARK: Group C — Thick vs thin function params
+///////////////////////////////////////////////////
+
+// Test 16: Thick closure param as task-isolated callee (correct: error)
+// The function is nonisolated so %1 is task-isolated. Calling the closure with
+// %0 as the isolated actor sends the task-isolated klass into %0 - error expected.
+sil [ossa] @test_call_closure_sends_task_isolated_klass_to_actor : $@convention(thin) @async (@guaranteed MyActor, @guaranteed NonSendableKlass, @guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $NonSendableKlass, %2 : @guaranteed $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()):
+  apply [callee_isolation=actor_instance] %2(%1, %0) : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending task-isolated value of non-Sendable type 'NonSendableKlass' to actor-isolated callee risks causing races in between task-isolated and actor-isolated uses}}
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 17: Nonisolated function receives a thick function (callee_guaranteed)
+// with an isolated param. The thick function could have closed over state in
+// the caller, so it should be considered task-isolated. Invoking it with an
+// actor should error.
+sil [ossa] @test_thick_function_param_is_task_isolated : $@convention(thin) @async (@guaranteed MyActor, @guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), %2 : @guaranteed $NonSendableKlass):
+  apply [callee_isolation=actor_instance] %1(%2, %0) : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending task-isolated value of non-Sendable type 'NonSendableKlass' to actor-isolated callee risks causing races in between task-isolated and actor-isolated uses}}
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 18: Nonisolated function receives a thin function (convention(thin))
+// with an isolated param. A thin function cannot have captures, so it is
+// disconnected and should be safe to invoke with an actor - no error expected.
+sil [ossa] @test_thin_function_param_is_disconnected : $@convention(thin) @async (@guaranteed MyActor, @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), @guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> (), %2 : @guaranteed $NonSendableKlass):
+  // BUG! Should NOT error here - a thin function has no captures, is
+  // disconnected, and should be considered Sendable. Invoking it with an actor
+  // should be safe. The analysis does not distinguish thin vs thick function
+  // params for isolation.
+  apply [callee_isolation=actor_instance] %1(%2, %0) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending task-isolated value of non-Sendable type 'NonSendableKlass' to actor-isolated callee risks causing races in between task-isolated and actor-isolated uses}}
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 19: Thick function param applied with two different actors. The callee
+// is a non-Sendable thick function in %1's domain. Applying it with %0 may
+// taint it, preventing subsequent local use.
+sil [ossa] @test_thick_param_apply_two_actors : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor, @guaranteed @async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()):
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass1 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %klass2 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+
+  // Apply thick with klass1 to %0 (crossing)
+  %b1 = begin_borrow %klass1 : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %2(%b1, %0) : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b1 : $NonSendableKlass
+
+  // Apply thick with klass2 to %1 (local)
+  %b2 = begin_borrow %klass2 : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %2(%b2, %1) : $@async @callee_guaranteed (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b2 : $NonSendableKlass
+
+  destroy_value %klass2 : $NonSendableKlass
+  destroy_value %klass1 : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 20: Same as test 15 but with thin function param. Thin functions are
+// trivial/Sendable, so both applies should produce the same results as thick.
+// The interesting difference is whether the callee itself gets tainted.
+sil [ossa] @test_thin_param_apply_two_actors : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor, @convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()):
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass1 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %klass2 = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+
+  // Apply thin with klass1 to %0 (crossing)
+  %b1 = begin_borrow %klass1 : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %2(%b1, %0) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b1 : $NonSendableKlass
+
+  // Apply thin with klass2 to %1 (local)
+  %b2 = begin_borrow %klass2 : $NonSendableKlass
+  apply [callee_isolation=actor_instance] %2(%b2, %1) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  end_borrow %b2 : $NonSendableKlass
+
+  destroy_value %klass2 : $NonSendableKlass
+  destroy_value %klass1 : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+////////////////////////////////////////////
+// MARK: Group D — Global actor isolation
+////////////////////////////////////////////
+
+// Test 21: function_ref to a global-actor-isolated function. The function_ref
+// should carry the global actor isolation, making it non-Sendable. Calling it
+// from a nonisolated context with a task-isolated klass should error since the
+// klass crosses into the global actor's domain.
+sil [ossa] @test_global_actor_functionref_is_non_sendable : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass):
+  %fn = function_ref @global_actor_function_with_nsk : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [callee_isolation=global_actor] %fn(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending task-isolated value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between task-isolated and global actor '<null>'-isolated uses}}
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 22: function_ref to a nonisolated function from nonisolated context.
+// Both caller and callee are nonisolated so there should be no crossing.
+sil [ossa] @test_nonisolated_functionref_no_error : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass):
+  %fn = function_ref @nonisolated_function_with_nsk : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // BUG! Should NOT error here - both caller and callee are nonisolated, so
+  // there is no isolation crossing. The analysis treats task-isolated and
+  // nonisolated as different domains.
+  apply [callee_isolation=nonisolated] %fn(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending task-isolated value of non-Sendable type 'NonSendableKlass' to nonisolated callee risks causing races in between task-isolated and nonisolated uses}}
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 23: From an actor-isolated context, call a global-actor-isolated
+// function_ref. The klass is in %0's domain. Sending it to the global actor
+// should error.
+sil [ossa] @test_global_actor_functionref_from_actor_isolated : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %borrow = begin_borrow %klass : $NonSendableKlass
+
+  %fn = function_ref @global_actor_function_with_nsk : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // BUG! Should error here - klass is in %0's actor-isolated domain and we're
+  // sending it to a global-actor-isolated callee. The analysis does not flag
+  // actor-isolated to global-actor crossings.
+  apply [callee_isolation=global_actor] %fn(%borrow) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+  end_borrow %borrow : $NonSendableKlass
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 24: From a global-actor-isolated context, call the same global-actor
+// function_ref. Since caller and callee share the same global actor, the klass
+// stays in the same domain - no error expected.
+sil [isolation "global_actor(CustomActor)"] [ossa] @test_global_actor_functionref_same_isolation : $@convention(thin) @async () -> () {
+bb0:
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %borrow = begin_borrow %klass : $NonSendableKlass
+
+  %fn = function_ref @global_actor_function_with_nsk : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [callee_isolation=global_actor] %fn(%borrow) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+  end_borrow %borrow : $NonSendableKlass
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 25: Global actor A → Global actor B crossing. The klass is created in
+// CustomActor's domain and sent to CustomActor2. Should error.
+sil [isolation "global_actor(CustomActor)"] [ossa] @test_global_actor_a_to_global_actor_b : $@convention(thin) @async () -> () {
+bb0:
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %borrow = begin_borrow %klass : $NonSendableKlass
+
+  %fn = function_ref @global_actor2_function_with_nsk : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // BUG! Should error here - klass is in CustomActor's domain and we're
+  // sending it to CustomActor2. The analysis does not detect global actor A
+  // to global actor B crossings.
+  apply [callee_isolation=global_actor] %fn(%borrow) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+  end_borrow %borrow : $NonSendableKlass
+  destroy_value %klass : $NonSendableKlass
+  %r2 = tuple ()
+  return %r2 : $()
+}
+
+//////////////////////////////////////////////////////////
+// MARK: Group E — Unannotated applies, crossings, chains
+//////////////////////////////////////////////////////////
+
+// Test 26: Apply without [callee_isolation] attribute. The callee has
+// @sil_isolated in its type but the apply has no isolation annotation.
+// Tests whether the analysis infers isolation from the function type or
+// requires the explicit attribute.
+sil [ossa] @test_apply_no_isolation_attribute : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %borrow = begin_borrow %klass : $NonSendableKlass
+
+  // Apply with %0 but NO [callee_isolation] attribute.
+  %fn = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  // BUG! Should error here - the callee has @sil_isolated on %0 which is a
+  // different actor, but without [callee_isolation=actor_instance] the analysis
+  // does not detect the isolation crossing.
+  apply %fn(%borrow, %0) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+
+  end_borrow %borrow : $NonSendableKlass
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 27: Actor-isolated → nonisolated crossing. From actor-isolated context,
+// call a nonisolated function. The klass is in %1's domain. Sending it to a
+// nonisolated callee should be a crossing.
+sil [ossa] @test_actor_to_nonisolated_crossing : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+  %borrow = begin_borrow %klass : $NonSendableKlass
+
+  %fn = function_ref @nonisolated_function_with_nsk : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // BUG! Should error here - klass is in %1's actor-isolated domain and we're
+  // sending it to a nonisolated callee. The analysis does not detect
+  // actor-isolated → nonisolated crossings.
+  apply [callee_isolation=nonisolated] %fn(%borrow) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+  end_borrow %borrow : $NonSendableKlass
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 27: Multiple sends of same value to different isolation domains.
+// First send to %0 (actor), then send to global actor. Both should error.
+sil [ossa] @test_multiple_sends_different_domains : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  %get = function_ref @get_klass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %get() : $@convention(thin) () -> @owned NonSendableKlass
+
+  // First send to %0
+  %borrow1 = begin_borrow %klass : $NonSendableKlass
+  %fn1 = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %fn1(%borrow1, %0) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type 'NonSendableKlass' to actor-isolated callee risks causing data races between actor-isolated and local nonisolated uses}}
+  end_borrow %borrow1 : $NonSendableKlass
+
+  // Second send to global actor — also flagged
+  %borrow2 = begin_borrow %klass : $NonSendableKlass
+  %fn2 = function_ref @global_actor_function_with_nsk : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [callee_isolation=global_actor] %fn2(%borrow2) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing data races between global actor '<null>'-isolated and local nonisolated uses}}
+  // expected-note @-2 {{access can happen concurrently}}
+  end_borrow %borrow2 : $NonSendableKlass
+
+  // Use locally — also flagged
+  %borrow3 = begin_borrow %klass : $NonSendableKlass
+  %fn3 = function_ref @async_function_2param_with_isolated : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  apply [callee_isolation=actor_instance] %fn3(%borrow3, %1) : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_isolated @guaranteed MyActor) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %borrow3 : $NonSendableKlass
+
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test 28: Chain — receive a value from %0's isolation, then send it to a
+// global actor. The value should be in %0's region, and sending it to the
+// global actor is a second crossing.
+sil [ossa] @test_chain_receive_then_send : $@convention(thin) @async (@guaranteed MyActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  // Get klass from %0's isolation domain.
+  %get_fn = function_ref @async_return_nsk_isolated : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  %klass = apply [callee_isolation=actor_instance] %get_fn(%0) : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass // expected-error {{non-Sendable 'NonSendableKlass'-typed result can not be returned from actor-isolated function to nonisolated context}}
+
+  // Send to global actor. The klass crossed isolation on return, and now we
+  // send it again to the global actor.
+  %borrow = begin_borrow %klass : $NonSendableKlass
+  %fn = function_ref @global_actor_function_with_nsk : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [callee_isolation=global_actor] %fn(%borrow) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{sending actor-isolated value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between actor-isolated and global actor '<null>'-isolated uses}}
+  end_borrow %borrow : $NonSendableKlass
+
+  destroy_value %klass : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}

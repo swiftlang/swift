@@ -595,23 +595,30 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
               .withUnsafeNonIsolated(partialApplyIsNonIsolatedUnsafe);
         }
 
-        // For now, if we do not have an actor instance, just create an actor
-        // instance isolated without an actor instance.
+        // In this case, we do not have an actor isolated instance, so we do not
+        // know the actual actor that this partial_apply is isolated to. Mark is
+        // as disconnected... when we apply the partial_apply, we will merge in
+        // the actor's isolation as appropriate.
         //
-        // If we do not have an actor instance, that means that we have a
-        // partial apply for which the isolated parameter was not closed over
-        // and is an actual argument that we pass in. This means that the
-        // partial apply is actually flow sensitive in terms of which specific
-        // actor instance we are isolated to.
+        // The real question here is what do we do for things that are captured
+        // within it. Here is what is interesting about this:
         //
-        // TODO: How do we want to resolve this.
-        return SILIsolationInfo::getPartialApplyActorInstanceIsolated(
-                   pai, actorIsolation.getActor())
-            .withUnsafeNonIsolated(partialApplyIsNonIsolatedUnsafe);
+        // 1. If anything captured by the partial_apply is isolated, the
+        // partial_apply becomes isolated and if we apply it to an actor that
+        // has a differing isolation, we will get an error at the apply
+        // site. This also means that if we send the partial_apply or anything
+        // contained within the partial_apply to another isolation domain, we
+        // cannot invoke it again locally as expected no matter the actor unless
+        // that is the same actor as where we sent it to which should just work.
+        //
+        // 2. If everything captured by the partial_apply is disconnected, then
+        // we should be able to send it to another isolation domain. If we do
+        // so, then when it is in that other isolation domain, we should be able
+        // to invoke it there since we will not be using it again locally. So
+        // that should work.
+        return SILIsolationInfo::getDisconnected(
+            partialApplyIsNonIsolatedUnsafe);
       }
-
-      assert(actorIsolation.getKind() != ActorIsolation::Erased &&
-             "Implement this!");
     }
 
     if (partialApplyIsNonIsolatedUnsafe)
@@ -654,14 +661,16 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
             fri, isolation.getGlobalActor());
       }
 
-      // TODO: We need to be able to support flow sensitive actor instances
-      // like we do for partial apply. Until we do so, just store SILValue()
-      // for this. This could cause a problem if we can construct a function
-      // ref and invoke it with two different actor instances of the same type
-      // and pass in the same parameters to both. We should error and we would
-      // not with this impl since we could not distinguish the two.
+      // If we are actor isolated, we do not know which specific actor
+      // instance we are isolated to. We should be able to figure this out
+      // later based off of the isolated parameter. So we can just return this
+      // as disconnected since when we apply the actor isolation, we should
+      // get the actor isolation.
+      //
+      // TODO: Make sure that synchronous functions that are isolated to an
+      // actor always get the isolated parameter.
       if (isolation.getKind() == ActorIsolation::ActorInstance) {
-        return SILIsolationInfo::getFlowSensitiveActorIsolated(fri, isolation);
+        return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
       }
 
       assert(isolation.getKind() != ActorIsolation::Erased &&
@@ -1718,6 +1727,13 @@ bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
   if (type.getASTType()->is<SILTokenType>()) {
     return false;
   }
+
+  // Treat thin functions as Sendable. They do not contain any State that can
+  // cause anything to escape. Of course, if we make it a thick function this
+  // changes.
+  if (auto *fTy = type.getASTType()->getAs<SILFunctionType>();
+      fTy && fTy->getRepresentation() == SILFunctionType::Representation::Thin)
+    return false;
 
   // First before we do anything, see if we have a Sendable type. In such a
   // case, just return true early.
