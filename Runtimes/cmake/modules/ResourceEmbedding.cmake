@@ -46,6 +46,11 @@ function(embed_manifest target)
   get_target_property(_EM_BINARY_DIR ${target} BINARY_DIR)
   get_target_property(_EM_NAME ${target} NAME)
 
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "i[3-6]86")
+    set(SXS_ARCH "x86")
+  else()
+    STRING(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" SXS_ARCH)
+  endif()
   # Evaluate variables
   file(CONFIGURE
     OUTPUT ${_EM_BINARY_DIR}/${_EM_NAME}-${PROJECT_VERSION}.1.manifest.in
@@ -53,7 +58,7 @@ function(embed_manifest target)
 <assembly manifestversion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity
     name="$<TARGET_NAME:@target@>"
-    processorArchitecture="@CMAKE_SYSTEM_PROCESSOR@"
+    processorArchitecture="@SXS_ARCH@"
     type="win32"
     version="@PROJECT_VERSION@" />
   <file name="$<TARGET_FILE_NAME:@target@>" />
