@@ -1,0 +1,159 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=unchecked_ownership_conversion | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+class C {}
+
+// CHECK-LABEL: sil [ossa] @simplify_destructor :
+// CHECK:         %2 = begin_borrow %0
+// CHECK:         debug_value %2
+// CHECK:         end_borrow %2
+// CHECK:         %5 = unchecked_ref_cast %0 to $Builtin.NativeObject
+// CHECK:         %6 = unchecked_ref_cast %5 to $C
+// CHECK:         dealloc_ref %6
+// CHECK:       } // end sil function 'simplify_destructor'
+sil [ossa] @simplify_destructor : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  debug_value %0, let, name "self", argno 1
+  %2 = begin_borrow %0
+  debug_value %2, let, name "self", argno 1
+  %4 = unchecked_ref_cast %2 to $Builtin.NativeObject
+  %5 = unchecked_ownership_conversion %4, @guaranteed to @owned
+  end_borrow %2
+  end_lifetime %0
+  %8 = unchecked_ref_cast %5 to $C
+  dealloc_ref %8
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @no_simplify_result_not_owned :
+// CHECK:         unchecked_ownership_conversion
+// CHECK:       } // end sil function 'no_simplify_result_not_owned'
+sil [ossa] @no_simplify_result_not_owned : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %2 = begin_borrow %0
+  %4 = unchecked_ref_cast %2 to $Builtin.NativeObject
+  %5 = unchecked_ownership_conversion %4, @guaranteed to @none
+  end_borrow %2
+  end_lifetime %0
+  fix_lifetime %5
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_simplify_operand_not_ref_cast :
+// CHECK:         unchecked_ownership_conversion
+// CHECK:       } // end sil function 'no_simplify_operand_not_ref_cast'
+sil [ossa] @no_simplify_operand_not_ref_cast : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %2 = begin_borrow %0
+  %5 = unchecked_ownership_conversion %2, @guaranteed to @owned
+  end_borrow %2
+  end_lifetime %0
+  destroy_value %5
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_simplify_refcast_not_from_begin_borrow :
+// CHECK:         unchecked_ownership_conversion
+// CHECK:       } // end sil function 'no_simplify_refcast_not_from_begin_borrow'
+sil [ossa] @no_simplify_refcast_not_from_begin_borrow : $@convention(method) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %4 = unchecked_ref_cast %0 to $Builtin.NativeObject
+  %5 = unchecked_ownership_conversion %4, @guaranteed to @owned
+  destroy_value %5
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_simplify_borrow_of_guaranteed :
+// CHECK:         unchecked_ownership_conversion
+// CHECK:       } // end sil function 'no_simplify_borrow_of_guaranteed'
+sil [ossa] @no_simplify_borrow_of_guaranteed : $@convention(method) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %2 = begin_borrow %0
+  %4 = unchecked_ref_cast %2 to $Builtin.NativeObject
+  %5 = unchecked_ownership_conversion %4, @guaranteed to @owned
+  end_borrow %2
+  destroy_value %5
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_simplify_multiple_end_borrows :
+// CHECK:         unchecked_ownership_conversion
+// CHECK:       } // end sil function 'no_simplify_multiple_end_borrows'
+sil [ossa] @no_simplify_multiple_end_borrows : $@convention(method) (@owned C, Builtin.Int1) -> () {
+bb0(%0 : @owned $C, %cond : $Builtin.Int1):
+  %2 = begin_borrow %0
+  %4 = unchecked_ref_cast %2 to $Builtin.NativeObject
+  %5 = unchecked_ownership_conversion %4, @guaranteed to @owned
+  cond_br %cond, bb1, bb2
+bb1:
+  end_borrow %2
+  destroy_value %0
+  destroy_value %5
+  br bb3
+bb2:
+  end_borrow %2
+  destroy_value %0
+  destroy_value %5
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_simplify_borrowed_value_extra_use :
+// CHECK:         unchecked_ownership_conversion
+// CHECK:       } // end sil function 'no_simplify_borrowed_value_extra_use'
+sil [ossa] @no_simplify_borrowed_value_extra_use : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %2 = begin_borrow %0
+  %4 = unchecked_ref_cast %2 to $Builtin.NativeObject
+  %5 = unchecked_ownership_conversion %4, @guaranteed to @owned
+  end_borrow %2
+  destroy_value %0
+  destroy_value %5
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_simplify_different_blocks :
+// CHECK:         unchecked_ownership_conversion
+// CHECK:       } // end sil function 'no_simplify_different_blocks'
+sil [ossa] @no_simplify_different_blocks : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %2 = begin_borrow %0
+  %4 = unchecked_ref_cast %2 to $Builtin.NativeObject
+  %5 = unchecked_ownership_conversion %4, @guaranteed to @owned
+  br bb1
+bb1:
+  end_borrow %2
+  end_lifetime %0
+  destroy_value %5
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_simplify_used_before_end_borrow :
+// CHECK:         unchecked_ownership_conversion
+// CHECK:       } // end sil function 'no_simplify_used_before_end_borrow'
+sil [ossa] @no_simplify_used_before_end_borrow : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %2 = begin_borrow %0
+  %4 = unchecked_ref_cast %2 to $Builtin.NativeObject
+  %5 = unchecked_ownership_conversion %4, @guaranteed to @owned
+  fix_lifetime %5
+  end_borrow %2
+  end_lifetime %0
+  destroy_value %5
+  %r = tuple ()
+  return %r
+}
+
