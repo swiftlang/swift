@@ -410,7 +410,7 @@ ERROR(error_opt_invalid_mapping, none,
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))
 
-WARNING(module_interface_scoped_import_unsupported,none,
+GROUPED_WARNING(module_interface_scoped_import_unsupported,UnsupportedScopedImport,none,
         "scoped imports are not yet supported in module interfaces",
         ())
 WARNING(warn_unsupported_module_interface_swift_version,none,

@@ -870,9 +870,9 @@ NOTE(sema_no_import_no_sdk,none,
 NOTE(sema_no_import_no_sdk_xcrun,none,
      "use \"xcrun swiftc\" to select the default macOS SDK "
      "installed with Xcode", ())
-WARNING(sema_import_current_module,none,
+GROUPED_WARNING(sema_import_current_module,ModuleSelfImport,none,
         "this file is part of module %0; ignoring import", (Identifier))
-WARNING(sema_import_current_module_with_file,none,
+GROUPED_WARNING(sema_import_current_module_with_file,ModuleSelfImport,none,
         "file '%0' is part of module %1; ignoring import",
         (StringRef, Identifier))
 ERROR(sema_opening_import,Fatal,
@@ -1257,7 +1257,8 @@ ERROR(in_package_module_not_compiled_from_source_or_package_interface,none,
       "modules of the same package can only be loaded if built from source or package interface: %2",
       (Identifier, StringRef, StringRef))
 
-WARNING(in_package_module_not_compiled_locally,none,
+GROUPED_WARNING(in_package_module_not_compiled_locally,
+        PackageModuleLoadedFromSDK,none,
         "module %0 is in package %1 but was loaded from SDK; "
         "modules of the same package should be built locally from source only: %2",
         (Identifier, Identifier, StringRef))
@@ -2735,7 +2736,7 @@ ERROR(spi_attribute_on_frozen_stored_properties,none,
 ERROR(spi_attribute_on_frozen_enum_case,none,
       "%kind0 cannot be declared '@_spi' in a '@frozen' enum",
       (const ValueDecl *))
-WARNING(spi_attribute_on_import_of_public_module,none,
+GROUPED_WARNING(spi_attribute_on_import_of_public_module,SPIImportIgnored,none,
         "'@_spi' import of %0 will not include any SPI symbols; "
         "%0 was built from the public interface at %1",
         (DeclName, StringRef))
@@ -2916,17 +2917,17 @@ NOTE(add_nominal_sendable_conformance,none,
 NOTE(add_generic_parameter_conformance,none,
      "consider making generic parameter %0 conform to the %1 protocol",
      (Type, ProtocolDecl *))
-WARNING(add_predates_concurrency_import,none,
+GROUPED_WARNING(add_predates_concurrency_import,AddPreconcurrencyImport,none,
      "add '@preconcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
      "%select{| as warnings}0", (bool, Identifier))
 GROUPED_WARNING(remove_predates_concurrency_import,PreconcurrencyImport,
                 none,
                 "'@preconcurrency' on module %0 has no effect", (Identifier))
-WARNING(remove_public_import,none,
+GROUPED_WARNING(remove_public_import,UnusedImportAccess,none,
         "public import of %0 was not used in public declarations or inlinable code",
         (Identifier))
-WARNING(remove_package_import,none,
+GROUPED_WARNING(remove_package_import,UnusedImportAccess,none,
         "package import of %0 was not used in package declarations",
         (Identifier))
 GROUPED_WARNING(public_decl_needs_sendable,ExplicitSendable,none,
@@ -4031,7 +4032,7 @@ NOTE(inconsistent_implicit_access_level_on_import_here,none,
 FIXIT(inconsistent_implicit_access_level_on_import_fixit,
      "%select{private|fileprivate|internal|package|public|%error}0 ",
      (AccessLevel))
-WARNING(inconsistent_import_access_levels,none,
+GROUPED_WARNING(inconsistent_import_access_levels,InconsistentImportAccess,none,
         "module %0 is imported as "
         "'%select{private|fileprivate|internal|package|public|%error}1' "
         "from the same file; "

@@ -14,6 +14,8 @@
 
 /// Reading from the public .swiftinterface should produce the warning.
 // RUN: rm %t/SPIHelper.private.swiftinterface
-// RUN: %target-typecheck-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -I %t -verify-additional-prefix noerror-
+// RUN: %target-typecheck-verify-swift -I %t -verify-additional-prefix werror- -Werror SPIImportIgnored
 
-@_spi(SPIHelper) import SPIHelper // expected-warning {{'@_spi' import of 'SPIHelper' will not include any SPI symbols; 'SPIHelper' was built from the public interface at}}
+@_spi(SPIHelper) import SPIHelper // expected-noerror-warning {{'@_spi' import of 'SPIHelper' will not include any SPI symbols; 'SPIHelper' was built from the public interface at}}
+// expected-werror-error @-1 {{'@_spi' import of 'SPIHelper' will not include any SPI symbols; 'SPIHelper' was built from the public interface at}}
