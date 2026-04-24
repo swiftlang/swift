@@ -20,6 +20,30 @@
   }
   ```
 
+* [SE-0503][]:
+  Introduced the ability to define protocols with associated types that are `~Copyable` and/or 
+  `~Escapable`, which relaxes the requirement on types conforming to that protocol. In other words, types can 
+  now implement those associated-type requirements with types that may be noncopyable or nonescapable:
+
+  ```swift
+  protocol WritingInstrument {
+    associatedtype Eraser: ~Copyable
+  }
+  
+  struct Pencil: WritingInstrument {  
+    struct Eraser: ~Copyable {}
+  }
+   
+  struct Chalk: WritingInstrument {
+    struct Eraser {}
+  }
+  ```
+  
+  During the evolution process, a prototype version of this feature existed under the experimental feature
+  named `SuppressedAssociatedTypes`. That feature is now deprecated and is source-incompatible with the accepted
+  version detailed in SE-0503. If that experimental feature is in use, a warning will be emitted by the compiler with
+  information to help migrate.
+
 * [SE-0518][]:
   Introduced `~Sendable` conformance syntax to explicitly suppress a conformance to `Sendable`,
   which prevents automatic `Sendable` inference on types, and provides an alternative way
@@ -11136,6 +11160,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
 [SE-0493]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0493-defer-async.md
+[SE-0503]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0503-suppressed-associated-types.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
 [SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
 [#64927]: <https://github.com/apple/swift/issues/64927>

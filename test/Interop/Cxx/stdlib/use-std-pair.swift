@@ -16,7 +16,7 @@ import Cxx
 
 var StdPairTestSuite = TestSuite("StdPair")
 
-func takePair<T: CxxPair & ~Copyable>(_ _: consuming T) { }
+func takePair<T: CxxPair & ~Copyable>(_ _: consuming T) where T.First: ~Copyable, T.Second: ~Copyable { }
 
 StdPairTestSuite.test("StdPairInts.init") {
   let pi = PairInts(first: 1, second: 2)

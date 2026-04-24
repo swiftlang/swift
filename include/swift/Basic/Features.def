@@ -284,6 +284,7 @@ BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude privat
 LANGUAGE_FEATURE(BuiltinMarkDependence, 0, "markDependence Builtin")
 LANGUAGE_FEATURE(BuiltinAddTaskLocalValue, 0, "addTaskLocalValue and removeTaskLocalValue builtins")
 SUPPRESSIBLE_LANGUAGE_FEATURE(TildeSendable, 518, "~Sendable for explicitly marking non-Sendable types")
+LANGUAGE_FEATURE(SuppressedAssociatedTypesWithDefaults, 503, "Associated types that are ~Copyable and ~Escapable")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
@@ -463,10 +464,6 @@ EXPERIMENTAL_FEATURE(Volatile, true)
 
 // LEGACY: Enables ~Copyable and ~Escapable annotations on associatedtype declarations.
 EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
-
-// Enables ~Copyable and ~Escapable annotations on associatedtype declarations,
-// and infers defaults for them.
-EXPERIMENTAL_FEATURE(SuppressedAssociatedTypesWithDefaults, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)

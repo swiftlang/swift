@@ -6,9 +6,9 @@ import StdSpan
 func takesSequence<T: Sequence>(_ _: T) {}
 // expected-note@-1 {{where 'T' = 'SpanOfNonCopyable'}}
 
-func takesBorrowingSequence<T: CxxBorrowingSequence>(_ _: T) {}
+func takesBorrowingSequence<T: CxxBorrowingSequence>(_ _: T) where T.Element: ~Copyable {}
 
-func takesSpan<S: CxxMutableSpan>(_ _: S) {}
+func takesSpan<S: CxxMutableSpan>(_ _: S) where S.Element: ~Copyable {}
 
 let arr: [Int32] = [1, 2, 3]
 arr.withUnsafeBufferPointer { ubpointer in
