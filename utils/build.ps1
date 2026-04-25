@@ -1715,6 +1715,7 @@ function Build-CMakeProject {
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_API "$AndroidAPILevel"
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_ARCH_ABI $Platform.Architecture.ABI
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_NDK "$AndroidNDKPath"
+        Add-KeyValueIfNew $Defines CMAKE_SYSROOT "$AndroidSysroot"
 
         if ($UseASM) {
         }
@@ -1722,7 +1723,7 @@ function Build-CMakeProject {
         if ($UseC) {
           Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_TARGET $Platform.Triple
 
-          $CFLAGS = @("--sysroot=${AndroidSysroot}", "-ffunction-sections", "-fdata-sections")
+          $CFLAGS = @("-ffunction-sections", "-fdata-sections")
           if ($DebugInfo) {
             $CFLAGS += @("-gdwarf")
           }
@@ -1732,7 +1733,7 @@ function Build-CMakeProject {
         if ($UseCXX) {
           Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_TARGET $Platform.Triple
 
-          $CXXFLAGS = @("--sysroot=${AndroidSysroot}", "-ffunction-sections", "-fdata-sections")
+          $CXXFLAGS = @("-ffunction-sections", "-fdata-sections")
           if ($DebugInfo) {
             $CXXFLAGS += @("-gdwarf")
           }
@@ -1760,6 +1761,8 @@ function Build-CMakeProject {
           [string[]] $SwiftFlags = @()
 
           $SwiftFlags += if ($SwiftSDK) {
+            # TODO: CMake does not yet have support for passing `CMAKE_SYSROOT` to the Swift compiler yet.
+            #       Once we have that, we can drop `-sysroot $AndroidSysroot` here.
             @("-sdk", $SwiftSDK, "-sysroot", $AndroidSysroot)
           } else {
             @()
