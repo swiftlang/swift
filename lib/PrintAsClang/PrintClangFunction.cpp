@@ -937,6 +937,15 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   if (kind == FunctionSignatureKind::CFunctionProto) {
     // First, verify that the C++ param types are representable.
     for (auto param : *FD->getParameters()) {
+      // Consuming a non-copyable type is not supported, as the
+      // generated thunk would need to copy the parameter.
+      if (param->getSpecifier() == ParamDecl::Specifier::Consuming) {
+        if (auto *nominal =
+                param->getInterfaceType()->getNominalOrBoundGenericNominal()) {
+          if (!nominal->canBeCopyable())
+            return ClangRepresentation::unsupported;
+        }
+      }
       OptionalTypeKind optKind;
       Type objTy;
       std::tie(objTy, optKind) =

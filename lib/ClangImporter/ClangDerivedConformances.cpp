@@ -444,6 +444,7 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
       auto lookupTable2 = impl.findLookupTable(owningModule);
       if (lookupTable1 != lookupTable2)
         addEntryToLookupTable(*lookupTable2, clangCallee, impl.getNameImporter());
+      impl.synthesizedAndAlwaysVisibleDecls.insert(clangCallee);
       return clangCallee;
     }
     break;
