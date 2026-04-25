@@ -16,7 +16,7 @@
 /// `std::multiset` conform to this protocol.
 ///
 /// - SeeAlso: `CxxUniqueSet`
-public protocol CxxSet<Element>: ExpressibleByArrayLiteral {
+public protocol CxxSet<Element> {
   associatedtype Element
   associatedtype Size: BinaryInteger
   associatedtype RawIterator: UnsafeCxxInputIterator
@@ -28,8 +28,6 @@ public protocol CxxSet<Element>: ExpressibleByArrayLiteral {
   // iterator for std::multiset
   associatedtype InsertionResult
 
-  init()
-
   func __endUnsafe() -> RawIterator
   func __findUnsafe(_ value: Element) -> RawIterator
 
@@ -39,6 +37,24 @@ public protocol CxxSet<Element>: ExpressibleByArrayLiteral {
 }
 
 extension CxxSet {
+  /// Returns a Boolean value that indicates whether the given element exists
+  /// in the set.
+  @inlinable
+  public func contains(_ element: Element) -> Bool {
+    return self.__findUnsafe(element) != self.__endUnsafe()
+  }
+}
+
+/// A C++ set type that can be default constructed.
+///
+/// C++ standard library set types conform to this protocol when their
+/// construction-related template arguments support default construction.
+public protocol CxxDefaultConstructibleSet<Element>:
+  CxxSet, ExpressibleByArrayLiteral {
+  init()
+}
+
+extension CxxDefaultConstructibleSet {
   /// Creates a C++ set containing the elements of a Swift Sequence.
   ///
   /// This initializes the set by copying every element of the sequence.
@@ -56,13 +72,6 @@ extension CxxSet {
   @inlinable
   public init(arrayLiteral elements: Element...) {
     self.init(elements)
-  }
-
-  /// Returns a Boolean value that indicates whether the given element exists
-  /// in the set.
-  @inlinable
-  public func contains(_ element: Element) -> Bool {
-    return self.__findUnsafe(element) != self.__endUnsafe()
   }
 }
 

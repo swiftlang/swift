@@ -20,6 +20,7 @@ Work with standard C++ types.
 - ``Cxx/CxxMutableRandomAccessCollection``
 - ``Cxx/CxxVector``
 - ``Cxx/CxxSet``
+- ``Cxx/CxxDefaultConstructibleSet``
 - ``Cxx/CxxUniqueSet``
 - ``Cxx/CxxPair``
 - ``Cxx/CxxConvertibleToCollection``
@@ -40,4 +41,3 @@ Work with standard C++ types.
 ### Comparison Functions
 
 - ``CxxStdlib/==(_:_:)``
-

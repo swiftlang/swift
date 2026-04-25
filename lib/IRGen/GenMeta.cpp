@@ -7474,6 +7474,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::CxxRandomAccessCollection:
   case KnownProtocolKind::CxxMutableRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
+  case KnownProtocolKind::CxxDefaultConstructibleSet:
   case KnownProtocolKind::CxxSequence:
   case KnownProtocolKind::CxxBorrowingSequence:
   case KnownProtocolKind::CxxUniqueSet:
