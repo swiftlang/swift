@@ -60,6 +60,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:untyped-throws>
 - <doc:unused-import-access>
 - <doc:no-use-throwing-unstructured-task>
+- <doc:no-usage>
 - <doc:use-any-apple-os-availability>
 
 
@@ -119,5 +120,6 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:untyped-throws>
 - <doc:unused-import-access>
 - <doc:no-use-throwing-unstructured-task>
+- <doc:no-usage>
 - <doc:use-any-apple-os-availability>
 - <doc:existential-member-access-limitations>

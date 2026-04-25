@@ -659,7 +659,7 @@ NOTE(async_inferred_from_operation,none,
 // Key-path expressions.
 ERROR(expr_keypath_no_objc_runtime,none,
       "'#keyPath' can only be used with the Objective-C runtime", ())
-ERROR(expression_unused_keypath_result,NoUsage,
+GROUPED_ERROR(expression_unused_keypath_result,NoUsage,NoUsage,
       "result of key path is unused", ())
 ERROR(expr_keypath_non_objc_property,none,
       "argument of '#keyPath' refers to non-'@objc' property %0",
@@ -5308,18 +5308,18 @@ WARNING(guard_always_succeeds,none,
         "'guard' condition is always true, body is unreachable", ())
 
 
-ERROR(expression_unused_closure,NoUsage,
+GROUPED_ERROR(expression_unused_closure,NoUsage,NoUsage,
       "closure expression is unused", ())
-ERROR(expression_unused_function,NoUsage,
+GROUPED_ERROR(expression_unused_function,NoUsage,NoUsage,
       "function is unused", ())
-WARNING(expression_unused_lvalue,NoUsage,
+GROUPED_WARNING(expression_unused_lvalue,NoUsage,NoUsage,
       "%select{"
         "variable|"
         "property is accessed but result|"
         "subscript is accessed but result"
       "}0 is unused",
       (unsigned))
-WARNING(expression_unused_result_call,NoUsage,
+GROUPED_WARNING(expression_unused_result_call,NoUsage,NoUsage,
         "result of call to %0 is unused", (const ValueDecl *))
 GROUPED_WARNING(expression_unused_throwing_unstructured_task,
         NoUseUnstructuredThrowingTask, none,
@@ -5329,21 +5329,21 @@ GROUPED_WARNING(expression_unused_throwing_unstructured_task,
 NOTE(expression_unused_throwing_unstructured_task_silence, none,
      "to silence this warning, handle the error inside the task, or "
      "store/discard the task value explicitly", ())
-WARNING(expression_unused_result_operator,NoUsage,
+GROUPED_WARNING(expression_unused_result_operator,NoUsage,NoUsage,
         "result of operator %0 is unused", (const ValueDecl *))
-WARNING(expression_unused_result_operator_name,NoUsage,
+GROUPED_WARNING(expression_unused_result_operator_name,NoUsage,NoUsage,
         "result of operator %0 is unused", (DeclName))
-WARNING(expression_unused_result_unknown, NoUsage,
+GROUPED_WARNING(expression_unused_result_unknown, NoUsage, NoUsage,
         "result of call to %select{function|closure}0 returning %1 is unused", (bool, Type))
-WARNING(expression_unused_result, NoUsage,
+GROUPED_WARNING(expression_unused_result, NoUsage, NoUsage,
         "expression of type %0 is unused", (Type))
-WARNING(expression_unused_init_result,NoUsage,
+GROUPED_WARNING(expression_unused_init_result,NoUsage,NoUsage,
         "result of %0 initializer is unused", (Type))
-WARNING(expression_unused_optional_try,NoUsage,
+GROUPED_WARNING(expression_unused_optional_try,NoUsage,NoUsage,
         "result of 'try?' is unused", ())
-WARNING(expression_unused_selector_result, NoUsage,
+GROUPED_WARNING(expression_unused_selector_result, NoUsage, NoUsage,
         "result of '#selector' is unused", ())
-WARNING(expression_unused_literal,NoUsage,
+GROUPED_WARNING(expression_unused_literal,NoUsage,NoUsage,
         "%0 literal is unused", (StringRef))
 
 ERROR(assignment_lhs_not_lvalue,none,
@@ -6630,7 +6630,7 @@ ERROR(unsupported_convention,none,
 ERROR(invalid_isolated_and_convention_attributes,none,
       "'@convention(%0)' attribute is not allowed on '@isolated' types",
       (StringRef))
-ERROR(unreferenced_generic_parameter,NoUsage,
+GROUPED_ERROR(unreferenced_generic_parameter,NoUsage,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
 ERROR(unexpected_ctype_for_non_c_convention,none,
       "convention '%0' does not support the 'cType' argument label, did you "
@@ -7648,31 +7648,31 @@ NOTE(specialize_found_function_of_type, none,
 // MARK: Variable usage diagnostics
 //------------------------------------------------------------------------------
 
-WARNING(pbd_never_used_stmtcond, NoUsage,
+GROUPED_WARNING(pbd_never_used_stmtcond, NoUsage, NoUsage,
         "value %0 was defined but never used; consider replacing "
         "with boolean test",
         (Identifier))
-WARNING(unused_setter_parameter, NoUsage,
+GROUPED_WARNING(unused_setter_parameter, NoUsage, NoUsage,
         "setter argument %0 was never used, but the property was accessed",
         (Identifier))
 NOTE(fixit_for_unused_setter_parameter, none,
      "did you mean to use %0 instead of accessing the property's current value?", (Identifier))
 
-WARNING(pbd_never_used, NoUsage,
+GROUPED_WARNING(pbd_never_used, NoUsage, NoUsage,
         "initialization of %select{variable|immutable value}1 %0 was never used"
         "; consider replacing with assignment to '_' or removing it",
         (Identifier, unsigned))
 
 
-WARNING(capture_never_used, NoUsage,
+GROUPED_WARNING(capture_never_used, NoUsage, NoUsage,
         "capture %0 was never used",
         (Identifier))
 
-WARNING(variable_never_used, NoUsage,
+GROUPED_WARNING(variable_never_used, NoUsage, NoUsage,
         "%select{variable|immutable value}1 %0 was never used; "
         "consider replacing with '_' or removing it",
         (Identifier, unsigned))
-WARNING(immutable_value_never_used_but_assigned, NoUsage,
+GROUPED_WARNING(immutable_value_never_used_but_assigned, NoUsage, NoUsage,
         "immutable value %0 was never used; consider removing it",
         (Identifier))
 WARNING(variable_never_mutated, none,
