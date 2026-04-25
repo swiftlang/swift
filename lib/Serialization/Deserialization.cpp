@@ -35,6 +35,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -538,6 +539,26 @@ getActualClangDeclPathComponentKind(uint64_t raw) {
   return std::nullopt;
 }
 
+/// Translate from the serialization VarDeclSpecifier enumerators, which are
+/// guaranteed to be stable, to the AST ones.
+static std::optional<swift::ParamDecl::Specifier>
+getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
+  switch (raw) {
+#define CASE(ID) \
+  case serialization::ParamDeclSpecifier::ID: \
+    return swift::ParamDecl::Specifier::ID;
+  CASE(Default)
+  CASE(InOut)
+  CASE(Borrowing)
+  CASE(Consuming)
+  CASE(LegacyShared)
+  CASE(LegacyOwned)
+  CASE(ImplicitlyCopyableConsuming)
+  }
+#undef CASE
+  return std::nullopt;
+}
+
 Expected<ParameterList *> ModuleFile::readParameterList() {
   using namespace decls_block;
 
@@ -560,6 +581,46 @@ Expected<ParameterList *> ModuleFile::readParameterList() {
   }
 
   return ParameterList::create(getContext(), params);
+}
+
+Expected<SmallVector<AnyFunctionType::Yield, 1>> ModuleFile::readYieldList() {
+  SmallVector<AnyFunctionType::Yield, 1> yields;
+  SmallVector<uint64_t, 8> scratch;
+  
+  while (true) {
+    BCOffsetRAII restoreOffset(DeclTypeCursor);
+    llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned recordID = fatalIfUnexpected(
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+    if (recordID != decls_block::FUNCTION_YIELD)
+      break;
+
+    restoreOffset.reset();
+
+    TypeID typeID;
+    unsigned rawOwnership;
+    decls_block::FunctionYieldLayout::readRecord(
+        scratch, typeID, rawOwnership);
+
+    auto ownership = getActualParamDeclSpecifier(
+      (serialization::ParamDeclSpecifier)rawOwnership);
+    if (!ownership)
+      return diagnoseFatal();
+
+    auto yieldTy = getTypeChecked(typeID);
+    if (!yieldTy)
+      return yieldTy.takeError();
+
+    yields.emplace_back(yieldTy.get(), *ownership);
+  }
+
+  return yields;
 }
 
 static std::optional<swift::VarDecl::Introducer>
@@ -3229,26 +3290,6 @@ getActualSelfAccessKind(uint8_t raw) {
   return std::nullopt;
 }
 
-/// Translate from the serialization VarDeclSpecifier enumerators, which are
-/// guaranteed to be stable, to the AST ones.
-static std::optional<swift::ParamDecl::Specifier>
-getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
-  switch (raw) {
-#define CASE(ID) \
-  case serialization::ParamDeclSpecifier::ID: \
-    return swift::ParamDecl::Specifier::ID;
-  CASE(Default)
-  CASE(InOut)
-  CASE(Borrowing)
-  CASE(Consuming)
-  CASE(LegacyShared)
-  CASE(LegacyOwned)
-  CASE(ImplicitlyCopyableConsuming)
-  }
-#undef CASE
-  return std::nullopt;
-}
-
 static std::optional<swift::OpaqueReadOwnership>
 getActualOpaqueReadOwnership(unsigned rawKind) {
   switch (serialization::OpaqueReadOwnership(rawKind)) {
@@ -4597,6 +4638,18 @@ public:
     ParameterList *paramList;
     SET_OR_RETURN_ERROR(paramList, MF.readParameterList());
     fn->setParameters(paramList);
+    {
+      SmallVector<AnyFunctionType::Yield, 1> yields;
+      SET_OR_RETURN_ERROR(yields, MF.readYieldList());
+
+      // Sanity check: non-coroutines should have empty yields and
+      // coroutines shoud have non-empty yields.
+      if (fn->isCoroutine() != !yields.empty())
+        return MF.diagnoseFatal();
+
+      if (yields.size())
+        fn->setYields(YieldList::create(ctx, yields));
+    }
 
     SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
     while (auto info = MF.maybeReadLifetimeDependence()) {
@@ -7382,7 +7435,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            StringRef blobData, bool isGeneric) {
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind;
-  bool noescape = false, sendable, async, throws, hasSendingResult;
+  bool noescape = false, sendable, async, throws, hasSendingResult, coro;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -7392,12 +7445,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
-        hasSendingResult);
+        hasSendingResult, coro);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, sendable, async, throws,
-        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult,
+        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult, coro,
         rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
@@ -7453,6 +7506,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                   /*LifetimeDependenceInfo */ {}, hasSendingResult)
                   .withSendable(sendable)
                   .withAsync(async)
+                  .withCoroutine(coro)
                   .build();
 
   auto resultTy = MF.getTypeChecked(resultID);
@@ -7505,6 +7559,10 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                         MF.getIdentifier(internalLabelID));
   }
 
+  SmallVector<AnyFunctionType::Yield, 1> yields;
+  if (coro)
+    SET_OR_RETURN_ERROR(yields, MF.readYieldList());
+
   SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
 
   while (auto lifetimeDependence = MF.maybeReadLifetimeDependence()) {
@@ -7517,11 +7575,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
 
   if (!isGeneric) {
     assert(genericSig.isNull());
-    return FunctionType::get(params, resultTy.get(), info);
+    return FunctionType::get(params, yields, resultTy.get(), info);
   }
 
   assert(!genericSig.isNull());
-  return GenericFunctionType::get(genericSig, params, resultTy.get(), info);
+  return GenericFunctionType::get(genericSig, params, yields, resultTy.get(),
+                                  info);
 }
 
 Expected<Type> DESERIALIZE_TYPE(FUNCTION_TYPE)(

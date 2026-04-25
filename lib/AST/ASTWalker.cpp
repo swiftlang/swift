@@ -58,6 +58,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/YieldList.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -135,6 +136,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   [[nodiscard]]
   bool visit(ParameterList *PL) {
     return inherited::visit(PL);
+  }
+
+  [[nodiscard]]
+  bool visit(YieldList *YL) {
+    return inherited::visit(YL);
   }
 
   //===--------------------------------------------------------------------===//
@@ -548,10 +554,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-      if (!isa<AccessorDecl>(FD))
+      if (auto *YL = AFD->getYields())
+        if (visit(YL))
+          return true;
+
+      if (!isa<AccessorDecl>(FD)) {
         if (auto *const TyR = FD->getResultTypeRepr())
           if (doIt(TyR))
             return true;
+      }
     }
 
     // Visit trailing requirements
@@ -1572,6 +1583,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         [&]() { return Walker.walkToParameterListPost(PL); });
   }
 
+  [[nodiscard]]
+  bool visitYieldList(YieldList *YL) {
+    return traverse(
+        Walker.walkToYieldListPre(YL),
+        [&]() {
+          for (auto &Y : *YL) {
+            if (doIt(&Y))
+              return true;
+          }
+          return false;
+        },
+        [&]() { return Walker.walkToYieldListPost(YL); });
+  }
+
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 
@@ -1672,6 +1697,19 @@ public:
       }
     }
     return false;
+  }
+
+  [[nodiscard]]
+  bool doIt(Yield *Y) {
+    return traverse(
+        Walker.walkToYieldPre(Y),
+        [&]() {
+          if (Y->getTypeRepr())
+            if (doIt(Y->getTypeRepr()))
+              return true;
+          return false;
+        },
+        [&]() { return Walker.walkToYieldPost(Y); });
   }
 
 private:

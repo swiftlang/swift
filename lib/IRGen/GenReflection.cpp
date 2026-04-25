@@ -1783,7 +1783,7 @@ llvm::ArrayRef<CanType> IRGenModule::getOrCreateSpecialStlibBuiltinTypes() {
     // extra inhabitants as these. But maybe it's best not to codify
     // that in the ABI anyway.
     CanType thinFunction =
-        CanFunctionType::get({}, Context.TheEmptyTupleType,
+        CanFunctionType::get({}, {}, Context.TheEmptyTupleType,
                              AnyFunctionType::ExtInfo().withRepresentation(
                                  FunctionTypeRepresentation::Thin));
     SpecialStdlibBuiltinTypes.push_back(thinFunction);

@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=begin_apply | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=begin_apply  -enable-experimental-feature CoroutineFunctions | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_CoroutineFunctions
 
 sil_stage canonical
 
@@ -20,7 +21,7 @@ class Bar {
 sil @devirt_class_method : $@convention(thin) () -> (Int, @error any Error) {
 bb0:
   %0 = alloc_ref $Bar
-  %1 = class_method %0 : $Bar, #Bar.field!read : (Bar) -> () -> (), $@yield_once @convention(method) (@guaranteed Bar) -> @yields Int
+  %1 = class_method %0 : $Bar, #Bar.field!read : (Bar) -> @yield_once () yields (Int) -> (), $@yield_once @convention(method) (@guaranteed Bar) -> @yields Int
   (%2, %3) = begin_apply %1(%0) : $@yield_once @convention(method) (@guaranteed Bar) -> @yields Int
   end_apply %3 as $()
   return %2 : $Int

@@ -470,6 +470,13 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
       Printer << ")";
     }
   }
+  if (isCoroutine()) {
+    Printer << " ";
+    Printer.printKeyword("yields", Opts);
+    // FIXME: Do we need a PrintStructureKind for this?
+    printTypeRepr(YieldsTy, Printer, Opts);
+  }
+
   Printer << " -> ";
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
@@ -707,6 +714,10 @@ SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
   auto mem = C.Allocate(size, alignof(SILBoxTypeRepr));
   return new (mem) SILBoxTypeRepr(GenericParams, LBraceLoc, Fields, RBraceLoc,
                                   ArgLAngleLoc, GenericArgs, ArgRAngleLoc);
+}
+
+bool FunctionTypeRepr::isCoroutine() const {
+  return YieldsTy && YieldsTy->getParens().isValid();
 }
 
 SourceLoc FunctionTypeRepr::getStartLocImpl() const {

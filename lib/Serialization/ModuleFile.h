@@ -501,7 +501,7 @@ private:
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
   llvm::Expected<ParameterList *> readParameterList();
-  
+
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a generic param list, returns null
@@ -1137,6 +1137,8 @@ public:
 
   /// Reads pattern initializer text from \c DeclTypeCursor, if present.
   std::optional<StringRef> maybeReadPatternInitializerText();
+
+  llvm::Expected<SmallVector<AnyFunctionType::Yield, 1>> readYieldList();
 };
 
 template <typename T, typename RawData>

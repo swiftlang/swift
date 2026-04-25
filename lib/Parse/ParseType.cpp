@@ -25,6 +25,7 @@
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/ParserResult.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -410,6 +411,47 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   return makeParserResult(attrs.applyAttributesToType(*this, repr));
 }
 
+ParserStatus Parser::parseYieldTypes(TupleTypeRepr *&yieldTypes) {
+  if (!Tok.isContextualKeyword("yields"))
+    return makeParserSuccess();
+
+  if (!Context.LangOpts.hasFeature(Feature::CoroutineFunctions)) {
+    diagnose(Tok, diag::yields_requires_coroutine_functions);
+    return makeParserError();
+  }
+
+  consumeToken();
+
+  Parser::StructureMarkerRAII ParsingYieldTypes(*this, Tok);
+  SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
+
+  SmallVector<TupleTypeReprElement, 8> ElementsR;
+  ParserStatus status =
+      parseList(tok::r_paren, LPLoc, RPLoc,
+                /*AllowSepAfterLast=*/true,
+                diag::expected_rparen_tuple_type_list, [&]() -> ParserStatus {
+                  TupleTypeReprElement element;
+
+                  // Parse the type annotation.
+                  auto type = parseType(diag::expected_yield_type);
+                  if (type.hasCodeCompletion())
+                    return makeParserCodeCompletionStatus();
+                  if (type.isNull())
+                    return makeParserError();
+                  element.Type = type.get();
+
+                  // Record the ',' location.
+                  if (Tok.is(tok::comma))
+                    element.TrailingCommaLoc = Tok.getLoc();
+
+                  ElementsR.push_back(element);
+                  return makeParserSuccess();
+                });
+
+  yieldTypes =
+      TupleTypeRepr::create(Context, ElementsR, SourceRange(LPLoc, RPLoc));
+  return status;
+}
 
 /// parseTypeScalar
 ///   type-scalar:
@@ -417,7 +459,8 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///     attribute-list type-function
 ///
 ///   type-function:
-///     type-composition 'async'? 'throws'? '->' type-scalar
+///     type-composition 'async'? 'throws'? '->' ('yields' type-scalar)?
+///     type-scalar
 ///
 ParserResult<TypeRepr> Parser::parseTypeScalar(
     Diag<> MessageID, ParseTypeReason reason) {
@@ -480,11 +523,13 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
   TypeRepr *thrownTy = nullptr;
+  TupleTypeRepr *yieldsTy = nullptr;
   if (isAtFunctionTypeArrow()) {
     status |= parseEffectsSpecifiers(SourceLoc(),
                                      asyncLoc, /*reasync=*/nullptr,
                                      throwsLoc, /*rethrows=*/nullptr,
                                      thrownTy);
+    status |= parseYieldTypes(yieldsTy);
   }
 
   // Handle type-function if we have an arrow.
@@ -579,10 +624,10 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
       }
     }
 
-    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
-                                         thrownTy, arrowLoc, SecondHalf.get(),
-                                         patternGenerics, patternSubsTypes,
-                                         invocationSubsTypes);
+    tyR = new (Context)
+        FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc, thrownTy,
+                         yieldsTy, arrowLoc, SecondHalf.get(), patternGenerics,
+                         patternSubsTypes, invocationSubsTypes);
   } else if (auto firstGenerics = generics ? generics : patternGenerics) {
     // Only function types may be generic.
     auto brackets = firstGenerics->getSourceRange();
@@ -2070,6 +2115,12 @@ bool Parser::isAtFunctionTypeArrow() {
       return true;
 
     return false;
+  } else if (Tok.isContextualKeyword("yields") &&
+             peekToken().is(tok::l_paren)) {
+    BacktrackingScope backtrack(*this);
+    consumeToken();
+    skipSingle();
+    return isAtFunctionTypeArrow();
   }
 
   // Don't look for '->' in code completion. The user may write it later.

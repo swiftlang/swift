@@ -500,7 +500,10 @@ class LifetimeDependenceChecker {
   // represent the function result.
   const unsigned resultIndex;
 
-  // The result or yield type of the function being checked in its generic
+  // The result type of the function.
+  Type resultInterfaceType;
+
+  // The result type of the function being checked in its generic
   // environment.
   Type resultTy;
 
@@ -533,15 +536,24 @@ public:
   }
 
   static Type getResultOrYieldInterface(DeclContext *functionDC) {
-    if (auto *accessor = dyn_cast<AccessorDecl>(functionDC);
-        accessor && accessor->isCoroutine()) {
-      return accessor->getStorage()->getValueInterfaceType();
-    }
+    Type resultType;
     if (auto fn = dyn_cast<FuncDecl>(functionDC)) {
-      return fn->getResultInterfaceType();
+      resultType = fn->getResultInterfaceType();
+      if (fn->isCoroutine()) {
+        SmallVector<AnyFunctionType::Yield, 1> yields;
+        fn->getYieldInterfaceTypes(yields);
+
+        // TODO: Extend tracking to coroutines with multiple yields and / or
+        // yields and results.
+        ASSERT(/*resultType->isEqual(fn->getASTContext().TheEmptyTupleType) &&*/
+               yields.size() == 1);
+        resultType = yields.front().getType();
+      }
+    } else {
+      auto ctor = cast<ConstructorDecl>(functionDC);
+      resultType =  ctor->getResultInterfaceType();
     }
-    auto ctor = cast<ConstructorDecl>(functionDC);
-    return ctor->getResultInterfaceType();
+    return resultType;
   }
 
   static SourceLoc getReturnLoc(AbstractFunctionDecl *afd) {
@@ -645,7 +657,8 @@ public:
             swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
         genericEnv(afd->getGenericEnvironment()),
         resultIndex(getResultIndex(afd)),
-        resultTy(afd->mapTypeIntoEnvironment(getResultOrYieldInterface(afd))),
+        resultInterfaceType(getResultOrYieldInterface(afd)),
+        resultTy(afd->mapTypeIntoEnvironment(resultInterfaceType)),
         returnLoc(getReturnLoc(afd)),
         implicitSelfParamInfo(getSelfParamInfo(afd)),
         depBuilder(resultIndex),
@@ -667,15 +680,22 @@ public:
             swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
         genericEnv(env),
         resultIndex(funcType->getParams().size()),
-        resultTy(
-          GenericEnvironment::mapTypeIntoEnvironment(env,
-                                                     funcType->getResult())),
         returnLoc(funcRepr->getResultTypeRepr()->getLoc()),
         implicitSelfParamInfo(std::nullopt),
         depBuilder(resultIndex),
         isImplicit(false),
         isInit(false),
-        hasUnsafeNonEscapableResult(false) {}
+        hasUnsafeNonEscapableResult(false) {
+    if (funcType->isCoroutine()) {
+      assert(funcType->getYields().size() == 1);
+      resultTy = GenericEnvironment::mapTypeIntoEnvironment(
+        env, funcType->getYields().front().getType());
+    } else {
+      resultTy = 
+          GenericEnvironment::mapTypeIntoEnvironment(env,
+                                                     funcType->getResult());
+    }
+  }
 
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   currentDependencies() const {
@@ -1483,14 +1503,14 @@ protected:
       // regular methods...
     }
 
-    // Infer non-Escapable results.
+    // Infer non-Escapable results / yields
     if (isDiagnosedNonEscapable(resultTy)) {
       if (isInit && isImplicitOrSIL()) {
         inferImplicitInit();
       } else {
         // Apply the same-type rule before the single parameter rule. The
         // same-type rule does not trigger any diagnostics.
-        inferNonEscapableResultOnSameTypeParam();
+        inferNonEscapableResultOnSameTypeParam(resultTy);
 
         if (hasImplicitSelfParam()) {
           // Methods that return a non-Escapable value - single parameter
@@ -1519,7 +1539,7 @@ protected:
   //     @_lifetime(copy a) // OK: Optional<T>: Escapable requires T: Escapable
   //     func foo<T: ~Escapable>(a: T?) -> T {
   //
-  void inferNonEscapableResultOnSameTypeParam() {
+  void inferNonEscapableResultOnSameTypeParam(Type resultType) {
     // Check that no @_lifetime annotation is present for the function result.
     TargetDeps *targetDeps = depBuilder.getInferredTargetDeps(resultIndex);
     if (!targetDeps)

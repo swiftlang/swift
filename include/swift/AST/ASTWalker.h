@@ -32,6 +32,8 @@ class Stmt;
 class Pattern;
 class TypeRepr;
 class ParameterList;
+class YieldList;
+class Yield;
 enum class AccessKind: unsigned char;
 
 enum class SemaReferenceKind : uint8_t {
@@ -740,6 +742,51 @@ public:
   ///
   /// The default implementation returns \c Action::Continue().
   virtual PostWalkAction walkToArgumentPost(const Argument &Arg) {
+    return Action::Continue();
+  }
+
+  /// walkToYieldListPre - This method is called when first visiting a
+  /// YieldList, before walking into yield types.
+  ///
+  /// \param YL The yield list to walk.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PreWalkAction walkToYieldListPre(YieldList *PL) {
+    return Action::Continue();
+  }
+
+  /// walkToYieldListPost - This method is called after visiting the
+  /// children of a yield list.
+  ///
+  /// \param YL The yield list that was walked.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PostWalkAction walkToYieldListPost(YieldList *PL) {
+    return Action::Continue();
+  }
+
+  /// This method is called when first visiting a yield before walking into
+  /// its children.
+  ///
+  /// \param Y The yield to check.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PreWalkAction walkToYieldPre(Yield *Y) { return Action::Continue(); }
+
+  /// This method is called after visiting yield.
+  ///
+  /// \param Y The yield that was walked.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PostWalkAction walkToYieldPost(Yield *Y) {
     return Action::Continue();
   }
 

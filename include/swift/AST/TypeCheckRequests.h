@@ -2581,6 +2581,26 @@ public:
   void cacheResult(Type value) const;
 };
 
+/// Determines the yield type of a coroutine
+class YieldsTypeRequest
+    : public SimpleRequest<YieldsTypeRequest, Type(FuncDecl *, unsigned),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, FuncDecl *decl, unsigned idx) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 class PatternBindingEntryRequest
     : public SimpleRequest<PatternBindingEntryRequest,
                            const PatternBindingEntry *(PatternBindingDecl *,

@@ -1163,8 +1163,14 @@ public:
 
     SmallVector<AnyFunctionType::Yield, 4> buffer;
     auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
-    auto yieldResults = TheFunc->getBodyYieldResults(buffer);
+    // Checking yields requires proper interface type. If decl is invalid, then
+    // we already emitted diagnostics elsewhere.
+    if (auto *AFD = TheFunc->getAbstractFunctionDecl()) {
+      if (AFD->isInvalid())
+        return YS;
+    }
 
+    auto yieldResults = TheFunc->getBodyYieldResults(buffer);
     auto yieldExprs = YS->getMutableYields();
     if (yieldExprs.size() != yieldResults.size()) {
       getASTContext().Diags.diagnose(YS->getYieldLoc(), diag::bad_yield_count,

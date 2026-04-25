@@ -1116,6 +1116,46 @@ void ResultTypeRequest::cacheResult(Type type) const {
 }
 
 //----------------------------------------------------------------------------//
+// YieldTypeRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<Type> YieldsTypeRequest::getCachedResult() const {
+  auto *const funcDecl = std::get<0>(getStorage());
+  unsigned idx = std::get<1>(getStorage());
+
+  auto *bodyYields = funcDecl->getYields();
+  ASSERT(bodyYields && idx < bodyYields->size());
+
+  const auto &yield = bodyYields->get(idx);
+  Type type = yield.typeAndFlags.getPointer();
+
+  if (type.isNull())
+    return std::nullopt;
+
+  YieldTypeFlags flags = yield.getFlags();
+  if (flags.isInOut())
+    type = InOutType::get(type);
+
+  return type;
+}
+
+void YieldsTypeRequest::cacheResult(Type type) const {
+  auto *const funcDecl = std::get<0>(getStorage());
+  unsigned idx = std::get<1>(getStorage());
+
+  auto *bodyYields = funcDecl->getYields();
+  ASSERT(bodyYields && idx < bodyYields->size());
+
+  auto &yield = bodyYields->get(idx);
+  YieldTypeFlags flags = yield.getFlags();
+  if (auto inoutType = type->getAs<InOutType>()) {
+    flags = flags.withInOut(true);
+    type = inoutType->getObjectType();
+  }
+
+  yield.setType(type, flags);
+}
+
+//----------------------------------------------------------------------------//
 // PatternBindingEntryRequest computation.
 //----------------------------------------------------------------------------//
 

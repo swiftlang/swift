@@ -1296,7 +1296,7 @@ class TargetExtendedFunctionTypeFlags {
     NonIsolatedNonsending  = 0x00000004U,
 
     // Values if we have a sending result.
-    HasSendingResult  = 0x00000010U,
+    HasSendingResult       = 0x00000010U,
 
     /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,

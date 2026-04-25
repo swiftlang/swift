@@ -1305,6 +1305,32 @@ namespace {
       printFoot();
     }
 
+    /// Print a yield list as a child node.
+    void printRec(const YieldList *yields, Label label,
+                  const ASTContext *ctx = nullptr) {
+      if (!yields) {
+        printHead("<<NULL yields>>", ParameterColor, label);
+      } else {
+        printRecArbitrary(
+            [&](Label label) { visitYieldList(yields, label, ctx); }, label);
+      }
+    }
+
+    /// Print a yield list node.
+    void visitYieldList(const YieldList *yields, Label label,
+                        const ASTContext *ctx = nullptr) {
+      printHead("yield_list", ParameterColor, label);
+
+      printSourceRange(yields->getSourceRange(), ctx);
+
+      printList(
+          *yields,
+          [&](auto &Y, Label label) { printRec(Y.getTypeRepr(), label); },
+          Label::optional("yields"));
+
+      printFoot();
+    }
+
     /// Print an \c IfConfigClause as a child node.
     void printRec(const IfConfigClause &Clause, Label label,
                   const ASTContext *Ctx = nullptr) {
@@ -2868,6 +2894,11 @@ namespace {
             opaque && *opaque != nullptr) {
           printRec(*opaque, Label::always("opaque_result_decl"));
         }
+
+        if (FD->isCoroutine()) {
+          printRec(D->getYields(), Label::optional("yields"),
+                   &D->getASTContext());
+        }
       }
 
       printTypeOrTypeRepr(D->getCachedThrownInterfaceType(),
@@ -2920,6 +2951,7 @@ namespace {
     void printCommonFD(FuncDecl *FD, const char *type, Label label) {
       printCommonAFD(FD, type, label);
       printFlag(FD->isStatic(), "static", DeclModifierColor);
+      printFlag(FD->isCoroutine(), "@yield_once", DeclModifierColor);
     }
 
     void visitFuncDecl(FuncDecl *FD, Label label) {
@@ -5070,6 +5102,7 @@ public:
   TRIVIAL_ATTR_PRINTER(CompilerInitialized, compiler_initialized)
   TRIVIAL_ATTR_PRINTER(Consuming, consuming)
   TRIVIAL_ATTR_PRINTER(Convenience, convenience)
+  TRIVIAL_ATTR_PRINTER(Coroutine, coroutine)
   TRIVIAL_ATTR_PRINTER(DiscardableResult, discardable_result)
   TRIVIAL_ATTR_PRINTER(DisfavoredOverload, disfavored_overload)
   TRIVIAL_ATTR_PRINTER(DistributedActor, distributed_actor)
@@ -6613,6 +6646,32 @@ namespace {
       }, label);
     }
 
+    void printAnyFunctionYieldsRec(ArrayRef<AnyFunctionType::Yield> yields,
+                                   Label label) {
+      printRecArbitrary(
+          [&](Label label) {
+            printHead("coroutine_yields", FieldLabelColor, label);
+            printField(yields.size(), Label::always("num_yields"));
+            printList(
+                yields,
+                [&](const auto &yield, Label label) {
+                  printRecArbitrary(
+                      [&](Label label) {
+                        printHead("yield", FieldLabelColor, label);
+
+                        printFlag(yield.isInOut(), "inout");
+                        printRec(yield.getType(),
+                                 Label::optional("yield_type"));
+                        printFoot();
+                      },
+                      label);
+                },
+                Label::optional("yields"));
+            printFoot();
+          },
+          label);
+    }
+
     void printClangTypeRec(const ClangTypeInfo &info, const ASTContext &ctx,
                            Label label) {
       // [TODO: Improve-Clang-type-printing]
@@ -6645,6 +6704,7 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
+        printFlag(T->isCoroutine(), "@yield_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {
           default:
@@ -6690,6 +6750,8 @@ namespace {
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
                         Label::optional("clang_type_info"));
       printAnyFunctionParamsRec(T->getParams(), Label::always("input"));
+      if (T->isCoroutine())
+        printAnyFunctionYieldsRec(T->getYields(), Label::always("yields"));
       printRec(T->getResult(), Label::always("output"));
       if (Type thrownError = T->getThrownError()) {
         printRec(thrownError, Label::always("thrown_error"));

@@ -722,6 +722,7 @@ extension ASTGenVisitor {
     var throwsLoc: SourceLoc
     var isRethrows: Bool
     var thrownType: BridgedTypeRepr?
+    var yieldList: BridgedYieldList?
     var returnType: BridgedTypeRepr?
   }
   
@@ -736,6 +737,7 @@ extension ASTGenVisitor {
     let isRethrows = node.effectSpecifiers?.throwsClause?.throwsSpecifier.rawText == "rethrows"
     let thrownType = (node.effectSpecifiers?.thrownError).map(self.generate(type:))
     let returnType = (node.returnClause?.type).map(self.generate(type:))
+    let yieldList = self.generate(functionYieldClause: node.yieldClause)
     return GeneratedFunctionSignature(
       parameterList: parameterList,
       asyncLoc: asyncLoc,
@@ -743,6 +745,7 @@ extension ASTGenVisitor {
       throwsLoc: throwsLoc,
       isRethrows: isRethrows,
       thrownType: thrownType,
+      yieldList: yieldList,
       returnType: returnType
     )
   } 
@@ -770,6 +773,7 @@ extension ASTGenVisitor {
       asyncSpecifierLoc: signature.asyncLoc,
       throwsSpecifierLoc: signature.throwsLoc,
       thrownType: signature.thrownType.asNullable,
+      yieldList: signature.yieldList.asNullable,
       returnType: signature.returnType.asNullable,
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )

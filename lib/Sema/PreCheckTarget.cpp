@@ -2526,6 +2526,12 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
       assert(ThrownTypeRepr && "Parser ensures that this never fails");
     }
 
+    TupleTypeRepr *YieldsTypeRepr = nullptr;
+    if (auto yieldsTypeExpr = AE->getYieldsExpr()) {
+      YieldsTypeRepr = extractInputTypeRepr(yieldsTypeExpr);
+      assert(YieldsTypeRepr && "Parser ensures that this never fails");
+    }
+
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
       Ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
@@ -2533,10 +2539,9 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
       ResultTypeRepr = makeErrorTypeRepr(AE->getResultExpr());
     }
 
-    auto NewTypeRepr = new (Ctx)
-        FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getAsyncLoc(),
-                         AE->getThrowsLoc(), ThrownTypeRepr, AE->getArrowLoc(),
-                         ResultTypeRepr);
+    auto NewTypeRepr = new (Ctx) FunctionTypeRepr(
+        nullptr, ArgsTypeRepr, AE->getAsyncLoc(), AE->getThrowsLoc(),
+        ThrownTypeRepr, YieldsTypeRepr, AE->getArrowLoc(), ResultTypeRepr);
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
 
