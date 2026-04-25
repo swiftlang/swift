@@ -1360,6 +1360,21 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
   if (ToAI->getSubstitutionMap().getReplacementTypes().size() != 1)
     return false;
 
+  // Bail out if any apply argument (other than the open_existential_addr
+  // itself) has a type that depends on the opened archetype. The operand
+  // replacement below cannot remap such types, which would result in an
+  // apply with mismatched archetypes.
+  auto *FromEnv = From->getDefinedOpenedArchetype()->getGenericEnvironment();
+  for (auto Op : FromAI->getArguments()) {
+    if (Op == From) {
+      continue;
+    }
+    if (Op->getType().hasOpenedExistential() &&
+        Op->getType().getASTType()->hasLocalArchetypeFromEnvironment(FromEnv)) {
+      return false;
+    }
+  }
+
   // Prepare the Apply args.
   SmallVector<SILValue, 8> Args;
   for (auto Op : FromAI->getArguments()) {
