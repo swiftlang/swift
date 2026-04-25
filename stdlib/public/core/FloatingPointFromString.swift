@@ -2311,6 +2311,9 @@ internal func parse_float64(_ span: Span<UInt8>) -> Optional<Float64> {
           case .plus:
             return Double(digits)
           case .minus:
+            if digits == UInt64(bitPattern: Int64.min) {
+              return Double(-Int64(truncatingIfNeeded: UInt64.max/2))
+            }
             return Double(-Int64(truncatingIfNeeded: digits))
           }
         }
