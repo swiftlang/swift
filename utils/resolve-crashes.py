@@ -4,14 +4,14 @@
 # where some compiler crashers have been fixed, and move them into the
 # "fixed" testsuite, removing the "--crash" in the process.
 
-import os
+import importlib
 import re
 import sys
 
 
 def execute_cmd(cmd):
     print(cmd)
-    os.system(cmd)
+    importlib.import_module('subprocess').run(cmd)
 
 
 # The regular expression we use to match compiler-crasher lines.
@@ -30,24 +30,17 @@ for line in sys.stdin:
         # Move the test over to the fixed suite.
         from_filename = 'validation-test/%s/%s' % (suffix, filename)
         to_filename = 'validation-test/%s_fixed/%s' % (suffix, filename)
-        git_mv_cmd = 'git mv %s %s' % (from_filename, to_filename)
-        execute_cmd(git_mv_cmd)
+        execute_cmd(['git', 'mv', from_filename, to_filename])
 
         # Replace "not --crash" with "not".
-        sed_replace_not_cmd = 'sed -e "s/not --crash/not/" -i "" %s' % (
-            to_filename)
-        execute_cmd(sed_replace_not_cmd)
+        execute_cmd(['sed', '-e', 's/not --crash/not/', '-i', '', to_filename])
 
         # Remove "// XFAIL: whatever" lines.
-        sed_remove_xfail_cmd = 'sed -e "s|^//.*XFAIL.*$||g" -i "" %s' % (
-            to_filename)
-        execute_cmd(sed_remove_xfail_cmd)
+        execute_cmd(['sed', '-e', 's|^//.*XFAIL.*$||g', '-i', '', to_filename])
 
         # Remove "// REQUIRES: asserts" lines.
-        sed_remove_requires_asserts_cmd = \
-            'sed -e "s|^//.*REQUIRES: asserts.*$||g" -i "" %s' % (to_filename)
-        execute_cmd(sed_remove_requires_asserts_cmd)
+        execute_cmd(['sed', '-e', 's|^//.*REQUIRES: asserts.*$||g', '-i', '',
+                     to_filename])
 
         # "git add" the result.
-        git_add_cmd = 'git add %s' % (to_filename)
-        execute_cmd(git_add_cmd)
+        execute_cmd(['git', 'add', to_filename])
