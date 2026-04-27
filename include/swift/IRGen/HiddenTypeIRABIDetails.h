@@ -37,6 +37,7 @@ class HiddenTypeIRABIInfo : public ASTAllocated<HiddenTypeIRABIInfo> {
 public:
   enum class Kind {
     LoadableStruct,
+    AddressOnlyStruct,
   };
 
 private:
@@ -70,16 +71,17 @@ class HiddenStructTypeIRABIInfo : public HiddenTypeIRABIInfo {
 public:
   const bool Copyable;
 
-  HiddenStructTypeIRABIInfo(llvm::ArrayRef<Type> fieldTypes,
+  HiddenStructTypeIRABIInfo(Kind kind, llvm::ArrayRef<Type> fieldTypes,
                             bool copyable)
-      : HiddenTypeIRABIInfo(Kind::LoadableStruct),
+      : HiddenTypeIRABIInfo(kind),
         FieldTypes(fieldTypes.begin(), fieldTypes.end()),
         Copyable(copyable) {}
 
   llvm::ArrayRef<Type> getFieldTypes() const { return FieldTypes; }
 
   static bool classof(const HiddenTypeIRABIInfo *info) {
-    return info->getKind() == Kind::LoadableStruct;
+    return info->getKind() == Kind::LoadableStruct ||
+           info->getKind() == Kind::AddressOnlyStruct;
   }
 
 protected:

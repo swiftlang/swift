@@ -5893,8 +5893,9 @@ ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
     auto *decl = HiddenTypeLayoutInfoDecl::create(ctx, DC);
     switch (kind) {
       case irgen::HiddenTypeIRABIInfo::Kind::LoadableStruct:
+      case irgen::HiddenTypeIRABIInfo::Kind::AddressOnlyStruct:
         abiInfo = new (ctx) irgen::HiddenStructTypeIRABIInfo(
-            fieldTypes, isCopyable);
+            kind, fieldTypes, isCopyable);
         break;
       default:
         llvm_unreachable("unhandled hidden struct type kind");

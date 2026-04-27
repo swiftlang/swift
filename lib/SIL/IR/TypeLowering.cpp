@@ -2766,16 +2766,16 @@ namespace {
       auto *abiInfo = type->getDecl()->getABIInfo();
       assert(abiInfo && "HiddenTypeLayoutInfoType should have ABI info");
 
-      if (auto *loadable =
-              dyn_cast<irgen::HiddenStructTypeIRABIInfo>(abiInfo)) {
-        auto properties = mergeIsTypeExpansionSensitive(
-            isSensitive, loadable->getSILTypeProperties());
-        if (loadable->getSILTypeProperties().isTrivial())
+      auto properties = mergeIsTypeExpansionSensitive(
+          isSensitive, abiInfo->getSILTypeProperties());
+      switch (abiInfo->getKind()) {
+      case irgen::HiddenTypeIRABIInfo::Kind::LoadableStruct:
+        if (abiInfo->getSILTypeProperties().isTrivial())
           return handleTrivial(type, properties);
         return new (TC) MiscNontrivialTypeLowering(type, properties, Expansion);
+      case irgen::HiddenTypeIRABIInfo::Kind::AddressOnlyStruct:
+        return handleAddressOnly(type, properties);
       }
-
-      llvm_unreachable("unhandled HiddenTypeIRABIInfo kind");
     }
 
     // WARNING: when the specification of trivial types changes, also update

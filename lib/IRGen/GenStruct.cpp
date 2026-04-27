@@ -80,6 +80,7 @@ enum class StructTypeInfoKind {
   NonFixedStructTypeInfo,
   ResilientStructTypeInfo,
   HiddenLoadableStructTypeInfo,
+  HiddenFixedStructTypeInfo,
 };
 
 static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
@@ -1036,6 +1037,7 @@ namespace {
         fieldTypes.push_back(field.Field->getInterfaceType());
 
       return new (ctx) HiddenStructTypeIRABIInfo(
+          HiddenTypeIRABIInfo::Kind::LoadableStruct,
           fieldTypes,
           isCopyable(ResilienceExpansion::Minimal));
     }
@@ -1131,6 +1133,17 @@ namespace {
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
                                    const StructFieldInfo &field) const {
       llvm_unreachable("non-fixed field in fixed struct?");
+    }
+
+    HiddenTypeIRABIInfo *getHiddenTypeIRABIInfo(ASTContext &ctx) const override {
+      SmallVector<Type, 8> fieldTypes;
+      for (auto &field : getFields())
+        fieldTypes.push_back(field.Field->getInterfaceType());
+
+      return new (ctx) HiddenStructTypeIRABIInfo(
+          HiddenTypeIRABIInfo::Kind::AddressOnlyStruct,
+          fieldTypes,
+          isCopyable(ResilienceExpansion::Minimal));
     }
   };
 
@@ -1716,6 +1729,8 @@ private:
       llvm_unreachable("resilient structs are opaque");                        \
     case StructTypeInfoKind::HiddenLoadableStructTypeInfo:                    \
       llvm_unreachable("hidden structs don't have named fields");             \
+    case StructTypeInfoKind::HiddenFixedStructTypeInfo:                      \
+      llvm_unreachable("hidden structs don't have named fields");             \
     }                                                                          \
     llvm_unreachable("bad struct type info kind!");                            \
   } while (0)
@@ -1920,6 +1935,64 @@ public:
   }
 };
 
+/// A type implementation for fixed-size, address-only hidden value types.
+class HiddenFixedStructTypeInfo final
+    : public RecordTypeInfo<HiddenFixedStructTypeInfo,
+                            IndirectTypeInfo<HiddenFixedStructTypeInfo,
+                                             FixedTypeInfo>,
+                            HiddenFieldInfo> {
+  using super = RecordTypeInfo<HiddenFixedStructTypeInfo,
+                               IndirectTypeInfo<HiddenFixedStructTypeInfo,
+                                                FixedTypeInfo>,
+                               HiddenFieldInfo>;
+public:
+  HiddenFixedStructTypeInfo(ArrayRef<HiddenFieldInfo> fields,
+                            FieldsAreABIAccessible_t areFieldsABIAccessible,
+                            llvm::Type *storageType, Size size,
+                            SpareBitVector &&spareBits,
+                            Alignment align,
+                            IsTriviallyDestroyable_t isTriviallyDestroyable,
+                            IsBitwiseTakable_t isBitwiseTakable,
+                            IsCopyable_t isCopyable,
+                            IsFixedSize_t alwaysFixedSize,
+                            IsABIAccessible_t isABIAccessible)
+      : super(fields, areFieldsABIAccessible,
+              storageType, size, std::move(spareBits),
+              align, isTriviallyDestroyable, isBitwiseTakable,
+              isCopyable,
+              alwaysFixedSize, isABIAccessible)
+  {
+    setSubclassKind((unsigned)StructTypeInfoKind::HiddenFixedStructTypeInfo);
+  }
+
+  std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+    return std::nullopt;
+  }
+  std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+    return std::nullopt;
+  }
+
+  Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
+                              const HiddenFieldInfo &field) const {
+    if (field.isEmpty())
+      return addr;
+    return field.projectAddress(IGF, addr, std::nullopt);
+  }
+
+  MemberAccessStrategy
+  getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
+                                 const HiddenFieldInfo &field) const {
+    llvm_unreachable("non-fixed field in fixed hidden struct?");
+  }
+
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
+    llvm_unreachable("type layout entry for hidden address-only types not yet supported");
+  }
+};
+
 const TypeInfo *irgen::createTypeInfoFromHiddenStructTypeABIInfo(
     IRGenModule &IGM,
     CanType type,
@@ -1967,6 +2040,25 @@ const TypeInfo *irgen::createTypeInfoFromHiddenStructTypeABIInfo(
           std::move(layout.getSpareBits()), layout.getAlignment(),
           triviallyDestroyable, copyable,
           layout.isAlwaysFixedSize(), isTypeABIAccessibleIfFixedSize(IGM, type));
+    }
+    case HiddenTypeIRABIInfo::Kind::AddressOnlyStruct: {
+      SmallVector<HiddenFieldInfo, 8> fields;
+      auto fieldsABIAccessible = FieldsAreABIAccessible;
+      for (unsigned i = 0, e = fieldTIs.size(); i != e; ++i) {
+        if (!fieldTIs[i]->isABIAccessible())
+          fieldsABIAccessible = FieldsAreNotABIAccessible;
+
+        fields.push_back(HiddenFieldInfo(fieldSILTypes[i],
+                                        layout.getElements()[i],
+                                        0, 0));
+      }
+
+      return HiddenFixedStructTypeInfo::create(
+          fields, fieldsABIAccessible,
+          layout.getType(), layout.getSize(),
+          std::move(layout.getSpareBits()), layout.getAlignment(),
+          triviallyDestroyable, layout.isBitwiseTakable(),
+          copyable, layout.isAlwaysFixedSize(), isTypeABIAccessibleIfFixedSize(IGM, type));
     }
   }
 }
