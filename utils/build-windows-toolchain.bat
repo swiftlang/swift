@@ -81,6 +81,9 @@ set "WindowsSDKArgs=-Windows"
 if "%INCLUDE_PACKAGING%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKLinkModes dynamic"
 if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKArchitectures %WINDOWS_SDKS%"
 
+:: Build the arguments related to WASI SDK builds
+set "WASISDKArgs=-WASI"
+
 :: Build the -HostArchName argument, if any.
 set "HostArchNameArg="
 if not "%HOST_ARCH_NAME%"=="" set "HostArchNameArg=-HostArchName %HOST_ARCH_NAME%"
@@ -94,6 +97,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
   %WindowsSDKArgs% ^
+  %WASISDKArgs% ^
   %PackagingArg% ^
   %TestArg% ^
   -IncludeSBoM ^

@@ -195,6 +195,14 @@ param
   [string[]] $AndroidSDKVersions = @("Android", "AndroidExperimental"),
   [string] $AndroidSDKVersionDefault = "Android",
 
+  # WASI SDK Options
+  [switch] $WASI = $false,
+  [string[]] $WASISDKArchitectures = @("wasm32"),
+  [ValidateSet("dynamic", "static")]
+  [string[]] $WASISDKLinkModes = @("static"),
+  [string[]] $WASISDKVersions = @("WASIExperimental"),
+  [string] $WASISDKVersionDefault = "WASIExperimental",
+
   # Windows SDK Options
   [switch] $Windows = $false,
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
@@ -284,6 +292,7 @@ $DefaultPinned = @{
 enum OS {
   Windows
   Android
+  WASI
 }
 
 $KnownPlatforms = @{
@@ -390,6 +399,20 @@ $KnownPlatforms = @{
     Cache = @{};
     DefaultSDK = $AndroidSDKVersionDefault;
     LinkModes = $AndroidSDKLinkModes;
+  };
+
+  WASI32 = @{
+    OS = [OS]::WASI;
+    Triple = "wasm32-unknown-wasip1";
+    Architecture = @{
+      ABI = "wasm32";
+      CMakeName = "wasm32";
+      LLVMName = "wasm32";
+      ShortName = "wasm32";
+    };
+    BinaryDir = "bin";
+    DefaultSDK = $WASISDKVersionDefault;
+    LinkModes = $WASISDKLinkModes;
   };
 }
 
@@ -591,6 +614,13 @@ $AndroidSDKBuilds = @($AndroidSDKArchitectures | ForEach-Object {
     "i686" { $KnownPlatforms["AndroidX86"] }
     "x86_64" { $KnownPlatforms["AndroidX64"] }
     default { throw "No Android platform for architecture $_" }
+  }
+})
+
+$WASISDKBuilds = @($WASISDKArchitectures | ForEach-Object {
+  switch ($_) {
+    "wasm32" { $KnownPlatforms["WASI32"] }
+    default { throw "No WASI platform for architecture $_" }
   }
 })
 
@@ -1405,6 +1435,7 @@ function Build-CMakeProject {
     [string[]] $UsePinnedCompilers = @(),
     [switch] $AddAndroidCMakeEnv = $false,
     [switch] $UseGNUDriver = $false,
+    [switch] $freestanding = $false,
     [string] $SwiftSDK = $null,
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
     [string[]] $BuildTargets = @()
@@ -1500,9 +1531,24 @@ function Build-CMakeProject {
     #
     # TODO(etcwilde) consider removing this once we have removed
     # SwiftSupport.cmake across the project.
-    if (($Platform.OS -ne [OS]::Windows) -or ($Platform.Architecture.CMakeName -ne $BuildPlatform.Architecture.CMakeName)) {
-      Add-KeyValueIfNew $Defines CMAKE_SYSTEM_NAME $Platform.OS.ToString()
-      Add-KeyValueIfNew $Defines CMAKE_SYSTEM_PROCESSOR $Platform.Architecture.CMakeName
+    switch ($Platform.OS) {
+      WASI {
+        if ($CMakeVersion -gt [version]"3.31.0") {
+          Add-KeyValueIfNew $Defines CMAKE_SYSTEM_NAME $Platform.OS.ToString()
+        } else {
+          Add-KeyValueIfNew $Defines CMAKE_SYSTEM_NAME Generic
+        }
+        Add-KeyValueIfNew $Defines CMAKE_SYSTEM_PROCESSOR $Platform.Architecture.CMakeName
+      }
+      Windows {
+      }
+      default {
+        if ($Platform.Architecture.CMakeName -eq $BuildPlatform.Architecture.CMakeName) {
+          break
+        }
+        Add-KeyValueIfNew $Defines CMAKE_SYSTEM_NAME $Platform.OS.ToString()
+        Add-KeyValueIfNew $Defines CMAKE_SYSTEM_PROCESSOR $Platform.Architecture.CMakeName
+      }
     }
 
     # Always prefer the CONFIG format for the packages so that we can build
@@ -1510,6 +1556,87 @@ function Build-CMakeProject {
     Add-KeyValueIfNew $Defines CMAKE_FIND_PACKAGE_PREFER_CONFIG YES
 
     switch ($Platform.OS) {
+      WASI {
+        $sysroot = "$(Get-SwiftSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr"
+
+        if ($UseC) {
+          $CC = if ($UseBuiltCompilers.Contains("C")) {
+            [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang.exe")
+          } elseif ($UsePinnedCompilers.Contains("C")) {
+            Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang.exe"
+          }
+
+          Add-KeyValueIfNew $Defines CMAKE_C_COMPILER $CC
+          Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_TARGET $Platform.Triple
+
+          # TODO(compnerd) we should consider enabling stack protector usage for standard libraries.
+          $CFLAGS = @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer", "-finline-functions")
+          if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
+            $CFLAGS += @("-gdwarf")
+          }
+
+          # NOTE(compnerd) we stage a custom compiler resource dir which must be used
+          if (-not $freestanding) {
+            $CFLAGS += @("-resource-dir", "$BinaryCache\$($Platform.Triple)\resources")
+            # NOTE(compnerd) `--sysroot` is apparently not wired into the standard library search
+            $CFLAGS += @("-L$BinaryCache\$($Platform.Triple)\usr\lib");
+          }
+
+          Add-FlagsDefine $Defines CMAKE_C_FLAGS $CFLAGS
+          Add-KeyValueIfNew $Defines CMAKE_SYSROOT $sysroot
+        }
+
+        if ($UseCXX) {
+          $CXX = if ($UseBuiltCompilers.Contains("CXX")) {
+            [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang++.exe")
+          } elseif ($UsePinnedCompilers.Contains("CXX")) {
+            Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang++.exe"
+          }
+
+          Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER $CXX
+          Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_TARGET $Platform.Triple
+
+          # TODO(compnerd) we should consider enabling stack protector usage for standard libraries.
+          $CXXFLAGS = @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer", "-finline-functions")
+          if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
+            $CXXFLAGS += @("-gdwarf")
+          }
+
+          if (-not $freestanding) {
+            # NOTE(compnerd) we stage a custom compiler resource dir which must be used
+            $CXXFLAGS += @("-resource-dir", "$BinaryCache\$($Platform.Triple)\resources")
+            # NOTE(compnerd) `--sysroot` is apparently not wired into the standard library search
+            $CXXFLAGS += @("-L$(Get-SwiftSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr\lib");
+          }
+
+          Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFLAGS
+          Add-KeyValueIfNew $Defines CMAKE_SYSROOT $sysroot
+        }
+
+        if ($UseSwift) {
+          if ($UseBuiltCompilers.Contains("Swift")) {
+            Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_WORKS "YES"
+          }
+
+          $SWIFTC = if ($UseBuiltCompilers.Contains("Swift")) {
+            [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "swiftc.exe")
+          } elseif ($UsePinnedCompilers.Contains("Swift")) {
+            Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "swiftc.exe"
+          }
+
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
+          # Skip compiler ID detection: avoids compiling+scanning a multi-MB test binary on every configure.
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_ID "Apple"
+
+          $SwiftFlags = if ($SwiftSDK) { @("-sdk", $SwiftSDK, "-static-stdlib") } else { @() }
+          $SwiftFlags += @("-sysroot", $sysroot)
+          $SwiftFlags += if ($DebugInfo) { @("-g") } else { @("-gnone") }
+
+          Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftFlags
+        }
+      }
+
       Windows {
         if ($UseASM) {
           $Driver = $(if ($UseGNUDriver) { "clang.exe" } else { "clang-cl.exe" })
@@ -2499,27 +2626,47 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
 
   $InstallRoot = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
 
+  $PlatformDefines = @{}
+  if ($Platform.OS -eq [OS]::WASI) {
+    $PlatformDefines += @{
+      # NOTE(compnerd) workaround the compiler-rt build system which also does
+      # not honour `CMAKE_C_COMPILE_TARGET`
+      CMAKE_C_FLAGS = @("-target", $Platform.Triple);
+      # WASI does not provide mmap yet, so exclude some of the hosted functionality.
+      COMPILER_RT_BAREMETAL_BUILD = "YES";
+    }
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt\lib\builtins `
     -Bin "$(Get-ProjectBinaryCache $Platform ClangBuiltins)" `
     -InstallTo $InstallRoot `
     -Platform $Platform `
-    -UseBuiltCompilers ASM,C,CXX `
+    -freestanding `
+    -UsePinnedCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
-    -Defines @{
+    -Defines ($PlatformDefines + @{
       LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
+    })
+
+  if ($Platform.OS -eq [OS]::WASI) {
+    $PlatformDefines = @{
+      CMAKE_C_COMPILER_WORKS = "YES";
+      CMAKE_CXX_COMPILER_WORKS = "YES";
     }
+  }
 
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt `
     -Bin "$(Get-ProjectBinaryCache $Platform ClangRuntime)" `
     -InstallTo $InstallRoot `
     -Platform $Platform `
-    -UseBuiltCompilers ASM,C,CXX `
+    -freestanding `
+    -UsePinnedCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
-    -Defines @{
+    -Defines ($PlatformDefines + @{
       LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
@@ -2530,7 +2677,7 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
       COMPILER_RT_BUILD_XRAY = "NO";
       COMPILER_RT_BUILD_PROFILE = "YES";
       COMPILER_RT_BUILD_SANITIZERS = "YES";
-    }
+    })
 }
 
 function Build-Brotli([Hashtable] $Platform) {
@@ -2600,7 +2747,7 @@ function Build-XML2([Hashtable] $Platform) {
       LIBXML2_WITH_SCHEMATRON = "NO";
       LIBXML2_WITH_TESTS = "NO";
       LIBXML2_WITH_THREAD_ALLOC = "NO";
-      LIBXML2_WITH_THREADS = "YES";
+      LIBXML2_WITH_THREADS = if ($Platform.OS -eq [OS]::WASI) { "NO" } else { "YES" };
       LIBXML2_WITH_TREE = "YES";
       LIBXML2_WITH_VALID = "YES";
       LIBXML2_WITH_WRITER = "NO";
@@ -2637,6 +2784,54 @@ function Build-DS2([Hashtable] $Platform) {
       DS2_PROGRAM_PREFIX = "$(Get-ModuleTriple $Platform)-";
       BISON_EXECUTABLE = "$(Get-BisonExecutable)";
       FLEX_EXECUTABLE = "$(Get-FlexExecutable)";
+    }
+}
+
+function Build-WASIC([Hashtable] $Platform) {
+  $SDKRoot = Get-SwiftSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental"
+
+  Build-CMakeProject `
+    -Src "$SourceCache\wasi-libc" `
+    -Bin "$BinaryCache\$($Platform.Triple)\wasi-libc" `
+    -InstallTo "${SDKRoot}\usr" `
+    -Platform $Platform `
+    -UsePinnedCompilers @("C") `
+    -Defines @{
+      BUILD_SHARED = "NO";
+      TARGET_TRIPLE = $Platform.Triple;
+      CMAKE_INSTALL_LIBDIR = "lib";
+      CMAKE_C_COMPILER_WORKS = "YES";
+      SED = "${env:ProgramFiles}\Git\usr\bin\sed.exe";
+    }
+
+  Copy-Item -Path "${SDKRoot}\usr\include\$($Platform.Triple)" -Destination "${SDKRoot}\usr\include\$($Platform.Triple -Replace "-unknown-","-")" -Force -Recurse
+  Copy-Item -Path "${SDKRoot}\usr\lib\$($Platform.Triple)" -Destination "${SDKRoot}\usr\lib\$($Platform.Triple -Replace "-unknown-","-")" -Force -Recurse
+}
+
+function Build-WASICXX([Hashtable] $Platform) {
+  New-Item -Type Directory -Path "$BinaryCache\$($Platform.Triple)\libc++" -Force -ErrorAction Ignore | Out-Null
+  @'
+set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
+'@ | Set-Content -Path "$BinaryCache\$($Platform.Triple)\libc++\WASIWorkaround.cmake"
+
+  Build-CMakeProject `
+    -Src "$SourceCache\llvm-project\runtimes" `
+    -Bin "$BinaryCache\$($Platform.Triple)\libc++" `
+    -InstallTo "$(Get-SwiftSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+    -Platform $Platform `
+    -UsePinnedCompilers @("C", "CXX") `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      CMAKE_CXX_COMPILER_WORKS = "YES";
+      CMAKE_PROJECT_INCLUDE = "$BinaryCache\$($Platform.Triple)\libc++\WASIWorkaround.cmake"
+      LIBCXXABI_ENABLE_SHARED = "NO";
+      LIBCXXABI_USE_LLVM_UNWINDER = "NO";
+      LIBCXX_CXX_ABI = "libcxxabi";
+      LIBCXX_ENABLE_SHARED = "NO";
+      LIBCXX_ENABLE_STATIC = "YES";
+      LIBCXX_HAS_MUSL_LIBC = "YES";
+      LIBCXX_INCLUDE_TESTS = "NO";
+      LLVM_ENABLE_RUNTIMES = "libcxx;libcxxabi";
     }
 }
 
@@ -2945,7 +3140,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
         CMAKE_Swift_FLAGS = $(if ($Static) { @("-Xcc", "-static-libclosure") } else { @() });
 
         # FIXME(compnerd) remove this once the default option is flipped to `ON`.
-        SwiftCore_ENABLE_BACKTRACING = "YES";
+        SwiftCore_ENABLE_BACKTRACING = if ($Platform.OS -eq [OS]::WASI) { "NO" } else { "YES" };
         # FIXME(compnerd) remove this once the default option is flipped to `ON`.
         SwiftCore_ENABLE_CONCURRENCY = "YES";
         # FIXME(compnerd) remove this once the default option is flipped to `ON`.
@@ -3099,33 +3294,31 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
         SwiftVolatile_ENABLE_LIBRARY_EVOLUTION = "NO";
       }
 
-    if ($Platform.OS -ne [OS]::Windows) {
-      return
+    if ($Platform.OS -ne [OS]::Android -and $Platform.OS -ne [OS]::WASI) {
+      Build-CMakeProject `
+        -Src $SourceCache\swift\Runtimes\Supplemental\Runtime `
+        -Bin $RuntimeModuleBinaryCache `
+        -InstallTo "${SDKROOT}\usr" `
+        -Platform $Platform `
+        -UseBuiltCompilers C,CXX,Swift `
+        -SwiftSDK $null `
+        -UseGNUDriver `
+        -Defines @{
+          BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+          SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
+          SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+          SwiftCxxOverlay_DIR = "${OverlayBinaryCache}\Cxx\cmake\SwiftCxxOverlay";
+
+          # FIXME(compnerd) this currently causes a build failure on Windows, but
+          # this should be enabled when building the dynamic runtime.
+          SwiftRuntime_ENABLE_LIBRARY_EVOLUTION = "NO";
+
+          SwiftRuntime_ENABLE_BACKTRACING = "YES";
+        }
     }
-
-    Build-CMakeProject `
-      -Src $SourceCache\swift\Runtimes\Supplemental\Runtime `
-      -Bin $RuntimeModuleBinaryCache `
-      -InstallTo "${SDKROOT}\usr" `
-      -Platform $Platform `
-      -UseBuiltCompilers C,CXX,Swift `
-      -SwiftSDK $null `
-      -UseGNUDriver `
-      -Defines @{
-        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-
-        SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
-        SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
-        SwiftCxxOverlay_DIR = "${OverlayBinaryCache}\Cxx\cmake\SwiftCxxOverlay";
-
-        # FIXME(compnerd) this currently causes a build failure on Windows, but
-        # this should be enabled when building the dynamic runtime.
-        SwiftRuntime_ENABLE_LIBRARY_EVOLUTION = "NO";
-
-        SwiftRuntime_ENABLE_BACKTRACING = "YES";
-      }
   }
 }
 
@@ -3226,6 +3419,7 @@ function Build-Foundation([Hashtable] $Platform) {
       } else {
         "$(Get-ProjectBinaryCache $Platform brotli)\libbrotlidec.a"
       }
+      FOUNDATION_BUILD_NETWORKING = if ($Platform.OS -eq [OS]::WASI) { "NO" } else { "YES" };
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
       LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
@@ -3294,10 +3488,18 @@ function Build-FoundationMacros([Hashtable] $Platform) {
 }
 
 function Build-XCTest([Hashtable] $Platform) {
-  $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
-    @();
-  } else {
-    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
+  $SwiftFlags = switch ($Platform.OS) {
+    Windows {
+      @();
+    }
+
+    WASI {
+      @("-static-stdlib", "-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
+    }
+
+    default {
+      @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
+    }
   }
 
   Build-CMakeProject `
@@ -3308,7 +3510,7 @@ function Build-XCTest([Hashtable] $Platform) {
     -UseBuiltCompilers Swift `
     -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
     -Defines @{
-      BUILD_SHARED_LIBS = "YES";
+      BUILD_SHARED_LIBS = if ($Platform.OS -eq [OS]::WASI) { "NO" } else { "YES" };
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
       CMAKE_Swift_FLAGS = $SwiftFlags;
       ENABLE_TESTING = "NO";
@@ -3359,10 +3561,18 @@ function Test-XCTest {
 }
 
 function Build-Testing([Hashtable] $Platform) {
-  $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
-    @();
-  } else {
-    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
+  $SwiftFlags = switch ($Platform.OS) {
+    Windows {
+      @();
+    }
+
+    WASI {
+      @("-static-stdlib", "-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
+    }
+
+    default {
+      @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
+    }
   }
 
   Build-CMakeProject `
@@ -3373,7 +3583,7 @@ function Build-Testing([Hashtable] $Platform) {
     -UseBuiltCompilers CXX,Swift `
     -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
     -Defines @{
-      BUILD_SHARED_LIBS = "YES";
+      BUILD_SHARED_LIBS = if ($Platform.OS -eq [OS]::WASI) { "NO" } else { "YES" };
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
       CMAKE_Swift_FLAGS = $SwiftFlags;
       SwiftTesting_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros)\TestingMacros.dll";
@@ -3438,7 +3648,9 @@ function Build-SDK([Hashtable] $Platform) {
 }
 
 function Build-ExperimentalSDK([Hashtable] $Platform) {
-  Invoke-BuildStep Build-CDispatch $Platform
+  if ($Platform.OS -ne [OS]::WASI) {
+    Invoke-BuildStep Build-CDispatch $Platform
+  }
 
   if ($Platform.LinkModes.Contains("dynamic")) {
     Invoke-BuildStep Build-ExperimentalRuntime $Platform
@@ -3478,22 +3690,24 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
   $SDKROOT = Get-SwiftSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental"
 
   if ($Platform.LinkModes.Contains("dynamic")) {
-    Record-OperationTime $Platform "Build-ExperimentalDynamicDispatch" {
-      Build-CMakeProject `
-        -Src $SourceCache\swift-corelibs-libdispatch `
-        -Bin (Get-ProjectBinaryCache $Platform ExperimentalDynamicDispatch) `
-        -InstallTo "${SDKROOT}\usr" `
-        -Platform $Platform `
-        -UseBuiltCompilers C,CXX,Swift `
-        -SwiftSDK "${SDKROOT}" `
-        -Defines @{
-          BUILD_TESTING = "NO";
-          BUILD_SHARED_LIBS = "YES";
-          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    if ($Platform.OS -ne [OS]::WASI) {
+      Record-OperationTime $Platform "Build-ExperimentalDynamicDispatch" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift-corelibs-libdispatch `
+          -Bin (Get-ProjectBinaryCache $Platform ExperimentalDynamicDispatch) `
+          -InstallTo "${SDKROOT}\usr" `
+          -Platform $Platform `
+          -UseBuiltCompilers C,CXX,Swift `
+          -SwiftSDK "${SDKROOT}" `
+          -Defines @{
+            BUILD_TESTING = "NO";
+            BUILD_SHARED_LIBS = "YES";
+            CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
-          ENABLE_SWIFT = "YES";
-        }
+            ENABLE_SWIFT = "YES";
+          }
+      }
     }
 
     Record-OperationTime $Platform "Build-ExperimentalDynamicFoundation" {
@@ -3511,6 +3725,7 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
           ENABLE_TESTING = "NO";
 
+          FOUNDATION_BUILD_NETWORKING = if ($Platform.OS -eq [OS]::WASI) { "NO" } else { "YES" };
           FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
           CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
           LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
@@ -3531,22 +3746,24 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
   }
 
   if ($Platform.LinkModes.Contains("static")) {
-    Record-OperationTime $Platform "Build-ExperimentalStaticDispatch" {
-      Build-CMakeProject `
-        -Src $SourceCache\swift-corelibs-libdispatch `
-        -Bin (Get-ProjectBinaryCache $Platform ExperimentalStaticDispatch) `
-        -InstallTo "${SDKROOT}\usr" `
-        -Platform $Platform `
-        -UseBuiltCompilers C,CXX,Swift `
-        -SwiftSDK "${SDKROOT}" `
-        -Defines @{
-          BUILD_TESTING = "NO";
-          BUILD_SHARED_LIBS = "NO";
-          CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
-          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    if ($Platform.OS -ne [OS]::WASI) {
+      Record-OperationTime $Platform "Build-ExperimentalStaticDispatch" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift-corelibs-libdispatch `
+          -Bin (Get-ProjectBinaryCache $Platform ExperimentalStaticDispatch) `
+          -InstallTo "${SDKROOT}\usr" `
+          -Platform $Platform `
+          -UseBuiltCompilers C,CXX,Swift `
+          -SwiftSDK "${SDKROOT}" `
+          -Defines @{
+            BUILD_TESTING = "NO";
+            BUILD_SHARED_LIBS = "NO";
+            CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
-          ENABLE_SWIFT = "YES";
-        }
+            ENABLE_SWIFT = "YES";
+          }
+      }
     }
 
     Record-OperationTime $Platform "Build-ExperimentalStaticFoundation" {
@@ -3564,6 +3781,7 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
           ENABLE_TESTING = "NO";
 
+          FOUNDATION_BUILD_NETWORKING = if ($Platform.OS -eq [OS]::WASI) { "NO" } else { "YES" };
           FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
           CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
           LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
@@ -4309,6 +4527,7 @@ if ($Clean) {
 
   $KnownPlatforms.Values | Where-Object {
     switch ($_.OS) {
+      WASI { $WASI }
       Windows { $Windows }
       Android { $Android }
       default { $false }
@@ -4340,6 +4559,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts"
   $KnownPlatforms.Values | Where-Object {
     switch ($_.OS) {
+      WASI { $WASI }
       Windows { $Windows }
       Android { $Android }
       default { $false }
@@ -4450,6 +4670,55 @@ if (-not $SkipBuild) {
       Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" -Destination "${SwiftResourceDir}\libxml2s.lib" | Out-Null
       Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" -Destination "${SwiftResourceDir}\zlibstatic.lib" | Out-Null
     }
+  }
+
+  if ($WASI) {
+    $SDKROOT = Get-SwiftSDK WASI -Identifier WASIExperimental
+
+    foreach ($Build in $WASISDKBuilds) {
+      $ResourceDir = "$BinaryCache\$($Build.Triple)\resources\"
+      $PinnedCompiler = Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang.exe"
+      $PinnedResourceDir = & $PinnedCompiler -print-resource-dir
+
+      New-Item -ItemType Directory -ErrorAction Ignore "$ResourceDir\" | Out-Null
+      Copy-Item -Force -Recurse -Path "$BinaryCache\$($Build.Triple)\ClangBuiltins\lib\" -Destination "$ResourceDir\"
+      Copy-Item -Force -Recurse -Path "$PinnedResourceDir\include\" -Destination "$ResourceDir\"
+
+      Invoke-BuildStep Build-WASIC $Build
+      Invoke-BuildStep Build-WASICXX $Build
+      Invoke-BuildStep Build-ZLib $Build
+      Invoke-BuildStep Build-Brotli $Build
+      Invoke-BuildStep Build-XML2 $Build
+      # Invoke-BuildStep Build-CURL $Build
+
+      if ($Build.LinkModes.Contains("dynamic")) {
+        Invoke-BuildStep Build-ExperimentalSDK $Build
+      }
+
+      if ($Build.LinkModes.Contains("static")) {
+        Invoke-BuildStep Build-ExperimentalSDK $Build -Static
+      }
+
+      Get-ChildItem "${SDKROOT}\usr\lib\swift\wasi" -File | Where-Object { $_.Name -match ".a$|.wasm$" } | ForEach-Object {
+        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+        Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\wasi\$($Build.Architecture.LLVMName)\" | Out-Null
+      }
+
+      Get-ChildItem -ErrorAction Ignore "${SDKROOT}\usr\lib\swift_static\wasi" -File | Where-Object { $_.Name -match ".a$|.wasm$" } | ForEach-Object {
+        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+        Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\wasi\$($Build.Architecture.LLVMName)\" | Out-Null
+      }
+    }
+
+    Install-SDK $WASISDKBuilds -Identifier WASIExperimental
+    Write-SDKSettings WASI -Identifier WASIExperimental
+
+    foreach ($Build in $WASISDKBuilds) {
+      Invoke-BuildStep Build-Testing $Build
+      Invoke-BuildStep Build-XCTest $Build
+    }
+
+    Write-PlatformInfoPlist WASI
   }
 
   if ($Android) {
