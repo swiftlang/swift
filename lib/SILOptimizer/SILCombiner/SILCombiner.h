@@ -255,7 +255,6 @@ public:
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
 
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
-  SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
