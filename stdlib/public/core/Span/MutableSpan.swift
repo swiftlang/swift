@@ -30,6 +30,7 @@ public struct MutableSpan<Element: ~Copyable>
 
   @unsafe
   @_alwaysEmitIntoClient
+  @_transparent
   internal func _start() -> UnsafeMutableRawPointer {
     unsafe _pointer._unsafelyUnwrappedUnchecked
   }
@@ -343,6 +344,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @unsafe
   @_alwaysEmitIntoClient
+  @_transparent
   internal func _unsafeAddressOfElement(
     unchecked position: Index
   ) -> UnsafeMutablePointer<Element> {

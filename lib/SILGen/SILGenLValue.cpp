@@ -3481,6 +3481,34 @@ LValue SILGenLValue::visitApplyExpr(ApplyExpr *e, SGFAccessKind accessKind,
     lv.add<ValueComponent>(deref, std::nullopt, typeData, /*isRValue*/ true);
     return lv;
   }
+  case BuiltinValueKind::BorrowAt: {
+    ManagedValue borrowedValue = SGF.emitRValueAsSingleValue(e);
+    // Emitting the call to Builtin.borrowAt requires the usual emitRValue
+    // pathways. So the result follows RValue rules: an address for address-only
+    // types, a load_borrow value for loadable types. If the borrowedValue is
+    // addressable-for-dependencies, then strip off the load_borrow to get back
+    // to the original address required for an LValue.
+    if (!borrowedValue.getType().isAddress()) {
+      if (borrowedValue.getType().isAddressableForDeps(SGF.F)) {
+        // RValue construction is expected to emit load_borrow.
+        auto *load = cast<SingleValueInstruction>(borrowedValue.getValue());
+        ASSERT(isa<LoadInst>(load) || isa<LoadBorrowInst>(load));
+        SILValue addr = load->getOperand(0);
+        // Replace the borrowed value with an address. Borrowed values have no
+        // cleanups. The dead borrow will be removed by Onone simplification.
+        borrowedValue = ManagedValue::forRValueWithoutOwnership(addr);
+      } else {
+        // Allow this LValue to be used in a return expression, which violates
+        // end_borrow ownership.
+        borrowedValue = SGF.B.createUncheckedOwnership(e, borrowedValue);
+      }
+    }
+    auto typeData = getValueTypeData(SGF, accessKind, e);
+    LValue lv;
+    lv.add<ValueComponent>(borrowedValue, std::nullopt, typeData,
+                           /*isRValue*/ true);
+    return lv;
+  }
 
   default:
     llvm_unreachable("not an lvalue builtin");

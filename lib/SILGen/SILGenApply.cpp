@@ -3515,6 +3515,23 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
       }
     }
   }
+  if (auto ae = dyn_cast<ApplyExpr>(expr)) {
+    if (auto declRef = ae->getFn()->getReferencedDecl()) {
+      if (declRef.getDecl()->getModuleContext()->isBuiltinModule()) {
+        auto &builtinInfo
+          = SGM.M.getBuiltinInfo(declRef.getDecl()->getBaseIdentifier());
+        // TODO: Support things like Builtin.makeBorrow(Builtin.borrowAt(p)).
+        // We should call a SGF.tryEmitBuiltinAsAddres() helper here. But
+        // CallEmission does not have a way to query ahead of time whether its
+        // result will be loaded into its RValue result.
+        if (builtinInfo.ID == BuiltinValueKind::BorrowAt) {
+          SGM.diagnose(expr, diag::not_implemented,
+                       "Builtin.borrowAt must be direclty returned from a "
+                       "borrow accessor");
+        }
+      }
+    }
+  }
   
   // Property or subscript member accesses may also be addressable.
   
