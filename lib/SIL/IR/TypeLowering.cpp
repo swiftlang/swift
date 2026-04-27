@@ -1030,6 +1030,10 @@ namespace {
       auto *abiInfo = type->getDecl()->getABIInfo();
       assert(abiInfo && "HiddenTypeLayoutInfoType should have ABI info");
 
+      if (isa<irgen::HiddenReferenceTypeIRABIInfo>(abiInfo)) {
+        return getReferenceSILTypeProperties(isSensitive);
+      }
+
       return mergeIsTypeExpansionSensitive(isSensitive,
                                            abiInfo->getSILTypeProperties());
     }
@@ -2775,6 +2779,8 @@ namespace {
         return new (TC) MiscNontrivialTypeLowering(type, properties, Expansion);
       case irgen::HiddenTypeIRABIInfo::Kind::AddressOnlyStruct:
         return handleAddressOnly(type, properties);
+      case irgen::HiddenTypeIRABIInfo::Kind::ReferenceType:
+        return handleReference(type, properties);
       }
     }
 

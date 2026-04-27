@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/MetadataValues.h"
+#include "GenClass.h"
 #include "GenStruct.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
@@ -2484,6 +2485,11 @@ TypeConverter::convertHiddenTypeLayoutInfoType(HiddenTypeLayoutInfoType *T) {
           dyn_cast<irgen::HiddenStructTypeIRABIInfo>(abiInfo)) {
     return createTypeInfoFromHiddenStructTypeABIInfo(IGM, CanType(T),
                                                      *structInfo);
+  }
+
+  if (auto *refInfo =
+          dyn_cast<irgen::HiddenReferenceTypeIRABIInfo>(abiInfo)) {
+    return createReferenceTypeInfoFromABIInfo(IGM, *refInfo);
   }
 
   llvm_unreachable("unsupported hidden type ABI info kind");

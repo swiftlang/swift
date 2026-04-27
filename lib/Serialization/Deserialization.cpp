@@ -5915,6 +5915,33 @@ ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
     return decl;
   }
 
+  case HIDDEN_REFERENCE_TYPE: {
+    uint8_t refcounting;
+    uint16_t silTypePropertiesFlags;
+    IdentifierID mangledNameID;
+    DeclID parentDeclID;
+
+    HiddenReferenceTypeLayoutDescriptorLayout::readRecord(
+        scratch, refcounting, silTypePropertiesFlags, mangledNameID, parentDeclID);
+
+    auto *decl = HiddenTypeLayoutInfoDecl::create(ctx, DC);
+    auto *abiInfo = new (ctx) irgen::HiddenReferenceTypeIRABIInfo(
+        static_cast<ReferenceCounting>(refcounting));
+    abiInfo->setMangledTypeName(getIdentifier(mangledNameID).str());
+    abiInfo->setSILTypeProperties(
+        SILTypeProperties::fromRawFlags(silTypePropertiesFlags));
+    decl->setABIInfo(abiInfo);
+    if (parentDeclID) {
+      auto parentDecl = getDeclChecked(parentDeclID);
+      if (!parentDecl)
+        return parentDecl.takeError();
+      decl->setParentDecl(cast<TypeDecl>(parentDecl.get()));
+    }
+
+    declOrOffset = decl;
+    return decl;
+  }
+
   default:
     return diagnoseFatal();
   }

@@ -2060,6 +2060,8 @@ const TypeInfo *irgen::createTypeInfoFromHiddenStructTypeABIInfo(
           triviallyDestroyable, layout.isBitwiseTakable(),
           copyable, layout.isAlwaysFixedSize(), isTypeABIAccessibleIfFixedSize(IGM, type));
     }
+  default:
+    llvm_unreachable("non-struct hidden type in createTypeInfoFromHiddenStructTypeABIInfo");
   }
 }
 

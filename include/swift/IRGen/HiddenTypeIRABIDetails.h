@@ -38,6 +38,7 @@ public:
   enum class Kind {
     LoadableStruct,
     AddressOnlyStruct,
+    ReferenceType,
   };
 
 private:
@@ -86,6 +87,27 @@ public:
 
 protected:
   ~HiddenStructTypeIRABIInfo() {}
+};
+
+/// ABI details for a hidden reference type (class).
+class HiddenReferenceTypeIRABIInfo : public HiddenTypeIRABIInfo {
+public:
+  const ReferenceCounting Refcounting;
+
+  HiddenReferenceTypeIRABIInfo(ReferenceCounting refcounting)
+      : HiddenTypeIRABIInfo(Kind::ReferenceType),
+        Refcounting(refcounting) {}
+
+  std::optional<ReferenceCounting> getReferenceCountingSystem() const override {
+    return Refcounting;
+  }
+
+  static bool classof(const HiddenTypeIRABIInfo *info) {
+    return info->getKind() == Kind::ReferenceType;
+  }
+
+protected:
+  ~HiddenReferenceTypeIRABIInfo() {}
 };
 
 } // end namespace irgen

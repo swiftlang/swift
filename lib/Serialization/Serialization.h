@@ -41,6 +41,7 @@ namespace swift {
 
   namespace irgen {
     class HiddenStructTypeIRABIInfo;
+    class HiddenReferenceTypeIRABIInfo;
   }
 
   namespace fine_grained_dependencies {
@@ -468,6 +469,9 @@ private:
   void writeHiddenLayoutInformationForDecl(const Decl* D);
 
   void writeHiddenStructTypeLayoutRecord(const irgen::HiddenStructTypeIRABIInfo *hiddenStructInfo,
+      const TypeDecl *parentDecl);
+  void writeHiddenReferenceTypeLayoutRecord(
+      const irgen::HiddenReferenceTypeIRABIInfo *refInfo,
       const TypeDecl *parentDecl);
 
   /// Writes the offsets for a serialized entity kind.

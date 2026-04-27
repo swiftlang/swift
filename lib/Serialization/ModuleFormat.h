@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1009; // add hidden loadable struct record
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1010; // add hidden reference type record
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2712,6 +2712,14 @@ namespace decls_block {
     IdentifierIDField, // mangled type name
     DeclIDField,       // parent decl
     BCArray<TypeIDField> // field type IDs
+  >;
+
+  using HiddenReferenceTypeLayoutDescriptorLayout = BCRecordLayout<
+    HIDDEN_REFERENCE_TYPE,
+    BCFixed<8>,        // reference counting kind
+    BCVBR<16>,         // SILTypeProperties raw flags
+    IdentifierIDField,  // mangled type name
+    DeclIDField       // parent decl
   >;
   // clang-format on
 
