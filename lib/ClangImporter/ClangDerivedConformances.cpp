@@ -235,6 +235,78 @@ static ValueDecl *lookupOperator(
   return nullptr;
 }
 
+static bool isValidEqualEqualOp(const NominalTypeDecl *decl,
+                                const ValueDecl *imported) {
+  auto equalEqual = dyn_cast<FuncDecl>(imported);
+  if (!equalEqual)
+    return false;
+  auto params = equalEqual->getParameters();
+  if (params->size() != 2)
+    return false;
+  auto lhs = params->get(0);
+  auto rhs = params->get(1);
+  if (lhs->isInOut() || rhs->isInOut())
+    return false;
+  auto lhsTy = lhs->getTypeInContext();
+  auto rhsTy = rhs->getTypeInContext();
+  if (!lhsTy || !rhsTy)
+    return false;
+  auto lhsNominal = lhsTy->getAnyNominal();
+  auto rhsNominal = rhsTy->getAnyNominal();
+  return lhsNominal == rhsNominal && lhsNominal == decl;
+}
+
+static bool isValidMinusOp(const NominalTypeDecl *decl,
+                           const ValueDecl *imported) {
+  auto minus = dyn_cast<FuncDecl>(imported);
+  if (!minus)
+    return false;
+  auto params = minus->getParameters();
+  if (params->size() != 2)
+    return false;
+  auto lhs = params->get(0);
+  auto rhs = params->get(1);
+  if (lhs->isInOut() || rhs->isInOut())
+    return false;
+  auto lhsTy = lhs->getTypeInContext();
+  auto rhsTy = rhs->getTypeInContext();
+  if (!lhsTy || !rhsTy)
+    return false;
+  auto lhsNominal = lhsTy->getAnyNominal();
+  auto rhsNominal = rhsTy->getAnyNominal();
+  if (lhsNominal != rhsNominal || lhsNominal != decl)
+    return false;
+  auto returnTy = minus->getResultInterfaceType();
+  auto binaryIntegerProto =
+      decl->getASTContext().getProtocol(KnownProtocolKind::BinaryInteger);
+  return static_cast<bool>(checkConformance(returnTy, binaryIntegerProto));
+}
+
+static bool isValidPlusEqualOp(const NominalTypeDecl *decl, Type distanceTy,
+                               const ValueDecl *imported) {
+  auto plusEqual = dyn_cast<FuncDecl>(imported);
+  if (!plusEqual)
+    return false;
+  auto params = plusEqual->getParameters();
+  if (params->size() != 2)
+    return false;
+  auto lhs = params->get(0);
+  auto rhs = params->get(1);
+  if (rhs->isInOut())
+    return false;
+  auto lhsTy = lhs->getTypeInContext();
+  auto rhsTy = rhs->getTypeInContext();
+  if (!lhsTy || !rhsTy)
+    return false;
+  if (rhsTy->getCanonicalType() != distanceTy->getCanonicalType())
+    return false;
+  auto lhsNominal = lhsTy->getAnyNominal();
+  if (lhsNominal != decl)
+    return false;
+  auto returnTy = plusEqual->getResultInterfaceType();
+  return returnTy->isVoid();
+}
+
 // Is this an operator where both arguments take T, or const T&?
 static bool isValidBinOp(NominalTypeDecl *decl, const clang::FunctionDecl *fd) {
   if (!fd)
@@ -275,24 +347,8 @@ static bool isValidBinOp(NominalTypeDecl *decl, const clang::FunctionDecl *fd) {
 }
 
 static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
-  auto isValidMember = [&](ValueDecl *equalEqualOp) -> bool {
-    auto equalEqual = dyn_cast<FuncDecl>(equalEqualOp);
-    if (!equalEqual)
-      return false;
-    auto params = equalEqual->getParameters();
-    if (params->size() != 2)
-      return false;
-    auto lhs = params->get(0);
-    auto rhs = params->get(1);
-    if (lhs->isInOut() || rhs->isInOut())
-      return false;
-    auto lhsTy = lhs->getTypeInContext();
-    auto rhsTy = rhs->getTypeInContext();
-    if (!lhsTy || !rhsTy)
-      return false;
-    auto lhsNominal = lhsTy->getAnyNominal();
-    auto rhsNominal = rhsTy->getAnyNominal();
-    return lhsNominal == rhsNominal && lhsNominal == decl;
+  auto isValidMember = [decl](const ValueDecl *imported) {
+    return isValidEqualEqualOp(decl, imported);
   };
   return lookupOperator(
       decl, decl->getASTContext().Id_EqualsOperator, isValidMember,
@@ -300,30 +356,8 @@ static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
 }
 
 static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
-  auto binaryIntegerProto =
-      decl->getASTContext().getProtocol(KnownProtocolKind::BinaryInteger);
-
-  auto isValidMember = [&](ValueDecl *minusOp) -> bool {
-    auto minus = dyn_cast<FuncDecl>(minusOp);
-    if (!minus)
-      return false;
-    auto params = minus->getParameters();
-    if (params->size() != 2)
-      return false;
-    auto lhs = params->get(0);
-    auto rhs = params->get(1);
-    if (lhs->isInOut() || rhs->isInOut())
-      return false;
-    auto lhsTy = lhs->getTypeInContext();
-    auto rhsTy = rhs->getTypeInContext();
-    if (!lhsTy || !rhsTy)
-      return false;
-    auto lhsNominal = lhsTy->getAnyNominal();
-    auto rhsNominal = rhsTy->getAnyNominal();
-    if (lhsNominal != rhsNominal || lhsNominal != decl)
-      return false;
-    auto returnTy = minus->getResultInterfaceType();
-    return static_cast<bool>(checkConformance(returnTy, binaryIntegerProto));
+  auto isValidMember = [decl](const ValueDecl *imported) -> bool {
+    return isValidMinusOp(decl, imported);
   };
   auto isValidGlobal = [&](const clang::FunctionDecl *minusOp) -> bool {
     if (!isValidBinOp(decl, minusOp))
@@ -377,6 +411,11 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
     return lhsTy->getCanonicalTypeUnqualified() ==
            ty->getCanonicalTypeUnqualified();
   };
+#if 0
+  auto isValid = [decl, distanceTy](const ValueDecl *imported) -> bool {
+    return isValidPlusEqualOp(decl, distanceTy, imported);
+  };
+#endif
   auto isValidMember = [&](ValueDecl *plusEqualOp) -> bool {
     auto plusEqual = dyn_cast<FuncDecl>(plusEqualOp);
     if (!plusEqual)
@@ -405,10 +444,15 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
   return dyn_cast_or_null<FuncDecl>(result);
 }
 
+/// Use Clang's argument-dependent lookup to find the best viable operator for
+/// \p classDecl. Handles non-member operators in associated namespaces, hidden
+/// friends, and triggers template instantiation when needed. The result is
+/// added to the SwiftLookupTable. Returns the winning FunctionDecl, or nullptr
+/// if no viable candidate exists.
 static clang::FunctionDecl *
-instantiateTemplatedOperator(ClangImporter::Implementation &impl,
-                             const clang::CXXRecordDecl *classDecl,
-                             clang::BinaryOperatorKind operatorKind) {
+findOperatorByADL(ClangImporter::Implementation &impl,
+                  const clang::CXXRecordDecl *classDecl,
+                  clang::BinaryOperatorKind operatorKind) {
 
   clang::ASTContext &clangCtx = impl.getClangASTContext();
   clang::Sema &clangSema = impl.getClangSema();
@@ -461,11 +505,10 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
 /// Warning: This function emits an error and stops compilation if the
 /// underlying operator function is unavailable in Swift for the current target
 /// (see `clang::Sema::DiagnoseAvailabilityOfDecl`).
-static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
-                                  const clang::CXXRecordDecl *classDecl,
-                                  clang::BinaryOperatorKind operatorKind,
-                                  clang::QualType lhsTy, clang::QualType rhsTy,
-                                  clang::QualType returnTy) {
+static clang::FunctionDecl *synthesizeCXXOperator(
+    ClangImporter::Implementation &impl, const clang::CXXRecordDecl *classDecl,
+    clang::BinaryOperatorKind operatorKind, clang::QualType lhsTy,
+    clang::QualType rhsTy, clang::QualType returnTy) {
   auto &clangCtx = impl.getClangASTContext();
   auto &clangSema = impl.getClangSema();
 
@@ -537,9 +580,9 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
   impl.getClangSema().DelayedDiagnostics.popWithoutEmitting(diagState);
 
   if (!diagPool.empty())
-    return false;
+    return nullptr;
   if (!underlyingCallResult.isUsable())
-    return false;
+    return nullptr;
   auto underlyingCall = underlyingCallResult.get();
 
   auto equalEqualBody = clang::ReturnStmt::Create(
@@ -554,7 +597,94 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
   if (lookupTable1 != lookupTable2)
     addEntryToLookupTable(*lookupTable2, equalEqualDecl,
                           impl.getNameImporter());
-  return true;
+  return equalEqualDecl;
+}
+
+static Identifier cxxBinOpToSwiftIdent(const ASTContext &ctx,
+                                       clang::BinaryOperatorKind operatorKind) {
+  using Kind = clang::BinaryOperatorKind;
+  switch (operatorKind) {
+  case Kind::BO_EQ:
+    return ctx.Id_EqualsOperator;
+  case Kind::BO_AddAssign:
+    return ctx.getIdentifier("+=");
+  case Kind::BO_Sub:
+    return ctx.getIdentifier("-");
+  default:
+    llvm_unreachable("invalid operator kind");
+  }
+}
+
+/// Find a C++ binary operator for \p classDecl and import it as a Swift
+/// ValueDecl. Searches previously synthesized operators, member operators,
+/// and non-member operators via Clang ADL (which covers free functions, hidden
+/// friends, and template instantiations). If ADL finds an operator that doesn't
+/// pass \p isValid (e.g. defined on a base class), synthesizes a forwarding
+/// wrapper with types from \p makeLhsTy, \p makeRhsTy, and \p makeReturnTy.
+static ValueDecl *findOrSynthesizeCxxOperator(
+    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
+    const clang::CXXRecordDecl *classDecl,
+    clang::BinaryOperatorKind operatorKind,
+    function_ref<clang::QualType()> makeLhsTy,
+    function_ref<clang::QualType()> makeRhsTy,
+    function_ref<clang::QualType(const clang::FunctionDecl *op)> makeReturnTy,
+    function_ref<bool(ValueDecl *)> isValid) {
+  clang::ASTContext &clangCtx = classDecl->getASTContext();
+
+  // 1. Check previously synthesized operators. These wrappers live only in
+  // synthesizedAndAlwaysVisibleDecls (not in any Clang DeclContext), so
+  // neither member lookup nor ADL can find them.
+  auto overloadedOpKind =
+      clang::BinaryOperator::getOverloadedOperator(operatorKind);
+  const char *opSpelling = clang::getOperatorSpelling(overloadedOpKind);
+  auto &idents = clangCtx.Idents;
+  auto synthName = clang::DeclarationName(&idents.get(opSpelling));
+  for (auto *synthDecl : impl.synthesizedAndAlwaysVisibleDecls) {
+    if (auto *fd = dyn_cast<clang::FunctionDecl>(synthDecl)) {
+      if (fd->getDeclName() == synthName) {
+        if (auto *imported = dyn_cast_or_null<ValueDecl>(
+                impl.importDecl(fd, impl.CurrentVersion)))
+          if (isValid(imported))
+            return imported;
+      }
+    }
+  }
+
+  // 2. Look for operator declared as a member of the class.
+  auto id = cxxBinOpToSwiftIdent(decl->getASTContext(), operatorKind);
+  auto memberResults = lookupDirectWithoutExtensions(decl, id);
+  for (const auto &member : memberResults) {
+    if (isValid(member))
+      return member;
+  }
+
+  // 3. Use Clang's ADL to find non-member operators (free functions, hidden
+  // friends, template instantiations).
+  clang::FunctionDecl *clangCallee =
+      findOperatorByADL(impl, classDecl, operatorKind);
+  if (!clangCallee || impl.isUnavailableInSwift(clangCallee))
+    return nullptr;
+
+  if (auto *imported = dyn_cast_or_null<ValueDecl>(
+          impl.importDecl(clangCallee, impl.CurrentVersion)))
+    if (isValid(imported))
+      return imported;
+
+  // 4. ADL found a viable operator but isValid rejected it (e.g. it's defined
+  // on a base class). Synthesize a forwarding wrapper with the derived type.
+  clang::QualType lhsTy = makeLhsTy();
+  clang::QualType rhsTy = makeRhsTy();
+  clang::QualType returnTy = makeReturnTy(clangCallee);
+  clang::FunctionDecl *synthOp = synthesizeCXXOperator(
+      impl, classDecl, operatorKind, lhsTy, rhsTy, returnTy);
+  if (!synthOp)
+    return nullptr;
+  if (auto *imported = dyn_cast_or_null<ValueDecl>(
+          impl.importDecl(synthOp, impl.CurrentVersion)))
+    if (isValid(imported))
+      return imported;
+
+  return nullptr;
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -790,28 +920,19 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   if (!successorTy || successorTy->getAnyNominal() != decl)
     return;
 
+  clang::QualType recordTy = clangCtx.getRecordType(clangDecl);
+
   // Check if present: `func ==`
-  auto equalEqual = getEqualEqualOperator(decl);
-  if (!equalEqual) {
-    // If this class is inherited, `operator==` might be defined for a base
-    // class. If this is a templated class, `operator==` might be templated as
-    // well. Try to instantiate it.
-    clang::FunctionDecl *instantiated = instantiateTemplatedOperator(
-        impl, clangDecl, clang::BinaryOperatorKind::BO_EQ);
-    if (instantiated && !impl.isUnavailableInSwift(instantiated)) {
-      // If `operator==` was instantiated successfully, try to find `func ==`
-      // again.
-      equalEqual = getEqualEqualOperator(decl);
-      if (!equalEqual) {
-        // If `func ==` still can't be found, it might be defined for a base
-        // class of the current class.
-        auto paramTy = clangCtx.getRecordType(clangDecl);
-        synthesizeCXXOperator(impl, clangDecl, clang::BinaryOperatorKind::BO_EQ,
-                              paramTy, paramTy, clangCtx.BoolTy);
-        equalEqual = getEqualEqualOperator(decl);
-      }
-    }
-  }
+  auto eqParamTy = [recordTy]() { return recordTy; };
+  auto eqReturnTy = [boolTy = clangCtx.BoolTy](const clang::FunctionDecl *) {
+    return boolTy;
+  };
+  auto isValidEqOp = [decl](const ValueDecl *imported) {
+    return isValidEqualEqualOp(decl, imported);
+  };
+  auto equalEqual = findOrSynthesizeCxxOperator(
+      impl, decl, clangDecl, clang::BinaryOperatorKind::BO_EQ, eqParamTy,
+      eqParamTy, eqReturnTy, isValidEqOp);
   if (!equalEqual)
     return;
 
@@ -854,27 +975,42 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   //   - operator+=() / func +=(lhs:rhs)
 
   // Check if present: `func -`
-  auto minus = getMinusOperator(decl);
-  if (!minus) {
-    clang::FunctionDecl *instantiated = instantiateTemplatedOperator(
-        impl, clangDecl, clang::BinaryOperatorKind::BO_Sub);
-    if (instantiated && !impl.isUnavailableInSwift(instantiated)) {
-      minus = getMinusOperator(decl);
-      if (!minus) {
-        clang::QualType returnTy = instantiated->getReturnType();
-        auto paramTy = clangCtx.getRecordType(clangDecl);
-        synthesizeCXXOperator(impl, clangDecl,
-                              clang::BinaryOperatorKind::BO_Sub, paramTy,
-                              paramTy, returnTy);
-        minus = getMinusOperator(decl);
-      }
-    }
-  }
+  auto subParamTy = [recordTy]() { return recordTy; };
+  auto minusReturnTy = [](const clang::FunctionDecl *fd) {
+    return fd->getReturnType();
+  };
+  auto isValidSubOp = [decl](const ValueDecl *imported) {
+    return isValidMinusOp(decl, imported);
+  };
+  auto minusVal = findOrSynthesizeCxxOperator(
+      impl, decl, clangDecl, clang::BinaryOperatorKind::BO_Sub, subParamTy,
+      subParamTy, minusReturnTy, isValidSubOp);
+  auto minus = dyn_cast_or_null<FuncDecl>(minusVal);
   if (!minus)
     return;
+
   // distanceTy conforms to BinaryInteger, this is ensured by getMinusOperator.
   auto distanceTy = minus->getResultInterfaceType();
 
+  auto addLhsTy = [recordTy]() { return recordTy; };
+  auto addRhsTy = [minus]() {
+    auto clangMinus = cast<clang::FunctionDecl>(minus->getClangDecl());
+    return clangMinus->getReturnType();
+  };
+  auto addReturnTy = [](const clang::FunctionDecl *fd) {
+    return fd->getReturnType();
+  };
+  auto isValidAddOp = [decl, distanceTy](const ValueDecl *imported) {
+    return isValidPlusEqualOp(decl, distanceTy, imported);
+  };
+  auto plusEqualVal = findOrSynthesizeCxxOperator(
+      impl, decl, clangDecl, clang::BinaryOperatorKind::BO_AddAssign, addLhsTy,
+      addRhsTy, addReturnTy, isValidAddOp);
+  auto plusEqual = dyn_cast_or_null<FuncDecl>(plusEqualVal);
+  if (!plusEqual)
+    return;
+
+#if 0
   auto plusEqual = getPlusEqualOperator(decl);
   if (!plusEqual ||
       plusEqual->getParameters()
@@ -882,6 +1018,7 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
               ->getInterfaceType()
               ->getCanonicalType() != distanceTy->getCanonicalType())
     return;
+#endif
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Distance"), distanceTy);
   if (mutableIterator)
