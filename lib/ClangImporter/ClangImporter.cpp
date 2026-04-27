@@ -1221,24 +1221,24 @@ ClangImporter::computeClangImporterFileSystem(
     baseFS->setCurrentWorkingDirectory(*(workingDirPos - 1));
 
   if (!fileMapping.redirectedFiles.empty()) {
-    if (importerOpts.DumpClangDiagnostics) {
-      llvm::errs() << "clang importer redirected file mappings:\n";
+    if (!suppressDiagnostics && ctx.LangOpts.RemarkClangImporter) {
       for (const auto &mapping : fileMapping.redirectedFiles) {
-        llvm::errs() << "   mapping real file '" << mapping.second
-                     << "' to virtual file '" << mapping.first << "'\n";
+        ctx.Diags.diagnose(
+            SourceLoc(), diag::remark_clang_importer_redirected_file_mapping,
+            mapping.second, mapping.first);
       }
-      llvm::errs() << "\n";
     }
   }
 
   auto overridenVFS =
       llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   for (auto &file : fileMapping.overridenFiles) {
-    if (importerOpts.DumpClangDiagnostics) {
-      llvm::errs() << "clang importer overriding file '"
-                   << file->getBufferIdentifier()
-                   << "' with the following contents:\n";
-      llvm::errs() << file->getBuffer() << "\n";
+    if (!suppressDiagnostics && ctx.LangOpts.RemarkClangImporter) {
+      ctx.Diags.diagnose(SourceLoc(), diag::remark_clang_importer_overriding_file,
+                         file->getBufferIdentifier());
+      ctx.Diags.diagnose(SourceLoc(),
+                         diag::note_clang_importer_overriding_file_contents,
+                         file->getBuffer());
     }
     // Note MemoryBuffer is guaranteeed to be null-terminated.
     auto content = file->getMemBufferRef();
@@ -1362,12 +1362,16 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
       invocationArgs.push_back(Arg.c_str());
     });
 
-    if (ctx.ClangImporterOpts.DumpClangDiagnostics) {
-      llvm::errs() << "clang importer driver args: '";
+    if (ctx.LangOpts.RemarkClangImporter) {
+      std::string argsStr;
+      llvm::raw_string_ostream os(argsStr);
+      os << "'";
       llvm::interleave(
-          invocationArgs, [](StringRef arg) { llvm::errs() << arg; },
-          [] { llvm::errs() << "' '"; });
-      llvm::errs() << "'\n\n";
+          invocationArgs, [&](StringRef arg) { os << arg; },
+          [&] { os << "' '"; });
+      os << "'";
+      ctx.Diags.diagnose(SourceLoc(), diag::remark_clang_importer_driver_args,
+                         StringRef(argsStr));
     }
 
     clang::CreateInvocationOptions CIOpts;
@@ -1495,12 +1499,16 @@ ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
       return nullptr;
 
     ArrayRef<std::string> invocationArgStrs = importer->Impl.ClangArgs;
-    if (importerOpts.DumpClangDiagnostics) {
-      llvm::errs() << "clang importer cc1 args: '";
+    if (ctx.LangOpts.RemarkClangImporter) {
+      std::string argsStr;
+      llvm::raw_string_ostream os(argsStr);
+      os << "'";
       llvm::interleave(
-                       invocationArgStrs, [](StringRef arg) { llvm::errs() << arg; },
-                       [] { llvm::errs() << "' '"; });
-      llvm::errs() << "'\n";
+          invocationArgStrs, [&](StringRef arg) { os << arg; },
+          [&] { os << "' '"; });
+      os << "'";
+      ctx.Diags.diagnose(SourceLoc(), diag::remark_clang_importer_cc1_args,
+                         StringRef(argsStr));
     }
     importer->Impl.Invocation = createClangInvocation(
         importer.get(), importerOpts, vfs, importer->Impl.ClangArgs);

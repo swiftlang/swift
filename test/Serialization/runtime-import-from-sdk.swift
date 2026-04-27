@@ -51,7 +51,7 @@
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t/mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-sdk) -resource-dir %t/empty-toolchain/usr/lib/swift -module-cache-path %t/mcp -typecheck %s -dump-clang-diagnostics -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import 2>&1 | %FileCheck --check-prefix CHECK-EMPTY %s
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-sdk) -resource-dir %t/empty-toolchain/usr/lib/swift -module-cache-path %t/mcp -typecheck %s -Rclang-importer -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import 2>&1 | %FileCheck --check-prefix CHECK-EMPTY %s
 // CHECK-EMPTY-NOT: '-isystem' '{{.*}}/bad-sdk/usr/lib/swift/shims'
 // CHECK-EMPTY: error: could not find module 'Swift' for target '{{.*}}'; found: garbage-garbage-garbage, at: {{.*}}/Swift.swiftmodule
 
@@ -59,7 +59,7 @@
 // *does* add a -I flag to look in the SDK.
 
 // RUN: %empty-directory(%t/mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-sdk) -resource-dir %t/really-empty-toolchain/usr/lib/swift -module-cache-path %t/mcp -typecheck %s -dump-clang-diagnostics -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import 2>&1 | %FileCheck --check-prefix CHECK-REALLY-EMPTY %s
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-sdk) -resource-dir %t/really-empty-toolchain/usr/lib/swift -module-cache-path %t/mcp -typecheck %s -Rclang-importer -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import 2>&1 | %FileCheck --check-prefix CHECK-REALLY-EMPTY %s
 // CHECK-REALLY-EMPTY: '-isystem' '{{.*}}/bad-sdk/usr/lib/swift/shims'
 // CHECK-REALLY-EMPTY: error: could not find module 'Swift' for target '{{.*}}'; found: garbage-garbage-garbage, at: {{.*}}/Swift.swiftmodule
 

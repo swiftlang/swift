@@ -5,11 +5,11 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
-// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-prefix experimental- -Rmacro-expansions -suppress-notes
+// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-prefix experimental- -Rmacro-expansions -Rclang-importer -verify-ignore-macro-note
 
 // lifetimebound support is not stabilized yet. Don't generate _any_ overloads on functions with lifetimebound to prevent future sourcebreak.
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
-// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-prefix stable- -Rmacro-expansions -suppress-notes
+// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-prefix stable- -Rmacro-expansions -Rclang-importer -verify-ignore-macro-note
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by __lifetimebound parameters and return values.
 
@@ -23,6 +23,10 @@
 #endif
 #define __lifetimebound __attribute__((lifetimebound))
 
+// expected-stable-note@+17{{'simple' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:70{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func simple(_ len: Int32, _ p: RawSpan) -> RawSpan {|}}
@@ -38,6 +42,10 @@
 // }}
 const void * __sized_by(len) simple(int len, int len2, const void * p __sized_by(len2) __lifetimebound);
 
+// expected-stable-note@+17{{'shared' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:60{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func shared(_ p: RawSpan) -> RawSpan {|}}
@@ -53,6 +61,10 @@ const void * __sized_by(len) simple(int len, int len2, const void * p __sized_by
 // }}
 const void * __sized_by(len) shared(int len, const void * p __sized_by(len) __lifetimebound);
 
+// expected-stable-note@+17{{'complexExpr' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:96{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: RawSpan) -> RawSpan {|}}
@@ -68,6 +80,10 @@ const void * __sized_by(len) shared(int len, const void * p __sized_by(len) __li
 // }}
 const void * __sized_by(len - offset) complexExpr(int len, int offset, int len2, const void * p __sized_by(len2) __lifetimebound);
 
+// expected-stable-note@+17{{'nullUnspecified' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:115{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func nullUnspecified(_ len: Int32, _ p: RawSpan) -> RawSpan {|}}
@@ -83,6 +99,10 @@ const void * __sized_by(len - offset) complexExpr(int len, int offset, int len2,
 // }}
 const void * __sized_by(len) _Null_unspecified nullUnspecified(int len, int len2, const void * _Null_unspecified p __sized_by(len2) __lifetimebound);
 
+// expected-stable-note@+17{{'nonnull' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:89{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func nonnull(_ len: Int32, _ p: RawSpan) -> RawSpan {|}}
@@ -98,6 +118,10 @@ const void * __sized_by(len) _Null_unspecified nullUnspecified(int len, int len2
 // }}
 const void * __sized_by(len) _Nonnull nonnull(int len, int len2, const void * _Nonnull p __sized_by(len2) __lifetimebound);
 
+// expected-stable-note@+24{{'nullable' declared here}}
+// expected-stable-remark@+23{{did not add safe interop wrapper}}
+// expected-stable-note@+22{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+21{{added safe interop wrapper}}
 // expected-experimental-expansion@+20:92{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func nullable(_ len: Int32, _ p: RawSpan?) -> RawSpan? {|}}
@@ -121,6 +145,10 @@ const void * __sized_by(len) _Nonnull nonnull(int len, int len2, const void * _N
 const void * __sized_by(len) _Nullable nullable(int len, int len2, const void * _Nullable p __sized_by(len2) __lifetimebound);
 
 typedef struct foo opaque_t;
+// expected-stable-note@+17{{'opaque' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:66{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func opaque(_ len: Int32, _ p: RawSpan) -> RawSpan {|}}
@@ -136,6 +164,9 @@ typedef struct foo opaque_t;
 // }}
 opaque_t * __sized_by(len) opaque(int len, int len2, opaque_t * p __sized_by(len2) __lifetimebound);
 
+// expected-stable-remark@+9{{did not add safe interop wrapper}}
+// expected-stable-note@+8{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+7{{added safe interop wrapper}}
 // expected-experimental-expansion@+6:70{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow p) @_disfavoredOverload public func nonsizedLifetime(_ len: Int32, _ p: UnsafeRawPointer!) -> RawSpan {|}}
@@ -144,6 +175,10 @@ opaque_t * __sized_by(len) opaque(int len, int len2, opaque_t * p __sized_by(len
 // }}
 const void * __sized_by(len) nonsizedLifetime(int len, const void * p __lifetimebound);
 
+// expected-stable-note@+17{{'bytesized' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:65{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func bytesized(_ p: RawSpan) -> MutableRawSpan {|}}
@@ -159,6 +194,10 @@ const void * __sized_by(len) nonsizedLifetime(int len, const void * p __lifetime
 // }}
 uint8_t *__sized_by(size)  bytesized(int size, const uint8_t * p __sized_by(size) __lifetimebound);
 
+// expected-stable-note@+17{{'charsized' declared here}}
+// expected-stable-note@+16{{lifetimebound support is not yet stabilized}}
+// expected-stable-remark@+15{{did not add safe interop wrapper}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:85{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func charsized(_ p: inout MutableRawSpan) -> MutableRawSpan {|}}
@@ -174,6 +213,14 @@ uint8_t *__sized_by(size)  bytesized(int size, const uint8_t * p __sized_by(size
 // }}
 char *__sized_by(size) charsized(char * p __sized_by(size) __lifetimebound, int size);
 
+// expected-remark@+8 2{{ignoring __sized_by attribute}}
+// expected-note@+7 2{{__sized_by attribute on pointer to type larger than a single byte}}
+// expected-note@+6 2{{type 'uint16_t' has size 2}}
+// expected-stable-remark@+5{{did not add safe interop wrapper}}
+// expected-stable-note@+4{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+3{{ignoring lifetimebound attribute because return value is Escapable}}
+// expected-experimental-remark@+2{{did not add safe interop wrapper}}
+// expected-experimental-note@+1{{no bounds or lifetime information found}}
 const uint16_t *__sized_by(size)  doublebytesized(uint16_t * p __sized_by(size) __lifetimebound, int size);
 
 //--- module.modulemap
@@ -287,6 +334,7 @@ func call_doublebytesized(_ p: UnsafeMutablePointer<UInt16>!, _ size: Int32) -> 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @_lifetime(copy p)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ len: Int32, _ p: RawSpan?) -> RawSpan? {
+  // expected-stable-note@+4{{arguments to generic parameter 'Wrapped' ('UnsafeRawPointer' and 'RawSpan') are expected to be equal}}
   // expected-stable-error@+3{{missing argument for parameter #3 in call}}
   // expected-stable-error@+2{{cannot convert value of type 'RawSpan?' to expected argument type 'Int32'}}
   // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer?' to return type 'RawSpan?'}}

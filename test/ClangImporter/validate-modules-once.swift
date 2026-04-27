@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: touch %t/Build.session
-// RUN: %swift %s -typecheck -dump-clang-diagnostics -validate-clang-modules-once -clang-build-session-file %t/Build.session 2>&1 | %FileCheck %s
+// RUN: %swift %s -typecheck -Rclang-importer -validate-clang-modules-once -clang-build-session-file %t/Build.session 2>&1 | %FileCheck %s
 
 public func foo() {}
 

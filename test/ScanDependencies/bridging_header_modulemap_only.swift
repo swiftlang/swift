@@ -14,7 +14,7 @@
 // RUN: %target-swift-emit-pcm -module-name A -o %t/TestInputs/A.pcm %S/Inputs/CHeaders/module.modulemap
 // RUN: %target-swift-emit-pcm -module-name SwiftShims %swift-lib-dir/swift/shims/module.modulemap -o %t/TestInputs/SwiftShims.pcm
 
-// RUN: %target-swift-frontend -c -disable-implicit-swift-modules -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -explicit-swift-module-map-file %t/map.json -primary-file %t/bridging_header_modulemap_only.swift -o %t/bridging_header_modulemap_only.o -dump-clang-diagnostics 2>&1 | %FileCheck %s --check-prefix=CHECK-CLANG-COMMAND
+// RUN: %target-swift-frontend -c -disable-implicit-swift-modules -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -explicit-swift-module-map-file %t/map.json -primary-file %t/bridging_header_modulemap_only.swift -o %t/bridging_header_modulemap_only.o -Rclang-importer 2>&1 | %FileCheck %s --check-prefix=CHECK-CLANG-COMMAND
 
 //--- map.json.template
 [
