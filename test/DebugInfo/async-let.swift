@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - \
 // RUN:    -module-name M  -target %target-swift-5.1-abi-triple \
-// RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK
+// RUN:    -parse-as-library \
+// RUN:    | %swift-llvm-opt -passes=unreachableblockelim \
+// RUN:    | %FileCheck %s --check-prefix=CHECK
 
 // REQUIRES: concurrency
 // REQUIRES: CPU=x86_64 || CPU=arm64

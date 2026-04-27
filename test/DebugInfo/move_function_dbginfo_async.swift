@@ -106,7 +106,6 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // CHECK:   #dbg_value(ptr %{{[0-9]+}}, !{{[0-9]+}}, !DIExpression(DW_OP_LLVM_entry_value, 1, DW_OP_deref, DW_OP_plus_uconst, 24, DW_OP_deref, DW_OP_deref)
 // CHECK: musttail call swifttailcc void @swift_task_switch(ptr swiftasync %{{[0-9]+}}, ptr @"$s27move_function_dbginfo_async13varSimpleTestyyxz_xtYalFTY1_", i64 0, i64 0)
 // CHECK-NEXT: ret void
-// CHECK-NEXT: }
 //
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async13varSimpleTestyyxz_xtYalFTY1_"(ptr swiftasync %0)
 // CHECK: entryresume.1:
@@ -114,7 +113,6 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // CHECK:   #dbg_value(ptr undef, ![[METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK:   musttail call swifttailcc void @"$s27move_function_dbginfo_async10forceSplityyYaF"(ptr swiftasync
 // CHECK-NEXT: ret void
-// CHECK-NEXT: }
 //
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async13varSimpleTestyyxz_xtYalFTQ2_"(ptr swiftasync %0)
 // CHECK: entryresume.2:
@@ -126,7 +124,6 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // CHECK:   #dbg_value(ptr %{{[0-9]+}}, ![[METADATA]], !DIExpression(DW_OP_LLVM_entry_value, 1, DW_OP_plus_uconst, 24, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: musttail call swifttailcc void @"$s27move_function_dbginfo_async10forceSplityyYaF"(
 // CHECK-NEXT:   ret void
-// CHECK-NEXT: }
 //
 // RUN: %llvm-dwarfdump -c --name='$s3out13varSimpleTestyyxz_xtYalF' %t/out.o | %FileCheck -check-prefix=DWARF4 %s
 // DWARF4: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalF")
@@ -315,11 +312,10 @@ public func varSimpleTestVar() async {
 // CHECK:  #dbg_value(ptr %{{[0-9]+}}, !{{[0-9]+}}, !DIExpression(DW_OP_LLVM_entry_value, 1, DW_OP_deref, DW_OP_plus_uconst, 24, DW_OP_deref, DW_OP_deref),
 // CHECK:  musttail call swifttailcc void @swift_task_switch(ptr swiftasync %{{[0-9]+}}, ptr @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTY1_", i64 0, i64 0)
 // CHECK-NEXT: ret void
-// CHECK-NEXT: }
 
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTY1_"(
 // CHECK: #dbg_value(ptr %{{[0-9]+}}, ![[METADATA:[0-9]*]], !DIExpression(DW_OP_LLVM_entry_value, 1, DW_OP_plus_uconst, 24, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
-// CHECK:    br i1 %{{[0-9]}}, label %[[LHS_BLOCK:[a-zA-Z\.0-9]*]], label %[[RHS_BLOCK:[a-zA-Z\.0-9]*]],
+// CHECK:    br i1 %{{[0-9]+}}, label %[[LHS_BLOCK:[a-zA-Z\.0-9]*]], label %[[RHS_BLOCK:[a-zA-Z\.0-9]*]],
 //
 // CHECK: [[LHS_BLOCK]]:
 // CHECK:  #dbg_value(ptr undef, ![[METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
@@ -348,7 +344,6 @@ public func varSimpleTestVar() async {
 // CHECK-NEXT:  #dbg_value(ptr undef, ![[msg_var]]
 // CHECK:   musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit4yyYaF"(
 // CHECK-NEXT:   ret void,
-// CHECK-NEXT: }
 //
 // This is the continuation block
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTQ4_"(
@@ -494,7 +489,6 @@ public func letArgCCFlowTrueTest<T>(_ msg: __owned T) async {
 // CHECK-NOT: #dbg_value(
 // CHECK:  musttail call swifttailcc void %{{[0-9]+}}(ptr swiftasync
 // CHECK-NEXT:  ret void,
-// CHECK-NEXT: }
 
 // RUN: %llvm-dwarfdump -c --name='$s3out20varArgCCFlowTrueTestyyxzYaAA1PRzlF' %t/out.o | %FileCheck -check-prefix=DWARF24 %s
 // DWARF24: DW_AT_linkage_name	("$s3out20varArgCCFlowTrueTestyyxzYaAA1PRzlF")

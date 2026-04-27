@@ -408,6 +408,18 @@ void swift::performLLVMOptimizations(
                               Opts.VerifyEach, PrintPassOpts);
   SI.registerCallbacks(PIC, &MAM);
 
+  // At -Onone, skip SimplifyCFG to preserve debug line info.
+  // SimplifyCFG is added by the CoroSplitter to cleanup async functions and
+  // coroutines, but it loses debug locations.
+  // Clang avoids this by setting optnone on all functions at -O0, but
+  // Swift cannot use optnone as we need mandatory inlining.
+  if (!Opts.shouldOptimize()) {
+    PIC.registerShouldRunOptionalPassCallback(
+        [](StringRef PassID, Any IR) {
+          return !PassID.contains("SimplifyCFGPass");
+        });
+  }
+
   PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC, FS);
 
   // Attempt to load pass plugins and register their callbacks with PB.
