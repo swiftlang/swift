@@ -2781,6 +2781,8 @@ namespace {
         return handleAddressOnly(type, properties);
       case irgen::HiddenTypeIRABIInfo::Kind::ReferenceType:
         return handleReference(type, properties);
+      case irgen::HiddenTypeIRABIInfo::Kind::ResilientStruct:
+        return handleAddressOnly(type, properties);
       }
     }
 

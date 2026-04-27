@@ -2492,6 +2492,11 @@ TypeConverter::convertHiddenTypeLayoutInfoType(HiddenTypeLayoutInfoType *T) {
     return createReferenceTypeInfoFromABIInfo(IGM, *refInfo);
   }
 
+  if (auto *resilientInfo =
+          dyn_cast<irgen::HiddenResilientStructTypeIRABIInfo>(abiInfo)) {
+    return createResilientTypeInfoFromABIInfo(IGM, *resilientInfo);
+  }
+
   llvm_unreachable("unsupported hidden type ABI info kind");
 }
 

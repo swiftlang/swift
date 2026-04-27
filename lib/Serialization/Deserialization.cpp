@@ -5942,6 +5942,36 @@ ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
     return decl;
   }
 
+  case HIDDEN_RESILIENT_STRUCT_TYPE: {
+    bool isCopyable;
+    bool isKnownABIAccessible;
+    uint16_t silTypePropertiesFlags;
+    IdentifierID mangledNameID;
+    DeclID parentDeclID;
+
+    HiddenResilientStructTypeLayoutDescriptorLayout::readRecord(
+        scratch, isCopyable, isKnownABIAccessible,
+        silTypePropertiesFlags,
+        mangledNameID, parentDeclID);
+
+    auto *decl = HiddenTypeLayoutInfoDecl::create(ctx, DC);
+    auto *abiInfo = new (ctx) irgen::HiddenResilientStructTypeIRABIInfo(
+        isCopyable, isKnownABIAccessible);
+    abiInfo->setMangledTypeName(getIdentifier(mangledNameID).str());
+    abiInfo->setSILTypeProperties(
+        SILTypeProperties::fromRawFlags(silTypePropertiesFlags));
+    decl->setABIInfo(abiInfo);
+    if (parentDeclID) {
+      auto parentDecl = getDeclChecked(parentDeclID);
+      if (!parentDecl)
+        return parentDecl.takeError();
+      decl->setParentDecl(cast<TypeDecl>(parentDecl.get()));
+    }
+
+    declOrOffset = decl;
+    return decl;
+  }
+
   default:
     return diagnoseFatal();
   }

@@ -6795,6 +6795,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<HiddenStructTypeLayoutDescriptorLayout>();
   registerDeclTypeAbbr<HiddenReferenceTypeLayoutDescriptorLayout>();
+  registerDeclTypeAbbr<HiddenResilientStructTypeLayoutDescriptorLayout>();
 
 #define DECL_ATTR(X, NAME, ...) \
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();
@@ -6887,6 +6888,10 @@ void Serializer::writeHiddenLayoutInformationForDecl(const Decl* D) {
                    llvm::dyn_cast<irgen::HiddenReferenceTypeIRABIInfo>(
                        abiInfo)) {
       writeHiddenReferenceTypeLayoutRecord(refInfo, parentDecl);
+    } else if (auto *resilientInfo =
+                   llvm::dyn_cast<irgen::HiddenResilientStructTypeIRABIInfo>(
+                       abiInfo)) {
+      writeHiddenResilientStructTypeLayoutRecord(resilientInfo, parentDecl);
     } else {
       llvm_unreachable("unhandled HiddenTypeIRABIInfo kind");
     }
@@ -6910,6 +6915,10 @@ void Serializer::writeHiddenLayoutInformationForDecl(const Decl* D) {
   } else if (auto *refInfo =
                  llvm::dyn_cast<irgen::HiddenReferenceTypeIRABIInfo>(abiInfo)) {
     writeHiddenReferenceTypeLayoutRecord(refInfo, parentDecl);
+  } else if (auto *resilientInfo =
+                 llvm::dyn_cast<irgen::HiddenResilientStructTypeIRABIInfo>(
+                     abiInfo)) {
+    writeHiddenResilientStructTypeLayoutRecord(resilientInfo, parentDecl);
   } else {
     llvm_unreachable("unhandled HiddenTypeIRABIInfo kind");
   }
@@ -6964,6 +6973,27 @@ void Serializer::writeHiddenReferenceTypeLayoutRecord(
       Out, ScratchRecord, abbrCode, refcounting,
       refInfo->getSILTypeProperties().getRawFlags(),
       mangledNameID, parentDeclID);
+}
+
+void Serializer::writeHiddenResilientStructTypeLayoutRecord(
+    const irgen::HiddenResilientStructTypeIRABIInfo *resilientInfo,
+    const TypeDecl *parentDecl) {
+  using namespace decls_block;
+
+  auto mangledNameID =
+      addUniquedString(resilientInfo->getMangledTypeName()).second;
+  auto parentDeclID = parentDecl ? addDeclRef(parentDecl) : DeclID();
+
+  unsigned abbrCode =
+      DeclTypeAbbrCodes
+          [HiddenResilientStructTypeLayoutDescriptorLayout::Code];
+  HiddenResilientStructTypeLayoutDescriptorLayout::emitRecord(
+      Out, ScratchRecord, abbrCode,
+      resilientInfo->Copyable,
+      resilientInfo->IsKnownABIAccessible,
+      resilientInfo->getSILTypeProperties().getRawFlags(),
+      mangledNameID,
+      parentDeclID);
 }
 
 std::vector<CharOffset> Serializer::writeAllIdentifiers() {

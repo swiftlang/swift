@@ -46,6 +46,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/IRGen/HiddenTypeIRABIDetails.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/TypeLowering.h"
@@ -2287,7 +2288,27 @@ namespace {
     UNSUPPORTED_METADATA(ReferenceStorage)
     UNSUPPORTED_METADATA(SILFunction)
     UNSUPPORTED_METADATA(SILToken)
-    UNSUPPORTED_METADATA(HiddenTypeLayoutInfo) // We will add support later
+    MetadataResponse visitHiddenTypeLayoutInfoType(CanHiddenTypeLayoutInfoType type,
+                                           DynamicMetadataRequest request) {
+      auto *abiInfo = type->getDecl()->getABIInfo();
+
+      auto accessorName = abiInfo->getMetadataAccessorName();
+      auto *fnTy = llvm::FunctionType::get(
+          IGF.IGM.TypeMetadataResponseTy,
+          {IGF.IGM.SizeTy},
+          false);
+      auto *accessor = cast<llvm::Function>(
+          IGF.IGM.Module.getOrInsertFunction(accessorName, fnTy)
+              .getCallee());
+      accessor->setCallingConv(IGF.IGM.SwiftCC);
+
+      auto call =
+          IGF.Builder.CreateCall(fnTy, accessor, {request.get(IGF)});
+      call->setDoesNotThrow();
+      call->setCallingConv(IGF.IGM.SwiftCC);
+
+      return MetadataResponse::handle(IGF, request, call);
+    }
     UNSUPPORTED_METADATA(SILMoveOnlyWrapped)
     UNSUPPORTED_METADATA(GenericTypeParam)
     UNSUPPORTED_METADATA(DependentMember)
@@ -3460,6 +3481,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   if (type->hasArchetype() ||
       !shouldTypeMetadataAccessUseAccessor(IGM, type) ||
       isa<PackType>(type) ||
+      isa<HiddenTypeLayoutInfoType>(type) ||
       IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }

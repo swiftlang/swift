@@ -39,6 +39,7 @@ public:
     LoadableStruct,
     AddressOnlyStruct,
     ReferenceType,
+    ResilientStruct,
   };
 
 private:
@@ -60,6 +61,10 @@ public:
 
   virtual std::optional<ReferenceCounting> getReferenceCountingSystem() const {
     return std::nullopt;
+  }
+
+  std::string getMetadataAccessorName() const {
+    return MangledTypeName + "Ma";
   }
 
 protected:
@@ -108,6 +113,25 @@ public:
 
 protected:
   ~HiddenReferenceTypeIRABIInfo() {}
+};
+
+/// ABI details for a hidden resilient struct type.
+class HiddenResilientStructTypeIRABIInfo : public HiddenTypeIRABIInfo {
+public:
+  const bool Copyable;
+  bool IsKnownABIAccessible = false;
+
+  HiddenResilientStructTypeIRABIInfo(bool copyable, bool isKnownABIAccessible = false)
+      : HiddenTypeIRABIInfo(Kind::ResilientStruct),
+        Copyable(copyable),
+        IsKnownABIAccessible(isKnownABIAccessible) {}
+
+  static bool classof(const HiddenTypeIRABIInfo *info) {
+    return info->getKind() == Kind::ResilientStruct;
+  }
+
+protected:
+  ~HiddenResilientStructTypeIRABIInfo() {}
 };
 
 } // end namespace irgen

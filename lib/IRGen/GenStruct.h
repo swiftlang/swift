@@ -75,11 +75,16 @@ namespace irgen {
                                                       VarDecl *field);
 
   class HiddenStructTypeIRABIInfo;
+  class HiddenResilientStructTypeIRABIInfo;
 
   const TypeInfo *createTypeInfoFromHiddenStructTypeABIInfo(
       IRGenModule &IGM,
       CanType type,
       const HiddenStructTypeIRABIInfo &abiInfo);
+
+  const TypeInfo *createResilientTypeInfoFromABIInfo(
+      IRGenModule &IGM,
+      const HiddenResilientStructTypeIRABIInfo &abiInfo);
 } // end namespace irgen
 } // end namespace swift
 

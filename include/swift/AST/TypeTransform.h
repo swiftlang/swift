@@ -123,7 +123,9 @@ case TypeKind::Id:
       return t;
 
     case TypeKind::HiddenTypeLayoutInfo:
-      llvm_unreachable("not implemented yet");
+      // TODO: When HiddenTypeLayoutInfoType carries generic args or a
+      // parent type, we need to transform those components here.
+      return t;
 
     // BuiltinGenericType subclasses
     case TypeKind::BuiltinBorrow:

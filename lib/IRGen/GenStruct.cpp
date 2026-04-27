@@ -81,6 +81,7 @@ enum class StructTypeInfoKind {
   ResilientStructTypeInfo,
   HiddenLoadableStructTypeInfo,
   HiddenFixedStructTypeInfo,
+  HiddenResilientStructTypeInfo,
 };
 
 static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
@@ -1731,6 +1732,8 @@ private:
       llvm_unreachable("hidden structs don't have named fields");             \
     case StructTypeInfoKind::HiddenFixedStructTypeInfo:                      \
       llvm_unreachable("hidden structs don't have named fields");             \
+    case StructTypeInfoKind::HiddenResilientStructTypeInfo:                   \
+      llvm_unreachable("hidden resilient structs are opaque");                \
     }                                                                          \
     llvm_unreachable("bad struct type info kind!");                            \
   } while (0)
@@ -1834,6 +1837,11 @@ namespace {
                           SILType T,
                           bool useStructLayouts) const override {
       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+    }
+
+    HiddenTypeIRABIInfo *getHiddenTypeIRABIInfo(ASTContext &ctx) const override {
+      return new (ctx) HiddenResilientStructTypeIRABIInfo(
+          isCopyable(ResilienceExpansion::Minimal));
     }
   };
 } // end anonymous namespace
@@ -2063,6 +2071,42 @@ const TypeInfo *irgen::createTypeInfoFromHiddenStructTypeABIInfo(
   default:
     llvm_unreachable("non-struct hidden type in createTypeInfoFromHiddenStructTypeABIInfo");
   }
+}
+
+namespace {
+  class HiddenResilientStructTypeInfo
+      : public ResilientTypeInfo<HiddenResilientStructTypeInfo>
+  {
+    std::string MetadataAccessorName;
+  public:
+    HiddenResilientStructTypeInfo(llvm::Type *T,
+                                  IsCopyable_t copyable,
+                                  IsABIAccessible_t abiAccessible,
+                                  StringRef metadataAccessorName)
+      : ResilientTypeInfo(T, copyable, abiAccessible),
+        MetadataAccessorName(metadataAccessorName.str()) {
+      setSubclassKind(
+          (unsigned)StructTypeInfoKind::HiddenResilientStructTypeInfo);
+    }
+
+    StringRef getMetadataAccessorName() const { return MetadataAccessorName; }
+
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      llvm_unreachable("Producing a type layout entry from hidden types is not yet supported");
+    }
+  };
+} // end anonymous namespace
+
+const TypeInfo *irgen::createResilientTypeInfoFromABIInfo(
+    IRGenModule &IGM,
+    const HiddenResilientStructTypeIRABIInfo &abiInfo) {
+  auto copyable = abiInfo.Copyable ? IsCopyable : IsNotCopyable;
+  auto abiAccessible = IsABIAccessible_t(abiInfo.IsKnownABIAccessible);
+  return new HiddenResilientStructTypeInfo(
+      IGM.OpaqueTy, copyable, abiAccessible, abiInfo.getMetadataAccessorName());
 }
 
 const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
