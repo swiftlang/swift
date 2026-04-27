@@ -105,6 +105,13 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
   switch (access) {
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
+      // When the conforming type is more accessible than the protocol, the
+      // conformance may be referenced from other files (e.g. a public type
+      // conforming to a file-private protocol that refines a public protocol).
+      // Use Hidden/HiddenExternal so the descriptor can be linked across
+      // compilation units. If both are (file-)private, Private is correct.
+      if (typeDecl->getEffectiveAccess() > access)
+        return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
       return SILLinkage::Private;
     case AccessLevel::Internal:
       return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
