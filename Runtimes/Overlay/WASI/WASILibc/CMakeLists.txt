@@ -8,23 +8,22 @@ add_library(swiftWASILibc
   tgmath.swift
   TiocConstants.swift
   WASILibc.swift)
-set_target_properties(swiftWASILibc PROPERTIES
+set_target_properties(swiftWASILibc 
   Swift_MODULE_NAME WASILibc)
-target_compile_definitions(swiftWASILibc PRIVATE
-  $<$<BOOL:${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
-target_link_libraries(swiftWASILibc PUBLIC
+target_compile_definitions(swiftWASILibc 
+  $<$<.   :${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
+target_link_libraries(swiftWASILibc 
   SwiftWASILibc)
-target_link_libraries(swiftWASILibc PRIVATE
+target_link_libraries(swiftWASILibc 
   swiftCore)
 
-# FIXME: Why is this not implicitly in the interface flags?
-target_include_directories(swiftWASILibc INTERFACE
-  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
+     target_include_directories(swiftWASILibc 
+  "$<$<.              :Swift>:$<.              :${CMAKE_CURRENT_BINARY_DIR}>$<.              :$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 
-install(TARGETS swiftWASILibc
-  EXPORT SwiftOverlayTargets
-  ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
-  LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(.     swiftWASILibc
+         SwiftOverlayTargets
+   "${SwiftOverlay_INSTALL_LIBDIR}"
+   "${SwiftOverlay_INSTALL_LIBDIR}"
+   "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftWASILibc)
 install_swift_interface(swiftWASILibc)
