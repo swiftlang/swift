@@ -6951,6 +6951,7 @@ void Serializer::writeHiddenStructTypeLayoutRecord(const irgen::HiddenStructType
       Out, ScratchRecord, abbrCode,
       static_cast<uint8_t>(hiddenStructInfo->getKind()),
       hiddenStructInfo->Copyable,
+      hiddenStructInfo->IsKnownABIAccessible,
       hiddenStructInfo->getSILTypeProperties().getRawFlags(),
       mangledNameID,
       parentDeclID,

@@ -5872,30 +5872,31 @@ ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
   case HIDDEN_STRUCT_TYPE: {
     uint8_t rawKind;
     bool isCopyable;
+    bool isKnownABIAccessible;
     uint16_t silTypePropertiesFlags;
     IdentifierID mangledNameID;
     DeclID parentDeclID;
     ArrayRef<uint64_t> fieldTypeIDs;
 
     HiddenStructTypeLayoutDescriptorLayout::readRecord(
-        scratch, rawKind, isCopyable, silTypePropertiesFlags,
+        scratch, rawKind, isCopyable, isKnownABIAccessible,
+        silTypePropertiesFlags,
         mangledNameID, parentDeclID, fieldTypeIDs);
 
     auto kind = static_cast<irgen::HiddenTypeIRABIInfo::Kind>(rawKind);
 
     SmallVector<Type, 4> fieldTypes;
-    for (auto rawID : fieldTypeIDs) {
-      auto fieldType = getType(static_cast<serialization::TypeID>(rawID));
-      fieldTypes.push_back(fieldType);
-    }
+    for (auto rawID : fieldTypeIDs)
+      fieldTypes.push_back(getType(rawID));
 
     irgen::HiddenTypeIRABIInfo *abiInfo = nullptr;
     auto *decl = HiddenTypeLayoutInfoDecl::create(ctx, DC);
     switch (kind) {
       case irgen::HiddenTypeIRABIInfo::Kind::LoadableStruct:
       case irgen::HiddenTypeIRABIInfo::Kind::AddressOnlyStruct:
+      case irgen::HiddenTypeIRABIInfo::Kind::NonFixedStruct:
         abiInfo = new (ctx) irgen::HiddenStructTypeIRABIInfo(
-            kind, fieldTypes, isCopyable);
+            kind, fieldTypes, isCopyable, isKnownABIAccessible);
         break;
       default:
         llvm_unreachable("unhandled hidden struct type kind");

@@ -2708,6 +2708,7 @@ namespace decls_block {
     HIDDEN_STRUCT_TYPE,
     BCFixed<3>,        // type info kind
     BCFixed<1>,        // isCopyable
+    BCFixed<1>,        // isKnownABIAccessible
     BCVBR<16>,         // SILTypeProperties raw flags
     IdentifierIDField, // mangled type name
     DeclIDField,       // parent decl

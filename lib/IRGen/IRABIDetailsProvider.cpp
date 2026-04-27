@@ -166,6 +166,10 @@ public:
     auto props = typeConverter.getTypeProperties(
         TD->getDeclaredTypeInContext(), TypeExpansionContext::minimal());
     abiInfo->setSILTypeProperties(props);
+    if (auto *structInfo = dyn_cast<irgen::HiddenStructTypeIRABIInfo>(abiInfo)) {
+      if (structInfo->getKind() == irgen::HiddenTypeIRABIInfo::Kind::NonFixedStruct)
+        structInfo->IsKnownABIAccessible = isTypeKnownToBeABIAccessible(TD);
+    }
     if (auto *resilientInfo =
             dyn_cast<irgen::HiddenResilientStructTypeIRABIInfo>(abiInfo)) {
       resilientInfo->IsKnownABIAccessible =

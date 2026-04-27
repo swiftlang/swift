@@ -2782,6 +2782,7 @@ namespace {
       case irgen::HiddenTypeIRABIInfo::Kind::ReferenceType:
         return handleReference(type, properties);
       case irgen::HiddenTypeIRABIInfo::Kind::ResilientStruct:
+      case irgen::HiddenTypeIRABIInfo::Kind::NonFixedStruct:
         return handleAddressOnly(type, properties);
       }
     }

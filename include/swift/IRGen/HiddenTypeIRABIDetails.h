@@ -40,6 +40,7 @@ public:
     AddressOnlyStruct,
     ReferenceType,
     ResilientStruct,
+    NonFixedStruct,
   };
 
 private:
@@ -76,18 +77,22 @@ class HiddenStructTypeIRABIInfo : public HiddenTypeIRABIInfo {
 
 public:
   const bool Copyable;
+  bool IsKnownABIAccessible = false;
 
   HiddenStructTypeIRABIInfo(Kind kind, llvm::ArrayRef<Type> fieldTypes,
-                            bool copyable)
+                            bool copyable,
+                            bool isKnownABIAccessible = false)
       : HiddenTypeIRABIInfo(kind),
         FieldTypes(fieldTypes.begin(), fieldTypes.end()),
-        Copyable(copyable) {}
+        Copyable(copyable),
+        IsKnownABIAccessible(isKnownABIAccessible) {}
 
   llvm::ArrayRef<Type> getFieldTypes() const { return FieldTypes; }
 
   static bool classof(const HiddenTypeIRABIInfo *info) {
     return info->getKind() == Kind::LoadableStruct ||
-           info->getKind() == Kind::AddressOnlyStruct;
+           info->getKind() == Kind::AddressOnlyStruct ||
+           info->getKind() == Kind::NonFixedStruct;
   }
 
 protected:

@@ -82,6 +82,7 @@ enum class StructTypeInfoKind {
   HiddenLoadableStructTypeInfo,
   HiddenFixedStructTypeInfo,
   HiddenResilientStructTypeInfo,
+  HiddenNonFixedStructTypeInfo,
 };
 
 static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
@@ -1331,6 +1332,17 @@ namespace {
             });
         });
     }
+
+    HiddenTypeIRABIInfo *getHiddenTypeIRABIInfo(ASTContext &ctx) const override {
+      SmallVector<Type, 8> fieldTypes;
+      for (auto &field : getFields())
+        fieldTypes.push_back(field.Field->getInterfaceType());
+
+      return new (ctx) HiddenStructTypeIRABIInfo(
+          HiddenTypeIRABIInfo::Kind::NonFixedStruct,
+          fieldTypes,
+          isCopyable(ResilienceExpansion::Minimal));
+    }
   };
 
   class StructTypeBuilder :
@@ -1734,6 +1746,8 @@ private:
       llvm_unreachable("hidden structs don't have named fields");             \
     case StructTypeInfoKind::HiddenResilientStructTypeInfo:                   \
       llvm_unreachable("hidden resilient structs are opaque");                \
+    case StructTypeInfoKind::HiddenNonFixedStructTypeInfo:                   \
+      llvm_unreachable("hidden non-fixed structs are opaque");               \
     }                                                                          \
     llvm_unreachable("bad struct type info kind!");                            \
   } while (0)
@@ -2001,6 +2015,114 @@ public:
   }
 };
 
+namespace {
+  class HiddenNonFixedOffsets : public NonFixedOffsetsImpl {
+    SmallVector<SILType, 8> FieldSILTypes;
+    SmallVector<const TypeInfo *, 8> FieldTIs;
+  public:
+    HiddenNonFixedOffsets(ArrayRef<SILType> fieldSILTypes,
+                          ArrayRef<const TypeInfo *> fieldTIs)
+      : FieldSILTypes(fieldSILTypes.begin(), fieldSILTypes.end()),
+        FieldTIs(fieldTIs.begin(), fieldTIs.end()) {}
+
+    llvm::Value *getOffsetForIndex(IRGenFunction &IGF,
+                                   unsigned index) override {
+      auto &IGM = IGF.IGM;
+      llvm::Value *offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
+      for (unsigned i = 0; i <= index; ++i) {
+        auto &fieldTI = *FieldTIs[i];
+        auto fieldAlign = fieldTI.getAlignmentMask(IGF, FieldSILTypes[i]);
+        offset = IGF.Builder.CreateAdd(offset, fieldAlign);
+        offset = IGF.Builder.CreateAnd(
+            offset, IGF.Builder.CreateNot(fieldAlign));
+        if (i == index)
+          return offset;
+        auto fieldSize = fieldTI.getSize(IGF, FieldSILTypes[i]);
+        offset = IGF.Builder.CreateAdd(offset, fieldSize);
+      }
+      llvm_unreachable("index out of range");
+    }
+  };
+
+  class HiddenNonFixedStructTypeInfo final
+      : public RecordTypeInfo<HiddenNonFixedStructTypeInfo,
+                              WitnessSizedTypeInfo<HiddenNonFixedStructTypeInfo>,
+                              HiddenFieldInfo>
+  {
+    using super = RecordTypeInfo<HiddenNonFixedStructTypeInfo,
+                                 WitnessSizedTypeInfo<HiddenNonFixedStructTypeInfo>,
+                                 HiddenFieldInfo>;
+
+    SmallVector<SILType, 8> FieldSILTypes;
+    SmallVector<const TypeInfo *, 8> FieldTIs;
+  public:
+    HiddenNonFixedStructTypeInfo(ArrayRef<HiddenFieldInfo> fields,
+                                 FieldsAreABIAccessible_t areFieldsABIAccessible,
+                                 ArrayRef<SILType> fieldSILTypes,
+                                 ArrayRef<const TypeInfo *> fieldTIs,
+                                 llvm::Type *storageType,
+                                 Alignment align,
+                                 IsTriviallyDestroyable_t isTriviallyDestroyable,
+                                 IsBitwiseTakable_t isBitwiseTakable,
+                                 IsCopyable_t isCopyable,
+                                 IsABIAccessible_t isABIAccessible)
+      : super(fields, areFieldsABIAccessible,
+              storageType, align, isTriviallyDestroyable, isBitwiseTakable,
+              isCopyable, isABIAccessible),
+        FieldSILTypes(fieldSILTypes.begin(), fieldSILTypes.end()),
+        FieldTIs(fieldTIs.begin(), fieldTIs.end())
+    {
+      setSubclassKind(
+          (unsigned)StructTypeInfoKind::HiddenNonFixedStructTypeInfo);
+    }
+
+    HiddenNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF) const {
+      return HiddenNonFixedOffsets(FieldSILTypes, FieldTIs);
+    }
+    HiddenNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return HiddenNonFixedOffsets(FieldSILTypes, FieldTIs);
+    }
+
+    Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
+                                const HiddenFieldInfo &field) const {
+      if (field.isEmpty())
+        return addr;
+      auto offsets = getNonFixedOffsets(IGF, T);
+      return field.projectAddress(IGF, addr, offsets);
+    }
+
+    MemberAccessStrategy
+    getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
+                                   const HiddenFieldInfo &field) const {
+      llvm_unreachable("non-fixed field access not supported for hidden types");
+    }
+
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address addr,
+                                         SILType T,
+                                         bool isOutlined) const override {
+      return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, addr);
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *whichCase,
+                                   llvm::Value *numEmptyCases,
+                                   Address addr,
+                                   SILType T,
+                                   bool isOutlined) const override {
+      emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases, addr);
+    }
+
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      llvm_unreachable("Generating type layouts from a hidden type is not yet supported");
+    }
+  };
+} // end anonymous namespace
+
 const TypeInfo *irgen::createTypeInfoFromHiddenStructTypeABIInfo(
     IRGenModule &IGM,
     CanType type,
@@ -2068,8 +2190,28 @@ const TypeInfo *irgen::createTypeInfoFromHiddenStructTypeABIInfo(
           triviallyDestroyable, layout.isBitwiseTakable(),
           copyable, layout.isAlwaysFixedSize(), isTypeABIAccessibleIfFixedSize(IGM, type));
     }
-  default:
-    llvm_unreachable("non-struct hidden type in createTypeInfoFromHiddenStructTypeABIInfo");
+    case HiddenTypeIRABIInfo::Kind::NonFixedStruct: {
+      SmallVector<HiddenFieldInfo, 8> fields;
+      auto fieldsABIAccessible = FieldsAreABIAccessible;
+      for (unsigned i = 0, e = fieldTIs.size(); i != e; ++i) {
+        if (!fieldTIs[i]->isABIAccessible())
+          fieldsABIAccessible = FieldsAreNotABIAccessible;
+
+        fields.push_back(HiddenFieldInfo(fieldSILTypes[i],
+                                        layout.getElements()[i],
+                                        0, 0));
+      }
+
+      return HiddenNonFixedStructTypeInfo::create(
+          fields, fieldsABIAccessible,
+          fieldSILTypes, fieldTIs,
+          layout.getType(), layout.getAlignment(),
+          layout.isTriviallyDestroyable(),
+          layout.isBitwiseTakable(),
+          copyable, IsABIAccessible_t(abiInfo.IsKnownABIAccessible));
+    }
+    default:
+      llvm_unreachable("non-struct hidden type in createTypeInfoFromHiddenStructTypeABIInfo");
   }
 }
 
