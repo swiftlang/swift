@@ -24,8 +24,10 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/MapVector.h"
 #include <array>
+#include <memory>
 #include <queue>
 #include <tuple>
 
@@ -34,6 +36,7 @@ namespace clang {
 }
 
 namespace swift {
+  class HiddenTypeLayoutInfoDecl;
   class SILModule;
 
   namespace fine_grained_dependencies {
@@ -53,7 +56,7 @@ protected:
   SmallVector<uint64_t, 64> ScratchRecord;
 
   /// The module currently being serialized.
-  const ModuleDecl *M = nullptr;
+  ModuleDecl *M = nullptr;
 
   /// The SourceFile currently being serialized, if any.
   ///
@@ -83,8 +86,16 @@ class Serializer : public SerializerBase {
   friend class DeclSerializer;
   class TypeSerializer;
   friend class TypeSerializer;
+  class HiddenDeclSerializer;
+  friend class HiddenDeclSerializer;
 
   const SerializationOptions &Options;
+
+  /// Layout provider for computing type layouts of hidden types.
+  std::unique_ptr<IRABIDetailsProvider> LayoutProvider;
+
+  /// Returns the layout provider, creating it lazily.
+  IRABIDetailsProvider *getLayoutProvider();
 
   /// A map from non-identifier uniqued strings to their serialized IDs.
   ///
@@ -214,6 +225,14 @@ class Serializer : public SerializerBase {
   ASTBlockRecordKeeper<const Decl *, DeclID,
                        index_block::DECL_OFFSETS>
   DeclsToSerialize;
+
+  ASTBlockRecordKeeper<const Decl *, DeclID,
+                       index_block::HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS>
+  DeclsToSerializeHiddenTypeLayoutInformationFor;
+
+  /// Maps original DeclIDs (of XREFs) to hidden layout DeclIDs.
+  /// Written as a side table in the index block after serialization completes.
+  SmallVector<std::pair<DeclID, DeclID>, 16> HiddenTypeFallbackTable;
 
   ASTBlockRecordKeeper<Type, TypeID,
                        index_block::TYPE_OFFSETS>
@@ -355,6 +374,13 @@ private:
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
 
+  /// Schedules a decl for hidden type layout serialization and records
+  /// the fallback mapping from the decl's XREF DeclID to its hidden
+  /// layout DeclID. All additions to DeclsToSerializeHiddenTypeLayoutInformationFor
+  /// should go through this method. Note a hidden declaration can also be scheduled
+  /// for "re-serialization" this way.
+  void scheduleHiddenTypeLayoutSerialization(const Decl *D);
+
   /// Writes the given decl.
   void writeASTBlockEntity(const Decl *D);
 
@@ -427,6 +453,11 @@ private:
   /// This must be called after writeAllDeclsAndTypes(), since that may add
   /// additional identifiers to the pool.
   std::vector<CharOffset> writeAllIdentifiers();
+
+  /// Writes hidden type layout information for any pending declarations.
+  bool writeHiddenTypeLayoutInformationIfNeeded();
+
+  void writeHiddenLayoutInformationForDecl(const Decl* D);
 
   /// Writes the offsets for a serialized entity kind.
   ///

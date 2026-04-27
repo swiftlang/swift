@@ -2383,7 +2383,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::HiddenTypeLayoutInfo: {
     auto *hiddenDecl = cast<HiddenTypeLayoutInfoDecl>(D);
-    auto hiddenType = HiddenTypeLayoutInfoType::get(hiddenDecl, Context);
+    Type parent;
+    if (auto *parentDecl = hiddenDecl->getParentDecl())
+      parent = parentDecl->getDeclaredInterfaceType();
+
+    Type hiddenType = HiddenTypeLayoutInfoType::get(hiddenDecl, parent, Context);
     return MetatypeType::get(hiddenType, Context);
   }
 

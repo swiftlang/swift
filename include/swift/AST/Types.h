@@ -1733,17 +1733,19 @@ class HiddenTypeLayoutInfoType : public TypeBase {
   friend class ASTContext;
 
   HiddenTypeLayoutInfoDecl *Decl;
+  Type Parent;
 
   HiddenTypeLayoutInfoType(HiddenTypeLayoutInfoDecl *decl,
-                           const ASTContext &ctx,
+                           Type Parent, const ASTContext &ctx,
                            RecursiveTypeProperties properties)
       : TypeBase(TypeKind::HiddenTypeLayoutInfo, &ctx, properties),
         Decl(decl) {}
 
 public:
   HiddenTypeLayoutInfoDecl *getDecl() const { return Decl; }
+  Type getParent() const { return Parent; }
 
-  static Type get(HiddenTypeLayoutInfoDecl *decl, const ASTContext &ctx);
+  static Type get(HiddenTypeLayoutInfoDecl *decl, Type Parent, const ASTContext &ctx);
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::HiddenTypeLayoutInfo;

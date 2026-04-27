@@ -305,6 +305,14 @@ private:
   /// Identifiers referenced by this module.
   MutableArrayRef<SerializedIdentifier> Identifiers;
 
+  /// Hidden type layout info decls referenced by this module.
+  MutableArrayRef<Serialized<Decl*>> HiddenTypeLayoutInfoDecls;
+
+  /// Maps DeclIDs of XREFs to DeclIDs of hidden layout fallback records.
+  llvm::DenseMap<uint32_t, uint32_t> HiddenTypeFallbackMap;
+
+  void populateHiddenTypeFallbackMap(std::shared_ptr<const ModuleFileSharedCore> core);
+
   using SerializedDeclMembersTable =
       ModuleFileSharedCore::SerializedDeclMembersTable;
 
@@ -1075,6 +1083,10 @@ public:
   getDeclChecked(
     serialization::DeclID DID,
     llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
+
+  /// Returns a stub decl based on hidden type layout information.
+  llvm::Expected<HiddenTypeLayoutInfoDecl *>
+  getHiddenTypeLayoutInfoDecl(serialization::DeclID DID);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);

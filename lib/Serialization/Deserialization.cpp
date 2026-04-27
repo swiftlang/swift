@@ -3555,8 +3555,11 @@ class DeclDeserializer {
   llvm::Error finishRecursiveAttrs();
 
 public:
-  DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset)
-      : MF(MF), ctx(MF.getContext()), declOrOffset(declOrOffset) {}
+  DeclID thisDeclID; 
+  DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset,
+                   DeclID declID)
+      : MF(MF), ctx(MF.getContext()), declOrOffset(declOrOffset),
+        thisDeclID(declID) {}
 
   ~DeclDeserializer() {
     if (!declOrOffset.isComplete()) {
@@ -5776,7 +5779,7 @@ ModuleFile::getDeclChecked(
       return std::move(error);
 
     Expected<Decl *> deserialized =
-      DeclDeserializer(*this, declOrOffset).getDeclCheckedImpl(
+      DeclDeserializer(*this, declOrOffset, DID).getDeclCheckedImpl(
         matchAttributes);
     if (!deserialized)
       return deserialized;
@@ -5805,6 +5808,54 @@ ModuleFile::getDeclChecked(
     });
 
   return declOrOffset;
+}
+
+llvm::Expected<HiddenTypeLayoutInfoDecl *>
+ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
+  using namespace decls_block;
+
+  if (DID == 0)
+    return nullptr;
+
+  assert(DID <= HiddenTypeLayoutInfoDecls.size() &&
+         "invalid hidden type layout decl ID");
+  auto &declOrOffset = HiddenTypeLayoutInfoDecls[DID-1];
+
+  if (declOrOffset.isComplete())
+    return cast<HiddenTypeLayoutInfoDecl>(declOrOffset.get());
+
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+
+  if (auto error =
+          diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(declOrOffset)))
+    return std::move(error);
+
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return diagnoseFatal();
+
+  unsigned recordID = fatalIfUnexpected(
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+
+  ASTContext &ctx = getContext();
+  DeclContext *DC = getAssociatedModule();
+
+  switch (recordID) {
+  case HIDDEN_STRUCT_TYPE: {
+    IdentifierID nameID;
+    HiddenStructTypeLayoutDescriptorLayout::readRecord(scratch, nameID);
+
+    auto *decl = HiddenTypeLayoutInfoDecl::create(ctx, DC);
+    declOrOffset = decl;
+    return decl;
+  }
+
+  default:
+    return diagnoseFatal();
+  }
 }
 
 static std::optional<AvailabilityDomainKind>
@@ -6953,10 +7004,26 @@ DeclDeserializer::getDeclCheckedImpl(
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
     auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
-    if (!resolved)
-      return resolved;
-    declOrOffset = resolved.get();
-    break;
+    if (resolved) {
+      declOrOffset = resolved.get();
+      break;
+    }
+
+    if (MF.getContext().LangOpts.hasFeature(Feature::SafeImplementationOnly)) {
+      auto fallbackIt = MF.HiddenTypeFallbackMap.find(thisDeclID);
+      if (fallbackIt != MF.HiddenTypeFallbackMap.end()) {
+        llvm::consumeError(resolved.takeError());
+        auto localDecl =
+            MF.getHiddenTypeLayoutInfoDecl(fallbackIt->second);
+        if (localDecl) {
+          declOrOffset = localDecl.get();
+          break;
+        }
+        return localDecl.takeError();
+      }
+    }
+
+    return resolved;
   }
 
   default:
@@ -7353,12 +7420,16 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
   if (!parentTy)
     return parentTy.takeError();
 
-  auto nominalOrError = MF.getDeclChecked(declID);
-  if (!nominalOrError)
-    return nominalOrError.takeError();
+  auto declOrError = MF.getDeclChecked(declID);
+  if (!declOrError)
+    return declOrError.takeError();
+
+  if (auto *hiddenDecl = dyn_cast<HiddenTypeLayoutInfoDecl>(declOrError.get())) {
+    return HiddenTypeLayoutInfoType::get(hiddenDecl, parentTy.get(), MF.getContext());
+  }
 
   // Look through compatibility aliases.
-  if (auto *alias = dyn_cast<TypeAliasDecl>(nominalOrError.get())) {
+  if (auto *alias = dyn_cast<TypeAliasDecl>(declOrError.get())) {
     // Reminder: TypeBase::getAs will look through sugar. But we don't want to
     // do that here, so we do isa<> checks on the TypeBase itself instead of
     // using the Type wrapper.
@@ -7377,15 +7448,15 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
     // We only want to use the type we found if it's a simple non-generic
     // nominal type.
     if (auto simpleNominalTy = dyn_cast_or_null<NominalType>(underlyingTy)) {
-      nominalOrError = simpleNominalTy->getDecl();
-      (void)!nominalOrError; // "Check" the llvm::Expected<> value.
+      declOrError = simpleNominalTy->getDecl();
+      (void)!declOrError; // "Check" the llvm::Expected<> value.
     }
   }
 
-  auto nominal = dyn_cast<NominalTypeDecl>(nominalOrError.get());
+  auto nominal = dyn_cast<NominalTypeDecl>(declOrError.get());
   if (!nominal) {
-    XRefTracePath tinyTrace{*nominalOrError.get()->getModuleContext()};
-    const DeclName fullName = cast<ValueDecl>(nominalOrError.get())->getName();
+    XRefTracePath tinyTrace{*declOrError.get()->getModuleContext()};
+    const DeclName fullName = cast<ValueDecl>(declOrError.get())->getName();
     tinyTrace.addValue(fullName.getBaseIdentifier());
     return llvm::make_error<XRefError>("declaration is not a nominal type",
                                        tinyTrace, fullName);
