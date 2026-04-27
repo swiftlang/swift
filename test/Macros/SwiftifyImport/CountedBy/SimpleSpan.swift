@@ -19,7 +19,7 @@ public func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt) {
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func myFunc(_ ptr: Span<CInt>) {
     let len = CInt(exactly: ptr.count)!
-    let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
+    let _ptrPtr = ptr.withUnsafeBufferPointer {
         unsafe $0
     }
     defer {

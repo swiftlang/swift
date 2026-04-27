@@ -191,3 +191,41 @@ bb0(%0 : @noImplicitCopy @guaranteed $Span<Int>, %1 : @guaranteed $NonTrivialWra
   %t = tuple ()
   return %t : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_topological_index_clone :
+// CHECK: [[CHECK:%[0-9]+]] = function_ref @checkIndex
+// CHECK: apply [[CHECK]]
+// CHECK-NEXT: apply [[CHECK]]
+// CHECK-LABEL: } // end sil function 'test_topological_index_clone'
+sil [ossa] @test_topological_index_clone : $@convention(thin) (@guaranteed Span<Int>) -> Bool {
+bb0(%0 : @guaranteed $Span<Int>):
+  %zero = integer_literal $Builtin.Int64, 0
+  %cnt = struct_extract %0, #Span._count
+  %count = struct_extract %cnt, #Int._value
+  br bb1(%zero : $Builtin.Int64)
+
+bb1(%i : $Builtin.Int64):
+  %done = builtin "cmp_eq_Int64"(%i : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
+  cond_br %done, bb3, bb2
+
+bb2:
+  %idx_i = struct $Int (%i : $Builtin.Int64)
+  %chk = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %c1 = apply %chk(%idx_i, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %no_trap = integer_literal $Builtin.Int1, 0
+  %one = integer_literal $Builtin.Int64, 1
+  %sub1 = builtin "ssub_with_overflow_Int64"(%count : $Builtin.Int64, %one : $Builtin.Int64, %no_trap : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %sub1v = tuple_extract %sub1 : $(Builtin.Int64, Builtin.Int1), 0
+  %sub2 = builtin "ssub_with_overflow_Int64"(%sub1v : $Builtin.Int64, %i : $Builtin.Int64, %no_trap : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %mirror = tuple_extract %sub2 : $(Builtin.Int64, Builtin.Int1), 0
+  %idx_m = struct $Int (%mirror : $Builtin.Int64)
+  %c2 = apply %chk(%idx_m, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %inc = builtin "sadd_with_overflow_Int64"(%i : $Builtin.Int64, %one : $Builtin.Int64, %no_trap : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %next = tuple_extract %inc : $(Builtin.Int64, Builtin.Int1), 0
+  br bb1(%next : $Builtin.Int64)
+
+bb3:
+  %true_val = integer_literal $Builtin.Int1, -1
+  %ret = struct $Bool (%true_val : $Builtin.Int1)
+  return %ret : $Bool
+}

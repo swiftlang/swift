@@ -17,7 +17,7 @@
 // REQUIRES: PTRSIZE=64
 
 // Fails only with Android NDK 28 because of an lld issue
-// UNSUPPORTED: OS=linux-android
+// XFAIL: OS=linux-android
 
 12TypeLowering6SimpleV
 

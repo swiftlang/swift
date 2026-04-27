@@ -222,6 +222,7 @@ extension Slice: Collection {
   }
 
   @_alwaysEmitIntoClient @inlinable
+  @safe
   public func withContiguousStorageIfAvailable<R, E: Error>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R? {
@@ -252,7 +253,7 @@ extension Slice {
   public __consuming func _copyContents(
       initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
-    if let (_, copied) = unsafe self.withContiguousStorageIfAvailable({
+    if let (_, copied) = self.withContiguousStorageIfAvailable({
       unsafe $0._copyContents(initializing: buffer)
     }) {
       let position = index(startIndex, offsetBy: copied)
@@ -306,6 +307,7 @@ extension Slice: MutableCollection where Base: MutableCollection {
   }
 
   @_alwaysEmitIntoClient @inlinable
+  @safe
   public mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R? {
@@ -313,14 +315,14 @@ extension Slice: MutableCollection where Base: MutableCollection {
     // that we don't calculate index distances unless we know we'll use them.
     // The expectation here is that the base collection will make itself
     // contiguous on the first try and the second call will be relatively cheap.
-    guard unsafe _base.withContiguousMutableStorageIfAvailable({ _ in }) != nil
+    guard _base.withContiguousMutableStorageIfAvailable({ _ in }) != nil
     else {
       return nil
     }
     let start = _base.distance(from: _base.startIndex, to: _startIndex)
     let count = _base.distance(from: _startIndex, to: _endIndex)
   #if hasFeature(Embedded)
-    return try unsafe _base.withContiguousMutableStorageIfAvailable { buffer throws(E) in
+    return try _base.withContiguousMutableStorageIfAvailable { buffer throws(E) in
       var slice = unsafe UnsafeMutableBufferPointer(
         rebasing: buffer[start ..< start + count])
       let copy = unsafe slice

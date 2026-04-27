@@ -972,10 +972,6 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
 
     case clang::DeclarationName::Identifier:
       if (auto *md = dyn_cast<clang::CXXMethodDecl>(fn)) {
-        // Import virtual functions eagerly for now, those are synthesized
-        if (md->isVirtual())
-          return true;
-
         // Name lookup doesn't know about these renamed methods, import eagerly
         if (LangOpts.CxxInteropGettersSettersAsProperties ||
             hasComputedPropertyAttr(fn)) {
@@ -2203,9 +2199,9 @@ namespace {
         ++resultIndex;
       }
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
-      LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, resultIndex,
-                                              /*isImmortal*/ true,
-                                              /*isFromAnnotation*/ true);
+      LifetimeDependenceInfo immortalLifetime(
+          nullptr, nullptr, resultIndex,
+          LifetimeFlags().withImmortalSpecifier().withAnnotated());
       lifetimeDependencies.push_back(immortalLifetime);
       Impl.SwiftContext.evaluator.cacheOutput(
           LifetimeDependenceInfoRequest{fd},
@@ -2547,7 +2543,6 @@ namespace {
 
       // Import each of the members.
       SmallVector<VarDecl *, 4> members;
-      SmallVector<FuncDecl *, 4> methods;
       SmallVector<ConstructorDecl *, 4> ctors;
 
       // The name of every member.
@@ -2562,9 +2557,11 @@ namespace {
           continue;
         }
 
+        bool isFriend = false;
         if (auto friendDecl = dyn_cast<clang::FriendDecl>(m)) {
-          if (friendDecl->getFriendDecl()) {
-            m = friendDecl->getFriendDecl();
+          if (auto *underlyingDecl = friendDecl->getFriendDecl()) {
+            m = underlyingDecl;
+            isFriend = true;
           }
         }
 
@@ -2610,6 +2607,12 @@ namespace {
 
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
 
+        if (isFriend)
+          // We import friend decls because we (might) rely on side effects from
+          // doing so, but skip the rest of the normal import routine becaus we
+          // don't need to add friend decls as members.
+          continue;
+
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd) &&
               !isa<clang::TypeAliasTemplateDecl>(nd) &&
@@ -2640,10 +2643,8 @@ namespace {
           continue;
         }
 
-        if (auto MD = dyn_cast<FuncDecl>(member)) {
-          methods.push_back(MD);
+        if (isa<FuncDecl>(member))
           continue;
-        }
 
         if (isa<VarDecl>(member) && isa<clang::CXXMethodDecl>(nd)) {
           result->addMember(member);
@@ -4362,8 +4363,7 @@ namespace {
         dependenciesOfRet[result->getSelfIndex()] = true;
         lifetimeDependencies.emplace_back(
             nullptr, IndexSubset::get(Impl.SwiftContext, dependenciesOfRet),
-            returnIdx,
-            /*isImmortal*/ false, /*isFromAnnotation*/ true);
+            returnIdx, LifetimeFlags().withAnnotated());
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
@@ -4431,9 +4431,9 @@ namespace {
       auto &ASTContext = result->getASTContext();
 
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
-      LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, 0,
-                                              /*isImmortal*/ true,
-                                              /*isFromAnnotation*/ true);
+      LifetimeDependenceInfo immortalLifetime(
+          nullptr, nullptr, 0,
+          LifetimeFlags().withImmortalSpecifier().withAnnotated());
       if (hasUnsafeAPIAttr(decl) && !isEscapable(decl->getReturnType())) {
         lifetimeDependencies.push_back(immortalLifetime);
         Impl.SwiftContext.evaluator.cacheOutput(
@@ -4525,7 +4525,7 @@ namespace {
             inheritedDepVec.any()
                 ? IndexSubset::get(Impl.SwiftContext, inheritedDepVec)
                 : nullptr,
-            nullptr, idx, /*isImmortal=*/false, /*isFromAnnotation=*/true);
+            nullptr, idx, LifetimeFlags().withAnnotated());
       }
 
       if (inheritLifetimeParamIndicesForReturn.any() ||
@@ -4539,8 +4539,7 @@ namespace {
                 ? IndexSubset::get(Impl.SwiftContext,
                                    scopedLifetimeParamIndicesForReturn)
                 : nullptr,
-            returnIdx,
-            /*isImmortal*/ false, /*isFromAnnotation*/ true);
+            returnIdx, LifetimeFlags().withAnnotated());
       else if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
         // Assume default constructed view types have no dependencies.
         if (ctordecl->isDefaultConstructor() &&
@@ -9678,31 +9677,7 @@ void ClangImporter::Implementation::importAttributes(
 
       // Does this availability attribute map to the platform we are
       // currently targeting?
-      if (!platformAvailability.isPlatformRelevant(Platform))
-        continue;
-
-      auto platformK =
-          llvm::StringSwitch<std::optional<PlatformKind>>(Platform)
-              .Case("ios", PlatformKind::iOS)
-              .Case("macos", PlatformKind::macOS)
-              .Case("maccatalyst", PlatformKind::macCatalyst)
-              .Case("tvos", PlatformKind::tvOS)
-              .Case("watchos", PlatformKind::watchOS)
-              .Case("xros", PlatformKind::visionOS)
-              .Case("visionos", PlatformKind::visionOS)
-              .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
-              .Case("maccatalyst_app_extension",
-                    PlatformKind::macCatalystApplicationExtension)
-              .Case("macos_app_extension",
-                    PlatformKind::macOSApplicationExtension)
-              .Case("tvos_app_extension",
-                    PlatformKind::tvOSApplicationExtension)
-              .Case("watchos_app_extension",
-                    PlatformKind::watchOSApplicationExtension)
-              .Case("xros_app_extension",
-                    PlatformKind::visionOSApplicationExtension)
-              .Case("android", PlatformKind::Android)
-              .Default(std::nullopt);
+      auto platformK = platformAvailability.platformKindIfRelevant(Platform);
       if (!platformK)
         continue;
 

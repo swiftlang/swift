@@ -34,8 +34,10 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -1691,6 +1693,14 @@ bool WitnessChecker::findBestWitness(
       break;
     case IgnoreMissingImports:
       if (ignoreMissingImportsDuringRegularLookup)
+        continue;
+
+      // Conformance checking in swiftinterfaces is lenient and can recover
+      // from missing witnesses by assuming that the protocol witness table
+      // will have an entry for the requirement at runtime. As a result,
+      // diagnosing missing imports for witnesses here could break source
+      // compatibility for existing interface files and must be skipped.
+      if (DC->isInSwiftinterface())
         continue;
 
       // Try again, this time ignoring missing imports to find more candidates.
@@ -3677,8 +3687,15 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
 
       // If this requirement is a function, check that its parameters are Sendable as well
       if (isa<AbstractFunctionDecl>(requirement)) {
+        // Create substitutions based on the conformance that are in the
+        // requirements generic environment, so that protocol generic parameters
+        // and associated types within the conformance can both resolve.
+        auto reqGenEnv = requirement->getInnermostDeclContext()
+                             ->getGenericEnvironmentOfContext();
+        auto reqSubs = Conformance->getType()->getMemberSubstitutionMap(
+            requirement, reqGenEnv);
         diagnoseNonSendableTypesInReference(
-            /*base=*/nullptr, getDeclRefInContext(requirement),
+            /*base=*/nullptr, ConcreteDeclRef(requirement, reqSubs),
             requirement->getInnermostDeclContext(), requirement->getLoc(),
             SendableCheckReason::Conformance, getActorIsolation(witness),
             FunctionCheckKind::Params, loc);
@@ -7041,27 +7058,35 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       SmallVector<ProtocolConformance *, 2> conformances;
       nominal->lookupConformance(diag.Protocol, conformances);
       for (auto conformance : conformances) {
-        if (isa<InheritedProtocolConformance>(conformance))
+        if (isa<InheritedProtocolConformance>(conformance)) {
           SendableConformance = conformance;
+          break;
+        }
       }
     }
+
+    // If the existing conformance was marked unavailable and should be
+    // described as unavailable in diagnostics.
+    bool existingDeclUnavailableConformance = false;
 
     if ((existingModule != dc->getParentModule() && conformanceInOrigModule) ||
         diag.Protocol->isMarkerProtocol()) {
       // Warn about the conformance.
-      if (isSendable && SendableConformance &&
-          isa<InheritedProtocolConformance>(SendableConformance)) {
-        // Allow re-stated unchecked conformances to Sendable in subclasses
-        // as long as the inherited conformance isn't unavailable.
-        auto *conformance = SendableConformance->getRootConformance();
-        auto *decl = conformance->getDeclContext()->getAsDecl();
-        if (!decl->isUnavailable()) {
-          continue;
-        }
+      if (isSendable && SendableConformance) {
+        auto *rootConf = SendableConformance->getRootConformance();
+        auto *decl = rootConf->getDeclContext()->getAsDecl();
 
-        Context.Diags.diagnose(diag.Loc, diag::unavailable_conformance,
+        // Allow redundant Sendable conformances when neither the existing
+        // declaration nor the root conformance is unavailable.
+        if (!(existingDecl->isUnavailable() || decl->isUnavailable()))
+          continue;
+
+        existingDeclUnavailableConformance = true;
+        Context.Diags.diagnose(diag.Loc, diag::unavailable_sendable_conformance,
                                nominal->getDeclaredInterfaceType(),
-                               diag.Protocol->getName());
+                               diag.ExistingKind ==
+                                   ConformanceEntryKind::Inherited,
+                               existingModule->getName());
       } else if (existingModule == dc->getParentModule()) {
         Context.Diags.diagnose(diag.Loc, diag::redundant_conformance,
                                nominal->getDeclaredInterfaceType(),
@@ -7136,12 +7161,17 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         }
       }
     }
+    existingDecl->diagnose(
+        existingDeclUnavailableConformance
+            ? diag::declared_protocol_unavailable_conformance_here
+            : diag::declared_protocol_conformance_here,
+        dc->getDeclaredInterfaceType(),
+        static_cast<unsigned>(diag.ExistingKind), diag.Protocol->getName(),
+        diag.ExistingExplicitProtocol->getName());
 
-    existingDecl->diagnose(diag::declared_protocol_conformance_here,
-                           dc->getDeclaredInterfaceType(),
-                           static_cast<unsigned>(diag.ExistingKind),
-                           diag.Protocol->getName(),
-                           diag.ExistingExplicitProtocol->getName());
+    // TODO: For ExistingKind == Inherited, walk the class hierarchy and show
+    // an appropriate amount of notes. We probably don't want to show a note for
+    // every single ancestor for long hierarchies...
   }
 
   if (groupChecker.getConformances().empty()) {

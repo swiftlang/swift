@@ -332,6 +332,13 @@ public:
   void visitOwnedAttr(OwnedAttr *attr) {
     assert(!D->hasClangNode() && "@_owned on imported declaration?");
 
+    if (!Ctx.LangOpts.hasFeature(Feature::UnderscoreOwned) &&
+        !D->getDeclContext()->isInSwiftinterface()) {
+      Ctx.Diags.diagnose(attr->getLocation(),
+                         diag::attribute_requires_experimental_feature, attr,
+                         "UnderscoreOwned");
+    }
+
     auto *ASD = cast<AbstractStorageDecl>(D);
 
     // Ensure it defines a 'get' for read accesses.

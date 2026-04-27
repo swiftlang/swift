@@ -1113,7 +1113,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_typeMismatch_nilUnderlyingError() {
         expectErrorDescription(
             #"""
-            DecodingError.typeMismatch: expected value of type String. Path: [0].address.city.birds[1].name. Debug description: This is where the debug description goes
+            DecodingError.typeMismatch: Expected value of type String. Path: [0].address.city.birds[1].name. Debug description: This is where the debug description goes
             """#,
             fromDecodingError: DecodingError.typeMismatch(
                 String.self,
@@ -1128,7 +1128,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_typeMismatch_nonNilUnderlyingError() {
         expectErrorDescription(
             #"""
-            DecodingError.typeMismatch: expected value of type String. Path: [0].address[1].street. Debug description: Some debug description. Underlying error: GenericError(name: "some generic error goes here")
+            DecodingError.typeMismatch: Expected value of type String. Path: [0].address[1].street. Debug description: Some debug description. Underlying error: GenericError(name: "some generic error goes here")
             """#,
             fromDecodingError: DecodingError.typeMismatch(
                 String.self,
@@ -1144,7 +1144,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_valueNotFound_nilUnderlyingError() {
         expectErrorDescription(
             #"""
-            DecodingError.valueNotFound: Expected value of type String but found null instead. Path: [0].firstName. Debug description: Description for debugging purposes
+            DecodingError.valueNotFound: Expected value of type String. Path: [0].firstName. Debug description: Description for debugging purposes
             """#,
             fromDecodingError: DecodingError.valueNotFound(
                 String.self,
@@ -1159,7 +1159,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_valueNotFound_nonNilUnderlyingError() {
         expectErrorDescription(
             #"""
-            DecodingError.valueNotFound: Expected value of type Int but found null instead. Path: [0].population. Debug description: Here is the debug description for value-not-found. Underlying error: GenericError(name: "these aren\'t the droids you\'re looking for")
+            DecodingError.valueNotFound: Expected value of type Int. Path: [0].population. Debug description: Here is the debug description for value-not-found. Underlying error: GenericError(name: "these aren\'t the droids you\'re looking for")
             """#,
             fromDecodingError: DecodingError.valueNotFound(
                 Int.self,

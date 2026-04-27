@@ -14,7 +14,7 @@ import os
 
 from . import product
 from . import wasisysroot
-from .wasmstdlib import WasmStdlib, WasmThreadsStdlib
+from .wasistdlib import WASIStdlib, WASIThreadsStdlib
 from .cmake_product import CMakeProduct
 from .. import shell
 
@@ -33,7 +33,7 @@ class WASISwiftSDK(product.Product):
         return False
 
     def should_build(self, host_target):
-        return self.args.build_wasmstdlib
+        return self.args.build_wasistdlib
 
     def should_test(self, host_target):
         return False
@@ -263,10 +263,10 @@ class WASISwiftSDK(product.Product):
         #    and header paths from the sysroot
         #    https://github.com/llvm/llvm-project/blob/73ef397fcba35b7b4239c00bf3e0b4e689ca0add/clang/lib/Driver/ToolChains/WebAssembly.cpp#L29-L36
         for swift_host_triple, clang_multiarch_triple, build_basename, build_sdk, has_pthread in [
-            ('wasm32-unknown-wasip1', 'wasm32-wasip1', 'wasmstdlib', True, False),
+            ('wasm32-unknown-wasip1', 'wasm32-wasip1', 'wasistdlib', True, False),
             # TODO: Include p1-threads in the Swift SDK once sdk-generator supports multi-target SDK
             ('wasm32-unknown-wasip1-threads', 'wasm32-wasip1-threads',
-             'wasmthreadsstdlib', False, True),
+             'wasithreadsstdlib', False, True),
         ]:
             stdlib_build_path = os.path.join(
                 build_root, '%s-%s' % (build_basename, host_target))
@@ -319,4 +319,4 @@ class WASISwiftSDK(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return [WasmStdlib, WasmThreadsStdlib]
+        return [WASIStdlib, WASIThreadsStdlib]

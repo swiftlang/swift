@@ -194,10 +194,6 @@ function(add_swift_compiler_modules_library name)
     # For "swift/shims/*.h".
     list(APPEND sdk_option "-I" "${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib")
 
-    # Workaround a crash in the LoadableByAddress pass
-    # https://github.com/apple/swift/issues/73254
-    list(APPEND swift_compile_options "-Xllvm" "-sil-disable-pass=loadable-address")
-
     # MSVC 14.40 (VS 17.10, MSVC_VERSION 1940) added a requirement for Clang 17 or higher.
     # Swift 6.0 is the first version to include Clang 17.
     # MSVC 14.43 (VS 17.13, MSVC_VERSION 1943) added a requirement for Clang 18 or higher.

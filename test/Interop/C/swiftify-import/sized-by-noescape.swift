@@ -22,7 +22,7 @@
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func simple(_ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.byteCount)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -37,7 +37,7 @@ void simple(int len, const void * __sized_by(len) __noescape p);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func swiftAttr(_ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.byteCount)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -56,13 +56,13 @@ void swiftAttr(int len, const void *p) __attribute__((swift_attr(
 //   expected-remark@4{{macro content: |    if p2.byteCount != len {|}}
 //   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p2.byteCount)")|}}
 //   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    let _p1Ptr = unsafe p1.withUnsafeBytes {|}}
+//   expected-remark@7{{macro content: |    let _p1Ptr = p1.withUnsafeBytes {|}}
 //   expected-remark@8{{macro content: |        unsafe $0|}}
 //   expected-remark@9{{macro content: |    }|}}
 //   expected-remark@10{{macro content: |    defer {|}}
 //   expected-remark@11{{macro content: |        _fixLifetime(p1)|}}
 //   expected-remark@12{{macro content: |    }|}}
-//   expected-remark@13{{macro content: |    let _p2Ptr = unsafe p2.withUnsafeBytes {|}}
+//   expected-remark@13{{macro content: |    let _p2Ptr = p2.withUnsafeBytes {|}}
 //   expected-remark@14{{macro content: |        unsafe $0|}}
 //   expected-remark@15{{macro content: |    }|}}
 //   expected-remark@16{{macro content: |    defer {|}}
@@ -80,7 +80,7 @@ void shared(int len, const void * __sized_by(len) __noescape p1, const void * __
 //   expected-remark@4{{macro content: |    if _pCount != len - offset {|}}
 //   expected-remark@5{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(_pCount)")|}}
 //   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-remark@7{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@8{{macro content: |        unsafe $0|}}
 //   expected-remark@9{{macro content: |    }|}}
 //   expected-remark@10{{macro content: |    defer {|}}
@@ -95,7 +95,7 @@ void complexExpr(int len, int offset, const void * __sized_by(len - offset) __no
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func nullUnspecified(_ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.byteCount)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -110,7 +110,7 @@ void nullUnspecified(int len, const void * __sized_by(len) __noescape _Null_unsp
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func nonnull(_ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.byteCount)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -125,7 +125,7 @@ void nonnull(int len, const void * __sized_by(len) __noescape _Nonnull p);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func nullable(_ p: RawSpan?) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p?.byteCount ?? 0)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p?.withUnsafeBytes {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p?.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -149,7 +149,7 @@ typedef struct foo opaque_t;
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func opaque(_ p: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.byteCount)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -164,7 +164,7 @@ void opaque(int len, opaque_t * __sized_by(len) __noescape p);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func bytesized(_ _bytesized_param1: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let _bytesized_param0 = Int32(exactly: _bytesized_param1.byteCount)!|}}
-//   expected-remark@4{{macro content: |    let __bytesized_param1Ptr = unsafe _bytesized_param1.withUnsafeBytes {|}}
+//   expected-remark@4{{macro content: |    let __bytesized_param1Ptr = _bytesized_param1.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
@@ -179,7 +179,7 @@ void bytesized(int size, const uint8_t *__sized_by(size) __noescape);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_charsized_param0: copy _charsized_param0) @_disfavoredOverload public func charsized(_ _charsized_param0: inout MutableRawSpan) {|}}
 //   expected-remark@3{{macro content: |    let _charsized_param1 = Int32(exactly: _charsized_param0.byteCount)!|}}
-//   expected-remark@4{{macro content: |    let __charsized_param0Ptr = unsafe _charsized_param0.withUnsafeMutableBytes {|}}
+//   expected-remark@4{{macro content: |    let __charsized_param0Ptr = _charsized_param0.withUnsafeMutableBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}

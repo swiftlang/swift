@@ -128,3 +128,9 @@ module IncludeMath {
   header "include-math.h"
   export *
 }
+
+module StdSingleFieldAggregate {
+  header "std-single-field-aggregate.h"
+  requires cplusplus
+  export *
+}

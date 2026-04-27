@@ -1552,12 +1552,12 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   StringRef CategoryName;
   if (auto wrapped = diagnostic.getWrappedDiagnostic())
     CategoryName = wrapped.value()->getCategoryName();
+  else if (groupID != DiagGroupID::no_group)
+    CategoryName = getDiagGroupInfoByID(groupID).name;
   else if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     CategoryName = "api-digester-breaking-change";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
     CategoryName = "no-usage";
-  else if (groupID != DiagGroupID::no_group)
-    CategoryName = getDiagGroupInfoByID(groupID).name;
   else if (isDeprecationDiagnostic(diagnostic.getID()))
     CategoryName = "deprecation";
 

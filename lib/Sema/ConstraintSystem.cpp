@@ -1981,6 +1981,16 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
   if (!decl || !decl->isImplicitlyUnwrappedOptional())
     return std::nullopt;
 
+  // A variable or parameter spelled with an IUO type (`x: T!`) is always an
+  // IUO value; only functions and subscripts can carry an IUO on the return.
+  // Short-circuit here so we don't force the declaration's interface type.
+  // Doing so while the solver is mid-closure can re-enter
+  // `typeCheckPatternBinding` from outside the closure's own type-check
+  // context and trip the assertion in `TypeChecker::typeCheckBinding` (see
+  // https://github.com/swiftlang/swift/issues/88530).
+  if (isa<VarDecl>(decl))
+    return IUOReferenceKind::Value;
+
   // If this isn't an IUO return () -> T!, it's an IUO value.
   if (!decl->getInterfaceType()->is<AnyFunctionType>())
     return IUOReferenceKind::Value;

@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
-
-// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
+// RUN: %target-typecheck-verify-swift
 
 protocol P<Primary> {
   associatedtype Primary: ~Copyable

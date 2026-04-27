@@ -19,6 +19,7 @@
 
 #include "swift/SIL/SILFunction.h"
 
+#include "ComputedWitnessIndex.h"
 #include "Fulfillment.h"
 #include "GenericRequirement.h"
 #include "MetadataSource.h"
@@ -105,7 +106,7 @@ namespace irgen {
 
   llvm::Value *loadParentProtocolWitnessTable(IRGenFunction &IGF,
                                               llvm::Value *wtable,
-                                              WitnessIndex index);
+                                              ComputedWitnessIndex index);
 
   llvm::Value *loadConditionalConformance(IRGenFunction &IGF,
                                           llvm::Value *wtable,

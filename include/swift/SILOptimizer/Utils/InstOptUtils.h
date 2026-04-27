@@ -132,6 +132,11 @@ bool isInstructionTriviallyDead(SILInstruction *inst);
 
 bool canTriviallyDeleteOSSAEndScopeInst(SILInstruction *inst);
 
+/// Return true if \p inst is a forwarding operation that destructures an owned
+/// move-only value. Such instructions must not be deleted because they end
+/// the lifetime of their operand.
+bool canDeleteDeadMoveOnlyOwnedDestructureInst(SILInstruction *inst);
+
 /// Return true if this is a release instruction that's not going to
 /// free the object.
 bool isIntermediateRelease(SILInstruction *inst, EpilogueARCFunctionInfo *erfi);

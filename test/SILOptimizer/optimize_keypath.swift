@@ -7,6 +7,12 @@
 // RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK2 %s < %t/output6.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output6.sil
 
+// Turning on force verification of analyses is exposing:
+// rdar://175520775 (RegionAnalysis crashes saying it cannot handle `assign` instruction)
+// TODO: %target-swift-frontend -primary-file %s -O -Xllvm -sil-verify-force-analysis=true -swift-version 6 -Xllvm -sil-print-types -emit-sil >%t/output2.sil
+// TODO: %FileCheck --check-prefix=CHECK --check-prefix=CHECK2 %s < %t/output2.sil
+// TODO: %FileCheck -check-prefix=CHECK-ALL %s < %t/output2.sil
+
 // RUN: %target-build-swift -O %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT -check-prefix=CHECK5-OUTPUT
 

@@ -418,7 +418,7 @@ private func _withCocoaASCIIPointer<R>(
       return nil // tagged pointer strings don't support _fastCStringContents
     }
     if let smol = _SmallString(taggedASCIICocoa: str) {
-      return unsafe _StringGuts(smol).withFastUTF8 {
+      return _StringGuts(smol).withFastUTF8 {
         unsafe work($0.baseAddress._unsafelyUnwrappedUnchecked)
       }
     }
@@ -443,7 +443,7 @@ private func _withCocoaUTF8Pointer<R>(
       return nil // tagged pointer strings don't support _fastCStringContents
     }
     if let smol = _SmallString(taggedCocoa: str) {
-      return unsafe _StringGuts(smol).withFastUTF8 {
+      return _StringGuts(smol).withFastUTF8 {
         unsafe work($0.baseAddress._unsafelyUnwrappedUnchecked)
       }
     }

@@ -1467,13 +1467,6 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 }
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
-  // In Embedded Swift, only class-bound wtables are allowed.
-  auto &langOpts = SIL.getASTContext().LangOpts;
-  if (langOpts.hasFeature(Feature::Embedded) &&
-      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
-    assert(Conf->getProtocol()->requiresClass());
-  }
-
   if (auto *wt = SIL.lookUpWitnessTable(Conf)) {
     // Add it to the queue if it hasn't already been put there.
     if (canEmitWitnessTableLazily(wt) &&
@@ -2448,7 +2441,5 @@ bool swift::writeEmptyOutputFilesFor(
 }
 
 bool IRGenModule::isEmbeddedWithExistentials() const {
-  auto &langOpts = Context.LangOpts;
-  return langOpts.hasFeature(Feature::Embedded) &&
-    langOpts.hasFeature(Feature::EmbeddedExistentials);
+  return Context.LangOpts.hasFeature(Feature::Embedded);
 }

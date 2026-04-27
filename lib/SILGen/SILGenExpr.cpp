@@ -3294,7 +3294,8 @@ static bool canEmitClosureFunctionUnderConversion(
 ///
 /// TODO: ideally, our prolog/epilog emission would be able to handle
 /// all possible subtype and reabstraction conversions.
-static bool canEmitSpecializedClosureFunction(CanAnyFunctionType closureType,
+static bool canEmitSpecializedClosureFunction(const AbstractClosureExpr *closure,
+                                        CanAnyFunctionType closureType,
                                         const FunctionTypeInfo &contextInfo) {
   auto destType = contextInfo.FormalType;
 
@@ -3309,6 +3310,14 @@ static bool canEmitSpecializedClosureFunction(CanAnyFunctionType closureType,
   if (hasOpaqueThrownError(contextInfo.OrigType) &&
       (closureType->isThrowing() != destType->isThrowing() ||
        closureType.getThrownError() != destType.getThrownError()))
+    return false;
+
+  // If the closure has a different thrown error type than the destination,
+  // we cannot emit the closure directly because the SIL function type
+  // (derived from the closure's own type) will have a different error
+  // type than what the body expects (derived from the destination type).
+  if (closureType.getThrownError() != destType.getThrownError() &&
+      !isa<ClosureExpr>(closure))
     return false;
 
   return true;
@@ -3326,7 +3335,7 @@ ManagedValue RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
 
   // If we can emit the closure with all of the specialized type information,
   // that's great.
-  if (canEmitSpecializedClosureFunction(closureType, *info)) {
+  if (canEmitSpecializedClosureFunction(e, closureType, *info)) {
     return emitClosureReference(e, *info);
   }
 
@@ -3346,7 +3355,7 @@ ManagedValue RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
     auto erasureInfo = SGF.getFunctionTypeInfo(erasedClosureType);
 
     // Emit the closure under that conversion.  This should always succeed.
-    assert(canEmitSpecializedClosureFunction(closureType, erasureInfo));
+    assert(canEmitSpecializedClosureFunction(e, closureType, erasureInfo));
     auto erasedResult = emitClosureReference(e, erasureInfo);
 
     // Narrow the original conversion to start from the erased closure type.

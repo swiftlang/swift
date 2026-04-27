@@ -5453,7 +5453,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
 
       if (access > importAccessLevel && isVisible) {
         access = std::min(access, importAccessLevel);
-        resultDC = useDC->getParentSourceFile();
+        resultDC = useDC->getOutermostParentSourceFile();
       }
     }
   }
@@ -6822,6 +6822,29 @@ NominalTypeDecl::getExecutorLegacyUnownedEnqueueFunction() const {
   }
 
   return nullptr;
+}
+
+bool AbstractFunctionDecl::isUnstructuredTaskFactory() const {
+  auto &C = getASTContext();
+
+  auto *dc = getDeclContext();
+  if (!dc)
+    return false;
+  auto *nominal = dc->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  if (nominal->getName() != C.Id_Task ||
+      dc->getParentModule()->getName() != C.Id_Concurrency)
+    return false;
+
+  if (isa<ConstructorDecl>(this)) // Task.init
+    return true;
+
+  auto baseName = getBaseName();
+  return baseName.getIdentifier() == C.Id_detached ||
+         baseName.getIdentifier() == C.Id_immediate ||
+         baseName.getIdentifier() == C.Id_immediateDetached;
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -12637,15 +12660,8 @@ StringRef swift::getAccessorLabel(AccessorKind kind) {
 #define ACCESSOR(ID, KEYWORD)
 #include "swift/AST/AccessorKinds.def"
 
-    // Transitional terminology.  Let's use this for a little
-    // while to ease the transition.  (Both forms are parsed
-    // correctly, this just changes what gets written into
-    // .swiftinterface files.)
-    case AccessorKind::YieldingBorrow: return "read";
-    case AccessorKind::YieldingMutate: return "modify";
-    // TODO: Switch to the final terminology before shipping...
-    // case AccessorKind::YieldingBorrow: return "yielding borrow";
-    // case AccessorKind::YieldingMutate: return "yielding mutate";
+    case AccessorKind::YieldingBorrow: return "yielding borrow";
+    case AccessorKind::YieldingMutate: return "yielding mutate";
   }
   llvm_unreachable("bad accessor kind");
 }

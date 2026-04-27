@@ -17,7 +17,7 @@
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_lifetime(p: copy p) @_disfavoredOverload public func simple(_ p: inout MutableSpan<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}

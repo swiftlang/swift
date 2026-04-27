@@ -1507,3 +1507,33 @@ bb1(%6 : $Builtin.RawPointer):
   return %11
 }
 
+protocol Q {}
+protocol P : Identifiable where Self.ID : Q {}
+
+// CHECK-LABEL: sil [ossa] @test_cse_open_existential_addr
+// The second open_existential_addr must not be eliminated.
+// CHECK: open_existential_addr
+// CHECK: open_existential_addr
+// CHECK: } // end sil function 'test_cse_open_existential_addr'
+sil [ossa] @test_cse_open_existential_addr : $@convention(thin) (@in_guaranteed any P) -> () {
+bb0(%0 : $*any P):
+  %1 = open_existential_addr immutable_access %0 to $*@opened("00000000-0000-0000-0000-000000000001", any P) Self
+  %2 = alloc_stack $any Hashable & Q
+  %3 = witness_method $@opened("00000000-0000-0000-0000-000000000001", any P) Self, #Identifiable.id!getter : <Self where Self : Identifiable> (Self) -> () -> Self.ID, %1 : $*@opened("00000000-0000-0000-0000-000000000001", any P) Self : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
+  %4 = init_existential_addr %2, $(@opened("00000000-0000-0000-0000-000000000001", any P) Self).ID
+  %5 = apply %3<@opened("00000000-0000-0000-0000-000000000001", any P) Self>(%4, %1) : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
+  destroy_addr %2
+  dealloc_stack %2
+
+  %8 = open_existential_addr immutable_access %0 to $*@opened("00000000-0000-0000-0000-000000000002", any P) Self
+  %9 = alloc_stack $any Hashable & Q
+  %10 = witness_method $@opened("00000000-0000-0000-0000-000000000002", any P) Self, #Identifiable.id!getter : <Self where Self : Identifiable> (Self) -> () -> Self.ID, %8 : $*@opened("00000000-0000-0000-0000-000000000002", any P) Self : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
+  %11 = init_existential_addr %9, $(@opened("00000000-0000-0000-0000-000000000002", any P) Self).ID
+  %12 = apply %10<@opened("00000000-0000-0000-0000-000000000002", any P) Self>(%11, %8) : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
+  destroy_addr %9
+  dealloc_stack %9
+
+  %15 = tuple ()
+  return %15 : $()
+}
+

@@ -38,17 +38,7 @@ extension Toolchain {
     case .exited(code: 0), .exited(code: 1):
       return nil
     default:
-      let output = String(
-        decoding: result.standardError.prefix(1_000_000), as: UTF8.self
-      )
-      guard let crashLog = CrashLog(from: output) else {
-        throw ReproducerError("""
-          couldn't extract sig for \
-          \(inputs.first!.parentDir!.fileName) \
-          <sig>\(output)</sig>
-          """)
-      }
-      return crashLog
+      return CrashLog(from: result.standardError)
     }
   }
 

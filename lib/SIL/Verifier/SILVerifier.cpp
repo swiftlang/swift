@@ -1053,6 +1053,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   ModuleDecl *M;
   const SILFunction &F;
   CalleeCache *calleeCache;
+  DominanceInfo *Dominance;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
   InstructionIndices instIndices;
@@ -1148,7 +1149,7 @@ public:
 
 private:
   VerifierErrorEmitter ErrorEmitter;
-  std::unique_ptr<DominanceInfo> Dominance;
+  std::unique_ptr<DominanceInfo> LocalDominance = nullptr;
 
   /// TODO: LifetimeCompletion: Remove.
   std::shared_ptr<DeadEndBlocks> DEBlocks;
@@ -1420,14 +1421,13 @@ public:
   }
 
   SILVerifier(const SILFunction &F, CalleeCache *calleeCache,
-              bool SingleFunction, bool checkLinearLifetime)
-      : M(F.getModule().getSwiftModule()), F(F),
-        calleeCache(calleeCache),
-        fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
-        instIndices(const_cast<SILFunction *>(&F)),
+              DominanceInfo *dominanceInfo = nullptr,
+              bool SingleFunction = true, bool checkLinearLifetime = true)
+      : M(F.getModule().getSwiftModule()), F(F), calleeCache(calleeCache),
+        Dominance(dominanceInfo), fnConv(F.getConventionsInContext()),
+        TC(F.getModule().Types), instIndices(const_cast<SILFunction *>(&F)),
         SingleFunction(SingleFunction),
-        checkLinearLifetime(checkLinearLifetime),
-        Dominance(nullptr) {
+        checkLinearLifetime(checkLinearLifetime) {
     if (F.isExternalDeclaration())
       return;
 
@@ -1439,7 +1439,10 @@ public:
               "Basic blocks must end with a terminator instruction");
     }
 
-    Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
+    if (!Dominance) {
+      LocalDominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
+      Dominance = LocalDominance.get();
+    }
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
@@ -7550,7 +7553,7 @@ static bool verificationEnabled(const SILModule &M) {
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify(CalleeCache *calleeCache,
+void SILFunction::verify(CalleeCache *calleeCache, DominanceInfo *dominanceInfo,
                          bool SingleFunction, bool isCompleteOSSA,
                          bool checkLinearLifetime) const {
   if (!verificationEnabled(getModule()))
@@ -7563,7 +7566,8 @@ void SILFunction::verify(CalleeCache *calleeCache,
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier verifier(*this, calleeCache, SingleFunction, checkLinearLifetime);
+  SILVerifier verifier(*this, calleeCache, dominanceInfo, SingleFunction,
+                       checkLinearLifetime);
   verifier.verify(isCompleteOSSA);
 }
 
@@ -7572,8 +7576,10 @@ void SILFunction::verifyCriticalEdges() const {
     return;
 
   SILVerifier(*this, /*calleeCache=*/nullptr,
-                     /*SingleFunction=*/true,
-                     /*checkLinearLifetime=*/ false).verifyBranches(this);
+              /*dominanceInfo=*/nullptr,
+              /*SingleFunction=*/true,
+              /*checkLinearLifetime=*/false)
+      .verifyBranches(this);
 }
 
 /// Validate that all SILUndef in \p f have f as a parent.
@@ -7721,8 +7727,9 @@ void SILVTable::verify(const SILModule &M) const {
       // function must be compatible with being used as the requirement
       // type.
       SILVerifier(*entry.getImplementation(), /*calleeCache=*/nullptr,
-                                              /*SingleFunction=*/true,
-                                              /*checkLinearLifetime=*/ false)
+                  /*dominanceInfo=*/nullptr,
+                  /*SingleFunction=*/true,
+                  /*checkLinearLifetime=*/false)
           .requireABICompatibleFunctionTypes(
               entry.getImplementation()->getLoweredFunctionType(),
               baseInfo.getSILType().castTo<SILFunctionType>(),
@@ -7833,6 +7840,7 @@ void SILWitnessTable::verify(const SILModule &mod) const {
       }
 
       SILVerifier verifier(*witnessFunction, /*calleeCache=*/nullptr,
+                           /*dominanceInfo*/ nullptr,
                            /*SingleFunction=*/true,
                            /*checkLinearLifetime=*/false);
       SILVerifier::VerifierErrorEmitterGuard guard(&verifier, this);
@@ -7885,6 +7893,7 @@ void SILDefaultWitnessTable::verify(const SILModule &mod) const {
       }
 
       SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
+                  /*dominanceInfo=*/nullptr,
                   /*SingleFunction=*/true,
                   /*checkLinearLifetime=*/false)
           .requireABICompatibleFunctionTypes(
@@ -7945,7 +7954,8 @@ void SILModule::verify(CalleeCache *calleeCache,
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify(calleeCache, /*singleFunction*/ false, isCompleteOSSA, checkLinearLifetime);
+    f.verify(calleeCache, /*dominanceInfo=*/nullptr, /*singleFunction*/ false,
+             isCompleteOSSA, checkLinearLifetime);
   }
 
   // Check all globals.

@@ -28,15 +28,27 @@
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name pkg -Rmodule-api-import \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault -verify \
-// RUN:   -experimental-spi-only-imports
+// RUN:   -experimental-spi-only-imports -verify-additional-prefix noerror-
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -package-name pkg -Rmodule-api-import \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault -verify \
+// RUN:   -experimental-spi-only-imports -verify-additional-prefix werror- \
+// RUN:   -Werror UnusedImportAccess
 // RUN: %target-swift-frontend -typecheck %t/ClientOfClangModules.swift -I %t \
 // RUN:   -package-name pkg -Rmodule-api-import \
-// RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
+// RUN:   -enable-upcoming-feature InternalImportsByDefault -verify \
+// RUN:   -verify-additional-prefix noerror-
+// RUN: %target-swift-frontend -typecheck %t/ClientOfClangModules.swift -I %t \
+// RUN:   -package-name pkg -Rmodule-api-import \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault -verify \
+// RUN:   -verify-additional-prefix werror- -Werror UnusedImportAccess
 // RUN: %target-swift-frontend -typecheck %t/ClientOfClangReexportedSubmodules.swift -I %t \
 // RUN:   -package-name pkg -Rmodule-api-import \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
-// RUN:   -swift-version 5 -verify
+// RUN:   -swift-version 5 -verify -verify-additional-prefix noerror-
+// RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
+// RUN:   -swift-version 5 -verify -verify-additional-prefix werror- -Werror UnusedImportAccess
 
 // REQUIRES: swift_feature_InternalImportsByDefault
 
@@ -129,7 +141,8 @@ public struct Extended {
 //--- Client_Swift5.swift
 /// No diagnostics should be raised on the implicit access level.
 import UnusedImport
-public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-7=internal}}
+public import UnusedImport // expected-noerror-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-7=internal}}
+// expected-werror-error @-1 {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-7=internal}}
 
 //--- Client.swift
 public import DepUsedFromInlinableCode
@@ -143,19 +156,26 @@ public import ExtensionA
 public import ExtensionB
 public import PropertyWrapper
 public import ExtendedDefinitionPublic
-public import ExtendedDefinitionNonPublic // expected-warning {{public import of 'ExtendedDefinitionNonPublic' was not used in public declarations or inlinable code}} {{1-8=}}
+public import ExtendedDefinitionNonPublic // expected-noerror-warning {{public import of 'ExtendedDefinitionNonPublic' was not used in public declarations or inlinable code}} {{1-8=}}
+// expected-werror-error @-1 {{public import of 'ExtendedDefinitionNonPublic' was not used in public declarations or inlinable code}} {{1-8=}}
 
 /// Repeat some imports to make sure we report all of them.
-public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-8=}}
-// expected-note @-1 {{imported 'public' here}}
-public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-8=}}
-package import UnusedImport // expected-warning {{package import of 'UnusedImport' was not used in package declarations}} {{1-9=}}
-// expected-warning @-1 {{module 'UnusedImport' is imported as 'public' from the same file; this 'package' access level will be ignored}}
+public import UnusedImport // expected-noerror-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-8=}}
+// expected-werror-error @-1 {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-8=}}
+// expected-note @-2 {{imported 'public' here}}
+public import UnusedImport // expected-noerror-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-8=}}
+// expected-werror-error @-1 {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-8=}}
+package import UnusedImport // expected-noerror-warning {{package import of 'UnusedImport' was not used in package declarations}} {{1-9=}}
+// expected-werror-error @-1 {{package import of 'UnusedImport' was not used in package declarations}} {{1-9=}}
+// expected-warning @-2 {{module 'UnusedImport' is imported as 'public' from the same file; this 'package' access level will be ignored}}
 
-package import UnusedPackageImport // expected-warning {{package import of 'UnusedPackageImport' was not used in package declarations}} {{1-9=}}
+package import UnusedPackageImport // expected-noerror-warning {{package import of 'UnusedPackageImport' was not used in package declarations}} {{1-9=}}
+// expected-werror-error @-1 {{package import of 'UnusedPackageImport' was not used in package declarations}} {{1-9=}}
 package import ExtendedPackageTypeImport
-public import ImportNotUseFromAPI // expected-warning {{public import of 'ImportNotUseFromAPI' was not used in public declarations or inlinable code}} {{1-8=}}
-public import ImportUsedInPackage // expected-warning {{public import of 'ImportUsedInPackage' was not used in public declarations or inlinable code}} {{1-7=package}}
+public import ImportNotUseFromAPI // expected-noerror-warning {{public import of 'ImportNotUseFromAPI' was not used in public declarations or inlinable code}} {{1-8=}}
+// expected-werror-error @-1 {{public import of 'ImportNotUseFromAPI' was not used in public declarations or inlinable code}} {{1-8=}}
+public import ImportUsedInPackage // expected-noerror-warning {{public import of 'ImportUsedInPackage' was not used in public declarations or inlinable code}} {{1-7=package}}
+// expected-werror-error @-1 {{public import of 'ImportUsedInPackage' was not used in public declarations or inlinable code}} {{1-7=package}}
 
 @_exported public import ExportedUnused
 @_spiOnly public import SPIOnlyUsedInSPI
@@ -329,9 +349,11 @@ typedef struct _TypedefTypeUnderlying {
 
 //--- ClientOfClangModules.swift
 public import ClangSimple
-public import ClangSimpleUnused // expected-warning {{public import of 'ClangSimpleUnused' was not used in public declarations or inlinable code}}
+public import ClangSimpleUnused // expected-noerror-warning {{public import of 'ClangSimpleUnused' was not used in public declarations or inlinable code}}
+// expected-werror-error @-1 {{public import of 'ClangSimpleUnused' was not used in public declarations or inlinable code}}
 public import ClangSubmodule.ClangSubmoduleSubmodule
-public import ClangSubmoduleUnused.ClangSubmoduleUnsuedSubmodule // expected-warning {{public import of 'ClangSubmoduleUnused' was not used in public declarations or inlinable code}}
+public import ClangSubmoduleUnused.ClangSubmoduleUnsuedSubmodule // expected-noerror-warning {{public import of 'ClangSubmoduleUnused' was not used in public declarations or inlinable code}}
+// expected-werror-error @-1 {{public import of 'ClangSubmoduleUnused' was not used in public declarations or inlinable code}}
 
 // Only the top-level module is used, but we can't detect whether the submodule was used or not.
 public import ClangTopModule.ClangTopModuleSubmodule

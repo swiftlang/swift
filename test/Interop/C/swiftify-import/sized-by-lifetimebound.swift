@@ -27,7 +27,7 @@
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func simple(_ len: Int32, _ p: RawSpan) -> RawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.byteCount)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -42,7 +42,7 @@ const void * __sized_by(len) simple(int len, int len2, const void * p __sized_by
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func shared(_ p: RawSpan) -> RawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let len = Int32(exactly: p.byteCount)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -57,7 +57,7 @@ const void * __sized_by(len) shared(int len, const void * p __sized_by(len) __li
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: RawSpan) -> RawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.byteCount)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -72,7 +72,7 @@ const void * __sized_by(len - offset) complexExpr(int len, int offset, int len2,
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func nullUnspecified(_ len: Int32, _ p: RawSpan) -> RawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.byteCount)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -87,7 +87,7 @@ const void * __sized_by(len) _Null_unspecified nullUnspecified(int len, int len2
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func nonnull(_ len: Int32, _ p: RawSpan) -> RawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.byteCount)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -102,7 +102,7 @@ const void * __sized_by(len) _Nonnull nonnull(int len, int len2, const void * _N
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func nullable(_ len: Int32, _ p: RawSpan?) -> RawSpan? {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p?.byteCount ?? 0)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p?.withUnsafeBytes {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p?.withUnsafeBytes {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -125,7 +125,7 @@ typedef struct foo opaque_t;
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func opaque(_ len: Int32, _ p: RawSpan) -> RawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.byteCount)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -148,7 +148,7 @@ const void * __sized_by(len) nonsizedLifetime(int len, const void * p __lifetime
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func bytesized(_ p: RawSpan) -> MutableRawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let size = Int32(exactly: p.byteCount)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBytes {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -163,7 +163,7 @@ uint8_t *__sized_by(size)  bytesized(int size, const uint8_t * p __sized_by(size
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func charsized(_ p: inout MutableRawSpan) -> MutableRawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let size = Int32(exactly: p.byteCount)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBytes {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBytes {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}

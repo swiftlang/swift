@@ -66,7 +66,8 @@ let tempLValueElimination = FunctionPass(name: "temp-lvalue-elimination") {
 
 private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassContext) {
   guard let allocStack = copy.sourceAddress as? AllocStackInst,
-        allocStack.isDeallocatedInSameBlock(as: copy)
+        allocStack.isDeallocatedInSameBlock(as: copy),
+        !allocStack.parentFunction.hasOwnership || !allocStack.hasDynamicLifetime
   else {
     return
   }

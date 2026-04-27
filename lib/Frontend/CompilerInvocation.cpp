@@ -161,7 +161,7 @@ void CompilerInvocation::setDefaultBlocklistsIfNecessary() {
     for (llvm::sys::fs::directory_iterator F(blocklistDir, EC), FE;
          F != FE; F.increment(EC)) {
       StringRef ext = llvm::sys::path::extension(F->path());
-      if (ext == "yml" || ext == "yaml") {
+      if (ext.ends_with(".yml") || ext.ends_with(".yaml")) {
         LangOpts.BlocklistConfigFilePaths.push_back(F->path());
       }
     }
@@ -882,7 +882,6 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
   // honored, we iterate over them in reverse order.
   std::vector<StringRef> psuedoFeatures;
   llvm::SmallSet<Feature, 8> seenFeatures;
-  bool shouldEnableEmbeddedExistentialsPerDefault = false;
   for (const Arg *A : Args.filtered_reverse(
            OPT_enable_experimental_feature, OPT_disable_experimental_feature,
            OPT_enable_upcoming_feature, OPT_disable_upcoming_feature)) {
@@ -998,21 +997,6 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     if (!seenFeatures.insert(*feature).second)
       continue;
 
-    // "Embedded" enables "EmbeddedExistentials" per default except if
-    // EmbeddedExistentials is explicitly disabled.
-    // "Embedded" enables "EmbeddedExistentials" if we have not yet seen
-    // explicit feature handling of "EmbeddedExistentials".
-    // Because we can see "Embedded" before (parsing in reverse) we see explict
-    // disabling of "EmbeddedExistentials" we delay default enablement so that a
-    // later (when viewed in reverse as this loop's logic does) explicit
-    // disablement can take place.
-    if (*feature == Feature::Embedded &&
-        isEnableFeatureFlag &&
-        !seenFeatures.contains(Feature::EmbeddedExistentials))
-      shouldEnableEmbeddedExistentialsPerDefault = true;
-    else if (*feature == Feature::EmbeddedExistentials && !isEnableFeatureFlag)
-      shouldEnableEmbeddedExistentialsPerDefault = false;
-
     bool forMigration = featureMode.has_value();
 
     // Enable the feature if requested.
@@ -1068,10 +1052,6 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       auto modules = featureName->split("=").second;
       modules.split(Opts.ModulesRequiringObjC, ",");
     }
-  }
-
-  if (shouldEnableEmbeddedExistentialsPerDefault) {
-    Opts.enableFeature(Feature::EmbeddedExistentials);
   }
 
   // Map historical flags over to experimental features. We do this for all
@@ -1383,11 +1363,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (ParseEnabledFeatureArgs(Opts, Args, Diags, FrontendOpts))
     HadError = true;
 
-  // Do not allow both versions of SuppressedAssociatedTypes at the same time.
-  // Pick the version with defaults if both are specified.
+  // SuppressedAssociatedTypesWithDefaults is now always-on by default.
+  // If the old prototype version of the feature has been requested, honor it.
   if (Opts.hasFeature(SuppressedAssociatedTypes) &&
       Opts.hasFeature(SuppressedAssociatedTypesWithDefaults)) {
-    Opts.disableFeature(SuppressedAssociatedTypes);
+    Opts.disableFeature(SuppressedAssociatedTypesWithDefaults);
   }
 
   Opts.EnableAppExtensionLibraryRestrictions |= Args.hasArg(OPT_enable_app_extension_library);
@@ -1904,11 +1884,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
-  if (Opts.hasFeature(Feature::EmbeddedExistentials) &&
-      !Opts.hasFeature(Feature::Embedded)) {
-      Diags.diagnose(SourceLoc(), diag::embedded_existentials_without_embedded);
-      HadError = true;
-  }
   if (Opts.hasFeature(Feature::Embedded)) {
     Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
     Opts.DisableImplicitStringProcessingModuleImport = true;
@@ -2622,7 +2597,8 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.CandidateCompiledModules.push_back(resolveSearchPath(A->getValue()));
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_const_gather_protocols_file))
+  if (const Arg *A = Args.getLastArg(OPT_const_gather_protocols_file,
+                                     OPT_const_gather_protocols_list))
     Opts.ConstGatherProtocolListFilePath = A->getValue();
 
   for (auto A : Args.getAllArgValues(options::OPT_serialized_path_obfuscate)) {

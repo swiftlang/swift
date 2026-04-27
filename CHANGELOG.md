@@ -20,6 +20,30 @@
   }
   ```
 
+* [SE-0503][]:
+  Introduced the ability to define protocols with associated types that are `~Copyable` and/or 
+  `~Escapable`, which relaxes the requirement on types conforming to that protocol. In other words, types can 
+  now implement those associated-type requirements with types that may be noncopyable or nonescapable:
+
+  ```swift
+  protocol WritingInstrument {
+    associatedtype Eraser: ~Copyable
+  }
+  
+  struct Pencil: WritingInstrument {  
+    struct Eraser: ~Copyable {}
+  }
+   
+  struct Chalk: WritingInstrument {
+    struct Eraser {}
+  }
+  ```
+  
+  During the evolution process, a prototype version of this feature existed under the experimental feature
+  named `SuppressedAssociatedTypes`. That feature is now deprecated and is source-incompatible with the accepted
+  version detailed in SE-0503. If that experimental feature is in use, a warning will be emitted by the compiler with
+  information to help migrate.
+
 * [SE-0518][]:
   Introduced `~Sendable` conformance syntax to explicitly suppress a conformance to `Sendable`,
   which prevents automatic `Sendable` inference on types, and provides an alternative way
@@ -31,6 +55,20 @@
   // constant and thus may be marked as `Sendable`.
   public class Base: ~Sendable {
     // ...
+  }
+  ```
+
+* Throwing unstructured task initializers (`Task.init`, `Task.immediate`, `Task.detached`, etc) 
+  now use typed-throws and will warn if an operation is throwing and the result of the task is not
+  stored or ignored. This addresses a long standing issue where it was too easy to miss that an 
+  operation was throwing:
+
+  ```swift
+  Task { // Unstructured throwing task created by 'init(priority:operation:)' is unused [#NoUseUnstructuredThrowingTask]
+    try example()
+  }
+  Task { // no warning, as previously
+    example()
   }
   ```
 
@@ -166,6 +204,17 @@
   permissible in a valid value of `Element`.
 
 ## Swift 6.3
+
+* [SE-0489][]:
+  When you encounter errors while encoding or decoding `Codable` types, the resulting error messages are now more human-readable thanks to improved `debugDescription` output.
+
+  Before:
+
+  `typeMismatch(Swift.String, Swift.DecodingError.Context(codingPath: [_CodingKey(stringValue: "Index 0", intValue: 0), CodingKeys(stringValue: "address", intValue: nil), CodingKeys(stringValue: "city", intValue: nil), CodingKeys(stringValue: "birds", intValue: nil), _CodingKey(stringValue: "Index 1", intValue: 1), CodingKeys(stringValue: "name", intValue: nil)], debugDescription: "Expected to decode String but found number instead.", underlyingError: nil))`
+
+  After:
+
+  `DecodingError.typeMismatch: expected value of type String. Path: [0].address.city.birds[1].name. Debug description: Expected to decode String but found number instead.`
 
 * [SE-0491][]:
   You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
@@ -11121,7 +11170,9 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
+[SE-0489]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0489-codable-error-printing.md
 [SE-0493]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0493-defer-async.md
+[SE-0503]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0503-suppressed-associated-types.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
 [SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
 [#64927]: <https://github.com/apple/swift/issues/64927>

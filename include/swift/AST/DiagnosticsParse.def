@@ -1978,7 +1978,7 @@ ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
 ERROR(compiler_version_too_many_components,none,
       "compiler version must not have more than five components", ())
-WARNING(unused_compiler_version_component,NoUsage,
+GROUPED_WARNING(unused_compiler_version_component,NoUsage,NoUsage,
       "the second version component is not used for comparison in legacy "
       "compiler versions%select{|; are you trying to encode a new Swift "
       "compiler version for compatibility with legacy compilers?}0",

@@ -183,4 +183,14 @@ StdSetTestSuite.test("UnorderedSetOfCInt.remove") {
     expectFalse(s.contains(2))
 }
 
+StdSetTestSuite.test("SetOfCIntWithCustomComparator") {
+    let s = initSetOfCIntWithCustomComparator()
+    expectEqual(s.count(1), 1)
+    // FIXME: uncomment the following checks (https://github.com/swiftlang/swift/issues/88588)
+//     expectTrue(s.contains(1))
+//     expectFalse(s.contains(2))
+//     expectTrue(s.contains(3))
+//     expectTrue(s.contains(5))
+}
+
 runAllTests()

@@ -683,20 +683,19 @@ class BuildScriptInvocation(object):
         builder.begin_pipeline()
 
         builder.add_product(products.WASISysroot,
-                            is_enabled=self.args.build_wasmstdlib)
+                            is_enabled=self.args.build_wasistdlib)
 
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
 
         builder.add_product(products.WasmKit,
                             is_enabled=self.args.build_wasmkit)
-        builder.add_product(products.WasmStdlib,
-                            is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmThreadsStdlib,
-                            is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WASIStdlib,
+                            is_enabled=self.args.build_wasistdlib)
+        builder.add_product(products.WASIThreadsStdlib,
+                            is_enabled=self.args.build_wasistdlib)
         builder.add_product(products.WASISwiftSDK,
-                            is_enabled=self.args.build_wasmstdlib)
-
+                            is_enabled=self.args.build_wasistdlib)
         builder.add_product(products.SwiftFoundationTests,
                             is_enabled=self.args.build_foundation)
         builder.add_product(products.FoundationTests,

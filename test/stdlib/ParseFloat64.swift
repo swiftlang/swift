@@ -345,6 +345,13 @@ tests.test("Substring - short") {
   expectEqual(parsed!.bitPattern, (2.0).bitPattern)
 }
 
+tests.test("Int64.min") {
+  // found in rdar://174966224
+  let s = "-9223372036854775808e0"
+  let parsed = Float64(s)
+  expectEqual(parsed!, -9.2233720368547758E+18)
+}
+
 tests.test("Substring - long") {
   let s1 = "1.00000000000000000000000000000000002.0000000000000000000000000000000000000000000000000000000003.00000000000000004.0000000000000000"
   let s1sub = s1[s1.firstIndex(of: "2")!..<s1.firstIndex(of: "3")!]

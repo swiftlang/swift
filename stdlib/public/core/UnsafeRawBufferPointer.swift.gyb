@@ -1282,6 +1282,7 @@ extension ${Self} {
 ///     of the closure's execution.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
+@safe
 public func withUnsafeMutableBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
   of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
@@ -1300,7 +1301,7 @@ func __abi_se0413_withUnsafeMutableBytes<T, Result>(
   of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws -> Result
 ) throws -> Result {
-  return try unsafe withUnsafeMutablePointer(to: &value) {
+  return try withUnsafeMutablePointer(to: &value) {
     return try unsafe body(unsafe UnsafeMutableRawBufferPointer(
         start: $0, count: MemoryLayout<T>.size))
   }
@@ -1351,6 +1352,7 @@ public func _withUnprotectedUnsafeMutableBytes<
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
+@safe
 public func withUnsafeBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
   of value: inout T,
   _ body: (UnsafeRawBufferPointer) throws(E) -> Result
@@ -1369,7 +1371,7 @@ func __abi_se0413_withUnsafeBytes<T, Result>(
   of value: inout T,
   _ body: (UnsafeRawBufferPointer) throws -> Result
 ) throws -> Result {
-  return try unsafe withUnsafePointer(to: &value) {
+  return try withUnsafePointer(to: &value) {
     try unsafe body(unsafe UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
   }
 }
@@ -1415,6 +1417,7 @@ public func _withUnprotectedUnsafeBytes<
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
+@safe
 public func withUnsafeBytes<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(

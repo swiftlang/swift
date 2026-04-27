@@ -639,7 +639,7 @@ public class ReferenceWritableKeyPath<
       func formalMutation<MutationRoot>(_ base: MutationRoot)
           -> UnsafeMutablePointer<Value> {
         var base2 = base
-        return unsafe withUnsafeBytes(of: &base2) { baseBytes in
+        return withUnsafeBytes(of: &base2) { baseBytes in
           var p = unsafe baseBytes.baseAddress.unsafelyUnwrapped
           var curType: Any.Type = MutationRoot.self
           while true {
@@ -1048,11 +1048,11 @@ internal final class ClassHolder<ProjectionType> {
     // withUnsafeMutablePointer(to:) because the instance was just allocated with
     // allocWithTailElems_1 and so we need to make sure to use an initialization
     // rather than an assignment.
-    unsafe withUnsafeMutablePointer(to: &holder.previous) {
+    withUnsafeMutablePointer(to: &holder.previous) {
       unsafe $0.initialize(to: previous)
     }
 
-    unsafe withUnsafeMutablePointer(to: &holder.instance) {
+    withUnsafeMutablePointer(to: &holder.instance) {
       unsafe $0.initialize(to: instance)
     }
 

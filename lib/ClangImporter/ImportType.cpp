@@ -2710,6 +2710,12 @@ bool ClangImporter::Implementation::isDefaultArgSafeToImport(
     // HACK: Clang will crash while trying to instantiate this default arg.
     return false;
 
+  if (param->hasUninstantiatedDefaultArg() &&
+      isa<clang::CXXConstructorDecl>(functionDecl))
+    // HACK: Constructors of std::set have default arguments that rely on the
+    // comparator type being copyable.
+    return false;
+
   clang::CXXDefaultArgExpr *defaultArgExpr = nullptr;
   // Try to instantiate the default expression.
   auto defaultArgExprResult = getClangSema().BuildCXXDefaultArgExpr(

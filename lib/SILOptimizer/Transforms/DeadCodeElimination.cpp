@@ -93,15 +93,8 @@ static bool seemsUseful(SILInstruction *I) {
     return true;
   }
 
-  // A dead `destructure_struct` with an owned argument can appear for a
-  // non-copyable struct which has only trivial elements. The instruction is not
-  // trivially dead because it ends the lifetime of its operand.
-  if (auto *dsi = dyn_cast<DestructureStructInst>(I)) {
-    auto structOp = dsi->getOperand();
-    if (structOp->getOwnershipKind() == OwnershipKind::Owned &&
-        structOp->getType().isMoveOnly()) {
-      return true;
-    }
+  if (!canDeleteDeadMoveOnlyOwnedDestructureInst(I)) {
+    return true;
   }
 
   return false;

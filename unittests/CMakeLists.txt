@@ -17,6 +17,7 @@ if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(Sema)
   add_subdirectory(SIL)
   add_subdirectory(SILOptimizer)
+  add_subdirectory(MetadataReader)
   add_subdirectory(SwiftDemangle)
 
   add_subdirectory(Threading)

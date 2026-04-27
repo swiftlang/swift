@@ -534,6 +534,7 @@ extension RawSpan {
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
   @_transparent
+  @safe
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {

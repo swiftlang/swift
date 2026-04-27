@@ -235,6 +235,7 @@ where SubSequence: MutableCollection
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
   @available(SwiftStdlib 6.4, *)
+  @safe
   mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
     _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R?
@@ -242,6 +243,7 @@ where SubSequence: MutableCollection
 #if !hasFeature(Embedded)
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
+  @safe
   mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
@@ -262,6 +264,7 @@ extension MutableCollection {
   // as the concrete implementations are now @_alwaysEmitIntoClient.
   @_disfavoredOverload
   @_alwaysEmitIntoClient
+  @safe
   public mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R? {

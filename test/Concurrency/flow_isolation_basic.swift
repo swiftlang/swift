@@ -805,9 +805,8 @@ func testActorWithInitAccessorInit() {
       let escapingSelf: (EscapeBeforeFullInit) -> Void = { _ in }
 
       escapingSelf(self) // expected-error {{'self' used before all stored properties are initialized}}
-      // expected-note @-1 {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
 
-      self.a = v // expected-warning {{cannot access property '_a' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+      self.a = v // expected-warning {{actor-isolated property 'a' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     }
   }
 

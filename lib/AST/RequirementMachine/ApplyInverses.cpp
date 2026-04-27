@@ -53,9 +53,9 @@ void swift::rewriting::applyInverses(
     return;
   }
 
-  const bool allowInverseOnAssocType =
+  assert(
       ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes) ||
-      ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypesWithDefaults);
+      ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypesWithDefaults));
       
   llvm::DenseMap<CanType, CanType> representativeGPs;
   
@@ -175,15 +175,6 @@ void swift::rewriting::applyInverses(
   for (auto inverse : inverseList) {
     auto canSubject =
         stripBoundDependentMemberTypes(inverse.subject)->getCanonicalType();
-
-    // Inverses on associated types are experimental.
-    if (!allowInverseOnAssocType && canSubject->is<DependentMemberType>()) {
-      // Special exception: allow if we're building the stdlib.
-      if (!ctx.MainModule->isStdlibModule()) {
-        errors.push_back(RequirementError::forInvalidInverseSubject(inverse));
-        continue;
-      }
-    }
 
     // Noncopyable checking support for parameter packs is not implemented yet.
     if (canSubject->isParameterPack()) {

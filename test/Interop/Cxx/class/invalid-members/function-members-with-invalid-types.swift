@@ -78,6 +78,9 @@ struct GoodStruct {
   // expected-swift-note@+1 {{unavailable (cannot import)}}
   static Bro<Ken> badStatic(Bro<Ken>);
 
+  // expected-swift-note@+1 * {{unavailable (cannot import)}}
+  virtual Bro<Ken> badVirtual(Bro<Ken>);
+
   void overloadsSameNumArgs(int) const;
   void overloadsSameNumArgs(Bro<Ken>) const;
 
@@ -108,6 +111,8 @@ struct GoodStruct {
 //
 // NOTE-MISSING: func badStatic(_: Never) -> Never
 //
+// NOTE-MISSING: func badVirtual(_: Never) -> Never
+//
 // CHECK-NEXT:   func overloadsSameNumArgs(_: Int32)
 // NOTE-MISSING: func overloadsSameNumArgs(_: Never)
 //
@@ -124,6 +129,7 @@ struct DerivedGoodStruct : GoodStruct {};
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func badReturn() -> Never
 // CHECK-NEXT:   func getBad() -> Never
+// NOTE-MISSING: func badVirtual(_: Never) -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: Int32)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: Int32, _: Int32)
 // CHECK-NEXT:   func __beginUnsafe() -> Never
@@ -192,12 +198,14 @@ void err(void) {
   gs.badArg(inc);
   auto inc2 = gs.getBad();
   GoodStruct::badStatic(inc2);
+  gs.badVirtual(inc);
 
   DerivedGoodStruct dgs;
   auto dinc = dgs.badReturn();
   dgs.badArg(dinc);
   auto dinc2 = dgs.getBad();
   DerivedGoodStruct::badStatic(dinc2);
+  dgs.badVirtual(dinc);
 
   UsingGoodStruct ugs;
   auto uinc = ugs.badReturn();
@@ -253,6 +261,7 @@ func err() {
                              // expected-swift-warning@-1 {{an enum with no cases}}
                              // expected-swift-note@-2 {{add an explicit type annotation}}
   GoodStruct.badStatic(inc2) // expected-swift-error {{has no member}}
+  gs.badVirtual(inc)        // expected-swift-error {{has no member}}
 
   let _ = GoodStruct(inc) // expected-swift-error {{call that takes no arguments}}
 
@@ -273,6 +282,8 @@ func err() {
   dgs.badArg(dinc)            // expected-swift-error {{has no member}}
 
   let _ = dgs.getBad()  // expected-swift-error {{is unavailable}}
+
+  dgs.badVirtual(dinc)        // expected-swift-error {{has no member}}
 
   let ugs = UsingGoodStruct()
   let uinc = ugs.badReturn() // expected-swift-error {{is unavailable}}

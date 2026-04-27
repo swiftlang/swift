@@ -1694,8 +1694,12 @@ private:
       InnerTypeCache[UID] = llvm::TrackingMDNodeRef(UniqueType);
     }
 
+    // CodeView drops empty unnamed members, so we need to give the inner struct
+    // member a name so it survives.
+    StringRef MemberName = Opts.isDebugInfoCodeView() ? MangledName : "";
     llvm::Metadata *Elements[] = {DBuilder.createMemberType(
-        Scope, "", File, 0, SizeInBits, AlignInBits, 0, Flags, UniqueType)};
+        Scope, MemberName, File, 0, SizeInBits, AlignInBits, 0, Flags,
+        UniqueType)};
     // FIXME: It's a limitation of LLVM that a forward declaration cannot have a
     // specificationOf, so this attritbute is put on the sized container type
     // instead. This is confusing consumers, and LLDB has to go out of its way

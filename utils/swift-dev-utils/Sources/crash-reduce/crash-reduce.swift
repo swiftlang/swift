@@ -157,12 +157,13 @@ extension ReduceCommand {
         sdkPath: computeSDKPath()
       ),
       quickMode: quick,
-      deleteInputs: deleteInputs
-    ).process(
-       reprocess: reprocess, ignoreExisting: ignoreExisting,
-       fileIssues: fileIssues, frontendArgs: frontendArgs.map { .value($0) },
-       checkOnly: checkOnly
-    )
+      deleteInputs: deleteInputs,
+      reprocess: reprocess,
+      ignoreExisting: ignoreExisting,
+      fileIssues: fileIssues,
+      frontendArgs: frontendArgs.map { .value($0) },
+      checkOnly: checkOnly
+    ).process()
   }
 }
 
@@ -195,18 +196,15 @@ struct GetSignatureCommand: ParsableCommand {
       }
       return input
     }()
-    func runOnce() -> Signature? {
-      CrashLog(from: input)?.signature
+    func runOnce() -> Signature {
+      CrashLog(from: input).signature
     }
     let start = Date()
     for _ in 0 ..< repeats {
-      guard runOnce() != nil else {
-        Darwin.exit(1)
-      }
+      // TODO: Make sure this doesn't get optimized out?
+      _ = runOnce()
     }
-    guard let sig = runOnce() else {
-      Darwin.exit(1)
-    }
+    let sig = runOnce()
     print(sig)
     if repeats > 0 {
       print("\(Int((Date().timeIntervalSince(start) * 1000).rounded()))ms")

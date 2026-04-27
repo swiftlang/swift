@@ -2950,14 +2950,21 @@ static CanSILFunctionType getSILFunctionType(
     destructurer.destructure(origResultType, substFormalResultType);
   }
 
+  // range [begin, end) of inputs corresponding to lowered closure captures.
+  std::pair<unsigned, unsigned> captureInputIndices;
+
   // Lower the capture context parameters, if any.
   if (constant && constant->getAnyFunctionRef()) {
+    const unsigned numInputsBefore = inputs.size();
     // Lower in the context of the closure. Since the set of captures is a
     // private contract between the closure and its enclosing context, we
     // don't need to keep its capture types opaque.
     lowerCaptureContextParameters(TC, *constant, genericSig,
                                   TC.getCaptureTypeExpansionContext(*constant),
                                   inputs, extInfoBuilder);
+    // Determine the range of inputs that correspond to lowered captures so we
+    // can lower a 'captures' lifetime dependence.
+    captureInputIndices = {numInputsBefore, inputs.size()};
   }
   
   // Form the lowered lifetime dependency records using the parameter mapping
@@ -2966,20 +2973,37 @@ static CanSILFunctionType getSILFunctionType(
   auto lowerLifetimeDependence
     = [&](const LifetimeDependenceInfo &formalDeps,
           unsigned target) -> LifetimeDependenceInfo {
-      if (target == parameterMap.size()) {
-        // The target is the result, represented by the number of parameters.
-        // Parameters may have been added if there were closure captures, so
-        // update the result index accordingly.
-        target = inputs.size();
+    auto flags = formalDeps.getFlags();
+
+    if (target == parameterMap.size()) {
+      // The target is the result, represented by the number of parameters.
+      // Parameters may have been added if there were closure captures, so
+      // update the result index accordingly.
+      target = inputs.size();
+    }
+
+    auto lowerIndexSet =
+        [&](IndexSubset *formal,
+            bool withClosureContextDependence) -> IndexSubset * {
+      if (!formal && !withClosureContextDependence) {
+        return nullptr;
       }
 
-      auto lowerIndexSet = [&](IndexSubset *formal) -> IndexSubset * {
-        if (!formal) {
-          return nullptr;
-        }
-        
-        SmallBitVector loweredIndices;
-        loweredIndices.resize(parameterMap.size());      
+      SmallBitVector loweredIndices;
+      loweredIndices.resize(inputs.size());
+
+      if (withClosureContextDependence &&
+          captureInputIndices.first < captureInputIndices.second) {
+        // There are lowered captures, with which we can replace the closure
+        // context dependence.
+        flags.setCaptures(false);
+        // With a formal dependence on the closure context, add a lowered
+        // dependence on each capture.
+        loweredIndices.set(captureInputIndices.first,
+                           captureInputIndices.second);
+      }
+
+      if (formal) {
         for (unsigned j = 0; j < parameterMap.size(); ++j) {
           int formalIndex = parameterMap[j];
           if (formalIndex < 0) {
@@ -2987,49 +3011,51 @@ static CanSILFunctionType getSILFunctionType(
           }
           loweredIndices[j] = formal->contains(formalIndex);
         }
-        
-        if (!loweredIndices.any()) {
-          return nullptr;
-        }
-        
-        return IndexSubset::get(TC.Context, loweredIndices);
-      };
-      
-      IndexSubset *inheritIndicesSet
-        = lowerIndexSet(formalDeps.getInheritIndices());
-      IndexSubset *scopeIndicesSet
-        = lowerIndexSet(formalDeps.getScopeIndices());
-      
-      // If the original formal parameter dependencies were lowered away
-      // entirely (such as if they were of `()` type), then there is effectively
-      // no dependency, leaving behind an immortal value.
-      if (!inheritIndicesSet && !scopeIndicesSet) {
-        return LifetimeDependenceInfo(
-            nullptr, nullptr, target,
-            /*hasImmortalSpecifier*/ true,
-            /*fromAnnotation*/ formalDeps.isFromAnnotation());
       }
-      
-      SmallBitVector addressableDeps = scopeIndicesSet
-        ? scopeIndicesSet->getBitVector() & addressableParams
-        : SmallBitVector(1, false);
-      IndexSubset *addressableSet = addressableDeps.any()
-        ? IndexSubset::get(TC.Context, addressableDeps)
-        : nullptr;
-        
-      SmallBitVector condAddressableDeps = scopeIndicesSet
-        ? scopeIndicesSet->getBitVector() & conditionallyAddressableParams
-        : SmallBitVector(1, false);
-      IndexSubset *condAddressableSet = condAddressableDeps.any()
-        ? IndexSubset::get(TC.Context, condAddressableDeps)
-        : nullptr;
 
-      return LifetimeDependenceInfo(
-        inheritIndicesSet, scopeIndicesSet, target,
-        formalDeps.hasImmortalSpecifier(),
-        /*fromAnnotation*/ formalDeps.isFromAnnotation(), addressableSet,
-        condAddressableSet);
+      if (!loweredIndices.any()) {
+        return nullptr;
+      }
+
+      return IndexSubset::get(TC.Context, loweredIndices);
     };
+
+    // A formal dependence on the closure context corresponds to a scoped/borrow
+    // dependence on every capture.
+    IndexSubset *inheritIndicesSet =
+        lowerIndexSet(formalDeps.getInheritIndices(), false);
+    IndexSubset *scopeIndicesSet =
+        lowerIndexSet(formalDeps.getScopeIndices(), formalDeps.hasCaptures());
+
+    // If the original formal parameter dependencies were lowered away
+    // entirely (such as if they were of `()` type), then there is effectively
+    // no dependency, leaving behind a value that is either immortal, or
+    // depends on the function's closure context.
+    if (!inheritIndicesSet && !scopeIndicesSet) {
+      if (!flags.hasCaptures())
+        flags.setImmortalSpecifier(true);
+      return LifetimeDependenceInfo(nullptr, nullptr, target, flags);
+    }
+
+    SmallBitVector addressableDeps =
+        scopeIndicesSet ? scopeIndicesSet->getBitVector() & addressableParams
+                        : SmallBitVector(1, false);
+    IndexSubset *addressableSet =
+        addressableDeps.any() ? IndexSubset::get(TC.Context, addressableDeps)
+                              : nullptr;
+
+    SmallBitVector condAddressableDeps =
+        scopeIndicesSet
+            ? scopeIndicesSet->getBitVector() & conditionallyAddressableParams
+            : SmallBitVector(1, false);
+    IndexSubset *condAddressableSet =
+        condAddressableDeps.any()
+            ? IndexSubset::get(TC.Context, condAddressableDeps)
+            : nullptr;
+
+    return LifetimeDependenceInfo(inheritIndicesSet, scopeIndicesSet, target,
+                                  addressableSet, condAddressableSet, flags);
+  };
   // Lower parameter dependencies.
   for (unsigned i = 0; i < parameterMap.size(); ++i) {
     if (parameterMap[i] < 0) {
@@ -5318,8 +5344,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   if (innerExtInfo.getLifetimeDependencies().size() > 0) {
     ASSERT(extInfo.getLifetimeDependencies().size() == 0 &&
            "We only support uncurrying function types where at most one of the "
-           "inner and outer type has lifetime dependencies, because we do not "
-           "yet support closure context lifetime dependencies.");
+           "inner and outer type has lifetime dependencies.");
 
     auto uncurriedLifetimes = LifetimeDependenceInfo::uncurry(
         Context, innerExtInfo.getLifetimeDependencies(),

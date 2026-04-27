@@ -227,6 +227,7 @@ internal func _fallBackToHeapAllocation<R: ~Copyable, E: Error>(
 /// the buffer) must not escape. It will be deallocated when `body` returns and
 /// cannot be used afterward.
 @_alwaysEmitIntoClient @_transparent
+@safe
 public func withUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
   byteCount: Int,
   alignment: Int,
@@ -313,6 +314,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
 /// the buffer) must not escape. It will be deallocated when `body` returns and
 /// cannot be used afterward.
 @_alwaysEmitIntoClient @_transparent
+@safe
 public func withUnsafeTemporaryAllocation<
   T: ~Copyable, R: ~Copyable,
   E: Error
