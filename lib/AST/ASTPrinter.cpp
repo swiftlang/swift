@@ -575,6 +575,13 @@ static std::string getLifetimeDependenceInfoSourceListString(
     }
     return result;
   };
+  if (info.hasCaptures()) {
+    if (!isFirstSpecifier) {
+      lifetimeDependenceString += ", ";
+    }
+    lifetimeDependenceString += LifetimeDescriptor::CapturesContextSpecifier;
+    isFirstSpecifier = false;
+  }
   if (info.hasImmortalSpecifier()) {
     if (!isFirstSpecifier) {
       lifetimeDependenceString += ", ";
@@ -7131,7 +7138,10 @@ public:
       ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
 
       for (const auto &lifetimeDependence : info.getLifetimeDependencies()) {
-        if (lifetimeDependence.isFromAnnotation()) {
+        // In .swiftinterface files, only print lifetime dependencies that
+        // originated from explicit @lifetime annotations.
+        if (!Options.IsForSwiftInterface ||
+            lifetimeDependence.isFromAnnotation()) {
           Printer.printSwiftLifetimeDependence(lifetimeDependence, params);
         }
       }

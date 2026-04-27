@@ -8633,8 +8633,8 @@ ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
        ())
 ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
       "lifetime dependence specifiers cannot be applied to tuple elements", ())
-ERROR(lifetime_dependence_immortal_conflict_name, none,
-      "conflict between the parameter name and 'immortal' contextual keyword", ())
+ERROR(lifetime_dependence_contextual_keyword_conflict_name, none,
+      "conflict between the parameter name and '%0' contextual keyword", (StringRef))
 ERROR(lifetime_dependence_function_type, none,
       "lifetime dependencies on function types are not supported",
       ())

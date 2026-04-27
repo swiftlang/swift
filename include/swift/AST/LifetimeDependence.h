@@ -23,6 +23,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/FlagSet.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
 
@@ -144,6 +145,17 @@ public:
     return getName().str() == "immortal";
   }
 
+  /// A specifier indicating that the target depends on variables in the
+  /// captured context.
+  static constexpr StringRef CapturesContextSpecifier = "captures";
+
+  bool isCapturesSpecifier() const {
+    if (getDescriptorKind() != LifetimeDescriptor::DescriptorKind::Named) {
+      return false;
+    }
+    return getName().str() == CapturesContextSpecifier;
+  }
+
   std::string getString() const;
 };
 
@@ -190,16 +202,40 @@ public:
   }
 };
 
+class LifetimeFlags : public FlagSet<uint8_t> {
+public:
+  enum {
+    /// Whether the lifetime dependence info entry has an immortal specifier.
+    HasImmortalSpecifier = 0,
+    /// Whether the lifetime dependence info entry originated from an
+    /// annotation.
+    IsFromAnnotation = 1,
+    /// Whether the LifetimeDependenceInfo entry includes a dependence on the
+    /// closure context.
+    Captures = 2,
+  };
+
+  explicit constexpr LifetimeFlags(uint8_t bits) : FlagSet(bits) {}
+  constexpr LifetimeFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS_AND_BUILDER(HasImmortalSpecifier,
+                                            hasImmortalSpecifier,
+                                            setImmortalSpecifier,
+                                            withImmortalSpecifier)
+  FLAGSET_DEFINE_FLAG_ACCESSORS_AND_BUILDER(IsFromAnnotation, isFromAnnotation,
+                                            setAnnotated, withAnnotated)
+  FLAGSET_DEFINE_FLAG_ACCESSORS_AND_BUILDER(Captures, hasCaptures, setCaptures,
+                                            withCaptures)
+};
+
 class LifetimeDependenceInfo {
   IndexSubset *inheritLifetimeParamIndices;
   IndexSubset *scopeLifetimeParamIndices;
-  // The outer bool is the "isFromAnnotation" bit. The inner one is the
-  // "hasImmortalSpecifier" bit.
-  llvm::PointerIntPair<llvm::PointerIntPair<IndexSubset *, 1, bool>, 1, bool>
-      addressableParamIndicesAndImmortalAndFromAnnotation;
+  IndexSubset *addressableParamIndices;
   IndexSubset *conditionallyAddressableParamIndices;
 
   unsigned targetIndex;
+  const LifetimeFlags flags;
 
   static unsigned numParams(IndexSubset *paramIndices) {
     return paramIndices ? paramIndices->getCapacity() : 0;
@@ -213,18 +249,17 @@ public:
   /// Fully-initialized dependence info.
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
-                         unsigned targetIndex, bool hasImmortalSpecifier,
-                         bool isFromAnnotation,
+                         unsigned targetIndex,
                          IndexSubset *addressableParamIndices,
-                         IndexSubset *conditionallyAddressableParamIndices)
+                         IndexSubset *conditionallyAddressableParamIndices,
+                         LifetimeFlags flags)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
         scopeLifetimeParamIndices(scopeLifetimeParamIndices),
-        addressableParamIndicesAndImmortalAndFromAnnotation(
-            {addressableParamIndices, hasImmortalSpecifier}, isFromAnnotation),
+        addressableParamIndices(addressableParamIndices),
         conditionallyAddressableParamIndices(
             conditionallyAddressableParamIndices),
-        targetIndex(targetIndex) {
-    ASSERT(this->hasImmortalSpecifier() || hasDependencySource());
+        targetIndex(targetIndex), flags(flags) {
+    ASSERT(!empty());
     ASSERT(!inheritLifetimeParamIndices ||
            !inheritLifetimeParamIndices->isEmpty());
     ASSERT(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
@@ -260,25 +295,22 @@ public:
   /// addressable parameter indices unset for now.
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
-                         unsigned targetIndex, bool hasImmortalSpecifier,
-                         bool isFromAnnotation)
+                         unsigned targetIndex, LifetimeFlags flags)
       : LifetimeDependenceInfo(inheritLifetimeParamIndices,
                                scopeLifetimeParamIndices, targetIndex,
-                               hasImmortalSpecifier, isFromAnnotation,
                                // set during SIL type lowering
-                               nullptr, nullptr) {}
+                               nullptr, nullptr, flags) {}
 
   operator bool() const { return !empty(); }
 
   bool empty() const {
     return !hasImmortalSpecifier() && inheritLifetimeParamIndices == nullptr &&
-           scopeLifetimeParamIndices == nullptr;
+           !hasCaptures() && scopeLifetimeParamIndices == nullptr;
   }
 
-  bool hasImmortalSpecifier() const {
-    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
-        .getInt();
-  }
+  LifetimeFlags getFlags() const { return flags; }
+
+  bool hasImmortalSpecifier() const { return flags.hasImmortalSpecifier(); }
 
   bool isImmortal() const {
     return hasImmortalSpecifier() && !hasDependencySource();
@@ -288,9 +320,11 @@ public:
   /// the source program (Swift or SIL). Such dependencies are likely to differ
   /// from the default (inferred) ones, so they must be included when printing a
   /// Swift function's type.
-  bool isFromAnnotation() const {
-    return addressableParamIndicesAndImmortalAndFromAnnotation.getInt();
-  }
+  bool isFromAnnotation() const { return flags.isFromAnnotation(); }
+
+  /// Whether the target depends on the closure context.
+  /// This is implicitly true for any function type.
+  bool hasCaptures() const { return flags.hasCaptures(); }
 
   unsigned getTargetIndex() const { return targetIndex; }
 
@@ -301,8 +335,7 @@ public:
     return scopeLifetimeParamIndices != nullptr;
   }
   bool hasAddressableParamIndices() const {
-    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
-               .getPointer() != nullptr;
+    return addressableParamIndices != nullptr;
   }
 
   unsigned getParamIndicesLength() const {
@@ -327,10 +360,7 @@ public:
   /// This indicates that any dependency on the parameter value is dependent
   /// not only on the value, but the memory location of a particular instance
   /// of the value.
-  IndexSubset *getAddressableIndices() const {
-    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
-        .getPointer();
-  }
+  IndexSubset *getAddressableIndices() const { return addressableParamIndices; }
   /// Return the set of parameters which may have addressable dependencies
   /// depending on the type of the parameter.
   ///
@@ -397,6 +427,7 @@ public:
 
   bool operator==(const LifetimeDependenceInfo &other) const {
     return this->hasImmortalSpecifier() == other.hasImmortalSpecifier() &&
+           this->hasCaptures() == other.hasCaptures() &&
            this->getTargetIndex() == other.getTargetIndex() &&
            this->getInheritIndices() == other.getInheritIndices() &&
            this->getAddressableIndices() == other.getAddressableIndices() &&
