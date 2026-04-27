@@ -256,6 +256,14 @@ OptionalBridgedDeclObj BridgedDeclObj::NominalType_getValueTypeDestructor() cons
   return {getAs<swift::NominalTypeDecl>()->getValueTypeDestructor()};
 }
 
+SwiftInt BridgedDeclObj::NominalType_getNumStoredProperties() const {
+  return (SwiftInt)getAs<swift::NominalTypeDecl>()->getStoredProperties().size();
+}
+
+BridgedDeclObj BridgedDeclObj::NominalType_getStoredProperty(SwiftInt index) const {
+  return {getAs<swift::NominalTypeDecl>()->getStoredProperties()[index]};
+}
+
 BridgedASTType BridgedDeclObj::Enum_getRawType() const {
   swift::Type rawTy = getAs<swift::EnumDecl>()->getRawType();
   if (rawTy)
@@ -604,6 +612,10 @@ bool BridgedASTType::hasExistentialArchetype() const {
   return unbridged()->hasOpenedExistential();
 }
 
+bool BridgedASTType::hasPrimaryArchetype() const {
+  return unbridged()->hasPrimaryArchetype();
+}
+
 bool BridgedASTType::hasDynamicSelf() const {
   return unbridged()->hasDynamicSelfType();
 }
@@ -915,6 +927,10 @@ BridgedASTTypeArray BridgedASTType::NominalType_getGenericArgs() const {
 
 BridgedASTTypeArray BridgedASTType::PackType_getElementTypes() const {
   return {llvm::cast<swift::PackType>(type)->getElementTypes()};
+}
+
+BridgedASTType BridgedASTType::getTypeOfMember(BridgedDeclObj varDecl) const {
+  return {unbridged()->getTypeOfMember(varDecl.getAs<swift::VarDecl>()).getPointer()};
 }
 
 static_assert((int)BridgedASTType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
