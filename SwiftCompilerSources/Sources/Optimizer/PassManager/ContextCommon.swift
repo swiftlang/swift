@@ -56,6 +56,54 @@ extension Context {
   var moduleDecl: ModuleDecl {
     bridgedPassContext.getModuleDecl().getAs(ModuleDecl.self)
   }
+
+  func createSpecializedFunctionDeclaration(
+    from original: Function, withName specializedFunctionName: String,
+    withParams specializedParameters: [ParameterInfo],
+    withResults specializedResults: [ResultInfo]? = nil,
+    withRepresentation: FunctionTypeRepresentation? = nil,
+    makeBare: Bool = false,
+    preserveGenericSignature: Bool = true
+  ) -> Function {
+    return specializedFunctionName._withBridgedStringRef { nameRef in
+      let bridgedParamInfos = specializedParameters.map { $0._bridged }
+      let repr = withRepresentation ?? original.loweredFunctionType.functionTypeRepresentation
+
+      return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
+
+        if let bridgedResultInfos = specializedResults?.map({ $0._bridged }) {
+
+          return bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
+            return bridgedPassContext.createSpecializedFunctionDeclaration(
+              nameRef, paramBuf.baseAddress, paramBuf.count,
+              resultBuf.baseAddress, resultBuf.count,
+              original.bridged, repr.bridged, makeBare,
+              preserveGenericSignature
+            ).function
+          }
+        } else {
+          return bridgedPassContext.createSpecializedFunctionDeclaration(
+            nameRef, paramBuf.baseAddress, paramBuf.count,
+            nil, 0,
+            original.bridged, repr.bridged, makeBare,
+            preserveGenericSignature
+          ).function
+        }
+      }
+    }
+  }
+
+  func buildSpecializedFunction<T>(specializedFunction: Function, buildFn: (Function, FunctionPassContext) -> T) -> T {
+    let nestedBridgedContext = bridgedPassContext.initializeNestedPassContext(specializedFunction.bridged)
+    let nestedContext = FunctionPassContext(_bridged: nestedBridgedContext)
+    defer { bridgedPassContext.deinitializedNestedPassContext() }
+
+    return buildFn(specializedFunction, nestedContext)
+  }
+
+  func notifyNewFunction(function: Function, derivedFrom: Function) {
+    bridgedPassContext.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
+  }
 }
 
 extension MutatingContext {

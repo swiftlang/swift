@@ -362,7 +362,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
 }
 
 extension ArgumentConventions {
-  private func parameterIndex(ofArgumentIndex argIdx: Int) -> Int? {
+  public func parameterIndex(ofArgumentIndex argIdx: Int) -> Int? {
     let firstParamIdx = firstParameterIndex  // bridging call
     return argIdx < firstParamIdx ? nil : argIdx - firstParamIdx
   }

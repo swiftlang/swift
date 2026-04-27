@@ -116,11 +116,12 @@ struct ModulePassContext : Context, CustomStringConvertible {
   ///
   /// Only a single `transform` can be alive at the same time, i.e. it's not allowed to nest
   /// calls to `transform`.
-  func transform(function: Function, _ runOnFunction: (FunctionPassContext) -> ()) {
+  func transform<T>(function: Function, _ runOnFunction: (FunctionPassContext) -> T) -> T {
     let nestedBridgedContext = bridgedPassContext.initializeNestedPassContext(function.bridged)
     let nestedContext = FunctionPassContext(_bridged: nestedBridgedContext)
-    runOnFunction(nestedContext)
+    let r = runOnFunction(nestedContext)
     bridgedPassContext.deinitializedNestedPassContext()
+    return r
   }
 
   func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
