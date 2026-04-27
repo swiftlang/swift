@@ -135,9 +135,7 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
   Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
                                                     Invocation.getFrontendOptions());
-  if (Invocation.getLangOptions().EnableCXXInterop) {
-    Invocation.computeCXXStdlibOptions();
-  }
+  Invocation.computeCXXStdlibOptions();
 
   if (ParsedArgs.hasArg(OPT_disable_safe_interop_wrappers))
     Invocation.getLangOptions().DisableSafeInteropWrappers = true;
