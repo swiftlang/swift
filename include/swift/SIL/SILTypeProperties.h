@@ -135,6 +135,11 @@ enum IsVeryLargeType_t : bool {
   IsVeryLargeType = true
 };
 
+enum IsLexical_t : bool {
+  IsNotLexical = false,
+  IsLexical = true,
+};
+
 class SILTypeProperties {
   // These are chosen so that bitwise-or merges the flags properly.
   //
@@ -330,6 +335,16 @@ public:
   void setDefinitelyHasRawLayout() {
     Flags |= HasRawLayoutFlag;
     Flags |= DefinitelyHasRawLayoutFlag;
+  }
+
+  /// Get the raw flags value for serialization.
+  uint16_t getRawFlags() const { return Flags; }
+
+  /// Construct from raw serialized flags.
+  static SILTypeProperties fromRawFlags(uint16_t flags) {
+    SILTypeProperties props;
+    props.Flags = flags;
+    return props;
   }
 };
 

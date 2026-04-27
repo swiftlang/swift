@@ -27,6 +27,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/IRGen/HiddenTypeIRABIDetails.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
@@ -1427,8 +1428,27 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       appendOperator("Xe");
       return;
 
-    case TypeKind::HiddenTypeLayoutInfo:
-      llvm_unreachable("not implemented yet");
+    case TypeKind::HiddenTypeLayoutInfo: {
+      auto *hidden = cast<HiddenTypeLayoutInfoType>(tybase);
+
+      Type parent = hidden->getParent();
+      if (parent) {
+        if (parent->hasArchetype())
+          parent = parent->mapTypeOutOfEnvironment();
+        appendType(parent, sig, forDecl);
+      }
+
+      auto mangledName = hidden->getDecl()->getABIInfo()->getMangledTypeName();
+      if (mangledName.starts_with("$"))
+        mangledName = mangledName.drop_front(1);
+      appendIdentifier(mangledName);
+
+      char flag = parent ? ('p')
+                         : ('n');
+      char op[] = {'X', 'H', flag};
+      appendOperator(StringRef(op, sizeof(op)));
+      return;
+    }
 
       // We don't care about these types being a bit verbose because we
       // don't expect them to come up that often in API names.

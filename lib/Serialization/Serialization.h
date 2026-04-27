@@ -459,6 +459,9 @@ private:
 
   void writeHiddenLayoutInformationForDecl(const Decl* D);
 
+  void writeHiddenStructTypeLayoutRecord(const irgen::HiddenStructTypeIRABIInfo *hiddenStructInfo,
+      const TypeDecl *parentDecl);
+
   /// Writes the offsets for a serialized entity kind.
   ///
   /// \see ASTBlockRecordKeeper

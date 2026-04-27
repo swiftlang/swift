@@ -23,6 +23,8 @@ namespace llvm {
   class Constant;
 }
 
+#include "swift/AST/Types.h"
+
 namespace swift {
   class CanType;
   class SILType;
@@ -71,6 +73,13 @@ namespace irgen {
   std::optional<unsigned> getPhysicalStructFieldIndex(IRGenModule &IGM,
                                                       SILType baseType,
                                                       VarDecl *field);
+
+  class HiddenStructTypeIRABIInfo;
+
+  const TypeInfo *createTypeInfoFromHiddenStructTypeABIInfo(
+      IRGenModule &IGM,
+      CanType type,
+      const HiddenStructTypeIRABIInfo &abiInfo);
 } // end namespace irgen
 } // end namespace swift
 

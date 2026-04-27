@@ -38,6 +38,11 @@ namespace llvm {
 }
 
 namespace swift {
+  class ASTContext;
+
+namespace irgen {
+  class HiddenTypeIRABIInfo;
+} // end namespace irgen
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
   class SILType;
@@ -629,6 +634,14 @@ public:
 
   void callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
                            Atomicity atomicity) const;
+
+  /// Produce a HiddenTypeIRABIInfo capturing the ABI layout of this TypeInfo,
+  /// suitable for serialization into a swiftmodule so that client modules
+  /// can reconstruct a TypeInfo without seeing the full type definition.
+  /// Returns nullptr if conversion is not supported for this TypeInfo.
+  virtual irgen::HiddenTypeIRABIInfo *getHiddenTypeIRABIInfo(ASTContext &ctx) const {
+    return nullptr;
+  }
 };
 
 } // end namespace irgen

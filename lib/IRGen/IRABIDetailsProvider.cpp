@@ -26,13 +26,17 @@
 //        updated to take a different approach.
 #include "../SILGen/SILGen.h"
 
+#include "IRGenMangler.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/IRGen/HiddenTypeIRABIDetails.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "clang/CodeGen/ModuleBuilder.h"
@@ -102,6 +106,30 @@ public:
     return IRABIDetailsProvider::SizeAndAlignment{
         fixedTI->getFixedSize().getValue(),
         fixedTI->getFixedAlignment().getValue()};
+  }
+
+  irgen::HiddenTypeIRABIInfo *
+  getHiddenTypeIRABIInfoForDecl(const NominalTypeDecl *TD) {
+    auto &ctx = TD->getASTContext();
+    IRGenMangler mangler(ctx);
+
+    if (auto *structDecl = dyn_cast<StructDecl>(TD)) {
+      assert(structDecl->canBeCopyable() &&
+             "move-only hidden structs are not supported yet");
+    }
+
+    auto *TI = &IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
+    auto *abiInfo = TI->getHiddenTypeIRABIInfo(ctx);
+    if (!abiInfo)
+      return nullptr;
+
+    abiInfo->setMangledTypeName(
+        mangler.mangleMangledTypeName(TD->getDeclaredType()));
+
+    auto props = typeConverter.getTypeProperties(
+        TD->getDeclaredTypeInContext(), TypeExpansionContext::minimal());
+    abiInfo->setSILTypeProperties(props);
+    return abiInfo;
   }
 
   IRABIDetailsProvider::FunctionABISignature
@@ -473,6 +501,11 @@ IRABIDetailsProvider::~IRABIDetailsProvider() {}
 std::optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
+}
+
+irgen::HiddenTypeIRABIInfo *
+IRABIDetailsProvider::getHiddenTypeIRABIInfo(const NominalTypeDecl *TD) {
+  return impl->getHiddenTypeIRABIInfoForDecl(TD);
 }
 
 std::optional<LoweredFunctionSignature>

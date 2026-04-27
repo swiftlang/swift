@@ -15,8 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/MetadataValues.h"
+#include "GenStruct.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/IRGen/HiddenTypeIRABIDetails.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
@@ -2451,7 +2453,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::HiddenTypeLayoutInfo:
-    llvm_unreachable("not implemented yet");
+    return convertHiddenTypeLayoutInfoType(
+        cast<HiddenTypeLayoutInfoType>(ty));
   case TypeKind::Integer:
     llvm_unreachable("should not be asking for the type info an IntegerType");
   case TypeKind::Hidden: {
@@ -2470,6 +2473,20 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   }
   llvm_unreachable("bad type kind");
+}
+
+const TypeInfo *
+TypeConverter::convertHiddenTypeLayoutInfoType(HiddenTypeLayoutInfoType *T) {
+  auto *abiInfo = T->getDecl()->getABIInfo();
+  assert(abiInfo && "HiddenTypeLayoutInfoType should have ABI info");
+
+  if (auto *structInfo =
+          dyn_cast<irgen::HiddenStructTypeIRABIInfo>(abiInfo)) {
+    return createTypeInfoFromHiddenStructTypeABIInfo(IGM, CanType(T),
+                                                     *structInfo);
+  }
+
+  llvm_unreachable("unsupported hidden type ABI info kind");
 }
 
 /// Convert an inout type.  This is always just a bare pointer.
@@ -3136,6 +3153,20 @@ bool irgen::tryEmitDestroyUsingDeinit(IRGenFunction &IGF, Address address,
 
 IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
                                                         CanType ty) {
+
+  if (auto hidden = dyn_cast<HiddenTypeLayoutInfoType>(ty)) {
+    // We replicate the logic below for visible types with hidden types
+    auto abiInfo = hidden->getDecl()->getABIInfo();
+
+    if (auto hiddenStructABIInfo = dyn_cast<HiddenStructTypeIRABIInfo>(abiInfo)) {
+      if (hiddenStructABIInfo->Copyable)
+        return IsABIAccessible;
+
+      llvm_unreachable("We only support copyable hidden types currently");
+    }
+   
+    llvm_unreachable("Unhandled type of hidden ABI info");
+  }
 
   // Copyable types currently are always ABI-accessible if they're fixed size.
   if (ty->isCopyable())

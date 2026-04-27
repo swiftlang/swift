@@ -152,6 +152,7 @@ private:
   void addForwardDecl(TypeBase *key);
 
   const TypeInfo *convertType(CanType T);
+  const TypeInfo *convertHiddenTypeLayoutInfoType(HiddenTypeLayoutInfoType *T);
   const TypeInfo *convertAnyNominalType(CanType T, NominalTypeDecl *D);
   const TypeInfo *convertTupleType(TupleType *T);
   const TypeInfo *convertClassType(CanType type, ClassDecl *D);

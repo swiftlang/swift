@@ -38,6 +38,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/IRGen/HiddenTypeIRABIDetails.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/ClangImporter/SwiftAbstractBasicReader.h"
@@ -5845,10 +5846,46 @@ ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
 
   switch (recordID) {
   case HIDDEN_STRUCT_TYPE: {
-    IdentifierID nameID;
-    HiddenStructTypeLayoutDescriptorLayout::readRecord(scratch, nameID);
+    uint8_t rawKind;
+    bool isCopyable;
+    uint16_t silTypePropertiesFlags;
+    IdentifierID mangledNameID;
+    DeclID parentDeclID;
+    ArrayRef<uint64_t> fieldTypeIDs;
 
+    HiddenStructTypeLayoutDescriptorLayout::readRecord(
+        scratch, rawKind, isCopyable, silTypePropertiesFlags,
+        mangledNameID, parentDeclID, fieldTypeIDs);
+
+    auto kind = static_cast<irgen::HiddenTypeIRABIInfo::Kind>(rawKind);
+
+    SmallVector<Type, 4> fieldTypes;
+    for (auto rawID : fieldTypeIDs) {
+      auto fieldType = getType(static_cast<serialization::TypeID>(rawID));
+      fieldTypes.push_back(fieldType);
+    }
+
+    irgen::HiddenTypeIRABIInfo *abiInfo = nullptr;
     auto *decl = HiddenTypeLayoutInfoDecl::create(ctx, DC);
+    switch (kind) {
+      case irgen::HiddenTypeIRABIInfo::Kind::LoadableStruct:
+        abiInfo = new (ctx) irgen::HiddenStructTypeIRABIInfo(
+            fieldTypes, isCopyable);
+        break;
+      default:
+        llvm_unreachable("unhandled hidden struct type kind");
+    }
+    abiInfo->setMangledTypeName(getIdentifier(mangledNameID).str());
+    abiInfo->setSILTypeProperties(
+        SILTypeProperties::fromRawFlags(silTypePropertiesFlags));
+    decl->setABIInfo(abiInfo);
+    if (parentDeclID) {
+      auto parentDecl = getDeclChecked(parentDeclID);
+      if (!parentDecl)
+        return parentDecl.takeError();
+      decl->setParentDecl(cast<TypeDecl>(parentDecl.get()));
+    }
+
     declOrOffset = decl;
     return decl;
   }

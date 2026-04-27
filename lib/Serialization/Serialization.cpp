@@ -58,6 +58,7 @@
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/Serialization.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "swift/IRGen/HiddenTypeIRABIDetails.h"
 #include "swift/Strings.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -2649,6 +2650,22 @@ void Serializer::writeCrossReference(const Decl *D) {
                                        addTypeRef(ty), iid, isProtocolExt,
                                        D->hasClangNode(), val->isStatic());
 }
+
+static const TypeDecl *getHiddenTypeLayoutDeclParentDecl(const Decl *D) {
+  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(D))
+    return hidden->getParentDecl();
+
+  auto *typeDecl = dyn_cast<TypeDecl>(D);
+  if (!typeDecl)
+    return nullptr;
+
+  auto *parentDC = typeDecl->getDeclContext();
+  if (!parentDC || !parentDC->isTypeContext())
+    return nullptr;
+
+  return parentDC->getSelfNominalTypeDecl();
+}
+
 
 /// Translate from the AST associativity enum to the Serialization enum
 /// values, which are guaranteed to be stable.
@@ -6826,17 +6843,74 @@ IRABIDetailsProvider *Serializer::getLayoutProvider() {
 }
 
 void Serializer::writeHiddenLayoutInformationForDecl(const Decl* D) {
-  using namespace decls_block;
+  // Re-serialization: the decl is a HiddenTypeLayoutInfoDecl with
+  // already-materialized ABI info from a previous deserialization.
+  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(D)) {
+    auto *abiInfo = hidden->getABIInfo();
+    if (!abiInfo)
+      return;
+    auto *parentDecl = hidden->getParentDecl();
 
+    if (auto *hiddenStructInfo =
+            llvm::dyn_cast<irgen::HiddenStructTypeIRABIInfo>(abiInfo)) {
+      writeHiddenStructTypeLayoutRecord(hiddenStructInfo, parentDecl);
+    } else {
+      llvm_unreachable("unhandled HiddenTypeIRABIInfo kind");
+    }
+  }
+
+  // First-time serialization: compute ABI info from the nominal type.
   auto *nominal = dyn_cast<NominalTypeDecl>(D);
   if (!nominal)
     return;
 
-  auto nameID = addDeclBaseNameRef(nominal->getName());
+  auto *provider = getLayoutProvider();
+  auto *abiInfo = provider->getHiddenTypeIRABIInfo(nominal);
+  assert(abiInfo && "Failed to fetch ABI info for decl");
+  if (!abiInfo)
+    return;
+
+  auto *parentDecl = getHiddenTypeLayoutDeclParentDecl(nominal);
+
+  if (auto *hiddenStructInfo =
+          llvm::dyn_cast<irgen::HiddenStructTypeIRABIInfo>(abiInfo)) {
+    writeHiddenStructTypeLayoutRecord(hiddenStructInfo, parentDecl);
+  } else {
+    llvm_unreachable("unhandled HiddenTypeIRABIInfo kind");
+  }
+}
+
+void Serializer::writeHiddenStructTypeLayoutRecord(const irgen::HiddenStructTypeIRABIInfo *hiddenStructInfo,
+    const TypeDecl *parentDecl) {
+
+  using namespace decls_block;
+
+  SmallVector<TypeID, 4> fieldTypeIDs;
+  for (auto fieldType : hiddenStructInfo->getFieldTypes()) {
+    fieldTypeIDs.push_back(addTypeRef(fieldType));
+    if (auto *hiddenFieldType = fieldType->getAs<HiddenTypeLayoutInfoType>()) {
+        scheduleHiddenTypeLayoutSerialization(hiddenFieldType->getDecl());
+    } else if (auto *fieldNominal = fieldType->getAnyNominal()) {
+      if (fieldNominal->getModuleContext() != M)
+        scheduleHiddenTypeLayoutSerialization(fieldNominal);
+    }
+  }
+
+  auto mangledNameID =
+      addUniquedString(hiddenStructInfo->getMangledTypeName()).second;
+
+  auto parentDeclID = parentDecl ? addDeclRef(parentDecl) : DeclID();
+
   unsigned abbrCode =
       DeclTypeAbbrCodes[HiddenStructTypeLayoutDescriptorLayout::Code];
   HiddenStructTypeLayoutDescriptorLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, nameID);
+      Out, ScratchRecord, abbrCode,
+      static_cast<uint8_t>(hiddenStructInfo->getKind()),
+      hiddenStructInfo->Copyable,
+      hiddenStructInfo->getSILTypeProperties().getRawFlags(),
+      mangledNameID,
+      parentDeclID,
+      fieldTypeIDs);
 }
 
 std::vector<CharOffset> Serializer::writeAllIdentifiers() {

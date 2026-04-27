@@ -67,6 +67,7 @@ class PointerAuthQualifier;
 namespace swift {
 namespace irgen {
   class HiddenTypeIRABIInfo;
+  class HiddenStructTypeIRABIInfo;
 } // end namespace irgen
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;

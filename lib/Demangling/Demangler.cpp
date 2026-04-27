@@ -3952,6 +3952,36 @@ NodePointer Demangler::demangleSpecialType() {
       return demangleExtendedExistentialShape(specialChar);
     case 'j':
       return demangleSymbolicExtendedExistentialType();
+    case 'H': {
+      char flag = nextChar();
+      bool hasParent = false;
+      switch (flag) {
+      case 'n':
+        break;
+      case 'p':
+        hasParent = true;
+        break;
+      default:
+        return nullptr;
+      }
+
+      NodePointer baseName = popNode(Node::Kind::Identifier);
+      if (!baseName)
+        return nullptr;
+
+      NodePointer parent = nullptr;
+      if (hasParent) {
+        parent = popNode(Node::Kind::Type);
+        if (!parent)
+          return nullptr;
+      }
+
+      auto hiddenType = createNode(Node::Kind::HiddenTypeLayoutInfo);
+      hiddenType->addChild(baseName, *this);
+      if (parent)
+        hiddenType->addChild(parent, *this);
+      return createType(hiddenType);
+    }
     case 'z':
       switch (nextChar()) {
       case 'B':
