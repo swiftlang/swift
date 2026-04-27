@@ -43,6 +43,7 @@ class BasicBlockBitfield;
 class NodeBitfield;
 class OperandBitfield;
 class CalleeCache;
+class DominanceInfo;
 class SILTypeProperties;
 class SILUndef;
 
@@ -1741,14 +1742,15 @@ public:
   /// verify - Run the SIL verifier to make sure that the SILFunction follows
   /// invariants.
   void verify(CalleeCache *calleeCache = nullptr,
-              bool SingleFunction = true,
-              bool isCompleteOSSA = true,
+              DominanceInfo *dominanceInfo = nullptr,
+              bool SingleFunction = true, bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
 
   /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
   /// blocks.
   void verifyIncompleteOSSA() const {
-    verify(/*calleeCache*/nullptr, /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
+    verify(/*calleeCache*/ nullptr, /*dominanceInfo=*/nullptr,
+           /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
   }
 
   /// Verifies the lifetime of memory locations in the function.
