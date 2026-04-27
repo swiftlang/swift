@@ -36,6 +36,29 @@ func asyncFib(_ n: Int) async -> Int {
   return result
 }
 
+enum FibError: Error {
+case unhandledValue(Int)
+}
+
+@available(SwiftStdlib 5.1, *)
+func throwingFib(_ n: Int) async throws -> Int {
+  if n == 0 || n == 1 {
+    return n
+  }
+
+  async let first = throwingFib(n-2)
+  async let second = throwingFib(n-1)
+
+  let result = try await first + second
+
+  let s2nd = try await second
+  if s2nd > 17 && s2nd % 17 == 0 {
+    throw FibError.unhandledValue(try await second)
+  }
+
+  return result
+}
+
 @available(SwiftStdlib 5.1, *)
 func runFibonacci(_ n: Int) async {
   let result = await asyncFib(n)
@@ -49,5 +72,15 @@ func runFibonacci(_ n: Int) async {
 @main struct Main {
   static func main() async {
     await runFibonacci(10)
+
+    do {
+      _ = try await throwingFib(10)
+      fatalError("Throwing test failed to fail")
+    } catch let FibError {
+      // CHECK: Caught a FibError
+      print("Caught a FibError")
+    } catch {
+      fatalError("Caught something else??")
+    }
   }
 }
