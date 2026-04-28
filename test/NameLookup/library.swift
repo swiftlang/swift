@@ -28,10 +28,9 @@ func over2(_ x: UInt32) {}
 func over3(_ x: UInt32) {}
 typealias over4 = UInt32
 func testover() {
-  // FIXME: Very weird diagnostic here.
-  over1(0) // expected-error{{ambiguous use of 'over1'}}
+  over1(0) // expected-error{{ambiguous use of 'over1'; cannot select between potential parameter types '(UInt32)', '(UInt64)'}}
   over2(0)
-  over3(0) // FIXME: Should we produce an ambiguity error here?
+  over3(0) 
   var x : over4 = 10
 }
 

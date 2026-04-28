@@ -41,7 +41,7 @@ for x in <#T#> { // expected-error{{editor placeholder in source file}} expected
 func test_ambiguity_with_placeholders(pairs: [(rank: Int, count: Int)]) -> Bool {
   return pairs[<#^ARG^#>].count == 2
   // expected-error@-1 {{editor placeholder in source file}}
-  // expected-error@-2 {{ambiguous use of 'subscript(_:)'}}
+  // expected-error@-2 {{ambiguous use of 'subscript(_:)'; cannot select between potential result types 'Element', 'ArraySlice<Element>', 'Self.SubSequence'}}
 }
 
 let unboundInPlaceholder1: Array<Never> = <#T##Array#> // expected-error{{editor placeholder in source file}}

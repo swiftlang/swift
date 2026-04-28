@@ -176,7 +176,7 @@ struct OverloadedCallable {
 func testOverloaded(x: OverloadedCallable) {
   let _: Int = x(1, 2, 3)
   let _: Float = x(1, 2, 3)
-  let _ = x(1, 2, 3) // expected-error {{ambiguous use of 'dynamicallyCall(withArguments:)'}}
+  let _ = x(1, 2, 3) // expected-error {{ambiguous use of 'dynamicallyCall(withArguments:)'; cannot select between potential result types 'Float', 'Int'}}
 }
 
 //===----------------------------------------------------------------------===//

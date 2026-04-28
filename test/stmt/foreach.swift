@@ -125,7 +125,7 @@ func testForEachInference() {
   for d: Double in getOvlSeq() { }
 
   // Overloaded sequence not resolved contextually
-  for v in getOvlSeq() { } // expected-error{{ambiguous use of 'getOvlSeq()'}}
+  for v in getOvlSeq() { } // expected-error{{ambiguous use of 'getOvlSeq()'; cannot select between potential result types 'Seq<Double>', 'Seq<Int>', 'Seq<X<Int>>'}}
 
   // Generic sequence resolved contextually
   for i: Int in getGenericSeq() { }

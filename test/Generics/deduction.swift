@@ -119,7 +119,7 @@ func passOverloadSet() {
 
   // Passing an overloaded function set to a generic function
   // FIXME: Yet more terrible diagnostics.
-  acceptUnaryFn(unaryFnOvl)  // expected-error{{ambiguous use of 'unaryFnOvl'}}
+  acceptUnaryFn(unaryFnOvl)  // expected-error{{ambiguous use of 'unaryFnOvl'; cannot select between potential parameter types '(Int)', '(Float)'}}
   acceptUnaryFnSame(unaryFnOvl)
 
   // Passing a variable of function type to a generic function
@@ -158,11 +158,11 @@ func testMemberDeduction(_ sti: SomeType, ii: Int, fi: Float) {
   i = st.identity(i)
   f = st.identity(f)
   i = st.identity2(i)
-  f = st.identity2(f) // expected-error{{ambiguous use of 'identity2'}}
+  f = st.identity2(f) // expected-error{{ambiguous use of 'identity2'; cannot select between potential result types 'T', 'Float'}}
   i = st.returnAs()
   f = st.returnAs()
   acceptFnFloatFloat(st.identity)
-  acceptFnFloatFloat(st.identity2) // expected-error{{ambiguous use of 'identity2'}}
+  acceptFnFloatFloat(st.identity2) // expected-error{{ambiguous use of 'identity2'; cannot select between potential result types 'T', 'Float'}}
   acceptFnDoubleDouble(st.identity2)
 }
 

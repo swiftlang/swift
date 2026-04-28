@@ -63,7 +63,7 @@ enum Color : Int {
 
 func useRawValue(of color: Color) {
   _ = color.rawValue
-  // expected-error@-1 {{ambiguous use of 'rawValue'}}
+  // expected-error@-1 {{ambiguous use of 'rawValue'; cannot select between potential types 'Double', 'Int'}}
 }
 
 var colorRaw: Color.RawValue = 7.5

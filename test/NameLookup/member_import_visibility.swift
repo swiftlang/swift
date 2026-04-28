@@ -29,7 +29,7 @@ func testExtensionMembers(x: X, y: Y<Z>) {
   _ = X(true)
   _ = X(1) // expected-member-visibility-error{{initializer 'init(_:)' is not available due to missing import of defining module 'members_B'}}
 
-  _ = x.ambiguous() // expected-ambiguity-error{{ambiguous use of 'ambiguous()'}}
+  _ = x.ambiguous() // expected-ambiguity-error{{ambiguous use of 'ambiguous()'; cannot select between potential result types 'Bool', 'Int'}}
   let _: Bool = x.ambiguous()
   let _: Int = x.ambiguous() // expected-member-visibility-error{{instance method 'ambiguous()' is not available due to missing import of defining module 'members_B'}}
 

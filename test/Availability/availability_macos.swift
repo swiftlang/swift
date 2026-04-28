@@ -26,12 +26,12 @@ func testDeploymentTarget(_ s: S) {
 
 @available(macOS 99, *)
 func testFarFuture(_ s: S) {
-  ambiguousInFarFuture(.init()) // expected-error {{ambiguous use of 'init()'}}
-  s.ambiguousInFarFuture(.init()) // expected-error {{ambiguous use of 'init()'}}
+  ambiguousInFarFuture(.init()) // expected-error {{ambiguous use of 'init()'; cannot select between potential result types 'B', 'A'}}
+  s.ambiguousInFarFuture(.init()) // expected-error {{ambiguous use of 'init()'; cannot select between potential result types 'B', 'A'}}
 }
 
 @available(macOS, unavailable)
 func testUnavailable(_ s: S) {
-  ambiguousInFarFuture(.init()) // expected-error {{ambiguous use of 'init()'}}
-  s.ambiguousInFarFuture(.init()) // expected-error {{ambiguous use of 'init()'}}
+  ambiguousInFarFuture(.init()) // expected-error {{ambiguous use of 'init()'; cannot select between potential result types 'B', 'A'}}
+  s.ambiguousInFarFuture(.init()) // expected-error {{ambiguous use of 'init()'; cannot select between potential result types 'B', 'A'}}
 }

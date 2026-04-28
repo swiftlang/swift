@@ -94,14 +94,14 @@ extension String {
   func number() -> Double {  }  // expected-note {{found this candidate}}
 }
 
-let _ = "a".number  // expected-error {{ambiguous use of 'number()'}}
+let _ = "a".number  // expected-error {{ambiguous use of 'number()'; cannot select between potential result types 'Double', 'Int'}}
 
 extension Int {
   subscript(key: String) -> Int { get {} }      // expected-note {{found this candidate}}
   subscript(key: String) -> Double {  get {} }   // expected-note {{found this candidate}}
 }
 
-let _ = 1["1"]  // expected-error {{ambiguous use of 'subscript(_:)'}}
+let _ = 1["1"]  // expected-error {{ambiguous use of 'subscript(_:)'; cannot select between potential result types 'Double', 'Int'}}
 
 let squares = [ 1, 2, 3 ].reduce([:]) { (dict, n) in
   var dict = dict

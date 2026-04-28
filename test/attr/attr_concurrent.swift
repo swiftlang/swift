@@ -91,7 +91,7 @@ func passingConcurrentOrNot(
   ncfn: (Int) -> Int // expected-note{{parameter 'ncfn' is implicitly non-Sendable}}{{9-9=@Sendable }}
 ) {
   // Ambiguous because preconcurrency code doesn't consider `@Sendable`.
-  f(cfn) // expected-error{{ambiguous use of 'f'}}
+  f(cfn) // expected-error{{ambiguous use of 'f'; cannot select between potential parameter types '(@Sendable (Int) -> Int)', '((Int) -> Int)'}}
 
   // Okay due to overloading
   f(ncfn)

@@ -255,7 +255,7 @@ func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubs
 
   value = ovl[(i, j, i)] // expected-error{{cannot convert value of type '(Int, Int, Int)' to expected argument type 'Int'}}
 
-  ret[i] // expected-error{{ambiguous use of 'subscript(_:)'}}
+  ret[i] // expected-error{{ambiguous use of 'subscript(_:)'; cannot select between potential result types 'Float', 'Int'}}
 
   value = ret[i]
   ret[i] = value
@@ -401,7 +401,7 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   // expected-note@-2 {{to match this opening '('}}
 
   let _ = s1["hello"]
-  // expected-error@-1 {{ambiguous use of 'subscript(_:)'}}
+  // expected-error@-1 {{ambiguous use of 'subscript(_:)'; cannot select between potential result types 'Bool', 'String?'}}
   // expected-error@-2 {{expected ')' in expression list}}
 }
 

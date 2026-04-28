@@ -150,7 +150,7 @@ obj.ovl1()  // expected-warning {{result of call to function returning 'A' is un
 
 // Don't allow overload resolution between declarations from different
 // classes.
-var ovl2ResultA = obj.ovl2!() // expected-error{{ambiguous use of 'ovl2()'}}
+var ovl2ResultA = obj.ovl2!() // expected-error{{ambiguous use of 'ovl2()'; cannot select between potential result types 'C', 'A'}}
 
 // ... but it's okay to allow overload resolution between declarations
 // from the same class.
@@ -162,7 +162,7 @@ ovl3Result = B()
 var ovl4Result = obj.ovl4!()
 
 // ... but not when the types are different.
-var ovl5Result = obj.ovl5!() // expected-error{{ambiguous use of 'ovl5()'}}
+var ovl5Result = obj.ovl5!() // expected-error{{ambiguous use of 'ovl5()'; cannot select between potential result types 'C', 'B'}}
 
 // Same as above but without the '!'
 obj.ovl4()  // expected-warning {{result of call to function returning 'B' is unused}}
@@ -396,23 +396,23 @@ class C2 {
 }
 
 func testAnyObjectAmbiguity(_ x: AnyObject) {
-  _ = x.ambiguousProperty // expected-error {{ambiguous use of 'ambiguousProperty'}}
+  _ = x.ambiguousProperty // expected-error {{ambiguous use of 'ambiguousProperty'; cannot select between potential types 'String', 'Int'}}
   _ = x.unambiguousProperty
 
-  _ = x.ambiguousMethod() // expected-error {{ambiguous use of 'ambiguousMethod()'}}
+  _ = x.ambiguousMethod() // expected-error {{ambiguous use of 'ambiguousMethod()'; cannot select between potential result types 'String', 'Int'}}
   _ = x.unambiguousMethod()
 
-  _ = x.ambiguousMethod // expected-error {{ambiguous use of 'ambiguousMethod()'}}
+  _ = x.ambiguousMethod // expected-error {{ambiguous use of 'ambiguousMethod()'; cannot select between potential result types 'String', 'Int'}}
   _ = x.unambiguousMethod
 
-  _ = x.ambiguousMethodParam // expected-error {{ambiguous use of 'ambiguousMethodParam'}}
+  _ = x.ambiguousMethodParam // expected-error {{ambiguous use of 'ambiguousMethodParam'; cannot select between potential parameter types '(Int)', '(String)'}}
   _ = x.unambiguousMethodParam
 
   // https://github.com/apple/swift/issues/55244
   // Don't emit a single-element tuple error.
   _ = x[singleCandidate: 0]
 
-  _ = x[ambiguousSubscript: 0] // expected-error {{ambiguous use of 'subscript(ambiguousSubscript:)'}}
+  _ = x[ambiguousSubscript: 0] // expected-error {{ambiguous use of 'subscript(ambiguousSubscript:)'; cannot select between potential result types 'String', 'Int'}}
   _ = x[ambiguousSubscript: 0] as Int
   _ = x[ambiguousSubscript: 0] as String
 
@@ -422,7 +422,7 @@ func testAnyObjectAmbiguity(_ x: AnyObject) {
   _ = x[unambiguousSubscript: ""]
 
   // But not if they have different selectors.
-  _ = x[differentSelectors: 0] // expected-error {{ambiguous use of 'subscript(differentSelectors:)}}
+  _ = x[differentSelectors: 0] // expected-error {{ambiguous use of 'subscript(differentSelectors:)'; cannot select between potential types '<Self where Self : P3> (differentSelectors: Int) -> Int', '(Int) -> Int'}}
 }
 
 // https://github.com/apple/swift/issues/54059

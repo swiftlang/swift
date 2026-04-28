@@ -73,7 +73,7 @@ public func also_unavailable_in_embedded(
   unavailable_in_embedded() // OK
   universally_unavailable() // expected-error {{'universally_unavailable()' is unavailable: always unavailable}}
   a.unavailable_in_embedded_method(uie, uu, a)
-  has_unavailable_in_embedded_overload(.init()) // expected-error {{ambiguous use of 'init()'}}
+  has_unavailable_in_embedded_overload(.init()) // expected-error {{ambiguous use of 'init()'; cannot select between potential result types 'S2', 'S1'}}
   has_universally_unavailable_overload(.init()) // not ambiguous, selects available overload
 }
 
@@ -86,6 +86,6 @@ public func also_universally_unavailable(
   unavailable_in_embedded()
   universally_unavailable() // expected-error {{'universally_unavailable()' is unavailable: always unavailable}}
   a.unavailable_in_embedded_method(uie, uu, a)
-  has_unavailable_in_embedded_overload(.init()) // expected-error {{ambiguous use of 'init()'}}
+  has_unavailable_in_embedded_overload(.init()) // expected-error {{ambiguous use of 'init()'; cannot select between potential result types 'S2', 'S1'}}
   has_universally_unavailable_overload(.init()) // not ambiguous, selects available overload
 }

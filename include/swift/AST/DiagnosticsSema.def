@@ -4998,6 +4998,14 @@ ERROR(incorrect_operand_for_op,none,
       (DeclNameRef, Type, Type))
 ERROR(ambiguous_decl_ref_types,none,
       "ambiguous use of %0; cannot convert value of type %1 to any of potential types %2", (DeclNameRef, Type, StringRef))
+ERROR(ambiguous_operator_ref_types,none,
+      "ambiguous use of operator %0; cannot convert value of type %1 to any of potential types %2", (DeclNameRef, Type, StringRef))
+ERROR(ambiguous_decl_ref_unknown,none,
+      "ambiguous use of %0; cannot select between potential%1 types %2", (DeclNameRef, StringRef, StringRef))
+ERROR(ambiguous_operator_ref_unknown,none,
+      "ambiguous use of operator %0; cannot select between potential%1 types %2", (DeclNameRef, StringRef, StringRef))
+ERROR(ambiguous_initializer_unknown,none,
+      "ambiguous use of initializer; cannot determine which initializer for potential types %0", (StringRef))
 ERROR(ambiguous_decl_ref,none,
       "ambiguous use of %0", (DeclNameRef))
 ERROR(ambiguous_init,none,

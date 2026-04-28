@@ -46,5 +46,5 @@ func test() {
 
   Text("Test")
     .title(__findValue("someKey", fallback: "<unknown>"))
-    .background(ambiguitySource()) // expected-error {{ambiguous use of 'ambiguitySource()'}}
+    .background(ambiguitySource()) // expected-error {{ambiguous use of 'ambiguitySource()'; cannot select between potential result types 'AnyGradient', 'AnyShapeStyle'}}
 }

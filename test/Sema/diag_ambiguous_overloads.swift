@@ -186,10 +186,10 @@ do {
   var i16 = MyInt16()
 
   let _ = i16 ++ i16
-  // expected-error@-1 {{ambiguous use of operator '++'}}
+  // expected-error@-1 {{ambiguous use of operator '++'; cannot select between potential result types 'T.D', 'T'}}
 
   let _ = i16 -- i16
-  // expected-error@-1 {{ambiguous use of operator '--'}}
+  // expected-error@-1 {{ambiguous use of operator '--'; cannot select between potential result types 'T.D', 'T'}}
 }
 
 // https://github.com/swiftlang/swift/issues/79999

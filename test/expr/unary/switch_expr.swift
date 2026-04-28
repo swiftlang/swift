@@ -623,7 +623,7 @@ let m = !switch Bool.random() { case true: true case false: true }
 // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
 // FIXME: Shouldn't be ambiguous
-let n = switch Bool.random() { case true: 1 case false: 2 } + // expected-error {{ambiguous use of operator '+'}}
+let n = switch Bool.random() { case true: 1 case false: 2 } + // expected-error {{ambiguous use of operator '+'; cannot select between potential result types 'UInt16', 'Int64', 'UInt8', 'Int16', 'Double', 'UInt32', 'UInt64', 'Int', 'Int8', 'UInt', 'Float16', 'Float', 'Int32'}}
         switch Bool.random() { case true: 3 case false: 4 } +
         switch Bool.random() { case true: 5 case false: 6 }
 // expected-error@-3 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}

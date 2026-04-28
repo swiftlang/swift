@@ -3493,6 +3493,11 @@ public:
   /// curried self parameter.
   bool hasCurriedSelf() const;
 
+  /// If the declarations interface type causes hasCurriedSelf
+  /// to return true, then this will return the result of the interface type's function.
+  /// Otherwise returns the interface type.
+  Type removeCurriedSelf() const;
+
   /// Returns true if the declaration has a parameter list associated with it.
   ///
   /// Note that not all declarations with function interface types have
@@ -10079,6 +10084,14 @@ inline bool ValueDecl::hasCurriedSelf() const {
   if (isa<EnumElementDecl>(this))
     return true;
   return false;
+}
+
+inline Type ValueDecl::removeCurriedSelf() const {
+  auto type = this->getInterfaceType();
+  if (this->hasCurriedSelf()) {
+    return type->castTo<AnyFunctionType>()->getResult();
+  }
+  return type;
 }
 
 inline unsigned ValueDecl::getNumCurryLevels() const {
