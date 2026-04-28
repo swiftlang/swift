@@ -333,6 +333,19 @@ class ClassWithIsolatedAsyncInitializer {
     init(isolation: isolated (any Actor)? = #isolation) async {}
 }
 
+// Subscripts
+struct SubscriptTest {
+  subscript(x: isolated (any Actor)? = #isolation) -> Int { return 0 }
+}
+
+func f1(x: (any Actor)?) async {
+  _ = await SubscriptTest()[x]
+}
+
+func f2() async {
+  _ = await SubscriptTest()[]
+}
+
 // https://github.com/swiftlang/swift/issues/80992
 struct WritableActorKeyPath<Root: Actor, Value>: Sendable {
     var getter: @Sendable (isolated Root) -> Value
