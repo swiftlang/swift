@@ -813,29 +813,29 @@ actor LazyActor {
     lazy var l25: Int = { [unowned self] in self.l }()
 
     nonisolated lazy var l31: Int = { v }()
-    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' can not be applied to 'lazy' stored property 'l31'; this is an error in the Swift 6 language mode}}
     // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l32: Int = v
-    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' can not be applied to 'lazy' stored property 'l32'; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l33: Int = { self.v }()
-    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' can not be applied to 'lazy' stored property 'l33'; this is an error in the Swift 6 language mode}}
     // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l34: Int = self.v
-    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' can not be applied to 'lazy' stored property 'l34'; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l35: Int = { [unowned self] in self.v }()
-    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' can not be applied to 'lazy' stored property 'l35'; this is an error in the Swift 6 language mode}}
     // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
 
     nonisolated lazy var l41: Int = { l }()
-    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' can not be applied to 'lazy' stored property 'l41'; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l42: Int = l
-    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' can not be applied to 'lazy' stored property 'l42'; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l43: Int = { self.l }()
-    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' can not be applied to 'lazy' stored property 'l43'; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l44: Int = self.l
-    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' can not be applied to 'lazy' stored property 'l44'; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l45: Int = { [unowned self] in self.l }()
-    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' can not be applied to 'lazy' stored property 'l45'; this is an error in the Swift 6 language mode}}
 }
 
 // Infer global actors from context only for instance members.
