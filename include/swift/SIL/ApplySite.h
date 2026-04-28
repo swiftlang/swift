@@ -21,6 +21,7 @@
 #ifndef SWIFT_SIL_APPLYSITE_H
 #define SWIFT_SIL_APPLYSITE_H
 
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILArgument.h"
@@ -942,10 +943,16 @@ public:
     if (auto isolation = getIsolationCrossing();
         isolation && isolation->getCalleeIsolation())
       return isolation->getCalleeIsolation();
-    auto *calleeFunction = getCalleeFunction();
-    if (!calleeFunction)
-      return {};
-    return calleeFunction->getActorIsolation();
+    if (auto *calleeFunction = getCalleeFunction())
+      return calleeFunction->getActorIsolation();
+
+    if (auto isolatedParam =
+            getSubstCalleeType()->maybeGetIsolatedParameter()) {
+      if (isolatedParam->hasOption(SILParameterInfo::ImplicitLeading))
+        return ActorIsolation::forCallerIsolationInheriting();
+    }
+
+    return std::nullopt;
   }
 
   bool isCallerIsolationInheriting() const {
