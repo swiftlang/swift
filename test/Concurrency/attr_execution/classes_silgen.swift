@@ -26,6 +26,7 @@ class AllDefault : SuperKlass {
 
 class AllConcurrent : SuperKlass {
   // CHECK-LABEL: vtable thunk for SuperKlass.callerTest() dispatching to AllConcurrent.callerTest()
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil private [thunk] [ossa] @$s21attr_execution_silgen13AllConcurrentC10callerTestyyYaFAA10SuperKlassCADyyYaFTV : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed AllConcurrent) -> () {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[PARAM:%.*]] : @guaranteed $AllConcurrent):
   // CHECK:  [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen13AllConcurrentC10callerTestyyYaF : $@convention(method) @async (@guaranteed AllConcurrent) -> ()
@@ -41,6 +42,7 @@ class AllNonIsolatedUnsafe : SuperKlass {
   override nonisolated(nonsending) func callerTest() async {}
 
   // CHECK-LABEL: // vtable thunk for SuperKlass.concurrentTest() dispatching to AllNonIsolatedUnsafe.concurrentTest()
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil private [thunk] [ossa] @$s21attr_execution_silgen20AllNonIsolatedUnsafeC14concurrentTestyyYaFAA10SuperKlassCADyyYaFTV : $@convention(method) @async (@guaranteed AllNonIsolatedUnsafe) -> () {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed
   // CHECK:   [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
@@ -52,6 +54,7 @@ class AllNonIsolatedUnsafe : SuperKlass {
   override nonisolated(nonsending) func concurrentTest() async {}
 
   // CHECK-LABEL: // vtable thunk for SuperKlass.mainActorTest() dispatching to AllNonIsolatedUnsafe.mainActorTest()
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil private [thunk] [ossa] @$s21attr_execution_silgen20AllNonIsolatedUnsafeC13mainActorTestyyYaFAA10SuperKlassCADyyYaFTV : $@convention(method) @async (@guaranteed AllNonIsolatedUnsafe) -> () {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $AllNonIsolatedUnsafe):
   // CHECK:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor

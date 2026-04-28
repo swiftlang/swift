@@ -337,9 +337,9 @@ BridgedProperty::outline(SILModule &M) {
   auto name = M.allocateCopy(nameTmp);
 
   auto *Fun = FuncBuilder.getOrCreateFunction(
-      ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
-      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible);
+      ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType,
+      ActorIsolation::forUnspecified(), IsNotBare, IsNotTransparent,
+      IsSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
   bool NeedsDefinition = Fun->empty();
 
   if (Release) {
@@ -1074,9 +1074,9 @@ ObjCMethodCall::outline(SILModule &M) {
   auto name = M.allocateCopy(nameTmp);
 
   auto *Fun = FuncBuilder.getOrCreateFunction(
-      ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
-      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible);
+      ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType,
+      ActorIsolation::forUnspecified(), IsNotBare, IsNotTransparent,
+      IsSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
   bool NeedsDefinition = Fun->empty();
 
   // Call the outlined function.

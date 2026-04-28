@@ -6254,7 +6254,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   auto loc = F.getLocation();
   SILGenFunctionBuilder fb(SGM);
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
+    loc, name, thunkDeclType, F.getActorIsolation(), IsBare, IsTransparent, IsSerialized,
       ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible);
 
@@ -6617,8 +6617,8 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
                      : stripExternalFromLinkage(originalFn->getLinkage());
 
   auto *thunk = fb.getOrCreateFunction(
-      loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
-      customDerivativeFn->getSerializedKind(),
+      loc, name, linkage, thunkFnTy, customDerivativeFn->getActorIsolation(),
+      IsBare, IsNotTransparent, customDerivativeFn->getSerializedKind(),
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->isDistributed(),
       customDerivativeFn->isRuntimeAccessible(),

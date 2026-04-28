@@ -27,9 +27,9 @@ public:
                                                  CanSILFunctionType ty,
                                                  SILLocation loc) {
     auto *result = builder.createFunction(
-        SILLinkage::Private, name, ty, nullptr, loc, IsNotBare,
-        IsNotTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
-        IsNotRuntimeAccessible);
+        SILLinkage::Private, name, ty, ActorIsolation::forUnspecified(),
+        nullptr, loc, IsNotBare, IsNotTransparent, IsNotSerialized,
+        IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
     result->setDebugScope(new (builder.mod) SILDebugScope(loc, result));
 
     // If we did not have a declcontext set, as a fallback set the parent module

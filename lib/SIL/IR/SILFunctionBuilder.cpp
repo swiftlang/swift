@@ -28,7 +28,7 @@ using namespace swift;
 
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
     SILLocation loc, StringRef name, SILLinkage linkage,
-    CanSILFunctionType type, IsBare_t isBareSILFunction,
+    CanSILFunctionType type, ActorIsolation isolation, IsBare_t isBareSILFunction,
     IsTransparent_t isTransparent, SerializedKind_t serializedKind,
     IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
     IsRuntimeAccessible_t isRuntimeAccessible, ProfileCounter entryCount,
@@ -41,11 +41,10 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     return fn;
   }
 
-  auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
-                                isBareSILFunction, isTransparent, serializedKind,
-                                entryCount, isDynamic, isDistributed,
-                                isRuntimeAccessible, IsNotExactSelfClass,
-                                isThunk, subclassScope);
+  auto fn = SILFunction::create(
+      mod, linkage, name, type, isolation, nullptr, loc, isBareSILFunction,
+      isTransparent, serializedKind, entryCount, isDynamic, isDistributed,
+      isRuntimeAccessible, IsNotExactSelfClass, isThunk, subclassScope);
   fn->setDebugScope(new (mod) SILDebugScope(loc, fn));
   return fn;
 }
@@ -372,10 +371,10 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   IsRuntimeAccessible_t isRuntimeAccessible = IsNotRuntimeAccessible;
 
   auto *F = SILFunction::create(
-      mod, linkage, name, constantType, nullptr, std::nullopt, IsNotBare,
-      IsTrans, IsSer, entryCount, IsDyn, IsDistributed, isRuntimeAccessible,
-      IsNotExactSelfClass, IsNotThunk, constant.getSubclassScope(),
-      inlineStrategy);
+      mod, linkage, name, constantType, constant.getActorIsolation(),
+      nullptr, std::nullopt, IsNotBare, IsTrans, IsSer, entryCount,
+      IsDyn, IsDistributed, isRuntimeAccessible, IsNotExactSelfClass,
+      IsNotThunk, constant.getSubclassScope(), inlineStrategy);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
 
   if (constant.isGlobal())
@@ -453,11 +452,12 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
 SILFunction *SILFunctionBuilder::getOrCreateSharedFunction(
     SILLocation loc, StringRef name, CanSILFunctionType type,
-    IsBare_t isBareSILFunction, IsTransparent_t isTransparent,
-    SerializedKind_t serializedKind, ProfileCounter entryCount, IsThunk_t isThunk,
+    ActorIsolation isolation, IsBare_t isBareSILFunction,
+    IsTransparent_t isTransparent, SerializedKind_t serializedKind,
+    ProfileCounter entryCount, IsThunk_t isThunk,
     IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
     IsRuntimeAccessible_t isRuntimeAccessible) {
-  return getOrCreateFunction(loc, name, SILLinkage::Shared, type,
+  return getOrCreateFunction(loc, name, SILLinkage::Shared, type, isolation,
                              isBareSILFunction, isTransparent, serializedKind,
                              isDynamic, isDistributed, isRuntimeAccessible,
                              entryCount, isThunk, SubclassScope::NotApplicable);
@@ -465,17 +465,17 @@ SILFunction *SILFunctionBuilder::getOrCreateSharedFunction(
 
 SILFunction *SILFunctionBuilder::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-    GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
-    IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-    SerializedKind_t serializedKind, IsDynamicallyReplaceable_t isDynamic,
-    IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
-    ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope,
-    Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
+    ActorIsolation isolation, GenericEnvironment *genericEnv,
+    std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
+    IsTransparent_t isTrans, SerializedKind_t serializedKind,
+    IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
+    IsRuntimeAccessible_t isRuntimeAccessible, ProfileCounter entryCount,
+    IsThunk_t isThunk, SubclassScope subclassScope, Inline_t inlineStrategy,
+    EffectsKind EK, SILFunction *InsertBefore,
     const SILDebugScope *DebugScope) {
-  return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
-                             isBareSILFunction, isTrans, serializedKind,
-                             entryCount, isDynamic, isDistributed,
-                             isRuntimeAccessible, IsNotExactSelfClass, isThunk,
-                             subclassScope, inlineStrategy, EK, InsertBefore,
-                             DebugScope);
+  return SILFunction::create(
+      mod, linkage, name, loweredType, isolation, genericEnv, loc,
+      isBareSILFunction, isTrans, serializedKind, entryCount, isDynamic,
+      isDistributed, isRuntimeAccessible, IsNotExactSelfClass, isThunk,
+      subclassScope, inlineStrategy, EK, InsertBefore, DebugScope);
 }

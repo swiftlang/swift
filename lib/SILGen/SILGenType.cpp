@@ -205,7 +205,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
   SILGenFunctionBuilder builder(*this);
   auto thunk = builder.createFunction(
       SILLinkage::Private, name, overrideInfo.SILFnType,
-      genericEnv, loc,
+      ActorIsolation::forUnspecified(), genericEnv, loc,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
       IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
@@ -884,10 +884,11 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   SILGenFunctionBuilder builder(*this);
   f = builder.createFunction(
-      linkage, nameBuffer, witnessSILFnType, genericEnv,
-      SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent,
+      linkage, nameBuffer, witnessSILFnType, ActorIsolation::forUnspecified(),
+      genericEnv, SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent,
       serializedKind, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-      ProfileCounter(), thunkKind, SubclassScope::NotApplicable, InlineStrategy);
+      ProfileCounter(), thunkKind, SubclassScope::NotApplicable,
+      InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
@@ -977,8 +978,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   SILGenFunctionBuilder builder(SGM);
   auto *f = builder.createFunction(
-      linkage, name, witnessSILFnType, genericEnv,
-      SILLocation(requirement.getDecl()), IsNotBare, IsTransparent,
+      linkage, name, witnessSILFnType, ActorIsolation::forUnspecified(),
+      genericEnv, SILLocation(requirement.getDecl()), IsNotBare, IsTransparent,
       IsSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
       ProfileCounter(), IsThunk, SubclassScope::NotApplicable, InlineDefault);
 
@@ -1307,9 +1308,10 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
           .SILFnType;
   auto loc = replacement.getAsRegularLocation();
   auto *function = builder.getOrCreateFunction(
-      loc, name, SILLinkage::Shared, replacementTy, IsBare, IsNotTransparent,
-      IsSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-      ProfileCounter(), IsNotThunk);
+      loc, name, SILLinkage::Shared, replacementTy,
+      ActorIsolation::forUnspecified(), IsBare, IsNotTransparent, IsSerialized,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(),
+      IsNotThunk);
 
   if (!function->empty())
     return function;

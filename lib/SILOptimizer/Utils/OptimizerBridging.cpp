@@ -461,7 +461,7 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
       // classes (the classSubclassScope), because that may incorrectly
       // influence the linkage.
       getSpecializedLinkage(original, original->getLinkage()), specializedName.unbridged(),
-      ClonedTy,
+      ClonedTy, original->getActorIsolation(),
       preserveGenericSignature ? original->getGenericEnvironment() : nullptr,
       original->getLocation(), makeBare ? IsBare : original->isBare(), original->isTransparent(),
       original->getSerializedKind(), IsNotDynamic, IsNotDistributed,
@@ -477,9 +477,6 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   
   for (auto &Attr : original->getSemanticsAttrs())
     specializedApplySiteCallee->addSemanticsAttr(Attr);
-
-  if (auto isolation = original->getActorIsolation())
-    specializedApplySiteCallee->setActorIsolation(*isolation);
 
   return {specializedApplySiteCallee};
 }

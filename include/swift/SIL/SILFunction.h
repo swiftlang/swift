@@ -34,6 +34,7 @@
 namespace swift {
 
 class ASTContext;
+class ActorIsolation;
 enum class CodeGenerationModel: uint8_t;
 class SILInstruction;
 class SILModule;
@@ -363,7 +364,7 @@ private:
   unsigned BlockListChangeIdx = 0;
 
   /// The isolation of this function.
-  std::optional<ActorIsolation> actorIsolation;
+  ActorIsolation actorIsolation;
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -519,12 +520,12 @@ private:
   }
 
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
-              CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-              IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-              SerializedKind_t serializedKind, ProfileCounter entryCount,
-              IsThunk_t isThunk, SubclassScope classSubclassScope,
-              Inline_t inlineStrategy, EffectsKind E,
-              const SILDebugScope *debugScope,
+              CanSILFunctionType loweredType, ActorIsolation isolation,
+              GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
+              IsTransparent_t isTrans, SerializedKind_t serializedKind,
+              ProfileCounter entryCount, IsThunk_t isThunk,
+              SubclassScope classSubclassScope, Inline_t inlineStrategy,
+              EffectsKind E, const SILDebugScope *debugScope,
               IsDynamicallyReplaceable_t isDynamic,
               IsExactSelfClass_t isExactSelfClass,
               IsDistributed_t isDistributed,
@@ -532,11 +533,11 @@ private:
 
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
-         CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-         std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
-         IsTransparent_t isTrans, SerializedKind_t serializedKind,
-         ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
-         IsDistributed_t isDistributed,
+         CanSILFunctionType loweredType, ActorIsolation isolation,
+         GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
+         IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+         SerializedKind_t serializedKind, ProfileCounter entryCount,
+         IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
          IsRuntimeAccessible_t isRuntimeAccessible,
          IsExactSelfClass_t isExactSelfClass, IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
@@ -546,11 +547,12 @@ private:
          const SILDebugScope *DebugScope = nullptr);
 
   void init(SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
-            GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
-            IsTransparent_t isTrans, SerializedKind_t serializedKind,
-            ProfileCounter entryCount, IsThunk_t isThunk,
-            SubclassScope classSubclassScope, Inline_t inlineStrategy,
-            EffectsKind E, const SILDebugScope *DebugScope,
+            ActorIsolation isolation, GenericEnvironment *genericEnv,
+            IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+            SerializedKind_t serializedKind, ProfileCounter entryCount,
+            IsThunk_t isThunk, SubclassScope classSubclassScope,
+            Inline_t inlineStrategy, EffectsKind E,
+            const SILDebugScope *DebugScope,
             IsDynamicallyReplaceable_t isDynamic,
             IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
             IsRuntimeAccessible_t isRuntimeAccessible);
@@ -1532,12 +1534,12 @@ public:
     actorIsolation = newActorIsolation;
   }
 
-  std::optional<ActorIsolation> getActorIsolation() const {
+  ActorIsolation getActorIsolation() const {
     return actorIsolation;
   }
 
   bool isNonisolatedNonsending() const {
-    return actorIsolation && actorIsolation->isCallerIsolationInheriting();
+    return actorIsolation.isCallerIsolationInheriting();
   }
 
   /// Return the source file that this SILFunction belongs to if it exists.
