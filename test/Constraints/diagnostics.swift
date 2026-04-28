@@ -1014,7 +1014,7 @@ func ambiguousCall() -> Float {} // expected-note {{found this candidate}}
 
 func takesClosure(fn: () -> ()) {}
 
-takesClosure() { ambiguousCall() } // expected-error {{ambiguous use of 'ambiguousCall()'}}
+takesClosure() { ambiguousCall() } // expected-error {{ambiguous use of 'ambiguousCall()', cannot select between potential result types 'Float', 'Int'}}
 
 // https://github.com/apple/swift/issues/47269
 // Useless diagnostics calling non-static method

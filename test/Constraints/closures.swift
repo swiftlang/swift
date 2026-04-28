@@ -801,7 +801,7 @@ overloaded { } // empty body => inferred as returning ()
 overloaded { print("hi") } // single-expression closure => typechecked with body
 
 overloaded { print("hi"); print("bye") } // multiple expression closure without explicit returns; can default to any return type
-// expected-error@-1 {{ambiguous use of 'overloaded'}}
+// expected-error@-1 {{ambiguous use of 'overloaded', cannot select between potential parameter types '(() -> Int)', '(() -> Void)'}}
 
 func not_overloaded(_ handler: () -> Int) {}
 
@@ -1049,7 +1049,7 @@ func rdar52204414() {
 func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {} // expected-note{{found this candidate}}
 func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {} // expected-note{{found this candidate}}
 
-overloaded_with_default { 0 } // expected-error{{ambiguous use of 'overloaded_with_default'}}
+overloaded_with_default { 0 } // expected-error{{ambiguous use of 'overloaded_with_default', cannot select between potential parameter types '(a: () -> Int, b: Int, c: Int)', '(b: Int, c: Int, a: () -> Int)'}}
 
 func overloaded_with_default_and_autoclosure<T>(_ a: @autoclosure () -> T, b: Int = 0) {}
 func overloaded_with_default_and_autoclosure<T>(b: Int = 0, c: @escaping () -> T?) {}

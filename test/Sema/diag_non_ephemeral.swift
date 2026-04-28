@@ -419,7 +419,7 @@ func testNonEphemeralWithVarOverloads() {
   // diagnostic doesn't affect solver behaviour, so we diagnose an ambiguity.
   takesRaw(&overloadedVarOnlyOneResilient) // expected-error {{ambiguous use of 'overloadedVarOnlyOneResilient'}}
 
-  takesRaw(&overloadedVarDifferentTypes) // expected-error {{ambiguous use of 'overloadedVarDifferentTypes'}}
+  takesRaw(&overloadedVarDifferentTypes) // expected-error {{ambiguous use of 'overloadedVarDifferentTypes', cannot select between potential types 'Int', 'String'}}
 
   func takesIntPtr(@_nonEphemeral _ ptr: UnsafePointer<Int>) {}
   takesIntPtr(&overloadedVarDifferentTypes)
@@ -528,7 +528,7 @@ func ambiguous_fn(@_nonEphemeral _ ptr: UnsafePointer<Int>) {} // expected-note 
 func ambiguous_fn(_ ptr: UnsafeRawPointer) {} // expected-note {{found this candidate}}
 
 func test_ambiguity_with_function_instead_of_argument(_ x: inout Int) {
-  ambiguous_fn(&x) // expected-error {{ambiguous use of 'ambiguous_fn'}}
+  ambiguous_fn(&x) // expected-error {{ambiguous use of 'ambiguous_fn', cannot select between potential parameter types '(UnsafePointer<Int>)', '(UnsafeRawPointer)'}}
 }
 
 func tuplify<Ts>(_ fn: @escaping (Ts) -> Void) -> (Ts) -> Void { fn }

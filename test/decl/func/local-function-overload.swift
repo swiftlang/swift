@@ -51,7 +51,7 @@ func invalid2() {
   // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'Int'}}
 
   _ = inner
-  // expected-error@-1 {{ambiguous use of 'inner'}}
+  // expected-error@-1 {{ambiguous use of 'inner', cannot select between potential parameter types '(Int)', '(String)', '(label: Int)'}}
 
   _ = inner(label:) // no-error
 

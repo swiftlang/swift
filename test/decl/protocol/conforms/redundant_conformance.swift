@@ -25,7 +25,7 @@ extension OtherConformsToP : P1 { // expected-error{{redundant conformance of 'O
 
 func testConformsToP(cp1: ConformsToP, ocp1: OtherConformsToP) {
   // Note:
-  let _ = cp1.f()  // expected-error{{ambiguous use of 'f()'}}
+  let _ = cp1.f()  // expected-error{{ambiguous use of 'f()', cannot select between potential result types 'Double', 'Int'}}
 
   let _ = ocp1.f() // okay: picks "our" OtherConformsToP.f()
 }

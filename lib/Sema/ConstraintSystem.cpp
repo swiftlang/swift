@@ -3410,11 +3410,62 @@ bool ConstraintSystem::diagnoseAmbiguityInSolutions(ArrayRef<Solution> solutions
     if (relevantDecls.size() == 1)
       return false;
 
+    llvm::StringSet<> typeChoicesResults;
+    llvm::StringSet<> typeChoicesParams;
+    llvm::StringSet<> typeChoices;
+
+    for (auto decl : relevantDecls) {
+      Type choiceType = decl->removeCurriedSelf();
+      typeChoices.insert(choiceType->getString());
+
+      if (choiceType->is<AnyFunctionType>()) {
+        auto fun = choiceType->getAs<AnyFunctionType>();
+        typeChoicesResults.insert(fun->getResult()->getString());
+        typeChoicesParams.insert(fun->getParamListAsString(fun->getParams()));
+      } else if (choiceType->is<GenericFunctionType>()) {
+        auto gFun = choiceType->getAs<GenericFunctionType>();
+        typeChoicesResults.insert(gFun->getResult()->getString());
+        typeChoicesParams.insert(gFun->getParamListAsString(gFun->getParams()));
+      }
+    }
+
+    auto makeDiagList = [&](llvm::StringSet<> vec) {
+      llvm::SmallVector<std::string, 2> result;
+      for (auto &entry : vec) {
+        result.emplace_back("'" + entry.getKey().str() + "'");
+      }
+      llvm::sort(result);
+      return llvm::join(result, ", ");
+    };
+
+    std::string typeChoiceString;
+    std::string paramOrResultMsg = "";
+    if (typeChoicesResults.size() > 1) {
+      typeChoiceString = makeDiagList(typeChoicesResults);
+      paramOrResultMsg = " result";
+    } else if (typeChoicesParams.size() > 1 && typeChoicesResults.size() > 1) {
+      typeChoiceString = makeDiagList(typeChoices);
+    } else if (typeChoicesParams.size() > 1) {
+      typeChoiceString = makeDiagList(typeChoicesParams);
+      paramOrResultMsg = " parameter";
+    } else {
+      if (typeChoices.size() == 1)
+        typeChoiceString = "";
+      else
+        typeChoiceString = makeDiagList(typeChoices);
+    }
+
+    // Emit the ambiguity diagnostic
     auto &DE = getASTContext().Diags;
-    DE.diagnose(getLoc(anchor),
-                name.isOperator() ? diag::ambiguous_operator_ref
-                                  : diag::ambiguous_decl_ref,
-                name);
+    if (typeChoiceString == "")
+      DE.diagnose(getLoc(anchor), name.isOperator() ?
+                  diag::ambiguous_operator_ref
+                  : diag::ambiguous_decl_ref, name);
+    else
+      DE.diagnose(getLoc(anchor),
+                  name.isOperator() ? diag::ambiguous_operator_ref_unknown
+                                    : diag::ambiguous_decl_ref_unknown,
+                  name, paramOrResultMsg, typeChoiceString);
 
     TrailingClosureAmbiguityFailure failure(solutions, anchor,
                                             overload.choices);
@@ -3432,7 +3483,6 @@ bool ConstraintSystem::diagnoseAmbiguityInSolutions(ArrayRef<Solution> solutions
       case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional: {
-        // FIXME: show deduced types, etc, etc.
         auto decl = choice.getDecl();
         if (EmittedDecls.insert(decl).second) {
           auto declModule = decl->getDeclContext()->getParentModule();

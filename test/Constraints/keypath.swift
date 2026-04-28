@@ -290,7 +290,7 @@ func test_invalid_argument_to_keypath_subscript() {
   // The diagnostic should point out that `ambiguous` is indeed ambiguous and that `5` is not a valid argument
   // for a key path subscript.
   ambiguous {
-    // expected-error@-1 {{ambiguous use of 'ambiguous'}}
+    // expected-error@-1 {{ambiguous use of 'ambiguous', cannot select between potential parameter types '((Int) -> Void)', '((String) -> Void)'}}
     $0[keyPath: 5]
   }
 

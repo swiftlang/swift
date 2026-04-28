@@ -42,7 +42,7 @@ enum ActionType: String, ActionIdentifier, CaseIterable {
             .download
         )
         if true { // If condition without else is needed to make sure that `buildOptional` affects `buildBlock` resolution.
-          // expected-error@-1 {{ambiguous use of 'buildBlock'}}
+          // expected-error@-1 {{ambiguous use of 'buildBlock', cannot select between potential result types 'ActionLookup<Identifier>', '[ActionLookup<Identifier>]'}}
             ActionTypeLookup(
                 .upload
             )

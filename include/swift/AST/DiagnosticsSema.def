@@ -5031,6 +5031,12 @@ WARNING(use_of_void_pointer,none,
 "Unsafe%0Pointer<Void> has been replaced by Unsafe%0RawPointer", (StringRef))
 
 // Ambiguities
+ERROR(ambiguous_decl_ref_unknown,none,
+      "ambiguous use of %0, cannot select between potential%1 types %2",
+      (DeclNameRef, StringRef, StringRef))
+ERROR(ambiguous_operator_ref_unknown,none,
+      "ambiguous use of operator %0, cannot select between potential%1 types %2",
+      (DeclNameRef, StringRef, StringRef))
 ERROR(ambiguous_decl_ref,none,
       "ambiguous use of %0", (DeclNameRef))
 ERROR(ambiguous_operator_ref,none,

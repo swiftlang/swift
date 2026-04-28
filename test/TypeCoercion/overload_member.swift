@@ -35,7 +35,7 @@ func test_method_overload(_ a: A, x: X, y: Y) {
 }
 
 func test_method_overload_coerce(_ a: A, x: inout X, y: inout Y, z: Z) {
-  var fail = a.g(z: z) // expected-error{{ambiguous use of 'g(z:)'}}
+  var fail = a.g(z: z) // expected-error{{ambiguous use of 'g(z:)', cannot select between potential result types 'X', 'Y'}}
   x = a.g(z: z)
   y = a.g(z: z)
 }
@@ -56,7 +56,7 @@ func test_static_method_overload(_ a: A, x: X, y: Y) {
 }
 
 func test_static_method_overload_coerce(_ a: A, x: inout X, y: inout Y, z: Z) {
-  var fail = A.sg(z: z) // expected-error{{ambiguous use of 'sg(z:)'}}
+  var fail = A.sg(z: z) // expected-error{{ambiguous use of 'sg(z:)', cannot select between potential result types 'X', 'Y'}}
   x = A.sg(z: z)
   y = A.sg(z: z)
 }
@@ -112,7 +112,7 @@ extension A {
   }
 
   func test_method_overload_coerce(x: inout X, y: inout Y, z: Z) {
-    var fail = g(z: z) // expected-error{{ambiguous use of 'g(z:)'}}
+    var fail = g(z: z) // expected-error{{ambiguous use of 'g(z:)', cannot select between potential result types 'X', 'Y'}}
     x = g(z: z)
     y = g(z: z)
   }
@@ -146,7 +146,7 @@ extension A {
   }
 
   class func test_method_overload_coerce_static(x: inout X, y: inout Y, z: Z) {
-    var fail = sg(z: z) // expected-error{{ambiguous use of 'sg(z:)'}}
+    var fail = sg(z: z) // expected-error{{ambiguous use of 'sg(z:)', cannot select between potential result types 'X', 'Y'}}
     x = sg(z: z)
     y = sg(z: z)
   }

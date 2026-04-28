@@ -28,6 +28,7 @@ extension S4 where T == (outer: Int, y: Int) {
 }
 
 public func rdar85263844_2(_ x: [Int]) -> S4<(outer: Int, y: Int)> {
-  // FIXME: Weak error message.
-  S4(x.map { (inner: $0, y: $0) }) // expected-error {{failed to produce diagnostic}}
+  // FIXME: attempts to deconstruct tuple in differing order because binding is failing, so no consistent locator
+  // can be found
+  S4(x.map { (inner: $0, y: $0) }) // expected-error {{failed to produce diagnostic for expression}}
 }

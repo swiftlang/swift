@@ -100,7 +100,7 @@ func f1() {
 func f5(_ i: Int) -> A { return A() } // expected-note{{candidate}}
 func f5(_ i: Int) -> B { return B() } // expected-note{{candidate}}
 
-f5(5) // expected-error{{ambiguous use of 'f5'}}
+f5(5) // expected-error{{ambiguous use of 'f5', cannot select between potential result types 'A', 'B'}}
 
 struct HasX1aProperty {
   func write(_: X1a) {}

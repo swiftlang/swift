@@ -18,5 +18,5 @@ func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
 
   var total = 0.0 // This is Double by default
   total += test(CGFloat(v)) + CGFloat(v)
-  // expected-error@-1 {{ambiguous use of 'test'}}
+  // expected-error@-1 {{ambiguous use of 'test', cannot select between potential result types 'CGFloat', 'Double'}}
 }

@@ -91,7 +91,7 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(_ ovl: Ovl, ovl2: Ovl,
   // Overloading based on return type
   a = ovl.f2(17)
   b = ovl.f2(17)
-  ovl.f2(17) // expected-error{{ambiguous use of 'f2'}}
+  ovl.f2(17) // expected-error{{ambiguous use of 'f2', cannot select between potential result types 'Self.A', 'Self.B'}}
 
   // Check associated types from different objects/different types.
   a = ovl2.f2(17)

@@ -3,16 +3,14 @@
 // https://github.com/apple/swift/issues/43464
 
 class Aaron {
-  // expected-note@+1 {{found this candidate}}
   init(x: Int) {
     func foo() {
       // Make sure we recover and assume 'self.init'.
       // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'self.'?}} {{11-11=self.}}
-      // expected-error@+1 {{ambiguous use of 'init'}}
+      // expected-error@+1 {{cannot reference 'self.init' initializer delegation as function value}}
       _ = init
     }
   }
-  // expected-note@+1 {{found this candidate}}
   convenience init() {
     // Make sure we recover and assume 'self.init'.
     // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'self.'?}} {{5-5=self.}}
@@ -25,7 +23,7 @@ class Aaron {
     func foo() { _ = init() }
   }
 
-  required init(y: Int) {} // expected-note {{found this candidate}}
+  required init(y: Int) {}
 
   static func aaronFn() {
     // Make sure we recover and assume 'self.init'.
@@ -42,7 +40,6 @@ class Aaron {
 }
 
 class Theodosia: Aaron {
-  // expected-note@+1 {{found this candidate}}
   init() {
     // Make sure we recover and assume 'super.init'.
     // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'super.'?}} {{5-5=super.}}
@@ -51,11 +48,11 @@ class Theodosia: Aaron {
 
     // Make sure we recover and assume 'self.init'.
     // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'self.'?}} {{22-22=self.}}
-    // expected-error@+1 {{ambiguous use of 'init'}}
+    // expected-error@+1 {{cannot reference 'self.init' initializer delegation as function value}}
     func foo() { _ = init }
   }
 
-  required init(y: Int) {} // expected-note {{found this candidate}}
+  required init(y: Int) {}
 
   static func theodosiaFn() {
     // Make sure we recover and assume 'self.init'.

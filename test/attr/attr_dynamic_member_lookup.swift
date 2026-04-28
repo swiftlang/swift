@@ -318,7 +318,7 @@ struct Ambiguity {
 func testAmbiguity(a: Ambiguity) {
   let _: Int = a.flexibility
   let _: Float = a.dynamism
-  _ = a.dynamism // expected-error {{ambiguous use of 'subscript(dynamicMember:)'}}
+  _ = a.dynamism // expected-error {{ambiguous use of 'subscript(dynamicMember:)', cannot select between potential result types 'Float', 'Int'}}
 }
 
 // References to overloads are also resolved just like normal subscript and
@@ -388,7 +388,7 @@ func testMultiArgAmbiguity(a: MultiArgAmbiguity) {
   // Other normal ambiguity rules still apply too.
   let _: Float = a.foo
   let _: Double = a.foo
-  let _: any BinaryFloatingPoint = a.foo // expected-error{{ambiguous use of 'subscript(dynamicMember:_:)'}}
+  let _: any BinaryFloatingPoint = a.foo // expected-error{{ambiguous use of 'subscript(dynamicMember:_:)', cannot select between potential result types 'Double', 'Float'}}
 
   class Cls { var foo: Int = 42 }
   let _: KeyPath<Cls, _> = a.foo

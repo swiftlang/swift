@@ -28,5 +28,5 @@ func foo(_ x: some Collection) {
   // 'makeIterator' was considered "less specialized" than WrapperSequence's
   // concrete implementation.
   for _ in x.foo() {}
-  // expected-error@-1 {{ambiguous use of 'foo()'}}
+  // expected-error@-1 {{ambiguous use of 'foo()', cannot select between potential result types 'WrapperCollection<Self>', 'WrapperSequence<Self>'}}
 }

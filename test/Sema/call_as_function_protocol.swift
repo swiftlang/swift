@@ -50,7 +50,7 @@ let conforming = Conforming()
 _ = conforming(x: 1, y: 2)
 _ = conforming().callAsFunction(x:y:)(1, 2)
 _ = conforming.callAsFunction(x:y:)
-_ = conforming.callAsFunction // expected-error {{ambiguous use of 'callAsFunction'}}
+_ = conforming.callAsFunction // expected-error {{ambiguous use of 'callAsFunction', cannot select between potential result types 'Int', 'Self'}}
 
 protocol P3 {}
 extension P3 {

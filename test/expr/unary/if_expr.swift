@@ -463,7 +463,7 @@ func testConditionalBinding2(_ x: Int?) -> Int {
 let o = !if .random() { true } else { false }  // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
 // FIXME: Shouldn't be ambiguous
-let p = if .random() { 1 } else { 2 } + // expected-error {{ambiguous use of operator '+'}}
+let p = if .random() { 1 } else { 2 } + // expected-error {{ambiguous use of operator '+', cannot select between potential result types }}
         if .random() { 3 } else { 4 } +
         if .random() { 5 } else { 6 }
 // expected-error@-3 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
