@@ -53,6 +53,7 @@
 #include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "EnumMetadataVisitor.h"
+#include "ExistentialMetadataVisitor.h"
 #include "ExtendedExistential.h"
 #include "Field.h"
 #include "FixedTypeInfo.h"
@@ -71,6 +72,7 @@
 #include "IRGenModule.h"
 #include "MetadataLayout.h"
 #include "MetadataRequest.h"
+#include "MetatypeMetadataVisitor.h"
 #include "ProtocolInfo.h"
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
@@ -5762,9 +5764,14 @@ void irgen::emitLazySpecializedValueMetadata(IRGenModule &IGM,
   } else if (valueTy->getStructOrBoundGenericStruct()) {
     emitSpecializedGenericStructMetadata(IGM, valueTy,
                                          *valueTy.getStructOrBoundGenericStruct());
+  } else if (auto enumTy = valueTy->getEnumOrBoundGenericEnum()) {
+    emitSpecializedGenericEnumMetadata(IGM, valueTy, *enumTy);
+  } else if (valueTy->isAnyExistentialType()) {
+    emitLazyExistentialMetadata(IGM, valueTy);
+  } else if (isa<MetatypeType>(valueTy)) {
+    emitLazyMetatypeMetadata(IGM, valueTy);
   } else {
-    emitSpecializedGenericEnumMetadata(IGM, valueTy,
-                                       *valueTy.getEnumOrBoundGenericEnum());
+    llvm_unreachable("unhandled specialized value metadata");
   }
 }
 
@@ -6414,7 +6421,7 @@ void irgen::emitSpecializedGenericStructMetadata(IRGenModule &IGM, CanType type,
                          init.finishAndCreateFuture());
 }
 
-// Tuples (currently only used in embedded existentials mode)
+// Tuples (currently only used in Embedded Swift)
 //
 namespace {
 class TupleMetadataBuilder : public TupleMetadataVisitor<TupleMetadataBuilder> {
@@ -6472,7 +6479,7 @@ void irgen::emitLazyTupleMetadata(IRGenModule &IGM, CanType tupleTy) {
                          init.finishAndCreateFuture());
 }
 
-// Functions (only used in embedded existentials mode)
+// Functions (only used in Embedded Swift)
 //
 namespace {
 class FunctionMetadataBuilder : public FunctionMetadataVisitor<FunctionMetadataBuilder> {
@@ -6531,6 +6538,127 @@ void irgen::emitLazyFunctionMetadata(IRGenModule &IGM, CanType funTy) {
                          init.finishAndCreateFuture());
 
 }
+
+// Existentials (currently only used in Embedded Swift)
+//
+namespace {
+class ExistentialMetadataBuilder : public ExistentialMetadataVisitor<ExistentialMetadataBuilder> {
+  using super = ExistentialMetadataVisitor<ExistentialMetadataBuilder>;
+
+  ConstantStructBuilder &B;
+
+protected:
+
+  using super::asImpl;
+  using super::IGM;
+  using super::Target;
+
+public:
+  ExistentialMetadataBuilder(IRGenModule &IGM, CanType existentialTy, ConstantStructBuilder &B) :
+    super(IGM, existentialTy), B(B) {}
+
+  ConstantReference emitValueWitnessTable(bool relativeReference) {
+    return irgen::emitValueWitnessTable(IGM, Target->getCanonicalType(),
+                                        false, relativeReference);
+  }
+
+  void addMetadataFlags() {
+    B.addInt(IGM.MetadataKindTy,
+             unsigned(Target->isExistentialType()
+                        ? MetadataKind::Existential
+                        : MetadataKind::ExistentialMetatype));
+  }
+
+  void addValueWitnessTable() {
+    auto vwtPointer = emitValueWitnessTable(false).getValue();
+    B.addSignedPointer(vwtPointer,
+                       IGM.getOptions().PointerAuth.ValueWitnessTable,
+                       PointerAuthEntity());
+  }
+};
+} // end anonymous namespace
+
+void irgen::emitLazyExistentialMetadata(IRGenModule &IGM, CanType existentialTy) {
+  assert(IGM.isEmbeddedWithExistentials());
+  assert(existentialTy.isAnyExistentialType());
+
+  auto &context = existentialTy->getASTContext();
+  PrettyStackTraceType stackTraceRAII(
+      context, "emitting prespecialized metadata for", existentialTy);
+
+  ConstantInitBuilder initBuilder(IGM);
+  auto init = initBuilder.beginStruct();
+  init.setPacked(true);
+
+  bool isPattern = false;
+  bool canBeConstant = true;
+
+  ExistentialMetadataBuilder builder(IGM, existentialTy, init);
+  builder.embeddedLayout();
+
+  IGM.defineTypeMetadata(existentialTy, isPattern, canBeConstant,
+                         init.finishAndCreateFuture());
+}
+
+// Metatypes (currently only used in embedded Swift)
+//
+namespace {
+class MetatypeMetadataBuilder : public MetatypeMetadataVisitor<MetatypeMetadataBuilder> {
+  using super = MetatypeMetadataVisitor<MetatypeMetadataBuilder>;
+
+  ConstantStructBuilder &B;
+
+protected:
+
+  using super::asImpl;
+  using super::IGM;
+  using super::Target;
+
+public:
+  MetatypeMetadataBuilder(IRGenModule &IGM, MetatypeType *const metatypeTy, ConstantStructBuilder &B) :
+    super(IGM, metatypeTy), B(B) {}
+
+  ConstantReference emitValueWitnessTable(bool relativeReference) {
+    return irgen::emitValueWitnessTable(IGM, Target->getCanonicalType(),
+                                        false, relativeReference);
+  }
+
+  void addMetadataFlags() {
+    B.addInt(IGM.MetadataKindTy, unsigned(MetadataKind::Metatype));
+  }
+
+  void addValueWitnessTable() {
+    auto vwtPointer = emitValueWitnessTable(false).getValue();
+    B.addSignedPointer(vwtPointer,
+                       IGM.getOptions().PointerAuth.ValueWitnessTable,
+                       PointerAuthEntity());
+  }
+};
+} // end anonymous namespace
+
+void irgen::emitLazyMetatypeMetadata(IRGenModule &IGM, CanType metatypeTy) {
+  assert(IGM.isEmbeddedWithExistentials());
+  assert(isa<MetatypeType>(metatypeTy));
+
+  auto &context = metatypeTy->getASTContext();
+  PrettyStackTraceType stackTraceRAII(
+      context, "emitting prespecialized metadata for", metatypeTy);
+
+  ConstantInitBuilder initBuilder(IGM);
+  auto init = initBuilder.beginStruct();
+  init.setPacked(true);
+
+  bool isPattern = false;
+  bool canBeConstant = true;
+
+  MetatypeMetadataBuilder builder(IGM, cast<MetatypeType>(metatypeTy), init);
+  builder.embeddedLayout();
+
+  IGM.defineTypeMetadata(metatypeTy, isPattern, canBeConstant,
+                         init.finishAndCreateFuture());
+}
+
+
 // Enums
 
 static std::optional<Size>

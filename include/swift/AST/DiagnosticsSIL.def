@@ -394,10 +394,6 @@ GROUPED_ERROR(embedded_cannot_specialize_witness_method,EmbeddedRestrictions,non
       "a protocol type cannot contain a generic method %0 in embedded Swift", (DeclName))
 GROUPED_ERROR(cannot_specialize_class,EmbeddedRestrictions,none,
       "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
-GROUPED_ERROR(embedded_swift_existential_type,EmbeddedRestrictions,none,
-      "cannot use a value of protocol type %0 in embedded Swift", (Type))
-GROUPED_ERROR(embedded_swift_existential,EmbeddedRestrictions,none,
-      "cannot use a value of protocol type in embedded Swift", ())
 GROUPED_ERROR(embedded_swift_value_deinit,EmbeddedRestrictions,none,
       "cannot de-virtualize deinit of type %0", (Type))
 GROUPED_ERROR(embedded_swift_metatype_type,EmbeddedRestrictions,none,

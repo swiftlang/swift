@@ -950,8 +950,14 @@ final public class IndexRawPointerInst : SingleValueInstruction, IndexingInstruc
 final public
 class TailAddrInst : SingleValueInstruction, IndexingInstruction {}
 
+/// An instruction that initializes an existential
+@_semantics("fast_cast")
+public protocol InitExistentialInstruction: Instruction {
+  var conformances: ConformanceArray { get }
+}
+
 final public
-class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {
+class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
   public var instance: Value { operand.value }
 
   public var conformances: ConformanceArray {
@@ -969,13 +975,17 @@ class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public
-class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
+class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitExistentialValueInst_getConformances())
+  }
+}
 
 final public
 class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
+class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
   public var conformances: ConformanceArray {
     ConformanceArray(bridged: bridged.InitExistentialAddrInst_getConformances())
   }
@@ -1003,8 +1013,12 @@ final public
 class OpenExistentialBoxValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {
+class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
   public var metatype: Value { operand.value }
+
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitExistentialMetatypeInst_getConformances())
+  }
 }
 
 final public

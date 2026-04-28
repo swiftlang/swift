@@ -1306,8 +1306,16 @@ BridgedConformanceArray BridgedInstruction::InitExistentialAddrInst_getConforman
   return {getAs<swift::InitExistentialAddrInst>()->getConformances()};
 }
 
+BridgedConformanceArray BridgedInstruction::InitExistentialValueInst_getConformances() const {
+  return {getAs<swift::InitExistentialValueInst>()->getConformances()};
+}
+
 BridgedCanType BridgedInstruction::InitExistentialAddrInst_getFormalConcreteType() const {
   return getAs<swift::InitExistentialAddrInst>()->getFormalConcreteType();
+}
+
+BridgedConformanceArray BridgedInstruction::InitExistentialMetatypeInst_getConformances() const {
+  return {getAs<swift::InitExistentialMetatypeInst>()->getConformances()};
 }
 
 bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {

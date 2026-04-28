@@ -597,7 +597,26 @@ public func swift_dynamicCast(
      unsafe _swift_embedded_get_heap_object_metadata_pointer(
        UnsafeMutableRawPointer(boxPtrRaw)) == UnsafeMutableRawPointer(Builtin.addressof(&_errorMetadataStorage)) {
     // src holds a pointer to an error box. Extract the concrete type.
-    let contents = unsafe _errorBoxContents(UnsafeRawPointer(boxPtrRaw))
+    var contents = unsafe _errorBoxContents(UnsafeRawPointer(boxPtrRaw))
+
+    // When Failure == any Error, passing an error through a typed-generic continuation
+    // (e.g. AsyncThrowingStream<E, Error>) can produce a chain of error boxes where
+    // each outer box stores `any Error` (Swift.Error) and its value field holds a raw
+    // pointer to the next inner box.  Unwrap the chain until we find the concrete type
+    // or the value is no longer an error box.
+    for _ in 0..<16 {
+      if unsafe contents.type == UnsafeRawPointer(dstMetadata) { break }
+      // Read the first word of the stored value as a potential inner box pointer.
+      let innerPtr: Builtin.RawPointer = unsafe contents.value
+        .assumingMemoryBound(to: Builtin.RawPointer.self).pointee
+      let innerBits = UInt(Builtin.ptrtoint_Word(innerPtr))
+      guard innerBits != 0 &&
+            (unsafe innerBits & UInt(MemoryLayout<UnsafeRawPointer>.alignment - 1)) == 0 else { break }
+      guard unsafe _swift_embedded_get_heap_object_metadata_pointer(
+              UnsafeMutableRawPointer(innerPtr))
+            == UnsafeMutableRawPointer(Builtin.addressof(&_errorMetadataStorage)) else { break }
+      unsafe contents = unsafe _errorBoxContents(UnsafeRawPointer(innerPtr))
+    }
 
     // For class types, check the superclass chain; for value types, compare directly.
     var typeMatches = unsafe contents.type == UnsafeRawPointer(dstMetadata)
