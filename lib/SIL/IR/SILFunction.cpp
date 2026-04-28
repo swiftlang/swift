@@ -153,11 +153,12 @@ void SILFunction::removeSpecializeAttr(SILSpecializeAttr *attr) {
 
 SILFunction *SILFunction::create(
     SILModule &M, SILLinkage linkage, StringRef name,
-    CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-    std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
-    IsTransparent_t isTrans, SerializedKind_t serializedKind,
-    ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
-    IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
+    CanSILFunctionType loweredType, ActorIsolation isolation,
+    GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
+    IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+    SerializedKind_t serializedKind, ProfileCounter entryCount,
+    IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
+    IsRuntimeAccessible_t isRuntimeAccessible,
     IsExactSelfClass_t isExactSelfClass, IsThunk_t isThunk,
     SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
     SILFunction *insertBefore, const SILDebugScope *debugScope) {
@@ -176,17 +177,17 @@ SILFunction *SILFunction::create(
     // Resurrect a zombie function.
     // This happens for example if a specialized function gets dead and gets
     // deleted. And afterwards the same specialization is created again.
-    fn->init(linkage, name, loweredType, genericEnv, isBareSILFunction, isTrans,
-             serializedKind, entryCount, isThunk, classSubclassScope,
-             inlineStrategy, E, debugScope, isDynamic, isExactSelfClass,
-             isDistributed, isRuntimeAccessible);
+    fn->init(linkage, name, loweredType, isolation, genericEnv,
+             isBareSILFunction, isTrans, serializedKind, entryCount, isThunk,
+             classSubclassScope, inlineStrategy, E, debugScope, isDynamic,
+             isExactSelfClass, isDistributed, isRuntimeAccessible);
     assert(fn->empty());
   } else {
     fn = new (M) SILFunction(
-        M, linkage, name, loweredType, genericEnv, isBareSILFunction, isTrans,
-        serializedKind, entryCount, isThunk, classSubclassScope, inlineStrategy,
-        E, debugScope, isDynamic, isExactSelfClass, isDistributed,
-        isRuntimeAccessible);
+        M, linkage, name, loweredType, isolation, genericEnv, isBareSILFunction,
+        isTrans, serializedKind, entryCount, isThunk, classSubclassScope,
+        inlineStrategy, E, debugScope, isDynamic, isExactSelfClass,
+        isDistributed, isRuntimeAccessible);
   }
   if (entry) entry->setValue(fn);
 
@@ -219,9 +220,10 @@ static BridgedFunction::IsDeinitBarrierFn isDeinitBarrierFunction = nullptr;
 
 SILFunction::SILFunction(
     SILModule &Module, SILLinkage Linkage, StringRef Name,
-    CanSILFunctionType LoweredType, GenericEnvironment *genericEnv,
-    IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-    SerializedKind_t serializedKind, ProfileCounter entryCount, IsThunk_t isThunk,
+    CanSILFunctionType LoweredType, ActorIsolation isolation,
+    GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
+    IsTransparent_t isTrans, SerializedKind_t serializedKind,
+    ProfileCounter entryCount, IsThunk_t isThunk,
     SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
     const SILDebugScope *DebugScope, IsDynamicallyReplaceable_t isDynamic,
     IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
@@ -229,7 +231,7 @@ SILFunction::SILFunction(
     : SwiftObjectHeader(functionMetatype), Module(Module),
       index(Module.getNewFunctionIndex()),
       Availability(AvailabilityRange::alwaysAvailable()) {
-  init(Linkage, Name, LoweredType, genericEnv, isBareSILFunction, isTrans,
+  init(Linkage, Name, LoweredType, isolation, genericEnv, isBareSILFunction, isTrans,
        serializedKind, entryCount, isThunk, classSubclassScope, inlineStrategy, E,
        DebugScope, isDynamic, isExactSelfClass, isDistributed,
        isRuntimeAccessible);
@@ -243,19 +245,20 @@ SILFunction::SILFunction(
 
 void SILFunction::init(
     SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
-    GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
-    IsTransparent_t isTrans, SerializedKind_t serializedKind,
-    ProfileCounter entryCount, IsThunk_t isThunk,
-    SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
-    const SILDebugScope *DebugScope, IsDynamicallyReplaceable_t isDynamic,
-    IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
-    IsRuntimeAccessible_t isRuntimeAccessible) {
+    ActorIsolation isolation, GenericEnvironment *genericEnv,
+    IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+    SerializedKind_t serializedKind, ProfileCounter entryCount,
+    IsThunk_t isThunk, SubclassScope classSubclassScope,
+    Inline_t inlineStrategy, EffectsKind E, const SILDebugScope *DebugScope,
+    IsDynamicallyReplaceable_t isDynamic, IsExactSelfClass_t isExactSelfClass,
+    IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible) {
   setName(Name);
 
   assert(!LoweredType->hasTypeParameter() &&
          "function type has open type parameters");
 
   this->LoweredType = LoweredType;
+  this->actorIsolation = isolation;
   this->SpecializationInfo = nullptr;
   this->EntryCount = entryCount;
   this->Availability = AvailabilityRange::alwaysAvailable();
@@ -333,12 +336,13 @@ void SILFunction::createSnapshot(int id) {
   assert(id != 0 && "invalid snapshot ID");
   assert(!getSnapshot(id) && "duplicate snapshot");
 
-  SILFunction *newSnapshot = new (Module) SILFunction(
-      Module, getLinkage(), getName(), getLoweredFunctionType(),
-      getGenericEnvironment(), isBare(), isTransparent(), getSerializedKind(),
-      getEntryCount(), isThunk(), getClassSubclassScope(), getInlineStrategy(),
-      getEffectsKind(), getDebugScope(), isDynamicallyReplaceable(),
-      isExactSelfClass(), isDistributed(), isRuntimeAccessible());
+  SILFunction *newSnapshot = new (Module)
+      SILFunction(Module, getLinkage(), getName(), getLoweredFunctionType(),
+                  getActorIsolation(), getGenericEnvironment(), isBare(),
+                  isTransparent(), getSerializedKind(), getEntryCount(),
+                  isThunk(), getClassSubclassScope(), getInlineStrategy(),
+                  getEffectsKind(), getDebugScope(), isDynamicallyReplaceable(),
+                  isExactSelfClass(), isDistributed(), isRuntimeAccessible());
 
   // Copy all relevant properties.
   // TODO: It's really unfortunate that this needs to be done manually. It would

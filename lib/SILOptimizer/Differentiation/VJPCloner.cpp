@@ -1584,16 +1584,13 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto linkage = vjp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
   auto *pullback = fb.createFunction(
       linkage, context.getASTContext().getIdentifier(pbName).str(), pbType,
-      pbGenericEnv, original->getLocation(), original->isBare(),
+      original->getActorIsolation(), pbGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, vjp->getSerializedKind(),
       original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
   auto &module = context.getModule();
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
-
-  if (auto isolation = original->getActorIsolation())
-    pullback->setActorIsolation(*isolation);
 
   return pullback;
 }

@@ -906,7 +906,7 @@ bool swift::matchesActorIsolation(ProtocolConformanceRef conformance, SILFunctio
 
     if (isolation.isGlobalActor()) {
       if (auto functionIsolation = inFunction->getActorIsolation()) {
-        if (isolation == functionIsolation.value())
+        if (isolation == functionIsolation)
           return false;
       }
     }

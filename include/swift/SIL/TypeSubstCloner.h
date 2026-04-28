@@ -449,7 +449,8 @@ protected:
       // but the symbol will be referred to by the debug info metadata.
       ParentFunction = FuncBuilder.getOrCreateFunction(
           ParentFunction->getLocation(), MangledName, SILLinkage::Shared,
-          ParentFunction->getLoweredFunctionType(), ParentFunction->isBare(),
+          ParentFunction->getLoweredFunctionType(),
+          ParentFunction->getActorIsolation(), ParentFunction->isBare(),
           ParentFunction->isTransparent(), ParentFunction->getSerializedKind(),
           IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, 0,
           ParentFunction->isThunk(), ParentFunction->getClassSubclassScope());

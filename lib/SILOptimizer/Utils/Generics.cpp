@@ -2756,9 +2756,9 @@ protected:
 SILFunction *ReabstractionThunkGenerator::createThunk() {
   CanSILFunctionType thunkType = ReInfo.createThunkType(OrigPAI);
   SILFunction *Thunk = FunctionBuilder.getOrCreateSharedFunction(
-      Loc, ThunkName, thunkType, IsBare, IsTransparent,
-      ReInfo.getSerializedKind(), ProfileCounter(), IsThunk, IsNotDynamic,
-      IsNotDistributed, IsNotRuntimeAccessible);
+      Loc, ThunkName, thunkType, ActorIsolation::forUnspecified(), IsBare,
+      IsTransparent, ReInfo.getSerializedKind(), ProfileCounter(), IsThunk,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;

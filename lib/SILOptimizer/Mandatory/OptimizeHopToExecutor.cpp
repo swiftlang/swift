@@ -120,8 +120,7 @@ public:
 void OptimizeHopToExecutor::collectActors(Actors &actors) {
   int uniqueActorID = 0;
 
-  if (auto isolation = function->getActorIsolation();
-      isolation && isolation->isCallerIsolationInheriting()) {
+  if (function->getActorIsolation().isCallerIsolationInheriting()) {
     actors[function->maybeGetIsolatedArgument()] = uniqueActorID++;
   }
 
@@ -223,8 +222,7 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
         return BlockState::NotSet;
       }
 
-      if (auto isolation = function->getActorIsolation();
-          isolation && isolation->isCallerIsolationInheriting()) {
+      if (function->getActorIsolation().isCallerIsolationInheriting()) {
         auto *fArg =
             cast<SILFunctionArgument>(function->maybeGetIsolatedArgument());
         return actors.lookup(SILValue(fArg));
@@ -405,8 +403,7 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
   // caller that needs this hop to executor to run on the correct actor.
   if (auto *term = dyn_cast<TermInst>(inst);
       term && term->isFunctionExiting()) {
-    if (auto isolation = inst->getFunction()->getActorIsolation();
-        isolation && isolation->isCallerIsolationInheriting()) {
+    if (inst->getFunction()->getActorIsolation().isCallerIsolationInheriting()) {
       return true;
     }
   }

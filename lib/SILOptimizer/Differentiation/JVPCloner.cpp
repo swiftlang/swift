@@ -1705,15 +1705,12 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
   auto *differential = fb.createFunction(
       linkage, context.getASTContext().getIdentifier(diffName).str(), diffType,
-      diffGenericEnv, original->getLocation(), original->isBare(),
+      original->getActorIsolation(), diffGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, jvp->getSerializedKind(),
       original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));
-
-  if (auto isolation = original->getActorIsolation())
-    differential->setActorIsolation(*isolation);
 
   return differential;
 }
