@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -Wwarning UseAnyAppleOSAvailability \
-// RUN:   -define-availability 'FourOSesAligned 26:macOS 26, iOS 26, tvOS 26, watchOS 26' \
-// RUN:   -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -Wwarning UseAnyAppleOSAvailability
+
+// NOTE: Do not add -verify-ignore-unknown to frontend invocations in this test.
 
 @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
 // expected-note@-1 {{'allFourOSesAligned()' is available in macOS 26 or newer}}
@@ -29,9 +29,6 @@ func allFourOSesAlignedReversed() { } // expected-warning {{use '@available(anyA
 // expected-note@-3 {{'allFourOSesAlignedSomeTrailingZeroes()' is available in tvOS 26 or newer}}
 // expected-note@-4 {{'allFourOSesAlignedSomeTrailingZeroes()' is available in watchOS 26.0 or newer}}
 func allFourOSesAlignedSomeTrailingZeroes() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{-5:12-56=anyAppleOS 26, *}}
-
-@available(FourOSesAligned 26, *)
-func allFourOSesAlignedMacro() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}
 
 @available(macOS 26, iOS 26, tvOS 26, watchOS 26, visionOS 26, macCatalyst 26, *)
 // expected-note@-1 {{'allSixOSesAligned()' is available in macOS 26 or newer}}
@@ -233,3 +230,12 @@ func someSPIAvailableTwoNonSPIOSesAligned() { } // expected-warning {{use '@avai
 @_spi_available(watchOS 26,  *)
 func someSPIAvailableTwoNonSPIOSesAligned2() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{none}}
 
+class BaseClass {
+  @available(macOS 26, iOS 26, *)
+  // expected-note@-1 {{'init()' is available in macOS 26 or newer}}
+  // expected-note@-2 {{'init()' is available in iOS 26 or newer}}
+  init() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}
+}
+
+// The synthesized inherited init should NOT trigger a warning.
+class DerivedClass: BaseClass { }

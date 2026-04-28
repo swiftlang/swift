@@ -5326,6 +5326,12 @@ void suggestAnyAppleOSAvailability(const Decl *D,
   if (!sf)
     return;
 
+  // Skip implicit declarations. Availability for these declarations is
+  // typically derived from other declarations and those other declarations are
+  // the ones that should adopt anyAppleOS.
+  if (D->isImplicit())
+    return;
+
   if (!diags.isDiagnosticGroupEnabled(sf,
                                       DiagGroupID::UseAnyAppleOSAvailability))
     return;
