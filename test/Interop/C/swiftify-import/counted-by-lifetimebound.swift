@@ -5,11 +5,11 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
-// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -verify-additional-prefix experimental-
+// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -Rclang-importer -verify-ignore-macro-note -verify-additional-prefix experimental-
 
 // lifetimebound support is not stabilized yet. Don't generate _any_ overloads on functions with lifetimebound to prevent future sourcebreak.
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
-// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -verify-additional-prefix stable-
+// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -Rclang-importer -verify-ignore-macro-note -verify-additional-prefix stable-
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __counted_by __lifetimebound parameters and return values.
 
@@ -20,6 +20,10 @@
 #define __counted_by_or_null(x) __attribute__((__counted_by_or_null__(x)))
 #define __lifetimebound __attribute__((lifetimebound))
 
+// expected-stable-note@+17{{'simple' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:58{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func simple(_ len: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {|}}
@@ -35,6 +39,10 @@
 // }}
 int * __counted_by(len) simple(int len, int len2, int * p __counted_by(len2) __lifetimebound);
 
+// expected-stable-note@+17{{'shared' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:48{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func shared(_ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {|}}
@@ -50,6 +58,10 @@ int * __counted_by(len) simple(int len, int len2, int * p __counted_by(len2) __l
 // }}
 int * __counted_by(len) shared(int len, int * p __counted_by(len) __lifetimebound);
 
+// expected-stable-note@+17{{'complexExpr' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:84{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {|}}
@@ -65,6 +77,10 @@ int * __counted_by(len) shared(int len, int * p __counted_by(len) __lifetimeboun
 // }}
 int * __counted_by(len - offset) complexExpr(int len, int offset, int len2, int * p __counted_by(len2) __lifetimebound);
 
+// expected-stable-note@+17{{'nullUnspecified' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:103{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func nullUnspecified(_ len: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {|}}
@@ -80,6 +96,10 @@ int * __counted_by(len - offset) complexExpr(int len, int offset, int len2, int 
 // }}
 int * __counted_by(len) _Null_unspecified nullUnspecified(int len, int len2, int * _Null_unspecified p __counted_by(len2) __lifetimebound);
 
+// expected-stable-note@+17{{'nonnull' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:77{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func nonnull(_ len: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {|}}
@@ -95,6 +115,10 @@ int * __counted_by(len) _Null_unspecified nullUnspecified(int len, int len2, int
 // }}
 int * __counted_by(len) _Nonnull nonnull(int len, int len2, int * _Nonnull p __counted_by(len2) __lifetimebound);
 
+// expected-stable-note@+24{{'nullable' declared here}}
+// expected-stable-remark@+23{{did not add safe interop wrapper}}
+// expected-stable-note@+22{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+21{{added safe interop wrapper}}
 // expected-experimental-expansion@+20:80{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func nullable(_ len: Int32, _ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {|}}
@@ -118,8 +142,18 @@ int * __counted_by(len) _Nonnull nonnull(int len, int len2, int * _Nonnull p __c
 int * __counted_by(len) _Nullable nullable(int len, int len2, int * _Nullable p __counted_by(len2) __lifetimebound);
 
 typedef struct foo opaque_t;
+// expected-remark@+7 2{{ignoring __counted_by attribute}}
+// expected-note@+6 2{{__counted_by attribute not on pointer with known pointee size}}
+// expected-stable-note@+5{{lifetimebound support is not yet stabilized}}
+// expected-stable-remark@+4{{did not add safe interop wrapper}}
+// expected-experimental-remark@+3{{ignoring lifetimebound attribute because return value is Escapable}}
+// expected-experimental-remark@+2{{did not add safe interop wrapper}}
+// expected-experimental-note@+1{{no bounds or lifetime information found}}
 opaque_t * __counted_by(len) opaque(int len, int len2, opaque_t * p __counted_by(len2) __lifetimebound);
 
+// expected-stable-remark@+9{{did not add safe interop wrapper}}
+// expected-stable-note@+8{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+7{{added safe interop wrapper}}
 // expected-experimental-expansion@+6:60{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow p) @_disfavoredOverload public func noncountedLifetime(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!) -> MutableSpan<Int32> {|}}
@@ -128,6 +162,9 @@ opaque_t * __counted_by(len) opaque(int len, int len2, opaque_t * p __counted_by
 // }}
 int * __counted_by(len) noncountedLifetime(int len, int * p __lifetimebound);
 
+// expected-stable-remark@+26{{did not add safe interop wrapper}}
+// expected-stable-note@+25{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+24{{added safe interop wrapper}}
 // expected-experimental-expansion@+23:60{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func constant(_ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {|}}
@@ -155,6 +192,11 @@ int * __counted_by(13) _Nullable constant(int * _Nullable p __counted_by_or_null
 
 struct EscapableStruct {};
 // make sure __lifetimebound is ignored when return value is escapable
+// expected-stable-note@+12{{'lifetimeboundEscapableReturn' declared here}}
+// expected-stable-remark@+11{{did not add safe interop wrapper}}
+// expected-stable-note@+10{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+9{{ignoring lifetimebound attribute because return value is Escapable}}
+// expected-experimental-remark@+8{{added safe interop wrapper}}
 // expected-experimental-expansion@+7:87{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func lifetimeboundEscapableReturn(_ p: UnsafeMutableBufferPointer<Int32>) -> EscapableStruct {|}}
@@ -165,6 +207,10 @@ struct EscapableStruct {};
 struct EscapableStruct lifetimeboundEscapableReturn(int len, int * __counted_by(len) p __lifetimebound);
 
 struct __attribute__((swift_attr("~Escapable"))) NonescapableStruct {};
+// expected-stable-note@+17{{'lifetimeboundNonescapableReturn' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:93{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func lifetimeboundNonescapableReturn(_ p: inout MutableSpan<Int32>) -> NonescapableStruct {|}}
@@ -180,6 +226,10 @@ struct __attribute__((swift_attr("~Escapable"))) NonescapableStruct {};
 // }}
 struct NonescapableStruct lifetimeboundNonescapableReturn(int len, int * __counted_by(len) p __lifetimebound);
 
+// expected-stable-note@+17{{'lifetimeboundNonescapableReturnDoubleBounds' declared here}}
+// expected-stable-remark@+16{{did not add safe interop wrapper}}
+// expected-stable-note@+15{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+14{{added safe interop wrapper}}
 // expected-experimental-expansion@+13:150{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p, copy s) @_lifetime(p: copy p) @_disfavoredOverload public func lifetimeboundNonescapableReturnDoubleBounds(_ p: inout MutableSpan<Int32>, _ s: NonescapableStruct) -> NonescapableStruct {|}}
@@ -195,6 +245,10 @@ struct NonescapableStruct lifetimeboundNonescapableReturn(int len, int * __count
 // }}
 struct NonescapableStruct lifetimeboundNonescapableReturnDoubleBounds(int len, int * __counted_by(len) p __lifetimebound, struct NonescapableStruct s __lifetimebound);
 
+// expected-stable-note@+18{{'oneLifetimeboundOneEscapable' declared here}}
+// expected-stable-remark@+17{{did not add safe interop wrapper}}
+// expected-stable-note@+16{{lifetimebound support is not yet stabilized}}
+// expected-experimental-remark@+15{{added safe interop wrapper}}
 // expected-experimental-expansion@+14:135{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func oneLifetimeboundOneEscapable(_ len: Int32, _ p: inout MutableSpan<Int32>, _ p2: UnsafeMutableBufferPointer<Int32>) -> MutableSpan<Int32> {|}}
@@ -288,6 +342,8 @@ func call_oneLifetimeboundOneEscapable(_ len: Int32, _ len2: Int32, _ p: UnsafeM
 @_lifetime(copy p)
 @_lifetime(p: copy p)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_constant(_ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {
+  // expected-stable-note@+4{{arguments to generic parameter 'Pointee' ('MutableSpan<Int32>?' and 'Int32') are expected to be equal}}
+  // expected-stable-note@+3{{arguments to generic parameter 'Wrapped' ('UnsafeMutablePointer<Int32>' and 'MutableSpan<Int32>') are expected to be equal}}
   // expected-stable-error@+2{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<Int32>?>' to expected argument type 'UnsafeMutablePointer<Int32>'}}
   // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<Int32>?' to return type 'MutableSpan<Int32>?'}}
   return constant(&p)
@@ -303,6 +359,7 @@ func call_oneLifetimeboundOneEscapable(_ len: Int32, _ len2: Int32, _ p: UnsafeM
 @_lifetime(copy p)
 @_lifetime(p: copy p)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_lifetimeboundNonescapableReturn(_ p: inout MutableSpan<Int32>) -> NonescapableStruct {
+  // expected-stable-note@+4{{arguments to generic parameter 'Pointee' ('MutableSpan<Int32>' and 'Int32') are expected to be equal}}
   // expected-stable-error@+3{{missing argument for parameter #2 in call}}
   // expected-stable-error@+2{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<Int32>>' to expected argument type 'UnsafeMutablePointer<Int32>'}}
   // expected-stable-error@+1{{cannot convert value of type 'MutableSpan<Int32>' to expected argument type 'Int32'}}
@@ -350,6 +407,7 @@ func call_oneLifetimeboundOneEscapable(_ len: Int32, _ len2: Int32, _ p: UnsafeM
 @_lifetime(copy p)
 @_lifetime(p: copy p)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ len: Int32, _ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {
+  // expected-stable-note@+4{{arguments to generic parameter 'Wrapped' ('UnsafeMutablePointer<Int32>' and 'MutableSpan<Int32>') are expected to be equal}}
   // expected-stable-error@+3{{missing argument for parameter #3 in call}}
   // expected-stable-error@+2{{cannot convert value of type 'MutableSpan<Int32>?' to expected argument type 'Int32'}}
   // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<Int32>?' to return type 'MutableSpan<Int32>?'}}
@@ -371,6 +429,7 @@ func call_oneLifetimeboundOneEscapable(_ len: Int32, _ len2: Int32, _ p: UnsafeM
 @_lifetime(copy p)
 @_lifetime(p: copy p)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_shared(_ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {
+  // expected-stable-note@+5{{arguments to generic parameter 'Pointee' ('MutableSpan<Int32>' and 'Int32') are expected to be equal}}
   // expected-stable-error@+4{{missing argument for parameter #2 in call}}
   // expected-stable-error@+3{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<Int32>>' to expected argument type 'UnsafeMutablePointer<Int32>'}}
   // expected-stable-error@+2{{cannot convert value of type 'MutableSpan<Int32>' to expected argument type 'Int32'}}

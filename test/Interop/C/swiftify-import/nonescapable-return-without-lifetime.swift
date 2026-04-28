@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -emit-module -I %t -plugin-path %swift-plugin-dir -strict-memory-safety -enable-experimental-feature Lifetimes %t/test.swift \
-// RUN:    -Rmacro-expansions -verify -verify-additional-file %t%{fs-sep}test.h
+// RUN:    -Rmacro-expansions -verify -verify-additional-file %t%{fs-sep}test.h -Rclang-importer
 
 //--- module.modulemap
 module Test {
@@ -20,6 +20,8 @@ struct __attribute__((swift_attr("~Escapable"))) NonescapableStruct {};
 // expected-error@+2{{a function with a ~Escapable result requires '@_lifetime(...)'}}
 // expected-warning@+1{{the returned type 'struct NonescapableStruct' is annotated as non-escapable; its lifetime dependencies must be annotated}}
 struct NonescapableStruct nonescapableReturnNoLifetime(int len, int * __counted_by(len) p);
+// expected-remark@-1:27{{did not add safe interop wrapper}}
+// expected-note@-2:1{{function without lifetime information returns ~Escapable type 'NonescapableStruct'}}
 
 //--- test.swift
 import Test
