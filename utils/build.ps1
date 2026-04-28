@@ -127,9 +127,6 @@ Build and include the no-assert toolchain variant in the output.
 .PARAMETER Summary
 Display a build time summary at the end of the build. Helpful for performance analysis.
 
-.PARAMETER TraceExpand
-Enable trace-expand mode for CMake.
-
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -212,8 +209,7 @@ param
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
 
-  [switch] $Summary,
-  [switch] $TraceExpand
+  [switch] $Summary
 )
 
 ## Prepare the build environment.
@@ -1863,10 +1859,6 @@ function Build-CMakeProject {
       }
 
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
-    }
-
-    if ($TraceExpand) {
-      $cmakeGenerateArgs += @("--trace-expand")
     }
 
     if ($UseBuiltCompilers.Contains("Swift")) {
