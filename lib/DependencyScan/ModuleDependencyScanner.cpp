@@ -2200,6 +2200,19 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
     swiftArgs.push_back(SDKPath.str());
   }
 
+  // Pass the -target flag so the Swift frontend uses the correct target
+  // triple for the -direct-clang-cc1-module-build action.
+  swiftArgs.push_back("-target");
+  swiftArgs.push_back(ScanASTContext.LangOpts.Target.str());
+
+  // If the scanner was invoked with -clang-target, forward it so the
+  // frontend can distinguish the Clang target from the Swift target
+  // (e.g. zippered Mac Catalyst builds).
+  if (ScanASTContext.LangOpts.ClangTarget.has_value()) {
+    swiftArgs.push_back("-clang-target");
+    swiftArgs.push_back(ScanASTContext.LangOpts.ClangTarget->str());
+  }
+
   // Add args reported by the scanner.
   auto clangArgs = invocation.getCC1CommandLine();
   llvm::for_each(clangArgs, addClangArg);
