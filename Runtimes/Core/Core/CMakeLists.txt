@@ -209,6 +209,7 @@ add_library(swiftCore
   UnicodeScalarProperties.swift
   CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
   UnicodeSPI.swift
+  UniqueBox.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
@@ -318,6 +319,7 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableParameters>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowInout>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowAndMutateAccessors>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"

@@ -281,7 +281,8 @@
     "_InlineArray.swift",
     "Exclusivity.swift",
     "Borrow.swift",
-    "Inout.swift"
+    "Inout.swift",
+    "UniqueBox.swift"
   ],
   "Result": [
     "Result.swift"

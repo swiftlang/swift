@@ -1277,3 +1277,11 @@ Added: _$ss15EmptyCollectionVyxGSHsWP
 
 // Wrapper for SWIFT_CONCURRENCY_TRACING_SUBSYSTEM environment variable
 Added: _concurrencyTracingSubsystem
+
+// UniqueBox type metadata accessor
+Added: _$ss9UniqueBoxVMa
+// UniqueBox type descriptor
+Added: _$ss9UniqueBoxVMn
+// UniqueBox.pointer getter
+Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
+
