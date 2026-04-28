@@ -1037,8 +1037,8 @@ visitUnreachableInst(UnreachableInst *UI) {
 ///
 /// Also remove dead unchecked_take_enum_data_addr:
 ///   (destroy_addr (unchecked_take_enum_data_addr x)) -> (destroy_addr x)
-SILInstruction *SILCombiner::visitUncheckedEnumDataAddrInstBase(
-    UncheckedEnumDataAddrInstBase *tedai) {
+SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
+    UncheckedTakeEnumDataAddrInst *tedai) {
   // If our TEDAI has no users, there is nothing to do.
   if (tedai->use_empty())
     return nullptr;
@@ -1073,7 +1073,7 @@ SILInstruction *SILCombiner::visitUncheckedEnumDataAddrInstBase(
 
   if (onlyDestroys) {
     // Destroying whole non-copyable enums with a deinit would wrongly trigger calling its deinit.
-    if (tedai->getEnum()->getType().isValueTypeWithDeinit())
+    if (tedai->getOperand()->getType().isValueTypeWithDeinit())
       return nullptr;
 
     // The unchecked_take_enum_data_addr is dead: remove it and replace all
@@ -1082,7 +1082,7 @@ SILInstruction *SILCombiner::visitUncheckedEnumDataAddrInstBase(
       Operand *use = *tedai->use_begin();
       SILInstruction *user = use->getUser();
       if (auto *dai = dyn_cast<DestroyAddrInst>(user)) {
-        dai->setOperand(tedai->getEnum());
+        dai->setOperand(tedai->getOperand());
       } else {
         assert(user->isDebugInstruction());
         eraseInstFromFunction(*user);
@@ -1098,18 +1098,18 @@ SILInstruction *SILCombiner::visitUncheckedEnumDataAddrInstBase(
   // thing to remember is that an enum is address only if any of its cases are
   // address only. So we *could* have a loadable payload resulting from the
   // TEDAI without the TEDAI being loadable itself.
-  if (tedai->getEnum()->getType().isAddressOnly(*tedai->getFunction()))
+  if (tedai->getOperand()->getType().isAddressOnly(*tedai->getFunction()))
     return nullptr;
 
   // If the enum is noncopyable and any loads cause copies, the transformation
   // would be illegal because it would introduce a copy of the noncopyable enum.
-  if (tedai->getEnum()->getType().isMoveOnly() && anyLoadCopies)
+  if (tedai->getOperand()->getType().isMoveOnly() && anyLoadCopies)
     return nullptr;
 
   // Grab the EnumAddr.
   SILLocation loc = tedai->getLoc();
   Builder.setCurrentDebugScope(tedai->getDebugScope());
-  SILValue enumAddr = tedai->getEnum();
+  SILValue enumAddr = tedai->getOperand();
   EnumElementDecl *enumElt = tedai->getElement();
   SILType payloadType = tedai->getType().getObjectType();
 

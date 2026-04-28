@@ -981,14 +981,15 @@ struct ImmutableAddressUseVerifier {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
         }
         break;
-      case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
-        return true;
-      case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
-      case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
-        for (auto result : inst->getResults()) {
-          llvm::copy(result->getUses(), std::back_inserter(worklist));
+      case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+        if (!cast<UncheckedTakeEnumDataAddrInst>(inst)->isDestructive()) {
+          for (auto result : inst->getResults()) {
+            llvm::copy(result->getUses(), std::back_inserter(worklist));
+          }
+          break;
         }
-        break;
+        return true;
+      }
       case SILInstructionKind::TuplePackElementAddrInst: {
         if (&cast<TuplePackElementAddrInst>(inst)->getOperandRef(
               TuplePackElementAddrInst::TupleOperand) == use) {
@@ -3965,44 +3966,26 @@ public:
     }
   }
 
-  void checkUncheckedEnumDataAddrInst(UncheckedEnumDataAddrInstBase *UI) {
-    EnumDecl *ud = UI->getEnum()->getType().getEnumOrBoundGenericEnum();
-    require(ud, "instruction must take an enum operand");
+  void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
+    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
+    require(ud, "UncheckedTakeEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
-            "instruction case must be a case of the enum operand type");
+            "UncheckedTakeEnumDataAddrInst case must be a case of the enum operand type");
     require(UI->getElement()->getPayloadInterfaceType(),
-            "instruction case must have a data type");
-    require(UI->getEnum()->getType().isAddress(),
-            "instruction must take an address operand");
+            "UncheckedTakeEnumDataAddrInst case must have a data type");
+    require(UI->getOperand()->getType().isAddress(),
+            "UncheckedTakeEnumDataAddrInst must take an address operand");
     require(UI->getType().isAddress(),
-            "instruction must produce an address");
+            "UncheckedTakeEnumDataAddrInst must produce an address");
 
-    SILType caseTy = UI->getEnum()->getType().getEnumElementType(
+    SILType caseTy = UI->getOperand()->getType().getEnumElementType(
         UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
     if (UI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(caseTy, UI->getType(),
-                      "instruction result "
+                      "UncheckedTakeEnumDataAddrInst result "
                       "does not match type of enum case");
     }
-  }
-
-  void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
-    checkUncheckedEnumDataAddrInst(UI);
-  }
-  void checkUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDataAddrInst *UI) {
-    checkUncheckedEnumDataAddrInst(UI);
-
-    require(UI->getEnum()->getType() == UI->getScratch()->getType(),
-            "scratch memory must be of the same type as the original enum");
-  }
-  void checkUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnumDataAddrInst *UI) {
-    checkUncheckedEnumDataAddrInst(UI);
-    
-    require(!UncheckedEnumDataAddrInstBase::isDestructive(UI->getEnumDecl(),
-                                                          UI->getFunction()),
-            "unchecked_in_place_enum_data_addr can only be used for enums whose "
-            "projection operation is nondestructive");
   }
 
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {

@@ -2740,15 +2740,8 @@ namespace {
           cxxRecordDecl->isCompleteDefinition() &&
           !cxxRecordDecl->bases().empty();
       if (hasBaseClasses) {
-        bool hasNonEmptyBaseClasses = llvm::any_of(
-            cxxRecordDecl->bases(), [](const clang::CXXBaseSpecifier &base) {
-              auto *record = base.getType()->getAsCXXRecordDecl();
-              return !record || !record->isEmpty();
-            });
-        if (hasNonEmptyBaseClasses) {
-          hasUnreferenceableStorage = true;
-          hasMemberwiseInitializer = false;
-        }
+        hasUnreferenceableStorage = true;
+        hasMemberwiseInitializer = false;
       }
 
       bool needsEmptyInitializer = true;

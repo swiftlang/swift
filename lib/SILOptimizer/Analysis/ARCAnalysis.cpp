@@ -203,8 +203,6 @@ bool swift::canUseObject(SILInstruction *Inst) {
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
-  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
-  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::RefElementAddrInst:
   case SILInstructionKind::RefTailAddrInst:
   case SILInstructionKind::UncheckedEnumDataInst:

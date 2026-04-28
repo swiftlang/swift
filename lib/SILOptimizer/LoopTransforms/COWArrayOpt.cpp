@@ -879,9 +879,7 @@ void COWArrayOpt::hoistAddressProjections(Operand &ArrayOp) {
       case ValueKind::UncheckedRefCastInst:
       case ValueKind::StructExtractInst:
       case ValueKind::IndexAddrInst:
-      case ValueKind::UncheckedTakeEnumDataAddrInst:
-      case ValueKind::UncheckedBorrowEnumDataAddrInst:
-      case ValueKind::UncheckedInPlaceEnumDataAddrInst: {
+      case ValueKind::UncheckedTakeEnumDataAddrInst: {
         auto *Inst = cast<SingleValueInstruction>(V);
         // We are done once the current projection dominates the insert point.
         if (DomTree->dominates(Inst->getParent(), Preheader))

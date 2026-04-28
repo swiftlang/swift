@@ -4054,7 +4054,7 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
 
     SILBuilder caseBuilder = pass.getBuilder(caseBB->begin());
     auto *caseAddr =
-        caseBuilder.createUncheckedEnumDataAddrForTake(loc, enumAddr, caseDecl);
+        caseBuilder.createUncheckedTakeEnumDataAddr(loc, enumAddr, caseDecl);
     auto *caseLoad = caseBuilder.createTrivialLoadOr(
         loc, caseAddr, LoadOwnershipQualifier::Take);
     caseArg->replaceAllUsesWith(caseLoad);
@@ -4128,7 +4128,7 @@ void UseRewriter::visitUncheckedEnumDataInst(
   auto elt = enumDataInst->getElement();
   auto destTy = enumDataInst->getType().getAddressType();
   auto *enumAddrInst =
-      builder.createUncheckedEnumDataAddrForTake(loc, srcAddr, elt, destTy);
+      builder.createUncheckedTakeEnumDataAddr(loc, srcAddr, elt, destTy);
 
   markRewritten(enumDataInst, enumAddrInst);
 }

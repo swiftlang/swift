@@ -5418,59 +5418,34 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     case SILInstructionKind::InitEnumDataAddrInst:
     case SILInstructionKind::UncheckedEnumDataInst:
-    case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
-    case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
-    case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst: {
-      SILValue Enum;
+    case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+      SILValue Operand;
       SILDeclRef EltRef;
-      if (parseTypedValueRef(Enum, B) ||
+      if (parseTypedValueRef(Operand, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseSILDeclRef(EltRef))
         return true;
 
-      ValueOwnershipKind forwardingOwnership = Enum->getOwnershipKind();
+      ValueOwnershipKind forwardingOwnership = Operand->getOwnershipKind();
       if (Opcode == SILInstructionKind::UncheckedEnumDataInst)
         parseForwardingOwnershipKind(forwardingOwnership);
 
       if (parseSILDebugLocation(InstLoc, B))
         return true;
       EnumElementDecl *Elt = cast<EnumElementDecl>(EltRef.getDecl());
-      auto ResultTy = Enum->getType().getEnumElementType(
+      auto ResultTy = Operand->getType().getEnumElementType(
           Elt, SILMod, B.getTypeExpansionContext());
 
       switch (Opcode) {
       case swift::SILInstructionKind::InitEnumDataAddrInst:
-        ResultVal = B.createInitEnumDataAddr(InstLoc, Enum, Elt, ResultTy);
+        ResultVal = B.createInitEnumDataAddr(InstLoc, Operand, Elt, ResultTy);
         break;
       case swift::SILInstructionKind::UncheckedTakeEnumDataAddrInst:
         ResultVal =
-            B.createUncheckedTakeEnumDataAddr(InstLoc, Enum, Elt, ResultTy);
+            B.createUncheckedTakeEnumDataAddr(InstLoc, Operand, Elt, ResultTy);
         break;
-      case swift::SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
-        ResultVal =
-            B.createUncheckedInPlaceEnumDataAddr(InstLoc, Enum, Elt, ResultTy);
-        break;
-      case swift::SILInstructionKind::UncheckedBorrowEnumDataAddrInst: {
-        SILValue Scratch;
-        Identifier InToken;
-        SourceLoc InLoc;
-        if (parseSILIdentifier(InToken, InLoc, diag::expected_tok_in_sil_instr, "in")
-            || parseTypedValueRef(Scratch, B)) {
-          return true;
-        }
-        if (InToken.str() != "in") {
-          P.diagnose(InLoc, diag::expected_tok_in_sil_instr, "to");
-          return true;
-        }
-        
-        ResultVal =
-            B.createUncheckedBorrowEnumDataAddr(InstLoc, Enum, Scratch,
-                                                Elt, ResultTy);
-          
-        break;
-      }
       case swift::SILInstructionKind::UncheckedEnumDataInst: {
-        ResultVal = B.createUncheckedEnumData(InstLoc, Enum, Elt, ResultTy,
+        ResultVal = B.createUncheckedEnumData(InstLoc, Operand, Elt, ResultTy,
                                               forwardingOwnership);
         break;
       }

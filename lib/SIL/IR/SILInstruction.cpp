@@ -1104,6 +1104,10 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     return MemoryBehavior::None;
   }
   
+  // TODO: An UncheckedTakeEnumDataAddr instruction has no memory behavior if
+  // it is nondestructive. Setting this currently causes LICM to miscompile
+  // because access paths do not account for enum projections.
+
   switch (getKind()) {
 #define FULL_INST(CLASS, TEXTUALNAME, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)  \
   case SILInstructionKind::CLASS:                                              \
@@ -2217,25 +2221,13 @@ DestroyValueInst::getNonescapingClosureAllocation() const {
 }
 
 bool
-UncheckedEnumDataAddrInstBase::isDestructive(EnumDecl *forEnum, SILFunction *F){
-  auto &M = F->getModule();
-  auto sig = forEnum->getGenericSignature().getCanonicalSignature();
-
-  // If the enum appears resilient in this context, then we don't control its
-  // layout, and have to assume it may use spare bit packing now or in the future.
-  if (forEnum->isResilient(M.getSwiftModule(),
-                           F->getTypeExpansionContext().getResilienceExpansion())) {
-    return true;
-  }
-  
+UncheckedTakeEnumDataAddrInst::isDestructive(EnumDecl *forEnum, SILModule &M) {
   // We only potentially use spare bit optimization when an enum is always
-  // loadable in its original defined context. (We may still use spare bits
-  // for a resilient type's layout, even though it will be treated as address-
-  // only outside of the defining module.)
-  if (SILType::isAddressOnly(
-                      forEnum->getDeclaredInterfaceType()->getReducedType(sig),
-                      M.Types, sig,
-                      TypeExpansionContext::maximalResilienceExpansionOnly())) {
+  // loadable.
+  auto sig = forEnum->getGenericSignature().getCanonicalSignature();
+  if (SILType::isAddressOnly(forEnum->getDeclaredInterfaceType()->getReducedType(sig),
+                             M.Types, sig,
+                             TypeExpansionContext::minimal())) {
     return false;
   }
   
@@ -2255,20 +2247,6 @@ UncheckedEnumDataAddrInstBase::isDestructive(EnumDecl *forEnum, SILFunction *F){
   }
   
   return false;
-}
-
-SILValue UncheckedEnumDataAddrInstBase::getEnum() const {
-  switch (getKind()) {
-#define ENUM_DATA_ADDR_SUBCLASS(c) \
-  case SILInstructionKind::c: \
-    return cast<c>(this)->getEnum();
-  ENUM_DATA_ADDR_SUBCLASS(UncheckedTakeEnumDataAddrInst)
-  ENUM_DATA_ADDR_SUBCLASS(UncheckedBorrowEnumDataAddrInst)
-  ENUM_DATA_ADDR_SUBCLASS(UncheckedInPlaceEnumDataAddrInst)
-
-  default:
-    llvm_unreachable("not an UncheckedEnumDataAddrInstBase");
-  }
 }
 
 SILInstructionContext SILInstructionContext::forFunctionInModule(SILFunction *F,

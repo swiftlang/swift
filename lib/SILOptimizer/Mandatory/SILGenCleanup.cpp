@@ -229,9 +229,9 @@ bool SILGenCleanup::removeAccessToNonDestructiveEnumProjection(
       }
 
       auto enumProjection =
-          dyn_cast<UncheckedInPlaceEnumDataAddrInst>(beginAccess->getSource());
+          dyn_cast<UncheckedTakeEnumDataAddrInst>(beginAccess->getSource());
 
-      if (!enumProjection) {
+      if (!enumProjection || enumProjection->isDestructive()) {
         continue;
       }
 

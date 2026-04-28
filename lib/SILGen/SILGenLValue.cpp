@@ -568,12 +568,12 @@ static ManagedValue getPayloadOfOptionalValue(SILGenFunction &SGF,
     isOwned = false;
   }
 
-  // UncheckedInPlaceEnumDataAddr is safe to apply to Optional, because it
-  // is a single-payload enum. There will never be spare bits embedded in the
-  // payload.
+  // UncheckedTakeEnumDataAddr is safe to apply to Optional, because it is
+  // a single-payload enum. There will (currently) never be spare bits
+  // embedded in the payload.
   SILValue payload;
   if (optBase.getType().isAddress()) {
-    payload = SGF.B.createUncheckedInPlaceEnumDataAddr(loc, value, someDecl,
+    payload = SGF.B.createUncheckedTakeEnumDataAddr(loc, value, someDecl,
                                           SILType::getPrimitiveAddressType(
                                               valueTypeData.TypeOfRValue));
   } else {

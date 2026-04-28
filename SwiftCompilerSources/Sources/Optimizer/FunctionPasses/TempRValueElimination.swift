@@ -211,8 +211,11 @@ private struct UseCollector : AddressDefUseWalker {
       if !openExistential.isImmutable {
         return.abortWalk
       }
-    case is UncheckedTakeEnumDataAddrInst:
-      return .abortWalk
+    case let takeEnum as UncheckedTakeEnumDataAddrInst:
+      // In certain cases, `unchecked_take_enum_data_addr` invalidates the underlying memory.
+      if takeEnum.mayBeDestructive {
+        return .abortWalk
+      }
     case let beginAccess as BeginAccessInst:
       if beginAccess.accessKind != .read {
         return .abortWalk

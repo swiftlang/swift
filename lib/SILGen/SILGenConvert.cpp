@@ -256,7 +256,7 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   if (isAddress) {
     SILType payloadType = optional.getType().getOptionalObjectType();
     result =
-        B.createUncheckedInPlaceEnumDataAddr(loc, optional, someDecl, payloadType);
+        B.createUncheckedTakeEnumDataAddr(loc, optional, someDecl, payloadType);
   } else {
     result = B.createOptionalSomeResult(switchEnum);
   }
@@ -307,7 +307,9 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(
     return B.createUncheckedEnumData(loc, addrOrValue, someDecl);
   }
 
-  ManagedValue payload = B.createUncheckedInPlaceEnumDataAddr(
+  // Cheat a bit in the +0 case--UncheckedTakeEnumData will never actually
+  // invalidate an Optional enum value. This is specific to optionals.
+  ManagedValue payload = B.createUncheckedTakeEnumDataAddr(
       loc, addrOrValue, someDecl, origPayloadTy);
   if (!optTL.isLoadable())
     return payload;
@@ -461,7 +463,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         if (getTypeLowering(input.getType()).isAddressOnly() &&
             silConv.useLoweredAddresses()) {
           auto *someDecl = Ctx.getOptionalSomeDecl();
-          input = B.createUncheckedInPlaceEnumDataAddr(
+          input = B.createUncheckedTakeEnumDataAddr(
               loc, input, someDecl, input.getType().getOptionalObjectType());
         }
 

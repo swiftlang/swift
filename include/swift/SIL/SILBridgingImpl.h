@@ -1410,8 +1410,12 @@ SwiftInt BridgedInstruction::InitEnumDataAddrInst_caseIndex() const {
   return getAs<swift::InitEnumDataAddrInst>()->getCaseIndex();
 }
 
-SwiftInt BridgedInstruction::UncheckedEnumDataAddrInstBase_caseIndex() const {
-  return getAs<swift::UncheckedEnumDataAddrInstBase>()->getCaseIndex();
+SwiftInt BridgedInstruction::UncheckedTakeEnumDataAddrInst_caseIndex() const {
+  return getAs<swift::UncheckedTakeEnumDataAddrInst>()->getCaseIndex();
+}
+
+bool BridgedInstruction::UncheckedTakeEnumDataAddrInst_isDestructive() const {
+  return getAs<swift::UncheckedTakeEnumDataAddrInst>()->isDestructive();
 }
 
 SwiftInt BridgedInstruction::InjectEnumAddrInst_caseIndex() const {
@@ -2781,17 +2785,6 @@ BridgedInstruction BridgedBuilder::createUncheckedEnumData(BridgedValue enumVal,
 BridgedInstruction BridgedBuilder::createUncheckedTakeEnumDataAddr(BridgedValue enumAddr, SwiftInt caseIdx) const {
   swift::SILValue en = enumAddr.getSILValue();
   return {unbridged().createUncheckedTakeEnumDataAddr(regularLoc(), en, en->getType().getEnumElement(caseIdx))};
-}
-
-BridgedInstruction BridgedBuilder::createUncheckedInPlaceEnumDataAddr(BridgedValue enumAddr, SwiftInt caseIdx) const {
-  swift::SILValue en = enumAddr.getSILValue();
-  return {unbridged().createUncheckedInPlaceEnumDataAddr(regularLoc(), en, en->getType().getEnumElement(caseIdx))};
-}
-
-BridgedInstruction BridgedBuilder::createUncheckedBorrowEnumDataAddr(BridgedValue enumAddr, BridgedValue scratchAddr, SwiftInt caseIdx) const {
-  swift::SILValue en = enumAddr.getSILValue();
-  swift::SILValue sc = scratchAddr.getSILValue();
-  return {unbridged().createUncheckedBorrowEnumDataAddr(regularLoc(), en, sc, en->getType().getEnumElement(caseIdx))};
 }
 
 BridgedInstruction BridgedBuilder::createInitEnumDataAddr(BridgedValue enumAddr,

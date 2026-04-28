@@ -133,7 +133,6 @@
 // CHECK-NEXT: }
 
 // CHECK-NEXT: public struct DerivedFromEmptyBaseClass {
-// CHECK-NEXT:   public init(a: Int32, b: Int32)
 // CHECK-NEXT:   public init()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func inBase() -> UnsafePointer<CChar>?

@@ -710,7 +710,7 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
       SILBuilder builder(enumBlock, enumBlock->begin());
 
       if (enumElt->hasAssociatedValues()) {
-        auto *take = builder.createUncheckedEnumDataAddrForTake(
+        auto *take = builder.createUncheckedTakeEnumDataAddr(
             cleanupLoc, selfValue, enumElt);
         builder.createDestroyAddr(cleanupLoc, take);
       }

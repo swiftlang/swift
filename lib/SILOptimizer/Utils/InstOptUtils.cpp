@@ -201,11 +201,9 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
     return false;
   }
 
-  // These invalidate enums, or use scratch space to avoid invalidating the
-  // original, so "write" memory, but that is not an essential
+  // These invalidate enums so "write" memory, but that is not an essential
   // operation so we can remove these if they are trivially dead.
-  if (isa<UncheckedTakeEnumDataAddrInst>(inst)
-      || isa<UncheckedBorrowEnumDataAddrInst>(inst))
+  if (isa<UncheckedTakeEnumDataAddrInst>(inst))
     return true;
 
   // An ossa end scope instruction is trivially dead if its operand has
