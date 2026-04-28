@@ -215,8 +215,7 @@ param
   [switch] $SkipPackaging = $false,
   [string[]] $Test = @(),
 
-  # XXX: True temporarily for testing. Do not merge.
-  [switch] $SmokeTest = $true,
+  [switch] $SmokeTest = $false,
 
   [switch] $IncludeDS2 = $false,
   [ValidateSet("none", "full", "thin")]
@@ -267,6 +266,11 @@ if ($SmokeTest) {
     $SmokeTestDockerSubdir = "1809-full"
   } else {
     throw "-SmokeTest is not supported on this Windows version (build $osBuild)."
+  }
+
+  $SmokeTestDockerfile = "$SourceCache\swift-docker\swift-ci\main\windows\smoketest\$SmokeTestDockerSubdir\Dockerfile"
+  if (-not (Test-Path $SmokeTestDockerfile)) {
+    throw "-SmokeTest requires a swift-docker checkout at '$SourceCache\swift-docker' (expected Dockerfile at '$SmokeTestDockerfile')."
   }
 }
 
@@ -4301,11 +4305,6 @@ function Check-DockerRequirements() {
 }
 
 function Run-SmokeTests([Hashtable] $Platform) {
-  # XXX: temp for testing! PR runs don't seem to pull down swift-docker
-  if (-not (Test-Path "$SourceCache\swift-docker")) {
-    git clone https://github.com/swiftlang/swift-docker "$SourceCache\swift-docker"
-  }
-
   Check-DockerRequirements
 
   $InstallerPath = "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe"
