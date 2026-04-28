@@ -71,7 +71,7 @@ private extension AllocStackInst {
         context.erase(instruction: iea)
       case let ieda as InitEnumDataAddrInst:
         ieda.replace(with: newAlloc, context)
-      case let uteda as UncheckedTakeEnumDataAddrInst:
+      case let uteda as UncheckedEnumDataAddrInstBase where uteda.enum == use.value:
         uteda.replace(with: newAlloc, context)
       case let dv as DebugValueInst:
         // TODO: Add support for op_enum_fragment
@@ -100,9 +100,10 @@ private extension AllocStackInst {
     guard let store = uses.users(ofType: StoreInst.self).singleElement else {
       return
     }
-    guard let take = uses.users(ofType: UncheckedTakeEnumDataAddrInst.self).singleElement else {
-      fatalError("a store requires a single unchecked_take_enum_data_addr")
+    guard let take = uses.users(ofType: UncheckedEnumDataAddrInstBase.self).singleElement else {
+      fatalError("a store requires a single unchecked_*_enum_data_addr")
     }
+    assert(take.enum == self, "store must be to the base of the enum projection")
 
     // The new store is placed immediately before the `unchecked_take_enum_data_addr` because the original
     // store might still store a different enum case, e.g.
@@ -159,7 +160,7 @@ private extension AllocStackInst {
           return nil
         }
         payloadType = ieda.type
-      case let uted as UncheckedTakeEnumDataAddrInst:
+      case let uted as UncheckedEnumDataAddrInstBase where uted.enum == use.value:
         if let previouslyFoundPayloadType = payloadType, previouslyFoundPayloadType != uted.type {
           return nil
         }
@@ -275,7 +276,8 @@ private extension AllocStackInst {
           noPayloadLiverange.pushIfNotVisited(inject)
         }
       case let store as StoreInst:
-        let take = uses.users(ofType: UncheckedTakeEnumDataAddrInst.self).singleElement!
+        let take = uses.users(ofType: UncheckedEnumDataAddrInstBase.self).singleElement!
+        assert(take.enum == self, "store must be to the base of the enum projection")
         if store.parentBlock == take.parentBlock {
           payloadLiverange.pushIfNotVisited(store)
         } else {
@@ -295,12 +297,12 @@ private extension AllocStackInst {
   }
 
   /// In case of a `store` to the enum we require that at an `unchecked_take_enum_data_addr` we can assume
-  /// the enum has that specific case. This is not true in general because `unchecked_take_enum_data_addr`
+  /// the enum has that specific case. This is not true in general because `unchecked_*_enum_data_addr`
   /// is a side-effect free address projection (for some enums). E.g
   /// ```
   ///   store %1 to %allocstack
-  ///   %2 = unchecked_take_enum_data_addr %allocstack, #Optional.some // Here we don't know the case, yet
-  ///   cond_br %c, bb1, bb2
+  ///   %2 = unchecked_*_enum_data_addr %allocstack, #Optional.some // Here we don't know the case, yet
+  ///   cond_br %c, bb1, UncheckedEnumDataAddrInstBase
   /// bb1:
   ///   %3 = load %2   // Only here we know that %allocstack is an Optional.some
   /// ```
@@ -308,9 +310,9 @@ private extension AllocStackInst {
     if uses.users(ofType: StoreInst.self).isEmpty {
       return true
     }
-    // Only if there is an actual use of the enum in the same block as the `unchecked_take_enum_data_addr`,
-    // we know that the enum has the `unchecked_take_enum_data_addr`'s case.
-    let take = uses.users(ofType: UncheckedTakeEnumDataAddrInst.self).singleElement!
+    // Only if there is an actual use of the enum in the same block as the `unchecked_*_enum_data_addr`,
+    // we know that the enum has the `unchecked_*_enum_data_addr`'s case.
+    let take = uses.users(ofType: UncheckedEnumDataAddrInstBase.self).singleElement!
     return useBlocks.blocks.contains(take.parentBlock)
   }
 
@@ -500,7 +502,7 @@ private struct EnumCaseUseBlocks : AddressDefUseWalker {
 
     for use in allocStack.uses {
       switch use.instruction {
-      case let uted as UncheckedTakeEnumDataAddrInst:
+      case let uted as UncheckedEnumDataAddrInstBase where uted.enum == allocStack:
         _  = walkDownUses(ofAddress: uted, path: UnusedWalkingPath())
       case let ieda as InitEnumDataAddrInst:
         _  = walkDownUses(ofAddress: ieda, path: UnusedWalkingPath())

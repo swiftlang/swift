@@ -264,6 +264,14 @@ public:
   ManagedValue createUncheckedTakeEnumDataAddr(SILLocation loc, ManagedValue operand,
                                                EnumElementDecl *element, SILType ty);
 
+  using SILBuilder::createUncheckedInPlaceEnumDataAddr;
+  ManagedValue createUncheckedInPlaceEnumDataAddr(SILLocation loc, ManagedValue operand,
+                                               EnumElementDecl *element, SILType ty);
+
+  using SILBuilder::createUncheckedEnumDataAddrForTake;
+  ManagedValue createUncheckedEnumDataAddrForTake(SILLocation loc, ManagedValue operand,
+                                                  EnumElementDecl *element, SILType ty);
+
   /// Given the address of a value, load a scalar value from it if the type
   /// is loadable.  Most general routines in SILGen expect to work with
   /// values with the canonical scalar-ness for their type.

@@ -48,7 +48,7 @@ struct AddressOnlyNC: ~Copyable {
 // CHECK:       switch_enum_addr [[ENUM_ADDR:%.*]], case #Optional.some!enumelt: [[BB:bb[0-9]+]]
 // CHECK:       [[BB]]:
 // CHECK-NOT:     copy_addr {{%.*}} to
-// CHECK:         [[TAKEN:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]]
+// CHECK:         [[TAKEN:%.*]] = unchecked_inplace_enum_data_addr [[ENUM_ADDR]]
 // CHECK:         = apply {{%.*}}([[TAKEN]])
 // CHECK:       } // end sil function
 func consume_address() {

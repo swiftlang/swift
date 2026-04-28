@@ -478,6 +478,27 @@ ManagedValue SILGenBuilder::createUncheckedTakeEnumDataAddr(
   return cloner.clone(result);
 }
 
+ManagedValue SILGenBuilder::createUncheckedInPlaceEnumDataAddr(
+    SILLocation loc, ManagedValue operand, EnumElementDecl *element,
+    SILType ty) {
+  CleanupCloner cloner(*this, operand);
+  SILValue result =
+      createUncheckedInPlaceEnumDataAddr(loc, operand.forward(SGF), element);
+  return cloner.clone(result);
+}
+
+/// Project an in-memory enum in such a way that we can take the payload,
+/// using the least side-effecting instruction possible.
+ManagedValue SILGenBuilder::createUncheckedEnumDataAddrForTake(
+    SILLocation loc, ManagedValue operand, EnumElementDecl *element,
+    SILType ty) {
+  if (UncheckedEnumDataAddrInstBase::isDestructive(element->getParentEnum(),
+                                                   &getFunction())) {
+    return createUncheckedTakeEnumDataAddr(loc, operand, element, ty);
+  }
+  return createUncheckedInPlaceEnumDataAddr(loc, operand, element, ty);
+}
+
 ManagedValue
 SILGenBuilder::createLoadIfLoadable(SILLocation loc, ManagedValue addr) {
   assert(addr.getType().isAddress());

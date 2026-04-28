@@ -40,21 +40,21 @@ cd build/Ninja-RelWithDebInfoAssert
 Then run the compiler and stdlib test suite via `ninja` (assuming your host is arm64 macOS, adjust paths accordingly otherwise):
 
 ```
-PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
+PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$(pwd)/swift-macosx-arm64/bin:$PATH" \
   ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasistdlib-macosx-arm64
 ```
 
 Filter to a subset of tests you'd like to run with `LIT_FILTER`. Here's an example to run only tests with `embedded` in their file path:
 
 ```
-LIT_FILTER='(embedded)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
+LIT_FILTER='(embedded)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$(pwd)/swift-macosx-arm64/bin:$PATH" \
   ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasistdlib-macosx-arm64
 ```
 
 Filter out tests you don't want to run with `LIT_FILTER_OUT`. Here's an example that excludes tests containing `KeyPath` in their file path:
 
 ```
-LIT_FILTER_OUT='(KeyPath)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
+LIT_FILTER_OUT='(KeyPath)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$(pwd)/swift-macosx-arm64/bin:$PATH" \
   ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasistdlib-macosx-arm64
 ```
 
@@ -62,7 +62,7 @@ Values passed to these environment variables are regular expressions, thus to ex
 use `|` regex operator:
 
 ```
-LIT_FILTER_OUT='(embedded|KeyPath)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
+LIT_FILTER_OUT='(embedded|KeyPath)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$(pwd)/swift-macosx-arm64/bin:$PATH" \
   ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasistdlib-macosx-arm64
 ```
 

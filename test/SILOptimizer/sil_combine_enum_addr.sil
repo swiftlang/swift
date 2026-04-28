@@ -43,7 +43,7 @@ bb1:
   return %15 : $()
 
 bb2:
-  %19 = unchecked_take_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
+  %19 = unchecked_inplace_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
   copy_addr [take] %19 to [init] %2 : $*CustomStringConvertible
   br bb1
 }
@@ -78,7 +78,7 @@ bb2:
   br bb1
 
 bb3:
-  %19 = unchecked_take_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
+  %19 = unchecked_inplace_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
   copy_addr [take] %19 to [init] %2 : $*CustomStringConvertible
   br bb1
 }

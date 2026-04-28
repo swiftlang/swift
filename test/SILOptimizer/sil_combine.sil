@@ -1311,7 +1311,7 @@ bb0(%0 : $*FakeOptional<B>):
   switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   debug_value %2 : $*B  // should not prevent the optimization
   %3 = load %2 : $*B
   return %3 : $B

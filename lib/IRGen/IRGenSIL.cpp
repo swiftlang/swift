@@ -1349,6 +1349,8 @@ public:
   void visitSelectEnumAddrInst(SelectEnumAddrInst *i);
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *i);
   void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *i);
+  void visitUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnumDataAddrInst *i);
+  void visitUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
   void visitObjCProtocolInst(ObjCProtocolInst *i);
   void visitMetatypeInst(MetatypeInst *i);
@@ -5639,7 +5641,8 @@ void IRGenSILFunction::visitUncheckedEnumDataInst(swift::UncheckedEnumDataInst *
   setLoweredExplosion(i, data);
 }
 
-void IRGenSILFunction::visitUncheckedTakeEnumDataAddrInst(swift::UncheckedTakeEnumDataAddrInst *i) {
+void IRGenSILFunction::visitUncheckedTakeEnumDataAddrInst(
+                                      swift::UncheckedTakeEnumDataAddrInst *i) {
   Address enumAddr = getLoweredAddress(i->getOperand());
   Address dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
                                                     i->getOperand()->getType(),
@@ -5647,6 +5650,74 @@ void IRGenSILFunction::visitUncheckedTakeEnumDataAddrInst(swift::UncheckedTakeEn
                                                     i->getElement());
   setLoweredAddress(i, dataAddr);
 }
+
+void IRGenSILFunction::visitUncheckedInPlaceEnumDataAddrInst(
+                                  swift::UncheckedInPlaceEnumDataAddrInst *i) {
+  Address enumAddr = getLoweredAddress(i->getOperand());
+  // Since this instruction is only available on types where the projection
+  // operation is known to be nondestructive, we can apply the projection
+  // unconditionally.
+  Address dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
+                                                    i->getOperand()->getType(),
+                                                    enumAddr,
+                                                    i->getElement());
+  setLoweredAddress(i, dataAddr);
+}
+
+void IRGenSILFunction::visitUncheckedBorrowEnumDataAddrInst(
+                                    swift::UncheckedBorrowEnumDataAddrInst *i) {
+    
+  Address enumAddr = getLoweredAddress(i->getEnum());
+  Address dataAddr;
+
+  auto enumTy = i->getEnum()->getType();
+  // If we know the project operation is nondestructive, then we can do the
+  // projection in place without using the scratch space.
+  if (!UncheckedEnumDataAddrInstBase::isDestructive(
+                                     enumTy.getEnumOrBoundGenericEnum(),
+                                     this->CurSILFn)) {
+    dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
+                                                        enumTy, enumAddr,
+                                                        i->getElement());
+  } else {
+    Address scratchAddr = getLoweredAddress(i->getScratch());
+
+    // Otherwise, we need to look at the runtime properties of the type in
+    // question. If the type is bitwise-borrowable, the enum layout may use
+    // spare bit packing, but we can safely memcpy the representation to the
+    // scratch space and mask the spare bits in the scratch space. If the type
+    // is not bitwise-borrowable, we never do spare bit packing, so can apply
+    // the projection in-place.
+    auto &enumTI = getTypeInfo(i->getEnum()->getType());
+    auto isBB = enumTI.getIsBitwiseBorrowable(*this, enumTy);
+    auto origBlock = Builder.GetInsertBlock();
+    auto bbBlock = createBasicBlock("enum.bitwiseBorrowable");
+    auto contBlock = createBasicBlock("enum.project");
+
+    Builder.CreateCondBr(isBB, bbBlock, contBlock);
+
+    {
+      Builder.emitBlock(bbBlock);
+      // Since the payload is bitwise-borrowable, copy the bits to the scratch
+      // space.
+      Builder.CreateMemCpy(scratchAddr, enumAddr, enumTI.getSize(*this, enumTy));
+      Builder.CreateBr(contBlock);
+    }
+
+    Builder.emitBlock(contBlock);
+    auto bufferPhi = Builder.CreatePHI(enumAddr->getType(), 2);
+    bufferPhi->addIncoming(enumAddr.getAddress(), origBlock);
+    bufferPhi->addIncoming(scratchAddr.getAddress(), bbBlock);
+
+    auto bufferAddr = enumTI.getAddressForPointer(bufferPhi);
+    dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
+                                                        enumTy, bufferAddr,
+                                                        i->getElement());
+  }
+
+  setLoweredAddress(i, dataAddr);
+}
+
 
 void IRGenSILFunction::visitInjectEnumAddrInst(swift::InjectEnumAddrInst *i) {
   Address enumAddr = getLoweredAddress(i->getOperand());

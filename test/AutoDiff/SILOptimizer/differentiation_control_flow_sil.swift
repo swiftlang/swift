@@ -236,7 +236,7 @@ func enum_addr_notactive<T>(_ e: AddressOnlyEnum<T>, _ x: Float) -> Float {
 
 // CHECK-SIL-LABEL: bb2:
 // CHECK-SIL:   [[BB2_PRED_PRED0:%.*]] = enum $_AD__enum_addr_notactive_bb2__Pred__src_0_wrt_1_l<τ_0_0>, #_AD__enum_addr_notactive_bb2__Pred__src_0_wrt_1_l.bb0!enumelt, [[BB0_PB_STRUCT]] : $()
-// CHECK-SIL:   [[ENUM_DATA:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>, #AddressOnlyEnum.some!enumelt
+// CHECK-SIL:   [[ENUM_DATA:%.*]] = unchecked_inplace_enum_data_addr [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>, #AddressOnlyEnum.some!enumelt
 // CHECK-SIL:   destroy_addr [[ENUM_DATA]] : $*τ_0_0
 // CHECK-SIL:   dealloc_stack [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>
 // CHECK-SIL:   [[BB2_PB_STRUCT:%.*]] = tuple $(predecessor: _AD__enum_addr_notactive_bb2__Pred__src_0_wrt_1_l<τ_0_0>) ([[BB2_PRED_PRED0]])

@@ -1133,10 +1133,8 @@ namespace {
         AllocStackInst *sourceTemp = nullptr;
         Source objectSource;
         if (source.isAddress()) {
-          // TODO: add an instruction for non-destructively getting a
-          // specific element's data.
           SILValue sourceAddr = source.Value;
-          sourceAddr = B.createUncheckedTakeEnumDataAddr(Loc, sourceAddr,
+          sourceAddr = B.createUncheckedInPlaceEnumDataAddr(Loc, sourceAddr,
                                     sourceSomeDecl, loweredSourceObjectType);
           objectSource = Source(sourceAddr, sourceObjectType);
         } else {

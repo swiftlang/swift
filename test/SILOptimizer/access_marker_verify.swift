@@ -399,7 +399,7 @@ enum IntTEnum<T> {
 // CHECK: bb0(%0 : $*IntTEnum<T>):
 // CHECK:   switch_enum_addr %{{.*}} : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK: bb1:
-// CHECK:   [[UTEDA:%.*]] = unchecked_take_enum_data_addr %{{.*}} : $*IntTEnum<T>, #IntTEnum.int!enumelt
+// CHECK:   [[UTEDA:%.*]] = unchecked_inplace_enum_data_addr %{{.*}} : $*IntTEnum<T>, #IntTEnum.int!enumelt
 // CHECK-NOT: begin_access
 // CHECK:   [[BOX:%.*]] = load [take] [[UTEDA]] : $*<τ_0_0> { var Int } <T>
 // CHECK:   [[PROJ:%.*]] = project_box [[BOX]] : $<τ_0_0> { var Int } <T>, 0
@@ -506,7 +506,7 @@ func accessOptionalArray(_ dict : MyDict<Int, [Int]>) {
 //
 // CHECK: [[TRUEBB]]:
 // CHECK-NOT: begin_access
-// CHECK:   [[TEMPARRAYADR:%.*]] = unchecked_take_enum_data_addr [[TEMPACCESS]] : $*Optional<Array<Int>>, #Optional.some!enumelt
+// CHECK:   [[TEMPARRAYADR:%.*]] = unchecked_inplace_enum_data_addr [[TEMPACCESS]] : $*Optional<Array<Int>>, #Optional.some!enumelt
 // ----- call Array.append
 // CHECK:   alloc_stack $Int
 // CHECK:   store %{{.*}} to [trivial]
@@ -564,7 +564,7 @@ enum OptionalWithMap<Wrapped> {
 //
 // CHECK: [[BBSOME]]:
 // CHECK-NOT: begin_access
-// CHECK: [[ADR:%.*]] = unchecked_take_enum_data_addr [[STK]]
+// CHECK: [[ADR:%.*]] = unchecked_inplace_enum_data_addr [[STK]]
 // CHECK: alloc_stack [lexical] [var_decl] $Wrapped, let, name "y"
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [take] [[ADR]] to [init]
@@ -902,7 +902,7 @@ internal struct CanCastStruct<Base : Hashable> : CanCast {
 // CHECK-NOT: begin_access
 // CHECK: checked_cast_addr_br take_always any CanCast in [[TEMP_BASE]] : $*any CanCast to CanCastStruct<T> in [[TEMP_SUB_ADR]] : $*CanCastStruct<T>
 // CHECK-NOT: begin_access
-// CHECK: [[TEMP_DATA:%.*]] = unchecked_take_enum_data_addr [[TEMP_SUB]] : $*Optional<CanCastStruct<T>>, #Optional.some!enumelt
+// CHECK: [[TEMP_DATA:%.*]] = unchecked_inplace_enum_data_addr [[TEMP_SUB]] : $*Optional<CanCastStruct<T>>, #Optional.some!enumelt
 // CHECK-NOT: begin_access
 // CHECK: [[BASE_ADR:%.*]] = struct_element_addr [[TEMP_DATA]] : $*CanCastStruct<T>, #CanCastStruct.base
 // CHECK: copy_addr [[BASE_ADR]] to [init] [[OUT_ENUM]] : $*T
@@ -940,7 +940,7 @@ func testOpenExistential(p: PBar) {
 // CHECK-NOT: begin_access
 // CHECK: switch_enum_addr [[OPT_Q]] : $*Optional<any Q>, case #Optional.some!enumelt: bb
 // CHECK-NOT: begin_access
-// CHECK: [[OPT_Q_ADR:%.*]] = unchecked_take_enum_data_addr [[OPT_Q]] : $*Optional<any Q>, #Optional.some!enumelt
+// CHECK: [[OPT_Q_ADR:%.*]] = unchecked_inplace_enum_data_addr [[OPT_Q]] : $*Optional<any Q>, #Optional.some!enumelt
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [take] [[OPT_Q_ADR]] to [init] [[Q]] : $*any Q
 // CHECK-NOT: begin_access

@@ -1860,7 +1860,7 @@ bb0(%0 : $Optional<A>, %1 : @guaranteed $OptionalKlassWrapper):
   switch_enum_addr %2 : $*Optional<A>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
-  %5 = unchecked_take_enum_data_addr %2 : $*Optional<A>, #Optional.some!enumelt
+  %5 = unchecked_inplace_enum_data_addr %2 : $*Optional<A>, #Optional.some!enumelt
   %6 = load [trivial] %5 : $*A
   br bb3(%6 : $A)
 

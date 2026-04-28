@@ -100,7 +100,7 @@ sil @useX : $@convention(thin) (X) -> ()
 // CHECK:   switch_enum_addr %2 : $*Optional<X>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 // CHECK: bb1:
-// CHECK:   %5 = unchecked_take_enum_data_addr %0 : $*Optional<X>, #Optional.some!enumelt
+// CHECK:   %5 = unchecked_inplace_enum_data_addr %0 : $*Optional<X>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] %5 to [init] %1 : $*X
 // CHECK:   %7 = function_ref @useX : $@convention(thin) (@in_guaranteed X) -> ()
 // CHECK:   %8 = apply %7(%1) : $@convention(thin) (@in_guaranteed X) -> ()
@@ -458,7 +458,7 @@ bb1:
   unreachable
 
 bb2(%7 : $X):
-  %8 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %8 = unchecked_inplace_enum_data_addr %1, #Optional.some!enumelt
   end_access %1
   %13 = tuple ()
   return %13 : $()

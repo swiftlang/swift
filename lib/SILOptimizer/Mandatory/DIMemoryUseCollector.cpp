@@ -1114,12 +1114,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       llvm_unreachable("bad access kind");
     }
 
-    // unchecked_take_enum_data_addr takes the address of the payload of an
+    // unchecked_*_enum_data_addr takes the address of the payload of an
     // optional, which could be used to update the payload. So, visit the
     // users of this instruction and ensure that there are no overwrites to an
     // immutable optional. Note that this special handling is for checking
     // immutability and is not for checking initialization before use.
-    if (auto *enumDataAddr = dyn_cast<UncheckedTakeEnumDataAddrInst>(User)) {
+    if (auto *enumDataAddr = dyn_cast<UncheckedEnumDataAddrInstBase>(User)) {
       // Keep track of the fact that we're inside of an enum. This informs our
       // recursion that tuple stores should not be treated as a partial
       // store. This is needed because if the enum has data it would be accessed

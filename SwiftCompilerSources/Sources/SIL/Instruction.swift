@@ -1183,20 +1183,22 @@ final public class InitEnumDataAddrInst : SingleValueInstruction, UnaryInstructi
   public var caseIndex: Int { bridged.InitEnumDataAddrInst_caseIndex() }
 }
 
-final public class UncheckedTakeEnumDataAddrInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
-  public var `enum`: Value { operand.value }
-  public var caseIndex: Int { bridged.UncheckedTakeEnumDataAddrInst_caseIndex() }
+public class UncheckedEnumDataAddrInstBase : SingleValueInstruction, EnumInstruction {
+  public var `enum`: Value { fatalError("implemented in subclasses") }
+  public final var caseIndex: Int { bridged.UncheckedEnumDataAddrInstBase_caseIndex() }
+}
 
-  /// True, if this instruction invalidates the operand memory value.
-  /// This happens for certain enum kinds because the enum tag must be cleared before the payload may be used.
-  public var isDestructive: Bool { bridged.UncheckedTakeEnumDataAddrInst_isDestructive() }
+final public class UncheckedTakeEnumDataAddrInst : UncheckedEnumDataAddrInstBase, UnaryInstruction {
+  public override var `enum`: Value { operand.value }
+}
 
-  /// True, if this instruction may invalidate the operand memory value.
-  public var mayBeDestructive: Bool {
-    return isDestructive ||
-           // We don't know the layout of resilient enums. So be conservative and assume they are destructive.
-           self.enum.type.nominal!.isResilient(in: parentFunction)
-  }
+final public class UncheckedInPlaceEnumDataAddrInst : UncheckedEnumDataAddrInstBase, UnaryInstruction {
+  public override var `enum`: Value { operand.value }
+}
+
+final public class UncheckedBorrowEnumDataAddrInst : UncheckedEnumDataAddrInstBase {
+  public override var `enum`: Value { operands[0].value }
+  public var scratch: Value { operands[1].value }
 }
 
 final public class SelectEnumInst : SingleValueInstruction {
