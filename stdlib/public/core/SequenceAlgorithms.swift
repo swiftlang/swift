@@ -778,10 +778,10 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_alwaysEmitIntoClient
-  public func reduce<Result, E: Error>( // AsyncSequence now has an untyped throws duplicate of this method to resolve ambiguity
-    _ initialResult: Result,
+  public func reduce<Result: ~Copyable, E: Error>(
+    _ initialResult: consuming Result,
     _ nextPartialResult:
-      (_ partialResult: Result, Element) throws(E) -> Result
+      (_ partialResult: consuming Result, Element) throws(E) -> Result
   ) throws(E) -> Result {
     var accumulator = initialResult
     for element in self {

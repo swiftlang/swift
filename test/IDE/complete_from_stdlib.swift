@@ -74,7 +74,7 @@ func testArchetypeReplacement2<BAR : Equatable>(_ a: [BAR]) {
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         min({#by: (Equatable, Equatable) throws(Error) -> Bool##(Equatable, Equatable) throws(Error) -> Bool#})[' throws'][#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         max({#by: (Equatable, Equatable) throws(Error) -> Bool##(Equatable, Equatable) throws(Error) -> Bool#})[' throws'][#Equatable?#]{{; name=.+}}
 // FIXME: The following should include 'partialResult' as local parameter name: "(nextPartialResult): (_ partialResult: Result, Equatable)"
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         reduce({#(initialResult): Result#}, {#(nextPartialResult): (Result, Equatable) throws(Error) -> Result##(_ partialResult: Result, Equatable) throws(Error) -> Result#})[' throws'][#Result#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         reduce({#(initialResult): ~Copyable#}, {#(nextPartialResult): (consuming ~Copyable, Equatable) throws(Error) -> ~Copyable##(_ partialResult: consuming ~Copyable, Equatable) throws(Error) -> ~Copyable#})[' throws'][#~Copyable#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         dropFirst({#(k): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
 // FIXME: restore Decl[InstanceMethod]/Super:         flatMap({#(transform): (Equatable) throws -> Sequence##(Equatable) throws -> Sequence#})[' rethrows'][#[IteratorProtocol.Element]#]{{; name=.+}}
 
