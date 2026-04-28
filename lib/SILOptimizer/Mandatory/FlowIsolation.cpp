@@ -1051,9 +1051,15 @@ void FunctionInfo::analyze(SILValue selfParam) {
         // Ignore these.
         continue;
       default:
+#if false        
         // Anything we do not understand mark as a property use to be
         // conservative.
         markPropertyUse(operand, true /*default*/);
+#else
+        // For now if we do not understand something, just ignore it to restore
+        // the previous behavior.
+        markIgnored(user);
+#endif
         continue;
       }
   }
