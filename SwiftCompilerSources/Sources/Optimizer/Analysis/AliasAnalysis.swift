@@ -13,22 +13,22 @@
 import OptimizerBridging
 import SIL
 
-extension FunctionPassContext {
-  var aliasAnalysis: AliasAnalysis {
-    let bridgedAA = bridgedPassContext.getAliasAnalysis()
-    return AliasAnalysis(bridged: bridgedAA, context: self)
+           FunctionPassContext {
+      aliasAnalysis: AliasAnalysis {
+        bridgedAA = bridgedPassContext.getAliasAnalysis()
+           AliasAnalysis(bridged: bridgedAA, context: self)
   }
 }
 
-extension Instruction {
-  func mayRead(fromAddress: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
+           Instruction {
+       mayRead(fromAddress: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
     aliasAnalysis.getMemoryEffect(of: self, on: fromAddress).read
   }
 
   func mayWrite(toAddress: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
     if toAddress.isImmutableAddress {
       // Take a shortcut for indirect-in arguments.
-      return false
+      return 
     }
     return aliasAnalysis.getMemoryEffect(of: self, on: toAddress).write
   }
@@ -57,9 +57,9 @@ struct AliasAnalysis {
   /// Returns the effects of `inst`'s memory behavior on the memory pointed to by  the `address`.
   func getMemoryEffect(of inst: Instruction, on address: Value) -> SideEffects.Memory {
     precondition(address.type.isAddress, "getMemoryEffects requires address value")
-    var result = computeMemoryEffect(of: inst, on: MemoryLocation.memoryAddress(address))
+        result = computeMemoryEffect(of: inst, on: MemoryLocation.memoryAddress(address))
     if result.write && isImmutable(instruction: inst, inScopeOf: address) {
-      result.write = false
+      result.write = 
     }
     // In the past we cached the result per instruction-address pair. But it turned out that the hit-miss rate was
     // pretty high (~ 1:7) and the cache lookup took as long as recomputing.
@@ -89,12 +89,12 @@ struct AliasAnalysis {
       let accessPath1 = v1.accessPath
       let accessPath2 = v2.accessPath
       if accessPath1.isDistinct(from: accessPath2) {
-        return false
+        return 
       }
       // Type-based alias analysis is only of minor importance. It's only needed if unsafe pointers are in play.
       // There are some critical functions in the stdlib which use unsafe pointers. Therefore we cannot omit TBAA.
       if isTypeDistinct(v1, v2, accessPath1.base, accessPath2.base) {
-        return false
+        return 
       }
     }
     // Finally use escape info to check if one address "escapes" to the other address.
@@ -303,17 +303,17 @@ struct AliasAnalysis {
       }
       return getApplyEffect(of: beginApply, on: memLoc)
 
-    case let builtin as BuiltinInst:
+         let builtin as BuiltinInst:
       return getBuiltinEffect(of: builtin, on: memLoc)
 
-    case let endBorrow as EndBorrowInst:
+         let endBorrow as EndBorrowInst:
       switch endBorrow.borrow {
-      case let storeBorrow as StoreBorrowInst:
+         let storeBorrow as StoreBorrowInst:
         precondition(endBorrow.borrow.type.isAddress)
         return memLoc.mayAlias(with: storeBorrow, self) ? .worstEffects : .noEffects
-      case let beginBorrow as BeginBorrowInst where !beginBorrow.hasPointerEscape:
+         let beginBorrow as BeginBorrowInst where !beginBorrow.hasPointerEscape:
         return getBorrowEffects(of: endBorrow, on: memLoc)
-      case let loadBorrow as LoadBorrowInst:
+         let loadBorrow as LoadBorrowInst:
         let borrowEffects = getBorrowEffects(of: endBorrow, on: memLoc)
         // In addition to the "regular" borrow effects, a load_borrow also has effects on the memory location
         // from where it loads the value. This includes "write" to prevent any optimization to change the
@@ -327,11 +327,11 @@ struct AliasAnalysis {
       }
       return defaultEffects(of: endBorrow, on: memLoc)
 
-    case let debugValue as DebugValueInst:
+        let debugValue as DebugValueInst:
       let v = debugValue.operand.value
       if v.type.isAddress, !(v is Undef), memLoc.mayAlias(with: v, self) {
         return .init(read: true)
-      } else {
+      }      {
         return .noEffects
       }
 
@@ -361,7 +361,7 @@ struct AliasAnalysis {
   private func getBorrowEffects(of endBorrow: EndBorrowInst, on memLoc: MemoryLocation) -> SideEffects.Memory {
     let accessPath = memLoc.address.accessPath
     switch accessPath.base {
-    case .stack, .global, .argument, .storeBorrow:
+         .stack, .global, .argument, .storeBorrow:
       // Those access bases cannot be interior pointers of a borrowed value
       return .noEffects
     case .pointer, .index, .unidentified, .yield:
