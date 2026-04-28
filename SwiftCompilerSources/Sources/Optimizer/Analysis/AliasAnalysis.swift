@@ -186,17 +186,17 @@ struct AliasAnalysis {
   // The actual logic to compute the memory effect of an instruction.
   private func computeMemoryEffect(of inst: Instruction, on memLoc: MemoryLocation) -> SideEffects.Memory {
     switch inst {
-    case let beginAccess as BeginAccessInst:
+         let beginAccess as BeginAccessInst:
       // begin_access does not physically read or write memory. But we model it as a memory read and/or write
       // to prevent optimizations to move other aliased loads/stores across begin_access into the access scope.
       return getAccessScopeEffect(of: beginAccess, on: memLoc)
 
-    case let endAccess as EndAccessInst:
+         let endAccess as EndAccessInst:
       // Similar to begin_access, we model it as a memory read and/or write to prevent optimizations to move
       // other aliased loads/stores into the access scope.
       return getAccessScopeEffect(of: endAccess.beginAccess, on: memLoc)
 
-    case is InjectEnumAddrInst,
+         is InjectEnumAddrInst,
          is UncheckedTakeEnumDataAddrInst,
          is InitExistentialAddrInst,
          is DeinitExistentialAddrInst,
@@ -209,7 +209,7 @@ struct AliasAnalysis {
       }
       return .noEffects
 
-    case is CondFailInst,
+         is CondFailInst,
          is StrongRetainInst,
          is UnownedRetainInst,
          is StrongRetainUnownedInst,
@@ -224,19 +224,19 @@ struct AliasAnalysis {
          is DebugStepInst:
       return .noEffects
 
-    case let load as LoadInst:
+         let load as LoadInst:
       if memLoc.mayAlias(with: load.address, self) {
         switch load.loadOwnership {
         case .unqualified, .copy, .trivial:
           return .init(read: true)
-        case .take:
+             .take:
           // "take" is conceptually a write to the memory location.
           return .worstEffects
         }
       } else {
         return .noEffects
       }
-    case let store as StoreInst:
+         let store as StoreInst:
       if memLoc.isLetValue && store.destination.accessBase != memLoc.address.accessBase {
         return .noEffects
       }
@@ -244,23 +244,23 @@ struct AliasAnalysis {
         return inst.memoryEffects
       } else {
         switch store.storeOwnership {
-        case .unqualified, .initialize, .trivial:
+             .unqualified, .initialize, .trivial:
           return .noEffects
-        case .assign:
+             .assign:
           // Consider side effects of the destructor
           return defaultEffects(of: store, on: memLoc)
         }
       }
-    case let storeBorrow as StoreBorrowInst:
+         let storeBorrow as StoreBorrowInst:
       return memLoc.mayAlias(with: storeBorrow.destination, self) ? .init(write: true) : .noEffects
 
-    case let mdi as MarkDependenceInst:
+         let mdi as MarkDependenceInst:
       if mdi.base.type.isAddress && memLoc.mayAlias(with: mdi.base, self) {
         return .init(read: true)
       }
       return .noEffects
 
-    case let mdai as MarkDependenceAddrInst:
+         let mdai as MarkDependenceAddrInst:
       if memLoc.mayAlias(with: mdai.address, self) {
         return .init(read: true, write: true)
       }
@@ -269,7 +269,7 @@ struct AliasAnalysis {
       }
       return .noEffects
 
-    case let copy as SourceDestAddrInstruction:
+         let copy as SourceDestAddrInstruction:
       let mayRead = memLoc.mayAlias(with: copy.source, self)
       let mayWrite = memLoc.mayAlias(with: copy.destination, self)
       var effects = SideEffects.Memory(read: mayRead, write: mayWrite || (mayRead && copy.isTakeOfSource))
@@ -278,15 +278,15 @@ struct AliasAnalysis {
       }
       return effects
 
-    case let apply as FullApplySite:
+         let apply as FullApplySite:
       return getApplyEffect(of: apply, on: memLoc)
 
-    case let partialApply as PartialApplyInst:
+         let partialApply as PartialApplyInst:
       return getPartialApplyEffect(of: partialApply, on: memLoc)
 
-    case let endApply as EndApplyInst:
+         let endApply as EndApplyInst:
       let beginApply = endApply.beginApply
-      if case .yield(let addr) = memLoc.address.accessBase, addr.parentInstruction == beginApply {
+      if      .yield(let addr) = memLoc.address.accessBase, addr.parentInstruction == beginApply {
         // The lifetime of yielded values always end at the end_apply. This is required because a yielded
         // address is non-aliasing inside the begin/end_apply scope, but might be aliasing after the end_apply.
         // For example, if the callee yields an `ref_element_addr` (which is encapsulated in a begin/end_access).
@@ -295,9 +295,9 @@ struct AliasAnalysis {
       }
       return getApplyEffect(of: beginApply, on: memLoc)
 
-    case let abortApply as AbortApplyInst:
+         let abortApply as AbortApplyInst:
       let beginApply = abortApply.beginApply
-      if case .yield(let addr) = memLoc.address.accessBase, addr.parentInstruction == beginApply {
+      if      .yield(let addr) = memLoc.address.accessBase, addr.parentInstruction == beginApply {
         // See the comment for `end_apply` above.
         return .worstEffects
       }
