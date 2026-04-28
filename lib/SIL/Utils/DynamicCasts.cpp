@@ -901,7 +901,7 @@ bool swift::matchesActorIsolation(ProtocolConformanceRef conformance, SILFunctio
       return false;
 
     ActorIsolation isolation = isolatedConf.getConcrete()->getIsolation();
-    if (isolation.isNonisolated())
+    if (isolation.isNonisolatedOrConcurrent())
       return false;
 
     if (isolation.isGlobalActor()) {

@@ -516,12 +516,12 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
       return true;
   }
 
-  auto hasCallerIsolatedAttr = [](TypeRepr *R) {
+  auto hasNonisolatedNonsendingAttr = [](TypeRepr *R) {
     if (!R)
       return false;
 
     return R->findIf([](TypeRepr *repr) {
-      if (isa<CallerIsolatedTypeRepr>(repr))
+      if (isa<NonisolatedNonsendingTypeRepr>(repr))
         return true;
 
       // We don't check for @concurrent here because it's
@@ -538,19 +538,19 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
 
   // The declaration is going to be printed with `nonisolated(nonsending)`
   // attribute.
-  if (getActorIsolation(VD).isCallerIsolationInheriting())
+  if (getActorIsolation(VD).isNonisolatedNonsending())
     return true;
 
   // Check if any parameters that have `nonisolated(nonsending)` attribute.
   if (auto *PL = VD->getParameterList()) {
     if (llvm::any_of(*PL, [&](const ParamDecl *P) {
-          return hasCallerIsolatedAttr(P->getTypeRepr());
+          return hasNonisolatedNonsendingAttr(P->getTypeRepr());
         }))
       return true;
   }
 
   // Check if result type has explicit `nonisolated(nonsending)` attribute.
-  if (hasCallerIsolatedAttr(VD->getResultTypeRepr()))
+  if (hasNonisolatedNonsendingAttr(VD->getResultTypeRepr()))
     return true;
 
   return false;

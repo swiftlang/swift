@@ -2214,7 +2214,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     nestedRepr = lifetime->getBase();
   }
 
-  if (auto callerIsolated = dyn_cast<CallerIsolatedTypeRepr>(nestedRepr)) {
+  if (auto callerIsolated = dyn_cast<NonisolatedNonsendingTypeRepr>(nestedRepr)) {
     nestedRepr = callerIsolated->getBase();
   }
 

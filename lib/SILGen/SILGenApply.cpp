@@ -1740,11 +1740,11 @@ public:
           return false;
 
         // old type MUST NOT have nonisolated(nonsending).
-        if (oldFnTy->getIsolation().isNonIsolatedCaller())
+        if (oldFnTy->getIsolation().isNonisolatedNonsending())
           return false;
 
         // new type MUST nonisolated(nonsending)
-        if (!newFnTy->getIsolation().isNonIsolatedCaller())
+        if (!newFnTy->getIsolation().isNonisolatedNonsending())
           return false;
 
         // See if setting isolation of old type to nonisolated(nonsending)
@@ -3191,7 +3191,8 @@ done:
 
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
-      case ActorIsolation::CallerIsolationInheriting:
+      case ActorIsolation::NonisolatedConcurrent:
+      case ActorIsolation::NonisolatedNonsending:
       case ActorIsolation::NonisolatedUnsafe:
         llvm_unreachable("Not isolated");
       }
@@ -6238,7 +6239,8 @@ RValue SILGenFunction::emitApply(
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedConcurrent:
+    case ActorIsolation::NonisolatedNonsending:
     case ActorIsolation::NonisolatedUnsafe:
       llvm_unreachable("Not isolated");
       break;

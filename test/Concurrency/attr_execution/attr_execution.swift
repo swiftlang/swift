@@ -4,25 +4,25 @@
 
 
 // CHECK-LABEL: // concurrentTest()
-// CHECK: // Isolation: nonisolated
+// CHECK: // Isolation: @concurrent
 // CHECK: sil hidden [ossa] @$s14attr_execution14concurrentTestyyYaF : $@convention(thin) @async () -> () {
 @concurrent
 func concurrentTest() async {}
 
 // CHECK-LABEL: // callerTest()
-// CHECK: // Isolation: caller_isolation_inheriting
+// CHECK: // Isolation: nonisolated(nonsending)
 // CHECK: sil hidden [ossa] @$s14attr_execution10callerTestyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 nonisolated(nonsending)
 func callerTest() async {}
 
 struct Test {
   // CHECK-LABEL: // closure #1 in variable initialization expression of Test.x
-  // CHECK: // Isolation: caller_isolation_inheriting
+  // CHECK: // Isolation: nonisolated(nonsending)
   // CHECK: sil private [ossa] @$s14attr_execution4TestV1xyyYaYCcvpfiyyYaYCcfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   var x: () async -> Void = {}
 
   // CHECK-LABEL: // Test.test()
-  // CHECK: // Isolation: caller_isolation_inheriting
+  // CHECK: // Isolation: nonisolated(nonsending)
   // CHECK: sil hidden [ossa] @$s14attr_execution4TestV4testyyYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Test) -> ()
   // CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Builtin.ImplicitActor, [[SELF:%.*]] : @guaranteed $Test)
   // CHECK: [[X_REF:%.*]] = struct_extract %1, #Test.x
@@ -35,7 +35,7 @@ struct Test {
   }
 
   // CHECK-LABEL: // Test.testParam(fn:)
-  // CHECK: // Isolation: caller_isolation_inheriting
+  // CHECK: // Isolation: nonisolated(nonsending)
   // CHECK: sil hidden [ossa] @$s14attr_execution4TestV9testParam2fnyyyYaYCcSg_tYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Optional<@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()>, @guaranteed Test) -> ()
   // CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Builtin.ImplicitActor, [[OPT_FN:%.*]] : @guaranteed $Optional<@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()>, [[SELF:%.*]] : @guaranteed $Test)
   // CHECK: bb1([[FN:%.*]] : @owned $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ())
@@ -48,7 +48,7 @@ struct Test {
 }
 
 // CHECK-LABEL: // testLocal()
-// CHECK: // Isolation: caller_isolation_inheriting
+// CHECK: // Isolation: nonisolated(nonsending)
 // CHECK: sil hidden [ossa] @$s14attr_execution9testLocalyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Builtin.ImplicitActor)
 // CHECK: bb1([[FN:%.*]] : @owned $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ())
@@ -74,7 +74,7 @@ func takesClosure(fn: () async -> Void) {
 // CHECK: } // end sil function '$s14attr_execution11testClosureyyF'
 
 // CHECK-LABEL: // closure #1 in testClosure()
-// CHECK: // Isolation: caller_isolation_inheriting
+// CHECK: // Isolation: nonisolated(nonsending)
 // CHECK: sil private [ossa] @$s14attr_execution11testClosureyyFyyYaYCXEfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
 func testClosure() {
   takesClosure {
@@ -97,7 +97,7 @@ func testOpenExistential(existential: any P) async {
 
 func testWithoutActuallyEscaping(_ f: () async -> (), _ f2: (Int) async -> Void) async {
   // CHECK-LABEL: // closure #1 in testWithoutActuallyEscaping(_:_:)
-  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
+  // CHECK-NEXT: // Isolation: nonisolated(nonsending)
   await withoutActuallyEscaping(f) {
     await $0()
   }
@@ -109,7 +109,7 @@ func testWithoutActuallyEscaping(_ f: () async -> (), _ f2: (Int) async -> Void)
   }
 
   // CHECK-LABEL: // closure #3 in testWithoutActuallyEscaping(_:_:)
-  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
+  // CHECK-NEXT: // Isolation: nonisolated(nonsending)
   await withoutActuallyEscaping(f2) { body in
     await body(42)
   }

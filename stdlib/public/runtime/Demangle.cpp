@@ -824,7 +824,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     } else if (func->getExtendedFlags().isIsolatedAny()) {
       funcNode->addChild(Dem.createNode(
           Node::Kind::IsolatedAnyFunctionType), Dem);
-    } else if (func->getExtendedFlags().isNonIsolatedCaller()) {
+    } else if (func->getExtendedFlags().isNonisolatedNonsending()) {
       funcNode->addChild(Dem.createNode(
         Node::Kind::NonIsolatedCallerFunctionType), Dem);
     }

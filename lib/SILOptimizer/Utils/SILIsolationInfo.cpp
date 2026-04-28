@@ -370,7 +370,7 @@ static SILIsolationInfo computeIsolationForClassField(SILValue queriedValue,
   // since we just want to squelch the error but still have it be isolated in
   // its normal way. This provides more information since we know what the
   // underlying isolation /would/ have been.
-  if (varIsolation.isNonisolated() && !varIsolation.isNonisolatedUnsafe())
+  if (varIsolation.isNonisolatedOrConcurrent() && !varIsolation.isNonisolatedUnsafe())
     return SILIsolationInfo::getDisconnected(false /*nonisolated unsafe*/);
 
   // Ok, we know that we do not have any overriding isolation from the var
@@ -901,7 +901,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   /// is initialized so they cannot into another isolation domain.
   if (auto *mi = dyn_cast<MetatypeInst>(inst)) {
     auto funcIsolation = mi->getFunction()->getActorIsolation();
-    if (funcIsolation.isCallerIsolationInheriting()) {
+    if (funcIsolation.isNonisolatedNonsending()) {
       return SILIsolationInfo::getTaskIsolated(mi)
           .withNonisolatedNonsendingTaskIsolated(true);
     }
@@ -932,7 +932,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   // caused by the actor instances not matching.
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
     if (auto crossing = apply->getIsolationCrossing()) {
-      if (crossing->getCalleeIsolation().isNonisolated()) {
+      if (crossing->getCalleeIsolation().isNonisolatedOrConcurrent()) {
         return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
       }
     }
@@ -1014,7 +1014,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
           func->maybeGetIsolatedArgument())) {
     // See if the function is nonisolated(nonsending). In such a case, return
     // task isolated.
-    if (func->getActorIsolation().isCallerIsolationInheriting()) {
+    if (func->getActorIsolation().isNonisolatedNonsending()) {
       return SILIsolationInfo::getTaskIsolated(fArg)
           .withNonisolatedNonsendingTaskIsolated(true)
           .withUnsafeNonIsolated(isClosureCapturedNonisolatedUnsafe);
@@ -1172,7 +1172,7 @@ SILIsolationInfo SILIsolationInfo::getForCastConformances(
   // any isolated conformances because it's not on any actor.
   auto function = value->getFunction();
   auto functionIsolation = function->getActorIsolation();
-  if (functionIsolation.isNonisolated())
+  if (functionIsolation.isNonisolatedOrConcurrent())
     return {};
 
   auto sendableMetatype =
@@ -1326,19 +1326,14 @@ StringRef SILIsolationInfo::printActorIsolationForDiagnostics(
 void SILIsolationInfo::printActorIsolationForDiagnostics(
     SILFunction *fn, ActorIsolation iso, llvm::raw_ostream &os,
     StringRef openingQuotationMark, bool asNoun) {
-  // If we have NonisolatedNonsendingByDefault enabled, we need to return
-  // @concurrent for nonisolated and nonisolated for caller isolation inherited.
-  if (fn->isAsync() && fn->getASTContext().LangOpts.hasFeature(
-                           Feature::NonisolatedNonsendingByDefault)) {
-    if (iso.isCallerIsolationInheriting()) {
-      os << "nonisolated";
-      return;
-    }
-
-    if (iso.isNonisolated()) {
-      os << "@concurrent";
-      return;
-    }
+  // Under NonisolatedNonsendingByDefault, render NonisolatedNonsending as
+  // "nonisolated" instead of the default "caller isolation inheriting-isolated".
+  if (fn->isAsync() &&
+      fn->getASTContext().LangOpts.hasFeature(
+          Feature::NonisolatedNonsendingByDefault) &&
+      iso.isNonisolatedNonsending()) {
+    os << "nonisolated";
+    return;
   }
 
   return iso.printForDiagnostics(os, openingQuotationMark, asNoun);

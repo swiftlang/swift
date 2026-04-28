@@ -59,8 +59,8 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
-  if (CallerIsolatedLoc.isValid()) {
-    ty = new (p.Context) CallerIsolatedTypeRepr(ty, CallerIsolatedLoc);
+  if (NonisolatedNonsendingLoc.isValid()) {
+    ty = new (p.Context) NonisolatedNonsendingTypeRepr(ty, NonisolatedNonsendingLoc);
   }
 
   if (lifetimeEntry) {

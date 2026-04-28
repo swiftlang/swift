@@ -155,7 +155,7 @@ private struct StructContainingValue {
   x.x = firstList
 
   await transferToNonIsolated(x) // expected-ni-warning {{sending 'x' risks causing data races}}
-  // expected-ni-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to nonisolated global function 'transferToNonIsolated' risks causing data races between nonisolated and global actor 'CustomActor'-isolated uses}}
+  // expected-ni-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to @concurrent global function 'transferToNonIsolated' risks causing data races between @concurrent and global actor 'CustomActor'-isolated uses}}
  
 
   useValue(x)
@@ -179,10 +179,8 @@ private struct StructContainingValue {
   x.1 = firstList
 
   await transferToNonIsolated(x) // expected-ni-warning {{sending 'x' risks causing data races}}
-  // expected-ni-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to nonisolated global function 'transferToNonIsolated' risks causing data races between nonisolated and global actor 'CustomActor'-isolated uses}}
+  // expected-ni-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to @concurrent global function 'transferToNonIsolated' risks causing data races between @concurrent and global actor 'CustomActor'-isolated uses}}
  
- 
-
   useValue(x)
 }
 
@@ -200,7 +198,7 @@ struct Clock {
 @MainActor func testIndirectParametersHandledCorrectly() async {
   let c = Clock()
   let _: Int = await c.measure { // expected-ni-warning {{sending value of non-Sendable type '() async -> Int' risks causing data races}}
-    // expected-ni-note @-1 {{sending main actor-isolated value of non-Sendable type '() async -> Int' to nonisolated instance method 'measure' risks causing races in between main actor-isolated and nonisolated uses}}
+    // expected-ni-note @-1 {{sending main actor-isolated value of non-Sendable type '() async -> Int' to @concurrent instance method 'measure' risks causing races in between main actor-isolated and @concurrent uses}}
     try! await c.sleep()
   }
 }
@@ -260,7 +258,7 @@ struct Clock {
   let erased: () -> Void = closure
 
   await useValueAsync(erased) // expected-ni-warning {{sending 'erased' risks causing data races}}
-  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
  
  
 }
@@ -269,7 +267,7 @@ struct Clock {
   let erased: () -> Void = mainActorFunction
 
   await useValueAsync(erased) // expected-ni-warning {{sending 'erased' risks causing data races}}
-  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
  
  
 }
@@ -278,9 +276,7 @@ struct Clock {
   let erased: (T) -> Void = useValueMainActor
 
   await useValueAsync(erased) // expected-ni-warning {{sending 'erased' risks causing data races}}
-  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
- 
- 
+  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
 }
 
 @MainActor func synchronousActorIsolatedClassMethodError() async {
@@ -292,9 +288,7 @@ struct Clock {
   let erased: () -> Void = t.foo
 
   await useValueAsync(erased) // expected-ni-warning {{sending 'erased' risks causing data races}}
-  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
- 
- 
+  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}} 
 }
 
 @MainActor func synchronousActorIsolatedFinalClassMethodError() async {
@@ -306,9 +300,7 @@ struct Clock {
   let erased: () -> Void = t.foo
 
   await useValueAsync(erased) // expected-ni-warning {{sending 'erased' risks causing data races}}
-  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
- 
- 
+  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
 }
 
 @MainActor func synchronousClosureCapturingGlobalActorIsolatedGlobal() async {

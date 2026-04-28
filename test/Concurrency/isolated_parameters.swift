@@ -218,7 +218,7 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
 @MainActor func callFromMainActor(ns: NotSendable) async {
   await optionalIsolated(ns, to: nil)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending main actor-isolated 'ns' to nonisolated global function 'optionalIsolated(_:to:)' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-note @-2 {{sending main actor-isolated 'ns' to @concurrent global function 'optionalIsolated(_:to:)' risks causing data races between @concurrent and main actor-isolated uses}}
 
   optionalIsolatedSync(ns, to: nil)
 

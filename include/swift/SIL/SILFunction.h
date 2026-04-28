@@ -1539,7 +1539,7 @@ public:
   }
 
   bool isNonisolatedNonsending() const {
-    return actorIsolation.isCallerIsolationInheriting();
+    return actorIsolation.isNonisolatedNonsending();
   }
 
   /// Return the source file that this SILFunction belongs to if it exists.

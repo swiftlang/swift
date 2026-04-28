@@ -1717,8 +1717,9 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       switch (isolation->getKind()) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedConcurrent:
       case ActorIsolation::NonisolatedUnsafe:
-      case ActorIsolation::CallerIsolationInheriting:
+      case ActorIsolation::NonisolatedNonsending:
         return emitNonIsolatedIsolation(loc).getValue();
       case ActorIsolation::ActorInstance:
         llvm::report_fatal_error("Should never see this");

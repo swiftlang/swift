@@ -1866,7 +1866,7 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
 
     // After the continuation resumes with a failure, hop back to the expected executor.
     //
-    // This is critical for CallerIsolationInheriting (nonisolated(nonsending))
+    // This is critical for NonisolatedNonsending (nonisolated(nonsending))
     // functions: without this hop, the function may return on whichever thread
     // resumed the continuation, violating the contract that the function
     // maintains the caller's isolation.

@@ -1196,7 +1196,7 @@ public:
         Tok.isContextualKeyword("isolated") ||
         Tok.isContextualKeyword("_const"))
       return true;
-    if (isCallerIsolatedSpecifier())
+    if (isNonisolatedNonsendingSpecifier())
       return true;
     if (Tok.isContextualKeyword("sending"))
       return true;
@@ -1215,7 +1215,7 @@ public:
            (peekToken().isContextualKeyword("lifetime"));
   }
 
-  bool isCallerIsolatedSpecifier() {
+  bool isNonisolatedNonsendingSpecifier() {
     if (!Tok.isContextualKeyword("nonisolated"))
       return false;
     return peekToken().isFollowingLParen();
@@ -1458,7 +1458,7 @@ public:
     SourceLoc IsolatedLoc;
     SourceLoc ConstLoc;
     SourceLoc SendingLoc;
-    SourceLoc CallerIsolatedLoc;
+    SourceLoc NonisolatedNonsendingLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
     LifetimeEntry *lifetimeEntry = nullptr;
 

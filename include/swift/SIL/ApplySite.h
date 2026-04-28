@@ -944,7 +944,7 @@ public:
            getNumIndirectSILErrorResults();
   }
 
-  bool isCallerIsolationInheriting() const {
+  bool isNonisolatedNonsending() const {
     return getSubstCalleeType()->hasNonisolatedNonsendingIsolation();
   }
 

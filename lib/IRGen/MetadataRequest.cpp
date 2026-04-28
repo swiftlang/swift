@@ -1451,7 +1451,7 @@ getFunctionTypeFlags(CanFunctionType type) {
   if (isolation.isErased())
     extFlags = extFlags.withIsolatedAny();
 
-  if (isolation.isNonIsolatedCaller())
+  if (isolation.isNonisolatedNonsending())
     extFlags = extFlags.withNonIsolatedCaller();
 
   auto flags = FunctionTypeFlags()

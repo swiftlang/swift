@@ -51,20 +51,20 @@ nonisolated(nonsending) func callDoSomethingNonisolatedNonsending(_ p: some MyPr
 // When the conformance is concrete (not generic), the error is caught at the
 // forwarding call site inside the nonisolated(nonsending) function body.
 nonisolated(nonsending) func nonsendingForwardToConcurrent(_ p: MyClass) async {
-  // expected-error@+1{{main actor-isolated conformance of 'MyClass' to 'MyProtocol' cannot be used in nonisolated context}}
+  // expected-error@+1{{main actor-isolated conformance of 'MyClass' to 'MyProtocol' cannot be used in @concurrent context}}
   await callDoSomethingConcurrent(p)
 }
 
 // When the conformance is abstract (generic), we reject it because the concrete
 // conformance may be isolated.
 nonisolated(nonsending) func nonsendingForwardToConcurrentGeneric(_ p: some MyProtocol) async {
-  // expected-warning@+1{{conformance of underlying type of 'some MyProtocol' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
+  // expected-warning@+1{{conformance of underlying type of 'some MyProtocol' to protocol 'MyProtocol' may be isolated and cannot be passed to @concurrent context}}
   await callDoSomethingConcurrent(p)
 }
 
 struct Container<T: MyProtocol> {
   nonisolated(nonsending) func nonsendingForwardToConcurrentGeneric(_ p: T) async {
-    // expected-warning@+1{{conformance of 'T' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
+    // expected-warning@+1{{conformance of 'T' to protocol 'MyProtocol' may be isolated and cannot be passed to @concurrent context}}
     await callDoSomethingConcurrent(p)
   }
 }
@@ -89,7 +89,7 @@ nonisolated(nonsending) func nonsendingForwardSendableGeneric(_ p: some Sendable
 }
 
 nonisolated(nonsending) func nonsendingForwardSendableGenericComp<P: MyProtocol>(_ p: P) async { // expected-note{{consider making generic parameter 'P' conform to the 'Sendable' protocol}}
-  // expected-warning@+2{{conformance of 'P' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
+  // expected-warning@+2{{conformance of 'P' to protocol 'MyProtocol' may be isolated and cannot be passed to @concurrent context}}
   // expected-error@+1{{type 'P' does not conform to the 'Sendable' protocol}}
   await callSendableProtocolComp(p)
 }
@@ -98,7 +98,7 @@ final class Caller {
   @concurrent func call(first p: some MyProtocol, second fine: String) async { p.doSomething() }
 }
 nonisolated(nonsending) func nonsendingForwardSendableGeneric(caller: Caller, _ p: some MyProtocol) async {
-  // expected-warning@+1{{conformance of underlying type of 'some MyProtocol' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
+  // expected-warning@+1{{conformance of underlying type of 'some MyProtocol' to protocol 'MyProtocol' may be isolated and cannot be passed to @concurrent context}}
   await caller.call(first: p, second: "this is fine")
 }
 
@@ -123,7 +123,7 @@ func callDoSomethingConcurrentExplicit<ItsMe: MyProtocol>(_ p: ItsMe) async {
 }
 
 nonisolated(nonsending) func nonsendingForwardExplicitGeneric<TheProblemIsNotHere: MyProtocol>(_ p: TheProblemIsNotHere) async {
-  // expected-warning@+1{{conformance of 'TheProblemIsNotHere' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
+  // expected-warning@+1{{conformance of 'TheProblemIsNotHere' to protocol 'MyProtocol' may be isolated and cannot be passed to @concurrent context}}
   await callDoSomethingConcurrentExplicit(p)
 }
 
@@ -134,7 +134,7 @@ nonisolated(nonsending) func nonsendingForwardExplicitGeneric<TheProblemIsNotHer
 // @MainActor forwarding generic to @concurrent — same issue, rejected.
 @MainActor
 func mainActorForwardToConcurrentGeneric(_ p: some MyProtocol) async {
-  // expected-warning@+1{{conformance of underlying type of 'some MyProtocol' to protocol 'MyProtocol' may be isolated and cannot be passed to nonisolated context}}
+  // expected-warning@+1{{conformance of underlying type of 'some MyProtocol' to protocol 'MyProtocol' may be isolated and cannot be passed to @concurrent context}}
   await callDoSomethingConcurrent(p)
 }
 
@@ -171,7 +171,7 @@ func callDoSomethingFromMainActor(_ p: some MyProtocol) async {
 @MainActor
 func test() async {
   // @concurrent async - don't allow changing execution context, would allow synchronous call on actor
-  // expected-error@+1{{main actor-isolated conformance of 'MyClass' to 'MyProtocol' cannot be used in nonisolated context}}
+  // expected-error@+1{{main actor-isolated conformance of 'MyClass' to 'MyProtocol' cannot be used in @concurrent context}}
   await callDoSomethingConcurrent(MyClass())
 
   // nonisolated(nonsending) — inherits caller's isolation, this is allowed

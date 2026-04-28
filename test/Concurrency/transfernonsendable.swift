@@ -110,14 +110,14 @@ extension MyActor {
   func warningIfCallingGetter() async {
     await self.klass.asyncCall()
     // expected-ni-warning @-1 {{sending 'self.klass' risks causing data races}}
-    // expected-ni-note @-2 {{sending 'self'-isolated 'self.klass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-ni-note @-2 {{sending 'self'-isolated 'self.klass' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   func warningIfCallingAsyncOnFinalField() async {
     // Since we are calling finalKlass directly, we emit a warning here.
     await self.finalKlass.asyncCall()
     // expected-ni-warning @-1 {{sending 'self.finalKlass' risks causing data races}}
-    // expected-ni-note @-2 {{sending 'self'-isolated 'self.finalKlass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-ni-note @-2 {{sending 'self'-isolated 'self.finalKlass' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // We do not warn on this since we warn in the caller of our getter instead.
@@ -131,7 +131,7 @@ extension FinalActor {
     // Since our whole class is final, we emit the error directly here.
     await self.klass.asyncCall()
     // expected-ni-warning @-1 {{sending 'self.klass' risks causing data races}}
-    // expected-ni-note @-2 {{sending 'self'-isolated 'self.klass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-ni-note @-2 {{sending 'self'-isolated 'self.klass' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 }
 
@@ -1488,7 +1488,7 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
     // through the loop, we are now main actor isolated, but again b/c we
     // inherit isolation, we are ok.
     await useValueAsync(c) // expected-ni-warning {{sending 'c' risks causing data races}}
-    // expected-ni-note @-1 {{sending main actor-isolated 'c' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+    // expected-ni-note @-1 {{sending main actor-isolated 'c' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
 
     c = a.klass
   }
@@ -1499,7 +1499,7 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   var c = NonSendableKlass()
   for _ in 0..<1024 {
     await useValueAsync(c) // expected-ni-warning {{sending 'c' risks causing data races}}
-    // expected-ni-note @-1 {{sending main actor-isolated 'c' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+    // expected-ni-note @-1 {{sending main actor-isolated 'c' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
 
     c = a.klassLet
   }
@@ -1747,7 +1747,7 @@ actor FunctionWithSendableResultAndIsolationActor {
 func previouslyBrokenTestCase(ns: NonSendableKlass) async -> SendableGenericStruct? {
   return await { () -> SendableGenericStruct? in
     return await ns.getSendableGenericStructAsync() // expected-ni-warning {{sending 'ns' risks causing data races}}
-    // expected-ni-note @-1 {{sending main actor-isolated 'ns' to nonisolated instance method 'getSendableGenericStructAsync()' risks causing data races between nonisolated and main actor-isolated uses}}
+    // expected-ni-note @-1 {{sending main actor-isolated 'ns' to @concurrent instance method 'getSendableGenericStructAsync()' risks causing data races between @concurrent and main actor-isolated uses}}
   }()
 }
 
@@ -2008,9 +2008,9 @@ func inferLocationOfCapturedTaskIsolatedSelfCorrectly() {
 
 nonisolated(nonsending) func testCallNonisolatedNonsending(_ x: NonSendableKlass) async {
   await useValueAsync(x) // expected-ni-warning {{sending 'x' risks causing data races}}
-  // expected-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  // expected-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and nonisolated(nonsending) task-isolated uses}}
   await useValueAsyncConcurrent(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'useValueAsyncConcurrent' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  // expected-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to @concurrent global function 'useValueAsyncConcurrent' risks causing data races between @concurrent and nonisolated(nonsending) task-isolated uses}}
   // expected-ni-ns-note @-2 {{sending task-isolated 'x' to @concurrent global function 'useValueAsyncConcurrent' risks causing data races between @concurrent and task-isolated uses}}
 }
 
@@ -2022,12 +2022,12 @@ func avoidThinkingClosureParameterIsSending() {
     func perform() {
         Task { [value] in
           await value.asyncCall() // expected-ni-warning {{sending 'value' risks causing data races}}
-          // expected-ni-note @-1 {{sending main actor-isolated 'value' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and main actor-isolated uses}}
+          // expected-ni-note @-1 {{sending main actor-isolated 'value' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and main actor-isolated uses}}
         }
 
         Task {
           await value.asyncCall() // expected-ni-warning {{sending 'self.value' risks causing data races}}
-          // expected-ni-note @-1 {{sending main actor-isolated 'self.value' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and main actor-isolated uses}}
+          // expected-ni-note @-1 {{sending main actor-isolated 'self.value' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and main actor-isolated uses}}
         }
     }
   }

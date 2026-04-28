@@ -7000,7 +7000,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         continue;
 
       // Only nonisolated conformances can be affected.
-      if (!conformance->getIsolation().isNonisolated())
+      if (!conformance->getIsolation().isNonisolatedOrConcurrent())
         continue;
 
       auto nameLoc = normal->getProtocolNameLoc();

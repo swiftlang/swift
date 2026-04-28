@@ -49,11 +49,14 @@ std::optional<ActorIsolation> ActorIsolation::forSILString(SILModule &mod,
                   .Case("unspecified", ActorIsolation::Unspecified)
                   .Case("actor_instance", ActorIsolation::ActorInstance)
                   .Case("nonisolated", ActorIsolation::Nonisolated)
+                  .Case("@concurrent", ActorIsolation::NonisolatedConcurrent)
                   .Case("nonisolated_unsafe", ActorIsolation::NonisolatedUnsafe)
                   .Case("global_actor", ActorIsolation::GlobalActor)
                   .Case("global_actor_unsafe", ActorIsolation::GlobalActor)
                   .Case("caller_isolation_inheriting",
-                        ActorIsolation::CallerIsolationInheriting)
+                        ActorIsolation::NonisolatedNonsending)
+                  .Case("nonisolated(nonsending)",
+                        ActorIsolation::NonisolatedNonsending)
                   .Default(std::nullopt);
   if (kind == std::nullopt)
     return std::nullopt;

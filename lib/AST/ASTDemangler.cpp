@@ -584,7 +584,7 @@ Type ASTBuilder::createFunctionType(
     isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
   } else if (extFlags.isIsolatedAny()) {
     isolation = FunctionTypeIsolation::forErased();
-  } else if (extFlags.isNonIsolatedCaller()) {
+  } else if (extFlags.isNonisolatedNonsending()) {
     isolation = FunctionTypeIsolation::forNonIsolatedCaller();
   }
 

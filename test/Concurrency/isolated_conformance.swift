@@ -251,7 +251,7 @@ struct MyHashable: @MainActor Hashable {
 }
 
 @concurrent func testMyHashableSet() async {
-  let _: Set<MyHashable> = [] // expected-warning{{main actor-isolated conformance of 'MyHashable' to 'Hashable' cannot be used in nonisolated context}}
+  let _: Set<MyHashable> = [] // expected-warning{{main actor-isolated conformance of 'MyHashable' to 'Hashable' cannot be used in @concurrent context}}
 }
 
 // Like Identifiable!

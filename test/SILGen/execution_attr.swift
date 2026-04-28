@@ -8,13 +8,13 @@
 // `@concurrent` and `nonisolated(nonsending)`
 
 // CHECK-LABEL: // executionCaller()
-// CHECK-NEXT: // Isolation: caller_isolation_inheriting
+// CHECK-NEXT: // Isolation: nonisolated(nonsending)
 // CHECK-NEXT: sil hidden [ossa] @$s14execution_attr0A6CalleryyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 nonisolated(nonsending)
 func executionCaller() async {}
 
 // CHECK-LABEL: // executionConcurrent()
-// CHECK: // Isolation: nonisolated
+// CHECK: // Isolation: @concurrent
 // CHECK: sil hidden [ossa] @$s14execution_attr0A10ConcurrentyyYaF : $@convention(thin) @async () -> () {
 @concurrent
 func executionConcurrent() async {}

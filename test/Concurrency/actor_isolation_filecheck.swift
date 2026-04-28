@@ -39,7 +39,7 @@ class NonSendableKlass {}
   let erased: () -> Void = t.foo
 
   await useValueAsync(erased) // expected-error {{sending 'erased' risks causing data races}}
-  // expected-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-note @-1 {{sending main actor-isolated 'erased' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
 }
 
 @MainActor

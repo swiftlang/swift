@@ -1437,7 +1437,7 @@ public:
 
   ConventionsKind getKind() const { return kind; }
 
-  bool hasCallerIsolationParameter() const {
+  bool hasNonisolatedNonsendingActorParameter() const {
     return kind == ConventionsKind::Default ||
            kind == ConventionsKind::Deallocator;
   }
@@ -1949,8 +1949,8 @@ private:
 
     // If the function has nonisolated(nonsending) isolation, insert the
     // implicit isolation parameter.
-    if (IsolationInfo && IsolationInfo->isCallerIsolationInheriting() &&
-        Convs.hasCallerIsolationParameter()) {
+    if (IsolationInfo && IsolationInfo->isNonisolatedNonsending() &&
+        Convs.hasNonisolatedNonsendingActorParameter()) {
       addParameter(-1, CanType(TC.Context.TheImplicitActorType),
                    ParameterConvention::Direct_Guaranteed,
                    ParameterTypeFlags().withIsolated(true),
@@ -2657,11 +2657,11 @@ swift::getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
       if (auto *nonisolatedAttr =
               decl->getAttrs().getAttribute<NonisolatedAttr>()) {
         if (nonisolatedAttr->isNonSending())
-          return ActorIsolation::forCallerIsolationInheriting();
+          return ActorIsolation::forNonisolatedNonsending();
       }
 
       if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
-        return ActorIsolation::forNonisolated(false /*unsafe*/);
+        return ActorIsolation::forNonisolatedConcurrent();
       }
     }
 
@@ -2673,10 +2673,10 @@ swift::getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
   }
 
   if (substFnInterfaceType->hasExtInfo() &&
-      substFnInterfaceType->getExtInfo().getIsolation().isNonIsolatedCaller()) {
+      substFnInterfaceType->getExtInfo().getIsolation().isNonisolatedNonsending()) {
     // If our function type is a nonisolated caller and we can not infer from
     // our constant, we must be caller isolation inheriting.
-    return ActorIsolation::forCallerIsolationInheriting();
+    return ActorIsolation::forNonisolatedNonsending();
   }
 
   return {};
@@ -3127,8 +3127,8 @@ static CanSILFunctionType getSILFunctionType(
   }
 
   bool isNonisolatedNonsending =
-      actorIsolation && actorIsolation->isCallerIsolationInheriting() &&
-      conventions.hasCallerIsolationParameter();
+      actorIsolation && actorIsolation->isNonisolatedNonsending() &&
+      conventions.hasNonisolatedNonsendingActorParameter();
 
   auto silExtInfo =
       extInfoBuilder.withClangFunctionType(clangType)

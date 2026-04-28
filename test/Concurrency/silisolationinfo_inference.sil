@@ -2026,7 +2026,7 @@ bb0:
 // CHECK-NEXT: Input Value: %1 = argument of bb0 : $NonSendableKlass
 // CHECK-NEXT: Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
 // CHECK-NEXT: end running test 1 of 1 on taskisolated_nonisolated_nonsending_test: sil_isolation_info_inference with: @trace[0]
-sil [ossa] [isolation "caller_isolation_inheriting"] @taskisolated_nonisolated_nonsending_test : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
+sil [ossa] [isolation "nonisolated(nonsending)"] @taskisolated_nonisolated_nonsending_test : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass):
   specify_test "sil_isolation_info_inference @trace[0]"
   debug_value [trace] %1
@@ -2038,7 +2038,7 @@ bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass)
 // CHECK-NEXT: Input Value:   %3 = apply %2(%1) : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>) -> @owned NonSendableKlass // user: %4
 // CHECK-NEXT: Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
 // CHECK-NEXT: end running test 1 of 1 on builtin_implicit_actor_means_functionapplication_is_taskisolated: sil_isolation_info_inference with: @trace[0]
-sil [ossa] [isolation "caller_isolation_inheriting"] @builtin_implicit_actor_means_functionapplication_is_taskisolated : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+sil [ossa] [isolation "nonisolated(nonsending)"] @builtin_implicit_actor_means_functionapplication_is_taskisolated : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 bb0(%0 : @guaranteed $Builtin.ImplicitActor):
   specify_test "sil_isolation_info_inference @trace[0]"
   %1 = implicitactor_to_opaqueisolation_cast %0
@@ -2054,7 +2054,7 @@ bb0(%0 : @guaranteed $Builtin.ImplicitActor):
 // CHECK-NEXT: Input Value:   %4 = apply %3(%2, %1) : $@convention(thin) (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass // user: %5
 // CHECK-NEXT: Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
 // CHECK-NEXT: end running test 1 of 1 on builtin_implicit_actor_means_functionapplication_with_taskisolated_arg: sil_isolation_info_inference with: @trace[0]
-sil [ossa] [isolation "caller_isolation_inheriting"] @builtin_implicit_actor_means_functionapplication_with_taskisolated_arg : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
+sil [ossa] [isolation "nonisolated(nonsending)"] @builtin_implicit_actor_means_functionapplication_with_taskisolated_arg : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass):
   specify_test "sil_isolation_info_inference @trace[0]"
   %2 = implicitactor_to_opaqueisolation_cast %0
@@ -2066,7 +2066,7 @@ bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass)
   return %9999 : $()
 }
 
-sil [ossa] [isolation "caller_isolation_inheriting"] @merge_isolated_any_with_taskisolated_from_nonisolated_nonsending_parameter : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
+sil [ossa] [isolation "nonisolated(nonsending)"] @merge_isolated_any_with_taskisolated_from_nonisolated_nonsending_parameter : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass):
   specify_test "sil_isolation_info_inference @trace[0]"
   %2 = implicitactor_to_opaqueisolation_cast %0
@@ -2100,7 +2100,7 @@ bb0:
 // CHECK-NEXT: Second Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
 // CHECK-NEXT: Merged Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
 // CHECK-NEXT: end running test 1 of 1 on unapplied_isolated_any_merge_test: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
-sil [ossa] [isolation "caller_isolation_inheriting"] @unapplied_isolated_any_merge_test : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
+sil [ossa] [isolation "nonisolated(nonsending)"] @unapplied_isolated_any_merge_test : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass):
   specify_test "sil-isolation-info-merged-inference @trace[0] @trace[1]"
   %f = function_ref @unappliedIsolatedAnyParameter : $@convention(method) @async (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
@@ -2117,7 +2117,7 @@ bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass)
 // CHECK-NEXT: Second Isolation: task-isolated: task_isolated_from_nonisolated_nonsending_parameter
 // CHECK-NEXT: Merged Isolation: Merge failure!
 // CHECK-NEXT: end running test 1 of 1 on unapplied_isolated_any_merge_failure_test: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
-sil [ossa] [isolation "caller_isolation_inheriting"] @unapplied_isolated_any_merge_failure_test : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
+sil [ossa] [isolation "nonisolated(nonsending)"] @unapplied_isolated_any_merge_failure_test : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass):
   specify_test "sil-isolation-info-merged-inference @trace[0] @trace[1]"
   %stack = alloc_stack $NonSendableKlass
