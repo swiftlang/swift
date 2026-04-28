@@ -519,6 +519,20 @@ namespace {
       // All other C pointers to concrete types map to
       // UnsafeMutablePointer<T> or OpaquePointer.
 
+      // If the pointee record is annotated with swift_attr("import_opaque_pointer"),
+      // import as OpaquePointer regardless of whether the struct definition is
+      // complete. This allows SDK overlays (e.g. Android NDK) to normalize a type
+      // like FILE* that is complete on some API levels and opaque on others.
+      if (const auto *recordType = pointeeQualType->getAs<clang::RecordType>()) {
+        if (importer::hasImportAsOpaquePointerAttr(recordType->getDecl())) {
+          auto opaquePointerDecl = Impl.SwiftContext.getOpaquePointerDecl();
+          if (!opaquePointerDecl)
+            return Type();
+          return {opaquePointerDecl->getDeclaredInterfaceType(),
+                  ImportHint::OtherPointer};
+        }
+      }
+
       // With pointer conversions enabled, map to the normal pointer types
       // without special hints.
       Type pointeeType = Impl.importTypeIgnoreIUO(
