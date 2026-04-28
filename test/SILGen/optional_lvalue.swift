@@ -11,7 +11,7 @@
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
-// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[WRITE]] : $*Optional<Int>, #Optional.some!enumelt
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_inplace_enum_data_addr [[WRITE]] : $*Optional<Int>, #Optional.some!enumelt
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
 func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
   x! = y
@@ -27,7 +27,7 @@ func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
-// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[WRITE]] : $*Optional<Int>, #Optional.some!enumelt
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_inplace_enum_data_addr [[WRITE]] : $*Optional<Int>, #Optional.some!enumelt
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
 func assign_iuo_lvalue(_ x: inout Int!, _ y: Int) {
   x! = y
@@ -52,7 +52,7 @@ struct S {
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
-// CHECK:         [[SOME:%.*]] = unchecked_take_enum_data_addr [[WRITE]]
+// CHECK:         [[SOME:%.*]] = unchecked_inplace_enum_data_addr [[WRITE]]
 // CHECK:         [[X:%.*]] = struct_element_addr [[SOME]]
 func assign_iuo_lvalue_implicit(_ s: inout S!, _ y: Int) {
   s.x = y
@@ -87,7 +87,7 @@ func generate_int() -> Int { return 0 }
 // CHECK:         cond_br [[HASVALUE]], [[SOME:bb[0-9]+]], [[NONE:bb[0-9]+]]
 //
 // CHECK:       [[SOME]]:
-// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_inplace_enum_data_addr
 // CHECK:         [[FN:%.*]] = function_ref
 // CHECK:         [[T0:%.*]] = apply [[FN]]()
 // CHECK:         assign [[T0]] to [[PAYLOAD]]
@@ -111,7 +111,7 @@ struct ComputedOptional {
 // CHECK:  store [[VALUE]] to [trivial] [[TEMP]] : $*Optional<Int>
 // CHECK:  select_enum_addr [[TEMP]] : $*Optional<Int>
 // CHECK:  cond_br
-// CHECK:  [[VALUE_ADDR:%.*]] = unchecked_take_enum_data_addr [[TEMP]] : $*Optional<Int>
+// CHECK:  [[VALUE_ADDR:%.*]] = unchecked_inplace_enum_data_addr [[TEMP]] : $*Optional<Int>
 // CHECK:  [[GENERATOR:%.*]] = function_ref @$s15optional_lvalue12generate_intSiyF
 // CHECK:  [[VALUE:%.*]] = apply [[GENERATOR]]()
 // CHECK:  assign [[VALUE]] to [[VALUE_ADDR]] : $*Int
@@ -134,7 +134,7 @@ func assign_bound_optional_computed_lvalue(_ co: inout ComputedOptional) {
 // CHECK:  [[OPTVALUE:%.*]] = apply [[GETTER]]([[T0]])
 // CHECK:  store [[OPTVALUE]] to [trivial] [[TEMP]]
 // CHECK:  switch_enum_addr [[TEMP]]
-// CHECK:  [[VALUE_ADDR:%.*]] = unchecked_take_enum_data_addr [[TEMP]] : $*Optional<Int>
+// CHECK:  [[VALUE_ADDR:%.*]] = unchecked_inplace_enum_data_addr [[TEMP]] : $*Optional<Int>
 // CHECK:  assign [[VALUE]] to [[VALUE_ADDR]] : $*Int
 // CHECK:  [[OPTVALUE:%.*]] = load [trivial] [[TEMP]] : $*Optional<Int>
 // CHECK:  [[SETTER:%.*]] = function_ref @$s15optional_lvalue16ComputedOptionalV08computedD0SiSgvs

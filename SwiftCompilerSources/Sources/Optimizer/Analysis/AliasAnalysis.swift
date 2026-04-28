@@ -198,13 +198,23 @@ struct AliasAnalysis {
 
     case is InjectEnumAddrInst,
          is UncheckedTakeEnumDataAddrInst,
+         is UncheckedInPlaceEnumDataAddrInst,
          is InitExistentialAddrInst,
          is DeinitExistentialAddrInst,
          is FixLifetimeInst,
          is ClassifyBridgeObjectInst,
          is ValueToBridgeObjectInst,
+         is UncheckedInPlaceEnumDataAddrInst,
+         is UncheckedTakeEnumDataAddrInst,
          is DeallocStackInst:
       if memLoc.mayAlias(with: (inst as! UnaryInstruction).operand.value, self) {
+        return inst.memoryEffects
+      }
+      return .noEffects
+
+    case let ubeda as UncheckedBorrowEnumDataAddrInst:
+      // The borrow won't modify the enum, but will write to the scratch space.
+      if memLoc.mayAlias(with: ubeda.scratch, self) {
         return inst.memoryEffects
       }
       return .noEffects

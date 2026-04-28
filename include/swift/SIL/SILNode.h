@@ -316,7 +316,7 @@ protected:
     SHARED_FIELD(UncheckedEnumDataInst, uint32_t caseIndex);
     SHARED_FIELD(InjectEnumAddrInst, uint32_t caseIndex);
     SHARED_FIELD(InitEnumDataAddrInst, uint32_t caseIndex);
-    SHARED_FIELD(UncheckedTakeEnumDataAddrInst, uint32_t caseIndex);
+    SHARED_FIELD(UncheckedEnumDataAddrInstBase, uint32_t caseIndex);
     SHARED_FIELD(TupleExtractInst, uint32_t fieldNo);
     SHARED_FIELD(TupleElementAddrInst, uint32_t fieldNo);
     SHARED_FIELD(MultipleValueInstructionResult, uint32_t index);

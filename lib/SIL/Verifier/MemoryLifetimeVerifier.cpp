@@ -307,7 +307,7 @@ void MemoryLifetimeVerifier::requireBitsSetForArgument(const Bits &bits, Operand
       addr = errorLoc->representativeValue;
 
     if (applyMayRead(argOp, addr)) {
-      reportError("memory is not initialized, but should be",
+      reportError("argument memory is not initialized, but should be",
                   errorLocIdx, argOp->getUser());
     }
   }
@@ -790,19 +790,12 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           requireBitsSet(bits, I.getOperand(0), &I);
         break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
-        // Note that despite the name, unchecked_take_enum_data_addr does _not_
-        // "take" the payload of the Swift.Optional enum. This is a terrible
-        // hack in SIL.
         auto enumInst = cast<UncheckedTakeEnumDataAddrInst>(&I);
-        // For some enums, projecting the enum data requires masking out
-        // embedded tag bits, which invalidates the value as an enum.
-        if (enumInst->isDestructive()) {
-          SILValue enumAddr = enumInst->getOperand();
-          int enumIdx = locations.getLocationIdx(enumAddr);
-          if (enumIdx >= 0)
-            requireBitsSet(bits, enumAddr, &I);
-          requireNoStoreBorrowLocation(enumAddr, &I);
-        }
+        SILValue enumAddr = enumInst->getOperand();
+        int enumIdx = locations.getLocationIdx(enumAddr);
+        if (enumIdx >= 0)
+          requireBitsSet(bits, enumAddr, &I);
+        requireNoStoreBorrowLocation(enumAddr, &I);
         break;
       }
       case SILInstructionKind::DestroyAddrInst: {

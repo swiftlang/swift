@@ -558,7 +558,7 @@ func dontLoadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTrivia
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2:
-// CHECK-NEXT: unchecked_take_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
+// CHECK-NEXT: unchecked_inplace_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[METATYPE]]
@@ -574,12 +574,12 @@ func dontLoadIgnoredLValueDoubleForceUnwrap(_ a: inout NonTrivialStruct??) -> No
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2:
-// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_take_enum_data_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, #Optional.some!enumelt
+// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_inplace_enum_data_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, #Optional.some!enumelt
 // CHECK-NEXT: switch_enum_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb3
 // CHECK: bb3:
 // CHECK: unreachable
 // CHECK: bb4:
-// CHECK-NEXT: unchecked_take_enum_data_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
+// CHECK-NEXT: unchecked_inplace_enum_data_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[METATYPE]]
@@ -617,7 +617,7 @@ func loadIgnoredLValueThroughForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTri
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2:
-// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_take_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
+// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_inplace_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
 // CHECK-NEXT: [[BORROW:%[0-9]+]] = load_borrow [[UNWRAPPED]]
 // CHECK-NEXT: // function_ref NonTrivialStruct.x.getter
 // CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$s{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>

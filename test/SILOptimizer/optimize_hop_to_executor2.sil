@@ -88,7 +88,7 @@ bb1:                                              // Preds: bb0
   br bb4                                          // id: %18
 
 bb2:                                              // Preds: bb0
-  %19 = unchecked_take_enum_data_addr %9 : $*Optional<Vista>, #Optional.some!enumelt // user: %20
+  %19 = unchecked_inplace_enum_data_addr %9 : $*Optional<Vista>, #Optional.some!enumelt // user: %20
   %20 = load [copy] %19 : $*Vista                 // users: %35, %31, %24
   end_access %9 : $*Optional<Vista>               // id: %21
   hop_to_executor %7 : $Optional<Builtin.Executor> // id: %22

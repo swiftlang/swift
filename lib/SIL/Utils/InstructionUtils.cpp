@@ -587,6 +587,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::InitEnumDataAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::SelectEnumInst:
   case SILInstructionKind::SelectEnumAddrInst:
   case SILInstructionKind::ProjectBlockStorageInst:

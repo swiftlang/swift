@@ -349,8 +349,8 @@ public:
     SGM.useConformancesFromObjectiveCType(UCCAI, UCCAI->getTargetFormalType());
   }
 
-  void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UTEDAI) {
-    SGM.useConformancesFromType(UTEDAI, UTEDAI->getOperand()->getType().getASTType());
+  void visitUncheckedEnumDataAddrInstBase(UncheckedEnumDataAddrInstBase *UTEDAI) {
+    SGM.useConformancesFromType(UTEDAI, UTEDAI->getEnum()->getType().getASTType());
   }
 
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {

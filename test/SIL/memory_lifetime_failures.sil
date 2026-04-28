@@ -194,7 +194,7 @@ bb0(%0 : $*Optional<T>):
   switch_enum_addr %0 : $*Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
-  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
   br bb3
 
 bb2:
@@ -213,7 +213,7 @@ bb0(%0 : $*Optional<T>):
 
 bb1(%3 : @guaranteed $T):
   end_borrow %1 : $Optional<T>
-  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
   br bb3
 
 bb2:
@@ -407,7 +407,7 @@ sil [ossa] @test_store_borrow_take_enum : $@convention(thin) (@guaranteed Option
 bb0(%0 :  @guaranteed $Optional<T>):
   %s = alloc_stack $Optional<T>
   %sb = store_borrow %0 to %s : $*Optional<T>
-  %ue = unchecked_take_enum_data_addr %sb : $*Optional<T>, #Optional.some!enumelt
+  %ue = unchecked_inplace_enum_data_addr %sb : $*Optional<T>, #Optional.some!enumelt
   end_borrow %sb : $*Optional<T>
   dealloc_stack %s : $*Optional<T>
   %res = tuple ()
@@ -768,7 +768,7 @@ entry:
   return %retval : $()
 }
 
-// CHECK: SIL memory lifetime failure in @begin_apply_inout_use_after_end_apply: memory is not initialized, but should be
+// CHECK: SIL memory lifetime failure in @begin_apply_inout_use_after_end_apply: argument memory is not initialized, but should be
 sil [ossa] @begin_apply_inout_use_after_end_apply : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout U
@@ -788,7 +788,7 @@ entry:
   return %retval : $()
 }
 
-// CHECK: SIL memory lifetime failure in @begin_apply_inout_aliasable_use_after_end_apply: memory is not initialized, but should be
+// CHECK: SIL memory lifetime failure in @begin_apply_inout_aliasable_use_after_end_apply: argument memory is not initialized, but should be
 sil [ossa] @begin_apply_inout_aliasable_use_after_end_apply : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout_aliasable U

@@ -785,9 +785,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {
     return SILIsolationInfo::getGlobalActorIsolated(uedi, uedi->getEnumDecl());
   }
-
-  // See if we have an unchecked_enum_data from a global-actor-isolated type.
-  if (auto *utedi = dyn_cast<UncheckedTakeEnumDataAddrInst>(inst)) {
+  if (auto *utedi = dyn_cast<UncheckedEnumDataAddrInstBase>(inst)) {
     return SILIsolationInfo::getGlobalActorIsolated(utedi,
                                                     utedi->getEnumDecl());
   }

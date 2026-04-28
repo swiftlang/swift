@@ -5378,7 +5378,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
           SILValue addr =
               addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
           auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
-          input = SGF.B.createUncheckedTakeEnumDataAddr(
+          input = SGF.B.createUncheckedInPlaceEnumDataAddr(
               loc, input, someDecl, input.getType().getOptionalObjectType());
           SGF.B.createCopyAddr(loc, input.getValue(), addr, IsNotTake,
                                IsInitialization);
@@ -6153,7 +6153,7 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
   assert(eltTy);
   SILValue address = optValue.forward(*this);
   return emitManagedBufferWithCleanup(
-      B.createUncheckedTakeEnumDataAddr(loc, address, someDecl, eltTy));
+      B.createUncheckedInPlaceEnumDataAddr(loc, address, someDecl, eltTy));
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {

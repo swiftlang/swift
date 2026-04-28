@@ -1405,7 +1405,7 @@ public:
       // projection with no effect on the access path.
       assert(isa<OpenExistentialAddrInst>(projectedAddr) ||
              isa<InitEnumDataAddrInst>(projectedAddr) ||
-             isa<UncheckedTakeEnumDataAddrInst>(projectedAddr)
+             isa<UncheckedEnumDataAddrInstBase>(projectedAddr)
              // project_box is not normally an access projection but we treat it
              // as such when it operates on unchecked_take_enum_data_addr.
              || isa<ProjectBoxInst>(projectedAddr)
@@ -1987,6 +1987,8 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
   // also report them as uses.
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
     pushUsers(svi, dfs);
     return LeafUse;
 
@@ -2009,7 +2011,7 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
     // for load+project_box.
     if (svi->getType().is<SILBoxType>()) {
       Operand *addrOper = &cast<LoadInst>(svi)->getOperandRef();
-      assert(isa<UncheckedTakeEnumDataAddrInst>(addrOper->get()));
+      assert(isa<UncheckedEnumDataAddrInstBase>(addrOper->get()));
       // Push the project_box uses
       for (auto *use : svi->getUses()) {
         if (auto *projectBox = dyn_cast<ProjectBoxInst>(use->getUser())) {
@@ -2809,6 +2811,8 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::SwitchEnumAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::PackElementGetInst: {
     // Assuming all the above have only a single address operand.

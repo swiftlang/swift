@@ -3584,6 +3584,36 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         ResultTy);
     break;
   }
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst: {
+    // Use SILOneValueOneOperandLayout.
+    EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
+    SILType OperandTy =
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
+    SILType ResultTy = OperandTy.getEnumElementType(
+        Elt, SILMod, Builder.getTypeExpansionContext());
+    ResultInst = Builder.createUncheckedInPlaceEnumDataAddr(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID2, OperandTy), Elt,
+        ResultTy);
+    break;
+  }
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst: {
+    // Use SILOneTypeValuesLayout.
+    EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ListOfValues[0]));
+
+    SILType EnumTy =
+        getSILType(MF->getType(ListOfValues[1]), (SILValueCategory)ListOfValues[2], Fn);
+    SILValue Enum = getLocalValue(Builder.maybeGetFunction(), ListOfValues[3],
+                                  EnumTy);
+    
+    SILType ScratchTy =
+        getSILType(MF->getType(ListOfValues[4]), (SILValueCategory)ListOfValues[5], Fn);
+    SILValue Scratch = getLocalValue(Builder.maybeGetFunction(), ListOfValues[6],
+                                  ScratchTy);
+
+    ResultInst = Builder.createUncheckedBorrowEnumDataAddr(
+        Loc, Enum, Scratch, Elt);
+    break;
+  }
   case SILInstructionKind::InjectEnumAddrInst: {
     // Use SILOneValueOneOperandLayout.
     EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));

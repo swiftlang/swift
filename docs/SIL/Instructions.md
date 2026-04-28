@@ -3596,8 +3596,11 @@ b_dest(%b : $String):
 
 An address-only enum can be tested by branching on it using the
 [switch_enum_addr](#switch_enum_addr) terminator. Its value can then be
-taken by destructively projecting the enum value with
-[unchecked_take_enum_data_addr](#unchecked_take_enum_data_addr):
+taken by projecting the enum value with
+[unchecked_take_enum_data_addr](#unchecked_take_enum_data_addr),
+[unchecked_borrow_enum_data_addr](#unchecked_borrow_enum_data_addr),
+[unchecked_inplace_enum_data_addr](#unchecked_inplace_enum_data_addr),
+:
 
 ```
 enum Foo<T> { case A(T), B(String) }
@@ -3735,12 +3738,53 @@ value referenced by the result address valid. In these cases, the enum
 memory cannot be reinitialized as an enum until the payload has also
 been invalidated.
 
+### unchecked_borrow_enum_data_addr
+
+```
+sil-instruction ::= 'unchecked_borrow_enum_data_addr' sil-operand ',' sil-decl-ref 'in' sil-operand
+
+%2 = unchecked_borrow_enum_data_addr %0 : $*U, #U.DataCase!enumelt in %1
+// $U must be an enum type
+// #U.DataCase must be a case of enum $U with data
+// %1 must be the address of an uninitialized memory location of type $*U
+// %2 will be of address type $*T for the data type of case U.DataCase
+```
+
+Borrows the address of the payload for the given enum `case` in-place in
+memory. It is undefined behavior if the referenced enum does not contain
+a value of the given `case`.
+
+A valid enum value must exist at the `%0` address when the instruction executes.
+The representation of the value may be bitwise-copied into the scratch space
+parameter `%1` if necessary. `%1` must be uninitialized prior to the instruction's
+execution, and neither `%0` or `%1` may be modified or deallocated while the result
+of the instruction is in use. The result address also must not be written through
+or deallocated. The memory at `%0` is not modified by the instruction.
+
+### unchecked_inplace_enum_data_addr
+
+```
+sil-instruction ::= 'unchecked_inplace_enum_data_addr' sil-operand ',' sil-decl-ref
+
+%1 = unchecked_inplace_enum_data_addr %0 : $*U, #U.DataCase!enumelt
+// $U must be an enum type with a nondestructive projection operation
+// #U.DataCase must be a case of enum $U with data
+// %1 will be of address type $*T for the data type of case U.DataCase
+```
+
 If an enum has no more than one payload case, or if the declaration is
 ever address-only, then `unchecked_take_enum_data_addr` is
 guaranteed to be nondestructive, and the payload address can be accessed
-without invalidating the enum in these cases. The payload can be
-invalidated to invalidate the enum (assuming the enum does not have a
-`deinit` at the type level).
+without invalidating the enum in these cases. `unchecked_inplace_enum_data_addr`
+represents an in-place projection that does not require modifying or bitwise-copying
+the representation.
+
+It is undefined behavior if the referenced enum does not contain
+a value of the given `case`. Since this is a simple projection, ownership is
+forwarded through the instruction, so if the user has ownership of the original
+value stored at `%0`, it may consume the payload through `%1` and thereby
+invalidate the enum (assuming the enum does not have an active `deinit` that
+must be executed).
 
 ### select_enum
 

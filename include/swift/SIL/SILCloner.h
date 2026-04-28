@@ -2580,6 +2580,28 @@ SILCloner<ImplClass>::visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAd
   
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnumDataAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createUncheckedInPlaceEnumDataAddr(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                Inst->getElement(), getOpType(Inst->getType())));
+}
+  
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDataAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createUncheckedBorrowEnumDataAddr(
+                getOpLocation(Inst->getLoc()),
+                getOpValue(Inst->getEnum()),
+                getOpValue(Inst->getScratch()),
+                Inst->getElement(), getOpType(Inst->getType())));
+}
+  
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitInjectEnumAddrInst(InjectEnumAddrInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(

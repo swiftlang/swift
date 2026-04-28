@@ -2657,6 +2657,18 @@ public:
           << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
   
+  void visitUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDataAddrInst *UDAI) {
+    *this << getIDAndType(UDAI->getEnum()) << ", "
+          << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement)
+          << " in "
+          << getIDAndType(UDAI->getScratch());
+  }
+  
+  void visitUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnumDataAddrInst *UDAI) {
+    *this << getIDAndType(UDAI->getOperand()) << ", "
+          << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
+  }
+  
   void visitInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
     *this << getIDAndType(IUAI->getOperand()) << ", "
           << SILDeclRef(IUAI->getElement(), SILDeclRef::Kind::EnumElement);
