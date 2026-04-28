@@ -5336,11 +5336,16 @@ void suggestAnyAppleOSAvailability(const Decl *D,
       attrsByIntroVersion;
 
   for (const AvailableAttr *attr : attrs) {
-    auto semAttr = D->getSemanticAvailableAttr(attr);
-    if (!semAttr || !semAttr->isPlatformSpecific())
+    // Only consider @available attributes that could indicate an introduction.
+    if (attr->getKind() != AvailableAttr::Kind::Default)
       continue;
 
-    if (attr->getKind() != AvailableAttr::Kind::Default)
+    // @_spi_available attributes should not be considered.
+    if (attr->isSPI())
+      continue;
+
+    auto semAttr = D->getSemanticAvailableAttr(attr);
+    if (!semAttr || !semAttr->isPlatformSpecific())
       continue;
 
     auto platform = semAttr->getPlatform();

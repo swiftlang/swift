@@ -206,3 +206,30 @@ func fourAppExtensionVersionsLongForm() { }
 
 @available(Windows 26, Android 26, *)
 func nonAppleOSesAligned() { }
+
+@_spi_available(macOS 26, *)
+@_spi_available(iOS 26, *)
+@_spi_available(watchOS 26, *)
+@available(visionOS 26, *)
+func someSPIAvailableSeparateShortForm() { }
+
+@available(macOS 26, *)
+@_spi_available(iOS 26, watchOS 26, visionOS 26, *)
+func someSPIAvailableSingleShortForm() { }
+
+@_spi_available(macOS 26, iOS 26, watchOS 26, visionOS 26, *)
+func allSPIAvailableSingleShortForm() { } // expected-warning {{symbols that are '@_spi_available' on all platforms should use '@_spi' instead}}
+
+@available(macOS 26, visionOS 26, *)
+// expected-note@-1 {{'someSPIAvailableTwoNonSPIOSesAligned()' is available in macOS 26 or newer}}
+// expected-note@-2 {{'someSPIAvailableTwoNonSPIOSesAligned()' is available in visionOS 26 or newer}}
+@_spi_available(iOS 26, watchOS 26,  *)
+func someSPIAvailableTwoNonSPIOSesAligned() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{none}}
+
+@available(macOS 26, visionOS 26, *)
+// expected-note@-1 {{'someSPIAvailableTwoNonSPIOSesAligned2()' is available in macOS 26 or newer}}
+// expected-note@-2 {{'someSPIAvailableTwoNonSPIOSesAligned2()' is available in visionOS 26 or newer}}
+@_spi_available(iOS 26, *)
+@_spi_available(watchOS 26,  *)
+func someSPIAvailableTwoNonSPIOSesAligned2() { } // expected-warning {{use '@available(anyAppleOS 26, *)' instead of platform specific '@available' attributes with the same version}}{{none}}
+
