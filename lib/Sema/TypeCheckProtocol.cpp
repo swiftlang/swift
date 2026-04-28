@@ -5226,18 +5226,13 @@ static void diagnoseConformanceIsolationErrors(
     if (potentialIsolation && potentialIsolation->isGlobalActor() &&
         !conformance->isIsolated()) {
       // Skip the suggestion when the conforming nominal already carries the
-      // same global actor and the user hasn't explicitly opted the conformance
-      // out of isolation: writing the attribute on the conformance would be
-      // redundant with the nominal's isolation. Explicit 'nonisolated' keeps
-      // the suggestion, since it reflects a deliberate choice the user may
-      // want to reconsider.
+      // same global actor: the inserted attribute would either duplicate the
+      // nominal's isolation, or (when the conformance is explicitly
+      // 'nonisolated') conflict with it.
       auto *nominal =
           conformance->getDeclContext()->getSelfNominalTypeDecl();
-      bool explicitlyNonisolated =
-          conformance->getOptions().contains(
-              ProtocolConformanceFlags::Nonisolated);
       bool redundantWithNominal =
-          nominal && !explicitlyNonisolated &&
+          nominal &&
           isolationsMatch(getActorIsolation(nominal), *potentialIsolation);
 
       if (!redundantWithNominal) {

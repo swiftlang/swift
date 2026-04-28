@@ -340,9 +340,9 @@ class ComputedGetSetWitness: HasMutableVar {
 
 // https://github.com/swiftlang/swift/issues/87776
 // The '@MainActor' suggestion on a conformance is suppressed when the
-// nominal already carries '@MainActor', since the attribute would be
-// redundant. The suggestion still fires for nominals with a different or
-// no global actor, and for conformances explicitly marked 'nonisolated'.
+// nominal already carries '@MainActor', since the inserted attribute would
+// either duplicate the nominal's isolation or, for explicit 'nonisolated'
+// conformances, conflict with it.
 // expected-warning@+2{{conformance of 'Issue87776' to protocol 'Identifiable' crosses into main actor-isolated code and can cause data races}}
 @MainActor
 class Issue87776: Identifiable {
@@ -350,4 +350,15 @@ class Issue87776: Identifiable {
   var id: String = ""
   // expected-note@-1{{main actor-isolated property 'id' cannot satisfy nonisolated requirement}}
   // expected-note@-2{{change property 'id' to a 'nonisolated let' constant}}{{3-6=nonisolated let}}
+}
+
+// Same suppression for an explicit 'nonisolated' conformance on a '@MainActor'
+// nominal: inserting '@MainActor' next to 'nonisolated' would be contradictory.
+// expected-warning@+2{{conformance of 'Issue87776Nonisolated' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+@MainActor
+class Issue87776Nonisolated: nonisolated P {
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{30-30=@preconcurrency }}
+  func f() {}
+  // expected-note@-1{{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+  // expected-note@-2{{mark instance method 'f()' 'nonisolated'}}{{3-3=nonisolated }}
 }

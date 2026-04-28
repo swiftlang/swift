@@ -14,8 +14,7 @@ protocol Q {
   func g()
 }
 
-// expected-note@+3{{turn data races into runtime errors with '@preconcurrency'}}
-// expected-note@+2{{isolate this conformance to the main actor with '@MainActor'}}
+// expected-note@+2{{turn data races into runtime errors with '@preconcurrency'}}
 // expected-error@+1{{conformance of 'CImplicitMainActorNonisolatedConformance' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
 class CImplicitMainActorNonisolatedConformance: nonisolated P {
   func f() { // expected-note{{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
