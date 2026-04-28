@@ -1,21 +1,21 @@
-// RUN: %target-swift-frontend %s -emit-silgen | %target-sil-opt
+// RUN: %target-swift-frontend %s -emit-tilgen | %target-til-opt
 
 infix operator ??
 
-struct A<V, E> {
+       A<V, E> {
 }
 
-struct B<V, E> {
+       B<V, E> {
 }
 
-struct C {
+       C {
 }
 
-struct V1 {
+      V1 {
 }
 
-struct E1 {
+      E1 {
 }
 
-var buffer: A<C, B<V1, E1>?>
-var buffer2: A<C, B<V1, E1>?>?
+    buffer: A<C, B<V1, E1>?>
+    buffer2: A<C, B<V1, E1>?>?
