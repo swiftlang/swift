@@ -7,7 +7,7 @@ class Aaron {
     func foo() {
       // Make sure we recover and assume 'self.init'.
       // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'self.'?}} {{11-11=self.}}
-      // expected-error@+1 {{failed to produce diagnostic for expression}}
+      // expected-error@+1 {{cannot reference 'self.init' initializer delegation as function value}}
       _ = init
     }
   }
@@ -48,7 +48,7 @@ class Theodosia: Aaron {
 
     // Make sure we recover and assume 'self.init'.
     // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'self.'?}} {{22-22=self.}}
-    // expected-error@+1 {{failed to produce diagnostic for expression}}
+    // expected-error@+1 {{cannot reference 'self.init' initializer delegation as function value}}
     func foo() { _ = init }
   }
 
