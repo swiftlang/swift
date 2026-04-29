@@ -156,7 +156,7 @@ GenericSignature swift::buildGenericSignatureWithCapturedEnvironments(
                                collector.OuterSig,
                                collector.Params,
                                collector.Requirements,
-                               DefaultRequirementOptions::none());
+                               DefaultRequirementOptions());
 }
 
 Type MapLocalArchetypesOutOfContext::getInterfaceType(

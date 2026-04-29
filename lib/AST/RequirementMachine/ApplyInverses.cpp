@@ -155,7 +155,8 @@ void swift::rewriting::applyInverses(
     // It would probably have been more principled to suppress any defaulting
     // in this case, but this behavior shipped in Swift 6.0 and 6.1, so we
     // need to maintain source compatibility.
-    if (typeOutOfScope->isTypeParameter()) {
+    if (typeOutOfScope->isTypeParameter() &&
+        !options.contains(InferOutOfScopeImpliedInverses)) {
       continue;
     }
     

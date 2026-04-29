@@ -390,7 +390,7 @@ getKeyPathSupportingGenericSignature(Type ty, GenericSignature contextSig) {
                                                contextSig,
                                                {},
                                                std::move(ceRequirements),
-                                               DefaultRequirementOptions::none());
+                                               DefaultRequirementOptions());
   
   // If the resulting signature has conflicting requirements, then it is
   // impossible for the type to be copyable and equatable.

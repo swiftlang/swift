@@ -58,7 +58,7 @@ public:
     auto sig = buildGenericSignature(ctx, GenericSignature(),
                                      addedParameters,
                                      addedRequirements,
-                                     DefaultRequirementOptions::none());
+                                     DefaultRequirementOptions());
 
     // TODO: minimize the signature by removing redundant generic
     // parameters.

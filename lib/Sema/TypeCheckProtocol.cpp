@@ -331,7 +331,7 @@ static GenericSignature maybeAddDifferentiableFromContext(DeclContext *dc,
 
   return buildGenericSignature(dc->getASTContext(), derivativeGenSig, {},
                                std::move(diffRequirements),
-                               DefaultRequirementOptions::expand());
+                               ExpandDefaults);
 }
 
 /// Given a witness, a requirement, and an existing `RequirementMatch` result,

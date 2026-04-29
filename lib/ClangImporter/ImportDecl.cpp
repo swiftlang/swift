@@ -10409,7 +10409,7 @@ GenericSignature ClangImporter::Implementation::buildGenericSignature(
       SwiftContext, GenericSignature(),
       std::move(genericParamTypes),
       std::move(requirements),
-      DefaultRequirementOptions::expand());
+      ExpandDefaults);
 }
 
 Decl *

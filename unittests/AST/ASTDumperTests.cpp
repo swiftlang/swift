@@ -27,7 +27,7 @@ TEST(ASTDumper, ArchetypeType) {
   auto &ctx = C.Ctx;
 
   auto sig = buildGenericSignature(ctx, nullptr, {ctx.TheSelfType}, {},
-                                   DefaultRequirementOptions::expand());
+                                   ExpandDefaults);
 
   TypeBase *archetype = nullptr;
   {

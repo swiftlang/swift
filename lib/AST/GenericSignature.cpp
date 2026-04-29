@@ -795,9 +795,9 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
 void swift::simple_display(raw_ostream &out,
                            DefaultRequirementOptions options) {
   out << "DefaultRequirementOptions(expandingDefaults="
-      << options.expandingDefaults
+      << options.contains(ExpandDefaults)
       << ", inferOutOfScopeImpliedInverses="
-      << options.inferOutOfScopeImpliedInverses << ")";
+      << options.contains(InferOutOfScopeImpliedInverses) << ")";
 }
 
 void swift::simple_display(raw_ostream &out, GenericSignature sig) {
@@ -1189,7 +1189,7 @@ void swift::validateGenericSignature(ASTContext &context,
 
     auto newSigWithError = buildGenericSignatureWithError(
         context, GenericSignature(), genericParams, requirements,
-        DefaultRequirementOptions::none());
+        DefaultRequirementOptions());
     // If there were any errors, the signature was invalid.
     auto errorFlags = newSigWithError.getInt();
     if (errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements) ||
@@ -1224,7 +1224,7 @@ void swift::validateGenericSignature(ASTContext &context,
           nullptr,
           genericParams,
           newRequirements,
-          DefaultRequirementOptions::none()},
+          DefaultRequirementOptions()},
         GenericSignatureWithError());
 
     // If there were any errors, we formed an invalid signature, so

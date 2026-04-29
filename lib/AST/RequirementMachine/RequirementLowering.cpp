@@ -928,7 +928,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result,
                                        defaults, expandedGPs);
     applyInverses(ctx, expandedGPs, inverses, result,
-                  DefaultRequirementOptions::none(), defaults, errors);
+                  DefaultRequirementOptions(), defaults, errors);
     result.append(defaults);
 
     diagnoseRequirementErrors(ctx, errors,
@@ -1009,7 +1009,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   }
 
   applyInverses(ctx, expandedGPs, inverses, result,
-                DefaultRequirementOptions::none(), defaults, errors);
+                DefaultRequirementOptions(), defaults, errors);
   result.append(defaults);
 
   diagnoseRequirementErrors(ctx, errors,

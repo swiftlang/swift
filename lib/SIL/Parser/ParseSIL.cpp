@@ -1187,7 +1187,7 @@ void SILParser::bindSILGenericParams(TypeRepr *TyR) {
 
         if (auto *genericParams = fnType->getPatternGenericParams()) {
           auto sig = handleSILGenericParams(genericParams, SF,
-                                            DefaultRequirementOptions::none());
+                                            DefaultRequirementOptions());
           fnType->setPatternGenericSignature(sig);
         }
       }
@@ -2267,7 +2267,7 @@ static bool parseSILDifferentiabilityWitnessConfigAndFunction(
         P.Context, origGenSig,
         /*addedGenericParams=*/{},
         std::move(witnessRequirements),
-        DefaultRequirementOptions::none());
+        DefaultRequirementOptions());
   }
   auto origFnType = resultOrigFn->getLoweredFunctionType();
   auto *parameterIndices = IndexSubset::get(
@@ -7608,7 +7608,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
                                                     fenv->getGenericSignature(),
                                                     /*addedGenericParams=*/{ },
                                                     std::move(requirements),
-                                                    DefaultRequirementOptions::none());
+                                                    DefaultRequirementOptions());
             FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
                 FunctionState.F->getModule(), genericSig, typeErasedParams, Attr.exported,
                 Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule, Attr.availability));

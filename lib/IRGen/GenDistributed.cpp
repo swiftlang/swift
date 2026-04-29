@@ -327,7 +327,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
     signature = buildGenericSignature(Context, GenericSignature(),
                                       std::move(genericParams),
                                       std::move(genericRequirements),
-                                      DefaultRequirementOptions::expand());
+                                      ExpandDefaults);
   }
 
   auto accessorTy = GenericFunctionType::get(

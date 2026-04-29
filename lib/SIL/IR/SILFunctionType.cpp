@@ -502,7 +502,7 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
   }
 
   return buildGenericSignature(ctx, sig, {}, reqs,
-                               DefaultRequirementOptions::none())
+                               DefaultRequirementOptions())
       .getCanonicalSignature();
 }
 

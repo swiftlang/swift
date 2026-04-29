@@ -571,7 +571,7 @@ AbstractGenericSignatureRequest::evaluate(
 
   // If there are no added requirements, we can form the signature directly
   // with the added parameters.
-  if (addedRequirements.empty() && !options.expandingDefaults) {
+  if (addedRequirements.empty() && !options.contains(ExpandDefaults)) {
     auto result = GenericSignature::get(genericParams,
                                         baseSignature.getRequirements());
     return GenericSignatureWithError(result, GenericSignatureErrors());
@@ -667,7 +667,7 @@ AbstractGenericSignatureRequest::evaluate(
 
   /// Next, we need to expand default requirements and then apply inverses.
   SmallVector<Type, 2> paramsAsTypes;
-  if (options.expandingDefaults) {
+  if (options.contains(ExpandDefaults)) {
     for (auto *gtpt : addedParameters)
       paramsAsTypes.push_back(gtpt);
   }
@@ -863,7 +863,7 @@ InferredGenericSignatureRequest::evaluate(
   // After realizing requirements, expand default requirements only for local
   // generic parameters, as the outer parameters have already been expanded.
   SmallVector<Type, 4> paramTypes;
-  if (options.expandingDefaults) {
+  if (options.contains(ExpandDefaults)) {
     paramTypes.append(genericParams.begin() + numOuterParams,
                       genericParams.end());
   }

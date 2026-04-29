@@ -581,50 +581,29 @@ void validateGenericSignaturesInModule(ModuleDecl *module);
 
 /// Controls how default requirements for invertible protocols such as Copyable
 /// or Escapable are expanded when building a generic signature.
-struct DefaultRequirementOptions {
-  /// If true, default requirements to Copyable/Escapable are
+enum DefaultRequirementFlags : uint8_t {
+  /// If set, default requirements to Copyable/Escapable are
   /// expanded for generic parameters.
-  const bool expandingDefaults;
+  ExpandDefaults = 1 << 0,
 
-  /// If true, generic parameters defined in an outer generic signature that
+  /// If set, generic parameters defined in an outer generic signature that
   /// are same-type constrained to some generic type X within the current
   /// generic signature will skip performing expansion of defaults on type X.
   ///
   /// At a high-level, it "carries inverses across same-type requirements".
-  const bool inferOutOfScopeImpliedInverses;
-
-  /// Requirements WILL NOT be expanded.
-  static DefaultRequirementOptions none() {
-    return DefaultRequirementOptions(/*expandingDefaults=*/false,
-                                     /*inferOutOfScopeImpliedInverses=*/false);
-  }
-
-  /// Requirements WILL be expanded.
-  static DefaultRequirementOptions expand() {
-    return DefaultRequirementOptions(/*expandingDefaults=*/true,
-                                     /*inferOutOfScopeImpliedInverses=*/false);
-  }
-
-  friend bool operator==(DefaultRequirementOptions lhs,
-                         DefaultRequirementOptions rhs) {
-    return lhs.expandingDefaults == rhs.expandingDefaults &&
-           lhs.inferOutOfScopeImpliedInverses ==
-               rhs.inferOutOfScopeImpliedInverses;
-  }
-
-  friend llvm::hash_code hash_value(DefaultRequirementOptions options) {
-    return llvm::hash_combine(options.expandingDefaults,
-                              options.inferOutOfScopeImpliedInverses);
-  }
-
-private:
-  DefaultRequirementOptions(bool expandingDefaults,
-                            bool inferOutOfScopeImpliedInverses)
-      : expandingDefaults(expandingDefaults),
-        inferOutOfScopeImpliedInverses(inferOutOfScopeImpliedInverses) {
-    assert(!inferOutOfScopeImpliedInverses || expandingDefaults);
-  }
+  InferOutOfScopeImpliedInverses = 1 << 1,
 };
+
+using DefaultRequirementOptions = OptionSet<DefaultRequirementFlags>;
+
+inline bool operator==(DefaultRequirementOptions lhs,
+                       DefaultRequirementOptions rhs) {
+  return lhs.containsOnly(rhs);
+}
+
+inline llvm::hash_code hash_value(DefaultRequirementOptions options) {
+  return llvm::hash_value(options.toRaw());
+}
 
 void simple_display(llvm::raw_ostream &out, DefaultRequirementOptions options);
 

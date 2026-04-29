@@ -6934,7 +6934,7 @@ ASTContext::getOpenedExistentialSignature(Type type) {
   collector.addOpenedExistential(gen.Shape);
   existentialSig.OpenedSig = buildGenericSignature(
       *this, collector.OuterSig, collector.Params, collector.Requirements,
-      DefaultRequirementOptions::expand()).getCanonicalSignature();
+      ExpandDefaults).getCanonicalSignature();
 
   // Stash the `Self` type.
   existentialSig.SelfType =
@@ -6962,7 +6962,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   collector.addOpenedElement(shapeClass);
   auto elementSig = buildGenericSignature(
       *this, collector.OuterSig, collector.Params, collector.Requirements,
-      DefaultRequirementOptions::none()).getCanonicalSignature();
+      DefaultRequirementOptions()).getCanonicalSignature();
 
   sigs[key] = elementSig;
   return elementSig;
@@ -7037,7 +7037,7 @@ ASTContext::getOverrideGenericSignature(const NominalTypeDecl *baseNominal,
   auto genericSig = buildGenericSignature(*this, derivedNominalSig,
                                           std::move(addedGenericParams),
                                           std::move(addedRequirements),
-                                          DefaultRequirementOptions::none());
+                                          DefaultRequirementOptions());
   getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
 }

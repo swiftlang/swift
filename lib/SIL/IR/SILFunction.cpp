@@ -91,7 +91,7 @@ GenericSignature SILSpecializeAttr::buildTypeErasedSignature(
         C, GenericSignature(),
         SmallVector<GenericTypeParamType *>(sig.getGenericParams()),
         requirementsErased,
-        DefaultRequirementOptions::none());
+        DefaultRequirementOptions());
   }
 
   return sig;
