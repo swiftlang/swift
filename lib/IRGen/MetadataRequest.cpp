@@ -1082,6 +1082,21 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
     if (requiresForeignTypeMetadata(nominal))
       return MetadataAccessStrategy::ForeignAccessor;
 
+    // @objc @implementation classes *should* be treated like imported ObjC
+    // classes, meaning they should use non-unique accessors. However, previous
+    // versions of the Swift compiler incorrectly emitted a public unique
+    // accessor, and clients which knew about the implementation (i.e. which had
+    // a swiftmodule that hadn't been generated from a swiftinterface) could
+    // sometimes use it.
+    //
+    // To improve this situation without breaking ABI, we'll use a non-unique
+    // accessor for classes implemented outside the main module, and fall
+    // through otherwise.
+    if (isa<ClassDecl>(nominal) && nominal->getObjCImplementationDecl()
+          && !nominal->getObjCImplementationDecl()
+                ->getModuleContext()->isMainModule())
+      return MetadataAccessStrategy::NonUniqueAccessor;
+
     // If the type doesn't guarantee that it has an access function,
     // we might have to use a non-unique accessor.
 
