@@ -582,17 +582,24 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     bool returnHasLifetimeInfo = false;
     if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(ClangDecl)) {
       DLOG("Found lifetimebound attribute on implicit 'this'\n");
-      if (!dependsOnClass(
-              MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
-        if (returnValueCanBeNonEscapable) {
-          printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
-                                           true);
-          returnHasLifetimeInfo = true;
+      if (Self.SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers)) {
+        if (!dependsOnClass(
+                MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
+          if (returnValueCanBeNonEscapable) {
+            printer.printLifetimeboundReturn(
+                SwiftifyInfoPrinter::SELF_PARAM_INDEX, true);
+            returnHasLifetimeInfo = true;
+          } else {
+            DLOG("lifetimebound ignored because return value is escapable");
+          }
         } else {
-          DLOG("lifetimebound ignored because return value is escapable");
+          DLOG("lifetimebound ignored because it depends on class with "
+               "refcount\n");
         }
       } else {
-        DLOG("lifetimebound ignored because it depends on class with refcount\n");
+        DLOG("lifetimebound not yet supported by stable feature-set - "
+             "skipping\n");
+        return false;
       }
     }
 
