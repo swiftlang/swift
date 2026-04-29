@@ -819,7 +819,6 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
       });
 
   F->setDeclRef(constant);
-  F->setActorIsolation(constant.getActorIsolation());
 
   assert(F && "SILFunction should have been defined");
 
@@ -1350,9 +1349,6 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
 
   // Initialize F with the constant we created for it.
   F->setDeclRef(constant);
-
-  // Set our actor isolation.
-  F->setActorIsolation(constant.getActorIsolation());
 
   // Closures automatically infer [manual_ownership] based on outermost func.
   //

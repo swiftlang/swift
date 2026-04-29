@@ -238,6 +238,7 @@ bool SILParser::diagnoseProblems() {
 /// it up and return an appropriate SIL function.
 SILFunction *SILParser::getGlobalNameForDefinition(Identifier name,
                                                    CanSILFunctionType ty,
+                                                   ActorIsolation isolation,
                                                    SourceLoc sourceLoc) {
   SILParserFunctionBuilder builder(SILMod);
   auto silLoc = RegularLocation(sourceLoc);
@@ -253,7 +254,8 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier name,
       P.diagnose(sourceLoc, diag::sil_value_use_type_mismatch, name.str(),
                  fn->getLoweredFunctionType(), ty);
       P.diagnose(iter->second.Loc, diag::sil_prior_reference);
-      fn = builder.createFunctionForForwardReference("" /*name*/, ty, silLoc);
+      fn = builder.createFunctionForForwardReference("" /*name*/, ty, isolation,
+                                                     silLoc);
     }
 
     assert(fn->isExternalDeclaration() && "Forward defns cannot have bodies!");
@@ -272,17 +274,20 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier name,
   // defined already.
   if (SILMod.lookUpFunction(name.str()) != nullptr) {
     P.diagnose(sourceLoc, diag::sil_value_redefinition, name.str());
-    return builder.createFunctionForForwardReference("" /*name*/, ty, silLoc);
+    return builder.createFunctionForForwardReference("" /*name*/, ty, isolation,
+                                                     silLoc);
   }
 
   // Otherwise, this definition is the first use of this name.
-  return builder.createFunctionForForwardReference(name.str(), ty, silLoc);
+  return builder.createFunctionForForwardReference(name.str(), ty, isolation,
+                                                   silLoc);
 }
 
 /// getGlobalNameForReference - Given a reference to a global name, look it
 /// up and return an appropriate SIL function.
 SILFunction *SILParser::getGlobalNameForReference(Identifier name,
                                                   CanSILFunctionType funcTy,
+                                                  ActorIsolation isolation,
                                                   SourceLoc sourceLoc,
                                                   bool ignoreFwdRef) {
   SILParserFunctionBuilder builder(SILMod);
@@ -299,13 +304,13 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier name,
                fn->getLoweredFunctionType(), funcTy);
 
     return builder.createFunctionForForwardReference("" /*name*/, funcTy,
-                                                     silLoc);
+                                                     isolation, silLoc);
   }
   
   // If we didn't find a function, create a new one - it must be a forward
   // reference.
-  auto *fn =
-      builder.createFunctionForForwardReference(name.str(), funcTy, silLoc);
+  auto *fn = builder.createFunctionForForwardReference(name.str(), funcTy,
+                                                       isolation, silLoc);
   TUState.ForwardRefFns[name] = {fn, ignoreFwdRef ? SourceLoc() : sourceLoc};
   return fn;
 }
@@ -7259,8 +7264,9 @@ bool SILParser::parseSILFunctionRef(SILLocation InstLoc,
     P.diagnose(Loc, diag::expected_sil_function_type);
     return true;
   }
-  
-  ResultFn = getGlobalNameForReference(Name, FnTy, Loc);
+
+  ResultFn = getGlobalNameForReference(
+      Name, FnTy, ActorIsolation::forUnspecified(), Loc);
   return false;
 }
 
@@ -7513,9 +7519,9 @@ bool SILParserState::parseDeclSIL(Parser &P) {
       P.diagnose(FnNameLoc, diag::expected_sil_function_type);
       return true;
     }
-  
-    FunctionState.F =
-      FunctionState.getGlobalNameForDefinition(FnName, SILFnType, FnNameLoc);
+
+    FunctionState.F = FunctionState.getGlobalNameForDefinition(
+        FnName, SILFnType, actorIsolation, FnNameLoc);
     FunctionState.F->setBare(IsBare);
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setSerializedKind(SerializedKind_t(isSerialized));
@@ -7558,8 +7564,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     for (auto &Attr : Semantics) {
       FunctionState.F->addSemanticsAttr(Attr);
     }
-    if (actorIsolation)
-      FunctionState.F->setActorIsolation(actorIsolation);
+
     // Now that we have a SILFunction parse the body, if present.
 
     bool isDefinition = false;
@@ -9117,7 +9122,8 @@ bool SILParserState::parseSILScope(Parser &P) {
       P.diagnose(FnLoc, diag::expected_sil_function_type);
       return true;
     }
-    ParentFn = ScopeState.getGlobalNameForReference(FnName, FnTy, FnLoc, true);
+    ParentFn = ScopeState.getGlobalNameForReference(
+        FnName, FnTy, ActorIsolation::forUnspecified(), FnLoc, true);
     ScopeState.TUState.PotentialZombieFns.insert(ParentFn);
   }
 

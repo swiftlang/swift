@@ -891,7 +891,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   SILGenFunctionBuilder builder(*this);
   f = builder.createFunction(
-      linkage, nameBuffer, witnessSILFnType, ActorIsolation::forUnspecified(),
+      linkage, nameBuffer, witnessSILFnType,
+      getSILFunctionTypeActorIsolation(reqtSubstTy, requirement, witnessRef),
       genericEnv, SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent,
       serializedKind, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
       ProfileCounter(), thunkKind, SubclassScope::NotApplicable,
@@ -928,11 +929,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
                           witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
-
-  if (auto isolation = getSILFunctionTypeActorIsolation(
-          reqtSubstTy, requirement, witnessRef)) {
-    f->setActorIsolation(*isolation);
-  }
 
   return f;
 }

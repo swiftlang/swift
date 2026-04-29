@@ -1530,10 +1530,6 @@ public:
     return false;
   }
 
-  void setActorIsolation(ActorIsolation newActorIsolation) {
-    actorIsolation = newActorIsolation;
-  }
-
   ActorIsolation getActorIsolation() const {
     return actorIsolation;
   }
