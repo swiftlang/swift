@@ -4085,6 +4085,9 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
       scope.pushCleanupState(exn.getCleanup(),
                              CleanupState::PersistentlyActive);
     }
+
+    // We may create temporaries while bridging from typed to untyped throws.
+    FullExpr throwScope(Cleanups, CleanupLocation(location));
     emitThrow(S, exn);
   };
   // Set up an initial clause matrix.
