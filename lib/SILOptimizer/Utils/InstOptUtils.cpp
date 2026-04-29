@@ -609,11 +609,6 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// to avoid any divergence between the check and the implementation in the
 /// future.
 ///
-/// \p usePoints are required when \p value has guaranteed ownership. It must be
-/// the last users of the returned, casted value. A usePoint cannot be a
-/// BranchInst (a phi is never the last guaranteed user). \p builder's current
-/// insertion point must dominate all \p usePoints. \p usePoints must
-/// collectively post-dominate \p builder's current insertion point.
 ///
 /// NOTE: The implementation of this function is very closely related to the
 /// rules checked by SILVerifier::requireABICompatibleFunctionTypes. It must
@@ -621,12 +616,8 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// areABICompatibleParamsOrReturns()).
 std::pair<SILValue, bool /* changedCFG */>
 swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
-                                    SILLocation loc,
-                                    SILValue value, SILType srcTy,
-                                    SILType destTy,
-                                    ArrayRef<SILInstruction *> usePoints) {
-  assert(value->getOwnershipKind() != OwnershipKind::Guaranteed ||
-         !usePoints.empty() && "guaranteed value must have use points");
+                                    SILLocation loc, SILValue value,
+                                    SILType srcTy, SILType destTy) {
 
   // No cast is required if types are the same.
   if (srcTy == destTy)
@@ -704,7 +695,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
     // Cast the unwrapped value.
     SILValue castedUnwrappedValue;
     std::tie(castedUnwrappedValue, std::ignore) = castValueToABICompatibleType(
-      builder, pm, loc, unwrappedValue, optionalSrcTy, optionalDestTy, usePoints);
+        builder, pm, loc, unwrappedValue, optionalSrcTy, optionalDestTy);
     // Wrap into optional. An owned value is forwarded through the cast and into
     // the Optional. A borrowed value will have a nested borrow for the
     // rewrapped Optional.
@@ -735,8 +726,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
         builder->createOptionalSome(loc, value, loweredOptionalSrcType);
     // Cast the wrapped value.
     return castValueToABICompatibleType(builder, pm, loc, wrappedValue,
-                                        wrappedValue->getType(), destTy,
-                                        usePoints);
+                                        wrappedValue->getType(), destTy);
   }
 
   // Handle tuple types.
@@ -749,7 +739,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
       bool neededCFGChange;
       std::tie(element, neededCFGChange) = castValueToABICompatibleType(
           builder, pm, loc, element, srcTy.getTupleElementType(idx),
-          destTy.getTupleElementType(idx), usePoints);
+          destTy.getTupleElementType(idx));
       changedCFG |= neededCFGChange;
       expectedTuple.push_back(element);
     };

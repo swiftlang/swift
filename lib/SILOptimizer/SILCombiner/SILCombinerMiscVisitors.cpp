@@ -1653,11 +1653,9 @@ SILCombiner::visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtrac
     if (!opTI->isABICompatibleWith(resTI, *DFEI->getFunction()).isCompatible())
       return nullptr;
 
-    std::tie(newValue, std::ignore) =
-      castValueToABICompatibleType(&Builder, parentTransform->getPassManager(),
-                                   DFEI->getLoc(),
-                                   newValue,
-                                   newValue->getType(), DFEI->getType(), {});
+    std::tie(newValue, std::ignore) = castValueToABICompatibleType(
+        &Builder, parentTransform->getPassManager(), DFEI->getLoc(), newValue,
+        newValue->getType(), DFEI->getType());
   }
 
   replaceInstUsesWith(*DFEI, newValue);
