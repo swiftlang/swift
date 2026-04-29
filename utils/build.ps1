@@ -1814,7 +1814,12 @@ function Build-CMakeProject {
       }
 
       if ($UseSwift) {
-        Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-explicit-module-build", "-cache-compile-job", "-cas-path", $Cache)
+        Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @(
+          "-explicit-module-build",
+          "-cache-compile-job",
+          "-cas-path", $Cache,
+          "-incremental-dependency-scan"
+        )
       }
     }
 

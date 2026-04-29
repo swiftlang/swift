@@ -504,7 +504,10 @@ _buildDemanglingForExtendedExistential(const Metadata *type,
                                               ee->getGeneralizationArguments());
 
   // Dig out the requirement list.
-  auto constrainedExistential = demangledExistential->getChild(0);
+  auto constrainedExistential = demangledExistential;
+  while (constrainedExistential->getKind() == Node::Kind::Type
+         || constrainedExistential->getKind() == Node::Kind::ExistentialMetatype)
+    constrainedExistential = constrainedExistential->getFirstChild();
   assert(constrainedExistential->getKind() == Node::Kind::ConstrainedExistential);
   auto reqList = constrainedExistential->getChild(1);
   assert(reqList->getKind() == Node::Kind::ConstrainedExistentialRequirementList);
