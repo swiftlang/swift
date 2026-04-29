@@ -5,6 +5,6 @@
 
 func f(buttonsStr: [Substring]) {
     // expected-error@+2 {{key path cannot refer to instance method 'compactMap'}}
-    // expected-error@+1 {{cannot convert value of type '() -> Int' to expected argument type '(ArraySlice<Character>) -> Int?'}}
+    // expected-error@+1 {{cannot convert value of type '() -> Int' to expected argument type '(ArraySlice<Character>) throws -> Int?'}}
     let _: [[Int]] = buttonsStr.map(\.split(separator: ",").compactMap(Int.init))
 }
