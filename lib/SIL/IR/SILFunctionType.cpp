@@ -1958,6 +1958,22 @@ private:
                    true /*implicit leading parameter*/);
     }
 
+    // If the function is a closure that behaves as if it has
+    // `nonisolated(nonsending)` isolation, add the implicit isolation
+    // parameter but don't mark it as "isolated" because the closure
+    // should maintain it's statically known isolation after prolog.
+    if (Constant) {
+      if (auto *closure = dyn_cast_or_null<ClosureExpr>(
+              Constant->getAbstractClosureExpr())) {
+        if (closure->behavesLikeNonisolatedNonsending()) {
+          addParameter(-1, CanType(TC.Context.TheImplicitActorType),
+                       ParameterConvention::Direct_Guaranteed,
+                       ParameterTypeFlags(),
+                       true /*implicit leading parameter*/);
+        }
+      }
+    }
+
     // Add any foreign parameters that are positioned at the start
     // of the sequence.  visit() will add foreign parameters that are
     // positioned after any parameters it adds.
