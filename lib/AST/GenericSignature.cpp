@@ -792,6 +792,14 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
   return GenericSignatureImpl::Profile(ID, genericParams, requirements);
 }
 
+void swift::simple_display(raw_ostream &out,
+                           DefaultRequirementOptions options) {
+  out << "DefaultRequirementOptions(expandingDefaults="
+      << options.expandingDefaults
+      << ", inferOutOfScopeImpliedInverses="
+      << options.inferOutOfScopeImpliedInverses << ")";
+}
+
 void swift::simple_display(raw_ostream &out, GenericSignature sig) {
   if (sig)
     sig->print(out);
@@ -1179,11 +1187,9 @@ void swift::validateGenericSignature(ASTContext &context,
   {
     PrettyStackTraceGenericSignature debugStack("verifying", sig);
 
-    auto newSigWithError = buildGenericSignatureWithError(context,
-                                                      GenericSignature(),
-                                                      genericParams,
-                                                      requirements,
-                                                      /*allowInverses*/ false);
+    auto newSigWithError = buildGenericSignatureWithError(
+        context, GenericSignature(), genericParams, requirements,
+        DefaultRequirementOptions::none());
     // If there were any errors, the signature was invalid.
     auto errorFlags = newSigWithError.getInt();
     if (errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements) ||
@@ -1218,7 +1224,7 @@ void swift::validateGenericSignature(ASTContext &context,
           nullptr,
           genericParams,
           newRequirements,
-          /*allowInverses=*/false},
+          DefaultRequirementOptions::none()},
         GenericSignatureWithError());
 
     // If there were any errors, we formed an invalid signature, so
@@ -1308,14 +1314,14 @@ swift::buildGenericSignatureWithError(ASTContext &ctx,
                              GenericSignature baseSignature,
                              SmallVector<GenericTypeParamType *, 2> addedParameters,
                              SmallVector<Requirement, 2> addedRequirements,
-                             bool allowInverses) {
+                             DefaultRequirementOptions options) {
   return evaluateOrDefault(
       ctx.evaluator,
       AbstractGenericSignatureRequest{
         baseSignature.getPointer(),
         addedParameters,
         addedRequirements,
-        allowInverses},
+        options},
       GenericSignatureWithError());
 }
 
@@ -1324,10 +1330,10 @@ swift::buildGenericSignature(ASTContext &ctx,
                              GenericSignature baseSignature,
                              SmallVector<GenericTypeParamType *, 2> addedParameters,
                              SmallVector<Requirement, 2> addedRequirements,
-                             bool allowInverses) {
+                             DefaultRequirementOptions options) {
   return buildGenericSignatureWithError(ctx, baseSignature,
                                         addedParameters, addedRequirements,
-                                        allowInverses).getPointer();
+                                        options).getPointer();
 }
 
 GenericSignature GenericSignature::withoutMarkerProtocols() const {

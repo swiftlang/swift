@@ -556,8 +556,8 @@ namespace {
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericSignature
-swift::handleSILGenericParams(GenericParamList *genericParams,
-                              DeclContext *DC, bool allowInverses) {
+swift::handleSILGenericParams(GenericParamList *genericParams, DeclContext *DC,
+                              DefaultRequirementOptions options) {
   if (genericParams == nullptr)
     return nullptr;
 
@@ -584,7 +584,7 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
       nestedList.back(), WhereClauseOwner(),
       {}, {}, genericParams->getLAngleLoc(),
       /*forExtension=*/nullptr,
-      allowInverses};
+      options};
   return evaluateOrDefault(DC->getASTContext().evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }

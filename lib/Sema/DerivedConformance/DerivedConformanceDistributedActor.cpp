@@ -251,7 +251,7 @@ static FuncDecl* createLocalFunc_doInvokeOnReturn(
                             {resultGenericParamDecl->getDeclaredInterfaceType()
                                  ->castTo<GenericTypeParamType>()},
                             std::move(requirements),
-                            /*allowInverses=*/true);
+                            DefaultRequirementOptions::expand());
 
   FuncDecl *doInvokeOnReturnFunc = FuncDecl::createImplicit(
       C, swift::StaticSpellingKind::None,

@@ -45,6 +45,7 @@ void swift::rewriting::applyInverses(
     ArrayRef<Type> gps,
     ArrayRef<InverseRequirement> inverseList,
     ArrayRef<StructuralRequirement> explicitRequirements,
+    DefaultRequirementOptions options,
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors) {
 

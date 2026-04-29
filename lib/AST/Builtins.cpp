@@ -378,7 +378,7 @@ synthesizeGenericSignature(SynthesisContext &SC,
                                GenericSignature(),
                                std::move(collector.GenericParamTypes),
                                std::move(collector.AddedRequirements),
-                               /*allowInverses=*/false);
+                               DefaultRequirementOptions::none());
 }
 
 /// Build a builtin function declaration.
@@ -819,7 +819,7 @@ namespace {
           Context, GenericSignature(),
           std::move(genericParamTypes),
           std::move(addedRequirements),
-          /*allowInverses=*/false);
+          DefaultRequirementOptions::none());
       return getBuiltinGenericFunction(name, InterfaceParams, InterfaceResult,
                                        TheGenericParamList, GenericSig, Async,
                                        Throws, ThrownError, SendingResult);

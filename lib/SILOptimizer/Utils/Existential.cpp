@@ -246,7 +246,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
   collector.addOpenedExistential(ExistentialType);
   auto ExistentialSig = buildGenericSignature(
       ctx, collector.OuterSig, collector.Params, collector.Requirements,
-      /*allowInverses=*/true).getCanonicalSignature();
+      DefaultRequirementOptions::expand()).getCanonicalSignature();
 
   ExistentialSubs = SubstitutionMap::get(
       ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },

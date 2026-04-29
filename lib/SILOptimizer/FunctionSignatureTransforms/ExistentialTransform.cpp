@@ -336,7 +336,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   NewGenericSig = buildGenericSignature(Ctx, OrigGenericSig,
                                         std::move(GenericParams),
                                         std::move(Requirements),
-                                        /*allowInverses=*/true);
+                                        DefaultRequirementOptions::expand());
 
   /// Original list of parameters
   SmallVector<SILParameterInfo, 4> params;

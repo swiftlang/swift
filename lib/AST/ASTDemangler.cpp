@@ -1130,11 +1130,9 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
   if (!genericTypeParams.empty()) {
     SmallVector<BuiltRequirement, 2> RequirementsVec(Requirements);
     appendInversesAsRequirements(InverseRequirements, RequirementsVec);
-    signature = swift::buildGenericSignature(Ctx,
-                                             signature,
-                                             genericTypeParams,
-                                             std::move(RequirementsVec),
-                                             /*allowInverses=*/true);
+    signature = swift::buildGenericSignature(
+        Ctx, signature, genericTypeParams, std::move(RequirementsVec),
+        DefaultRequirementOptions::expand());
   }
   SmallVector<SILField, 4> silFields;
   for (auto field: fields)
@@ -1429,7 +1427,7 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
   appendInversesAsRequirements(inverseRequirements, requirements);
 
   return buildGenericSignature(Ctx, baseGenericSig, {}, std::move(requirements),
-                               /*allowInverses=*/true)
+                               DefaultRequirementOptions::expand())
       .getCanonicalSignature();
 }
 

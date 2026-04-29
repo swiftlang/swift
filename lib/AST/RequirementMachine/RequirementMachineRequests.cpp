@@ -551,7 +551,7 @@ AbstractGenericSignatureRequest::evaluate(
          const GenericSignatureImpl *baseSignatureImpl,
          SmallVector<GenericTypeParamType *, 2> addedParameters,
          SmallVector<Requirement, 2> addedRequirements,
-         bool allowInverses) const {
+         DefaultRequirementOptions options) const {
   GenericSignature baseSignature = GenericSignature{baseSignatureImpl};
   // If nothing is added to the base signature, just return the base
   // signature.
@@ -571,7 +571,7 @@ AbstractGenericSignatureRequest::evaluate(
 
   // If there are no added requirements, we can form the signature directly
   // with the added parameters.
-  if (addedRequirements.empty() && !allowInverses) {
+  if (addedRequirements.empty() && !options.expandingDefaults) {
     auto result = GenericSignature::get(genericParams,
                                         baseSignature.getRequirements());
     return GenericSignatureWithError(result, GenericSignatureErrors());
@@ -602,7 +602,7 @@ AbstractGenericSignatureRequest::evaluate(
         AbstractGenericSignatureRequest{
           canBaseSignature.getPointer(), std::move(canAddedParameters),
           std::move(canAddedRequirements),
-          allowInverses},
+          options},
         GenericSignatureWithError());
     if (!canSignatureResult.getPointer())
       return GenericSignatureWithError();
@@ -667,7 +667,7 @@ AbstractGenericSignatureRequest::evaluate(
 
   /// Next, we need to expand default requirements and then apply inverses.
   SmallVector<Type, 2> paramsAsTypes;
-  if (allowInverses) {
+  if (options.expandingDefaults) {
     for (auto *gtpt : addedParameters)
       paramsAsTypes.push_back(gtpt);
   }
@@ -676,8 +676,8 @@ AbstractGenericSignatureRequest::evaluate(
   SmallVector<Type, 2> expandedGPs;
   InverseRequirement::expandDefaults(ctx, paramsAsTypes, requirements, defaults,
                                      expandedGPs);
-  applyInverses(ctx, expandedGPs, inverses, requirements,
-                defaults, errors);
+  applyInverses(ctx, expandedGPs, inverses, requirements, options, defaults,
+                errors);
   requirements.append(defaults);
 
   auto &rewriteCtx = ctx.getRewriteContext();
@@ -762,7 +762,7 @@ InferredGenericSignatureRequest::evaluate(
         WhereClauseOwner whereClause,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeBase *, 2> inferenceSources,
-        SourceLoc loc, ExtensionDecl *forExtension, bool allowInverses) const {
+        SourceLoc loc, ExtensionDecl *forExtension, DefaultRequirementOptions options) const {
   GenericSignature parentSig(parentSigImpl);
 
   SmallVector<GenericTypeParamType *, 4> genericParams(
@@ -863,7 +863,7 @@ InferredGenericSignatureRequest::evaluate(
   // After realizing requirements, expand default requirements only for local
   // generic parameters, as the outer parameters have already been expanded.
   SmallVector<Type, 4> paramTypes;
-  if (allowInverses) {
+  if (options.expandingDefaults) {
     paramTypes.append(genericParams.begin() + numOuterParams,
                       genericParams.end());
   }
@@ -871,8 +871,8 @@ InferredGenericSignatureRequest::evaluate(
   SmallVector<StructuralRequirement, 2> defaults;
   SmallVector<Type, 2> expandedGPs;
   InverseRequirement::expandDefaults(ctx, paramTypes, requirements, defaults, expandedGPs);
-  applyInverses(ctx, expandedGPs, inverses, requirements,
-                defaults, errors);
+  applyInverses(ctx, expandedGPs, inverses, requirements, options, defaults,
+                errors);
   
   // Any remaining implicit defaults in a conditional inverse requirement
   // extension must be made explicit.

@@ -202,9 +202,9 @@ namespace swift {
                              DeclContext *DC, bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  GenericSignature handleSILGenericParams(GenericParamList *genericParams,
-                                          DeclContext *DC,
-                                          bool allowInverses=true);
+  GenericSignature handleSILGenericParams(
+      GenericParamList *genericParams, DeclContext *DC,
+      DefaultRequirementOptions options = DefaultRequirementOptions::expand());
 
   /// Turn the given module into SIL IR.
   ///
