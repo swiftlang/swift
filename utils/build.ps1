@@ -830,6 +830,7 @@ enum Project {
   BootstrapTestingMacros
   BootstrapDispatch
   BootstrapFoundation
+  Stage1Compilers
 
   CDispatch
   Compilers
@@ -4998,6 +4999,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-BuildTools $BuildPlatform
   Invoke-BuildStep Build-SQLite $BuildPlatform
   Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
+
   Invoke-BuildStep Build-XML2 $BuildPlatform
   Invoke-BuildStep Build-CDispatch $BuildPlatform
   Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage0Compilers @{
@@ -5016,6 +5018,16 @@ if (-not $SkipBuild) {
     Static               = $false;
     BuildFoundation      = $false;
     SupplementalRuntimes = @("StringProcessing");
+  }
+
+  Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers @{
+    CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage1-$($BuildPlatform.Architecture.LLVMName).cmake";
+    CCompiler       = $Compilers.Stage0.C;
+    CXXCompiler     = $Compilers.Stage0.CXX;
+    SwiftCompiler   = $Compilers.Stage0.Swift;
+    SwiftSDK        = Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap;
+    ToolchainRoot   = Get-ProjectToolchainRoot $BuildPlatform Stage1Compilers;
+    RuntimeLocation = [IO.Path]::Combine((Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap), "usr", "bin");
   }
 
   if ($IsCrossCompiling) {
