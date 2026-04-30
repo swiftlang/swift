@@ -1640,8 +1640,8 @@ static bool swift_isInConformanceExecutionContextImpl(
     // Check whether we are running on this global actor.
     if (!_swift_task_isCurrentGlobalActorHook(
            context->globalActorIsolationType,
-           context->globalActorIsolationType,
-           context->globalActorIsolationWitnessTable))
+           context->globalActorIsolationWitnessTable,
+           context->globalActorIsolationType))
       return false;
   }
 

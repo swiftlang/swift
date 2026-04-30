@@ -789,7 +789,7 @@ public:
   SWIFT_RUNTIME_LIBRARY_VISIBILITY
   extern SWIFT_CC(swift) bool (*__ptrauth_swift_is_global_actor_function
                                _swift_task_isCurrentGlobalActorHook)(
-      SWIFT_CONTEXT const Metadata *, const Metadata *, const WitnessTable *);
+      const Metadata *, const WitnessTable *, SWIFT_CONTEXT const Metadata *);
 
 } // end namespace swift
 
