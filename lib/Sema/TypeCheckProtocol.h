@@ -49,9 +49,9 @@ class RequirementEnvironment;
 /// witnesses with the correct full name, the results will reflect
 /// lookup for just the base name and the pointee will be set to
 /// \c true.
-SmallVector<ValueDecl *, 4>
-lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames,
-                     bool ignoreMissingImports = false);
+SmallVector<ValueDecl *, 4> lookupValueWitnesses(DeclContext *DC,
+                                                 ValueDecl *req,
+                                                 bool *ignoringNames);
 
 class RequirementCheck;
 

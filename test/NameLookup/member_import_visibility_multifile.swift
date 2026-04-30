@@ -11,8 +11,8 @@
 
 //--- main.swift
 
-// expected-member-visibility-note@+2 {{add import of module 'members_A'}}{{1-1=@_implementationOnly import members_A\n}}
-// expected-member-visibility-note@+1 {{add import of module 'members_C'}}{{1-1=@_weakLinked @_spiOnly import members_C\n}}
+// expected-member-visibility-note@+2 1 {{add import of module 'members_A'}}{{1-1=@_implementationOnly import members_A\n}}
+// expected-member-visibility-note@+1 1 {{add import of module 'members_C'}}{{1-1=@_weakLinked @_spiOnly import members_C\n}}
 func testMembersWithInferredContextualBase() {
   takesEnumInA(.caseInA) // expected-member-visibility-error{{enum case 'caseInA' is not available due to missing import of defining module 'members_A'}}
   takesEnumInB(.caseInB)
@@ -25,11 +25,33 @@ func testQualifiedMembers() {
   takesEnumInC(EnumInC.caseInC) // expected-error{{cannot find 'EnumInC' in scope; did you mean 'EnumInB'?}}
 }
 
+// FIXME: Should diagnose import needed for defaultedRequirementInC().
+struct ConformsToRefinesProtocolInA1: RefinesProtocolInA1 {}
+// expected-member-visibility-error@-1 {{type 'ConformsToRefinesProtocolInA1' does not conform to protocol 'ProtocolInA1'}}
+// expected-member-visibility-note@-2 {{add stubs for conformance}}
+
+// FIXME: Should diagnose import needed for defaultedRequirementInA()/defaultedRequirementInC().
+struct ConformsToRefinesProtocolInA2: RefinesProtocolInA2 {}
+// expected-member-visibility-error@-1 {{type 'ConformsToRefinesProtocolInA2' does not conform to protocol 'ProtocolInA2'}}
+// expected-member-visibility-note@-2 {{add stubs for conformance}}
+
+struct ConformsToRefinesProtocolInA3: RefinesProtocolInA3 {}
+struct ConformsToRefinesProtocolInC1: RefinesProtocolInC1 {}
+
+// FIXME: Should diagnose import needed for defaultedRequirementInC().
+struct ConformsToRefinesProtocolInC2: RefinesProtocolInC2 {}
+// expected-member-visibility-error@-1 {{type 'ConformsToRefinesProtocolInC2' does not conform to protocol 'ProtocolInB2'}}
+// expected-member-visibility-note@-2 {{add stubs for conformance}}
+
 //--- A.swift
 
 @_implementationOnly import members_A
 
 func takesEnumInA(_ e: EnumInA) {}
+
+protocol RefinesProtocolInA1: ProtocolInA1 {}
+protocol RefinesProtocolInA2: ProtocolInA2 {}
+protocol RefinesProtocolInA3: ProtocolInA3 {}
 
 //--- B.swift
 
@@ -42,3 +64,6 @@ func takesEnumInB(_ e: EnumInB) {}
 @_spiOnly @_weakLinked import members_C
 
 func takesEnumInC(_ e: EnumInC) {}
+
+protocol RefinesProtocolInC1: ProtocolInC1 {}
+protocol RefinesProtocolInC2: ProtocolInC2 {}

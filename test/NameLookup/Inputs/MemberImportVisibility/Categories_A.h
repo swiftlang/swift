@@ -18,9 +18,14 @@
 - (void)fromA;
 @end
 
-@protocol ObjCProtoInA
-- (void)witnessesObjCConformanceRequirementInA __attribute__((deprecated("ObjCProtoInA")));
+@protocol ObjCProtoInA1
+- (void)witnessesObjCConformanceRequirementInA __attribute__((deprecated("ObjCProtoInA1")));
 @end
 
-@interface Base () <ObjCProtoInA>
+@interface Base () <ObjCProtoInA1>
+@end
+
+@protocol ObjCProtoInA2
+@optional
+- (void)optionalRequirementWitnessedInC;
 @end

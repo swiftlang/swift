@@ -79,3 +79,5 @@ extension ObjectInBridgingHeader {
     overridesCategoryMethodOnNSObject()
   }
 }
+
+class ConformsToObjCProtoInA2: NSObject, ObjCProtoInA2 { }
