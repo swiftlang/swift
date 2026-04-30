@@ -41,30 +41,27 @@ actor ProtectsNonSendable {
   var ns: NonSendableKlass = .init()
 
   nonisolated func testParameter(_ nsArg: NonSendableKlass) async {
-    self.assumeIsolated { isolatedSelf in
+    self.assumeIsolated { isolatedSelf in // expected-note {{passing closure to 'assumeIsolated' here causes closure to become isolated to 'self'}}
       isolatedSelf.ns = nsArg // expected-warning {{sending 'nsArg' risks causing data races}}
-      // expected-concurrent-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
-      // expected-ni-note @-2 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{'self'-isolated closure captures 'nsArg' which remains accessible to code in the current task}}
     }
   }
 
   nonisolated func testParameterOutOfLine2(_ nsArg: NonSendableKlass) async {
     let closure: (isolated ProtectsNonSendable) -> () = { isolatedSelf in
-      isolatedSelf.ns = nsArg // expected-warning {{sending 'nsArg' risks causing data races}}
-      // expected-concurrent-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
-      // expected-ni-note @-2 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      isolatedSelf.ns = nsArg // expected-warning 2{{sending 'nsArg' risks causing data races}}
+      // expected-note @-1 2{{'self'-isolated closure captures 'nsArg' which remains accessible to code in the current task}}
     }
-    self.assumeIsolated(closure)
-    self.assumeIsolated(closure)
+    self.assumeIsolated(closure) // expected-note {{passing closure to 'assumeIsolated' here causes closure to become isolated to 'self'}}
+    self.assumeIsolated(closure) // expected-note {{passing closure to 'assumeIsolated' here causes closure to become isolated to 'self'}}
   }
 
   nonisolated func testParameterMergedIntoLocal(_ nsArg: NonSendableKlass) async {
     let l = NonSendableKlass()
     doSomething(l, nsArg)
-    self.assumeIsolated { isolatedSelf in
+    self.assumeIsolated { isolatedSelf in // expected-note {{passing closure to 'assumeIsolated' here causes closure to become isolated to 'self'}}
       isolatedSelf.ns = l // expected-warning {{sending 'l' risks causing data races}}
-      // expected-concurrent-note @-1 {{task-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
-      // expected-ni-note @-2 {{task-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{'self'-isolated closure captures 'l' which remains accessible to code in the current task}}
     }
   }
 
@@ -81,10 +78,9 @@ actor ProtectsNonSendable {
     let l = NonSendableKlass()
 
     // This is not safe since we use l later.
-    self.assumeIsolated { isolatedSelf in
+    self.assumeIsolated { isolatedSelf in // expected-note {{passing closure to 'assumeIsolated' here causes closure to become isolated to 'self'}}
       isolatedSelf.ns = l // expected-warning {{sending 'l' risks causing data races}}
-      // expected-concurrent-note @-1 {{'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
-      // expected-ni-note @-2 {{'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{'self'-isolated closure captures 'l' which remains accessible to code in the current task}}
     }
 
     useValue(l) // expected-note {{access can happen concurrently}}

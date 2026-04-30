@@ -1,0 +1,138 @@
+// RUN: %target-sil-opt -send-non-sendable -swift-version 6 %s -verify -o /dev/null
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// Tests that Actor.assumeIsolated and DistributedActor.assumeIsolated are
+// recognized by translateAssumeIsolated in RegionAnalysis and produce send
+// diagnostics for non-sendable captures.
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+class NonSendableKlass {}
+
+actor MyActor {
+  var ns: NonSendableKlass
+}
+
+sil @use_nonsendable : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+
+// Actor.assumeIsolated<A>(_:file:line:)
+sil hidden_external [serialized] @$sScAsE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKs8SendableRd__lF : $@convention(method) <τ_0_0 where τ_0_0 : Actor><τ_1_0 where τ_1_0 : Sendable> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <τ_0_0, τ_1_0>, StaticString, UInt, @guaranteed τ_0_0) -> (@out τ_1_0, @error any Error)
+
+// (extension in Distributed):DistributedActor.assumeIsolated<A>(_:file:line:)
+sil hidden_external [serialized] @$s11Distributed0A5ActorPAAE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKs8SendableRd__lF : $@convention(method) <τ_0_0 where τ_0_0 : Actor><τ_1_0 where τ_1_0 : Sendable> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <τ_0_0, τ_1_0>, StaticString, UInt, @guaranteed τ_0_0) -> (@out τ_1_0, @error any Error)
+
+sil [transparent] [serialized] [readonly] @$ss12StaticStringV08_builtinB7Literal17utf8CodeUnitCount7isASCIIABBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin StaticString.Type) -> StaticString
+sil [transparent] [serialized] @$sSu22_builtinIntegerLiteralSuBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin UInt.Type) -> UInt
+
+// =============================================================================
+// Test 1: Actor.assumeIsolated — non-sendable capture triggers send diagnostic
+// =============================================================================
+
+sil private [ossa] @closure_actor : $@convention(thin) @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0, @guaranteed NonSendableKlass) -> (@out τ_0_1, @error any Error) for <MyActor, ()> {
+bb0(%0 : $*(), %1 : @guaranteed $MyActor, %2 : @closureCapture @guaranteed $NonSendableKlass):
+  debug_value %1, let, name "isolatedSelf", argno 1
+  debug_value %2, let, name "nsArg", argno 3
+  %use = function_ref @use_nonsendable : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  %call = apply %use(%2) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil hidden [ossa] @test_actor_assume_isolated : $@convention(method) (@guaranteed NonSendableKlass, @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass, %1 : @guaranteed $MyActor):
+  debug_value %0, let, name "nsArg", argno 1
+  debug_value %1, let, name "self", argno 2
+  %4 = alloc_stack $()
+  %5 = function_ref @closure_actor : $@convention(thin) @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0, @guaranteed NonSendableKlass) -> (@out τ_0_1, @error any Error) for <MyActor, ()>
+  %6 = copy_value %0
+  %7 = partial_apply [callee_guaranteed] %5(%6) : $@convention(thin) @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0, @guaranteed NonSendableKlass) -> (@out τ_0_1, @error any Error) for <MyActor, ()>
+  %8 = convert_escape_to_noescape [not_guaranteed] %7 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <MyActor, ()>
+  %9 = string_literal utf8 "test.swift"
+  %10 = integer_literal $Builtin.Word, 10
+  %11 = integer_literal $Builtin.Int1, -1
+  %12 = metatype $@thin StaticString.Type
+  %13 = function_ref @$ss12StaticStringV08_builtinB7Literal17utf8CodeUnitCount7isASCIIABBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin StaticString.Type) -> StaticString
+  %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin StaticString.Type) -> StaticString
+  %15 = integer_literal $Builtin.IntLiteral, 10
+  %16 = metatype $@thin UInt.Type
+  %17 = function_ref @$sSu22_builtinIntegerLiteralSuBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin UInt.Type) -> UInt
+  %18 = apply %17(%15, %16) : $@convention(method) (Builtin.IntLiteral, @thin UInt.Type) -> UInt
+  %19 = function_ref @$sScAsE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKs8SendableRd__lF : $@convention(method) <τ_0_0 where τ_0_0 : Actor><τ_1_0 where τ_1_0 : Sendable> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <τ_0_0, τ_1_0>, StaticString, UInt, @guaranteed τ_0_0) -> (@out τ_1_0, @error any Error)
+  try_apply %19<MyActor, ()>(%4, %8, %14, %18, %1) : $@convention(method) <τ_0_0 where τ_0_0 : Actor><τ_1_0 where τ_1_0 : Sendable> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <τ_0_0, τ_1_0>, StaticString, UInt, @guaranteed τ_0_0) -> (@out τ_1_0, @error any Error), normal bb1, error bb2 // expected-error {{task or actor-isolated value cannot be sent}}
+
+bb1(%21 : $()):
+  destroy_value %8
+  destroy_value %7
+  %24 = load [trivial] %4
+  dealloc_stack %4
+  %26 = tuple ()
+  return %26 : $()
+
+bb2(%28 : @owned $any Error):
+  destroy_value %28
+  destroy_value %8
+  destroy_value %7
+  dealloc_stack %4
+  unreachable
+}
+
+// =============================================================================
+// Test 2: DistributedActor.assumeIsolated — same pattern, different mangled name
+// =============================================================================
+
+sil private [ossa] @closure_distributed : $@convention(thin) @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0, @guaranteed NonSendableKlass) -> (@out τ_0_1, @error any Error) for <MyActor, ()> {
+bb0(%0 : $*(), %1 : @guaranteed $MyActor, %2 : @closureCapture @guaranteed $NonSendableKlass):
+  debug_value %1, let, name "isolatedSelf", argno 1
+  debug_value %2, let, name "nsArg", argno 3
+  %use = function_ref @use_nonsendable : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  %call = apply %use(%2) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil hidden [ossa] @test_distributed_actor_assume_isolated : $@convention(method) (@guaranteed NonSendableKlass, @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass, %1 : @guaranteed $MyActor):
+  debug_value %0, let, name "nsArg", argno 1
+  debug_value %1, let, name "self", argno 2
+  %4 = alloc_stack $()
+  %5 = function_ref @closure_distributed : $@convention(thin) @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0, @guaranteed NonSendableKlass) -> (@out τ_0_1, @error any Error) for <MyActor, ()>
+  %6 = copy_value %0
+  %7 = partial_apply [callee_guaranteed] %5(%6) : $@convention(thin) @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0, @guaranteed NonSendableKlass) -> (@out τ_0_1, @error any Error) for <MyActor, ()>
+  %8 = convert_escape_to_noescape [not_guaranteed] %7 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <MyActor, ()>
+  %9 = string_literal utf8 "test.swift"
+  %10 = integer_literal $Builtin.Word, 10
+  %11 = integer_literal $Builtin.Int1, -1
+  %12 = metatype $@thin StaticString.Type
+  %13 = function_ref @$ss12StaticStringV08_builtinB7Literal17utf8CodeUnitCount7isASCIIABBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin StaticString.Type) -> StaticString
+  %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin StaticString.Type) -> StaticString
+  %15 = integer_literal $Builtin.IntLiteral, 10
+  %16 = metatype $@thin UInt.Type
+  %17 = function_ref @$sSu22_builtinIntegerLiteralSuBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin UInt.Type) -> UInt
+  %18 = apply %17(%15, %16) : $@convention(method) (Builtin.IntLiteral, @thin UInt.Type) -> UInt
+  %19 = function_ref @$s11Distributed0A5ActorPAAE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKs8SendableRd__lF : $@convention(method) <τ_0_0 where τ_0_0 : Actor><τ_1_0 where τ_1_0 : Sendable> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <τ_0_0, τ_1_0>, StaticString, UInt, @guaranteed τ_0_0) -> (@out τ_1_0, @error any Error)
+  try_apply %19<MyActor, ()>(%4, %8, %14, %18, %1) : $@convention(method) <τ_0_0 where τ_0_0 : Actor><τ_1_0 where τ_1_0 : Sendable> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <τ_0_0, τ_1_0>, StaticString, UInt, @guaranteed τ_0_0) -> (@out τ_1_0, @error any Error), normal bb1, error bb2 // expected-error {{task or actor-isolated value cannot be sent}}
+
+bb1(%21 : $()):
+  destroy_value %8
+  destroy_value %7
+  %24 = load [trivial] %4
+  dealloc_stack %4
+  %26 = tuple ()
+  return %26 : $()
+
+bb2(%28 : @owned $any Error):
+  destroy_value %28
+  destroy_value %8
+  destroy_value %7
+  dealloc_stack %4
+  unreachable
+}
+
+sil_vtable NonSendableKlass {}
+sil_vtable MyActor {}

@@ -31,6 +31,7 @@
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
@@ -2849,6 +2850,26 @@ public:
     }
   }
 
+  bool translateAssumeIsolated(FullApplySite fas) {
+    auto *callee = fas.getCalleeFunction();
+    if (!callee)
+      return false;
+    if (callee->getName() != MANGLED_ACTOR_ASSUME_ISOLATED &&
+        callee->getName() != MANGLED_DISTRIBUTED_ACTOR_ASSUME_ISOLATED)
+      return false;
+
+    // assumeIsolated is a nonisolated function that takes in a closure that is
+    // isolated to a passed in actor. We need to be sure that nothing that is
+    // not disconnected (or in the actor's region which can never happen, but
+    // just saying) can get into that closure. So as a special case, we treat
+    // the closure as being moved into the region of the actor.
+    auto &op = fas.getOperandsWithoutIndirectResults()[0];
+    if (auto lookupResult = tryToTrackValue(op.get())) {
+      builder.addSend(lookupResult->value, &op);
+    }
+    return true;
+  }
+
   void translateSILApply(SILInstruction *inst) {
     // Handles normal builtins and async let start.
     if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
@@ -2863,6 +2884,10 @@ public:
       if (f->getName() == "swift_asyncLet_get") {
         return translateAsyncLetGet(cast<ApplyInst>(*fas));
       }
+    }
+
+    if (translateAssumeIsolated(fas)) {
+      return;
     }
 
     // If this apply does not cross isolation domains, it has normal

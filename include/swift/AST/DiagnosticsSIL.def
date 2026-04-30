@@ -1057,6 +1057,13 @@ NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
 NOTE(regionbasedisolation_named_isolated_closure_yields_race_mutable, none,
      "%0 closure captures reference to mutable %1 which remains modifiable by %select{%3 code|code in the current task}2", (StringRef, Identifier, bool, StringRef))
 
+NOTE(regionbasedisolation_assume_isolated_closure_capture, none,
+     "%0-isolated closure captures %1 which remains accessible to %select{%3 code|code in the current task}2",
+     (Identifier, Identifier, bool, StringRef))
+NOTE(regionbasedisolation_assume_isolated_callee, none,
+     "passing closure to 'assumeIsolated' here causes closure to become isolated to %0",
+     (Identifier))
+
 NOTE(regionbasedisolation_typed_use_after_sending, none,
       "Passing value of non-Sendable type %0 as a 'sending' argument risks causing races in between local and caller code",
       (Type))

@@ -68,6 +68,18 @@ constexpr static const StringLiteral SEMANTICS_DEFAULT_ACTOR =
 constexpr static const StringLiteral SEMANTICS_UNAVAILABLE_CODE_REACHED =
     "unavailable_code_reached";
 
+/// The mangled name of Actor.assumeIsolated<A>(_:file:line:) — the
+/// @_alwaysEmitIntoClient version with the Sendable constraint on A1.
+constexpr static const StringLiteral MANGLED_ACTOR_ASSUME_ISOLATED =
+    "$sScAsE14assumeIsolated_4file4lineqd__qd__xYiKXE_"
+    "s12StaticStringVSutKs8SendableRd__lF";
+
+/// The mangled name of (extension in Distributed):DistributedActor
+/// .assumeIsolated<A>(_:file:line:) — same shape, different protocol.
+constexpr static const StringLiteral MANGLED_DISTRIBUTED_ACTOR_ASSUME_ISOLATED =
+    "$s11Distributed0A5ActorPAAE14assumeIsolated_4file4lineqd__qd__xYiKXE_"
+    "s12StaticStringVSutKs8SendableRd__lF";
+
 constexpr static const StringLiteral DEFAULT_ACTOR_STORAGE_FIELD_NAME =
     "$defaultActor";
 

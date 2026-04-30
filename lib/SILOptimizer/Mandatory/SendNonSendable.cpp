@@ -43,6 +43,7 @@
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "swift/Sema/Concurrency.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
@@ -88,6 +89,21 @@ static SILValue stripFunctionConversions(SILValue val) {
 
     if (auto cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(val)) {
       val = cvt->getOperand();
+      continue;
+    }
+
+    if (auto cvi = dyn_cast<CopyValueInst>(val)) {
+      val = cvi->getOperand();
+      continue;
+    }
+
+    if (auto bbi = dyn_cast<BeginBorrowInst>(val)) {
+      val = bbi->getOperand();
+      continue;
+    }
+
+    if (auto mvi = dyn_cast<MoveValueInst>(val)) {
+      val = mvi->getOperand();
       continue;
     }
 
@@ -1144,6 +1160,21 @@ public:
     emitRequireInstDiagnostics();
   }
 
+  void emitAssumeIsolatedClosure(SILLocation captureLoc,
+                                 SILLocation callSiteLoc, Identifier name,
+                                 Identifier actorName, bool callerIsNonisolated,
+                                 StringRef callerIsolationStr) {
+    diagnoseError(captureLoc, diag::regionbasedisolation_named_send_yields_race,
+                  name)
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(captureLoc,
+                 diag::regionbasedisolation_assume_isolated_closure_capture,
+                 actorName, name, callerIsNonisolated, callerIsolationStr);
+    diagnoseNote(callSiteLoc, diag::regionbasedisolation_assume_isolated_callee,
+                 actorName);
+    emitRequireInstDiagnostics();
+  }
+
   void emitUnknownPatternError() {
     EMIT_UNKNOWN_PATTERN_ERROR(UseAfterSendDiagnosticEmitter,
                                sendingOp->getUser(), getBehaviorLimit());
@@ -1237,6 +1268,7 @@ public:
 private:
   bool initForIsolatedPartialApply(Operand *op, AbstractClosureExpr *ace);
   bool initForSendingPartialApply(FullApplySite fas, Operand *callsiteOp);
+  bool initForAssumeIsolated(FullApplySite fas, Operand *op);
 
   void initForApply(Operand *op, ApplyExpr *expr);
   void initForAutoclosure(Operand *op, AutoClosureExpr *expr);
@@ -1310,6 +1342,58 @@ bool UseAfterSendDiagnosticInferrer::initForSendingPartialApply(
   diagnosticEmitter.emitSendingClosureCapturesMultipleValues(
       baseLoc, baseInferredType, capturedValues, isAutoclosure);
   return true;
+}
+
+bool UseAfterSendDiagnosticInferrer::initForAssumeIsolated(FullApplySite fas,
+                                                           Operand *op) {
+  auto *callee = fas.getCalleeFunction();
+  if (!callee)
+    return false;
+
+  if (callee->getName() != MANGLED_ACTOR_ASSUME_ISOLATED &&
+      callee->getName() != MANGLED_DISTRIBUTED_ACTOR_ASSUME_ISOLATED)
+    return false;
+
+  auto *sendingPAI =
+      dyn_cast<PartialApplyInst>(stripFunctionConversions(op->get()));
+  if (!sendingPAI)
+    return false;
+
+  auto argsWithoutIndirectResults = fas.getOperandsWithoutIndirectResults();
+  auto actorArg = argsWithoutIndirectResults.back().get();
+  Identifier actorName;
+  if (auto actorNameAndRoot = inferNameAndRootHelper(actorArg))
+    actorName = actorNameAndRoot->first;
+
+  auto callSiteLoc = fas.getLoc();
+  for (auto &sendingPAIOp : sendingPAI->getArgumentOperands()) {
+    auto trackableValue = valueMap.getTrackableValue(sendingPAIOp.get());
+    if (trackableValue.value.isSendable())
+      continue;
+
+    auto capturedValue = findClosureUse(&sendingPAIOp);
+    if (!capturedValue)
+      continue;
+
+    auto *diagnosticOp = capturedValue->first;
+
+    if (auto rootValueAndName = inferNameAndRootHelper(sendingPAIOp.get())) {
+      auto callerIsolation =
+          SILIsolationInfo::getFunctionIsolation(op->getFunction());
+      bool callerIsNonisolated = !callerIsolation;
+      StringRef callerIsolationStr;
+      if (!callerIsNonisolated)
+        callerIsolationStr =
+            callerIsolation.printForDiagnostics(op->getFunction());
+      diagnosticEmitter.emitAssumeIsolatedClosure(
+          diagnosticOp->getUser()->getLoc(), callSiteLoc,
+          rootValueAndName->first, actorName, callerIsNonisolated,
+          callerIsolationStr);
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void UseAfterSendDiagnosticInferrer::initForApply(Operand *op,
@@ -1505,6 +1589,13 @@ void UseAfterSendDiagnosticInferrer::infer() {
   }
 
   if (auto *sourceApply = loc.getAsASTNode<ApplyExpr>()) {
+    // Check if this is an assumeIsolated call before trying to get the
+    // isolation crossing, since assumeIsolated has no AST-level crossing.
+    if (auto fas = FullApplySite::isa(sendingOp->getUser())) {
+      if (initForAssumeIsolated(fas, sendingOp))
+        return;
+    }
+
     // Before we do anything further, see if we can find a name and emit a name
     // error.
     if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
@@ -1758,6 +1849,20 @@ public:
                  diag::regionbasedisolation_named_isolated_closure_yields_race,
                  isDisconnected, descriptiveKindStr, name, calleeIsolationStr,
                  callerIsolationStr);
+  }
+
+  void emitAssumeIsolatedClosure(SILLocation captureLoc,
+                                 SILLocation callSiteLoc, Identifier name,
+                                 Identifier actorName) {
+    emitNamedOnlyError(captureLoc, name);
+    auto isTaskIsolated = getIsolationRegionInfo()->isTaskIsolated();
+    auto callerIsolationStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    diagnoseNote(captureLoc,
+                 diag::regionbasedisolation_assume_isolated_closure_capture,
+                 actorName, name, isTaskIsolated, callerIsolationStr);
+    diagnoseNote(callSiteLoc, diag::regionbasedisolation_assume_isolated_callee,
+                 actorName);
   }
 
   void
@@ -2093,6 +2198,8 @@ private:
 
   bool initForSendingPartialApply(FullApplySite fas, Operand *pai);
 
+  bool initForAssumeIsolated(FullApplySite fas, Operand *op);
+
   std::optional<unsigned>
   getIsolatedValuePartialApplyIndex(PartialApplyInst *pai,
                                     SILValue isolatedValue) {
@@ -2206,6 +2313,56 @@ bool SentNeverSendableDiagnosticEmitter::initForSendingPartialApply(
   diagnosticEmitter.emitSendingClosureMultipleCapturedOperandError(
       callsiteOp->getUser()->getLoc(), nonSendableOps);
   return true;
+}
+
+bool SentNeverSendableDiagnosticEmitter::initForAssumeIsolated(
+    FullApplySite fas, Operand *op) {
+  auto *callee = fas.getCalleeFunction();
+  if (!callee)
+    return false;
+
+  if (callee->getName() != MANGLED_ACTOR_ASSUME_ISOLATED &&
+      callee->getName() != MANGLED_DISTRIBUTED_ACTOR_ASSUME_ISOLATED)
+    return false;
+
+  // Get the partial_apply that is the closure being sent into assumeIsolated.
+  auto *sendingPAI =
+      dyn_cast<PartialApplyInst>(stripFunctionConversions(op->get()));
+  if (!sendingPAI)
+    return false;
+
+  // Get the actor name from the self argument of assumeIsolated.
+  auto argsWithoutIndirectResults = fas.getOperandsWithoutIndirectResults();
+  auto actorArg = argsWithoutIndirectResults.back().get();
+  Identifier actorName;
+  if (auto actorNameAndRoot = inferNameAndRootHelper(actorArg))
+    actorName = actorNameAndRoot->first;
+
+  // Emit the error at the capture use site inside the closure body (matching
+  // normal closure capture diagnostics), with a note explaining the capture,
+  // and a second note at the assumeIsolated call site explaining where the
+  // dynamic actor isolation comes from.
+  auto callSiteLoc = fas.getLoc();
+  for (auto &sendingPAIOp : sendingPAI->getArgumentOperands()) {
+    auto trackableValue = valueMap.getTrackableValue(sendingPAIOp.get());
+    if (trackableValue.value.isSendable())
+      continue;
+
+    auto capturedValue = findClosureUse(&sendingPAIOp);
+    if (!capturedValue)
+      continue;
+
+    auto *diagnosticOp = capturedValue->first;
+
+    if (auto rootValueAndName = inferNameAndRootHelper(sendingPAIOp.get())) {
+      diagnosticEmitter.emitAssumeIsolatedClosure(
+          diagnosticOp->getUser()->getLoc(), callSiteLoc,
+          rootValueAndName->first, actorName);
+      return true;
+    }
+  }
+
+  return false;
 }
 
 bool SentNeverSendableDiagnosticEmitter::initForIsolatedPartialApply(
@@ -2354,6 +2511,15 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
 
     // If we could not infer an isolation...
     if (!isolation) {
+      // Check if we are in an assumeIsolated call. If so, we handle the
+      // diagnostics specially since assumeIsolated has no AST-level isolation
+      // crossing but the region analysis treats it as sending the closure
+      // into actor isolation.
+      if (auto fas = FullApplySite::isa(op->getUser())) {
+        if (initForAssumeIsolated(fas, op))
+          return true;
+      }
+
       // Otherwise, emit a "we don't know error" that tells the user to file a
       // bug.
       diagnosticEmitter.emitUnknownPatternError();
