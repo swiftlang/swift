@@ -556,12 +556,12 @@ extension AsyncThrowingStream {
 ///
 /// Behavior:
 /// The stream can reach its terminal state either by producing `nil` or when a task with a consumer present is canceled.
-/// The `onCancel` closure will fire **once** and only if the consumer task was cancelled and an `onCancel` closure was set, after which it is cleared.
-/// Once the terminal state is reached, the installed `produce` and `onCancel` closure are cleared, and subsequent calls will immediately return `nil`.
+/// The `onCancel` closure will be invoked at most **once**, and only if the consumer task was cancelled and an `onCancel` closure was set. It is then **cleared**.
+/// Once a terminal state is reached, the installed `produce` and `onCancel` closures are **cleared**, and subsequent calls will **immediately return `nil`**.
 @safe
 final class _UnfoldingStorage<Element, Failure: Error>: @unchecked Sendable {
-  typealias Produce = @Sendable () async throws(Failure) -> Element?
-  typealias OnCancel = (@Sendable () -> Void)?
+  typealias Produce = @Sendable () async throws(Failure) -> Element? // TODO: This needs to have `nonisolated(nonsending)` in order to execute on the caller's actor
+  typealias OnCancel = (() -> Void)?
 
   enum State {
     case producing(
@@ -606,7 +606,7 @@ extension _UnfoldingStorage {
       case .producing(let produce, _) = state
     else { return nil }
 
-    do throws(Failure) {
+    do {
       switch try await produce() {
       case .some(let element):
         return element
@@ -644,13 +644,13 @@ extension _UnfoldingStorage {
 extension _UnfoldingStorage {
   @safe
   private func withLock<Value>(
-    _ action: (inout State) -> Value
+    _ body: (inout State) -> Value
   ) -> Value {
     unsafe _lock(self.lock)
 
     defer { unsafe _unlock(self.lock) }
 
-    return action(&self.state)
+    return body(&self.state)
   }
 }
 #endif
