@@ -226,7 +226,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::DragonFly:
   case llvm::Triple::DriverKit:
   case llvm::Triple::ELFIAMCU:
-  case llvm::Triple::Emscripten:
   case llvm::Triple::Fuchsia:
   case llvm::Triple::HermitCore:
   case llvm::Triple::Hurd:
@@ -286,6 +285,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "haiku";
   case llvm::Triple::WASI:
     return "wasi";
+  case llvm::Triple::Emscripten:
+    return "emscripten";
   case llvm::Triple::UnknownOS:
     return "none";
   case llvm::Triple::UEFI:
