@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -I %swift_src_root/lib/ClangImporter/SwiftBridging %s -cxx-interoperability-mode=default -disable-availability-checking
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs %s -cxx-interoperability-mode=default -disable-availability-checking
 
 import VirtMethodWitMoveOnly
 
