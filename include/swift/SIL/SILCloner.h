@@ -325,7 +325,7 @@ public:
   /// corresponding structural index in the remapped pack type.
   unsigned getOpStructuralPackIndex(CanPackType origPackType,
                                     unsigned origIndex) {
-    ASSERT(origIndex < origPackType->getNumElements());
+    ASSERT(origIndex <= origPackType->getNumElements());
     unsigned newIndex = 0;
     for (unsigned i = 0; i != origIndex; ++i) {
       auto origComponentType = origPackType.getElementType(i);
