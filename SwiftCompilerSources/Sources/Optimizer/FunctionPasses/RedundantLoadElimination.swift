@@ -107,7 +107,10 @@ func eliminateRedundantLoads(in function: Function,
     var iter = block.instructions.reversed().first
     while let succ = iter, let inst = succ.previous {
 
-      if let load = inst as? LoadingInstruction {
+      // TODO: replace this with `if let inst as? LoadingInstruction` once the toolchain builders are
+      // upgraded to a compiler version with fast type casting (https://github.com/swiftlang/swift/pull/88270).
+      if inst is LoadInst || inst is CopyAddrInst {
+        let load = inst as! LoadingInstruction
         if !context.continueWithNextSubpassRun(for: load) {
           return changed
         }

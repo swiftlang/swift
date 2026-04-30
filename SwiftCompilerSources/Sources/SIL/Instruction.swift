@@ -181,7 +181,7 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   public final var isDeinitBarrier: Bool {
     switch self {
-    case is FullApplySite, is EndApplyInst, is AbortApplyInst:
+    case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst:
       return true
     default:
       return mayAccessPointerOrGlobal || mayLoadWeakOrUnowned || maySynchronize
@@ -2067,6 +2067,25 @@ final public class UnreachableInst : TermInst {
 @_semantics("fast_cast")
 public protocol ReturnInstruction: Instruction {
   var returnedValue: Value { get }
+}
+
+public extension Instruction {
+  /// To be used for fast type casting to `isReturnInstruction` in time critical code.
+  /// This is a workaround for the slow runtime type casts. After toolchain builders are
+  /// upgraded to a compiler version which includes the fix for this problem
+  /// (https://github.com/swiftlang/swift/pull/88270), we don't need this anymore and
+  /// the regular `as isReturnInstruction` casts can be used instead.
+  var isReturnInstruction: Bool {
+    self is ReturnInst || self is ReturnBorrowInst
+  }
+}
+
+/// For pattern matching in switch statements.
+public struct IsReturnInstruction {}
+public let isReturnInstruction = IsReturnInstruction()
+
+public func ~= (pattern: IsReturnInstruction, value: Instruction) -> Bool {
+  return value.isReturnInstruction
 }
 
 final public class ReturnInst : TermInst, UnaryInstruction, ReturnInstruction {

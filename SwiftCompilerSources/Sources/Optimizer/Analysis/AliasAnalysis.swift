@@ -288,8 +288,8 @@ struct AliasAnalysis {
       }
       return effects
 
-    case let apply as FullApplySite:
-      return getApplyEffect(of: apply, on: memLoc)
+    case isFullApplySite:
+      return getApplyEffect(of: inst as! FullApplySite, on: memLoc)
 
     case let partialApply as PartialApplyInst:
       return getPartialApplyEffect(of: partialApply, on: memLoc)
@@ -452,6 +452,9 @@ struct AliasAnalysis {
       }
       return .noEffects
     default:
+      if builtin.memoryEffects == .noEffects {
+        return .noEffects
+      }
       return defaultEffects(of: builtin, on: memLoc)
     }
   }
@@ -858,7 +861,7 @@ private struct EscapesToInstructionVisitor : EscapeVisitor {
     if user == target {
       return .abort
     }
-    if user is ReturnInstruction {
+    if user.isReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
