@@ -20,12 +20,10 @@ set(swift_cmake_builddir "${SWIFT_BINARY_DIR}/${SWIFT_INSTALL_PACKAGE_DIR}")
 # Build-tree exports/config (kept for compatibility with existing behavior)
 # -----------------------------------------------------------------------------
 
-set(SWIFT_EXPORTS_FILE "${swift_cmake_builddir}/SwiftExports.cmake")
-set(SWIFT_EXPORTS_INSTALL_FILE "${swift_cmake_builddir}/SwiftExports-install.cmake")
+set(SWIFT_EXPORTS_FILE "${swift_cmake_builddir}/SwiftBuildTreeExports.cmake")
 get_property(SWIFT_EXPORTS GLOBAL PROPERTY SWIFT_EXPORTS)
 get_property(SWIFT_BUILDTREE_EXPORTS GLOBAL PROPERTY SWIFT_BUILDTREE_EXPORTS)
 
-# Export both "installing" and "build-tree-only" targets for build-tree usage.
 set(SWIFT_CONFIG_EXPORTS ${SWIFT_EXPORTS} ${SWIFT_BUILDTREE_EXPORTS})
 if(SWIFT_CONFIG_EXPORTS)
   export(TARGETS ${SWIFT_CONFIG_EXPORTS} FILE "${SWIFT_EXPORTS_FILE}")
@@ -34,13 +32,20 @@ endif()
 # -----------------------------------------------------------------------------
 # Install-tree exports file (generated in build dir, installed as a normal file)
 # -----------------------------------------------------------------------------
-#
-# Avoid install(CODE ...) to generate this file: install-time code does not
-# automatically respect DESTDIR staging. By generating it in the build tree and
-# installing it via swift_install_in_component(FILES ...), it will be staged
-# correctly under DESTDIR.
+set(SWIFT_EXPORTS_INSTALL_FILE "${swift_cmake_builddir}/SwiftExports.cmake")
 if(SWIFT_EXPORTS)
   export(TARGETS ${SWIFT_EXPORTS} FILE "${SWIFT_EXPORTS_INSTALL_FILE}")
+  swift_install_in_component(
+      CODE
+        "set(_dest \"\")\n"
+        "if(DEFINED ENV{DESTDIR})\n"
+        "  set(_dest \"$ENV{DESTDIR}\")\n"
+        "endif()\n"
+        "set(_src \"${SWIFT_EXPORTS_INSTALL_FILE}\")\n"
+        "set(_dst \"\${_dest}\${CMAKE_INSTALL_PREFIX}/${SWIFT_INSTALL_PACKAGE_DIR}\")\n"
+        "file(MAKE_DIRECTORY \"\${_dst}\")\n"
+        "file(COPY \"\${_src}\" DESTINATION \"\${_dst_dir}\")\n"
+      COMPONENT dev)
 endif()
 
 # Generate a build-tree SwiftConfig.cmake as well (useful for in-tree consumers).
@@ -60,9 +65,9 @@ configure_file(
   "${swift_cmake_builddir}/SwiftConfig.cmake"
   @ONLY)
 
-# -----------------------------------------------------------------------------
-# Install-tree package: SwiftConfig.cmake, SwiftConfigVersion.cmake, SwiftExports.cmake
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------
+# Install-tree package: SwiftConfig.cmake, SwiftConfigVersion.cmake
+# -----------------------------------------------------------------
 
 # 1) Install-tree SwiftConfig.cmake must be relocatable.
 # We generate it into the build staging dir, then install it.
@@ -85,7 +90,6 @@ write_basic_package_version_file(
 # Install config + version.
 swift_install_in_component(
   FILES
-    "${SWIFT_EXPORTS_INSTALL_FILE}"
     "${swift_cmake_builddir}/SwiftConfig.cmake.install"
     "${swift_cmake_builddir}/SwiftConfigVersion.cmake"
   DESTINATION "${SWIFT_INSTALL_PACKAGE_DIR}"
@@ -100,11 +104,3 @@ swift_install_in_component(
   COMPONENT dev
   RENAME "SwiftConfig.cmake")
 
-# Rename SwiftExports.cmake.install -> SwiftExports.cmake on install.
-# (CMake's install(FILES) does not rename, so install twice: once with RENAME.)
-swift_install_in_component(
-  FILES
-    "${SWIFT_EXPORTS_INSTALL_FILE}"
-  DESTINATION "${SWIFT_INSTALL_PACKAGE_DIR}"
-  COMPONENT dev
-  RENAME "SwiftExports.cmake")
