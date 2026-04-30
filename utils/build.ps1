@@ -831,6 +831,17 @@ enum Project {
   BootstrapDispatch
   BootstrapFoundation
   Stage1Compilers
+  ToolchainRuntime
+  ToolchainOverlay
+  ToolchainRuntimeModule
+  ToolchainStringProcessing
+  ToolchainSynchronization
+  ToolchainDistributed
+  ToolchainObservation
+  ToolchainDispatch
+  ToolchainDifferentiation
+  ToolchainVolatile
+  ToolchainFoundation
 
   CDispatch
   Compilers
@@ -1534,6 +1545,62 @@ $Compilers = @{
       AssumeFunctional  = $true
     }
   }
+
+  Stage1 = @{
+    C = @{
+      Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "clang-cl.exe")
+      DriverStyle       = [DriverStyle]::ClangCL
+      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline")
+      DebugFlags        = { param([string] $Format)
+        if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @() }
+      }
+      AssumeFunctional  = $true
+    }
+
+    CXX = @{
+      Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "clang-cl.exe")
+      DriverStyle       = [DriverStyle]::ClangCL
+      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:__cplusplus")
+      DebugFlags        = { param([string] $Format)
+        if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @() }
+      }
+      AssumeFunctional  = $true
+    }
+
+    GNUC = @{
+      Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "clang.exe")
+      DriverStyle       = [DriverStyle]::GNU
+      Flags             = @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer", "-finline-functions")
+      DebugFlags        = { param([string] $Format)
+        if ($Format -eq "dwarf") { @("-gdwarf") } else { @("-gcodeview") }
+      }
+      AssumeFunctional  = $true
+    }
+
+    GNUCXX = @{
+      Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "clang++.exe")
+      DriverStyle       = [DriverStyle]::GNU
+      Flags             = @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer", "-finline-functions")
+      DebugFlags        = { param([string] $Format)
+        if ($Format -eq "dwarf") { @("-gdwarf") } else { @("-gcodeview") }
+      }
+      AssumeFunctional  = $true
+    }
+
+    Swift = @{
+      Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "swiftc.exe")
+      DriverStyle       = [DriverStyle]::Swift
+      Flags             = @()
+      DebugFlags        = { param([string] $Format)
+        if ($Format -eq $null) { return @("-gnone") }
+        if ($Format -eq "dwarf") {
+          return @("-g", "-debug-info-format=dwarf", "-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
+        }
+        return @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
+      }
+      AssumeFunctional  = $true
+    }
+  }
 }
 
 $Compilers.Host = @{
@@ -1564,6 +1631,16 @@ $Assemblers = @{
 
   Stage0 = @{
     Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage0Compilers), "clang-cl.exe")
+    DriverStyle       = [DriverStyle]::ClangCL
+    Flags             = @()
+    DebugFlags        = { param([string] $Format)
+      if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
+    }
+    AssumeFunctional  = $true
+  }
+
+  Stage1 = @{
+    Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "clang-cl.exe")
     DriverStyle       = [DriverStyle]::ClangCL
     Flags             = @()
     DebugFlags        = { param([string] $Format)
@@ -4746,29 +4823,35 @@ function Test-SourceKitLSP {
   }
 }
 
-function Build-BootstrapFoundationMacros([Hashtable] $Platform) {
+function Build-BootstrapFoundationMacros([Hashtable] $Platform,
+                                         [Hashtable] $SwiftCompiler,
+                                         [string]    $SwiftSDK,
+                                         [string]    $SwiftSyntax_DIR) {
   Build-CMakeProject `
     -Src $SourceCache\swift-foundation\Sources\FoundationMacros `
     -Bin (Get-ProjectBinaryCache $Platform BootstrapFoundationMacros) `
     -BuildTargets default `
     -Platform $Platform `
-    -SwiftCompiler $Compilers.Built.Swift `
-    -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS) `
+    -SwiftCompiler $SwiftCompiler `
+    -SwiftSDK $SwiftSDK `
     -Defines @{
-      SwiftSyntax_DIR = (Get-ProjectCMakeModules $Platform Compilers);
+      SwiftSyntax_DIR = $SwiftSyntax_DIR;
     }
 }
 
-function Build-BootstrapTestingMacros([Hashtable] $Platform) {
+function Build-BootstrapTestingMacros([Hashtable] $Platform,
+                                      [Hashtable] $SwiftCompiler,
+                                      [string]    $SwiftSDK,
+                                      [string]    $SwiftSyntax_DIR) {
   Build-CMakeProject `
     -Src $SourceCache\swift-testing\Sources\TestingMacros `
     -Bin (Get-ProjectBinaryCache $Platform BootstrapTestingMacros) `
     -BuildTargets default `
     -Platform $Platform `
-    -SwiftCompiler $Compilers.Built.Swift `
-    -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS) `
+    -SwiftCompiler $SwiftCompiler `
+    -SwiftSDK $SwiftSDK `
     -Defines @{
-      SwiftSyntax_DIR = (Get-ProjectCMakeModules $Platform Compilers);
+      SwiftSyntax_DIR = $SwiftSyntax_DIR;
     }
 }
 
@@ -4997,6 +5080,7 @@ if (-not $SkipBuild) {
 
   Invoke-BuildStep Build-CMark $BuildPlatform
   Invoke-BuildStep Build-BuildTools $BuildPlatform
+
   Invoke-BuildStep Build-SQLite $BuildPlatform
   Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
 
@@ -5030,6 +5114,26 @@ if (-not $SkipBuild) {
     RuntimeLocation = [IO.Path]::Combine((Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap), "usr", "bin");
   }
 
+  Invoke-BuildStep Build-BootstrapFoundationMacros $BuildPlatform @{
+    SwiftCompiler   = $Compilers.Stage0.Swift;
+    SwiftSDK        = (Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap);
+    SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
+  }
+  Invoke-BuildStep Build-BootstrapTestingMacros $BuildPlatform @{
+    SwiftCompiler   = $Compilers.Stage0.Swift;
+    SwiftSDK        = (Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap);
+    SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
+  }
+
+  Invoke-BuildStep Build-SDK $BuildPlatform -Context @{
+    SDKIdentifier        = "Toolchain";
+    Variant              = "Toolchain";
+    Compilers            = $Compilers.Stage1;
+    Static               = $false;
+    BuildFoundation      = $true;
+    SupplementalRuntimes = $SDKSupplementalRuntimes;
+  }
+
   if ($IsCrossCompiling) {
     Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts"
   }
@@ -5045,8 +5149,6 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-CompilerRuntime $_
   }
 
-  Invoke-BuildStep Build-BootstrapFoundationMacros $BuildPlatform
-  Invoke-BuildStep Build-BootstrapTestingMacros $BuildPlatform
 
   if ($Windows) {
     Build-SDKDependencies $WindowsSDKBuilds
