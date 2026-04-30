@@ -103,7 +103,12 @@ if(SWIFT_EXPORTS)
     CODE
       "set(_swift_exports \"${_SWIFT_EXPORTS_ESCAPED}\")\n"
       "if(_swift_exports)\n"
-      "  export(TARGETS \${_swift_exports} FILE \"\${CMAKE_INSTALL_PREFIX}/${SWIFT_INSTALL_PACKAGE_DIR}/SwiftExports.cmake\")\n"
+      "  set(_dest \"\")\n"
+      "  if(DEFINED ENV{DESTDIR})\n"
+      "    set(_dest \"$ENV{DESTDIR}\")\n"
+      "  endif()\n"
+      "  file(MAKE_DIRECTORY \"\${_dest}\${CMAKE_INSTALL_PREFIX}/${SWIFT_INSTALL_PACKAGE_DIR}\")\n"
+      "  export(TARGETS \${_swift_exports} FILE \"\${_dest}\${CMAKE_INSTALL_PREFIX}/${SWIFT_INSTALL_PACKAGE_DIR}/SwiftExports.cmake\")\n"
       "endif()\n"
     COMPONENT dev)
 endif()
