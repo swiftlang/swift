@@ -5518,9 +5518,6 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
   // Get the callee type information.
   auto calleeTypeInfo = callee.getTypeInfo(SGF);
 
-  std::optional<ManagedValue> self;
-  auto fnValue = callee.getFnValue(SGF, self);
-
   // Evaluate the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
   std::optional<SILLocation> uncurriedLoc;
@@ -5530,6 +5527,12 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
       uncurriedArgs, uncurriedLoc);
 
   auto selfArgMV = uncurriedArgs.back();
+
+  std::optional<ManagedValue> self;
+  if (callee.requiresSelfValueForDispatch()) {
+    self = selfArgMV;
+  }
+  auto fnValue = callee.getFnValue(SGF, self);
 
   // Strip the unnecessary copy_value + mark_unresolved_non_copyable_value +
   // begin_borrow instructions added for move-only self argument.
