@@ -7,7 +7,7 @@
 
 ## Welcome to Swift
 
-Swift is a high-performance system programming language.  It has a clean
+Swift is a high-performance system programming language. It has a clean
 and modern syntax, offers seamless access to existing C and Objective-C code
 and frameworks, and is memory-safe by default.
 
@@ -32,8 +32,7 @@ To learn more about the compiler's internal design, see the
 Contributions to Swift are welcomed and encouraged! Please see the
 [Contributing to Swift guide](https://swift.org/contributing/).
 
-Before submitting the pull request, please make sure you have [tested your
- changes](https://github.com/apple/swift/blob/main/docs/ContinuousIntegration.md)
+Before submitting the pull request, please make sure you have [tested your changes](https://github.com/apple/swift/blob/main/docs/ContinuousIntegration.md)
  and that they follow the Swift project [guidelines for contributing
  code](https://swift.org/contributing/#contributing-code).
 
@@ -68,7 +67,7 @@ We also have an [FAQ](/docs/HowToGuides/FAQ.md) that answers common questions.
 
 Swift toolchains are created using the script
 [build-toolchain](https://github.com/apple/swift/blob/main/utils/build-toolchain). This
-script is used by swift.org's CI to produce snapshots and can allow for one to
+script is used by swift.org's CI to produce snapshots and allows developers to
 locally reproduce such builds for development or distribution purposes. A typical 
 invocation looks like the following:
 
