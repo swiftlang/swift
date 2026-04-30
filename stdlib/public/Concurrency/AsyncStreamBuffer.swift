@@ -577,7 +577,7 @@ final class _UnfoldingStorage<Element, Failure: Error>: @unchecked Sendable {
 
   init(
     produce: @escaping Produce,
-    onCancel: OnCancel
+    onCancel: sending OnCancel
   ) {
     unsafe self.lock = unsafe UnsafeMutableRawPointer.allocate(
       byteCount: _lockWordCount() * MemoryLayout<UnsafeRawPointer>.stride,
