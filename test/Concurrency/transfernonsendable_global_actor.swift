@@ -29,6 +29,8 @@ func useValueAsync<T>(_ t: T) async {}
 @MainActor func useValueMainActor<T>(_ t: T) {}
 @MainActor func mainActorFunction() {}
 
+func mergeValues(_ x: NonSendableKlass, _ y: NonSendableKlass) {}
+
 var booleanFlag: Bool { false }
 @MainActor var mainActorIsolatedGlobal = NonSendableKlass()
 @CustomActor var customActorIsolatedGlobal = NonSendableKlass()
@@ -383,5 +385,187 @@ class SetterAssignmentMustInferGlobalIsolationTest {
     nsField = ns
     await CustomActor.shared.acceptValue(ns) // expected-warning {{sending 'ns' risks causing data races}}
     // expected-note @-1 {{sending main actor-isolated 'ns' to actor-isolated instance method 'acceptValue' risks causing data races between actor-isolated and main actor-isolated uses}}
+  }
+}
+
+//////////////////////////////////////////////
+// MARK: nonisolated(unsafe) override tests //
+//////////////////////////////////////////////
+
+func NonisolatedUnsafeOverrideTests() {
+
+class MyObj {}
+
+  @MainActor
+  struct StructWrapper {
+    nonisolated(unsafe) var _store: MyObj?
+  }
+
+  @MainActor
+  struct GenericStructWrapper<T> {
+    nonisolated(unsafe) var _store: MyObj?
+    var t: T? = nil
+  }
+
+  @MainActor
+  class ClassWrapper {
+    nonisolated(unsafe) var _store: MyObj?
+  }
+
+  @MainActor
+  final class FinalClassWrapper {
+    nonisolated(unsafe) var _store: MyObj?
+  }
+
+  struct Box {
+    var oldStore: MyObj?
+
+    func structTest(w: StructWrapper) {
+      let _ = oldStore === w._store
+    }
+
+    func genericStructTest<T>(w: GenericStructWrapper<T>) {
+      let _ = oldStore === w._store
+    }
+
+    func classTest(w: ClassWrapper) {
+      let _ = oldStore === w._store
+    }
+
+    func finalClassTest(w: FinalClassWrapper) {
+      let _ = oldStore === w._store
+    }
+  }
+
+  @MainActor
+  struct MainActorStruct {
+    nonisolated(unsafe) var field: NonSendableKlass? = nil
+    var field2: NonSendableKlass? = nil
+    @CustomActor var customField: NonSendableKlass? = nil
+
+    init() {
+      mergeValues(field!, customField!)
+      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
+      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+    }
+
+    func testMultipleAccessesAreIndependent() async {
+      let x = field
+      await transferToCustomActor(field)
+      useValue(x)
+      await transferToCustomActor(x) // expected-warning {{sending 'x' risks causing data races}}
+      // expected-note @-1 {{sending 'x' to global actor 'CustomActor'-isolated global function 'transferToCustomActor' risks causing data races between global actor 'CustomActor'-isolated and local main actor-isolated uses}}
+      useValue(x) // expected-note {{access can happen concurrently}}
+      useValue(field)
+    }
+  }
+
+  func mergeValues<T>(_ x: T, _ y: NonSendableKlass) {}
+
+  @MainActor
+  struct MainActorIndirectStruct<T> {
+    nonisolated(unsafe) var field: T? = nil
+    var field2: T? = nil
+    @CustomActor var customField: NonSendableKlass? = nil
+    init() {
+      mergeValues(field!, customField!)
+      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
+      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+    }
+
+    func testMultipleAccessesAreIndependent() async {
+      let x = field
+      await transferToCustomActor(field)
+      useValue(x)
+      await transferToCustomActor(x) // expected-warning {{sending 'x' risks causing data races}}
+      // expected-note @-1 {{sending 'x' to global actor 'CustomActor'-isolated global function 'transferToCustomActor' risks causing data races between global actor 'CustomActor'-isolated and local main actor-isolated uses}}
+      useValue(x) // expected-note {{access can happen concurrently}}
+      useValue(field)
+    }
+  }
+
+  @MainActor
+  final class MainActorFinalClass {
+    nonisolated(unsafe) var field: NonSendableKlass? = nil
+    var field2: NonSendableKlass? = nil
+    @CustomActor var customField: NonSendableKlass? = nil
+
+    init() {
+      mergeValues(field!, customField!)
+      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
+      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+    }
+
+    func testMultipleAccessesAreIndependent() async {
+      let x = field
+      await transferToCustomActor(field)
+      useValue(x)
+      await transferToCustomActor(x) // expected-warning {{sending 'x' risks causing data races}}
+      // expected-note @-1 {{sending 'x' to global actor 'CustomActor'-isolated global function 'transferToCustomActor' risks causing data races between global actor 'CustomActor'-isolated and local main actor-isolated uses}}
+      useValue(x) // expected-note {{access can happen concurrently}}
+      useValue(field)
+    }
+  }
+
+  @MainActor
+  class MainActorClass {
+    nonisolated(unsafe) var field: NonSendableKlass? = nil
+    var field2: NonSendableKlass? = nil
+    @CustomActor var customField: NonSendableKlass? = nil
+
+    init() {
+      mergeValues(field!, customField!)
+      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
+      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+    }
+
+    func testMultipleAccessesAreIndependent() async {
+      let x = field
+      await transferToCustomActor(field)
+      useValue(x)
+      await transferToCustomActor(x) // expected-warning {{sending 'x' risks causing data races}}
+      // expected-note @-1 {{sending 'x' to global actor 'CustomActor'-isolated global function 'transferToCustomActor' risks causing data races between global actor 'CustomActor'-isolated and local main actor-isolated uses}}
+      useValue(x) // expected-note {{access can happen concurrently}}
+      useValue(field)
+    }
+  }
+
+  // Test that a differently-isolated context can access a nonisolated(unsafe)
+  // field on a @MainActor type without producing spurious cross-isolation merge
+  // errors.
+  @CustomActor
+  func crossActorAccessTest(s: MainActorStruct, c: MainActorClass, fc: MainActorFinalClass) async {
+    let x = s.field
+    useValue(x)
+
+    let y = c.field
+    useValue(y)
+
+    let z = fc.field
+    useValue(z)
+  }
+
+}
+
+///////////////////////////////////////////////////////////
+// MARK: Actor init with nonisolated(unsafe) merge tests //
+///////////////////////////////////////////////////////////
+
+actor ActorWithNonisolatedUnsafeField {
+  nonisolated(unsafe) var field: NonSendableKlass? = nil
+  var field2: NonSendableKlass? = nil
+  @MainActor var mainField: NonSendableKlass? = nil
+
+  init() {
+    mergeValues(field!, mainField!)
+    mergeValues(field2!, mainField!) // expected-warning {{passing main actor-isolated 'self.mainField' and 'self'-isolated 'self.field2' as arguments to global function 'mergeValues' risks causing data races}}
+    // expected-note @-1 {{'self.field2' could begin referencing 'self.mainField' allowing concurrent access to 'self.mainField' by 'self'-isolated code and main actor-isolated code}}
+  }
+
+  func testMultipleAccessesAreIndependent() async {
+    let x = field
+    await transferToMainActor(field)
+    useValue(x)
+    useValue(field)
   }
 }

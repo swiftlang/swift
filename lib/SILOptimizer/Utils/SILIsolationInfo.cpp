@@ -352,9 +352,12 @@ static SILIsolationInfo computeIsolationForClassField(SILValue queriedValue,
   // override what is on the class.
   auto varIsolation = swift::getActorIsolation(field);
 
-  // If we have an explicitly global actor isolated field, then we must prefer
-  // that isolation since it takes precedence over any isolation directly on the
-  // underlying class type.
+  // If we have a global actor isolated field, then prefer that.
+  //
+  // NOTE: This handles both cases where the field has an explicit isolation and
+  // a field where the field does not have an explicit isolation but inherits
+  // its isolation from its parent type since swift::getActorIsolation handles
+  // this for us.
   if (varIsolation.isGlobalActor()) {
     assert(!varIsolation.isNonisolatedUnsafe() &&
            "Cannot apply both nonisolated(unsafe) and a global actor attribute "
@@ -363,44 +366,29 @@ static SILIsolationInfo computeIsolationForClassField(SILValue queriedValue,
         queriedValue, varIsolation.getGlobalActor());
   }
 
-  // Then check if our field is explicitly nonisolated (not
-  // nonisolated(unsafe)). In such a case, we want to return disconnected since
-  // we are overriding the isolation of the actual nominal type. If we have
-  // nonisolated(unsafe), we want to respect the isolation of the nominal type
-  // since we just want to squelch the error but still have it be isolated in
-  // its normal way. This provides more information since we know what the
-  // underlying isolation /would/ have been.
-  if (varIsolation.isNonisolatedOrConcurrent() && !varIsolation.isNonisolatedUnsafe())
-    return SILIsolationInfo::getDisconnected(false /*nonisolated unsafe*/);
+  // Then check if our field is explicitly nonisolated or
+  // nonisolated(unsafe). If so, return early here.
+  if (varIsolation.isNonisolatedOrConcurrent())
+    return SILIsolationInfo::getDisconnected(
+        varIsolation.isNonisolatedUnsafe());
 
-  // Ok, we know that we do not have any overriding isolation from the var
-  // itself... so now we should use isolation from the underlying nominal type.
-
-  // First see if we have an actor instance value from an isolated
-  // SILFunctionArgument.
+  // Check if we actually have an actor as our class value. First see if we have
+  // an actor instance value from an isolated SILFunctionArgument.
   if (auto instance = ActorInstance::getForValue(classValue)) {
     if (auto *fArg = llvm::dyn_cast_or_null<SILFunctionArgument>(
             instance.maybeGetValue())) {
       if (auto info =
               SILIsolationInfo::getActorInstanceIsolated(queriedValue, fArg)) {
-        return info.withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+        return info;
       }
     }
   }
 
-  // First find out if our classValue is a nominal type and exit early...
-  if (auto *nomDecl = classValue->getType().getNominalOrBoundGenericNominal()) {
-    if (auto isolation = swift::getActorIsolation(nomDecl);
-        isolation && isolation.isGlobalActor()) {
-      return SILIsolationInfo::getGlobalActorIsolated(
-                 queriedValue, isolation.getGlobalActor())
-          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
-    }
-
-    if (nomDecl->isAnyActor())
-      return SILIsolationInfo::getActorInstanceIsolated(queriedValue,
-                                                        classValue, nomDecl)
-          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+  // Then check if our classValue is an any Actor.
+  if (auto *nomDecl = classValue->getType().getNominalOrBoundGenericNominal();
+      nomDecl && nomDecl->isAnyActor()) {
+    return SILIsolationInfo::getActorInstanceIsolated(queriedValue, classValue,
+                                                      nomDecl);
   }
 
   // If we have a metatype...
@@ -749,14 +737,9 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     // itself. We should use that instead.
     if (varIsolation.isGlobalActor()) {
       return SILIsolationInfo::getGlobalActorIsolated(
-                 sei, varIsolation.getGlobalActor())
-          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+          sei, varIsolation.getGlobalActor());
     }
 
-    if (auto isolation =
-            SILIsolationInfo::getGlobalActorIsolated(sei, sei->getStructDecl()))
-      return isolation.withUnsafeNonIsolated(
-          varIsolation.isNonisolatedUnsafe());
     return SILIsolationInfo::getDisconnected(
         varIsolation.isNonisolatedUnsafe());
   }
@@ -764,19 +747,13 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto *seai = dyn_cast<StructElementAddrInst>(inst)) {
     auto varIsolation = swift::getActorIsolation(seai->getField());
 
-    // If our var is global actor isolated, then we override the isolation of
-    // whatever our struct was with a specific isolation on the struct
-    // itself. We should use that instead.
+    // If our var is explicitly global actor isolated, return it.
     if (varIsolation.isGlobalActor()) {
       return SILIsolationInfo::getGlobalActorIsolated(
-                 seai, varIsolation.getGlobalActor())
-          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+          seai, varIsolation.getGlobalActor());
     }
 
-    if (auto isolation = SILIsolationInfo::getGlobalActorIsolated(
-            seai, seai->getStructDecl()))
-      return isolation.withUnsafeNonIsolated(
-          varIsolation.isNonisolatedUnsafe());
+    // Otherwise, just return disconnected.
     return SILIsolationInfo::getDisconnected(
         varIsolation.isNonisolatedUnsafe());
   }

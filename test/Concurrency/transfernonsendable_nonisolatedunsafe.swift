@@ -404,11 +404,18 @@ actor MyActor {
     await transferToMainIndirect(nonIsolatedUnsafeVarObject)
     // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
+    // We used to emit a warning here since we would leave
+    // nonIsolatedUnsafeLetObject as propagated MainActor isolation, but we do
+    // not anymore.
     let x = nonIsolatedUnsafeLetObject
     await transferToMainDirect(x)
-    // expected-warning @-1 {{sending 'x' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and 'self'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+
+  func testMultipleAccessesAreIndependent() async {
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
+    print(x)
+    print(nonIsolatedUnsafeLetObject)
   }
 }
 
@@ -426,11 +433,18 @@ final actor MyFinalActor {
     await transferToMainIndirect(nonIsolatedUnsafeVarObject)
     // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
+    // We used to emit a warning here since we would leave
+    // nonIsolatedUnsafeLetObject as propagated MainActor isolation, but we do
+    // not anymore.
     let x = nonIsolatedUnsafeLetObject
     await transferToMainDirect(x)
-    // expected-warning @-1 {{sending 'x' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and 'self'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+
+  func testMultipleAccessesAreIndependent() async {
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
+    print(x)
+    print(nonIsolatedUnsafeLetObject)
   }
 }
 
@@ -565,6 +579,19 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
     // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     print(x)
   }
+
+  func testMultipleAccessesAreIndependent() async {
+    // We do not emit errors here since every time that we access
+    // nonIsolatedUnsafeLetObject in SILGen, we reaccess and load a new value
+    // from a struct_element_addr. Since the root type is Sendable, this ensures
+    // that we in a certain sense simulate a sendable value. The best way to do
+    // that is to actually represent it at the SIL value as a Sendable value,
+    // but that is a much more invasive change.
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
+    print(x)
+    print(nonIsolatedUnsafeLetObject)
+  }
 }
 
 @CustomActor class CustomActorNonIsolatedUnsafeFieldKlass {
@@ -581,14 +608,26 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
     await transferToMainIndirect(nonIsolatedUnsafeVarObject)
     // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
-    // x is treated as global actor 'CustomActor' isolated since the
-    // nonisolated(unsafe) only applies to nonIsolatedUnsafeLetObject.
+    // We used to emit a warning here just on passing 'x' since we would leave
+    // nonIsolatedUnsafeLetObject as propagated MainActor isolation, but we do
+    // not anymore.
     let x = nonIsolatedUnsafeLetObject
-    await transferToMainDirect(x)
-    // expected-warning @-1 {{sending 'x' risks causing data races}}
-    // expected-note @-2 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMainDirect(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local global actor 'CustomActor'-isolated uses}}
+    print(x) // expected-note {{access can happen concurrently}}
+  }
+
+  func testMultipleAccessesAreIndependent() async {
+    // We do not emit errors here since every time that we access
+    // nonIsolatedUnsafeLetObject in SILGen, we reaccess and load a new value
+    // from a struct_element_addr. Since the root type is Sendable, this ensures
+    // that we in a certain sense simulate a sendable value. The best way to do
+    // that is to actually represent it at the SIL value as a Sendable value,
+    // but that is a much more invasive change.
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
     print(x)
+    print(nonIsolatedUnsafeLetObject)
   }
 }
 
@@ -606,13 +645,23 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
     await transferToMainIndirect(nonIsolatedUnsafeVarObject)
     // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
-    // 'x' is treated as global actor 'CustomActor'-isolated.
     let x = nonIsolatedUnsafeLetObject
-    await transferToMainDirect(x)
-    // expected-warning @-1 {{sending 'x' risks causing data races}}
-    // expected-note @-2 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMainDirect(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local global actor 'CustomActor'-isolated uses}}
+    print(x) // expected-note {{access can happen concurrently}}
+  }
+
+  func testMultipleAccessesAreIndependent() async {
+    // We do not emit errors here since every time that we access
+    // nonIsolatedUnsafeLetObject in SILGen, we reaccess and load a new value
+    // from a struct_element_addr. Since the root type is Sendable, this ensures
+    // that we in a certain sense simulate a sendable value. The best way to do
+    // that is to actually represent it at the SIL value as a Sendable value,
+    // but that is a much more invasive change.
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
     print(x)
+    print(nonIsolatedUnsafeLetObject)
   }
 }
 
@@ -626,35 +675,36 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
 
   func test() async {
     await transferToMainDirect(nonIsolatedUnsafeLetObject)
-    // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainDirect(nonIsolatedUnsafeVarObject)
-    // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainIndirect(nonIsolatedUnsafeLetObject)
-    // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainIndirect(nonIsolatedUnsafeVarObject)
-    // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
-    // 'x' is treated as global actor 'CustomActor'-isolated.
     let x = nonIsolatedUnsafeLetObject
-    await transferToMainDirect(x)
-    // expected-warning @-1 {{sending 'x' risks causing data races}}
-    // expected-note @-2 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMainDirect(x) // expected-warning {{sending 'x' risks causing data races; this is an error in the Swift 6 language mode}}
+    // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local global actor 'CustomActor'-isolated uses}}
 
     let x2 = nonIsolatedUnsafeVarObject
     await transferToMainDirect(x2)
-    // expected-warning @-1 {{sending 'x2' risks causing data races}}
-    // expected-note @-2 {{sending global actor 'CustomActor'-isolated 'x2' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
     let x3 = nonIsolatedUnsafeVarComputedObject
-    await transferToMainDirect(x3)
-    // expected-warning @-1 {{sending 'x3' risks causing data races}}
-    // expected-note @-2 {{sending global actor 'CustomActor'-isolated 'x3' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMainDirect(x3) // expected-warning {{sending 'x3' risks causing data races; this is an error in the Swift 6 language mode}}
+    // expected-note @-1 {{sending global actor 'CustomActor'-isolated 'x3' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
 
-    print(x)
+    print(x) // expected-note {{access can happen concurrently}}
   }
+
+  func testMultipleAccessesAreIndependent() async {
+    // We do not emit errors here since every time that we access
+    // nonIsolatedUnsafeLetObject in SILGen, we reaccess and load a new value
+    // from a struct_element_addr. Since the root type is Sendable, this ensures
+    // that we in a certain sense simulate a sendable value. The best way to do
+    // that is to actually represent it at the SIL value as a Sendable value,
+    // but that is a much more invasive change.
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
+    print(x)
+    print(nonIsolatedUnsafeLetObject)
+  }  
 }
 
 @CustomActor enum CustomActorNonIsolatedUnsafeComputedEnum {
