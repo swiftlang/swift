@@ -1198,7 +1198,7 @@ internal struct ComputedArgumentSize {
 #if _pointerBitWidth(_64)
     0x8000_0000_0000_0000
 #elseif _pointerBitWidth(_32)
-    0x6000_0000
+    0xC000_0000
 #else
 #warning("Unsupported platform")
     fatalError()
