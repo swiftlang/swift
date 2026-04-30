@@ -163,7 +163,7 @@ public class AnyKeyPath: _AppendKeyPath {
     // Subtract the buffer header and any padding it may have from the number of
     // bytes we need to allocate. The alloc below has a 0 sized 16 byte aligned
     // tail element that will force the compiler to insert buffer header + any
-    // padding necessary to accomodate.
+    // padding necessary to accommodate.
     let bytesWithoutHeader = bytes &- MemoryLayout<Int>.size
 
     let result = Builtin.allocWithTailElems_2(
