@@ -21,6 +21,7 @@ set(swift_cmake_builddir "${SWIFT_BINARY_DIR}/${SWIFT_INSTALL_PACKAGE_DIR}")
 # -----------------------------------------------------------------------------
 
 set(SWIFT_EXPORTS_FILE "${swift_cmake_builddir}/SwiftExports.cmake")
+set(SWIFT_EXPORTS_INSTALL_FILE "${swift_cmake_builddir}/SwiftExports-install.cmake")
 get_property(SWIFT_EXPORTS GLOBAL PROPERTY SWIFT_EXPORTS)
 get_property(SWIFT_BUILDTREE_EXPORTS GLOBAL PROPERTY SWIFT_BUILDTREE_EXPORTS)
 
@@ -28,6 +29,18 @@ get_property(SWIFT_BUILDTREE_EXPORTS GLOBAL PROPERTY SWIFT_BUILDTREE_EXPORTS)
 set(SWIFT_CONFIG_EXPORTS ${SWIFT_EXPORTS} ${SWIFT_BUILDTREE_EXPORTS})
 if(SWIFT_CONFIG_EXPORTS)
   export(TARGETS ${SWIFT_CONFIG_EXPORTS} FILE "${SWIFT_EXPORTS_FILE}")
+endif()
+
+# -----------------------------------------------------------------------------
+# Install-tree exports file (generated in build dir, installed as a normal file)
+# -----------------------------------------------------------------------------
+#
+# Avoid install(CODE ...) to generate this file: install-time code does not
+# automatically respect DESTDIR staging. By generating it in the build tree and
+# installing it via swift_install_in_component(FILES ...), it will be staged
+# correctly under DESTDIR.
+if(SWIFT_EXPORTS)
+  export(TARGETS ${SWIFT_EXPORTS} FILE "${SWIFT_EXPORTS_INSTALL_FILE}")
 endif()
 
 # Generate a build-tree SwiftConfig.cmake as well (useful for in-tree consumers).
@@ -72,6 +85,7 @@ write_basic_package_version_file(
 # Install config + version.
 swift_install_in_component(
   FILES
+    "${SWIFT_EXPORTS_INSTALL_FILE}"
     "${swift_cmake_builddir}/SwiftConfig.cmake.install"
     "${swift_cmake_builddir}/SwiftConfigVersion.cmake"
   DESTINATION "${SWIFT_INSTALL_PACKAGE_DIR}"
@@ -86,29 +100,11 @@ swift_install_in_component(
   COMPONENT dev
   RENAME "SwiftConfig.cmake")
 
-# 2) Install-tree SwiftExports.cmake:
-# We cannot use install(EXPORT ...) because Swift's targets are not installed into
-# a single export set. Instead, generate the exports file during installation.
-#
-# This writes directly into: ${CMAKE_INSTALL_PREFIX}/${SWIFT_INSTALL_PACKAGE_DIR}/SwiftExports.cmake
-#
-# It exports only the targets recorded in the global SWIFT_EXPORTS property
-# (i.e. those meant to be part of the install).
-if(SWIFT_EXPORTS)
-  # Escape the list for embedding into install(CODE).
-  # We pass it as a CMake list literal.
-  string(REPLACE ";" "\\;" _SWIFT_EXPORTS_ESCAPED "${SWIFT_EXPORTS}")
-
-  swift_install_in_component(
-    CODE
-      "set(_swift_exports \"${_SWIFT_EXPORTS_ESCAPED}\")\n"
-      "if(_swift_exports)\n"
-      "  set(_dest \"\")\n"
-      "  if(DEFINED ENV{DESTDIR})\n"
-      "    set(_dest \"$ENV{DESTDIR}\")\n"
-      "  endif()\n"
-      "  file(MAKE_DIRECTORY \"\${_dest}\${CMAKE_INSTALL_PREFIX}/${SWIFT_INSTALL_PACKAGE_DIR}\")\n"
-      "  export(TARGETS \${_swift_exports} FILE \"\${_dest}\${CMAKE_INSTALL_PREFIX}/${SWIFT_INSTALL_PACKAGE_DIR}/SwiftExports.cmake\")\n"
-      "endif()\n"
-    COMPONENT dev)
-endif()
+# Rename SwiftExports.cmake.install -> SwiftExports.cmake on install.
+# (CMake's install(FILES) does not rename, so install twice: once with RENAME.)
+swift_install_in_component(
+  FILES
+    "${SWIFT_EXPORTS_INSTALL_FILE}"
+  DESTINATION "${SWIFT_INSTALL_PACKAGE_DIR}"
+  COMPONENT dev
+  RENAME "SwiftExports.cmake")
