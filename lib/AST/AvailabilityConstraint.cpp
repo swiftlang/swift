@@ -236,7 +236,9 @@ getAvailabilityConstraintForAttr(const Decl *decl,
 
     // Is the decl obsoleted in this context?
     if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
-      if (availableRange && availableRange->isContainedIn(*obsoletedRange))
+      if (availableRange && !context.getPlatformRange().isKnownUnreachable() &&
+          !availableRange->isKnownUnreachable() &&
+          availableRange->isContainedIn(*obsoletedRange))
         return AvailabilityConstraint::unavailableObsolete(attr);
     }
 
