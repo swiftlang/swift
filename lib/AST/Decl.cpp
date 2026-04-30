@@ -1019,9 +1019,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
 
 bool Decl::isInMacroExpansionInContext() const {
   auto *mod = getModuleContext();
-  auto *file = mod->getSourceFileContainingLocation(getStartLoc());
-
-  auto parentFile = [&]() {
+  auto *parentSF = [&]() {
     // For accessors, the storage decl is the more accurate thing to check
     // since the entire property/subscript could be macro-generated, in which
     // case the accessor shouldn't be considered "added by macro expansion".
@@ -1032,17 +1030,7 @@ bool Decl::isInMacroExpansionInContext() const {
     }
     return getDeclContext()->getParentSourceFile();
   }();
-
-  // Decls in macro expansions always have a source file. The source
-  // file can be null if the decl is implicit or has an invalid
-  // source location.
-  if (!parentFile || !file)
-    return false;
-
-  if (file->getBufferID() == parentFile->getBufferID())
-    return false;
-
-  return file->getFulfilledMacroRole() != std::nullopt;
+  return swift::isMacroExpansionInContext(getStartLoc(), parentSF);
 }
 
 bool Decl::isInMacroExpansionFromClangHeader() const {
@@ -10253,6 +10241,23 @@ const ParamDecl *swift::getParameterAt(const DeclContext *source,
     return index < params->size() ? params->get(index) : nullptr;
   }
   return nullptr;
+}
+
+bool swift::isMacroExpansionInContext(SourceLoc loc, SourceFile *parentSF) {
+  if (!parentSF)
+    return false;
+
+  // Macro expansions always have a source file. The source file can be null if
+  // the loc is for an implicit decl or is invalid.
+  auto *mod = parentSF->getParentModule();
+  auto *file = mod->getSourceFileContainingLocation(loc);
+  if (!file)
+    return false;
+
+  if (file->getBufferID() == parentSF->getBufferID())
+    return false;
+
+  return file->getFulfilledMacroRole() != std::nullopt;
 }
 
 CaptureInfo AbstractFunctionDecl::getCaptureInfo() const {

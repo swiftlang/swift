@@ -10184,6 +10184,12 @@ const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
 
+/// Whether the given \p loc is within a macro expansion relative to
+/// \p parentSF. If the file is itself in a macro expansion, the method
+/// returns \c true if the loc is in a different macro expansion buffer than
+/// the file. If \p parentSF is \c nullptr, \c false is returned.
+bool isMacroExpansionInContext(SourceLoc loc, SourceFile *parentSF);
+
 class ABIRole {
 public:
   enum Value : uint8_t {
