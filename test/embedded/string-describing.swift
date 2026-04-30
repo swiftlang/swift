@@ -5,11 +5,11 @@
 // REQUIRES: swift_feature_Embedded
 
 public struct MyStruct: CustomStringConvertible {
-  var description: String { "" }
+  public var description: String { "" }
 }
 
 public struct MyStreamableStruct: TextOutputStreamable {
-  func write<Target: TextOutputStream>(to target: inout Target) {}
+  public func write<Target: TextOutputStream>(to target: inout Target) {}
 }
 
 public func foo(s: MyStruct) {
