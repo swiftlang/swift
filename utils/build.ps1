@@ -4413,7 +4413,7 @@ if (-not $SkipBuild) {
           foreach ($Build in $AndroidSDKBuilds) {
             Invoke-BuildStep Build-SDK $Build
 
-            ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift\android" -Filter @(".a", ".so")
+            ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift\android" -Filter @("*.a", "*.so")
           }
 
           Install-SDK $AndroidSDKBuilds
@@ -4425,8 +4425,8 @@ if (-not $SkipBuild) {
           foreach ($Build in $AndroidSDKBuilds) {
             Invoke-BuildStep Build-ExperimentalSDK $Build
 
-            ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift\android" -Filter @(".a", ".so")
-            ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift_static\android"  -Filter @(".a", ".so")
+            ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift\android" -Filter @("*.a", "*.so")
+            ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift_static\android"  -Filter @("*.a", "*.so")
           }
 
           Install-SDK $AndroidSDKBuilds -Identifiers AndroidExperimental
