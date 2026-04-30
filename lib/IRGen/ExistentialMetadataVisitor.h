@@ -46,7 +46,10 @@ public:
     // The embedded layout consists of:
     // -1 : vwt
     //  0 : metadata flags
+    //  1 : existential representation
     super::layout();
+
+    asImpl().addEmbeddedRepresentation();
   }
 };
 

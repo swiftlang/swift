@@ -293,6 +293,7 @@ if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF" AND NOT SWIFT_FREESTANDING_FLAVOR AND N
 endif()
 
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
+  EmbeddedCasting.swift
   EmbeddedRuntime.swift
   EmbeddedStubs.swift
   EmbeddedPrint.swift

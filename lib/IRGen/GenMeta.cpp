@@ -6569,6 +6569,25 @@ public:
                         : MetadataKind::ExistentialMetatype));
   }
 
+  void addEmbeddedRepresentation() {
+    unsigned representation;
+    auto layout = Target->getExistentialLayout();
+    switch (layout.getKind()) {
+    case ExistentialLayout::Class:
+      representation = 1;
+      break;
+
+    case ExistentialLayout::Error:
+      representation = 2;
+      break;
+
+    case ExistentialLayout::Opaque:
+      representation = 0;
+      break;
+    }
+    B.addInt(IGM.MetadataKindTy, representation);
+  }
+
   void addValueWitnessTable() {
     auto vwtPointer = emitValueWitnessTable(false).getValue();
     B.addSignedPointer(vwtPointer,

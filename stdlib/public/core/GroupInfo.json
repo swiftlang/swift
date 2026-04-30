@@ -274,6 +274,7 @@
     "Duration.swift",
     "DurationProtocol.swift",
     "Instant.swift",
+    "EmbeddedCasting.swift",
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
