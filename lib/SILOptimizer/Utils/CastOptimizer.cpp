@@ -551,7 +551,13 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
   auto sourceFormalTy = dynamicCast.getSourceFormalType();
   auto destLoweredTy = dynamicCast.getTargetLoweredType().getObjectType();
   auto destFormalTy = dynamicCast.getTargetFormalType();
-  assert(destLoweredTy == dynamicCast.getLoweredBridgedTargetObjectType() &&
+  // Lower the bridged target type through the TypeConverter so that
+  // DynamicSelfType is stripped consistently with destLoweredTy. Otherwise
+  // the comparison trips when casting to `Self` in a class extension.
+  auto *F = dynamicCast.getFunction();
+  auto bridgedLoweredTy =
+      F->getLoweredType(dynamicCast.getBridgedTargetType()).getObjectType();
+  assert(destLoweredTy == bridgedLoweredTy &&
          "Expected Dest Type to be the same as BridgedTargetTy");
 
   if (convTy == destLoweredTy) {
