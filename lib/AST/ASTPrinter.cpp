@@ -518,12 +518,11 @@ formatLifetimeDependence(LifetimeDependenceInfo const &info,
                          std::optional<ArrayRef<AnyFunctionType::Param>> params,
                          const PrintOptions &options) {
   bool isSIL = !params;
+  bool isDump = options.PrintTypesForDebugging;
 
   std::string result;
-  if (isSIL) {
-    result = "@lifetime(";
-  } else {
-    result = "@_lifetime(";
+  if (!isDump) {
+    result = isSIL ? "@lifetime(" : "@_lifetime(";
   }
 
   // Determine whether implicit self is present by comparing the param indices
@@ -616,7 +615,8 @@ formatLifetimeDependence(LifetimeDependenceInfo const &info,
     appendSources(scope, LifetimeDependenceKind::Scope);
   }
 
-  result += ") ";
+  if (!isDump)
+    result += ") ";
   return result;
 }
 
