@@ -18,6 +18,7 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 // UNSUPPORTED: LinuxDistribution=fedora-41
 // UNSUPPORTED: LinuxDistribution=rhel-10.1
+// UNSUPPORTED: LinuxDistribution=ubuntu-26.04
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
