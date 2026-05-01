@@ -2997,6 +2997,18 @@ LValue SILGenFunction::emitLValue(Expr *e, SGFAccessKind accessKind,
   // reabstraction component.
   auto substFormalType = r.getSubstFormalType();
   auto loweredSubstType = getLoweredType(substFormalType);
+  // When the LValue's original abstraction pattern carries a Clang type for
+  // a C function pointer (e.g., with const-ref parameters), use it to
+  // preserve parameter conventions. Restrict to CFunctionPointer to avoid
+  // affecting ObjC blocks which have legitimate optionality differences
+  // between their Clang type and Swift representation.
+  if (r.getOrigFormalType().isClangType()) {
+    if (auto fnType = substFormalType->lookThroughSingleOptionalType()
+                          ->getAs<AnyFunctionType>())
+      if (fnType->getRepresentation() ==
+              FunctionTypeRepresentation::CFunctionPointer)
+        loweredSubstType = getLoweredType(r.getOrigFormalType(), substFormalType);
+  }
   if (r.getTypeOfRValue() != loweredSubstType.getObjectType()) {
     // Logical components always re-abstract back to the substituted
     // type.
