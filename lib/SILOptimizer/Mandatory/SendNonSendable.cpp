@@ -169,6 +169,35 @@ static std::optional<SILDeclRef> getDeclRefForCallee(SILInstruction *inst) {
   }
 }
 
+/// Returns the ConstructorDecl if \p inst is a call to a nonisolated
+/// synchronous actor allocating init, nullptr otherwise. These inits are not
+/// actor-isolated, but SE-0414 specifies a special rule where non-Sendable
+/// arguments are treated as transferred into the actor's isolation domain.
+static ConstructorDecl *
+getNonisolatedSyncActorAllocatingInitCallee(SILInstruction *inst) {
+  auto declRef = getDeclRefForCallee(inst);
+  if (!declRef || declRef->kind != SILDeclRef::Kind::Allocator)
+    return nullptr;
+  auto fas = FullApplySite::isa(inst);
+  if (!fas)
+    return nullptr;
+  auto *fri = dyn_cast<FunctionRefInst>(fas.getCalleeOrigin());
+  if (!fri)
+    return nullptr;
+  auto *callee = fri->getReferencedFunctionOrNull();
+  if (!callee || callee->isAsync())
+    return nullptr;
+  if (!callee->getActorIsolation().isNonisolated())
+    return nullptr;
+  auto *ctorDecl = dyn_cast_or_null<ConstructorDecl>(declRef->getDecl());
+  if (!ctorDecl)
+    return nullptr;
+  auto *nominal = ctorDecl->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal || !nominal->isAnyActor())
+    return nullptr;
+  return ctorDecl;
+}
+
 static std::optional<ValueDecl *> getSendingApplyCallee(SILInstruction *inst) {
   auto declRef = getDeclRefForCallee(inst);
   if (!declRef)
@@ -961,6 +990,28 @@ public:
     emitRequireInstDiagnostics();
   }
 
+  void emitNamedActorAsyncInitIsolationCrossingError(
+      SILLocation loc, Identifier name,
+      SILIsolationInfo namedValuesIsolationInfo,
+      ApplyIsolationCrossing isolationCrossing,
+      const ValueDecl *callee) {
+    diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
+        .limitBehaviorIf(getBehaviorLimit());
+
+    auto descriptiveKindStr =
+        namedValuesIsolationInfo.printForDiagnostics(getFunction());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
+    bool isDisconnected = namedValuesIsolationInfo.isDisconnected();
+
+    diagnoseNote(
+        loc,
+        diag::regionbasedisolation_named_info_send_to_actor_init_yields_race,
+        isDisconnected, name, descriptiveKindStr, callee, callerIsolationStr);
+    emitRequireInstDiagnostics();
+  }
+
   void emitNamedAsyncLetNoIsolationCrossingError(SILLocation loc,
                                                  Identifier name) {
     // Emit the short error.
@@ -1600,6 +1651,17 @@ void UseAfterSendDiagnosticInferrer::infer() {
     // error.
     if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
       auto &state = sendingOpToStateMap.get(sendingOp);
+
+      // Check if this is a call to an actor async allocating init. These
+      // are not actually actor-isolated, but have a special rule that
+      // arguments are treated as crossing into actor isolation.
+      if (auto *ctorDecl =
+              getNonisolatedSyncActorAllocatingInitCallee(sendingOp->getUser())) {
+        return diagnosticEmitter.emitNamedActorAsyncInitIsolationCrossingError(
+            baseLoc, rootValueAndName->first, state.getIsolationInfo(),
+            *sourceApply->getIsolationCrossing(), ctorDecl);
+      }
+
       return diagnosticEmitter.emitNamedIsolationCrossingError(
           baseLoc, rootValueAndName->first, state.getIsolationInfo(),
           *sourceApply->getIsolationCrossing());
@@ -2079,6 +2141,21 @@ public:
     }
   }
 
+  void emitNamedActorAsyncInitIsolation(SILLocation loc, Identifier name,
+                                        ApplyIsolationCrossing isolationCrossing,
+                                        const ValueDecl *callee) {
+    emitNamedOnlyError(loc, name);
+
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
+
+    diagnoseNote(
+        loc,
+        diag::regionbasedisolation_named_send_to_actor_init_never_sendable,
+        isDisconnected, name, descriptiveKindStr, callee, descriptiveKindStr);
+  }
+
   void emitNamedSendingNeverSendableToSendingParam(SILLocation loc,
                                                    Identifier varName) {
     emitNamedOnlyError(loc, varName);
@@ -2538,6 +2615,13 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
 
     // See if we can infer a name from the value.
     if (auto name = inferNameHelper(op->get())) {
+      // Check if this is a call to an actor async allocating init.
+      if (auto *ctorDecl = getNonisolatedSyncActorAllocatingInitCallee(op->getUser())) {
+        diagnosticEmitter.emitNamedActorAsyncInitIsolation(loc, *name,
+                                                           *isolation,
+                                                           ctorDecl);
+        return true;
+      }
       diagnosticEmitter.emitNamedIsolation(loc, *name, *isolation);
       return true;
     }

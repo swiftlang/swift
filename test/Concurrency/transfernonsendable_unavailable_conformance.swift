@@ -24,7 +24,7 @@ actor Bar {
     _ = Bar(ns) // expected-warning {{sending 'ns' risks causing data races}}
     // TODO: This needs to be:
     // 'ns' is transferred to actor-isolated callee. Later local uses could race with uses in callee.
-    // expected-note @-3 {{sending 'ns' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local actor-isolated uses}}
+    // expected-note @-3 {{sending 'ns' to actor initializer 'init(_:)' risks causing data races between actor-isolated and local actor-isolated uses}}
     ns.foo() // expected-note {{access can happen concurrently}}
   }
 }

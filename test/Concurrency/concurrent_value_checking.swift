@@ -67,7 +67,7 @@ actor A2 {
 func testActorCreation(value: NotConcurrent) async {
   _ = A2(value: value)
   // expected-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(value:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending task-isolated 'value' to actor initializer 'init(value:)' risks causing data races between actor-isolated and task-isolated uses}}
 
   _ = await A2(valueAsync: value)
   // expected-warning @-1 {{sending 'value' risks causing data races}}
@@ -75,7 +75,7 @@ func testActorCreation(value: NotConcurrent) async {
 
   _ = A2(delegatingSync: value)
   // expected-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(delegatingSync:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending task-isolated 'value' to actor initializer 'init(delegatingSync:)' risks causing data races between actor-isolated and task-isolated uses}}
 
   _ = await A2(delegatingAsync: value, 9)
   // expected-warning @-1 {{sending 'value' risks causing data races}}

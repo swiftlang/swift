@@ -63,18 +63,16 @@ actor ActorWithSynchronousNonIsolatedInit {
 
 func initActorWithSyncNonIsolatedInit() {
   let k = NonSendableKlass()
-  // TODO: This should say actor isolated.
   _ = ActorWithSynchronousNonIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
-  // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
+  // expected-note @-1 {{sending 'k' to actor initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
   let _ = { @MainActor in // expected-note {{access can happen concurrently}}
     print(k)
   }
 }
 
 func initActorWithSyncNonIsolatedInit2(_ k: NonSendableKlass) {
-  // TODO: This should say actor isolated.
   _ = ActorWithSynchronousNonIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending task-isolated 'k' to actor initializer 'init(_:)' risks causing data races between actor-isolated and task-isolated uses}}
   let _ = { @MainActor in
     print(k) // expected-error {{sending 'k' risks causing data races}}
     // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
@@ -92,7 +90,6 @@ actor ActorWithAsyncIsolatedInit {
 
 func initActorWithAsyncIsolatedInit() async {
   let k = NonSendableKlass()
-  // TODO: This should say actor isolated.
   _ = await ActorWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
   // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
   let _ = { @MainActor in // expected-note {{access can happen concurrently}}
@@ -101,13 +98,80 @@ func initActorWithAsyncIsolatedInit() async {
 }
 
 func initActorWithAsyncIsolatedInit2(_ k: NonSendableKlass) async {
-  // TODO: This should say actor isolated.
   _ = await ActorWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
   // expected-note @-1 {{sending task-isolated 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and task-isolated uses}}
   let _ = { @MainActor in
     print(k) // expected-error {{sending 'k' risks causing data races}}
     // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
+}
+
+// Test with multiple non-sendable arguments.
+actor ActorWithMultiArgAsyncInit {
+  init(_ a: NonSendableKlass, _ b: NonSendableKlass) async {}
+}
+
+func initActorWithMultiArgAsyncInit() async {
+  let a = NonSendableKlass()
+  let b = NonSendableKlass()
+  _ = await ActorWithMultiArgAsyncInit(a, b) // expected-error {{sending 'a' risks causing data races}}
+  // expected-note @-1 {{sending 'a' to actor-isolated initializer 'init(_:_:)' risks causing data races between actor-isolated and local nonisolated uses}}
+  // expected-error @-2 {{sending 'b' risks causing data races}}
+  // expected-note @-3 {{sending 'b' to actor-isolated initializer 'init(_:_:)' risks causing data races between actor-isolated and local nonisolated uses}}
+  let _ = { @MainActor in // expected-note {{access can happen concurrently}}
+    // expected-note @-1 {{access can happen concurrently}}
+    print(a)
+    print(b)
+  }
+}
+
+// Test that sending the same value to two different actor async inits
+// produces errors for both.
+func initActorWithAsyncIsolatedInitTwice() async {
+  let k = NonSendableKlass()
+  _ = await ActorWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
+  _ = await ActorWithAsyncIsolatedInit(k) // expected-note {{access can happen concurrently}}
+}
+
+// Test use-after-send with actor async init.
+func useAfterSendToActorAsyncInit() async {
+  let k = NonSendableKlass()
+  _ = await ActorWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
+  print(k) // expected-note {{access can happen concurrently}}
+}
+
+// Test explicit .init(_:) call syntax.
+func initActorWithExplicitInitSyntax() async {
+  let k = NonSendableKlass()
+  _ = await ActorWithAsyncIsolatedInit.init(k) // expected-error {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
+  let _ = { @MainActor in // expected-note {{access can happen concurrently}}
+    print(k)
+  }
+}
+
+// TODO: The error should be on the use site (f(k)), not the function_ref.
+// Test higher-order: assign init to variable, then call.
+func initActorHigherOrderAssignAndCall() async {
+  let f = ActorWithAsyncIsolatedInit.init // expected-error {{sending 'newK' risks causing data races}}
+  // expected-ni-note @-1 {{sending task-isolated 'newK' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-ni-ns-note @-2 {{sending @concurrent task-isolated 'newK' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and @concurrent task-isolated uses}}
+  let k = NonSendableKlass()
+  _ = await f(k)
+}
+
+// TODO: The error should be on the use site, not the function_ref.
+// Test higher-order: pass init ref as argument.
+func callWithInit(_ f: (NonSendableKlass) async -> ActorWithAsyncIsolatedInit) async {
+  let k = NonSendableKlass()
+  _ = await f(k)
+}
+
+func initActorHigherOrderPassAsArg() async {
+  await callWithInit(ActorWithAsyncIsolatedInit.init) // expected-error {{sending 'newK' risks causing data races}}
+  // expected-note @-1 {{sending task-isolated 'newK' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and task-isolated uses}}
 }
 
 ////////////////////////////////

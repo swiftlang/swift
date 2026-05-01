@@ -670,6 +670,18 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       // TODO: Make sure that synchronous functions that are isolated to an
       // actor always get the isolated parameter.
       if (isolation.getKind() == ActorIsolation::ActorInstance) {
+        // Actor async allocating inits don't have an isolated parameter
+        // (they take a metatype, not an actor instance), but their
+        // parameters conceptually cross into actor isolation.
+        auto *func = fri->getReferencedFunction();
+        if (auto declRef = func->getDeclRef()) {
+          if (declRef.kind == SILDeclRef::Kind::Allocator &&
+              func->isAsync() && isolation.getActor()->isAnyActor()) {
+            return SILIsolationInfo::getActorInstanceIsolated(
+                fri, ActorInstance::getForActorAsyncAllocatingInit(),
+                isolation.getActor());
+          }
+        }
         return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
       }
 

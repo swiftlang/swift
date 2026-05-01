@@ -1037,6 +1037,9 @@ NOTE(regionbasedisolation_named_info_send_yields_race, none,
 NOTE(regionbasedisolation_named_info_send_yields_race_callee, none,
      "sending %select{%2 |}0%1 to %3 %kind4 risks causing data races between %3 and local %5 uses",
      (bool, Identifier, StringRef, StringRef, const ValueDecl *, StringRef))
+NOTE(regionbasedisolation_named_info_send_to_actor_init_yields_race, none,
+     "sending %select{%2 |}0%1 to actor %kind3 risks causing data races between actor-isolated and local %4 uses",
+     (bool, Identifier, StringRef, const ValueDecl *, StringRef))
 
 // Use after send closure.
 NOTE(regionbasedisolation_type_isolated_capture_yields_race, none,
@@ -1080,6 +1083,9 @@ NOTE(regionbasedisolation_named_send_never_sendable, none,
 NOTE(regionbasedisolation_named_send_never_sendable_callee, none,
       "sending %select{%2 |}0%1 to %3 %kind4 risks causing data races between %3 and %5 uses",
       (bool, Identifier, StringRef, StringRef, const ValueDecl *, StringRef))
+NOTE(regionbasedisolation_named_send_to_actor_init_never_sendable, none,
+      "sending %select{%2 |}0%1 to actor %kind3 risks causing data races between actor-isolated and %4 uses",
+      (bool, Identifier, StringRef, const ValueDecl *, StringRef))
 
 NOTE(regionbasedisolation_named_send_into_sending_param, none,
      "%select{%1 |}0%2 is passed as a 'sending' parameter; Uses in callee may race with "
