@@ -279,7 +279,7 @@ const SILDebugScope *SILGenFunction::getScopeOrNull(SILLocation Loc,
   }
 
   SourceLoc SLoc = Loc.getSourceLoc();
-  if (!SF || LastSourceLoc == SLoc)
+  if (!SF || !SLoc)
     return nullptr;
   if (ForMetaInstruction)
     if (ValueDecl *ValDecl = Loc.getAsASTNode<ValueDecl>()) {

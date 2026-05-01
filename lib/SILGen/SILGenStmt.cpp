@@ -596,8 +596,7 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
     if (!vanishes) {
       auto resultTupleType = cast<TupleType>(resultType);
       tupleInit = new TupleInitialization(resultTupleType);
-      tupleInit->SubInitializations.reserve(
-        cast<TupleType>(resultType)->getNumElements());
+      tupleInit->SubInitializations.reserve(resultTupleType->getNumElements());
     }
 
     // The list of element initializers to build into.
@@ -869,8 +868,8 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
 void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                     Expr *ret) {
   SmallVector<SILValue, 4> directResults;
-  auto retTy = ret->getType()->getCanonicalType();
-  
+  const auto retTy = ret->getType()->getCanonicalType();
+
   AbstractionPattern origRetTy = TypeContext
     ? TypeContext->OrigType.getFunctionResultType()
     : AbstractionPattern(retTy);
@@ -881,10 +880,8 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
 
     // Build an initialization which recursively destructures the tuple.
     SmallVector<CleanupHandle, 4> resultCleanups;
-    InitializationPtr resultInit =
-      prepareIndirectResultInit(ret, origRetTy,
-                                ret->getType()->getCanonicalType(),
-                                directResults, resultCleanups);
+    InitializationPtr resultInit = prepareIndirectResultInit(
+        ret, origRetTy, retTy, directResults, resultCleanups);
 
     // Emit the result expression into the initialization.
     emitExprInto(ret, resultInit.get());
@@ -1492,7 +1489,7 @@ void StmtEmitter::visitOpaqueStmt(OpaqueStmt *S) {
   if (P && P->hasCounterFor(ref))
     SGF.emitProfilerIncrement(ref);
 
-  visit(SGF.OpaqueStmts[S]);
+  visit(stmt);
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
