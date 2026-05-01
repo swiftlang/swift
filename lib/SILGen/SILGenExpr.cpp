@@ -2008,7 +2008,7 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
                                                 SGFContext C) {
   CanAnyFunctionType destType =
       cast<FunctionType>(e->getType()->getCanonicalType());
-  assert(destType->getIsolation().isNonIsolatedCaller() &&
+  assert(destType->getIsolation().isNonisolatedNonsending() &&
          "Should only call this if destType is non isolated caller");
 
   auto *subExpr = e->getSubExpr();
@@ -2028,7 +2028,7 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
     return RValue();
 
   auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
-  if (!decl || !getActorIsolation(decl).isCallerIsolationInheriting())
+  if (!decl || !getActorIsolation(decl).isNonisolatedNonsending())
     return RValue();
 
   // Ok, we found our target.
@@ -2072,9 +2072,9 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   CanAnyFunctionType subCvtType =
       cast<FunctionType>(subCvt->getType()->getCanonicalType());
 
-  // Src type should be isNonIsolatedCaller and they should only differ in
+  // Src type should be isNonisolatedNonsending and they should only differ in
   // isolation or sendability.
-  if (!subCvtType->getIsolation().isNonIsolatedCaller() ||
+  if (!subCvtType->getIsolation().isNonisolatedNonsending() ||
       subCvtType->withIsolation(destType->getIsolation())
               ->withSendable(destType->isSendable()) != destType)
     return RValue();
@@ -2085,13 +2085,13 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   if (!declRef)
     return RValue();
   auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
-  if (!decl || !getActorIsolation(decl).isCallerIsolationInheriting())
+  if (!decl || !getActorIsolation(decl).isNonisolatedNonsending())
     return RValue();
 
   // Make sure that subCvt/declRefType only differ by isolation and sendability.
   CanAnyFunctionType declRefType =
       cast<FunctionType>(declRef->getType()->getCanonicalType());
-  assert(!declRefType->getIsolation().isNonIsolatedCaller() &&
+  assert(!declRefType->getIsolation().isNonisolatedNonsending() &&
          "This should not be represented in interface types");
   if (declRefType->isSendable() || !subCvtType->isSendable())
     return RValue();
@@ -2244,7 +2244,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // @concurrent back to nonisolated(nonsending). This is done b/c we do
   // not represent nonisolated(nonsending) in interface types, so the actual decl ref
   // will be viewed as @async () -> ().
-  if (destType->getIsolation().isNonIsolatedCaller()) {
+  if (destType->getIsolation().isNonisolatedNonsending()) {
     if (RValue rv = emitFunctionCvtToExecutionCaller(e, C))
       return rv;
   }
@@ -3783,7 +3783,8 @@ static SILFunction *getOrCreateKeypathThunk(SILGenModule &SGM,
                                             RegularLocation loc) {
   SILGenFunctionBuilder builder(SGM);
   auto thunk = builder.getOrCreateSharedFunction(
-      loc, name, signature, IsBare, IsNotTransparent,
+      loc, name, signature, ActorIsolation::forUnspecified(), IsBare,
+      IsNotTransparent,
       (expansion == ResilienceExpansion::Minimal ? IsSerialized
                                                  : IsNotSerialized),
       ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
@@ -4293,16 +4294,16 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       .mangleKeyPathEqualsHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
     equals = builder.getOrCreateSharedFunction(
-        loc, name, signature, IsBare, IsNotTransparent,
-        (expansion == ResilienceExpansion::Minimal
-         ? IsSerialized
-         : IsNotSerialized),
+        loc, name, signature, ActorIsolation::forUnspecified(), IsBare,
+        IsNotTransparent,
+        (expansion == ResilienceExpansion::Minimal ? IsSerialized
+                                                   : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
         IsNotRuntimeAccessible);
     if (!equals->empty()) {
       return;
     }
-    
+
     SILGenFunction subSGF(SGM, *equals, SGM.SwiftModule);
     equals->setGenericEnvironment(genericEnv);
     auto entry = equals->begin();
@@ -4469,16 +4470,16 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       .mangleKeyPathHashHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
     hash = builder.getOrCreateSharedFunction(
-        loc, name, signature, IsBare, IsNotTransparent,
-        (expansion == ResilienceExpansion::Minimal
-         ? IsSerialized
-         : IsNotSerialized),
+        loc, name, signature, ActorIsolation::forUnspecified(), IsBare,
+        IsNotTransparent,
+        (expansion == ResilienceExpansion::Minimal ? IsSerialized
+                                                   : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
         IsNotRuntimeAccessible);
     if (!hash->empty()) {
       return;
     }
-    
+
     SILGenFunction subSGF(SGM, *hash, SGM.SwiftModule);
     hash->setGenericEnvironment(genericEnv);
     auto entry = hash->begin();
@@ -5377,7 +5378,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
           SILValue addr =
               addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
           auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
-          input = SGF.B.createUncheckedTakeEnumDataAddr(
+          input = SGF.B.createUncheckedInPlaceEnumDataAddr(
               loc, input, someDecl, input.getType().getOptionalObjectType());
           SGF.B.createCopyAddr(loc, input.getValue(), addr, IsNotTake,
                                IsInitialization);
@@ -6152,7 +6153,7 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
   assert(eltTy);
   SILValue address = optValue.forward(*this);
   return emitManagedBufferWithCleanup(
-      B.createUncheckedTakeEnumDataAddr(loc, address, someDecl, eltTy));
+      B.createUncheckedInPlaceEnumDataAddr(loc, address, someDecl, eltTy));
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
@@ -7507,7 +7508,7 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
 
   auto isolation = getRealActorIsolationOfContext(SGF.FunctionDC);
 
-  if (isolation == ActorIsolation::CallerIsolationInheriting) {
+  if (isolation == ActorIsolation::NonisolatedNonsending) {
     auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
     assert(isolatedArg &&
            "Caller Isolation Inheriting without isolated parameter");

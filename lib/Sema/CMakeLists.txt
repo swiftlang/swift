@@ -75,6 +75,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
   TypeCheckEmbedded.cpp
+  TypeCheckFullyInhabited.cpp
   TypeCheckGeneric.cpp
   TypeCheckInvertible.cpp
   TypeCheckMacros.cpp

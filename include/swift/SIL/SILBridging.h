@@ -814,7 +814,9 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialRefInst_getConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType InitExistentialRefInst_getFormalConcreteType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialAddrInst_getConformances() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialValueInst_getConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType InitExistentialAddrInst_getFormalConcreteType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialMetatypeInst_getConformances() const;
   BRIDGED_INLINE bool OpenExistentialAddr_isImmutable() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar GlobalAccessInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar AllocGlobalInst_getGlobal() const;
@@ -840,8 +842,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt EnumInst_caseIndex() const;
   BRIDGED_INLINE SwiftInt UncheckedEnumDataInst_caseIndex() const;
   BRIDGED_INLINE SwiftInt InitEnumDataAddrInst_caseIndex() const;
-  BRIDGED_INLINE SwiftInt UncheckedTakeEnumDataAddrInst_caseIndex() const;
-  BRIDGED_INLINE bool UncheckedTakeEnumDataAddrInst_isDestructive() const;
+  BRIDGED_INLINE SwiftInt UncheckedEnumDataAddrInstBase_caseIndex() const;
   BRIDGED_INLINE SwiftInt InjectEnumAddrInst_caseIndex() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj InjectEnumAddrInst_element() const;
   BRIDGED_INLINE SwiftInt RefElementAddrInst_fieldIndex() const;
@@ -1376,6 +1377,11 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedEnumData(BridgedValue enumVal,
                                           SwiftInt caseIdx, BridgedType resultType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedTakeEnumDataAddr(BridgedValue enumAddr,
+                                                                                        SwiftInt caseIdx) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedInPlaceEnumDataAddr(BridgedValue enumAddr,
+                                                                                        SwiftInt caseIdx) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedBorrowEnumDataAddr(BridgedValue enumAddr,
+                                                                                        BridgedValue scratchAddr,
                                                                                         SwiftInt caseIdx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createInitEnumDataAddr(BridgedValue enumAddr,
                                                                                SwiftInt caseIdx,

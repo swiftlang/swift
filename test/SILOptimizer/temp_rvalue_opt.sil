@@ -405,7 +405,7 @@ bb2:
   br bb5
 
 bb3:
-  %27 = unchecked_take_enum_data_addr %10 : $*Optional<Element>, #Optional.some!enumelt
+  %27 = unchecked_inplace_enum_data_addr %10 : $*Optional<Element>, #Optional.some!enumelt
   %28 = init_enum_data_addr %0 : $*Optional<Element>, #Optional.some!enumelt
   copy_addr [take] %27 to [init] %28 : $*Element
   dealloc_stack %10 : $*Optional<Element>
@@ -581,7 +581,7 @@ protocol P {
 sil @getP : $@convention(thin) () -> @out Optional<P>
 
 // CHECK-LABEL: sil @handle_open_existential_addr : $@convention(thin) () -> () {
-// CHECK: [[P:%.*]] = unchecked_take_enum_data_addr
+// CHECK: [[P:%.*]] = unchecked_inplace_enum_data_addr
 // CHECK-NOT: copy_addr
 // CHECK: open_existential_addr immutable_access [[P]]
 // CHECK: }
@@ -593,7 +593,7 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
+  %9 = unchecked_inplace_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [init] %10 : $*P
   %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self
@@ -626,7 +626,7 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
+  %9 = unchecked_inplace_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [init] %10 : $*P
   destroy_addr %2 : $*Optional<P>
@@ -660,7 +660,7 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
+  %9 = unchecked_inplace_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [init] %10 : $*P
   %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self

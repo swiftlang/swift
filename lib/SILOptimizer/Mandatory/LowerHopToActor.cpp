@@ -334,8 +334,9 @@ static SILValue getExecutorForImplicitActor(SILOptFunctionBuilder &funcBuilder,
       {}, {}, ctx);
   auto *newFunc = funcBuilder.getOrCreateSharedFunction(
       autoGenLoc, "_swift_implicitisolationactor_to_executor_cast", funcType,
-      IsNotBare, IsNotTransparent, IsNotSerialized, ProfileCounter(),
-      IsNotThunk, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
+      ActorIsolation::forUnspecified(), IsNotBare, IsNotTransparent,
+      IsNotSerialized, ProfileCounter(), IsNotThunk, IsNotDynamic,
+      IsNotDistributed, IsNotRuntimeAccessible);
 
   // If our function does not yet have a body... create that body.
   //

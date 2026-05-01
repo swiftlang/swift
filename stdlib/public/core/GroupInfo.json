@@ -268,12 +268,14 @@
     "Equatable.swift",
     "Comparable.swift",
     "Codable.swift",
+    "FullyInhabited.swift",
     "LegacyABI.swift",
     "MigrationSupport.swift",
     "PtrAuth.swift",
     "Duration.swift",
     "DurationProtocol.swift",
     "Instant.swift",
+    "EmbeddedCasting.swift",
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
@@ -281,7 +283,8 @@
     "_InlineArray.swift",
     "Exclusivity.swift",
     "Borrow.swift",
-    "Inout.swift"
+    "Inout.swift",
+    "UniqueBox.swift"
   ],
   "Result": [
     "Result.swift"

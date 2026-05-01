@@ -1831,7 +1831,7 @@ private:
                          SmallVectorImpl<SILInstruction *> &Delete);
   bool recreateUncheckedEnumDataInstr(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete);
-  bool recreateUncheckedTakeEnumDataAddrInst(SILInstruction &I,
+  bool recreateUncheckedEnumDataAddrInst(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete);
   bool fixStoreToBlockStorageInstr(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete);
@@ -1849,8 +1849,8 @@ private:
   llvm::SetVector<BuiltinInst *> builtinInstrs;
   llvm::SetVector<LoadInst *> loadInstrsOfFunc;
   llvm::SetVector<UncheckedEnumDataInst *> uncheckedEnumDataOfFunc;
-  llvm::SetVector<UncheckedTakeEnumDataAddrInst *>
-      uncheckedTakeEnumDataAddrOfFunc;
+  llvm::SetVector<UncheckedEnumDataAddrInstBase *>
+      uncheckedEnumDataAddrOfFunc;
   llvm::SetVector<StoreInst *> storeToBlockStorageInstrs;
   llvm::SetVector<SILInstruction *> modApplies;
   llvm::MapVector<SILInstruction *, SILValue> allApplyRetToAllocMap;
@@ -2212,7 +2212,7 @@ static void rewriteFunction(StructLoweringState &pass,
             newSILType = newSILType.getAddressType();
           }
 
-          auto *newArg = argBuilder.createUncheckedTakeEnumDataAddr(
+          auto *newArg = argBuilder.createUncheckedEnumDataAddrForTake(
               instr->getLoc(), copiedValue, decl, newSILType.getAddressType());
           arg->replaceAllUsesWith(newArg);
           currBB->eraseArgument(0);
@@ -2422,6 +2422,21 @@ static void rewriteFunction(StructLoweringState &pass,
       auto *convInstr = cast<UncheckedTakeEnumDataAddrInst>(instr);
       newInstr = resultTyBuilder.createUncheckedTakeEnumDataAddr(
           Loc, convInstr->getOperand(), convInstr->getElement(),
+          newSILType.getAddressType());
+      break;
+    }
+    case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst: {
+      auto *convInstr = cast<UncheckedInPlaceEnumDataAddrInst>(instr);
+      newInstr = resultTyBuilder.createUncheckedInPlaceEnumDataAddr(
+          Loc, convInstr->getOperand(), convInstr->getElement(),
+          newSILType.getAddressType());
+      break;
+    }
+    case SILInstructionKind::UncheckedBorrowEnumDataAddrInst: {
+      auto *convInstr = cast<UncheckedBorrowEnumDataAddrInst>(instr);
+      newInstr = resultTyBuilder.createUncheckedBorrowEnumDataAddr(
+          Loc, convInstr->getEnum(), convInstr->getScratch(),
+          convInstr->getElement(),
           newSILType.getAddressType());
       break;
     }
@@ -2953,30 +2968,49 @@ bool LoadableByAddress::recreateUncheckedEnumDataInstr(
   return false;
 }
 
-bool LoadableByAddress::recreateUncheckedTakeEnumDataAddrInst(
+bool LoadableByAddress::recreateUncheckedEnumDataAddrInst(
     SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
-  auto *enumInstr = dyn_cast<UncheckedTakeEnumDataAddrInst>(&I);
-  if (!enumInstr || !uncheckedTakeEnumDataAddrOfFunc.count(enumInstr))
+  auto *enumInstr = dyn_cast<UncheckedEnumDataAddrInstBase>(&I);
+  if (!enumInstr || !uncheckedEnumDataAddrOfFunc.count(enumInstr))
     return false;
+
   SILBuilderWithScope enumBuilder(enumInstr);
+
+  auto recreateInst = [&](SILType newTy) -> UncheckedEnumDataAddrInstBase* {
+    switch (enumInstr->getKind()) {
+    case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+      return enumBuilder.createUncheckedTakeEnumDataAddr(
+        enumInstr->getLoc(), enumInstr->getEnum(), enumInstr->getElement(),
+        newTy);
+    case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
+      return enumBuilder.createUncheckedInPlaceEnumDataAddr(
+        enumInstr->getLoc(), enumInstr->getEnum(), enumInstr->getElement(),
+        newTy);
+    case SILInstructionKind::UncheckedBorrowEnumDataAddrInst: {
+      auto b = cast<UncheckedBorrowEnumDataAddrInst>(enumInstr);
+      return enumBuilder.createUncheckedBorrowEnumDataAddr(
+        b->getLoc(), b->getEnum(), b->getScratch(), b->getElement(),
+        newTy);
+    }
+    default:
+      llvm_unreachable("not an enum_data_addr inst");
+    }
+  };
+  
   SILFunction *F = enumInstr->getFunction();
   IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
   SILType origType = enumInstr->getType();
   GenericEnvironment *genEnv = getSubstGenericEnvironment(F);
   SILType newType = MapperCache.getNewSILType(genEnv, origType, *currIRMod);
-  auto caseTy = enumInstr->getOperand()->getType().getEnumElementType(
+  auto caseTy = enumInstr->getEnum()->getType().getEnumElementType(
       enumInstr->getElement(), F->getModule(), TypeExpansionContext(*F));
   SingleValueInstruction *newInstr = nullptr;
   if (caseTy != origType.getObjectType()) {
-    auto *takeEnum = enumBuilder.createUncheckedTakeEnumDataAddr(
-        enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
-        caseTy.getAddressType());
+    auto *takeEnum = recreateInst(caseTy.getAddressType());
     newInstr = enumBuilder.createUncheckedAddrCast(
         enumInstr->getLoc(), takeEnum, newType.getAddressType());
   } else {
-    newInstr = enumBuilder.createUncheckedTakeEnumDataAddr(
-        enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
-        newType.getAddressType());
+    newInstr = recreateInst(newType.getAddressType());
   }
   enumInstr->replaceAllUsesWith(newInstr);
   Delete.push_back(enumInstr);
@@ -3376,8 +3410,8 @@ void LoadableByAddress::run() {
           loadInstrsOfFunc.insert(LI);
         } else if (auto *UED = dyn_cast<UncheckedEnumDataInst>(&I)) {
           uncheckedEnumDataOfFunc.insert(UED);
-        } else if (auto *UED = dyn_cast<UncheckedTakeEnumDataAddrInst>(&I)) {
-          uncheckedTakeEnumDataAddrOfFunc.insert(UED);
+        } else if (auto *UED = dyn_cast<UncheckedEnumDataAddrInstBase>(&I)) {
+          uncheckedEnumDataAddrOfFunc.insert(UED);
         } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
           auto dest = SI->getDest();
           if (isa<ProjectBlockStorageInst>(dest)) {
@@ -3485,7 +3519,7 @@ void LoadableByAddress::run() {
           continue;
         else if (recreateUncheckedEnumDataInstr(I, Delete))
           continue;
-        else if (recreateUncheckedTakeEnumDataAddrInst(I, Delete))
+        else if (recreateUncheckedEnumDataAddrInst(I, Delete))
           continue;
         else if (recreateLoadInstr(I, Delete))
           continue;
@@ -4423,7 +4457,7 @@ protected:
       builder.createStore(enumData->getLoc(), opd, opdAddr,
                           StoreOwnershipQualifier::Unqualified);
     }
-    auto extractAddr = builder.createUncheckedTakeEnumDataAddr(
+    auto extractAddr = builder.createUncheckedEnumDataAddrForTake(
         enumData->getLoc(), opdAddr, enumData->getElement(),
         enumData->getType().getAddressType());
     assignment.mapValueToAddress(origValue, extractAddr);
@@ -4770,7 +4804,7 @@ protected:
 
       SILBuilder caseBuilder = assignment.getBuilder(caseBB->begin());
       auto *caseAddr =
-        caseBuilder.createUncheckedTakeEnumDataAddr(loc, destructibleAddress,
+        caseBuilder.createUncheckedEnumDataAddrForTake(loc, destructibleAddress,
                                            caseDecl,
                                            caseArg->getType().getAddressType());
 
@@ -4834,8 +4868,9 @@ protected:
     auto addr = assignment.createAllocStack(enumData->getOperand()->getType());
     builder.createCopyAddr(enumData->getLoc(), opdAddr, addr, IsTake,
                            IsInitialization);
-    // TODO: we could omit the copy if this is the only user of the operand.
-    auto extractAddr = builder.createUncheckedTakeEnumDataAddr(
+    // TODO: we could omit the copy if this is the only user of the operand,
+    // or we can use a nondestructive in-place projection.
+    auto extractAddr = builder.createUncheckedEnumDataAddrForTake(
         loc, addr, enumData->getElement(),
         enumData->getType().getAddressType());
     auto newVal = builder.createLoad(loc, extractAddr,

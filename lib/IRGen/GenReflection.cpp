@@ -226,7 +226,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
 
       // The mangling for nonisolated(nonsending) function types was introduced
       // in Swift 6.2.
-      if (isolation.isNonIsolatedCaller())
+      if (isolation.isNonisolatedNonsending())
         return addRequirement(Swift_6_2);
 
       // The Swift 6.1 runtime fixes a bug preventing successful demangling

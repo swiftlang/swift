@@ -21,6 +21,14 @@ bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
          });
 }
 
+bool importer::hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl) {
+  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+             return swiftAttr->getAttribute() == "import_opaque_pointer";
+           return false;
+         });
+}
+
 /// This routine determines whether \a decl is a foreign reference type, and
 /// whether its foreign reference type attributes are valid. This determinition
 /// considers attributes annotated on both \a decl itself as well as its

@@ -425,7 +425,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     Builder.createDeallocStack(Loc, Tmp);
 
     Builder.setInsertionPoint(BridgeSuccessBB);
-    auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, outOptionalParam,
+    auto Addr = Builder.createUncheckedInPlaceEnumDataAddr(Loc, outOptionalParam,
                                                         SomeDecl);
 
     Builder.createCopyAddr(Loc, Addr, Dest, IsTake, IsInitialization);

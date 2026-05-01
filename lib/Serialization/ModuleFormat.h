@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 995; // LifetimeDependenceInfo hasCaptures flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 997; // ActorIsolation::Kind: split Nonisolated from NonisolatedConcurrent
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -578,14 +578,15 @@ using DefaultArgumentField = BCFixed<4>;
 enum class ActorIsolation : uint8_t {
   Unspecified = 0,
   ActorInstance,
-  Nonisolated,
+  NonisolatedConcurrent,
   NonisolatedUnsafe,
   GlobalActor,
   GlobalActorUnsafe,
   Erased,
-  CallerIsolationInheriting,
+  NonisolatedNonsending,
+  Nonisolated,
 };
-using ActorIsolationField = BCFixed<3>;
+using ActorIsolationField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.

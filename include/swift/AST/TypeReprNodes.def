@@ -77,7 +77,7 @@ TYPEREPR(Fixed, TypeRepr)
 TYPEREPR(SILBox, TypeRepr)
 TYPEREPR(Self, TypeRepr)
 TYPEREPR(LifetimeDependent, TypeRepr)
-TYPEREPR(CallerIsolated, TypeRepr)
+TYPEREPR(NonisolatedNonsending, TypeRepr)
 TYPEREPR(GenericArgumentExpr, TypeRepr)
 LAST_TYPEREPR(GenericArgumentExpr)
 

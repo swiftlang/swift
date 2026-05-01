@@ -624,8 +624,16 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(InitEnumDataAddrInst, init_enum_data_addr,
                     SingleValueInstruction, None, DoesNotRelease)
-  SINGLE_VALUE_INST(UncheckedTakeEnumDataAddrInst, unchecked_take_enum_data_addr,
-                    SingleValueInstruction, MayWrite, DoesNotRelease)
+  ABSTRACT_SINGLE_VALUE_INST(UncheckedEnumDataAddrInstBase, SingleValueInstruction)
+    SINGLE_VALUE_INST(UncheckedTakeEnumDataAddrInst, unchecked_take_enum_data_addr,
+                      UncheckedEnumDataAddrInstBase, MayWrite, DoesNotRelease)
+    SINGLE_VALUE_INST(UncheckedBorrowEnumDataAddrInst, unchecked_borrow_enum_data_addr,
+                      UncheckedEnumDataAddrInstBase, MayWrite, DoesNotRelease)
+    SINGLE_VALUE_INST(UncheckedInPlaceEnumDataAddrInst, unchecked_inplace_enum_data_addr,
+                      UncheckedEnumDataAddrInstBase, None, DoesNotRelease)
+    SINGLE_VALUE_INST_RANGE(UncheckedEnumDataAddrInstBase,
+                            UncheckedTakeEnumDataAddrInst,
+                            UncheckedInPlaceEnumDataAddrInst)
   SINGLE_VALUE_INST(SelectEnumInst, select_enum,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(SelectEnumAddrInst, select_enum_addr,

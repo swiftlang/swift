@@ -101,7 +101,7 @@
 ///         print("New tap detected at (\(nextTap.x), \(nextTap.y)).")
 ///     }
 ///     // Prints "New tap detected at (0, 1).")
-public protocol Hashable: Equatable & ~Copyable {
+public protocol Hashable: Equatable & ~Copyable & ~Escapable {
   /// The hash value.
   ///
   /// Hash values are not guaranteed to be equal across different executions of
@@ -135,7 +135,7 @@ public protocol Hashable: Equatable & ~Copyable {
   func _rawHashValue(seed: Int) -> Int
 }
 
-extension Hashable where Self: ~Copyable {
+extension Hashable where Self: ~Copyable & ~Escapable {
   @inlinable
   @inline(__always)
   @_preInverseGenerics
@@ -150,7 +150,7 @@ extension Hashable where Self: ~Copyable {
 @inlinable
 @inline(__always)
 @_preInverseGenerics
-public func _hashValue<H: Hashable & ~Copyable>(for value: borrowing H) -> Int {
+public func _hashValue<H: Hashable & ~Copyable & ~Escapable>(for value: borrowing H) -> Int {
   return value._rawHashValue(seed: 0)
 }
 

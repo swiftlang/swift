@@ -113,13 +113,18 @@ public:
       auto &builtinInfo
         = M.getBuiltinInfo(declRef.getDecl()->getBaseIdentifier());
 
-      if (builtinInfo.ID != BuiltinValueKind::DereferenceBorrow) {
-        return StorageRefResult();
-      }
-
-      if (auto result = findStorageReferenceExprForBorrow(M,
-                                                  ae->getArgs()->getExpr(0))) {
-        return result.withTransitiveRoot(e);
+      switch (builtinInfo.ID) {
+      default:
+        break;
+      case BuiltinValueKind::DereferenceBorrow:
+        if (auto result = findStorageReferenceExprForBorrow(
+              M, ae->getArgs()->getExpr(0))) {
+          return result.withTransitiveRoot(e);
+        }
+        break;
+      case BuiltinValueKind::BorrowAt:
+        // Builtin.borrowAt produces the base storage address.
+        return StorageRefResult(e);
       }
     }
 

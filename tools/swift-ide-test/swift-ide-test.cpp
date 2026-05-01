@@ -4779,10 +4779,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (InitInvok.getLangOptions().EnableCXXInterop) {
-    InitInvok.computeCXXStdlibOptions();
-  }
-
+  InitInvok.computeCXXStdlibOptions();
   InitInvok.computeAArch64TBIOptions();
 
   if (!options::InProcessPluginServerPath.empty()) {

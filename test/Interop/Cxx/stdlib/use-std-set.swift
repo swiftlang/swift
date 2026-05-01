@@ -17,6 +17,8 @@
 // Enable this everywhere once we have a solution for modularizing other C++ stdlibs: rdar://87654514
 // REQUIRES: OS=macosx || OS=linux-gnu
 // UNSUPPORTED: LinuxDistribution=fedora-41
+// UNSUPPORTED: LinuxDistribution=rhel-10.1
+// UNSUPPORTED: LinuxDistribution=ubuntu-26.04
 
 import StdlibUnittest
 #if !BRIDGING_HEADER

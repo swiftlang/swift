@@ -74,6 +74,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:sendable-closure-captures>
 - <doc:compilation-caching>
 - <doc:string-interpolation-conformance>
+- <doc:region-isolation-cross-isolation-data-race>
 - <doc:deprecated-declaration>
 - <doc:implementation-only-deprecated>
 - <doc:dynamic-exclusivity>
@@ -113,6 +114,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:temporary-pointers>
 - <doc:unavailable-sendable-conformance>
 - <doc:opaque-type-inference>
+- <doc:region-isolation-unknown-pattern>
 - <doc:unknown-warning-group>
 - <doc:availability-unrecognized-name>
 - <doc:mutable-global-variable>

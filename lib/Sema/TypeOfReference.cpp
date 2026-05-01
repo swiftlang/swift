@@ -1588,17 +1588,17 @@ std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
   // If the access is mutating, wrap the storage type in an lvalue type.
   Type refType;
   if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
-    auto elementTy = subscript->getElementInterfaceType();
+    auto *funcTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
 
+    auto indices = funcTy->getParams();
+
+    auto elementTy = funcTy->getResult();
     if (doesStorageProduceLValue(subscript, baseTy, useDC, *this, locator))
       elementTy = LValueType::get(elementTy);
 
-    auto indices = subscript->getInterfaceType()
-                            ->castTo<AnyFunctionType>()->getParams();
-
     // Transfer the thrown error type into the subscript reference type,
     // which will be used in the application.
-    FunctionType::ExtInfo info;
+    auto info = funcTy->getExtInfo();
     if (thrownErrorType) {
       info = info.withThrows(true, thrownErrorType);
       thrownErrorType = Type();
@@ -2234,12 +2234,14 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
     };
 
     if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-      auto elementTy = subscript->getElementInterfaceType();
+      auto *funcTy = type->castTo<AnyFunctionType>();
+      auto indices = funcTy->getParams();
 
+      auto elementTy = funcTy->getResult();
       if (doesStorageProduceLValue(subscript, overload.getBaseType(),
-                                   useDC, *this, locator))
+                                   useDC, *this, locator)) {
         elementTy = LValueType::get(elementTy);
-      else if (elementTy->hasDynamicSelfType()) {
+      } else if (elementTy->hasDynamicSelfType()) {
         elementTy = withDynamicSelfResultReplaced(elementTy);
       }
 
@@ -2249,10 +2251,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       if (subscript->getAttrs().hasAttribute<OptionalAttr>())
         elementTy = OptionalType::get(elementTy->getRValueType());
 
-      auto indices = subscript->getInterfaceType()
-                       ->castTo<AnyFunctionType>()->getParams();
-      // FIXME: Verify ExtInfo state is correct, not working by accident.
-      FunctionType::ExtInfo info;
+      auto info = funcTy->getExtInfo();
       type = adjustFunctionTypeForConcurrency(
           FunctionType::get(indices, elementTy, info), overload.getBaseType(),
           subscript, useDC, /*numApplies=*/1, /*isMainDispatchQueue=*/false,

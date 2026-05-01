@@ -396,9 +396,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       if handleDestroy(of: operand.value, path: path) == .abortWalk {
         return .abortWalk
       }
-    case is ReturnInstruction:
+    case isReturnInstruction:
       return isEscaping
-    case is ApplyInst, is TryApplyInst, is BeginApplyInst:
+    case isFullApplySite:
       return walkDownCallee(argOp: operand, apply: instruction as! FullApplySite, path: path)
     case let pai as PartialApplyInst:
       // Check whether the partially applied argument can escape in the body.
@@ -543,9 +543,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       if handleDestroy(of: operand.value, path: path) == .abortWalk {
         return .abortWalk
       }
-    case is ReturnInstruction:
+    case isReturnInstruction:
       return isEscaping
-    case is ApplyInst, is TryApplyInst, is BeginApplyInst:
+    case isFullApplySite:
       return walkDownCallee(argOp: operand, apply: instruction as! FullApplySite, path: path)
     case let pai as PartialApplyInst:
       if walkDownCallee(argOp: operand, apply: pai, path: path.with(knownType: nil)) == .abortWalk {

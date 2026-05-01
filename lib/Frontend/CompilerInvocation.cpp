@@ -419,6 +419,9 @@ void CompilerInvocation::computeAArch64TBIOptions() {
 }
 
 void CompilerInvocation::computeCXXStdlibOptions() {
+  if (!LangOpts.EnableCXXInterop)
+    return;
+
   // The MSVC driver in Clang is not aware of the C++ stdlib, and currently
   // always assumes libstdc++, which is incorrect: the Microsoft stdlib is
   // normally used.

@@ -893,17 +893,16 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
   auto *Fn = FuncBuilder.createFunction(
       swift::getSpecializedLinkage(Orig, Orig->getLinkage()), ClonedName,
-      ClonedTy, Orig->getGenericEnvironment(), Orig->getLocation(),
-      Orig->isBare(), Orig->isTransparent(), Serialized, IsNotDynamic,
-      IsNotDistributed, IsNotRuntimeAccessible, Orig->getEntryCount(),
-      Orig->isThunk(), Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
-      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
+      ClonedTy, Orig->getActorIsolation(), Orig->getGenericEnvironment(),
+      Orig->getLocation(), Orig->isBare(), Orig->isTransparent(), Serialized,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
+      Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
+      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
+      Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
-  if (auto isolation = Orig->getActorIsolation()) {
-    Fn->setActorIsolation(*isolation);
-  }
+
   if (!Orig->hasOwnership()) {
     Fn->setOwnershipEliminated();
   }

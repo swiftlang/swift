@@ -2455,6 +2455,17 @@ static ValueDecl *getMakeBorrow(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getBorrowAt(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+
+  auto T = makeGenericParam(0);
+
+  builder.addParameter(makeConcrete(ctx.TheRawPointerType));
+  builder.setResult(T);
+
+  return builder.build(id);
+}
+
 static ValueDecl *getDereferenceBorrow(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
 
@@ -3587,6 +3598,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::MakeBorrow:
     return getMakeBorrow(Context, Id);
+
+  case BuiltinValueKind::BorrowAt:
+    return getBorrowAt(Context, Id);
 
   case BuiltinValueKind::DereferenceBorrow:
     return getDereferenceBorrow(Context, Id);

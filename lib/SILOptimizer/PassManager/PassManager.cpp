@@ -1584,15 +1584,12 @@ createEmptyFunction(StringRef name,
   SILOptFunctionBuilder functionBuilder(*getTransform());
 
   SILFunction *newF = functionBuilder.createFunction(
-      fromFn->getLinkage(), name, newTy, nullptr,
+      fromFn->getLinkage(), name, newTy, fromFn->getActorIsolation(), nullptr,
       fromFn->getLocation(), fromFn->isBare(), fromFn->isTransparent(),
       fromFn->getSerializedKind(), IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
       fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(),
       fromFn->getEffectsKind(), nullptr, fromFn->getDebugScope());
-
-  if (auto isolation = fromFn->getActorIsolation())
-    newF->setActorIsolation(*isolation);
 
   return newF;
 }

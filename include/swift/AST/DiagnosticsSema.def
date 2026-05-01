@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -174,16 +174,6 @@ GROUPED_ERROR(member_from_missing_imports_2_or_more,MemberImportVisibility,none,
       "%kind0 is not available due to missing imports of defining modules "
       "%2%select{ and|, }1 %3%select{|, and others}1",
       (const ValueDecl *, bool, const ModuleDecl *, const ModuleDecl *))
-GROUPED_ERROR(witness_from_missing_import,MemberImportVisibility,none,
-      "%kind0 used to satisfy a requirement of protocol %1 is not available "
-      "due to missing import of defining module %2",
-      (const ValueDecl *, const ProtocolDecl *, const ModuleDecl *))
-GROUPED_ERROR(witness_from_missing_imports_2_or_more,MemberImportVisibility,none,
-      "%kind0 used to satisfy a requirement of protocol %1 is not available "
-      "due to missing import of defining modules "
-      "%3%select{ and|, }2 %4%select{|, and others}2",
-      (const ValueDecl *, const ProtocolDecl *, bool, const ModuleDecl *,
-       const ModuleDecl *))
 NOTE(candidate_add_import,none,
      "add import of module %0", (const ModuleDecl *))
 
@@ -191,9 +181,6 @@ GROUPED_WARNING(add_required_import_for_member,MemberImportVisibility,none,
      "import of module %0 is required", (const ModuleDecl *))
 NOTE(decl_from_module_used_here,none,
      "%kind0 from %1 used here", (const ValueDecl *, const ModuleDecl *))
-NOTE(witness_from_module_used_here,none,
-     "%kind0 from %1 used to satisfy a requirement of protocol %2",
-     (const ValueDecl *, const ModuleDecl *, const ProtocolDecl *))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
@@ -8450,6 +8437,18 @@ NOTE(add_generic_parameter_non_bitwise_copyable_conformance,none,
      (Type))
 ERROR(bitwise_copyable_outside_module,none,
       "conformance to 'BitwiseCopyable' must occur in the same module as %kind0",
+      (const ValueDecl *))
+ERROR(convertible_to_bytes_outside_stdlib,none,
+      "type conforming to 'ConvertibleToBytes' must be defined in the standard library module",
+      (const ValueDecl *))
+ERROR(convertible_to_bytes_outside_module,none,
+      "conformance to 'ConvertibleToBytes' must occur in the same module as %kind0",
+      (const ValueDecl *))
+ERROR(convertible_from_bytes_outside_stdlib,none,
+      "type conforming to 'ConvertibleFromBytes' must be defined in the standard library module",
+      (const ValueDecl *))
+ERROR(convertible_from_bytes_outside_module,none,
+      "conformance to 'ConvertibleFromBytes' must occur in the same module as %kind0",
       (const ValueDecl *))
 ERROR(suppress_inferrable_protocol_extension,none,
       "conformance to inferrable protocol %0 cannot be suppressed in an extension", (const ProtocolDecl *))

@@ -1,5 +1,5 @@
 // {"kind":"typecheck","original":"6af182ec","signature":"swift::FunctionType::get(llvm::ArrayRef<swift::AnyFunctionType::Param>, swift::Type, std::__1::optional<swift::ASTExtInfo>)","signatureAssert":"Assertion failed: (isConsistentAboutIsolation(info, params)), function FunctionType","signatureNext":"ConstraintSystem::getOpenedStorageType"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 @propertyWrapper struct a<b> {
   wrappedValue : b  static subscript<
     c: Actor

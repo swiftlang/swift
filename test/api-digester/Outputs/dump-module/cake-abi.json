@@ -2099,6 +2099,20 @@
           },
           {
             "kind": "Conformance",
+            "name": "ConvertibleFromBytes",
+            "printedName": "ConvertibleFromBytes",
+            "usr": "s:s20ConvertibleFromBytesP",
+            "mangledName": "$ss20ConvertibleFromBytesP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "ConvertibleToBytes",
+            "printedName": "ConvertibleToBytes",
+            "usr": "s:s18ConvertibleToBytesP",
+            "mangledName": "$ss18ConvertibleToBytesP"
+          },
+          {
+            "kind": "Conformance",
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",

@@ -74,4 +74,17 @@ MoveOnlyCxxValueType.test("Test move only field in anonymous struct") {
   let a = FieldInAnonStructNC()
   let b = a
 }
+
+MoveOnlyCxxValueType.test("Test move only type with an empty base") {
+  let a = DerivesEmptyBase(3, 5, 7)
+  expectEqual(a.first.x, 3)
+  expectEqual(a.second.x, 5)
+  expectEqual(a.third.x, 7)
+
+  let b = DerivesEmptyBaseNoAttr(9, 11, 13)
+  expectEqual(b.first.x, 9)
+  expectEqual(b.second.x, 11)
+  expectEqual(b.third.x, 13)
+}
+
 runAllTests()

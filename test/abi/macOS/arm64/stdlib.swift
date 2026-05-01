@@ -1290,3 +1290,10 @@ Added: _$sSM39withContiguousMutableStorageIfAvailableyqd__Sgqd__Sry7ElementQzGzq
 // Typed throws for withContiguousStorage operations
 Added: _$sST32withContiguousStorageIfAvailableyqd__Sgqd__SRy7ElementQzGqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lFTj
 Added: _$sST32withContiguousStorageIfAvailableyqd__Sgqd__SRy7ElementQzGqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lFTq
+
+// UniqueBox type metadata accessor
+Added: _$ss9UniqueBoxVMa
+// UniqueBox type descriptor
+Added: _$ss9UniqueBoxVMn
+// UniqueBox.pointer getter
+Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg

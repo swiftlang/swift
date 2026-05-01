@@ -583,7 +583,7 @@ bb6(%phi6 : @owned $InnerStruct<T>):
 // CHECK:   cond_br undef, bb2, bb1
 // CHECK: bb1:
 // CHECK:   destroy_addr %2 : $*T
-// CHECK:   [[P:%.*]] = unchecked_take_enum_data_addr %1 : $*Optional<T>, #Optional.some!enumelt
+// CHECK:   [[P:%.*]] = unchecked_inplace_enum_data_addr %1 : $*Optional<T>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[P]] to [init] %0 : $*T
 // CHECK:   br bb3
 // CHECK: bb2:

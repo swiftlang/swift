@@ -1359,6 +1359,7 @@ namespace {
       case ActorIsolation::Unspecified:
         printFlag(true, "unspecified_isolation", CapturesColor);
         break;
+
       case ActorIsolation::NonisolatedUnsafe:
         printFlag(true, "nonisolated(unsafe)", CapturesColor);
         break;
@@ -1367,12 +1368,16 @@ namespace {
         printFlag(true, "nonisolated", CapturesColor);
         break;
 
+      case ActorIsolation::NonisolatedConcurrent:
+        printFlag(true, "@concurrent", CapturesColor);
+        break;
+
       case ActorIsolation::Erased:
         printFlag(true, "dynamically_isolated", CapturesColor);
         break;
 
-      case ActorIsolation::CallerIsolationInheriting:
-        printFlag(true, "isolated_to_caller_isolation", CapturesColor);
+      case ActorIsolation::NonisolatedNonsending:
+        printFlag(true, "nonisolated_nonsending", CapturesColor);
         break;
 
       case ActorIsolation::ActorInstance:
@@ -4882,7 +4887,7 @@ public:
     printFoot();
   }
 
-  void visitCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *T, Label label) {
+  void visitNonisolatedNonsendingTypeRepr(NonisolatedNonsendingTypeRepr *T, Label label) {
     printCommon("caller_isolated", label);
     printRec(T->getBase(), Label::optional("base"));
     printFoot();

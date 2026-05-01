@@ -1437,7 +1437,7 @@ public:
 
   ConventionsKind getKind() const { return kind; }
 
-  bool hasCallerIsolationParameter() const {
+  bool hasNonisolatedNonsendingActorParameter() const {
     return kind == ConventionsKind::Default ||
            kind == ConventionsKind::Deallocator;
   }
@@ -1849,7 +1849,7 @@ class DestructureInputs {
   TypeConverter &TC;
   const Conventions &Convs;
   const ForeignInfo &Foreign;
-  std::optional<ActorIsolation> IsolationInfo;
+  ActorIsolation IsolationInfo;
   struct ForeignSelfInfo {
     AbstractionPattern OrigSelfParam;
     AnyFunctionType::CanParam SubstSelfParam;
@@ -1873,7 +1873,7 @@ class DestructureInputs {
 public:
   DestructureInputs(TypeExpansionContext expansion, TypeConverter &TC,
                     const Conventions &conventions, const ForeignInfo &foreign,
-                    std::optional<ActorIsolation> isolationInfo,
+                    ActorIsolation isolationInfo,
                     SmallVectorImpl<SILParameterInfo> &inputs,
                     SmallVectorImpl<int> &parameterMap,
                     SmallBitVector &addressableParams,
@@ -1949,8 +1949,8 @@ private:
 
     // If the function has nonisolated(nonsending) isolation, insert the
     // implicit isolation parameter.
-    if (IsolationInfo && IsolationInfo->isCallerIsolationInheriting() &&
-        Convs.hasCallerIsolationParameter()) {
+    if (IsolationInfo.isNonisolatedNonsending() &&
+        Convs.hasNonisolatedNonsendingActorParameter()) {
       addParameter(-1, CanType(TC.Context.TheImplicitActorType),
                    ParameterConvention::Direct_Guaranteed,
                    ParameterTypeFlags().withIsolated(true),
@@ -2645,7 +2645,7 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
   }
 }
 
-std::optional<ActorIsolation>
+ActorIsolation
 swift::getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
                                         std::optional<SILDeclRef> origConstant,
                                         std::optional<SILDeclRef> constant) {
@@ -2657,11 +2657,11 @@ swift::getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
       if (auto *nonisolatedAttr =
               decl->getAttrs().getAttribute<NonisolatedAttr>()) {
         if (nonisolatedAttr->isNonSending())
-          return ActorIsolation::forCallerIsolationInheriting();
+          return ActorIsolation::forNonisolatedNonsending();
       }
 
       if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
-        return ActorIsolation::forNonisolated(false /*unsafe*/);
+        return ActorIsolation::forNonisolatedConcurrent();
       }
     }
 
@@ -2673,13 +2673,13 @@ swift::getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
   }
 
   if (substFnInterfaceType->hasExtInfo() &&
-      substFnInterfaceType->getExtInfo().getIsolation().isNonIsolatedCaller()) {
+      substFnInterfaceType->getExtInfo().getIsolation().isNonisolatedNonsending()) {
     // If our function type is a nonisolated caller and we can not infer from
     // our constant, we must be caller isolation inheriting.
-    return ActorIsolation::forCallerIsolationInheriting();
+    return ActorIsolation::forNonisolatedNonsending();
   }
 
-  return {};
+  return ActorIsolation::forUnspecified();
 }
 
 /// Create the appropriate SIL function type for the given formal type
@@ -3127,8 +3127,8 @@ static CanSILFunctionType getSILFunctionType(
   }
 
   bool isNonisolatedNonsending =
-      actorIsolation && actorIsolation->isCallerIsolationInheriting() &&
-      conventions.hasCallerIsolationParameter();
+      actorIsolation.isNonisolatedNonsending() &&
+      conventions.hasNonisolatedNonsendingActorParameter();
 
   auto silExtInfo =
       extInfoBuilder.withClangFunctionType(clangType)
@@ -3165,7 +3165,7 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
   {
     bool unimplementable = false;
     ForeignInfo foreignInfo;
-    std::optional<ActorIsolation> actorIsolation; // For now always null.
+    ActorIsolation actorIsolation = ActorIsolation::forUnspecified(); // For now always unspecified.
     SmallVector<int, 8> unusedParameterMap;
     SmallBitVector unusedAddressableParams;
     SmallBitVector unusedConditionalAddressableParams;

@@ -19,7 +19,7 @@ func foo(f f: (() -> ())!) {
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
 // CHECK:    bb1:
-// CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[READ]]
+// CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_inplace_enum_data_addr [[READ]]
 // CHECK-NEXT: [[FN0:%.*]] = load [copy] [[FN0_ADDR]]
 //   .... then call it
 // CHECK:   [[B:%.*]] = begin_borrow [[FN0]]

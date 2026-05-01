@@ -5531,7 +5531,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
 
       auto kwLoc = P.consumeToken();
 
-      if (CallerIsolatedLoc.isValid()) {
+      if (NonisolatedNonsendingLoc.isValid()) {
         P.diagnose(kwLoc, diag::nonisolated_nonsending_repeated)
             .fixItRemove(SpecifierLoc);
       }
@@ -5558,7 +5558,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         continue;
       }
 
-      CallerIsolatedLoc = kwLoc;
+      NonisolatedNonsendingLoc = kwLoc;
       continue;
     }
 

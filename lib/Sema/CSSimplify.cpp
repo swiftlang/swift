@@ -3294,7 +3294,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // Support conversion from `nonisolated(nonsending)` to a function type
   // with an isolated parameter.
   if (subKind == ConstraintKind::Subtype &&
-      func1->getIsolation().isNonIsolatedCaller() &&
+      func1->getIsolation().isNonisolatedNonsending() &&
       func2->getIsolation().isParameter()) {
     // `nonisolated(nonsending)` function gets an implicit isolation parameter
     // introduced during SILGen and thunk is going to forward an isolation from

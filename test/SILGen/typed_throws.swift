@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s --enable-var-scope
 // RUN: %target-swift-emit-sil -sil-verify-all %s
 
 enum MyError: Error {
@@ -434,6 +434,37 @@ func testOverloadingWithConcreteErrorType() throws {
     }
   }
 }
+
+
+// From https://github.com/swiftlang/swift/issues/88220
+enum APIError: Error, Sendable {
+    case duplicateItem
+}
+func execute() throws(APIError) {}
+func store(replaceDuplicates: Bool) throws {
+    do {
+        try execute()
+    }
+    catch APIError.duplicateItem where replaceDuplicates {}
+}
+// CHECK-LABEL: sil {{.*}}[ossa] @$s12typed_throws5store17replaceDuplicatesySb_tKF : $@convention(thin) (Bool) -> @error any Error {
+// CHECK:          [[BOOL_VAL:%.*]] = struct_extract %0 : $Bool, #Bool._value
+// CHECK:          cond_br [[BOOL_VAL]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
+
+// CHECK:        [[TRUE_BB]]:
+// CHECK-NEXT:     br bb
+
+// CHECK:         [[FALSE_BB]]:
+// CHECK-NEXT:      alloc_stack $any Error
+// CHECK: } // end sil function
+
+
+
+
+
+
+// ----------------------------------------------------
+// Tests that must go at the end
 
 // CHECK-LABEL:      sil_vtable MySubclass {
 // CHECK-NEXT:   #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws10MySubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]

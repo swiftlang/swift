@@ -4469,14 +4469,14 @@ void PrintAST::printOneParameter(const ParamDecl *param,
         !willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
       auto type = TheTypeLoc.getType();
 
-      bool isCallerIsolated = false;
+      bool isNonisolatedNonsending = false;
       if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer()))
-        isCallerIsolated = funcTy->getIsolation().isNonIsolatedCaller();
+        isNonisolatedNonsending = funcTy->getIsolation().isNonisolatedNonsending();
 
       // We suppress `@escaping` on enum element parameters because it cannot
       // be written explicitly in this position.
       printParameterFlags(Printer, Options, param, paramFlags,
-                          isEscaping(type) && !isEnumElement, isCallerIsolated);
+                          isEscaping(type) && !isEnumElement, isNonisolatedNonsending);
     }
 
     printTypeLoc(TheTypeLoc, getNonRecursiveOptions(param));

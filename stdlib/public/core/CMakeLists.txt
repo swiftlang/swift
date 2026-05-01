@@ -93,6 +93,7 @@ split_embedded_sources(
   EMBEDDED Flatten.swift
   EMBEDDED FloatingPoint.swift
   EMBEDDED FloatingPointRandom.swift
+  EMBEDDED FullyInhabited.swift
   EMBEDDED HashTable.swift
   EMBEDDED Hashable.swift
   EMBEDDED Hasher.swift
@@ -237,6 +238,7 @@ split_embedded_sources(
   EMBEDDED UnicodeSPI.swift
   EMBEDDED UnicodeScalar.swift
   EMBEDDED UnicodeScalarProperties.swift
+  EMBEDDED UniqueBox.swift
   EMBEDDED Unmanaged.swift
   EMBEDDED UnmanagedOpaqueString.swift
   EMBEDDED UnmanagedString.swift
@@ -292,6 +294,7 @@ if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF" AND NOT SWIFT_FREESTANDING_FLAVOR AND N
 endif()
 
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
+  EmbeddedCasting.swift
   EmbeddedRuntime.swift
   EmbeddedStubs.swift
   EmbeddedPrint.swift
@@ -348,6 +351,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Suppresse
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Reparenting")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Lifetimes")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowInout")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAndMutateAccessors")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")

@@ -12,7 +12,7 @@ func take(iso: (any Actor)?) {}
 func takeDefaulted(iso: isolated (any Actor)? = #isolation) {}
 
 // CHECK-LABEL: // nonisolatedNonsending()
-// CHECK-NEXT: // Isolation: caller_isolation_inheriting
+// CHECK-NEXT: // Isolation: nonisolated(nonsending)
 // CHECK-NEXT: sil hidden @$s4test21nonisolatedNonsendingyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK:      bb0([[IMPLICIT_ACTOR:%.*]] : $Builtin.ImplicitActor):
 // CHECK:   [[ACTOR:%.*]] = implicitactor_to_opaqueisolation_cast [[IMPLICIT_ACTOR]]
@@ -25,7 +25,7 @@ func takeDefaulted(iso: isolated (any Actor)? = #isolation) {}
 
 //   Check that we emit #isolation correctly in closures.
 // CHECK-LABEL: // closure #1 in containsClosure()
-// CHECK-NEXT:  // Isolation: caller_isolation_inheriting
+// CHECK-NEXT:  // Isolation: nonisolated(nonsending)
 // CHECK-LABEL: sil private @$s4test15containsClosureyyFyyYaYCcfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK:       bb0(%0 : $Builtin.ImplicitActor):
 // CHECK:       [[ACTOR:%.*]] = implicitactor_to_opaqueisolation_cast %0
@@ -102,7 +102,7 @@ func hasDefer() async {
 // CHECK: } // end sil function '$s4test8hasDeferyyYaF'
 
 // CHECK-LABEL: // $defer #1 () in hasDefer()
-// CHECK-NEXT:  // Isolation: caller_isolation_inheriting
+// CHECK-NEXT:  // Isolation: nonisolated(nonsending)
 // CHECK:       bb0(%0 : $Builtin.ImplicitActor):
 // CHECK-NEXT:    [[ACTOR:%.*]] = implicitactor_to_opaqueisolation_cast %0
 // CHECK-NEXT:    // function_ref take(iso:)
@@ -129,7 +129,7 @@ func hasNestedDefer() async {
 // CHECK: } // end sil function '$s4test14hasNestedDeferyyYaF'
 
 // CHECK-LABEL: // $defer #1 () in hasNestedDefer()
-// CHECK-NEXT:  // Isolation: caller_isolation_inheriting
+// CHECK-NEXT:  // Isolation: nonisolated(nonsending)
 // CHECK:       bb0(%0 : $Builtin.ImplicitActor):
 // CHECK:         // function_ref $defer #1 () in $defer #1 () in hasNestedDefer()
 // CHECK-NEXT:    [[DEFER:%.*]] = function_ref
@@ -137,7 +137,7 @@ func hasNestedDefer() async {
 // CHECK: } // end sil function '$s4test14hasNestedDeferyyYaF6$deferL_yyF'
 
 // CHECK-LABEL: // $defer #1 () in $defer #1 () in hasNestedDefer()
-// CHECK-NEXT:  // Isolation: caller_isolation_inheriting
+// CHECK-NEXT:  // Isolation: nonisolated(nonsending)
 // CHECK-NEXT: sil private @$s4test14hasNestedDeferyyYaF6$deferL_yyFACL_yyF : $@convention(thin) @caller_isolated (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK:       bb0(%0 : $Builtin.ImplicitActor):
 // CHECK-NEXT:    [[ACTOR:%.*]] = implicitactor_to_opaqueisolation_cast %0

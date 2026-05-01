@@ -569,6 +569,19 @@ public struct Builder {
     return notifyNew(uteda.getAs(UncheckedTakeEnumDataAddrInst.self))
   }
 
+  public func createUncheckedBorrowEnumDataAddr(enumAddress: Value,
+                                              scratchAddress: Value,
+                                              caseIndex: Int) -> UncheckedBorrowEnumDataAddrInst {
+    let uteda = bridged.createUncheckedBorrowEnumDataAddr(enumAddress.bridged, scratchAddress.bridged, caseIndex)
+    return notifyNew(uteda.getAs(UncheckedBorrowEnumDataAddrInst.self))
+  }
+
+  public func createUncheckedInPlaceEnumDataAddr(enumAddress: Value,
+                                              caseIndex: Int) -> UncheckedInPlaceEnumDataAddrInst {
+    let uteda = bridged.createUncheckedInPlaceEnumDataAddr(enumAddress.bridged, caseIndex)
+    return notifyNew(uteda.getAs(UncheckedInPlaceEnumDataAddrInst.self))
+  }
+
   public func createInitEnumDataAddr(enumAddress: Value, caseIndex: Int, type: Type) -> InitEnumDataAddrInst {
     let uteda = bridged.createInitEnumDataAddr(enumAddress.bridged, caseIndex, type.bridged)
     return notifyNew(uteda.getAs(InitEnumDataAddrInst.self))

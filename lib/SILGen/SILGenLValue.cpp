@@ -568,12 +568,12 @@ static ManagedValue getPayloadOfOptionalValue(SILGenFunction &SGF,
     isOwned = false;
   }
 
-  // UncheckedTakeEnumDataAddr is safe to apply to Optional, because it is
-  // a single-payload enum. There will (currently) never be spare bits
-  // embedded in the payload.
+  // UncheckedInPlaceEnumDataAddr is safe to apply to Optional, because it
+  // is a single-payload enum. There will never be spare bits embedded in the
+  // payload.
   SILValue payload;
   if (optBase.getType().isAddress()) {
-    payload = SGF.B.createUncheckedTakeEnumDataAddr(loc, value, someDecl,
+    payload = SGF.B.createUncheckedInPlaceEnumDataAddr(loc, value, someDecl,
                                           SILType::getPrimitiveAddressType(
                                               valueTypeData.TypeOfRValue));
   } else {
@@ -3479,6 +3479,34 @@ LValue SILGenLValue::visitApplyExpr(ApplyExpr *e, SGFAccessKind accessKind,
                                      deref.getValue());
     LValue lv;
     lv.add<ValueComponent>(deref, std::nullopt, typeData, /*isRValue*/ true);
+    return lv;
+  }
+  case BuiltinValueKind::BorrowAt: {
+    ManagedValue borrowedValue = SGF.emitRValueAsSingleValue(e);
+    // Emitting the call to Builtin.borrowAt requires the usual emitRValue
+    // pathways. So the result follows RValue rules: an address for address-only
+    // types, a load_borrow value for loadable types. If the borrowedValue is
+    // addressable-for-dependencies, then strip off the load_borrow to get back
+    // to the original address required for an LValue.
+    if (!borrowedValue.getType().isAddress()) {
+      if (borrowedValue.getType().isAddressableForDeps(SGF.F)) {
+        // RValue construction is expected to emit load_borrow.
+        auto *load = cast<SingleValueInstruction>(borrowedValue.getValue());
+        ASSERT(isa<LoadInst>(load) || isa<LoadBorrowInst>(load));
+        SILValue addr = load->getOperand(0);
+        // Replace the borrowed value with an address. Borrowed values have no
+        // cleanups. The dead borrow will be removed by Onone simplification.
+        borrowedValue = ManagedValue::forRValueWithoutOwnership(addr);
+      } else {
+        // Allow this LValue to be used in a return expression, which violates
+        // end_borrow ownership.
+        borrowedValue = SGF.B.createUncheckedOwnership(e, borrowedValue);
+      }
+    }
+    auto typeData = getValueTypeData(SGF, accessKind, e);
+    LValue lv;
+    lv.add<ValueComponent>(borrowedValue, std::nullopt, typeData,
+                           /*isRValue*/ true);
     return lv;
   }
 

@@ -135,6 +135,7 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
   Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
                                                     Invocation.getFrontendOptions());
+  Invocation.computeCXXStdlibOptions();
 
   if (ParsedArgs.hasArg(OPT_disable_safe_interop_wrappers))
     Invocation.getLangOptions().DisableSafeInteropWrappers = true;
@@ -225,6 +226,9 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   StreamPrinter printer(fs);
   ide::printModuleInterface(M, /*GroupNames=*/{}, traversalOpts, printer,
                             printOpts, /*PrintSynthesizedExtensions=*/false);
+
+  if (CI.getASTContext().hadError())
+    return EXIT_FAILURE;
 
   return EXIT_SUCCESS;
 }

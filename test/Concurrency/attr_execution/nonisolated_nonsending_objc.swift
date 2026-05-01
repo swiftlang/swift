@@ -10,11 +10,11 @@ import Foundation
 class Test: NSObject {
 
   // CHECK: // Test.testExplicit(_:)
-  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
+  // CHECK-NEXT: // Isolation: nonisolated(nonsending)
   // CHECK-LABEL: sil hidden [ossa] @$s27nonisolated_nonsending_objc4TestC12testExplicityyySSYbcYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @Sendable @callee_guaranteed (@guaranteed String) -> (), @guaranteed Test) -> ()
 
   // CHECK: // @objc Test.testExplicit(_:)
-  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
+  // CHECK-NEXT: // Isolation: nonisolated(nonsending)
   // CHECK-LABEL: sil private [thunk] [ossa] @$s27nonisolated_nonsending_objc4TestC12testExplicityyySSYbcYaFTo : $@convention(objc_method) (@convention(block) @Sendable (NSString) -> (), @convention(block) () -> (), Test) -> ()
 
   // @objc closure #1 in Test.testExplicit(_:)
@@ -28,11 +28,11 @@ class Test: NSObject {
   }
 
   // CHECK: // Test.testImplicit(_:)
-  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
+  // CHECK-NEXT: // Isolation: nonisolated(nonsending)
   // CHECK-LABEL: sil hidden [ossa] @$s27nonisolated_nonsending_objc4TestC12testImplicityyySSYbcYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @Sendable @callee_guaranteed (@guaranteed String) -> (), @guaranteed Test) -> ()
 
   // CHECK: // @objc Test.testImplicit(_:)
-  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
+  // CHECK-NEXT: // Isolation: nonisolated(nonsending)
   // CHECK-LABEL: sil private [thunk] [ossa] @$s27nonisolated_nonsending_objc4TestC12testImplicityyySSYbcYaFTo : $@convention(objc_method) (@convention(block) @Sendable (NSString) -> (), @convention(block) () -> (), Test) -> ()
 
   // @objc closure #1 in Test.testImplicit(_:)

@@ -16,14 +16,14 @@ func g() {}
 
 class Fruit {
   // Fruit.__allocating_init()
-  // Isolation: caller_isolation_inheriting
+  // Isolation: nonisolated(nonsending)
   // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s11initializer5FruitCACyYacfC : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick Fruit.Type) -> @owned Fruit {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor
   // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s11initializer5FruitCACyYacfC'
 
   // Fruit.init()
-  // Isolation: caller_isolation_inheriting
+  // Isolation: nonisolated(nonsending)
   // CHECK-LABEL: sil hidden [ossa] @$s11initializer5FruitCACyYacfc : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned Fruit) -> @owned Fruit {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Builtin.ImplicitActor,
   // CHECK:   hop_to_executor [[ARG]]
@@ -59,14 +59,14 @@ class Banana: Fruit {
   // await test(Banana.self)
 
   // Banana.__allocating_init()
-  // Isolation: caller_isolation_inheriting
+  // Isolation: nonisolated(nonsending)
   // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s11initializer6BananaCACyYacfC : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick Banana.Type) -> @owned Banana {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor,
   // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s11initializer6BananaCACyYacfC'
 
   // Banana.init()
-  // Isolation: caller_isolation_inheriting
+  // Isolation: nonisolated(nonsending)
   // CHECK-LABEL: sil hidden [ossa] @$s11initializer6BananaCACyYacfc : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned Banana) -> @owned Banana {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor,
   // CHECK:   hop_to_executor [[ACTOR]]
@@ -78,7 +78,7 @@ class Banana: Fruit {
 
 class MyType {
   // MyType.__allocating_init(_:)
-  // Isolation: caller_isolation_inheriting
+  // Isolation: nonisolated(nonsending)
   //
   // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s11initializer6MyTypeCyACyyYaYCXEYacfC : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @thick MyType.Type) -> @owned MyType {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $@caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
@@ -88,7 +88,7 @@ class MyType {
   // CHECK: } // end sil function '$s11initializer6MyTypeCyACyyYaYCXEYacfC'
 
   // MyType.init(_:)
-  // Isolation: caller_isolation_inheriting
+  // Isolation: nonisolated(nonsending)
   // CHECK-LABEL: sil hidden [ossa] @$s11initializer6MyTypeCyACyyYaYCXEYacfc : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @owned MyType) -> @owned MyType {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $@caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), [[SELF:%.*]] : @owned $MyType):
   // CHECK:   hop_to_executor [[ACTOR]]

@@ -120,8 +120,7 @@ public:
 void OptimizeHopToExecutor::collectActors(Actors &actors) {
   int uniqueActorID = 0;
 
-  if (auto isolation = function->getActorIsolation();
-      isolation && isolation->isCallerIsolationInheriting()) {
+  if (function->getActorIsolation().isNonisolatedNonsending()) {
     actors[function->maybeGetIsolatedArgument()] = uniqueActorID++;
   }
 
@@ -199,7 +198,7 @@ void OptimizeHopToExecutor::solveDataflowBackward() {
 /// Returns true if \p inst is a suspension point or an async call.
 static bool isSuspensionPoint(SILInstruction *inst) {
   if (auto applySite = FullApplySite::isa(inst)) {
-    if (applySite.isAsync() && !applySite.isCallerIsolationInheriting())
+    if (applySite.isAsync() && !applySite.isNonisolatedNonsending())
       return true;
     return false;
   }
@@ -223,8 +222,7 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
         return BlockState::NotSet;
       }
 
-      if (auto isolation = function->getActorIsolation();
-          isolation && isolation->isCallerIsolationInheriting()) {
+      if (function->getActorIsolation().isNonisolatedNonsending()) {
         auto *fArg =
             cast<SILFunctionArgument>(function->maybeGetIsolatedArgument());
         return actors.lookup(SILValue(fArg));
@@ -392,7 +390,7 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
   // executors since caller isolation inheriting functions do not hop in their
   // prologue.
   if (auto fas = FullApplySite::isa(inst);
-      fas && fas.isAsync() && fas.isCallerIsolationInheriting()) {
+      fas && fas.isAsync() && fas.isNonisolatedNonsending()) {
     return true;
   }
 
@@ -405,8 +403,7 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
   // caller that needs this hop to executor to run on the correct actor.
   if (auto *term = dyn_cast<TermInst>(inst);
       term && term->isFunctionExiting()) {
-    if (auto isolation = inst->getFunction()->getActorIsolation();
-        isolation && isolation->isCallerIsolationInheriting()) {
+    if (inst->getFunction()->getActorIsolation().isNonisolatedNonsending()) {
       return true;
     }
   }

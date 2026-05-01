@@ -10,6 +10,7 @@ import Swift
 // "[global_init]".
 //
 // CHECK-LABEL: g.MyVar.unsafeMutableAddressor : Swift.Int
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil [global_init] @_TF1gau5MyVarSi
 
 sil [global_init] @_TF1gau5MyVarSi : $@convention(thin) () -> Builtin.RawPointer {

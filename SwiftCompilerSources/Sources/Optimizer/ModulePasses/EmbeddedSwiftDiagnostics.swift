@@ -77,47 +77,37 @@ private struct FunctionChecker {
 
   mutating func checkInstruction(_ instruction: Instruction) throws {
     switch instruction {
-    case is OpenExistentialMetatypeInst,
-         is InitExistentialMetatypeInst:
-      throw Diagnostic(.embedded_swift_metatype_type, instruction.operands[0].value.type, at: instruction.location)
-
     case is OpenExistentialBoxInst,
          is OpenExistentialBoxValueInst,
          is OpenExistentialValueInst,
          is OpenExistentialAddrInst,
-         is InitExistentialAddrInst,
-         is InitExistentialValueInst,
-         is ExistentialMetatypeInst:
-      if let ie = instruction as? InitExistentialAddrInst {
-        for conf in ie.conformances {
-          try checkConformance(conf, location: ie.location)
-        }
-      } else if instruction is OpenExistentialAddrInst
-             || instruction is OpenExistentialBoxInst
-             || instruction is OpenExistentialBoxValueInst {
-          // okay
-      } else {
-          // not supported even in embedded with existentials
-        throw Diagnostic(.embedded_swift_existential_type, instruction.operands[0].value.type, at: instruction.location)
-      }
+         is OpenExistentialMetatypeInst:
+      break
 
     case is AllocExistentialBoxInst:
       break
 
-    case let ier as InitExistentialRefInst:
-      for conf in ier.conformances {
-        try checkConformance(conf, location: ier.location)
+    case is InitExistentialAddrInst,
+         is InitExistentialValueInst,
+         is InitExistentialRefInst,
+         is InitExistentialMetatypeInst:
+      let ie = instruction as! any InitExistentialInstruction
+      for conf in ie.conformances {
+        try checkConformance(conf, location: ie.location)
       }
 
     case is ValueMetatypeInst,
-         is MetatypeInst:
+         is MetatypeInst,
+         is ExistentialMetatypeInst:
       let metaType = (instruction as! SingleValueInstruction).type
-      if metaType.representationOfMetatype != .thin {
+      switch metaType.representationOfMetatype {
+      case .objC:
         let rawType = metaType.canonicalType.rawType.instanceTypeOfMetatype
         let type = rawType.isDynamicSelf ? rawType.staticTypeOfDynamicSelf : rawType
-        if !type.isClass {
-          throw Diagnostic(.embedded_swift_metatype_type, type, at: instruction.location)
-        }
+        throw Diagnostic(.embedded_swift_metatype_type, type, at: instruction.location)
+
+      case .thick, .thin:
+        break
       }
 
     case is KeyPathInst:

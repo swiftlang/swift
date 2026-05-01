@@ -477,7 +477,7 @@ EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 /// Enable the ManualOwnership diagnostic groups:
 ///   * -Wwarning SemanticCopies
 ///   * -Wwarning DynamicExclusivity
-EXPERIMENTAL_FEATURE(ManualOwnership, false)
+EXPERIMENTAL_FEATURE(ManualOwnership, true)
 
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)

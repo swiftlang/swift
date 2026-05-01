@@ -1019,9 +1019,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
 
 bool Decl::isInMacroExpansionInContext() const {
   auto *mod = getModuleContext();
-  auto *file = mod->getSourceFileContainingLocation(getStartLoc());
-
-  auto parentFile = [&]() {
+  auto *parentSF = [&]() {
     // For accessors, the storage decl is the more accurate thing to check
     // since the entire property/subscript could be macro-generated, in which
     // case the accessor shouldn't be considered "added by macro expansion".
@@ -1032,17 +1030,7 @@ bool Decl::isInMacroExpansionInContext() const {
     }
     return getDeclContext()->getParentSourceFile();
   }();
-
-  // Decls in macro expansions always have a source file. The source
-  // file can be null if the decl is implicit or has an invalid
-  // source location.
-  if (!parentFile || !file)
-    return false;
-
-  if (file->getBufferID() == parentFile->getBufferID())
-    return false;
-
-  return file->getFulfilledMacroRole() != std::nullopt;
+  return swift::isMacroExpansionInContext(getStartLoc(), parentSF);
 }
 
 bool Decl::isInMacroExpansionFromClangHeader() const {
@@ -3144,6 +3132,7 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
         auto isolation = getActorIsolation(type);
         switch (isolation) {
           case ActorIsolation::Unspecified:
+          case ActorIsolation::Nonisolated:
           case ActorIsolation::NonisolatedUnsafe:
             break;
 
@@ -3153,9 +3142,9 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
 
             return true;
 
-          case ActorIsolation::CallerIsolationInheriting:
+          case ActorIsolation::NonisolatedNonsending:
           case ActorIsolation::ActorInstance:
-          case ActorIsolation::Nonisolated:
+          case ActorIsolation::NonisolatedConcurrent:
           case ActorIsolation::Erased: // really can't happen
             return true;
         }
@@ -9437,9 +9426,9 @@ void ParamDecl::setTypeRepr(TypeRepr *repr) {
         continue;
       }
 
-      if (auto *callerIsolated =
-              dyn_cast<CallerIsolatedTypeRepr>(unwrappedType)) {
-        unwrappedType = callerIsolated->getBase();
+      if (auto *nonsending =
+              dyn_cast<NonisolatedNonsendingTypeRepr>(unwrappedType)) {
+        unwrappedType = nonsending->getBase();
         continue;
       }
 
@@ -10252,6 +10241,23 @@ const ParamDecl *swift::getParameterAt(const DeclContext *source,
     return index < params->size() ? params->get(index) : nullptr;
   }
   return nullptr;
+}
+
+bool swift::isMacroExpansionInContext(SourceLoc loc, SourceFile *parentSF) {
+  if (!parentSF)
+    return false;
+
+  // Macro expansions always have a source file. The source file can be null if
+  // the loc is for an implicit decl or is invalid.
+  auto *mod = parentSF->getParentModule();
+  auto *file = mod->getSourceFileContainingLocation(loc);
+  if (!file)
+    return false;
+
+  if (file->getBufferID() == parentSF->getBufferID())
+    return false;
+
+  return file->getFulfilledMacroRole() != std::nullopt;
 }
 
 CaptureInfo AbstractFunctionDecl::getCaptureInfo() const {
@@ -12386,10 +12392,11 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       switch (auto isolation = closure->getActorIsolation()) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedConcurrent:
       case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::GlobalActor:
       case ActorIsolation::Erased:
-      case ActorIsolation::CallerIsolationInheriting:
+      case ActorIsolation::NonisolatedNonsending:
         return false;
 
       case ActorIsolation::ActorInstance:
@@ -12429,8 +12436,20 @@ ActorIsolation swift::getActorIsolationOfContext(
   // getActorIsolation does consider it already, but it's nice to
   // avoid some extra request evaluation in a trivial case.
   while (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
-    if (!FD->isDeferBody()) break;
-    dcToUse = FD->getDeclContext();
+    if (!FD->isDeferBody())
+      break;
+
+    auto contextIsolation = getActorIsolationOfContext(
+        FD->getDeclContext(), getClosureActorIsolation);
+
+    // Defer could be synchronous but be located in an asynchronous
+    // function or closure. Since nonisolated isolation is now split,
+    // it has to be set correctly depending on the defer itself.
+    if (contextIsolation.isNonisolatedOrConcurrent())
+      return FD->isAsync() ? ActorIsolation::forNonisolatedConcurrent()
+                           : ActorIsolation::forNonisolated(/*unsafe=*/false);
+
+    return contextIsolation;
   }
 
   if (auto *vd = dyn_cast_or_null<ValueDecl>(dcToUse->getAsDecl()))

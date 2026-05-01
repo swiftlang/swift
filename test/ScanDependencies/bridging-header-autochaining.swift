@@ -47,8 +47,7 @@
 // RUN:   %t/user.swift -auto-bridging-header-chaining -o %t/User.swiftmodule \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t > %t/header1.h
 // RUN:   %FileCheck %s --check-prefix=HEADER1 --input-file=%t/header1.h
-// HEADER1: #if __has_include
-// HEADER1-NEXT: #import
+// HEADER1: #include
 // HEADER1-SAME: Bridging.h
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py %swift_frontend_plain %t/deps2.json -o %t/User.cmd -b %t/header1.cmd
@@ -79,11 +78,9 @@
 // RUN:   %t/user.swift -auto-bridging-header-chaining -o %t/User.swiftmodule -import-objc-header %t/Bridging2.h \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t > %t/header2.h
 // RUN:   %FileCheck %s --check-prefix=HEADER2 --input-file=%t/header2.h
-// HEADER2: __has_include
-// HEADER2-NEXT: #import
+// HEADER2: #include
 // HEADER2-SAME: Bridging.h
-// HEADER2: __has_include
-// HEADER2-NEXT: #import
+// HEADER2: #include
 // HEADER2-SAME: Bridging2.h
 
 // RUN: %FileCheck %s --check-prefix DEPS_JSON --input-file=%t/deps3.json

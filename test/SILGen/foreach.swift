@@ -227,7 +227,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   br [[CONT_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<any P>, #Optional.some!enumelt
+// CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_inplace_enum_data_addr [[ELT_STACK]] : $*Optional<any P>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
@@ -388,7 +388,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   br [[CONT_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, #Optional.some!enumelt
+// CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_inplace_enum_data_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
@@ -496,7 +496,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK:   br [[CONT_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<T.Element>, #Optional.some!enumelt
+// CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_inplace_enum_data_addr [[ELT_STACK]] : $*Optional<T.Element>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
@@ -648,7 +648,7 @@ func injectForEachElementIntoOptional(_ xs: [Int]) {
 // CHECK: [[ADDR:%.*]] = alloc_stack $Optional<T>
 // CHECK: switch_enum_addr [[ADDR]] : $*Optional<T>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
 // CHECK: [[BB_SOME]]:
-// CHECK: [[RES:%.*]] = unchecked_take_enum_data_addr [[ADDR]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK: [[RES:%.*]] = unchecked_inplace_enum_data_addr [[ADDR]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK: copy_addr [take] [[RES]] to [init] [[RES_COPY:%.*]] : $*T
 // CHECK: [[X_BINDING:%.*]] = alloc_stack [lexical] [var_decl] $Optional<T>, let, name "x"
 // CHECK: [[X_ADDR:%.*]] = init_enum_data_addr [[X_BINDING]] : $*Optional<T>, #Optional.some!enumelt

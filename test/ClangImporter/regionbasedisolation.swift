@@ -134,7 +134,7 @@ nonisolated(nonsending) func useValueNonIsolatedNonSending<T>(_ t: T) async {}
   let x = ObjCObject()
   await x.useValue(y)
   await useValueConcurrently(x)  // expected-error {{sending 'x' risks causing data races}}
-  // expected-ni-note @-1 {{sending main actor-isolated 'x' to nonisolated global function 'useValueConcurrently' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-ni-note @-1 {{sending main actor-isolated 'x' to @concurrent global function 'useValueConcurrently' risks causing data races between @concurrent and main actor-isolated uses}}
   // expected-ni-ns-note @-2 {{sending main actor-isolated 'x' to @concurrent global function 'useValueConcurrently' risks causing data races between @concurrent and main actor-isolated uses}}
 }
 

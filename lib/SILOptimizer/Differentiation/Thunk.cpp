@@ -130,9 +130,9 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
       module.getSwiftModule());
 
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
-      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible);
+      loc, name, thunkDeclType, ActorIsolation::forUnspecified(), IsBare,
+      IsTransparent, IsSerialized, ProfileCounter(), IsReabstractionThunk,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
   if (!thunk->empty())
     return thunk;
 
@@ -426,9 +426,9 @@ getOrCreateSubsetParametersThunkForLinearMap(
 
   auto loc = parentThunk->getLocation();
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, thunkName, thunkType, IsBare, IsTransparent, IsSerialized,
-      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible);
+      loc, thunkName, thunkType, ActorIsolation::forUnspecified(), IsBare,
+      IsTransparent, IsSerialized, ProfileCounter(), IsThunk, IsNotDynamic,
+      IsNotDistributed, IsNotRuntimeAccessible);
 
   if (!thunk->empty())
     return {thunk, interfaceSubs};
@@ -776,9 +776,9 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 
   auto loc = origFnOperand.getLoc();
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, thunkName, thunkType, IsBare, IsTransparent,
-      caller->getSerializedKind(), ProfileCounter(), IsThunk, IsNotDynamic,
-      IsNotDistributed, IsNotRuntimeAccessible);
+      loc, thunkName, thunkType, ActorIsolation::forUnspecified(), IsBare,
+      IsTransparent, caller->getSerializedKind(), ProfileCounter(), IsThunk,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
 
   if (!thunk->empty())
     return {thunk, interfaceSubs};

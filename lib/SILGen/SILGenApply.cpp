@@ -1740,11 +1740,11 @@ public:
           return false;
 
         // old type MUST NOT have nonisolated(nonsending).
-        if (oldFnTy->getIsolation().isNonIsolatedCaller())
+        if (oldFnTy->getIsolation().isNonisolatedNonsending())
           return false;
 
         // new type MUST nonisolated(nonsending)
-        if (!newFnTy->getIsolation().isNonIsolatedCaller())
+        if (!newFnTy->getIsolation().isNonisolatedNonsending())
           return false;
 
         // See if setting isolation of old type to nonisolated(nonsending)
@@ -3191,7 +3191,8 @@ done:
 
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
-      case ActorIsolation::CallerIsolationInheriting:
+      case ActorIsolation::NonisolatedConcurrent:
+      case ActorIsolation::NonisolatedNonsending:
       case ActorIsolation::NonisolatedUnsafe:
         llvm_unreachable("Not isolated");
       }
@@ -3512,6 +3513,23 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
       if (auto addr = getVariableAddressableBuffer(param, expr,
                                                    ownership)) {
         return ManagedValue::forBorrowedAddressRValue(addr);
+      }
+    }
+  }
+  if (auto ae = dyn_cast<ApplyExpr>(expr)) {
+    if (auto declRef = ae->getFn()->getReferencedDecl()) {
+      if (declRef.getDecl()->getModuleContext()->isBuiltinModule()) {
+        auto &builtinInfo
+          = SGM.M.getBuiltinInfo(declRef.getDecl()->getBaseIdentifier());
+        // TODO: Support things like Builtin.makeBorrow(Builtin.borrowAt(p)).
+        // We should call a SGF.tryEmitBuiltinAsAddres() helper here. But
+        // CallEmission does not have a way to query ahead of time whether its
+        // result will be loaded into its RValue result.
+        if (builtinInfo.ID == BuiltinValueKind::BorrowAt) {
+          SGM.diagnose(expr, diag::not_implemented,
+                       "Builtin.borrowAt must be direclty returned from a "
+                       "borrow accessor");
+        }
       }
     }
   }
@@ -5500,9 +5518,6 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
   // Get the callee type information.
   auto calleeTypeInfo = callee.getTypeInfo(SGF);
 
-  std::optional<ManagedValue> self;
-  auto fnValue = callee.getFnValue(SGF, self);
-
   // Evaluate the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
   std::optional<SILLocation> uncurriedLoc;
@@ -5512,6 +5527,12 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
       uncurriedArgs, uncurriedLoc);
 
   auto selfArgMV = uncurriedArgs.back();
+
+  std::optional<ManagedValue> self;
+  if (callee.requiresSelfValueForDispatch()) {
+    self = selfArgMV;
+  }
+  auto fnValue = callee.getFnValue(SGF, self);
 
   // Strip the unnecessary copy_value + mark_unresolved_non_copyable_value +
   // begin_borrow instructions added for move-only self argument.
@@ -6221,7 +6242,8 @@ RValue SILGenFunction::emitApply(
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedConcurrent:
+    case ActorIsolation::NonisolatedNonsending:
     case ActorIsolation::NonisolatedUnsafe:
       llvm_unreachable("Not isolated");
       break;
@@ -7446,6 +7468,17 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
     if (selfParam.isConsumedInCaller() || base.getType().isAddressOnly(SGF.F)) {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
+      
+      // If the base is move only and a +0 value, then the copy we're about to emit is invalid
+      // and will later be diagnosed by the move checker. We'll mark the base as unresolved
+      // to give the move checker a chance to salvage things if it can eliminate the copy.
+      if (selfParam.isConsumedInCaller() && !shouldTake && base.getType().isMoveOnly() &&
+          !isa<MarkUnresolvedNonCopyableValueInst>(base.getValue())) {
+          auto marked = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+              loc, base.getValue(),
+              MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+          base = ManagedValue::forBorrowedAddressRValue(marked);
+      }
 
       auto isGuaranteed = selfParam.isGuaranteedInCaller();
 

@@ -4915,7 +4915,7 @@ private:
 
       // If the access is to a unspecified/nonisolated value, let's diagnose
       // it with a generic error/warning about expression being `async`.
-      if (declIsolation.isUnspecified() || declIsolation.isNonisolated())
+      if (declIsolation.isUnspecified() || declIsolation.isNonisolatedOrConcurrent())
         return false;
 
       const auto &[fixItLoc, insertText] =

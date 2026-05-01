@@ -218,7 +218,7 @@ class SlowServerlet: SlowServer {
     // CHECK-NN:   hop_to_executor [[ACTOR]]
     // CHECK-NN: } // end sil function '$s21objc_async_from_swift13SlowServerletC011doSomethingE8NullablyySiSSYaF'
 
-    // TODO: We are labeling this as having caller_isolation_inheriting when NN
+    // TODO: We are labeling this as having nonisolated(nonsending) when NN
     // is enabled... but we do not have an actor parameter. This is incorrect.
     //
     // @objc thunk closure

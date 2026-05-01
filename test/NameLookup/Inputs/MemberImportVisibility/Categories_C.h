@@ -17,4 +17,5 @@
 
 @interface NSObject (Categories_C)
 - (nullable id)overriddenInCategoryWithMethodReturningOptional;
+- (void)optionalRequirementWitnessedInC;
 @end

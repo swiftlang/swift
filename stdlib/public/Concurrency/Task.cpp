@@ -102,11 +102,7 @@ void FutureFragment::destroy() {
     break;
 
   case Status::Error:
-    #if SWIFT_CONCURRENCY_EMBEDDED
-    swift_unreachable("untyped error used in embedded Swift");
-    #else
     swift_errorRelease(getError());
-    #endif
     break;
   }
 }
@@ -300,11 +296,7 @@ void AsyncTask::completeFuture(AsyncContext *context) {
     auto waitingContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
     if (hadErrorResult) {
-      #if SWIFT_CONCURRENCY_EMBEDDED
-      swift_unreachable("untyped error used in embedded Swift");
-      #else
       waitingContext->fillWithError(fragment);
-      #endif
     } else {
       waitingContext->fillWithSuccess(fragment);
     }
@@ -1449,15 +1441,11 @@ void swift_task_future_wait_throwingImpl(
   }
 
   case FutureFragment::Status::Error: {
-    #if SWIFT_CONCURRENCY_EMBEDDED
-    swift_unreachable("untyped error used in embedded Swift");
-    #else
     // Run the task with an error result.
     auto future = task->futureFragment();
     auto error = future->getError();
     swift_errorRetain(error);
     return resumeFunction(callerContext, error);
-    #endif
   }
   }
 }

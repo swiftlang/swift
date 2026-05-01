@@ -2657,6 +2657,18 @@ public:
           << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
   
+  void visitUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDataAddrInst *UDAI) {
+    *this << getIDAndType(UDAI->getEnum()) << ", "
+          << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement)
+          << " in "
+          << getIDAndType(UDAI->getScratch());
+  }
+  
+  void visitUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnumDataAddrInst *UDAI) {
+    *this << getIDAndType(UDAI->getOperand()) << ", "
+          << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
+  }
+  
   void visitInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
     *this << getIDAndType(IUAI->getOperand()) << ", "
           << SILDeclRef(IUAI->getElement(), SILDeclRef::Kind::EnumElement);
@@ -3742,11 +3754,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
   OS << '\n';
 
-  if (auto functionIsolation = getActorIsolation()) {
-    OS << "// Isolation: ";
-    functionIsolation->print(OS);
-    OS << '\n';
-  }
+  OS << "// Isolation: ";
+  getActorIsolation().print(OS);
+  OS << '\n';
 
   printClangQualifiedNameCommentIfPresent(OS, getClangDecl());
 
@@ -3831,9 +3841,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
 
   if (auto isolation = getActorIsolation()) {
-    if (isolation->isSILParsed() || SILPrintFunctionIsolationInfo) {
+    if (isolation.isSILParsed() || SILPrintFunctionIsolationInfo) {
       OS << "[isolation \"";
-      isolation->printForSIL(OS);
+      isolation.printForSIL(OS);
       OS << "\"] ";
     }
   }
