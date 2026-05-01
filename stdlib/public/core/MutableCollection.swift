@@ -240,14 +240,12 @@ where SubSequence: MutableCollection
     _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R?
 
-#if !hasFeature(Embedded)
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @safe
   mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: (_ _buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
-#endif // !hasFeature(Embedded)
 }
 
 // TODO: swift-3-indexing-model - review the following
@@ -260,34 +258,34 @@ extension MutableCollection {
     return nil
   }
 
-  // This default implementation needs to be @_disfavoredOverload
-  // as the concrete implementations are now @_alwaysEmitIntoClient.
-  @_disfavoredOverload
   @_alwaysEmitIntoClient
   @safe
   public mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R? {
-    return nil
+    // This default typed throws implementation is preferred to the concrete
+    // typed throws implementations when the typed-throwing protocol requirement
+    // is unavailable (i.e., below SwiftStdlib 6.4).
+    // Hence, this method forwards to the `rethrows` variant (by passing an
+    // untyped-throwing closure) in order to dispatch a concrete implementation
+    // if available.
+
+    do {
+      return try self.withContiguousMutableStorageIfAvailable { buffer throws -> R in
+        return try unsafe body(&buffer)
+      }
+    } catch {
+      throw error as! E
+    }
   }
 
-#if !hasFeature(Embedded)
-  // This default implementation needs to be @_disfavoredOverload
-  // as the concrete implementations are now @_alwaysEmitIntoClient.
-  @_disfavoredOverload
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    mutating func withContiguousMutableStorageIfAvailable<R>(
-      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-    ) throws -> R?
-  )
-  @usableFromInline
-  internal mutating func __rethrows_withContiguousMutableStorageIfAvailable<R>(
+  @inlinable
+  @safe
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) throws -> R? {
-    return try unsafe self.withContiguousMutableStorageIfAvailable(body)
+  ) rethrows -> R? {
+    return nil
   }
-#endif // !hasFeature(Embedded)
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///

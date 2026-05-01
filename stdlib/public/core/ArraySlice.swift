@@ -1128,7 +1128,7 @@ extension ArraySlice: RangeReplaceableCollection {
   internal mutating func __rethrows_withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) throws -> R? {
-    return try unsafe self.withContiguousMutableStorageIfAvailable(body)
+    return try self.withContiguousMutableStorageIfAvailable(body)
   }
 #endif // !hasFeature(Embedded)
 
@@ -1154,7 +1154,7 @@ extension ArraySlice: RangeReplaceableCollection {
   internal func __rethrows_withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) throws -> R? {
-    return try unsafe self.withContiguousStorageIfAvailable(body)
+    return try self.withContiguousStorageIfAvailable(body)
   }
 #endif // !hasFeature(Embedded)
 

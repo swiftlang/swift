@@ -336,7 +336,7 @@ extension Slice: MutableCollection where Base: MutableCollection {
     }
   #else // hasFeature(Embedded)
     do {
-      return try unsafe _base.withContiguousMutableStorageIfAvailable { buffer in
+      return try _base.withContiguousMutableStorageIfAvailable { buffer in
         var slice = unsafe UnsafeMutableBufferPointer(
           rebasing: buffer[start ..< start + count])
         let copy = unsafe slice

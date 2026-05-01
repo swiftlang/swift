@@ -448,17 +448,15 @@ public protocol Sequence<Element> {
   @available(SwiftStdlib 6.4, *)
   @safe
   func withContiguousStorageIfAvailable<R, E: Error>(
-    _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> R
+    _ body: (_ _buffer: UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R?
 
-#if !hasFeature(Embedded)
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @safe
   func withContiguousStorageIfAvailable<R>(
-    _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
+    _ body: (_ _buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
-#endif // !hasFeature(Embedded)
 }
 
 // Provides a default associated type witness for Iterator when the
@@ -1292,35 +1290,34 @@ extension Sequence {
     return (it, buffer.endIndex)
   }
 
-  // This default implementation needs to be @_disfavoredOverload
-  // as the concrete implementations are now @_alwaysEmitIntoClient.
-  @_disfavoredOverload
   @_alwaysEmitIntoClient
   @safe
   public func withContiguousStorageIfAvailable<R, E: Error>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R? {
-    return nil
+    // This default typed throws implementation is preferred to the concrete
+    // typed throws implementations when the typed-throwing protocol requirement
+    // is unavailable (i.e., below SwiftStdlib 6.4).
+    // Hence, this method forwards to the `rethrows` variant (by passing an
+    // untyped-throwing closure) in order to dispatch a concrete implementation
+    // if available.
+
+    do {
+      return try self.withContiguousStorageIfAvailable { buffer throws -> R in
+        return try unsafe body(buffer)
+      }
+    } catch {
+      throw error as! E
+    }
   }
 
-#if !hasFeature(Embedded)
-  // This default implementation needs to be @_disfavoredOverload
-  // as the concrete implementations are now @_alwaysEmitIntoClient.
-  @_disfavoredOverload
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func withContiguousStorageIfAvailable<R>(
-      _ body: (UnsafeBufferPointer<Element>) throws -> R
-    ) throws -> R?
-  )
-  @usableFromInline
+  @inlinable
   @safe
-  internal func __rethrows_withContiguousStorageIfAvailable<R>(
+  public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) throws -> R? {
-    return try self.withContiguousStorageIfAvailable(body)
+  ) rethrows -> R? {
+    return nil
   }
-#endif // !hasFeature(Embedded)
 }
 
 // FIXME(ABI)#182

@@ -696,7 +696,7 @@ extension String.UTF8View {
   internal func __rethrows_withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) throws -> R? {
-    return try unsafe self.withContiguousStorageIfAvailable(body)
+    return try self.withContiguousStorageIfAvailable(body)
   }
 #endif // !hasFeature(Embedded)
 }

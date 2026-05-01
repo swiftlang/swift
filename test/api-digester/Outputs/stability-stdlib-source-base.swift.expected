@@ -73,9 +73,6 @@ Func RangeReplaceableCollection.filter(_:) is now without rethrows
 Func Dictionary.filter(_:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
 Func Dictionary.filter(_:) has self access kind changing from __Consuming to Consuming
 Func Dictionary.filter(_:) is now without rethrows
-Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has generic signature change from <Self, R where Self : Swift.MutableCollection> to <Self, R, E where Self : Swift.MutableCollection, E : Swift.Error>
-Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Self.Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Self.Element>) throws(E) -> R
-Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) is now without rethrows
 Func Sequence.allSatisfy(_:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
 Func Sequence.allSatisfy(_:) is now without rethrows
 Func Sequence.compactMap(_:) has generic signature change from <Self, ElementOfResult where Self : Swift.Sequence> to <Self, ElementOfResult, E where Self : Swift.Sequence, E : Swift.Error>
@@ -105,8 +102,6 @@ Func Sequence.starts(with:by:) is now without rethrows
 Func Set.filter(_:) has generic signature change from <Element where Element : Swift.Hashable> to <Element, E where Element : Swift.Hashable, E : Swift.Error>
 Func Set.filter(_:) has self access kind changing from __Consuming to Consuming
 Func Set.filter(_:) is now without rethrows
-Func Sequence.withContiguousStorageIfAvailable(_:) has generic signature change from <Self, R where Self : Swift.Sequence> to <Self, R, E where Self : Swift.Sequence, E : Swift.Error>
-Func Sequence.withContiguousStorageIfAvailable(_:) is now without rethrows
 Func Slice.withContiguousMutableStorageIfAvailable(_:) has generic signature change from <Base, R where Base : Swift.MutableCollection> to <Base, R, E where Base : Swift.MutableCollection, E : Swift.Error>
 Func Slice.withContiguousMutableStorageIfAvailable(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Swift.Slice<Base>.Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Swift.Slice<Base>.Element>) throws(E) -> R
 Func Slice.withContiguousMutableStorageIfAvailable(_:) is now without rethrows
