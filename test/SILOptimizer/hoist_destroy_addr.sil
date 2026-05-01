@@ -1365,7 +1365,7 @@ entry(%c_addr : $*X):
 
 // CHECK-LABEL: sil [ossa] @no_hoist_into_load_borrow_scope : {{.*}} {
 // CHECK:         end_borrow
-// CHECK-NEXT:    destroy_addr
+// CHECK:         destroy_addr
 // CHECK-LABEL: } // end sil function 'no_hoist_into_load_borrow_scope'
 sil [ossa] @no_hoist_into_load_borrow_scope : $@convention(thin) (@in X) -> () {
 entry(%c_addr_in : $*X):

@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend -module-name Logging -package-name MyLoggingPkg %t/File.swift -emit-module -emit-module-path %t/Logging.swiftmodule
 // RUN: test -f %t/Logging.swiftmodule
-// RUN: llvm-bcanalyzer -dump %t/Logging.swiftmodule | %FileCheck %s -check-prefix CHECK-BLOB
+// RUN: %llvm-bcanalyzer -dump %t/Logging.swiftmodule | %FileCheck %s -check-prefix CHECK-BLOB
 // CHECK-BLOB: <MODULE_PACKAGE_NAME abbrevid=5/> blob data = 'MyLoggingPkg'
 
 // RUN: %target-swift-frontend -module-name Logging -package-name MyLoggingPkg %t/File.swift -emit-module -emit-module-interface-path %t/Logging.swiftinterface -emit-private-module-interface-path %t/Logging.private.swiftinterface -swift-version 5 -enable-library-evolution -I %t

@@ -462,7 +462,7 @@ extension ASTGenVisitor {
     }
 
     if nonisolatedLoc.isValid {
-      type = BridgedCallerIsolatedTypeRepr.createParsed(
+      type = BridgedNonisolatedNonsendingTypeRepr.createParsed(
         self.ctx,
         base: type,
         specifierLoc: nonisolatedLoc

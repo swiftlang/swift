@@ -16,7 +16,7 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(anyAppleOS)
 internal import Darwin
 #elseif os(Windows)
 internal import ucrt
@@ -36,7 +36,7 @@ enum ImageSourceError: Error {
   #endif
 }
 
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 struct ImageSource: CustomStringConvertible {
 
   private class Storage: CustomStringConvertible {
@@ -183,7 +183,7 @@ struct ImageSource: CustomStringConvertible {
       self.init(mapped: UnsafeRawBufferPointer(
                   start: base, count: size))
       #else
-      var fd = _swift_open(path, O_RDONLY, 0)
+      let fd = _swift_open(path, O_RDONLY, 0)
       if fd < 0 {
         throw ImageSourceError.posixError(_swift_get_errno())
       }
@@ -411,7 +411,7 @@ struct ImageSource: CustomStringConvertible {
 }
 
 // MemoryReader support
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 extension ImageSource: MemoryReader {
   public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
@@ -448,7 +448,7 @@ extension ImageSource: MemoryReader {
 }
 
 /// Used as a cursor by the DWARF code
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 struct ImageSourceCursor {
   typealias Address = ImageSource.Address
   typealias Size = ImageSource.Size

@@ -2088,6 +2088,31 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       callee = dyn_cast<AbstractFunctionDecl>(
                  dynMemberRef->getMember().getDecl());
     
+    // If the callee is an unstructured Task factory, warn if the operation
+    // closure can throw a non-Never error warn about discarding the error.
+    if (callee && !call->isImplicit() && callee->isUnstructuredTaskFactory()) {
+      for (auto arg : *call->getArgs()) {
+        auto argTy = arg.getExpr()->getType();
+        if (!argTy)
+          continue;
+        auto *fnTy = argTy->getAs<AnyFunctionType>();
+        if (!fnTy || !fnTy->isThrowing())
+          continue;
+
+        // throws(Never) is fine to discard, don't warn. Bare `throws` has
+        // a null thrown-error type and always warns.
+        auto thrownError = fnTy->getThrownError();
+        if (thrownError && thrownError->isUninhabited())
+          continue;
+
+        DE.diagnose(fn->getLoc(),
+                    diag::expression_unused_throwing_unstructured_task, callee);
+        DE.diagnose(fn->getLoc(),
+                    diag::expression_unused_throwing_unstructured_task_silence);
+        return;
+      }
+    }
+
     // If the callee explicitly allows its result to be ignored, then don't
     // complain.
     if (callee && callee->getAttrs().getAttribute<DiscardableResultAttr>())
@@ -3107,17 +3132,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   return hadError ? errorBody() : body;
 }
 
-bool TypeChecker::typeCheckTapBody(TapExpr *expr, DeclContext *DC) {
-  // We intentionally use typeCheckStmt instead of typeCheckBody here
-  // because we want to contextualize TapExprs with the body they're in.
-  BraceStmt *body = expr->getBody();
-  bool HadError = StmtChecker(DC).typeCheckStmt(body);
-  if (body) {
-    expr->setBody(body);
-  }
-  return HadError;
-}
-
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   BraceStmt *Body = TLCD->getBody();
   StmtChecker(TLCD).typeCheckBody(Body);
@@ -3439,13 +3453,47 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
   return ctx.getAsyncIteratorNext();
 }
 
+bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
+                                       bool isAsync, SourceLoc loc,
+                                       DeclContext *dc) {
+  if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
+    return false;
+  }
+
+  if (isAsync || seqTy->isExistentialType()) {
+    return false;
+  }
+
+  auto *borrowingSeqProto =
+      ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
+  if (!borrowingSeqProto) {
+    return false;
+  }
+
+  // Always prefer conformance to Sequence over BorrowingSequence when
+  // both are available.
+  if (lookupConformance(seqTy, ctx.getProtocol(KnownProtocolKind::Sequence))) {
+    return false;
+  }
+
+  // Fall back to Sequence if no conformance to BorrowingSequence is found.
+  // This ensures that we maintain Sequence as the minimal required
+  // conformance.
+  auto seqConformanceRef = lookupConformance(seqTy, borrowingSeqProto);
+  if (seqConformanceRef.isInvalid()) {
+    return false;
+  }
+
+  return true;
+}
+
 namespace {
 class DesugarForEachStmt {
   ForEachStmt *stmt;
   DeclContext *dc;
   ASTContext &ctx;
   bool isAsync;
-  bool isBorrowing;
+  bool isBorrowing = false;
   VarDecl *makeIteratorVar = nullptr;
   ProtocolDecl *sequenceProto = nullptr;
   ProtocolConformanceRef seqConformanceRef;
@@ -3455,8 +3503,7 @@ public:
   DesugarForEachStmt(ForEachStmt *stmt)
       : stmt(stmt), dc(stmt->getDeclContext()),
         ctx(stmt->getDeclContext()->getASTContext()),
-        isAsync(stmt->getAwaitLoc().isValid()),
-        isBorrowing(ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {}
+        isAsync(stmt->getAwaitLoc().isValid()) {}
 
   BraceStmt *operator()() {
     auto *sequence = stmt->getSequence();
@@ -3472,7 +3519,8 @@ public:
         (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
       return nullptr;
 
-    isBorrowing = isBorrowing && !seqType->isExistentialType();
+    isBorrowing = shouldUseBorrowingSequence(ctx, seqType, isAsync,
+                                             sequence->getStartLoc(), dc);
 
     sequenceProto =
         isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
@@ -3481,6 +3529,12 @@ public:
                        : ctx.getProtocol(KnownProtocolKind::Sequence));
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
+
+    if (auto constraint = seqConformanceRef.getAvailabilityConstraint(
+            dc, stmt->getForLoc())) {
+      emitDiagnosticsForUnavailableConformance(seqType, constraint.value());
+      return nullptr;
+    }
 
     buildMakeIteratorVar();
 
@@ -3499,6 +3553,21 @@ public:
   }
 
 private:
+  void
+  emitDiagnosticsForUnavailableConformance(Type seqType,
+                                           AvailabilityConstraint constraint) {
+    auto loc = stmt->getForLoc();
+    auto protoDecl = seqConformanceRef.getProtocol();
+
+    auto domainAndRange = constraint.getDomainAndRange(ctx);
+    ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
+                       seqType, protoDecl,
+                       domainAndRange.getDomain().getNameForAttributePrinting(),
+                       domainAndRange.getRange().getVersionString());
+    fixAvailability(loc, dc, domainAndRange.getDomain(),
+                    domainAndRange.getRange(), ctx);
+  }
+
   void buildMakeIteratorVar() {
     std::string name;
     {

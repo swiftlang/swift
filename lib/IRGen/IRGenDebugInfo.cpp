@@ -216,7 +216,8 @@ public:
   IRGenDebugInfoImpl(const IRGenOptions &Opts, ClangImporter &CI,
                      IRGenModule &IGM, llvm::Module &M,
                      StringRef MainOutputFilenameForDebugInfo,
-                     StringRef PrivateDiscriminator);
+                     StringRef PrivateDiscriminator,
+                     StringRef CacheKeyForJob);
   ~IRGenDebugInfoImpl() {
     // FIXME: SILPassManager sometimes creates an IGM and doesn't finalize it.
     if (!FwdDeclTypes.empty())
@@ -967,6 +968,10 @@ private:
     // the module on disk is Bar (.swiftmodule or .swiftinterface), and is used
     // for loading and mangling.
     StringRef Name = M->getRealName().str();
+    // Handle bridging header imports. If there is a cache key, use cache key as
+    // path if debug module path is specified.
+    if (Name == CLANG_HEADER_MODULE_NAME && !Opts.BridgingPCHCacheKey.empty())
+      Path = Opts.BridgingPCHCacheKey;
     return getOrCreateModule(M, TheCU, Name, Path);
   }
 
@@ -1223,7 +1228,8 @@ private:
     llvm::DINodeArray BoundParams = collectGenericParams(Type);
     llvm::DICompositeType *DITy = createStruct(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
-        DBuilder.getOrCreateArray(Members), BoundParams, SpecificationOf);
+        DBuilder.getOrCreateArray(Members), BoundParams, SpecificationOf,
+        /*Annotations=*/nullptr);
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
@@ -1450,6 +1456,21 @@ private:
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
+  /// If the enum case is indirect, wrap the payload debug type in a
+  /// DW_TAG_reference_type to indicate the case stores a pointer to a
+  /// heap-allocated box rather than the payload directly.
+  llvm::DIType *wrapInReferenceTypeIfIndirect(llvm::DIType *PayloadDITy,
+                                              EnumElementDecl *ElemDecl,
+                                              EnumDecl *Decl) {
+    if (ElemDecl->isIndirect() || Decl->isIndirect()) {
+      unsigned PtrSizeInBits =
+          CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
+      return DBuilder.createReferenceType(llvm::dwarf::DW_TAG_reference_type,
+                                          PayloadDITy, PtrSizeInBits);
+    }
+    return PayloadDITy;
+  }
+
   /// Create debug information for an enum with no raw type.
   llvm::DICompositeType *createVariantType(CompletedDebugTypeInfo DbgTy,
                                            EnumDecl *Decl,
@@ -1491,10 +1512,14 @@ private:
               llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
               llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, MangledName);
         }
+        llvm::DIType *PayloadDITy = getOrCreateType(*ElemDbgTy);
+        PayloadDITy =
+            wrapInReferenceTypeIfIndirect(PayloadDITy, ElemDecl, Decl);
+
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(),
                                  getByteSize() *
                                      ElemDbgTy->getAlignment().getValue(),
-                                 TrackingDIType(getOrCreateType(*ElemDbgTy)));
+                                 TrackingDIType(PayloadDITy));
       } else {
         // A variant with no payload.
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
@@ -1548,10 +1573,14 @@ private:
         PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoEnvironment(PayloadTy);
         ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
             PayloadTy, IGM.getTypeInfoForUnlowered(PayloadTy), IGM);
+        llvm::DIType *PayloadDITy = getOrCreateType(*ElemDbgTy);
+        PayloadDITy =
+            wrapInReferenceTypeIfIndirect(PayloadDITy, ElemDecl, Decl);
+
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(),
                                  getByteSize() *
                                      ElemDbgTy->getAlignment().getValue(),
-                                 TrackingDIType(getOrCreateType(*ElemDbgTy)));
+                                 TrackingDIType(PayloadDITy));
       } else {
         // A variant with no payload.
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
@@ -1665,8 +1694,12 @@ private:
       InnerTypeCache[UID] = llvm::TrackingMDNodeRef(UniqueType);
     }
 
+    // CodeView drops empty unnamed members, so we need to give the inner struct
+    // member a name so it survives.
+    StringRef MemberName = Opts.isDebugInfoCodeView() ? MangledName : "";
     llvm::Metadata *Elements[] = {DBuilder.createMemberType(
-        Scope, "", File, 0, SizeInBits, AlignInBits, 0, Flags, UniqueType)};
+        Scope, MemberName, File, 0, SizeInBits, AlignInBits, 0, Flags,
+        UniqueType)};
     // FIXME: It's a limitation of LLVM that a forward declaration cannot have a
     // specificationOf, so this attritbute is put on the sized container type
     // instead. This is confusing consumers, and LLDB has to go out of its way
@@ -1846,12 +1879,13 @@ private:
                unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
                llvm::DINode::DIFlags Flags, StringRef MangledName,
                llvm::DINodeArray Elements, llvm::DINodeArray BoundParams,
-               llvm::DIType *SpecificationOf) {
+               llvm::DIType *SpecificationOf, llvm::DINodeArray Annotations) {
 
     auto StructType = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
         /* DerivedFrom */ nullptr, Elements, llvm::dwarf::DW_LANG_Swift,
-        nullptr, MangledName, SpecificationOf);
+        nullptr, MangledName, SpecificationOf,
+        /*NumExtraInhabitants=*/0, Annotations);
 
     if (BoundParams)
       DBuilder.replaceArrays(StructType, nullptr, BoundParams);
@@ -1863,9 +1897,11 @@ private:
                      unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
                      llvm::DINode::DIFlags Flags, StringRef MangledName,
                      llvm::DINodeArray BoundParams = {},
-                     llvm::DIType *SpecificationOf = nullptr) {
+                     llvm::DIType *SpecificationOf = nullptr,
+                     llvm::DINodeArray Annotations = nullptr) {
     return createStruct(Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
-                        MangledName, {}, BoundParams, SpecificationOf);
+                        MangledName, {}, BoundParams, SpecificationOf,
+                        Annotations);
   }
 
   bool shouldCacheDIType(llvm::DIType *DITy, DebugTypeInfo &DbgTy) {
@@ -1929,13 +1965,20 @@ private:
 
     // Here goes!
     switch (BaseTy->getKind()) {
+    case TypeKind::LValue:
+    case TypeKind::TypeVariable:
+    case TypeKind::ErrorUnion:
+    case TypeKind::Placeholder:
+    case TypeKind::Join:
+    case TypeKind::Meet:
+    case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
-      llvm_unreachable("not a real type");
+    case TypeKind::BuiltinBorrow:
+      ABORT([&](llvm::raw_ostream &out) {
+        out << "Don't know how to emit debug info for type:\n";
+        BaseTy->dump(out);
+      });
 
-    case TypeKind::BuiltinBorrow: {
-      llvm_unreachable("todo");
-
-    }
     case TypeKind::BuiltinFixedArray: {
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
         auto *FixedArray = llvm::cast<swift::BuiltinFixedArrayType>(BaseTy);
@@ -2111,20 +2154,77 @@ private:
       }
       // If the existential is just a protocol type it shares its mangled name
       // with it, so we can just represent it directly as a protocol.
-      BaseTy = TyPtr;
+      auto ProtoDbgTy = DebugTypeInfo::getFromTypeInfo(
+          TyPtr, IGM.getTypeInfoForUnlowered(TyPtr), IGM);
+      return getOrCreateType(ProtoDbgTy);
     }
-      LLVM_FALLTHROUGH;
+
+    case TypeKind::ProtocolComposition: {
+      auto *CompTy = BaseTy->castTo<ProtocolCompositionType>();
+
+      // A composition's mangled name will always be that of the canonical
+      // composition type. This means that a composition can be canonicalized
+      // into a single protocol type. For example, given:
+      //
+      // protocol P {}
+      // typealias P2 = P
+      // func f(param: (any P & P2)) {}
+      //
+      // The canonical type of "param" is simply P. To make sure we don't have
+      // two conflicting types with the same mangled name (one being the
+      // protocol composition, the other being only the protocol), In that case,
+      // emit debug info as only the protocol type.
+      auto CanTy = BaseTy->getCanonicalType();
+      if (!isa<ProtocolCompositionType>(CanTy)) {
+        return getOrCreateDesugaredType(CanTy, DbgTy);
+      }
+
+      llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
+          llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, nullptr, 0,
+          llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags));
+
+      SmallVector<llvm::Metadata *, 4> Members;
+      for (const Type MemberTy : CompTy->getMembers()) {
+        auto MemberDbgTy = DebugTypeInfo::getFromTypeInfo(
+            MemberTy, IGM.getTypeInfoForUnlowered(MemberTy), IGM);
+        auto *MemberDITy = getOrCreateType(MemberDbgTy);
+        Members.push_back(
+            DBuilder.createInheritance(FwdDecl.get(), MemberDITy, 0, 0, Flags));
+      }
+
+      auto *DITy = DBuilder.createStructType(
+          Scope, MangledName, nullptr, 0, SizeInBits, AlignInBits, Flags,
+          nullptr, DBuilder.getOrCreateArray(Members),
+          llvm::dwarf::DW_LANG_Swift, /*VTableHolder=*/nullptr, MangledName);
+
+      return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    }
 
     // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
     case TypeKind::Protocol:
-    case TypeKind::ProtocolComposition:
     case TypeKind::ParameterizedProtocol: {
       auto *Decl = DbgTy.getDecl();
       auto L = getFileAndLocation(Decl);
       unsigned FwdDeclLine = 0;
+
+      llvm::DINodeArray Annotations = nullptr;
+      if (auto *PD = dyn_cast_or_null<ProtocolDecl>(Decl)) {
+        if (PD->isMarkerProtocol()) {
+          llvm::Metadata *Ops[2] = {
+              llvm::MDString::get(IGM.getLLVMContext(),
+                                  StringRef("swift.MarkerProtocol")),
+              llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
+                  llvm::Type::getInt1Ty(IGM.getLLVMContext()), true))};
+          SmallVector<llvm::Metadata *, 1> Annots = {
+              llvm::MDNode::get(IGM.getLLVMContext(), Ops)};
+          Annotations = DBuilder.getOrCreateArray(Annots);
+        }
+      }
+
       return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
                                 L.File, FwdDeclLine, SizeInBits, AlignInBits,
-                                Flags, MangledName);
+                                Flags, MangledName, /*BoundParams=*/{},
+                                /*SpecificationOf=*/nullptr, Annotations);
     }
 
     case TypeKind::UnboundGeneric: {
@@ -2293,9 +2393,12 @@ private:
           return createSpecializedEnumType(EnumTy, Decl, MangledName,
                                            SizeInBits, AlignInBits, Scope, File,
                                            FwdDeclLine, Flags);
-        if (CompletedDbgTy)
-          return createEnumType(*CompletedDbgTy, Decl, MangledName, AlignInBits,
-                                Scope, L.File, L.Line, Flags);
+        // If we do not know the size of this type, pass a size of 0.
+        // FIXME: createEnumType should not require a sized debug info type.
+        if (!CompletedDbgTy)
+          CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy, 0);
+        return createEnumType(*CompletedDbgTy, Decl, MangledName, AlignInBits,
+                              Scope, L.File, L.Line, Flags);
       }
       return createOpaqueStructWithSizedContainer(
           Scope, Decl->getName().str(), L.File, FwdDeclLine, SizeInBits,
@@ -2385,11 +2488,6 @@ private:
     // The following types exist primarily for internal use by the type
     // checker.
     case TypeKind::Error:
-    case TypeKind::LValue:
-    case TypeKind::TypeVariable:
-    case TypeKind::ErrorUnion:
-    case TypeKind::Placeholder:
-    case TypeKind::Module:
     case TypeKind::SILBlockStorage:
     case TypeKind::SILToken:
     case TypeKind::BuiltinUnsafeValueBuffer:
@@ -2803,12 +2901,15 @@ private:
     if (auto *Decl = DbgTy.getDecl())
       Name = Decl->getName().str();
 
-    // If this is a forward decl, create one for this mangled name and don't
-    // cache it.
-    if (!isa<PrimaryArchetypeType>(DbgTy.getType()) &&
-        !isa<TypeAliasType>(DbgTy.getType()) &&
-        (DbgTy.isForwardDecl() || DbgTy.isFixedBuffer() ||
-         !completeType(DbgTy))) {
+    // If this type can have a definition that provides us with its layout/size,
+    // then only emit a forward declaration.
+    // TODO: This check can probably be simplified and generalized.
+    const bool RequiresSize = !isa<PrimaryArchetypeType>(DbgTy.getType()) &&
+                              !DbgTy.getType()->hasArchetype() &&
+                              !isa<TypeAliasType>(DbgTy.getType());
+    const bool HasNoFixedSize =
+        DbgTy.isForwardDecl() || DbgTy.isFixedBuffer() || !completeType(DbgTy);
+    if (RequiresSize && HasNoFixedSize) {
       // In LTO type uniquing is performed based on the UID. Forward
       // declarations may not have a unique ID to avoid a forward declaration
       // winning over a full definition.
@@ -2857,7 +2958,8 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        ClangImporter &CI, IRGenModule &IGM,
                                        llvm::Module &M,
                                        StringRef MainOutputFilenameForDebugInfo,
-                                       StringRef PD)
+                                       StringRef PD,
+                                       StringRef CacheKeyForJob)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), M(M), DBuilder(M),
       IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap) {
   assert(Opts.DebugInfoLevel > IRGenDebugInfoLevel::None &&
@@ -2930,6 +3032,9 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   // Create a module for the current compile unit.
   auto *MDecl = IGM.getSwiftModule();
   StringRef Path = Opts.DebugModulePath;
+  if (Opts.DebugModuleSelfKey)
+    Path = CacheKeyForJob;
+
   if (Path.empty()) {
     llvm::sys::path::remove_filename(SourcePath);
     Path = SourcePath;
@@ -4127,9 +4232,10 @@ void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
 std::unique_ptr<IRGenDebugInfo> IRGenDebugInfo::createIRGenDebugInfo(
     const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
     llvm::Module &M, StringRef MainOutputFilenameForDebugInfo,
-    StringRef PrivateDiscriminator) {
+    StringRef PrivateDiscriminator, StringRef CacheKeyForJob) {
   return std::make_unique<IRGenDebugInfoImpl>(
-      Opts, CI, IGM, M, MainOutputFilenameForDebugInfo, PrivateDiscriminator);
+      Opts, CI, IGM, M, MainOutputFilenameForDebugInfo, PrivateDiscriminator,
+      CacheKeyForJob);
 }
 
 IRGenDebugInfo::~IRGenDebugInfo() {}

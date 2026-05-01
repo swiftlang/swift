@@ -1049,7 +1049,7 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
           if (sendableDepTy->hasTypeVariable()) {
             extInfo = extInfo.withSendableDependentType(sendableDepTy);
           } else {
-            extInfo = extInfo.withSendable(sendableDepTy->isSendableType());
+            extInfo = extInfo.withSendable(isSendableCapture(sendableDepTy));
           }
           referenceTy =
               referenceTy->withExtInfo(extInfo)->castTo<FunctionType>();
@@ -1588,17 +1588,17 @@ std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
   // If the access is mutating, wrap the storage type in an lvalue type.
   Type refType;
   if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
-    auto elementTy = subscript->getElementInterfaceType();
+    auto *funcTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
 
+    auto indices = funcTy->getParams();
+
+    auto elementTy = funcTy->getResult();
     if (doesStorageProduceLValue(subscript, baseTy, useDC, *this, locator))
       elementTy = LValueType::get(elementTy);
 
-    auto indices = subscript->getInterfaceType()
-                            ->castTo<AnyFunctionType>()->getParams();
-
     // Transfer the thrown error type into the subscript reference type,
     // which will be used in the application.
-    FunctionType::ExtInfo info;
+    auto info = funcTy->getExtInfo();
     if (thrownErrorType) {
       info = info.withThrows(true, thrownErrorType);
       thrownErrorType = Type();
@@ -2166,7 +2166,6 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                                 const OverloadChoice &overload,
-                                                bool allowMembers,
                                                 DeclContext *useDC) {
   switch (overload.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -2223,30 +2222,26 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   // If this declaration is within a type context, we might not be able
   // to handle it.
   if (decl->getDeclContext()->isTypeContext()) {
-    if (!allowMembers)
-      return Type();
-
-    auto getBaseObjectType = [&] () -> Type {
-      return overload.getBaseType()
+    auto withDynamicSelfResultReplaced = [&](Type type) {
+      auto baseObjectType = overload.getBaseType()
           ->getRValueType()
           ->getMetatypeInstanceType()
           ->lookThroughAllOptionalTypes();
-    };
 
-    auto withDynamicSelfResultReplaced = [&](Type type) {
       return type->replaceDynamicSelfType(
         getDynamicSelfReplacementType(
-          getBaseObjectType(), decl, locator));
+          baseObjectType, decl, locator));
     };
 
-    SmallVector<OpenedType, 4> emptyReplacements;
     if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-      auto elementTy = subscript->getElementInterfaceType();
+      auto *funcTy = type->castTo<AnyFunctionType>();
+      auto indices = funcTy->getParams();
 
+      auto elementTy = funcTy->getResult();
       if (doesStorageProduceLValue(subscript, overload.getBaseType(),
-                                   useDC, *this, locator))
+                                   useDC, *this, locator)) {
         elementTy = LValueType::get(elementTy);
-      else if (elementTy->hasDynamicSelfType()) {
+      } else if (elementTy->hasDynamicSelfType()) {
         elementTy = withDynamicSelfResultReplaced(elementTy);
       }
 
@@ -2256,10 +2251,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       if (subscript->getAttrs().hasAttribute<OptionalAttr>())
         elementTy = OptionalType::get(elementTy->getRValueType());
 
-      auto indices = subscript->getInterfaceType()
-                       ->castTo<AnyFunctionType>()->getParams();
-      // FIXME: Verify ExtInfo state is correct, not working by accident.
-      FunctionType::ExtInfo info;
+      auto info = funcTy->getExtInfo();
       type = adjustFunctionTypeForConcurrency(
           FunctionType::get(indices, elementTy, info), overload.getBaseType(),
           subscript, useDC, /*numApplies=*/1, /*isMainDispatchQueue=*/false,
@@ -2287,16 +2279,19 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           return Type();
       }
 
+      // Insert a dynamic 'Self' if this is a class constructor, to work around
+      // the fact that the interface type doesn't have one, which sadly is a
+      // difficult assumption to unwind right now.
       if (isa<ConstructorDecl>(decl) &&
           decl->getDeclContext()->getSelfClassDecl()) {
         type = type->withCovariantResultType();
       }
 
-      // Cope with 'Self' returns.
+      // Replace any occurrences of dynamic 'Self' with the actual base type
+      // for the call. This handles constructors too, as per the above.
       if (type->hasDynamicSelfType()) {
         if (!overload.getBaseType())
           return Type();
-
         type = withDynamicSelfResultReplaced(type);
       }
 
@@ -2317,6 +2312,16 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   if (decl->getAttrs().hasAttribute<OptionalAttr>() &&
       !isa<SubscriptDecl>(decl))
     type = OptionalType::get(type->getRValueType());
+
+  GenericSignature genericSig;
+  if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
+    genericSig = GF->getGenericSignature();
+  } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+    genericSig = SD->getGenericSignature();
+  }
+
+  if (genericSig)
+    type = type->getReducedType(genericSig);
 
   return type;
 }

@@ -67,3 +67,16 @@ public class ToplevelClass10 {}
 @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
 @_originallyDefinedIn(module: "foo", macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26)
 public class ToplevelClass11 {}
+
+public class ToplevelClass12 {}
+
+@_originallyDefinedIn(module: "foo", OSX 13.13) // expected-error {{'@_originallyDefinedIn' requires that extension of 'ToplevelClass12' have explicit availability for macOS}}
+extension ToplevelClass12 {
+  public func extensionMember1() {}
+}
+
+@available(OSX 13.10, *)
+@_originallyDefinedIn(module: "foo", OSX 13.13)
+extension ToplevelClass12 {
+  public func extensionMember2() {}
+}

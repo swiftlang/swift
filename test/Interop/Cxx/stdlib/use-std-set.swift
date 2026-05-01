@@ -17,6 +17,8 @@
 // Enable this everywhere once we have a solution for modularizing other C++ stdlibs: rdar://87654514
 // REQUIRES: OS=macosx || OS=linux-gnu
 // UNSUPPORTED: LinuxDistribution=fedora-41
+// UNSUPPORTED: LinuxDistribution=rhel-10.1
+// UNSUPPORTED: LinuxDistribution=ubuntu-26.04
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
@@ -181,6 +183,16 @@ StdSetTestSuite.test("UnorderedSetOfCInt.remove") {
     expectFalse(s.contains(2))
     expectEqual(s.remove(2), nil)
     expectFalse(s.contains(2))
+}
+
+StdSetTestSuite.test("SetOfCIntWithCustomComparator") {
+    let s = initSetOfCIntWithCustomComparator()
+    expectEqual(s.count(1), 1)
+    // FIXME: uncomment the following checks (https://github.com/swiftlang/swift/issues/88588)
+//     expectTrue(s.contains(1))
+//     expectFalse(s.contains(2))
+//     expectTrue(s.contains(3))
+//     expectTrue(s.contains(5))
 }
 
 runAllTests()

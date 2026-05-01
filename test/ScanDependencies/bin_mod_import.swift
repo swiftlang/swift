@@ -15,6 +15,7 @@ import EWrapper
 // RUN: %validate-json %t/deps.json | %FileCheck %s
 
 // CHECK: "modulePath": "{{.*}}EWrapper.swiftmodule"
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: "directDependencies": [
 // CHECK-NEXT:   {
 // CHECK-DAG:     "swift": "E"

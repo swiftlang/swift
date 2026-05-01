@@ -433,3 +433,43 @@ bb6(%15 : @guaranteed $Optional<Klass>):
   %17 = copy_value %16
   return %17
 }
+
+struct Wrapper {
+  var value: E3
+}
+
+// CHECK-LABEL: sil [ossa] @no_forwarding_struct_extract_from_borrow :
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK-LABEL: } // end sil function 'no_forwarding_struct_extract_from_borrow'
+sil [ossa] @no_forwarding_struct_extract_from_borrow : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %borrow = begin_borrow %0 : $Wrapper
+  %value = struct_extract %borrow : $Wrapper, #Wrapper.value
+  switch_enum %value : $E3, case #E3.A!enumelt: bb1, default bb2
+
+bb1(%a : @guaranteed $Klass):
+  %e1 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%e1 : $FakeOptional<Klass>)
+
+bb2(%c : @guaranteed $E3):
+  %e2 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%e2 : $FakeOptional<Klass>)
+
+bb3(%14 : $FakeOptional<Klass>):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  end_borrow %borrow : $Wrapper
+  destroy_value %0 : $Wrapper
+  switch_enum %14 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb5
+
+bb4(%some : $Klass):
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}

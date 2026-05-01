@@ -15,10 +15,10 @@
 // RUN: not test -f %t/XLogging.swiftmodule
 
 /// Check AppleLogging.swiftmodule correctly contains AppleLogging as module name in the binary
-// RUN: llvm-bcanalyzer --dump %t/AppleLogging.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-FOUND
+// RUN: %llvm-bcanalyzer --dump %t/AppleLogging.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-FOUND
 // BCANALYZER-FOUND: MODULE_NAME{{.*}}AppleLogging
 
-// RUN: llvm-bcanalyzer --dump %t/AppleLogging.swiftmodule | not grep XLogging
+// RUN: %llvm-bcanalyzer --dump %t/AppleLogging.swiftmodule | not grep XLogging
 
 /// 2. Lib
 /// Create module Lib that imports XLogging WITH -module-alias XLogging=AppleLogging
@@ -37,9 +37,9 @@
 
 /// Check Lib.swiftmodule contains AppleLogging and NOT XLogging as an imported module
 /// in the binary
-// RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-IMPORT1
+// RUN: %llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-IMPORT1
 // BCANALYZER-IMPORT1: IMPORTED_MODULE{{.*}}AppleLogging
-// RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | not grep XLogging
+// RUN: %llvm-bcanalyzer --dump %t/Lib.swiftmodule | not grep XLogging
 
 /// 3. Client
 /// Create a module Client that imports Lib, WITHOUT module aliasing for XLogging
@@ -55,9 +55,9 @@
 // CHECK-LOAD2: remark: loaded module {{.*}}Lib.swiftmodule
 
 /// Check Client.swiftmodule contains Lib as an imported module in the binary
-// RUN: llvm-bcanalyzer --dump %t/Client.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-IMPORT2
+// RUN: %llvm-bcanalyzer --dump %t/Client.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-IMPORT2
 // BCANALYZER-IMPORT2: IMPORTED_MODULE{{.*}}Lib
-// RUN: llvm-bcanalyzer --dump %t/Client.swiftmodule | not grep XLogging
+// RUN: %llvm-bcanalyzer --dump %t/Client.swiftmodule | not grep XLogging
 
 
 // BEGIN FileLogging.swift

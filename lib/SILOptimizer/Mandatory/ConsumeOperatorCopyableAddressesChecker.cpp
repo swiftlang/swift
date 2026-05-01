@@ -1166,15 +1166,15 @@ SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
   assert(!orig->isGlobalInit() && "Global initializer cannot be cloned");
   auto *Fn = funcBuilder.createFunction(
       swift::getSpecializedLinkage(orig, orig->getLinkage()), clonedName,
-      clonedTy, orig->getGenericEnvironment(), orig->getLocation(),
-      orig->isBare(), orig->isTransparent(), serialized, IsNotDynamic,
-      IsNotDistributed, IsNotRuntimeAccessible, orig->getEntryCount(),
-      orig->isThunk(), orig->getClassSubclassScope(), orig->getInlineStrategy(),
-      orig->getEffectsKind(), orig, orig->getDebugScope());
+      clonedTy, orig->getActorIsolation(), orig->getGenericEnvironment(),
+      orig->getLocation(), orig->isBare(), orig->isTransparent(), serialized,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
+      orig->getEntryCount(), orig->isThunk(), orig->getClassSubclassScope(),
+      orig->getInlineStrategy(), orig->getEffectsKind(), orig,
+      orig->getDebugScope());
   for (auto &Attr : orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
-
   return Fn;
 }
 

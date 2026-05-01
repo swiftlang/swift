@@ -88,3 +88,12 @@ protocol MultiReparenting2: R, Q {}
 extension MultiReparenting2: @reparented R {} // expected-note {{previously '@reparented' by 'R' here}}
 extension MultiReparenting2: @reparented Q {}
 extension MultiReparenting2: @reparented R {} // expected-error {{cannot have multiple declarations of 'MultiReparenting2' being '@reparented' by 'R'}}
+
+
+@reparentable
+protocol Turtle {
+  func hello()
+}
+protocol LilTurtle: Turtle {
+  override func hello() // expected-error {{method does not override any method from its parent protocol}}
+}

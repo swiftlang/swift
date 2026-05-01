@@ -205,7 +205,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                          SourceFile *SF, StringRef ModuleName,
                          StringRef OutputFilename,
                          StringRef MainInputFilenameForDebugInfo,
-                         StringRef PrivateDiscriminator)
+                         StringRef PrivateDiscriminator,
+                         StringRef CacheKeyForJob)
     : LLVMContext(new llvm::LLVMContext()), IRGen(irgen),
       Context(irgen.SIL.getASTContext()),
       // The LLVMContext (and the IGM itself) will get deleted by the IGMDeleter
@@ -216,11 +217,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       DataLayout(irgen.getClangDataLayoutString()),
       Triple(irgen.getEffectiveClangTriple()),
       VariantTriple(irgen.getEffectiveClangVariantTriple()),
-      TargetMachine(std::move(target)),
-      silConv(irgen.SIL), OutputFilename(OutputFilename),
+      TargetMachine(std::move(target)), silConv(irgen.SIL),
+      OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
-      TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
-      ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      CacheKeyForJob(CacheKeyForJob), TargetInfo(SwiftTargetInfo::get(*this)),
+      DebugInfo(nullptr), ModuleHash(nullptr),
+      ObjCInterop(Context.LangOpts.EnableObjCInterop),
       UseDarwinPreStableABIBit(Context.LangOpts.UseDarwinPreStableABIBit),
       Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
@@ -574,10 +576,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   }
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
-    DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
-                                                     Module,
-                                                 MainInputFilenameForDebugInfo,
-                                                     PrivateDiscriminator);
+    DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(
+        IRGen.Opts, *CI, *this, Module, MainInputFilenameForDebugInfo,
+        PrivateDiscriminator, CacheKeyForJob);
 
   if (auto loader = Context.getClangModuleLoader()) {
     ClangASTContext =
@@ -788,6 +789,7 @@ namespace RuntimeConstants {
   const auto ReadOnly = llvm::MemoryEffects::readOnly();
   const auto ArgMemOnly = llvm::MemoryEffects::argMemOnly();
   const auto ArgMemReadOnly = llvm::MemoryEffects::argMemOnly(llvm::ModRefInfo::Ref);
+  const auto InaccessibleMemOnly = llvm::MemoryEffects::inaccessibleMemOnly();
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
@@ -1009,6 +1011,16 @@ namespace RuntimeConstants {
 
   RuntimeAvailability ValueGenericTypeAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getValueGenericTypeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  TaskPriorityEscalationHandlersAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getTaskPriorityEscalationHandlersAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
@@ -1455,13 +1467,6 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 }
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
-  // In Embedded Swift, only class-bound wtables are allowed.
-  auto &langOpts = SIL.getASTContext().LangOpts;
-  if (langOpts.hasFeature(Feature::Embedded) &&
-      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
-    assert(Conf->getProtocol()->requiresClass());
-  }
-
   if (auto *wt = SIL.lookUpWitnessTable(Conf)) {
     // Add it to the queue if it hasn't already been put there.
     if (canEmitWitnessTableLazily(wt) &&
@@ -2393,6 +2398,12 @@ bool IRGenModule::isConcurrencyAvailable() {
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
 }
 
+bool IRGenModule::isTypedAllocationAvailable() {
+  auto &langOpts = Context.LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+         langOpts.hasFeature(Feature::TypedAllocation);
+}
+
 /// Pretend the other files that drivers/build systems expect exist by
 /// creating empty files. Used by UseSingleModuleLLVMEmission when
 /// num-threads > 0.
@@ -2430,7 +2441,5 @@ bool swift::writeEmptyOutputFilesFor(
 }
 
 bool IRGenModule::isEmbeddedWithExistentials() const {
-  auto &langOpts = Context.LangOpts;
-  return langOpts.hasFeature(Feature::Embedded) &&
-    langOpts.hasFeature(Feature::EmbeddedExistentials);
+  return Context.LangOpts.hasFeature(Feature::Embedded);
 }

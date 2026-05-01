@@ -2288,9 +2288,6 @@ void PatternMatchEmission::emitEnumElementDispatch(
   // After this point we now that we must have an address only type.
   assert(src.getType().isAddressOnly(SGF.F) &&
          "Should have an address only type here");
-  assert(!UncheckedTakeEnumDataAddrInst::isDestructive(src.getType().getEnumOrBoundGenericEnum(),
-                                                       SGF.getModule()) &&
-         "address only enum projection should never be destructive");
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
@@ -2403,21 +2400,30 @@ void PatternMatchEmission::emitEnumElementDispatch(
       }
 
       ManagedValue eltValue;
-      // We can only project destructively from an address-only enum, so
-      // copy the value if we can't consume it.
-      // TODO: Copying should be avoidable now that we guarantee that address-
-      // only enums never use spare bit optimization.
+      // TODO: Copying should be avoidable in more cases now that we guarantee
+      // that address-only enums never use spare bit optimization.
       switch (eltConsumption) {
       case CastConsumptionKind::TakeAlways: {
         auto finalValue = src.getFinalManagedValue();
-        eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, finalValue,
-                                                         eltDecl, eltTy);
+        eltValue = SGF.B.createUncheckedEnumDataAddrForTake(loc, finalValue, eltDecl, eltTy);
         break;
       }
       case CastConsumptionKind::BorrowAlways: {
-        eltValue = ManagedValue::forBorrowedAddressRValue(
-          SGF.B.createUncheckedTakeEnumDataAddr(loc, src.getValue(),
-                                                eltDecl, eltTy));
+        // See if we can apply the projection in-place for this enum.
+        SILValue projection;
+        if (UncheckedEnumDataAddrInstBase::isDestructive(
+                                            eltDecl->getParentEnum(), &SGF.F)) {
+          // We can't, so allocate scratch space to borrow into.
+          auto scratch = SGF.emitTemporaryAllocation(loc, src.getType());
+          projection =
+            SGF.B.createUncheckedBorrowEnumDataAddr(loc, src.getValue(), scratch,
+                                                    eltDecl);
+        } else {
+          projection =
+            SGF.B.createUncheckedInPlaceEnumDataAddr(loc, src.getValue(),
+                                                     eltDecl, eltTy);
+        }
+        eltValue = ManagedValue::forBorrowedAddressRValue(projection);
         break;
       }
       case CastConsumptionKind::CopyOnSuccess: {
@@ -2428,15 +2434,16 @@ void PatternMatchEmission::emitEnumElementDispatch(
 
         // We can always take from the copy.
         eltConsumption = CastConsumptionKind::TakeAlways;
-        eltValue = SGF.B.createUncheckedTakeEnumDataAddr(
-            loc, temp->getManagedAddress(), eltDecl, eltTy);
+        auto tempAddr = temp->getManagedAddress();
+        eltValue = SGF.B.createUncheckedEnumDataAddrForTake(loc, tempAddr,
+                                                            eltDecl, eltTy);
         break;
       }
 
-      // We can't conditionally take, since UncheckedTakeEnumDataAddr
-      // invalidates the enum.
+      // TODO: Conditional take, using the nondestructive enum_data_addr forms
+      // if necessary.
       case CastConsumptionKind::TakeOnSuccess:
-        llvm_unreachable("not allowed");
+        llvm_unreachable("not implemented");
       }
 
       // If we have a loadable payload despite the enum being address only, load
@@ -2721,7 +2728,7 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
         visit(subPattern,
               SGF.emitManagedRValueWithCleanup(payload));
       } else {
-        SILValue payload = SGF.B.createUncheckedTakeEnumDataAddr(loc,
+        SILValue payload = SGF.B.createUncheckedEnumDataAddrForTake(loc,
                                                           mv.forward(SGF),
                                                           enumCase);
         if (payload->getType().isLoadable(SGF.F)) {
@@ -4078,6 +4085,9 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
       scope.pushCleanupState(exn.getCleanup(),
                              CleanupState::PersistentlyActive);
     }
+
+    // We may create temporaries while bridging from typed to untyped throws.
+    FullExpr throwScope(Cleanups, CleanupLocation(location));
     emitThrow(S, exn);
   };
   // Set up an initial clause matrix.

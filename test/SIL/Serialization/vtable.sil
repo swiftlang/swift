@@ -6,7 +6,11 @@ sil_stage canonical
 
 import Builtin
 
-public class Base {
+public protocol P1: Base {}
+public protocol P2: Base {}
+public protocol P3: Base {}
+
+public class Base: P2 {
   func m1()
   func m2()
 }
@@ -41,6 +45,9 @@ sil hidden_external [serialized] @$s1x7DerivedCACycfC : $@convention(method) (@t
 sil hidden_external [serialized] @$s1x7DerivedCACycfc : $@convention(method) (@owned Derived) -> @owned Derived
 
 sil_vtable Base {
+  no_conformance P1
+  conformance Base: P2 module vtable
+  no_conformance P3
   #Base.m1: (Base) -> () -> () : @$s1x4BaseC2m1yyF
   #Base.m2: (Base) -> () -> () : @$s1x4BaseC2m2yyF
   #Base.init!initializer: (Base.Type) -> () -> Base : @$s1x4BaseCACycfc
@@ -48,6 +55,9 @@ sil_vtable Base {
 }
 
 // CHECK-LABEL: sil_vtable Base {
+// CHECK-NEXT:  no_conformance P1
+// CHECK-NEXT:  conformance Base: P2 module vtable
+// CHECK-NEXT:  no_conformance P3
 // CHECK-NEXT:  #Base.m1: (Base) -> () -> () : @$s1x4BaseC2m1yyF
 // CHECK-NEXT:  #Base.m2: (Base) -> () -> () : @$s1x4BaseC2m2yyF
 // CHECK-NEXT:  #Base.init!initializer: (Base.Type) -> () -> Base : @$s1x4BaseCACycfc

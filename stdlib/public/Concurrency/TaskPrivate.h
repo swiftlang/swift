@@ -70,8 +70,11 @@ void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
 
 /// Given that we've already set the right executor as the active
 /// executor, run the given job.  This does additional bookkeeping
-/// related to the active task.
-void runJobInEstablishedExecutorContext(Job *job);
+/// related to the active task. actor and executorIdentity are used for emitting
+/// tracing around the run.
+void runJobInEstablishedExecutorContext(Job *job,
+                                        SerialExecutorRef serialExecutor,
+                                        TaskExecutorRef taskExecutor);
 
 /// Adopt the voucher stored in `task`. This removes the voucher from the task
 /// and adopts it on the current thread.
@@ -340,12 +343,8 @@ public:
     fillWithError(future->getError());
   }
   void fillWithError(SwiftError *error) {
-    #if SWIFT_CONCURRENCY_EMBEDDED
-    swift_unreachable("untyped error used in embedded Swift");
-    #else
     errorResult = error;
     swift_errorRetain(error);
-    #endif
   }
 };
 
@@ -751,11 +750,25 @@ public:
     return record_iterator::rangeBeginning(getInnermostRecord());
   }
 
-  void traceStatusChanged(AsyncTask *task, bool isStarting, bool wasRunning) {
-    concurrency::trace::task_status_changed(
-        task, static_cast<uint8_t>(getStoredPriority()), isCancelled(),
-        isStoredPriorityEscalated(), isStarting, isRunning(), isEnqueued(),
-        wasRunning);
+  void traceStatusChanged(AsyncTask *task, ActiveTaskStatus oldStatus,
+                          bool isStarting) {
+    uint8_t maxPriority = static_cast<uint8_t>(getStoredPriority());
+    bool cancelled = isCancelled();
+    bool escalated = isStoredPriorityEscalated();
+    bool running = isRunning();
+    bool enqueued = isEnqueued();
+    bool wasRunning = oldStatus.isRunning();
+
+    if (!isStarting &&
+        maxPriority == static_cast<uint8_t>(oldStatus.getStoredPriority()) &&
+        cancelled == oldStatus.isCancelled() &&
+        escalated == oldStatus.isStoredPriorityEscalated() &&
+        running == wasRunning && enqueued == oldStatus.isEnqueued())
+      return;
+
+    concurrency::trace::task_status_changed(task, maxPriority, cancelled,
+                                            escalated, isStarting, running,
+                                            enqueued, wasRunning);
   }
 };
 
@@ -875,20 +888,29 @@ struct AsyncTask::PrivateStorage {
     // here, before the task-local storage elements are destroyed; in order to
     // respect stack-discipline of the task-local allocator.
     {
-      if (task->hasInitialTaskNameRecord()) {
-        task->dropInitialTaskNameRecord();
-      }
       if (task->hasInitialTaskExecutorPreferenceRecord()) {
         task->dropInitialTaskExecutorPreferenceRecord();
       }
+      // We specifically DO NOT drop the task name record here, even if present,
+      // as it is possible to read it off a task handle (`task.name`).
     }
 
     // Drain unlock the task and remove any overrides on thread as a
     // result of the task
     auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
     while (true) {
-      assert(oldStatus.getInnermostRecord() == NULL &&
+      #ifndef NDEBUG
+      if (task->hasInitialTaskNameRecord()) {
+        // While we generally drop all task records during complete, the task name record is allowed to
+        // stay until destruction, because we allow reading the name from a task handle: `task.name`.
+        assert((oldStatus.getInnermostRecord() &&
+               (oldStatus.getInnermostRecord()->getKind() == TaskStatusRecordKind::TaskName)) &&
+          "The only remaining task record allowed after complete() is a task name, but was different!");
+      } else {
+        assert(oldStatus.getInnermostRecord() == NULL &&
              "Status records should have been removed by this time!");
+      }
+      #endif
       assert(oldStatus.isRunning());
 
       // Remove drainer, enqueued and override bit if any
@@ -1037,7 +1059,7 @@ inline uint32_t AsyncTask::flagAsRunning() {
       if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
                /* success */ std::memory_order_relaxed,
                /* failure */ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(this, true, oldStatus.isRunning());
+        newStatus.traceStatusChanged(this, oldStatus, true);
         adoptTaskVoucher(this);
         swift_task_enterThreadLocalContext(
             (char *)&_private().ExclusivityAccessSet[0]);

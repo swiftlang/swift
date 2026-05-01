@@ -456,6 +456,15 @@ struct SILCFGBackwardDFS {
   /// The region in reverse post-order.
   auto reversePostOrder() { return llvm::reverse(postOrder()); }
 };
+
+/// Find loop headers in the given function using a DFS-based back-edge
+/// detection algorithm. A block is a loop header if it is the target of a
+/// back-edge (an edge from a descendant to an ancestor in the DFS tree).
+///
+/// Populates \p LoopHeaders with the set of basic blocks that are loop headers.
+void findLoopHeaders(SILFunction &Fn,
+                     llvm::SmallPtrSet<SILBasicBlock *, 32> &LoopHeaders);
+
 } // namespace swift
 
 #endif

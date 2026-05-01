@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/tmp
 // RUN: %target-swiftc_driver -emit-module -disable-bridging-pch -import-objc-header %S/Inputs/app-bridging-header-to-pch.h -module-name App -emit-module-path %t/App.swiftmodule %S/Inputs/app-that-uses-pch-bridging-header.swift
-// RUN: llvm-bcanalyzer -dump %t/App.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer -dump %t/App.swiftmodule | %FileCheck %s
 // CHECK: IMPORTED_HEADER{{.*}}Inputs/app-bridging-header-to-pch.h
 
 // Should get a warning when we PCH-in the unit test header and then implicitly import the app header.

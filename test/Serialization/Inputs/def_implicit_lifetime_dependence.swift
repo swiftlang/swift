@@ -73,3 +73,17 @@ public struct Wrapper : ~Escapable {
   }
 }
 
+// Static methods (rdar://171315715)
+public struct GCM {
+  @inlinable
+  public static func open(
+    inPlace message: inout MutableRawSpan,
+    tag: RawSpan
+  ) {}
+  @inlinable
+  public static func propagate(message: consuming MutableRawSpan) -> MutableRawSpan {
+    return message
+  }
+}
+public func takeViewCallback(f: () -> BufferView) {
+}

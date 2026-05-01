@@ -32,6 +32,8 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/LanguageMode.h"
+#include "llvm/ADT/SmallVector.h"
 using namespace swift;
 
 static void adjustFunctionTypeForOverride(Type &type) {
@@ -915,9 +917,15 @@ OverrideMatcher::OverrideMatcher(ValueDecl *decl, bool ignoreMissingImports)
     if (auto superclassDecl = classDecl->getSuperclassDecl())
       superContexts.push_back(superclassDecl);
   } else if (auto protocol = dyn_cast<ProtocolDecl>(dc)) {
-    auto inheritedProtocols = protocol->getInheritedProtocols();
-    superContexts.insert(superContexts.end(), inheritedProtocols.begin(),
-                         inheritedProtocols.end());
+    for (auto inherited : protocol->getInheritedProtocols()) {
+      // Reparentable protocol members are never overridden by any members of
+      // protocols inheriting from it. This preserves the witness tables of
+      // those inheriting protocols.
+      if (inherited->getAttrs().hasAttribute<ReparentableAttr>())
+        continue;
+
+      superContexts.push_back(inherited);
+    }
   }
 }
 
@@ -2316,10 +2324,16 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
     // Objective-C protocols
     if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
 
-    // Associated types defined within reparentable protocols Q
-    // are not overridden by one defined in any reparented ones P, i.e.,
-    // if P was reparented by Q, then P's associated type serves as the anchor.
-    // We skip processing any protocols further inherited by the reparentable.
+    // Associated types defined within reparentable protocol RP
+    // are not "overridden" by one defined in a downstream protocol, i.e.,
+    // if P inherits from RP, then P's associated type does not override RP's,
+    // causing P's associated type to serves as the anchor.
+    //
+    // We skip processing any protocols further inherited by RP as they should
+    // all be @reparentable as well.
+    //
+    // See a corresponding bit of code in `swift::removeOverriddenDecls`, where
+    // we deprioritize @reparentable associated types in name-lookup too.
     if (inheritedProto->getAttrs().hasAttribute<ReparentableAttr>())
       return TypeWalker::Action::SkipNode;
 
@@ -2468,24 +2482,31 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     return noResults;
   }
 
-  auto matches = matcher.match(OverrideCheckingAttempt::PerfectMatch);
-  if (matches.empty()) {
-    return noResults;
+  // Mismatches on @Sendable and global-actor attributes are treated as
+  // warnings depending on the language mode and declaration attributes.
+  // `checkOverrides` would produce mismatching override results and so
+  // should this method.
+  for (auto attempt : {OverrideCheckingAttempt::PerfectMatch,
+                       OverrideCheckingAttempt::MismatchedConcurrency}) {
+    auto matches = matcher.match(attempt);
+    if (matches.empty())
+      continue;
+
+    // If we have more than one potential match from a class, diagnose the
+    // ambiguity and fail.
+    if (matches.size() > 1 && decl->getDeclContext()->getSelfClassDecl()) {
+      diagnoseGeneralOverrideFailure(decl, matches, attempt);
+      invalidateOverrideAttribute(decl);
+      return noResults;
+    }
+
+    // Check the matches. If any are ill-formed, invalidate the override
+    // attribute
+    // so we don't try again.
+    return matcher.checkPotentialOverrides(matches, attempt);
   }
 
-  // If we have more than one potential match from a class, diagnose the
-  // ambiguity and fail.
-  if (matches.size() > 1 && decl->getDeclContext()->getSelfClassDecl()) {
-    diagnoseGeneralOverrideFailure(decl, matches,
-                                   OverrideCheckingAttempt::PerfectMatch);
-    invalidateOverrideAttribute(decl);
-    return noResults;
-  }
-
-  // Check the matches. If any are ill-formed, invalidate the override attribute
-  // so we don't try again.
-  return matcher.checkPotentialOverrides(matches,
-                                         OverrideCheckingAttempt::PerfectMatch);
+  return noResults;
 }
 
 llvm::TinyPtrVector<ValueDecl *>

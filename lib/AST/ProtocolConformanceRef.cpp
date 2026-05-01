@@ -18,6 +18,8 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "AbstractConformance.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -400,6 +402,33 @@ bool ProtocolConformanceRef::forEachIsolatedConformance(
   }
 
   return false;
+}
+
+std::optional<AvailabilityConstraint>
+ProtocolConformanceRef::getAvailabilityConstraint(DeclContext *dc,
+                                                  SourceLoc loc) const {
+  // FIXME: Missing logic for pack conformances which is not currently needed.
+  // See diagnoseConformanceAvailability for implementation guidance.
+  if (!isConcrete())
+    return std::nullopt;
+
+  auto availability = AvailabilityContext::forLocation(loc, dc);
+  // Conformance declarations can be more available than the protocols they
+  // involve due to source compatibility exceptions. Thus, it is important to 
+  // verify that neither pose a constraint in the given context when checking 
+  // for availability of a conformance.
+  if (auto constraint =
+          getAvailabilityConstraintsForDecl(getProtocol(), availability)
+              .getPrimaryConstraint())
+    return constraint;
+
+  auto *conformanceDC = getConcrete()->getRootConformance()->getDeclContext();
+  if (auto constraint = getAvailabilityConstraintsForDecl(
+                            conformanceDC->getAsDecl(), availability)
+                            .getPrimaryConstraint())
+    return constraint;
+
+  return std::nullopt;
 }
 
 void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef) {

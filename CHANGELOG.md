@@ -5,6 +5,162 @@
 
 ## Swift (next)
 
+* When building modules using library evolution, Swift now uses module selectors in module interface files by default,
+  improving their robustness against name collisions and ambiguity. Compiler flags previously used to work around these
+  issues are disabled in this configuration and can now be removed. If necessary, you can disable this new behavior by
+  adding `-Xfrontend -disable-module-selectors-in-module-interface` to `OTHER_SWIFT_FLAGS`.
+
+* [SE-0493][]: `defer` statements now support `async` calls. The isolation of the body of the `defer` statement is always the same as the isolation of its enclosing scope.
+  
+  ```
+  func example() async {
+    let resource = getResource()
+    defer { await resource.cleanup() }
+    try resource.doSomething()
+  }
+  ```
+
+* [SE-0503][]:
+  Introduced the ability to define protocols with associated types that are `~Copyable` and/or 
+  `~Escapable`, which relaxes the requirement on types conforming to that protocol. In other words, types can 
+  now implement those associated-type requirements with types that may be noncopyable or nonescapable:
+
+  ```swift
+  protocol WritingInstrument {
+    associatedtype Eraser: ~Copyable
+  }
+  
+  struct Pencil: WritingInstrument {  
+    struct Eraser: ~Copyable {}
+  }
+   
+  struct Chalk: WritingInstrument {
+    struct Eraser {}
+  }
+  ```
+  
+  During the evolution process, a prototype version of this feature existed under the experimental feature
+  named `SuppressedAssociatedTypes`. That feature is now deprecated and is source-incompatible with the accepted
+  version detailed in SE-0503. If that experimental feature is in use, a warning will be emitted by the compiler with
+  information to help migrate.
+
+* [SE-0518][]:
+  Introduced `~Sendable` conformance syntax to explicitly suppress a conformance to `Sendable`,
+  which prevents automatic `Sendable` inference on types, and provides an alternative way
+  to mark types as non-`Sendable` without inheritance impact.
+
+  ```swift
+  // The `Base` type has been audited and determined to be non-`Sendable`, sub-classes
+  // can introduce non-`Sendable` mutable state or protect their state / make everything
+  // constant and thus may be marked as `Sendable`.
+  public class Base: ~Sendable {
+    // ...
+  }
+  ```
+
+* Throwing unstructured task initializers (`Task.init`, `Task.immediate`, `Task.detached`, etc) 
+  now use typed-throws and will warn if an operation is throwing and the result of the task is not
+  stored or ignored. This addresses a long standing issue where it was too easy to miss that an 
+  operation was throwing:
+
+  ```swift
+  Task { // Unstructured throwing task created by 'init(priority:operation:)' is unused [#NoUseUnstructuredThrowingTask]
+    try example()
+  }
+  Task { // no warning, as previously
+    example()
+  }
+  ```
+
+* The checking for illegal forward references to local variables is now consistent regardless of
+  whether the reference appears in a closure. Previously the type-checker could incorrectly permit
+  forward references within a closure that it would reject outside of the closure, however this
+  is not something that can be supported in general in the type-checker. In most cases this should
+  have no impact since such invalid references would have already been rejected by later diagnostic
+  passes in the compiler. However there are a couple of cases that were previously legal that are
+  now illegal.
+
+  These include:
+
+  - `lazy` local variables with initializers that forward reference a local variable in a closure,
+    or local variables with attached macros that relocate the initializer into an accessor, e.g:
+
+    ```swift
+    func foo() {
+      lazy var x = { y } // error: use of local variable 'y' before its declaration
+      let y = 0
+    }
+    ```
+
+    ```swift
+    func foo() {
+      @LazyLikeMacro var x = { y } // error: use of local variable 'y' before its declaration
+      let y = 0
+    }
+    ```
+
+  - Forward references to local computed variables from a closure, e.g:
+
+    ```swift
+    func foo() {
+      var x = { y } // error: use of local variable 'y' before its declaration
+      var y: Int { 0 }
+    }
+    ```
+
+  Both cases were already invalid if there was no closure involved. These are now consistently
+  rejected.
+
+  This then allows for consistent shadowing behavior inside and outside of closures, allowing the
+  following previously illegal case to become legal:
+
+  ```swift
+  struct S {
+    var x: Int
+    func foo() {
+      // Already legal, both refer to `self.x`
+      let y = x
+      let x = x
+
+      let z = x // Refers to the local var.
+    }
+    func bar() {
+      // Both previously illegal, now both refer to `self.x`.
+      let y = { x }()
+      let x: Int = { x }()
+
+      let z = x // Still refers to the local var.
+    }
+  }
+  ```
+
+* To simplify writing cross-platform code for Apple platforms while adopting
+  new APIs, availability on macOS, iOS, tvOS, watchOS, and visionOS can now be
+  specified implicitly using `anyAppleOS` for operating system versions starting
+  with `26.0`:
+
+  ```swift
+  @available(anyAppleOS 26.0, *)
+  func functionAvailableOnVersion26() {
+    // ...
+  }
+
+  if #available(anyAppleOS 26.0, *) {
+    // Executes on macOS 26, iOS 26, watchOS 26, tvOS 26, and visionOS 26.
+    functionAvailableOnVersion26()
+  }
+  ```
+
+  If availability for a specific platform is specified simultaneously with
+  `anyAppleOS`, availability for the specific platform takes precedence when
+  building for that platform:
+
+  ```swift
+  if #available(anyAppleOS 26.0, macOS 26.4, *) {
+    // Executes on macOS 26.4 and version 26 of all other Apple OSes.
+  }
+  ```
+
 * [SE-0504][]:
   Introduced Task Cancellation Shields which temporarily prevent the observation of task
   cancellation in a given scope. This functionality is intended for use with cleanup actions which
@@ -19,11 +175,6 @@
     cleanup() 
   }
   ```
-
-* Calling from Objective-C into into asynchronous Swift APIs will now attempt use `Task.immediate`
-  instead of `Task` when available. This reduces the initial enqueue delay which Task would incur
-  (by enqueueing on the global pool before calling the async target), and can improve performance
-  and ordering predictability of calling async code through these bridged APIs.
 
 * The raw span accessor properties of `Span` and `MutableSpan` (`bytes` and
   `mutableBytes`) as well as the two generic `append()` methods of
@@ -51,6 +202,19 @@
   applies when the memory is to later be used again as `Element`. In that case,
   the non-padding bytes of `Element` must allow every bit pattern to be
   permissible in a valid value of `Element`.
+
+## Swift 6.3
+
+* [SE-0489][]:
+  When you encounter errors while encoding or decoding `Codable` types, the resulting error messages are now more human-readable thanks to improved `debugDescription` output.
+
+  Before:
+
+  `typeMismatch(Swift.String, Swift.DecodingError.Context(codingPath: [_CodingKey(stringValue: "Index 0", intValue: 0), CodingKeys(stringValue: "address", intValue: nil), CodingKeys(stringValue: "city", intValue: nil), CodingKeys(stringValue: "birds", intValue: nil), _CodingKey(stringValue: "Index 1", intValue: 1), CodingKeys(stringValue: "name", intValue: nil)], debugDescription: "Expected to decode String but found number instead.", underlyingError: nil))`
+
+  After:
+
+  `DecodingError.typeMismatch: expected value of type String. Path: [0].address.city.birds[1].name. Debug description: Expected to decode String but found number instead.`
 
 * [SE-0491][]:
   You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
@@ -125,7 +289,7 @@
   }
   ```
 
-* [SE-0471][]:
+* [SE-0371][]:
   Actor and global actor annotated types may now declare a synchronous `isolated deinit`, which allows such deinitializer
   to access actor isolated state while deinitializing the actor. This enables actor deinitializers to safely access
   and shut down or close resources during an actors deinitialization, without explicitly resorting to unstructured 
@@ -10968,6 +11132,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0365]: <https://github.com/apple/swift-evolution/blob/main/proposals/0365-implicit-self-weak-capture.md>
 [SE-0366]: <https://github.com/apple/swift-evolution/blob/main/proposals/0366-move-function.md>
 [SE-0370]: <https://github.com/apple/swift-evolution/blob/main/proposals/0370-pointer-family-initialization-improvements.md>
+[SE-0371]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0376]: <https://github.com/apple/swift-evolution/blob/main/proposals/0376-function-back-deployment.md>
 [SE-0377]: <https://github.com/apple/swift-evolution/blob/main/proposals/0377-parameter-ownership-modifiers.md>
 [SE-0380]: <https://github.com/apple/swift-evolution/blob/main/proposals/0380-if-switch-expressions.md>
@@ -11003,10 +11168,13 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0462]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0462-task-priority-escalation-apis.md
 [SE-0469]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0469-task-names.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
-[SE-0471]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
+[SE-0489]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0489-codable-error-printing.md
+[SE-0493]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0493-defer-async.md
+[SE-0503]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0503-suppressed-associated-types.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
+[SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

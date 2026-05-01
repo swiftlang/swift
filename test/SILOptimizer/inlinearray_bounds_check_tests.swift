@@ -204,7 +204,6 @@ public func inlinearray_element_sum<let N: Int>(_ v: InlineArray<N, Int>, _ i: I
 // CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A7_searchySiSgs11InlineArrayVyq_xG_xtSiRV_SQRzr0_lF :
 // CHECK-SIL: bb3:
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s30inlinearray_bounds_check_tests0A7_searchySiSgs11InlineArrayVyq_xG_xtSiRV_SQRzr0_lF'
 public func inlinearray_search<T : Equatable, let N: Int>(_ v: InlineArray<N, T>, _ elem: T) -> Int? {
@@ -220,7 +219,6 @@ public func inlinearray_search<T : Equatable, let N: Int>(_ v: InlineArray<N, T>
 
 // CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A11_search_splySiSgs11InlineArrayVyxSiG_SitSiRVzlF :
 // CHECK-SIL: bb3:
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s30inlinearray_bounds_check_tests0A11_search_splySiSgs11InlineArrayVyxSiG_SitSiRVzlF'

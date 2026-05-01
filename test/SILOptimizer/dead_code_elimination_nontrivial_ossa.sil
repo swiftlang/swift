@@ -1478,3 +1478,48 @@ bb5(%16 : @reborrow $FakeOptional<Klass>, %17 : @reborrow $FakeOptional<Klass>):
   return %23
 }
 
+struct NCWithoutDeinit: ~Copyable {
+  var a: Bool
+  var b: Int
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_non_copyable_destructure
+// CHECK:         (%1, %2) = destructure_struct %0
+// CHECK:       } // end sil function 'dont_remove_non_copyable_destructure'
+sil [ossa] @dont_remove_non_copyable_destructure : $@convention(thin) (@owned NCWithoutDeinit) -> () {
+bb0(%0 : @owned $NCWithoutDeinit):
+  (%1, %2) = destructure_struct %0
+  %r = tuple ()
+  return %r
+}
+
+struct MoveOnlyPair : ~Copyable {
+  @_hasStorage var a: Int { get set }
+  @_hasStorage var b: Int { get set }
+}
+
+enum MoveOnlyTrivialPayloadEnum : ~Copyable {
+  case payload(Int)
+  case empty
+}
+
+// CHECK-LABEL: sil [ossa] @dce_dont_delete_dead_unchecked_enum_data_moveonly :
+// CHECK:         unchecked_enum_data
+// CHECK-LABEL: } // end sil function 'dce_dont_delete_dead_unchecked_enum_data_moveonly'
+sil [ossa] @dce_dont_delete_dead_unchecked_enum_data_moveonly : $@convention(thin) (@owned MoveOnlyTrivialPayloadEnum) -> () {
+bb0(%0 : @owned $MoveOnlyTrivialPayloadEnum):
+  %1 = unchecked_enum_data %0, #MoveOnlyTrivialPayloadEnum.payload!enumelt
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dce_dont_delete_dead_unchecked_value_cast_moveonly :
+// CHECK:         unchecked_value_cast
+// CHECK-LABEL: } // end sil function 'dce_dont_delete_dead_unchecked_value_cast_moveonly'
+sil [ossa] @dce_dont_delete_dead_unchecked_value_cast_moveonly : $@convention(thin) (@owned MoveOnlyPair) -> () {
+bb0(%0 : @owned $MoveOnlyPair):
+  %1 = unchecked_value_cast %0 to $(Int, Int)
+  %r = tuple ()
+  return %r
+}
+

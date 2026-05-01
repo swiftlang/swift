@@ -1077,7 +1077,7 @@ public:
 
   /// Get any requirements that must be satisfied for this conformance to apply.
   ArrayRef<Requirement> getConditionalRequirements() const {
-    return *getConditionalRequirementsIfAvailable();
+    return getConditionalRequirementsIfAvailable().value();
   }
 
   /// Get the protocol being conformed to.

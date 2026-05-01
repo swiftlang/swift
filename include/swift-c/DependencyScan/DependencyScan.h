@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 2
-#define SWIFTSCAN_VERSION_MINOR 2
+#define SWIFTSCAN_VERSION_MINOR 3
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -112,6 +112,14 @@ typedef enum {
   SWIFTSCAN_ACCESS_LEVEL_PUBLIC = 4
 } swiftscan_access_level_t;
 
+// Must maintain consistency with swift::LibraryLevel
+typedef enum {
+  SWIFTSCAN_LIBRARY_LEVEL_OTHER = 0,
+  SWIFTSCAN_LIBRARY_LEVEL_IPI = 1,
+  SWIFTSCAN_LIBRARY_LEVEL_SPI = 2,
+  SWIFTSCAN_LIBRARY_LEVEL_API = 3
+} swiftscan_library_level_t;
+
 typedef struct {
   swiftscan_diagnostic_info_t *diagnostics;
   size_t count;
@@ -176,6 +184,9 @@ swiftscan_module_info_get_imports(swiftscan_dependency_info_t info);
 
 SWIFTSCAN_PUBLIC swiftscan_module_details_t
 swiftscan_module_info_get_details(swiftscan_dependency_info_t info);
+
+SWIFTSCAN_PUBLIC swiftscan_library_level_t
+swiftscan_module_info_get_library_level(swiftscan_dependency_info_t info);
 
 //=== Import Details Functions -------------------------------------------===//
 SWIFTSCAN_PUBLIC swiftscan_source_location_set_t *
@@ -621,6 +632,55 @@ swiftscan_cas_prune_ondisk_data(swiftscan_cas_t, swiftscan_string_ref_t *error);
 
 /// Dispose the \c cas instance.
 SWIFTSCAN_PUBLIC void swiftscan_cas_dispose(swiftscan_cas_t cas);
+
+/// Builds a CAS file-system tree.
+/// Combines ingestion of paths from the on-disk file-system along with merging
+/// other CAS file-system roots.
+typedef struct swiftscan_cas_fs_builder_s *swiftscan_cas_fs_builder_t;
+
+/// Creates a \c swiftscan_cas_fs_builder_t instance.
+SWIFTSCAN_PUBLIC
+swiftscan_cas_fs_builder_t swiftscan_cas_fs_builder_create(swiftscan_cas_t);
+
+/// Disposes a \c swiftscan_cas_fs_builder_t instance.
+SWIFTSCAN_PUBLIC void
+    swiftscan_cas_fs_builder_dispose(swiftscan_cas_fs_builder_t);
+
+/// Ingest contents from the on-disk file-system. Symlinks are not followed.
+/// Emits an error if the path doesn't exist. Returns true if error.
+///
+/// \param recursive if true, and path is a directory, its contents will be
+/// ingested recursively, otherwise only the path will be included.
+///
+/// If error happens, the error message is returned via `error` parameter, and
+/// caller needs to free the error message via `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC bool
+swiftscan_cas_fs_builder_ingest_path(swiftscan_cas_fs_builder_t,
+                                     const char *path, bool recursive,
+                                     swiftscan_string_ref_t *error);
+
+/// Merge a prior constructed CAS file-system tree root. Returns true if error.
+///
+/// \param root_id the printed CASID of the tree root.
+/// \param path the path to place the root at; can be null.
+///
+/// If error happens, the error message is returned via `error` parameter, and
+/// caller needs to free the error message via `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC bool
+swiftscan_cas_fs_builder_merge_root(swiftscan_cas_fs_builder_t,
+                                    const char *root_id, const char *path,
+                                    swiftscan_string_ref_t *error);
+
+/// Produce the merged CAS file-system tree root CASID.
+/// \c swiftscan_cas_fs_builder_t should not be used after calling this.
+/// Returns NULL on error.
+///
+/// The returned CASID string needs to be freed via `swiftscan_string_dispose`.
+///
+/// If error happens, the error message is returned via `error` parameter, and
+/// caller needs to free the error message via `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t swiftscan_cas_fs_builder_finish(
+    swiftscan_cas_fs_builder_t, swiftscan_string_ref_t *error);
 
 /// Compute \c CacheKey for the outputs of a primary input file from a compiler
 /// invocation with command-line \c argc and \c argv. When primary input file

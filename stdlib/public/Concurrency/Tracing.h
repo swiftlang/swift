@@ -23,9 +23,10 @@ namespace swift {
 class AsyncLet;
 class AsyncTask;
 class ContinuationAsyncContext;
-class SerialExecutorRef;
 struct HeapObject;
 class Job;
+class SerialExecutorRef;
+class TaskExecutorRef;
 class TaskGroup;
 class TaskStatusRecord;
 
@@ -35,8 +36,6 @@ namespace trace {
 // Actor trace calls.
 
 void actor_create(HeapObject *actor);
-
-void actor_destroy(HeapObject *actor);
 
 void actor_deallocate(HeapObject *actor);
 
@@ -58,7 +57,9 @@ void actor_note_job_queue(HeapObject *actor, Job *first,
 
 void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
                  AsyncLet *asyncLet, uint8_t jobPriority, bool isChildTask,
-                 bool isFuture, bool isGroupChildTask, bool isAsyncLetTask);
+                 bool isFuture, bool isGroupChildTask, bool isAsyncLetTask,
+                 bool isDiscardingTask, bool hasInitialTaskExecutorPreference,
+                 const char *taskName);
 
 void task_destroy(AsyncTask *task);
 
@@ -89,7 +90,16 @@ void job_enqueue_global(Job *job);
 
 void job_enqueue_global_with_delay(unsigned long long delay, Job *job);
 
-void job_enqueue_main_executor(Job *job);
+void job_enqueue_executor(Job *job, SerialExecutorRef serialExecutor,
+                          TaskExecutorRef taskExecutor);
+
+enum class TracingExecutorKind : uint8_t {
+  GlobalConcurrent,
+  DefaultActor,
+  MainActor,
+  CustomSerialExecutor,
+  TaskExecutor,
+};
 
 struct job_run_info {
   /// The ID of the task that started running.
@@ -104,7 +114,8 @@ struct job_run_info {
 // call to task_run_end.  Any information we want to log must be
 // extracted from the job when we start to run it because execution
 // will invalidate the job.
-job_run_info job_run_begin(Job *job);
+job_run_info job_run_begin(Job *job, SerialExecutorRef serialExecutor,
+                           TaskExecutorRef taskExecutor);
 
 void job_run_end(job_run_info info);
 

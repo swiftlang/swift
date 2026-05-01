@@ -74,8 +74,7 @@ import Swift
 /// not cancel tasks or resume continuations while holding that lock.
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
-nonisolated(nonsending)
-public func withTaskCancellationHandler<Return, Failure>(
+public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Return,
   onCancel handler: sending () -> Void
 ) async throws(Failure) -> Return {
@@ -151,7 +150,8 @@ public func withTaskCancellationHandler<Return, Failure>(
 /// as resuming a continuation, may acquire these same internal locks.
 /// Therefore, if a cancellation handler must acquire a lock, other code should
 /// not cancel tasks or resume continuations while holding that lock.
-@available(SwiftStdlib 6.0, *)
+@available(SwiftStdlib 5.1, *)
+@backDeployed(before: SwiftStdlib 6.0)
 public func withTaskCancellationHandler<T>(
   operation: () async throws -> T,
   onCancel handler: @Sendable () -> Void,
@@ -208,10 +208,10 @@ extension Task {
   ///
   /// ### Instance property isCancelled ignores Task Cancellation Shields
   ///
-  /// Instance properties `task.isCancelled` and `unsafeCurrentTask.isCancelled`
-  /// are not contextual and therefore do not respect cancellation shields.
+  /// The instance property `task.isCancelled`
+  /// is not contextual and therefore does not respect cancellation shields.
   /// If a task was cancelled and is executing with an active cancellation shield,
-  /// these properties will return the _actual_ cancellation status of the task.
+  /// these properties will return the _actual_ cancellation status of the specific task.
   ///
   /// Prefer using `Task.isCancelled` (the static property) in most situations when checking
   /// the cancellation status from inside the task.
@@ -225,7 +225,7 @@ extension Task {
     // This is @available(SwiftStdlib 6.4, *) but can't use SwiftStdlib in transparent function
     if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) {
       let ignoreTaskCancellationShield: UInt64 = 0x1
-      return unsafe _taskIsCancelledWithFlags(_task, flags: ignoreTaskCancellationShield)
+      return _taskIsCancelledWithFlags(_task, flags: ignoreTaskCancellationShield)
     } else {
       return _taskIsCancelled(_task)
     }
@@ -376,6 +376,7 @@ func _taskRemoveCancellationHandler(
 public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Value,
 ) async throws(Failure) -> Value {
+#if $BuiltinTaskCancellationShield
   let didInstallShield = Builtin.taskCancellationShieldPush()
 
   defer {
@@ -385,6 +386,9 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
   }
 
   return try await operation()
+#else
+  fatalError("Swift compiler is incompatible with this SDK version")
+#endif
 }
 
 
@@ -466,6 +470,7 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
 public func withTaskCancellationShield<Value, Failure>(
   operation: () throws(Failure) -> Value,
 ) throws(Failure) -> Value {
+#if $BuiltinTaskCancellationShield
   let didInstallShield = Builtin.taskCancellationShieldPush()
 
   defer {
@@ -475,6 +480,9 @@ public func withTaskCancellationShield<Value, Failure>(
   }
 
   return try operation()
+#else
+  fatalError("Swift compiler is incompatible with this SDK version")
+#endif
 }
 
 @available(SwiftStdlib 6.4, *)

@@ -7,9 +7,9 @@ add_swift_host_library(swiftSema STATIC
   Comment.cpp
   CSApply.cpp
   CSBindings.cpp
+  CSDisjunction.cpp
   CSSyntacticElement.cpp
   CSGen.cpp
-  CSLookahead.cpp
   CSRanking.cpp
   CSSimplify.cpp
   CSSolver.cpp
@@ -75,6 +75,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
   TypeCheckEmbedded.cpp
+  TypeCheckFullyInhabited.cpp
   TypeCheckGeneric.cpp
   TypeCheckInvertible.cpp
   TypeCheckMacros.cpp

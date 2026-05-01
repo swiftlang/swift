@@ -142,11 +142,17 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   // format
   OutputFormat::Text,
 
+  // inBacktracer
+  false,
+
   // swiftBacktracePath
   NULL,
 
   // outputPath
   NULL,
+
+  // closeFds
+  false,
 };
 
 }
@@ -345,6 +351,9 @@ BacktraceInitializer::BacktraceInitializer() {
 
   if (backtracing)
     _swift_parseBacktracingSettings(backtracing);
+
+  _swift_backtraceSettings.inBacktracer
+    = swift::runtime::environment::SWIFT_IS_BACKTRACING();
 
 #if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
   if (!_swift_backtraceSettings.swiftBacktracePath) {
@@ -776,6 +785,8 @@ _swift_processBacktracingSetting(llvm::StringRef key,
     }
   } else if (key.equals_insensitive("cache")) {
     _swift_backtraceSettings.cache = parseBoolean(value);
+  } else if (key.equals_insensitive("close-fds")) {
+    _swift_backtraceSettings.closeFds = parseBoolean(value);
   } else if (key.equals_insensitive("output-to")) {
     if (value.equals_insensitive("auto"))
       _swift_backtraceSettings.outputTo = OutputTo::Auto;
@@ -890,6 +901,7 @@ _swift_parseBacktracingSettings(const char *settings)
 // write protected so they can't be manipulated by an attacker using a buffer
 // overrun.
 const char * const environmentVarsToPassThrough[] = {
+  "SWIFT_BACKTRACE",
   "PATH",
   "TERM",
   "LANG",
@@ -917,14 +929,30 @@ _swift_backtraceSetupEnvironment()
 
   std::memset(swiftBacktraceEnv, 0, sizeof(swiftBacktraceEnv));
 
-  // We definitely don't want this on in the swift-backtrace program
-  const char * const disable = "SWIFT_BACKTRACE=enable=no";
-  const size_t disableLen = std::strlen(disable) + 1;
-  std::memcpy(penv, disable, disableLen);
-  penv += disableLen;
-  remaining -= disableLen;
+  unsigned firstEnvVar = 0;
 
-  for (unsigned n = 0; n < BACKTRACE_MAX_ENV_VARS; ++n) {
+  // Remember that we're backtracing
+  const char * const backtracing = "SWIFT_IS_BACKTRACING=yes";
+  const size_t backtracingLen = std::strlen(backtracing) + 1;
+  std::memcpy(penv, backtracing, backtracingLen);
+  penv += backtracingLen;
+  remaining -= backtracingLen;
+
+  // If the backtracer itself crashes, ignore crashes in the backtracer that's
+  // backtracing the backtracer.  This means we'll get backtraces from the
+  // backtracer, but it won't go full-on recursive.
+  if (_swift_backtraceSettings.inBacktracer) {
+    const char * const disable = "SWIFT_BACKTRACE=enable=no";
+    const size_t disableLen = std::strlen(disable) + 1;
+    std::memcpy(penv, disable, disableLen);
+    penv += disableLen;
+    remaining -= disableLen;
+
+    // Skip the SWIFT_BACKTRACE settings from the user
+    firstEnvVar = 1;
+  }
+
+  for (unsigned n = firstEnvVar; n < BACKTRACE_MAX_ENV_VARS; ++n) {
     const char *name = environmentVarsToPassThrough[n];
     const char *value = getenv(name);
     if (!value)
@@ -1107,8 +1135,8 @@ _swift_backtrace_demangle(const char *mangledName,
     char *result = __unDNameEx(outputBuffer,
                                mangledName,
                                *outputBufferSize,
-                               nullptr,
-                               nullptr,
+                               malloc,
+                               free,
                                nullptr,
                                0);
 
@@ -1615,6 +1643,20 @@ _swift_displayCrashMessage(
   return;
 #else
   sys_fd_t fd = getOutputHandle();
+
+  if (_swift_backtraceSettings.inBacktracer) {
+    const char *in_backtracer;
+    if (_swift_backtraceSettings.color == OnOffTty::On) {
+      in_backtracer = " failed\n\n"
+        "\U0001F4A3\U0001F4A3 \033[91mBacktracer crashed during backtracing;"
+        " attempting to backtrace backtracer:\033[0m\n";
+    } else {
+      in_backtracer = " failed ***\n\n"
+        "*** Backtracer crashed during backtracing;"
+        " attempting to backtrace backtracer: ***\n";
+    }
+    sys_print(fd, in_backtracer);
+  }
 
   const char *intro;
   if (_swift_backtraceSettings.color == OnOffTty::On) {

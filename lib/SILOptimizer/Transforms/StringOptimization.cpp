@@ -358,9 +358,14 @@ bool StringOptimization::optimizeGetCString(ApplyInst *getCStringCall) {
   while (!workList.empty()) {
     SILInstruction *inst = workList.pop_back_val();
     // Look through string_extract which extract the buffer from the array.
-    if (isa<StructExtractInst>(inst) || inst == getCStringCall) {
-      for (Operand *use : cast<SingleValueInstruction>(inst)->getUses()) {
-        workList.push_back(use->getUser());
+    if (isa<StructExtractInst>(inst) || inst == getCStringCall ||
+        isa<DestructureStructInst>(inst) || isa<CopyValueInst>(inst) ||
+        isa<MoveValueInst>(inst) || isa<UncheckedRefCastInst>(inst) ||
+        isa<BeginBorrowInst>(inst)) {
+      for (SILValue result : inst->getResults()) {
+        for (Operand *use : result->getUses()) {
+          workList.push_back(use->getUser());
+        }
       }
       continue;
     }
@@ -501,16 +506,22 @@ static std::pair<SILValue, VarDecl *> skipStructExtract(SILValue value) {
   if (!ret)
     return {value, nullptr};
 
-  auto *sei = dyn_cast<StructExtractInst>(ret->getOperand());
-  if (!sei)
+  SILInstruction *extractInst = ret->getOperand()->getDefiningInstruction();
+  if (!extractInst)
     return {value, nullptr};
-  
-  auto *arg = dyn_cast<SILFunctionArgument>(sei->getOperand());
+  if (!isa<StructExtractInst>(extractInst) && !isa<DestructureStructInst>(extractInst))
+    return {value, nullptr};
+
+  auto *arg = dyn_cast<SILFunctionArgument>(extractInst->getOperand(0));
   if (!arg)
     return {value, nullptr};
 
   value = apply->getArgument(arg->getIndex());
-  return {value, sei->getField()};
+  if (auto *sei = dyn_cast<StructExtractInst>(extractInst))
+    return {value, sei->getField()};
+  unsigned resultIdx = cast<MultipleValueInstructionResult>(ret->getOperand())->getIndex();
+  auto *field = arg->getType().getFieldDecl(resultIdx);
+  return {value, field};
 }
 
 /// Returns information about value if it's a constant string.

@@ -15,6 +15,11 @@ do {
   let _: String = result
 }
 
+do {
+  let result = f(t: T.self)
+  let _: String = result
+}
+
 struct S: ~Copyable {}
 
 do {

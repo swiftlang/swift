@@ -405,7 +405,7 @@ bb2:
   br bb5
 
 bb3:
-  %27 = unchecked_take_enum_data_addr %10 : $*Optional<Element>, #Optional.some!enumelt
+  %27 = unchecked_inplace_enum_data_addr %10 : $*Optional<Element>, #Optional.some!enumelt
   %28 = init_enum_data_addr %0 : $*Optional<Element>, #Optional.some!enumelt
   copy_addr [take] %27 to [init] %28 : $*Element
   dealloc_stack %10 : $*Optional<Element>
@@ -581,7 +581,7 @@ protocol P {
 sil @getP : $@convention(thin) () -> @out Optional<P>
 
 // CHECK-LABEL: sil @handle_open_existential_addr : $@convention(thin) () -> () {
-// CHECK: [[P:%.*]] = unchecked_take_enum_data_addr
+// CHECK: [[P:%.*]] = unchecked_inplace_enum_data_addr
 // CHECK-NOT: copy_addr
 // CHECK: open_existential_addr immutable_access [[P]]
 // CHECK: }
@@ -593,7 +593,7 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
+  %9 = unchecked_inplace_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [init] %10 : $*P
   %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self
@@ -626,7 +626,7 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
+  %9 = unchecked_inplace_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [init] %10 : $*P
   destroy_addr %2 : $*Optional<P>
@@ -660,7 +660,7 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
+  %9 = unchecked_inplace_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [init] %10 : $*P
   %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self
@@ -855,4 +855,32 @@ bb0(%0 : $*NC):
   %r = tuple ()
   return %r
 }
+
+// CHECK-LABEL: sil @unknown_last_use_on_liverange_exit
+// CHECK:         copy_addr %1 to [init] %3
+// CHECK-LABEL: } // end sil function 'unknown_last_use_on_liverange_exit'
+sil @unknown_last_use_on_liverange_exit : $@convention(thin) (@in_guaranteed (AnyObject, Klass), @inout Klass) -> @out AnyObject {
+bb0(%0 : $*AnyObject, %1 : $*(AnyObject, Klass), %2 : $*Klass):
+  %3 = alloc_stack [lexical] [var_decl] $(AnyObject, Klass)
+  copy_addr %1 to [init] %3
+  %5 = tuple_element_addr %3, 0
+  %6 = tuple_element_addr %3, 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %8 = load %6
+  copy_addr [take] %5 to [init] %0
+  store %8 to %2
+  br bb3
+
+bb2:
+  destroy_addr %3
+  br bb3
+
+bb3:
+  dealloc_stack %3
+  %15 = tuple ()
+  return %15
+}
+
 

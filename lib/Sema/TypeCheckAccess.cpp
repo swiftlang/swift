@@ -25,6 +25,7 @@
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ExportKind.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -77,6 +78,7 @@ using CheckDeclAccessCallback = void(AccessScope, SourceLoc, ImportAccessLevel);
 class AccessControlCheckerBase {
 protected:
   bool checkUsableFromInline;
+  bool ignoreImportAccessLevel;
 
   bool shouldSkipChecking(const ValueDecl *decl);
 
@@ -122,8 +124,10 @@ protected:
                        AccessScope contextAccessScope, const DeclContext *useDC,
                        llvm::function_ref<CheckDeclAccessCallback> diagnose);
 
-  AccessControlCheckerBase(bool checkUsableFromInline)
-      : checkUsableFromInline(checkUsableFromInline) {}
+  AccessControlCheckerBase(bool checkUsableFromInline,
+                           bool ignoreImportAccessLevel)
+      : checkUsableFromInline(checkUsableFromInline),
+        ignoreImportAccessLevel(ignoreImportAccessLevel) {}
 
 public:
   void checkGenericParamAccess(
@@ -291,7 +295,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   if (type) {
     std::optional<AccessScope> typeAccessScope =
         TypeAccessScopeChecker::getAccessScope(type, useDC,
-                                               checkUsableFromInline);
+                                               checkUsableFromInline,
+                                               ignoreImportAccessLevel);
 
     // Note: This means that the type itself is invalid for this particular
     // context, because it references declarations from two incompatible scopes.
@@ -318,7 +323,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
 
     auto typeReprAccessScope =
         TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
-                                               checkUsableFromInline);
+                                               checkUsableFromInline,
+                                               ignoreImportAccessLevel);
     if (!typeReprAccessScope.has_value())
       return;
 
@@ -358,7 +364,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       typeRepr, problematicAccessScope, useDC, checkUsableFromInline);
 
   ImportAccessLevel complainImport = std::nullopt;
-  if (complainRepr) {
+  if (complainRepr && !ignoreImportAccessLevel) {
     const ValueDecl *VD = complainRepr->getBoundDecl();
     assert(VD &&
            "findTypeDeclWithAccessScope should return bound TypeReprs only");
@@ -680,11 +686,14 @@ class AccessControlChecker : public AccessControlCheckerBase,
                              public DeclVisitor<AccessControlChecker> {
 public:
 
-  AccessControlChecker(bool allowUsableFromInline)
-    : AccessControlCheckerBase(allowUsableFromInline) {}
+  AccessControlChecker(bool allowUsableFromInline,
+                       bool ignoreImportAccessLevel)
+    : AccessControlCheckerBase(allowUsableFromInline,
+                               ignoreImportAccessLevel) {}
 
   AccessControlChecker()
-      : AccessControlCheckerBase(/*checkUsableFromInline=*/false) {}
+      : AccessControlCheckerBase(/*checkUsableFromInline=*/false,
+                                 /*ignoreImportAccessLevel=*/false) {}
 
   void visit(Decl *D) {
     if (D->isInvalid() || D->isImplicit())
@@ -1440,7 +1449,8 @@ class UsableFromInlineChecker : public AccessControlCheckerBase,
                                 public DeclVisitor<UsableFromInlineChecker> {
 public:
   UsableFromInlineChecker()
-      : AccessControlCheckerBase(/*checkUsableFromInline=*/true) {}
+      : AccessControlCheckerBase(/*checkUsableFromInline=*/true,
+                                 /*ignoreImportAccessLevel=*/false) {}
 
   void visit(Decl *D) {
     if (!D->getASTContext().isLanguageModeAtLeast(LanguageMode::v4_2))
@@ -2169,9 +2179,12 @@ swift::getDisallowedOriginKind(const Decl *decl,
           Feature::AssumeResilientCxxTypes))
     return DisallowedOriginKind::FragileCxxAPI;
 
-  // Implementation-only memory layouts for non-library-evolution mode.
-  if (isa<NominalTypeDecl>(decl) &&
-      decl->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+  // Implementation-only declarations for non-library-evolution mode.
+  auto varDecl = dyn_cast<VarDecl>(decl);
+  if (decl->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+      (isa<NominalTypeDecl>(decl) ||
+       (varDecl && varDecl->hasStorage() &&
+        isa<ClassDecl>(varDecl->getDeclContext()))))
     return DisallowedOriginKind::ImplementationOnlyMemoryLayout;
 
   // Report non-public import last as it can be ignored by the caller.
@@ -2289,6 +2302,43 @@ public:
     }
   }
 
+  /// Pick the appropriate \c ExportabilityReason for stored properties.
+  ExportabilityReason
+  getVarDeclExportabilityReason(const VarDecl *varDecl) const {
+    // If explicit use library-evolution style reason.
+    if (Where.getExportedLevel() != ExportedLevel::ImplicitlyExported)
+      return ExportabilityReason::PublicVarDecl;
+
+    // Reasons specific to classes in non-library-evolution mode or embedded.
+    auto *CD = dyn_cast_or_null<ClassDecl>(Where.getDeclContext()->getAsDecl());
+    if (CD) {
+      if (CD->getFormalAccess() == AccessLevel::Open)
+        return ExportabilityReason::ImplicitlyPublicVarDeclOpenClass;
+
+      if (CD->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        // Check whether an embedded requirement is missing.
+        bool hasAttr = varDecl &&
+            varDecl->getAttrs().hasAttribute<ImplementationOnlyAttr>();
+        bool hasDeinit = false;
+        if (auto *destructor = CD->getDestructor())
+          if (destructor->isNeverEmittedIntoClient())
+            hasDeinit = true;
+
+        if (!hasDeinit && !hasAttr)
+          return ExportabilityReason::
+              ImplicitlyPublicVarDeclMissingAttributeAndDeinit;
+        else if (!hasDeinit)
+          return ExportabilityReason::
+              ImplicitlyPublicVarDeclMissingDeinit;
+        else if (!hasAttr)
+          return ExportabilityReason::
+              ImplicitlyPublicVarDeclMissingAttribute;
+      }
+    }
+
+    return ExportabilityReason::ImplicitlyPublicVarDecl;
+  }
+
   void checkAvailabilityDomains(const Decl *D) {
     D = D->getAbstractSyntaxDeclForAttributes();
 
@@ -2387,10 +2437,8 @@ public:
     if (seenVars.count(theVar))
       return;
 
-    ExportabilityReason reason =
-      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
-        ExportabilityReason::ImplicitlyPublicVarDecl :
-        ExportabilityReason::PublicVarDecl;
+    auto reason = getVarDeclExportabilityReason(theVar);
+
     checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar,
               reason);
 
@@ -2413,10 +2461,8 @@ public:
       anyVar = V;
     });
 
-    ExportabilityReason reason =
-      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
-        ExportabilityReason::ImplicitlyPublicVarDecl :
-        ExportabilityReason::PublicVarDecl;
+    auto reason = getVarDeclExportabilityReason(anyVar);
+
     checkType(TP->hasType() ? TP->getType() : Type(),
               TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD,
               reason);
@@ -2907,7 +2953,10 @@ void swift::checkAccessControl(Decl *D) {
   if (isa<ValueDecl>(D) || isa<PatternBindingDecl>(D)) {
     bool allowInlineable =
         D->getDeclContext()->isInSpecializeExtensionContext();
-    AccessControlChecker(allowInlineable).visit(D);
+    bool ignoreImportAccessLevel =
+        D->getInnermostDeclContext()->isInObjCImplementationContext();
+
+    AccessControlChecker(allowInlineable, ignoreImportAccessLevel).visit(D);
     UsableFromInlineChecker().visit(D);
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     checkExtensionAccess(ED);

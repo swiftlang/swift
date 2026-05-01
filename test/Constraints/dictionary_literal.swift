@@ -152,6 +152,40 @@ func testDefaultExistentials() {
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[AnyHashable : String]'}}
 }
 
+func defaultToAnyNoDiagnostic() {
+  let x = 0
+  let y = ""
+  let z: Any = 0
+  let optZ: Any? = 0
+
+  struct Exactly<T> {}
+  func typeIs<T>(_: T) -> Exactly<T> {}
+
+  // element type is already Any, doesn't count
+  let dict1 = ["a": x, "b": y, "c": z]
+  let type1 = typeIs(dict1)
+  let _: Exactly<[String: Any]> = type1
+
+  // element type is Any?; make sure that's the join type that we use
+  let dict2 = ["a": x, "b": y, "c": optZ]
+  let type2 = typeIs(dict2)
+  let _: Exactly<[String: Any?]> = type2
+
+  // element type is already Any, no diagnostic
+  let dict3 = ["a": z, "b": optZ]
+  // expected-warning@-1 {{expression implicitly coerced from 'Any?' to 'Any'}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+
+  let type3 = typeIs(dict3)
+  let _: Exactly<[String: Any]> = type3
+
+  let dict3a = ["a": z, "b": optZ as Any]
+  let type3a = typeIs(dict3a)
+  let _: Exactly<[String: Any]> = type3a
+}
+
 /// rdar://problem/32330004
 /// https://github.com/apple/swift/issues/47529
 /// Assertion failure during `swift::ASTVisitor<::FailureDiagnosis,...>::visit`

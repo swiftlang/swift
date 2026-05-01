@@ -36,7 +36,7 @@ bb1:                                              // Preds: bb0
   br bb3(%14 : $Optional<()>)                     // id: %15
 
 bb2:                                              // Preds: bb0
-  %16 = unchecked_take_enum_data_addr %4 : $*Optional<Fooer>, #Optional.some!enumelt // user: %17
+  %16 = unchecked_inplace_enum_data_addr %4 : $*Optional<Fooer>, #Optional.some!enumelt // user: %17
   %17 = load [copy] %16 : $*Fooer                 // users: %22, %21, %20
   destroy_addr %4 : $*Optional<Fooer>             // id: %18
   end_access %3 : $*@sil_weak Optional<Fooer>     // id: %19
@@ -66,7 +66,7 @@ bb4:                                              // Preds: bb3
   br bb6(%39 : $Optional<()>)                     // id: %40
 
 bb5:                                              // Preds: bb3
-  %41 = unchecked_take_enum_data_addr %29 : $*Optional<Fooer>, #Optional.some!enumelt // user: %42
+  %41 = unchecked_inplace_enum_data_addr %29 : $*Optional<Fooer>, #Optional.some!enumelt // user: %42
   %42 = load [copy] %41 : $*Fooer                 // users: %47, %46, %45
   destroy_addr %29 : $*Optional<Fooer>            // id: %43
   end_access %28 : $*@sil_weak Optional<Fooer>    // id: %44

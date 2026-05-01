@@ -16,7 +16,7 @@
 
 import Swift
 
-// #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+// #if os(anyAppleOS)
 // internal import Darwin
 // #elseif os(Windows)
 // internal import ucrt
@@ -27,7 +27,7 @@ import Swift
 // #endif
 
 /// Holds a backtrace.
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 public struct Backtrace: CustomStringConvertible, Sendable {
   /// The type of an address.
   ///
@@ -363,7 +363,6 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     -> SymbolicatedBacktrace? {
     return symbolicated(with: images,
                         platform: .default,
-                        alternativeSymbolFilePaths: [],
                         options: options)
   }
 
@@ -373,7 +372,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     case Linux
     case Windows
 
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if os(anyAppleOS)
     static public let `default` = SymbolicationPlatform.Darwin
     #elseif os(Linux)
     static public let `default` = SymbolicationPlatform.Linux
@@ -385,15 +384,17 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   @_spi(Internal)
   public func symbolicated(with images: ImageMap? = nil,
                            platform: SymbolicationPlatform,
-                           alternativeSymbolFilePaths: [String],
-                           options: SymbolicationOptions = .default)
+                           options: SymbolicationOptions = .default,
+                           symbolLocator: SymbolLocator =
+                            DefaultSymbolLocator.shared,
+                           )
     -> SymbolicatedBacktrace? {
     return SymbolicatedBacktrace.symbolicate(
       backtrace: self,
       images: images,
       platform: platform,
-      alternativeSymbolFilePaths: alternativeSymbolFilePaths,
-      options: options
+      options: options,
+      symbolLocator: symbolLocator
     )
   }
 
@@ -437,7 +438,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
 // -- Capture Implementation -------------------------------------------------
 
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 extension Backtrace {
 
   // ###FIXME: There is a problem with @_specialize here that results in the

@@ -1,4 +1,4 @@
-// {"kind":"emit-silgen","languageMode":6,"original":"8b10024f","signature":"swift::collectExistentialConformances(swift::CanType, swift::CanType, bool)","signatureAssert":"Assertion failed: (conformance), function collectExistentialConformances"}
+// {"kind":"emit-silgen","languageMode":6,"original":"8b10024f","signature":"swift::collectExistentialConformances(swift::CanType, swift::CanType, bool)","signatureAssert":"Assertion failed: (conformance), function collectExistentialConformances","signatureNext":"Lowering::SILGenFunction::emitTransformExistential"}
 // RUN: not --crash %target-swift-frontend -emit-silgen -swift-version 6 %s
 protocol a {
   static func b(c: AnyObject)

@@ -1,11 +1,10 @@
-// RUN: %target-typecheck-verify-swift -application-extension
-// RUN: %target-typecheck-verify-swift -application-extension-library
-// REQUIRES: OS=ios
+// RUN: %target-typecheck-verify-swift -application-extension -parse-stdlib -target arm64-apple-ios13.0
+// RUN: %target-typecheck-verify-swift -application-extension-library -parse-stdlib -target arm64-apple-ios13.0
 
 // Allow referencing unavailable API in situations where the caller is marked unavailable in the same circumstances.
 
 @available(iOS, unavailable)
-func ios() {} // expected-note 2{{'ios()' has been explicitly marked unavailable here}}
+func ios() {} // expected-note {{'ios()' has been explicitly marked unavailable here}}
 
 @available(iOSApplicationExtension, unavailable)
 func ios_extension() {} // expected-note {{'ios_extension()' has been explicitly marked unavailable here}}
@@ -34,5 +33,5 @@ func ios_extension_call_ios_extension() {
 
 @available(iOSApplicationExtension, unavailable)
 func ios_extension_call_ios() {
-    ios() // expected-error {{'ios()' is unavailable}}
+    ios()
 }

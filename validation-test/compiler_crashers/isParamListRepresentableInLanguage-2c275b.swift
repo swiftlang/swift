@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"isParamListRepresentableInLanguage(swift::AbstractFunctionDecl const*, swift::ParameterList const*, swift::ObjCReason)","signatureAssert":"Assertion failed: (Ptr && \"Cannot dereference a null Type!\"), function operator->"}
+// {"kind":"typecheck","signature":"isParamListRepresentableInLanguage(swift::AbstractFunctionDecl const*, swift::ParameterList const*, swift::ObjCReason)","signatureAssert":"Assertion failed: (Ptr && \"Cannot dereference a null Type!\"), function operator->","signatureNext":"isRepresentableInLanguage"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 // REQUIRES: objc_interop
 class a { @objc b(@e & d Int) @propertyWrapper enum e

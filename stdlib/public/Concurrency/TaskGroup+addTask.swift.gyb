@@ -297,7 +297,7 @@ extension ${TYPE} {
     #if $BuiltinCreateAsyncTaskName
     if let name {
       task =
-        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           ${TASK_CREATE_FN}(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,

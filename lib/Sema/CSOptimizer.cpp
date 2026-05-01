@@ -26,6 +26,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
@@ -571,29 +572,6 @@ static Type inferTypeOfArithmeticOperatorChain(ConstraintSystem &cs,
   return analyzer.chainType();
 }
 
-NullablePtr<Constraint> getApplicableFnConstraint(ConstraintGraph &CG,
-                                                  Constraint *disjunction) {
-  auto *boundVar = disjunction->getNestedConstraints()[0]
-                       ->getFirstType()
-                       ->getAs<TypeVariableType>();
-  if (!boundVar)
-    return nullptr;
-
-  auto constraints =
-      CG.gatherNearbyConstraints(boundVar, [](Constraint *constraint) {
-        return constraint->getKind() == ConstraintKind::ApplicableFunction;
-      });
-
-  if (constraints.size() != 1)
-    return nullptr;
-
-  auto *applicableFn = constraints.front();
-  // Unapplied disjunction could appear as a argument to applicable function,
-  // we are not interested in that.
-  return applicableFn->getSecondType()->isEqual(boundVar) ? applicableFn
-                                                          : nullptr;
-}
-
 void forEachDisjunctionChoice(
     ConstraintSystem &cs, Constraint *disjunction,
     llvm::function_ref<void(Constraint *, ValueDecl *decl, FunctionType *)>
@@ -604,10 +582,7 @@ void forEachDisjunctionChoice(
     if (!decl)
       continue;
 
-    Type overloadType = cs.getEffectiveOverloadType(
-        disjunction->getLocator(), constraint->getOverloadChoice(),
-        /*allowMembers=*/true, constraint->getDeclContext());
-
+    Type overloadType = constraint->getEffectiveOverloadType();
     if (!overloadType || !overloadType->is<FunctionType>())
       continue;
 
@@ -787,7 +762,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 
   ASSERT(argumentType);
 
-  if (argumentType->hasTypeVariable() || argumentType->hasDependentMember())
+  if (argumentType->hasTypeVariable())
     return DisjunctionInfo::none();
 
   SmallVector<Constraint *, 2> favoredChoices;
@@ -1057,8 +1032,11 @@ scoreCandidateMatch(ConstraintSystem &cs,
 
   // Conversion from a concrete type to its existential value.
   if (paramType->isExistentialType()) {
-    if (isSubtypeOfExistentialType(candidateType, paramType))
-      return 100;
+    if (isSubtypeOfExistentialType(candidateType, paramType)) {
+      // Operators always prefer exact and subtype matches. Erasure should
+      // shouldn't be scored higher than a match on a generic parameter.
+      return choice->isOperator() ? 90 : 100;
+    }
   }
 
   // Candidate could be converted to a superclass.
@@ -1091,8 +1069,11 @@ scoreCandidateMatch(ConstraintSystem &cs,
       // metatypes.
       if (candidateType->is<ExistentialMetatypeType>() ||
           !instanceType->isExistentialType()) {
-        if (isSubtypeOfExistentialType(instanceType, EMT->getInstanceType()))
-          return 100;
+        if (isSubtypeOfExistentialType(instanceType, EMT->getInstanceType())) {
+          // See other use of \c isSubtypeOfExistentialType as to why the score
+          // is lower.
+          return choice->isOperator() ? 90 : 100;
+        }
       }
     }
   }
@@ -1246,7 +1227,7 @@ scoreCandidateMatch(ConstraintSystem &cs,
 static DisjunctionInfo computeDisjunctionInfo(
     ConstraintSystem &cs,
     SmallVectorImpl<Constraint *> &disjunctions, unsigned index,
-    llvm::DenseMap<Constraint *, DisjunctionInfo> &result) {
+    Constraint *applicableFn) {
   auto *disjunction = disjunctions[index];
 
   // If this is a compiler synthesized disjunction, mark it as supported
@@ -1265,10 +1246,7 @@ static DisjunctionInfo computeDisjunctionInfo(
     return info.build();
   }
 
-  auto applicableFn =
-      getApplicableFnConstraint(cs.getConstraintGraph(), disjunction);
-
-  if (applicableFn.isNull()) {
+  if (applicableFn == nullptr) {
     auto *locator = disjunction->getLocator();
     if (auto expr = getAsExpr(locator->getAnchor())) {
       auto *parentExpr = cs.getParentExpr(expr);
@@ -1309,9 +1287,9 @@ static DisjunctionInfo computeDisjunctionInfo(
   }
 
   auto argFuncType =
-      applicableFn.get()->getFirstType()->getAs<FunctionType>();
+      applicableFn->getFirstType()->getAs<FunctionType>();
 
-  auto argumentList = cs.getArgumentList(applicableFn.get()->getLocator());
+  auto argumentList = cs.getArgumentList(applicableFn->getLocator());
   ASSERT(argumentList != nullptr);
 
   for (const auto &argument : *argumentList) {
@@ -1477,18 +1455,21 @@ static DisjunctionInfo computeDisjunctionInfo(
           types.push_back({type, /*fromLiteral=*/true});
         }
 
-        auto binding =
-            inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
 
-        if (auto instanceTy = binding.getPointer()) {
-          types.push_back({instanceTy,
-                           /*fromLiteral=*/false,
-                           /*fromInitializerCall=*/true});
+        if (cs.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+          auto binding =
+              inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
 
-          if (binding.getInt())
-            types.push_back({instanceTy->wrapInOptionalType(),
+          if (auto instanceTy = binding.getPointer()) {
+            types.push_back({instanceTy,
                              /*fromLiteral=*/false,
                              /*fromInitializerCall=*/true});
+
+            if (binding.getInt())
+              types.push_back({instanceTy->wrapInOptionalType(),
+                               /*fromLiteral=*/false,
+                               /*fromInitializerCall=*/true});
+          }
         }
       }
     } else {
@@ -1590,12 +1571,10 @@ static DisjunctionInfo computeDisjunctionInfo(
       cs, disjunction,
       [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
         GenericSignature genericSig;
-        {
-          if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
-            genericSig = GF->getGenericSignature();
-          } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-            genericSig = SD->getGenericSignature();
-          }
+        if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
+          genericSig = GF->getGenericSignature();
+        } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+          genericSig = SD->getGenericSignature();
         }
 
         auto matchings =
@@ -1610,13 +1589,6 @@ static DisjunctionInfo computeDisjunctionInfo(
             onlySpeculativeArgumentCandidates &&
             (!canUseContextualResultTypes || resultTypes.empty());
 
-        // This is important for SIMD operators in particular because
-        // a lot of their overloads have same-type requires to a concrete
-        // type:  `<Scalar == (U)Int*>(_: SIMD*<Scalar>, ...) -> ...`.
-        if (genericSig) {
-          overloadType = overloadType->getReducedType(genericSig)
-                             ->castTo<FunctionType>();
-        }
 
         unsigned score = 0;
         unsigned numDefaulted = 0;
@@ -1876,7 +1848,11 @@ std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
 ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
 
-  collectDisjunctions(disjunctions);
+  // FIXME: This is inefficient.
+  for (auto &constraint : InactiveConstraints) {
+    if (constraint.getKind() == ConstraintKind::Disjunction)
+      disjunctions.push_back(&constraint);
+  }
 
   if (disjunctions.empty())
     return std::nullopt;
@@ -1912,16 +1888,16 @@ ConstraintSystem::selectDisjunction() {
   for (auto index : indices(disjunctions)) {
     auto *disjunction = disjunctions[index];
 
-    auto applicableFn =
-        getApplicableFnConstraint(getConstraintGraph(), disjunction);
+    Constraint *applicableFn = getApplicableFnConstraint(disjunction);
     FunctionType *argFuncType = nullptr;
-    if (applicableFn) {
-      argFuncType =
-        applicableFn.get()->getFirstType()->getAs<FunctionType>();
+    if (applicableFn != nullptr) {
+      argFuncType = applicableFn->getFirstType()->getAs<FunctionType>();
     }
 
-    pruneDisjunction(disjunction, applicableFn.getPtrOrNull());
-    auto info = computeDisjunctionInfo(*this, disjunctions, index, favorings);
+    getRemainingDisjunction(disjunction)
+      .pruneDisjunctionIfNeeded(*this, applicableFn);
+
+    auto info = computeDisjunctionInfo(*this, disjunctions, index, applicableFn);
     favorings.try_emplace(disjunction, info);
 
     if (isDebugMode()) {

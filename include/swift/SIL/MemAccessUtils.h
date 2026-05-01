@@ -257,13 +257,6 @@ bool mayLoadWeakOrUnowned(SILInstruction* instruction);
 /// point like a memory barrier, lock or syscall.
 bool maySynchronize(SILInstruction* instruction);
 
-/// Conservatively, whether this instruction could be a barrier to hoisting
-/// destroys.
-///
-/// Does not consider function so effects, so every apply is treated as a
-/// barrier.
-bool mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction);
-
 } // end namespace swift
 
 //===----------------------------------------------------------------------===//
@@ -1574,6 +1567,8 @@ inline Operand *getAccessProjectionOperand(SingleValueInstruction *svi) {
   case SILInstructionKind::IndexAddrInst:
   case SILInstructionKind::TailAddrInst:
   case SILInstructionKind::InitEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
   // open_existential_addr and unchecked_take_enum_data_addr are problematic
   // because they both modify memory and are access projections. Ideally, they
   // would not be casts, but will likely be eliminated with opaque values.
@@ -1958,7 +1953,8 @@ public:
   }
 
   SILValue visitPhi(SILPhiArgument *phi) {
-    assert(false && "unexpected phi on access path");
+    // "Address" phis can happen because we look through `pointer_to_address`
+    // instructions and a phi can be a `Builtin.RawPointer`.
     return SILValue();
   }
 

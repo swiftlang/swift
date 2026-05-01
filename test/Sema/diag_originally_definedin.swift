@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -define-availability "_myProject 1.0:macOS 10.10"
+// RUN:   -define-availability "_myProject 1.0:macOS 10.10" \
+// RUN:   -define-availability "_emptyMacro:*"
+
 // REQUIRES: OS=macosx
 
 @_originallyDefinedIn(module: "original", OSX 10.13) // expected-error {{'@_originallyDefinedIn' requires that 'foo()' have explicit availability for macOS}}
@@ -32,6 +34,9 @@ public func macroVersioned() {}
 // expected-error@-1 {{expected version number in '@_originallyDefinedIn' attribute}}
 public func macroUnknown() {}
 
+@_originallyDefinedIn(module: "original", _emptyMacro)
+public func macroEmpty() {}
+
 @available(macOS 10.9, *)
 @_originallyDefinedIn(module: "original", macos 10.13) // expected-warning {{unknown platform 'macos' for attribute '@_originallyDefinedIn'; did you mean 'macOS'?}} {{43-48=macOS}}
 public func incorrectPlatformCase() {}
@@ -55,3 +60,7 @@ public func incorrectPlatformNotSimilar() {}
 @available(macOS 10.9, *)
 @_originallyDefinedIn(module: "original", swift 5.1) // expected-warning {{unknown platform 'swift' for attribute '@_originallyDefinedIn'}}
 public func swiftVersionMacro() {}
+
+@available(macOS, unavailable)
+@_originallyDefinedIn(module: "original", macOS 10.15) // expected-error {{'@_originallyDefinedIn' requires that 'unavailableWithODI()' have explicit availability for macOS}}
+public func unavailableWithODI() {}

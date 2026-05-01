@@ -94,9 +94,19 @@ Func RangeReplaceableCollection.filter(_:) has been removed
 Func Sequence._filter(_:) has been removed
 Func Sequence.filter(_:) has been removed
 Func Sequence.map(_:) has been removed
+Func Sequence.reduce(_:_:) has been removed
 Func Dictionary.filter(_:) has been removed
 Func Set.filter(_:) has been removed
+Func String._slowWithCString(encodedAs:_:) has been removed
+Func String._withNFCCodeUnits(_:) has been renamed to Func __rethrows_underscore_withNFCCodeUnits(_:)
+Func String._withNFCCodeUnits(_:) has mangled name changing from 'Swift.String._withNFCCodeUnits((Swift.UInt8) throws -> ()) throws -> ()' to 'Swift.String.__rethrows_underscore_withNFCCodeUnits((Swift.UInt8) throws -> ()) throws -> ()'
+Func String._withNFCCodeUnits(_:) is now without rethrows
+Func String.withCString(_:) has been removed
+Func String.withCString(encodedAs:_:) has been removed
 Func Substring.filter(_:) has been removed
+Func Substring.withCString(_:) has been removed
+Func Substring.withCString(encodedAs:_:) has been removed
+Func Unicode.Scalar.withUTF8CodeUnits(_:) has been removed
 Func _ArrayProtocol.filter(_:) has been removed
 Constructor Result.init(catching:) has been removed
 Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
@@ -238,7 +248,6 @@ Protocol FixedWidthInteger has added inherited protocol Copyable
 Protocol FixedWidthInteger has added inherited protocol Escapable
 Protocol FloatingPoint has added inherited protocol Copyable
 Protocol FloatingPoint has added inherited protocol Escapable
-Protocol Hashable has added inherited protocol Escapable
 Protocol Identifiable has added inherited protocol Copyable
 Protocol Identifiable has added inherited protocol Escapable
 Protocol IteratorProtocol has added inherited protocol Copyable
@@ -479,8 +488,8 @@ Constructor OpaquePointer.init(_:) has generic signature change from <T> to <T w
 Constructor OpaquePointer.init(_:) has mangled name changing from 'Swift.OpaquePointer.init<A>(Swift.Optional<Swift.UnsafePointer<A>>) -> Swift.Optional<Swift.OpaquePointer>' to 'Swift.OpaquePointer.init<A where A: ~Swift.Copyable>(Swift.Optional<Swift.UnsafePointer<A>>) -> Swift.Optional<Swift.OpaquePointer>'
 Constructor OpaquePointer.init(_:) has mangled name changing from 'Swift.OpaquePointer.init<A>(Swift.UnsafePointer<A>) -> Swift.OpaquePointer' to 'Swift.OpaquePointer.init<A where A: ~Swift.Copyable>(Swift.UnsafePointer<A>) -> Swift.OpaquePointer'
 Constructor OpaquePointer.init(_:) is now with @_preInverseGenerics
-Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
-Constructor Optional.init(_:) has mangled name changing from 'Swift.Optional.init(A) -> Swift.Optional<A>' to '(extension in Swift):Swift.Optional< where A: ~Swift.Copyable>.init(A) -> Swift.Optional<A>'
+Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
+Constructor Optional.init(_:) has mangled name changing from 'Swift.Optional.init(A) -> Swift.Optional<A>' to '(extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.init(A) -> Swift.Optional<A>'
 Constructor Optional.init(_:) has parameter 0 changing from Default to Owned
 Constructor Optional.init(_:) is now with @_preInverseGenerics
 Constructor Optional.init(nilLiteral:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
@@ -839,6 +848,12 @@ Func Dictionary.merge(_:uniquingKeysWith:) has been removed
 Func Dictionary.merging(_:uniquingKeysWith:) has been removed
 Func _NativeDictionary.mapValues(_:) has been removed
 Func _NativeDictionary.merge(_:isUnique:uniquingKeysWith:) has been removed
+Func _SmallString.withUTF8(_:) has been removed
+Func _StringGuts._slowWithCString(_:) has been removed
+Func _StringGuts.withCString(_:) has been removed
+Func _StringGuts.withFastCChar(_:) has been removed
+Func _StringGuts.withFastUTF8(_:) has been removed
+Func _StringGuts.withFastUTF8(range:_:) has been removed
 Func __CocoaDictionary.mapValues(_:) has been removed
 
 
@@ -855,6 +870,10 @@ Enum _DependenceType is a new API without '@available'
 Protocol CodingKey has added inherited protocol SendableMetatype
 Protocol Error has added inherited protocol SendableMetatype
 
+Struct CollectionOfOne has added a conformance to an existing protocol Equatable
+Struct CollectionOfOne has added a conformance to an existing protocol Hashable
+Struct Dictionary.Keys has added a conformance to an existing protocol Hashable
+Struct EmptyCollection has added a conformance to an existing protocol Hashable
 Struct EnumeratedSequence has added a conformance to an existing protocol BidirectionalCollection
 Struct EnumeratedSequence has added a conformance to an existing protocol Collection
 Struct EnumeratedSequence has added a conformance to an existing protocol RandomAccessCollection
@@ -928,19 +947,19 @@ Func Comparable.>=(_:_:) has parameter 0 changing from Default to Shared
 Func Comparable.>=(_:_:) has parameter 1 changing from Default to Shared
 Func Comparable.>=(_:_:) is now with @_preInverseGenerics
 
-// Hashable: ~Copyable
-Protocol Hashable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable>
-Accessor Hashable.hashValue.Get() has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
-Func Hashable._rawHashValue(seed:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
-Func Hashable._rawHashValue(seed:) has mangled name changing from '(extension in Swift):Swift.Hashable._rawHashValue(seed: Swift.Int) -> Swift.Int' to '(extension in Swift):Swift.Hashable< where A: ~Swift.Copyable>._rawHashValue(seed: Swift.Int) -> Swift.Int'
+// Hashable: ~Copyable & ~Escapable
+Protocol Hashable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
+Accessor Hashable.hashValue.Get() has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
+Func Hashable._rawHashValue(seed:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
+Func Hashable._rawHashValue(seed:) has mangled name changing from '(extension in Swift):Swift.Hashable._rawHashValue(seed: Swift.Int) -> Swift.Int' to '(extension in Swift):Swift.Hashable< where A: ~Swift.Copyable, A: ~Swift.Escapable>._rawHashValue(seed: Swift.Int) -> Swift.Int'
 Func Hashable._rawHashValue(seed:) is now with @_preInverseGenerics
-Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
-Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable>
-Func Hasher.combine(_:) has mangled name changing from 'Swift.Hasher.combine<A where A: Swift.Hashable>(A) -> ()' to 'Swift.Hasher.combine<A where A: Swift.Hashable, A: ~Swift.Copyable>(A) -> ()'
+Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
+Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable, H : ~Escapable>
+Func Hasher.combine(_:) has mangled name changing from 'Swift.Hasher.combine<A where A: Swift.Hashable>(A) -> ()' to 'Swift.Hasher.combine<A where A: Swift.Hashable, A: ~Swift.Copyable, A: ~Swift.Escapable>(A) -> ()'
 Func Hasher.combine(_:) has parameter 0 changing from Default to Shared
 Func Hasher.combine(_:) is now with @_preInverseGenerics
-Func _hashValue(for:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable>
-Func _hashValue(for:) has mangled name changing from 'Swift._hashValue<A where A: Swift.Hashable>(for: A) -> Swift.Int' to 'Swift._hashValue<A where A: Swift.Hashable, A: ~Swift.Copyable>(for: A) -> Swift.Int'
+Func _hashValue(for:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable, H : ~Escapable>
+Func _hashValue(for:) has mangled name changing from 'Swift._hashValue<A where A: Swift.Hashable>(for: A) -> Swift.Int' to 'Swift._hashValue<A where A: Swift.Hashable, A: ~Swift.Copyable, A: ~Swift.Escapable>(for: A) -> Swift.Int'
 Func _hashValue(for:) has parameter 0 changing from Default to Shared
 Func _hashValue(for:) is now with @_preInverseGenerics
 

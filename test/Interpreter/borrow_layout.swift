@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 //
-// RUN: %target-build-swift -enable-experimental-feature BuiltinModule \
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking \
+// RUN:   -enable-experimental-feature BuiltinModule \
 // RUN:   -enable-experimental-feature Lifetimes \
-// RUN:   -enable-experimental-feature AnyAppleOSAvailability \
 // RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanPointer \
 // RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanPointer \
 // RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanPointer \
@@ -27,6 +27,15 @@
 // RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanGrainy \
 // RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanGrainy \
 // RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanGrainy \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanArray1 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanArray1 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanArray1 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanArray3 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanArray3 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanArray3 \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend LoanString \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend OptionalLoanString \
+// RUN:   -Xfrontend -verify-type-layout -Xfrontend Optional2LoanString \
 // RUN:   -o %t/a.out \
 // RUN:   %s
 // RUN: %target-codesign %t/a.out
@@ -41,7 +50,6 @@
 //
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_BuiltinModule
-// REQUIRES: swift_feature_AnyAppleOSAvailability
 
 // CHECK-NOT: Type verification
 
@@ -117,6 +125,18 @@ struct Grainy { var x, y, z, w, v: Bool }
 typealias LoanGrainy = Loan<Grainy>
 typealias OptionalLoanGrainy = Optional<Loan<Grainy>>
 typealias Optional2LoanGrainy = Optional<Optional<Loan<Grainy>>>
+
+typealias LoanArray1 = Loan<[1 of Int]>
+typealias OptionalLoanArray1 = Optional<Loan<[1 of Int]>>
+typealias Optional2LoanArray1 = Optional<Optional<Loan<[1 of Int]>>>
+
+typealias LoanArray3 = Loan<[3 of Int]>
+typealias OptionalLoanArray3 = Optional<Loan<[3 of Int]>>
+typealias Optional2LoanArray3 = Optional<Optional<Loan<[3 of Int]>>>
+
+typealias LoanString = Loan<String>
+typealias OptionalLoanString = Optional<Loan<String>>
+typealias Optional2LoanString = Optional<Optional<Loan<String>>>
 
 // CHECK-NOT: *** Type verification
 // CHECK: ok!

@@ -55,4 +55,10 @@ struct ReturnsOptionalString {
   DerivedFromOptional getStrDerived() const { return "foo"; }
 };
 
+// compiler crasher: optional of a type with user-defined conversion operator
+//                   to an instantiated template type
+template <typename T> struct Templated {};
+struct ConvertsToTemplated { operator Templated<int>() const; };
+std::optional<ConvertsToTemplated> returnsConvertsToTemplated();
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_OPTIONAL_H

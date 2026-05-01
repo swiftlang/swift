@@ -135,7 +135,9 @@ private func tryOptimizeEnumComparison(apply: ApplyInst, _ context: SimplifyCont
   let lhs = apply.arguments[0]
   let rhs = apply.arguments[1]
   guard let enumDecl = lhs.type.nominal as? EnumDecl,
-        enumDecl.hasRawType,
+        // A custom raw type can implement the case comparison in a way that comparing different cases
+        // will return `true`. Therefore only do the optimization for known stdlib raw value types.
+        enumDecl.hasKnownRawType(context),
         !enumDecl.isResilient(in: apply.parentFunction),
         !enumDecl.hasClangNode,
         lhs.type.isAddress,
@@ -173,12 +175,14 @@ private func tryReplaceExistentialArchetype(of apply: ApplyInst, _ context: Simp
   if let concreteType = apply.concreteTypeOfDependentExistentialArchetype,
      apply.canReplaceExistentialArchetype()
   {
+    let newArgs = apply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context)
+
     let builder = Builder(after: apply, context)
 
     let newApply = builder.createApply(
       function: apply.callee,
       apply.replaceOpenedArchetypeInSubstitutions(withConcreteType: concreteType, context),
-      arguments: apply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context),
+      arguments: newArgs,
       isNonThrowing: apply.isNonThrowing, isNonAsync: apply.isNonAsync,
       specializationInfo: apply.specializationInfo)
     apply.replace(with: newApply, context)
@@ -193,12 +197,14 @@ private func tryReplaceExistentialArchetype(of tryApply: TryApplyInst, _ context
   if let concreteType = tryApply.concreteTypeOfDependentExistentialArchetype,
      tryApply.canReplaceExistentialArchetype()
   {
+    let newArgs = tryApply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context)
+
     let builder = Builder(before: tryApply, context)
 
     builder.createTryApply(
       function: tryApply.callee,
       tryApply.replaceOpenedArchetypeInSubstitutions(withConcreteType: concreteType, context),
-      arguments: tryApply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context),
+      arguments: newArgs,
       normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock,
       isNonAsync: tryApply.isNonAsync,
       specializationInfo: tryApply.specializationInfo)
@@ -250,13 +256,26 @@ private extension FullApplySite {
     withConcreteType concreteType: CanonicalType,
     _ context: SimplifyContext
   ) -> [Value] {
-    let newArgs = arguments.map { (arg) -> Value in
+    let newArgs = argumentOperands.map { (argOp) -> Value in
+      let arg = argOp.value
       if arg.type.isExistentialArchetype {
         // case 1. the argument _is_ the existential archetype:
         //         just insert an address cast to satisfy type equivalence.
         let builder = Builder(before: self, context)
         let concreteSILType = concreteType.loweredType(in: self.parentFunction)
-        return builder.createUncheckedAddrCast(from: arg, to: concreteSILType.addressType)
+        if arg.type.isAddress {
+          return builder.createUncheckedAddrCast(from: arg, to: concreteSILType.addressType)
+        } else {
+          if convention(of: argOp) == .directGuaranteed, arg.ownership == .owned {
+            let beginBorrow = builder.createBeginBorrow(of: arg)
+            Builder.insert(after: self, location: self.location, context) { endBuilder in
+              endBuilder.createEndBorrow(of: beginBorrow)
+            }
+            return builder.createUncheckedRefCast(from: beginBorrow, to: concreteSILType)
+          } else {
+            return builder.createUncheckedRefCast(from: arg, to: concreteSILType)
+          }
+        }
       }
       if arg.type.isMetatype, arg.type.canonicalType.instanceTypeOfMetatype.isExistentialArchetype {
         // case 2. the argument _is_ a metatype of the existential archetype:
@@ -288,5 +307,31 @@ private extension Type {
   func optionalPayloadType(in function: Function) -> Type {
     let subs = contextSubstitutionMap
     return subs.replacementTypes[0].loweredType(in: function)
+  }
+}
+
+private extension EnumDecl {
+  func hasKnownRawType(_ context: SimplifyContext) -> Bool {
+    guard let rawType,
+          let rawTypeDecl = rawType.nominal
+    else {
+      return false
+    }
+    switch rawTypeDecl {
+    case context.swiftIntDecl,
+         context.swiftInt64Decl,
+         context.swiftInt32Decl,
+         context.swiftInt16Decl,
+         context.swiftInt8Decl,
+         context.swiftUIntDecl,
+         context.swiftUInt64Decl,
+         context.swiftUInt32Decl,
+         context.swiftUInt16Decl,
+         context.swiftUInt8Decl,
+         context.swiftStringDecl:
+      return true
+    default:
+      return false
+    }
   }
 }

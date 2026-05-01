@@ -1215,7 +1215,7 @@ CanSILFunctionType getNativeSILFunctionType(
 /// origConstant is the parent decl ref in the case of class methods and the
 /// witness method decl ref if we are working with a protocol witness. Pass in
 /// None otherwise.
-std::optional<ActorIsolation>
+ActorIsolation
 getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
                                  std::optional<SILDeclRef> origConstant,
                                  std::optional<SILDeclRef> constant);

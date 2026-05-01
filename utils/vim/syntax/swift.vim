@@ -59,6 +59,7 @@ syn keyword swiftDefinitionModifier
       \ open
       \ override
       \ prefix
+      \ package
       \ private
       \ public
       \ reasync

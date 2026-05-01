@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && (os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS))
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && os(anyAppleOS)
 
 import Swift
 
@@ -34,4 +34,4 @@ public struct PlatformExecutorFactory: ExecutorFactory {
   }
 }
 
-#endif // os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+#endif // os(anyAppleOS)

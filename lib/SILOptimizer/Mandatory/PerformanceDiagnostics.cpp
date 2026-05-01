@@ -764,6 +764,12 @@ private:
     // indexing purposes.
     if (!module->getOptions().EnableWMORequiredDiagnostics) return;
 
+    // Bypass this verification when a prior diagnostic error is present.
+    // In that case, required mandatory transofmation passes may not have
+    // run which would mean the diagnostics we emit here would be
+    // false-positive.
+    if (module->getASTContext().hadError()) return;
+
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
     // Check that @section, @_silgen_name is only on constant globals

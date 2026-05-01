@@ -575,6 +575,10 @@ public:
   /// returns \c this.
   DeclContext *getImplementedObjCContext() const;
 
+  /// Is this DeclContext marked `@c @implementation` or an implementation
+  /// function in an `@objc @implementation` extension.
+  bool isInObjCImplementationContext() const;
+
   /// Returns the source file that contains this context, or null if this
   /// is not within a source file.
   LLVM_READONLY

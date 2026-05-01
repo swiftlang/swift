@@ -131,8 +131,10 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     assert(getIndex() == int(UEDI->getElementNo()));
     break;
   }
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
-    auto *UTEDAI = cast<UncheckedTakeEnumDataAddrInst>(I);
+    auto *UTEDAI = cast<UncheckedEnumDataAddrInstBase>(I);
     Value = ValueTy(ProjectionKind::Enum, UTEDAI->getCaseIndex());
     assert(getKind() == ProjectionKind::Enum);
     assert(getIndex() == int(UTEDAI->getCaseIndex()));
@@ -286,9 +288,17 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
         // TODO: do we need to be conservative here?
         /*needsStackProtection=*/ true);
   }
-  case ProjectionKind::Enum:
-    return B.createUncheckedTakeEnumDataAddr(Loc, Base,
-                                             getEnumElementDecl(BaseTy));
+  case ProjectionKind::Enum: {
+    if (UncheckedEnumDataAddrInstBase::isDestructive(
+                                            BaseTy.getEnumOrBoundGenericEnum(),
+                                            &B.getFunction())) {
+      return B.createUncheckedTakeEnumDataAddr(Loc, Base,
+                                               getEnumElementDecl(BaseTy));
+    } else {
+      return B.createUncheckedInPlaceEnumDataAddr(Loc, Base,
+                                               getEnumElementDecl(BaseTy));
+    }
+  }
   case ProjectionKind::Class:
     return B.createRefElementAddr(Loc, Base, getVarDecl(BaseTy));
   case ProjectionKind::TailElems:

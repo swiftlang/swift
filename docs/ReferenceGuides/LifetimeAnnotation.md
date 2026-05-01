@@ -116,19 +116,29 @@ The `inout` parameter default rule is:
 
 - Default to `@_lifetime(self: copy self)` on `mutating` methods where `self` is `~Escapable`.
 
-Lifetime dependencies on `inout` parameters generally handle the incoming value like a normal parameter and the outgoing value as a normal function result. From this perspective, the `inout` rule would follow from the same-type default rule above. It is helpful, however, to define these as separate rules. First, the default behvior of `~Escpabale` `inout` parameters is important enough to be explicitly defined. Furthermore, the two rules do not interact as if the incoming and outgoing `inout` values were a distinct parameter and result. For example, if an `inout` parameter has the same type as another parameter, no default dependency is created between them:
+Unlike other default rules, the `inout` default rule applies even if an explicit `@_lifetime` attribute already specifies the same `inout` parameter as a target.
 
 ```swift
-struct NE: ~Escapable {...}
-
-/* DEFAULT: @_lifetime(a: copy a) */
-/* NO DEFAULT: @_lifetime(a: copy b) */
-func foo(a: inout NE, b: NE) -> ()
+@lifetime(span: copy another)
+func mayReassign(span: inout Span<Int>, to another: Span<Int>) {
+  span = (...) ? span : another // ✅ `span` depends on its incoming value and `another`
+}
 ```
 
-Separating `inout` and same-type defaults is consistent with the fact that Swift APIs typically use `inout` for mutation of the parameter rather than its reassignment. If reassignment is expected, then it is helpful see an explicit `@_lifetime` annotation.
+With the `inout` default rule, the annotation `@lifetime(span: copy another)` above is equivalent to `@lifetime(span: copy span, copy another)`.
 
-#### `inout` default examples
+A copied `inout` dependency can only be suppressed with an explicit immortal dependency: `@lifetime(inoutArg: immortal)`. A consequence of this rule is that full reassignment can be expressed by combining an immortal dependency with an additive dependency on another parameter:
+
+```swift
+@lifetime(span: immortal, copy another)
+func reinitialize(span: inout Span<Int>, to another: Span<Int>) {
+  span = another // ✅ `span` depends on `another`
+}
+```
+
+This full reassignment syntax is a side-effect of the implementation rather then a deliberate syntax feature, but it is useful for fully expressing the model in the absence of a more approachable syntax.
+
+#### Examples
 
 ```swift
 struct A: Escapable {
@@ -228,7 +238,7 @@ Similarly, an implicit initializer of a non-Escapable struct defaults to `@_life
 
 Function types can also have lifetime dependencies. This makes it possible to pass a callback function parameter that returns a non-Escapable type.
 The annotation syntax is the same as above, and the default lifetime inference rules for non-member functions apply.
-Support for lifetime dependencies on captured values is not yet implemented, so methods and certain closures (see below) cannot be passed.
+In addition to dependencies on the parameters, a function type's outputs can have dependencies on a captured context.
 
 Examples:
 
@@ -259,11 +269,12 @@ func takeProcessor2(ne0: NE, ne1: NE,
 }
 ```
 
-Currently, there is no way to express lifetime dependencies on the captured context.
-Closures can use the captured context, but cannot return or write to captured `~Escapable` values.
+A dependence on a closure's context can be expressed with the `captures` source keyword.
+A `captures` dependence is inferred by default for all function types.
+Closures can use the captured context, but cannot write to captured `~Escapable` values.
 
 ```swift
-func takePicker(/* DEFAULT: @_lifetime(copy ne0, copy ne1) */
+func takePicker(/* DEFAULT: @_lifetime(captures, copy ne0, copy ne1) */
                 picker: (NE, NE) -> NE) {
     let x = NE()
     let y = NE()
@@ -274,7 +285,7 @@ func predicate(ne: NE) -> Bool { ... }
 // OK, only parameters are used
 takePicker { ne0, ne1 in ne0 }
 
-// Error: Captured ~Escapable variable ne2 escapes.
+// OK, the inferred lifetime for the result includes a `captures` dependence.
 let ne2 = NE()
 takePicker { ne0, ne1 in ne2 }
 
@@ -284,4 +295,54 @@ takePicker { ne0, ne1 in
   if predicate(ne: ne3) { return ne0 } else { return ne1 }
 }
 
+```
+
+## Lifetime Subtyping
+
+For a function, method or closure to conform to an interface, the lifetime dependencies must match those specified by the interface. This applies to protocol method requirements and function types.
+Lifetime dependencies match if they are identical, or if the interface has a superset of the function's lifetime dependencies.
+It is safe to *add* lifetime dependencies, because the original, "real" dependencies will still be enforced.
+
+The rules for matching are as follows:
+- The lifetime dependencies for an individual target match if every dependence source present in the original function is also present for that target in the interface.
+- The matching dependencies must be of the same kind: a `copy` constraint in the original function must have a matching `copy` constraint in the interface.
+- An `immortal` dependency is treated as an empty list of sources: on a function it will match any interface, but only another `immortal` dependency can match an `immortal` dependency on an interface.
+- A `captures` dependence can be added but not removed.
+- Dependencies with an `Escapable` source or target in the original function may be ignored, as described in "Dependency type requirements" above.
+- For the lifetimes to match overall, they must match for each lifetime target in the original function.
+
+```swift
+protocol P {
+  @_lifetime(copy a, copy c)
+  func foo(a: NE, b: NE, c: NE) -> NE
+}
+
+// OK: The only dependence, "result: copy a", is present in the protocol.
+struct SubsetAP: P {
+  @_lifetime(copy a)
+  func foo(a: NE, b: NE, c: NE) -> NE { a }
+}
+// Error: Result's "copy c" dependence is not present in the protocol.
+struct SupersetCopyP: P {
+  @_lifetime(copy a, copy b, copy c)
+  func foo(a: NE, b: NE, c: NE) -> NE { b }
+}
+```
+
+These test files have many examples of successful and unsuccessful lifetime subtype matching:
+- `test/decl/protocol/conforms/lifetime.swift`
+- `test/Sema/lifetime_dependence_functype.swift`
+
+For protocol method requirement parameters with function types, the subtyping rules apply in the opposite direction to what one might expect. A conforming implementation must accept any function that could be passed to the interface specified by the protocol. This means that the function type can have *more* restrictive lifetime:
+
+```swift
+protocol R {
+  func bar(
+    f: @_lifetime(copy a, copy c) (_ a: NE, _ b: NE, _ c: NE) -> NE)
+}
+// OK: Can accept functions of type @_lifetime(copy a, copy c) (_ a: NE, _ b: NE, _ c: NE) -> NE
+struct SupersetCopyR: R {
+  func bar(
+    f: @_lifetime(copy a, copy b, copy c) (_ a: NE, _ b: NE, _ c: NE) -> NE) {}
+}
 ```

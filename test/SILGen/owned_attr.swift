@@ -1,13 +1,16 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/OwnedAttrLib.swiftmodule -emit-module-interface-path %t/OwnedAttrLib.swiftinterface -module-name=OwnedAttrLib %S/Inputs/owned_attr.swift \
-// RUN:     -enable-experimental-feature Lifetimes
+// RUN:     -enable-experimental-feature Lifetimes \
+// RUN:     -enable-experimental-feature UnderscoreOwned
 
 // RUN: %target-swift-emit-silgen -module-name X %s -I %t -enable-experimental-feature Lifetimes | %FileCheck %s
 // RUN: %target-swift-emit-sil -module-name X %s -I %t -enable-experimental-feature Lifetimes -verify
 
+// RUN: %target-swift-typecheck-module-from-interface(%t/OwnedAttrLib.swiftinterface)
 // RUN: %FileCheck --check-prefix CHECK-INTERFACE %s < %t/OwnedAttrLib.swiftinterface
 
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_UnderscoreOwned
 
 import OwnedAttrLib
 

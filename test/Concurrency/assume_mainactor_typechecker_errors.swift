@@ -109,7 +109,7 @@ nonisolated struct MyOtherStruct { }
 
 extension MyOtherStruct {
   func f() {
-    17.memberOfInt() // okay, on main actor
+    17.memberOfInt() // ok, on main actor
   }
 }
 

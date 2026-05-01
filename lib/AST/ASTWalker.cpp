@@ -2380,7 +2380,7 @@ bool Traversal::visitSendingTypeRepr(SendingTypeRepr *T) {
   return doIt(T->getBase());
 }
 
-bool Traversal::visitCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *T) {
+bool Traversal::visitNonisolatedNonsendingTypeRepr(NonisolatedNonsendingTypeRepr *T) {
   return doIt(T->getBase());
 }
 
@@ -2436,8 +2436,10 @@ bool Traversal::visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T) {
   return doIt(T->getBase());
 }
 
-bool Traversal::visitIntegerTypeRepr(IntegerTypeRepr *T) {
-  return false;
+bool Traversal::visitGenericArgumentExprTypeRepr(
+    GenericArgumentExprTypeRepr *T) {
+  return false; // Don't walk the inner expression; it will be type-checked
+                // independently by `resolveGenericArgumentExprTypeRepr`
 }
 
 Expr *Expr::walk(ASTWalker &walker) {

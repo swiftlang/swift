@@ -549,8 +549,6 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                            Type builderType);
 
-bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
-
 void collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced);
 
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
@@ -921,6 +919,11 @@ void checkConformancesInContext(IterableDeclContext *idc);
 /// Check that the type of the given property conforms to NSCopying.
 ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 
+/// Simplify generic argument expressions which are type sugar productions that
+/// got parsed as expressions due to the parser not knowing which identifiers
+/// are type names.
+TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
+
 /// \name Name lookup
 ///
 /// Routines that perform name lookup.
@@ -1149,7 +1152,6 @@ void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkCallerSideDefaultArgumentEffects(DeclContext *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 
 /// Whether the given expression can throw, and if so, the thrown type.
 std::optional<Type> canThrow(ASTContext &ctx, Expr *expr);
@@ -1554,6 +1556,12 @@ bool maybeDiagnoseMissingImportForMember(
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
+
+// Guide ForEachStmt type-checking by indicating whether the BorrowingSequence
+// protocol should be used, thus enabling Borrowing iteration for a given
+// sequence type.
+bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync,
+                                SourceLoc loc, DeclContext *dc);
 
 } // end namespace swift
 

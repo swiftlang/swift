@@ -16,31 +16,40 @@ import Foundation
 public struct Assertion: Hashable, Sendable {
   public var fullMessage: String
   public var message: String
+  public var function: String?
 
-  private static func matchAssert(_ str: String) -> Assertion? {
-    str.scanningUTF8 { scanner in
-      while scanner.hasInput {
-        let start = scanner.cursor
-        guard scanner.tryEat(utf8: "Assertion fail") else {
-          _ = scanner.eat()
-          continue
-        }
-        scanner.skip(untilAfter: { $0 == ":" })
-        scanner.skip(while: \.isSpaceOrTab)
-        guard scanner.peek == "(", let msg = scanner.consumeMessage() else {
-          return nil
-        }
-        scanner.skip(while: \.isSpaceOrTab)
-        guard scanner.tryEat(",") else { return nil }
-        scanner.skip(while: \.isSpaceOrTab)
-        guard scanner.tryEat(utf8: "function") else { return nil }
-        scanner.skip(while: \.isSpaceOrTab)
-        scanner.skip(until: { $0 == "," || $0.isSpaceOrTab })
-        let full = scanner.decodeUTF8(start ..< scanner.cursor)
-        return Assertion(fullMessage: full, message: msg)
+  private static func matchAssertImpl(_ scanner: inout ByteScanner) -> Assertion? {
+    while scanner.hasInput {
+      let start = scanner.cursor
+      guard scanner.tryEat(utf8: "Assertion fail") else {
+        _ = scanner.eat()
+        continue
       }
-      return nil
+      scanner.skip(untilAfter: { $0 == ":" })
+      scanner.skip(while: \.isSpaceOrTab)
+      guard scanner.peek == "(", let msg = scanner.consumeMessage() else {
+        return nil
+      }
+      scanner.skip(while: \.isSpaceOrTab)
+      guard scanner.tryEat(",") else { return nil }
+      scanner.skip(while: \.isSpaceOrTab)
+      guard scanner.tryEat(utf8: "function") else { return nil }
+      scanner.skip(while: \.isSpaceOrTab)
+      let fn = scanner.eat(while: { $0 != "," && !$0.isSpaceOrTab })
+      let full = scanner.decodeUTF8(start ..< scanner.cursor)
+      return Assertion(
+        fullMessage: full, message: msg, function: fn.map(String.init)
+      )
     }
+    return nil
+  }
+
+  private static func matchAssert(_ bytes: some Sequence<UInt8>) -> Assertion? {
+    bytes.scanning(matchAssertImpl)
+  }
+
+  private static func matchAssert(_ string: String) -> Assertion? {
+    string.scanningUTF8(matchAssertImpl)
   }
 
   private static func matchExact(_ str: String, _ message: String) -> String? {
@@ -55,6 +64,14 @@ public struct Assertion: Hashable, Sendable {
     }
   }
 
+  public init?(from bytes: some Sequence<UInt8>) {
+    if let match = Self.matchAssert(bytes) {
+      self = match
+    } else {
+      return nil
+    }
+  }
+
   public init?(from str: String) {
     if let match = Self.matchAssert(str) {
       self = match
@@ -63,9 +80,10 @@ public struct Assertion: Hashable, Sendable {
     }
   }
 
-  init(fullMessage: String, message: String) {
+  init(fullMessage: String, message: String, function: String?) {
     self.fullMessage = fullMessage
     self.message = message
+    self.function = function
   }
 }
 

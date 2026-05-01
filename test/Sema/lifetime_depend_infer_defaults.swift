@@ -1,12 +1,12 @@
 // RUN: %target-swift-emit-silgen -primary-file %s \
 // RUN:   -enable-experimental-feature Lifetimes \
-// RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN:  | %FileCheck %s
 //
 // -primary-file is required to synthesize accessors.
 
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 // Check that all the DEFAULT cases in Sema/lifetime_depend_infer_defaults.swift generate the correct function
 // signature. Checking the SILGen output seems like the easiest way.
@@ -564,4 +564,22 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
     // CHECK: @$s30lifetime_depend_infer_defaults24NoncopyableSelfAccessorsV10neComputedAA2NEVvM : $@yield_once @convention(method) (@lifetime(copy 0) @inout NoncopyableSelfAccessors) -> @lifetime(copy 0) @yields @inout NE
   }
 
+}
+
+// DEFAULT: '@_lifetime(immortal)'
+// CHECK: @$s30lifetime_depend_infer_defaults17ImmortalAccessorsV8staticNEAA0H0VvgZ : $@convention(method) (@thin ImmortalAccessors.Type) -> @lifetime(immortal) @owned NE {
+struct ImmortalAccessors {
+  static let staticNE = NE()
+}
+
+// DEFAULT: '@_lifetime(immortal)'
+// CHECK: @$s30lifetime_depend_infer_defaults21ClassImmortalAccessorC8staticNEAA0I0VvgZ : $@convention(method) (@thick ClassImmortalAccessor.Type) -> @lifetime(immortal) @owned NE {
+class ClassImmortalAccessor {
+  static let staticNE = NE()
+}
+
+// Default immortal inference negative case
+// CHECK: @$s30lifetime_depend_infer_defaults26ImmortalEscapableAccessorsV7staticESivgZ : $@convention(method) (@thin ImmortalEscapableAccessors.Type) -> Int {
+struct ImmortalEscapableAccessors {
+  static let staticE = Int()
 }

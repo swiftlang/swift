@@ -654,10 +654,13 @@ def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
 def debug_module_path : Separate<["-"], "debug-module-path">,
-  Flags<[FrontendOption]>,
-  HelpText<"Path to this module's binary swiftmodule artifact (required by debug info)">;
-def debug_module_path_EQ : Joined<["-"], "debug-module-path=">, Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Path or cache key to this module's binary swiftmodule artifact (required by debug info)">;
+def debug_module_path_EQ : Joined<["-"], "debug-module-path=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<debug_module_path>;
+def debug_module_self_key : Flag<["-"], "debug-module-self-key">,
+  Flags<[FrontendOption]>,
+  HelpText<"Embeded the key of current job in debug info generation (required by debug info)">;
 
 def module_alias : Separate<["-"], "module-alias">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -1513,6 +1516,10 @@ def print_ast_decl : Flag<["-"], "print-ast-decl">,
   HelpText<"Parse and type-check input file(s) and pretty print declarations from AST(s)">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_polyglot_ast : Flag<["-"], "emit-polyglot-ast">,
+  HelpText<"Parse the Objective-C input file and emit polyglot AST as JSON">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_pcm : Flag<["-"], "dump-pcm">,
   HelpText<"Dump debugging information about a precompiled Clang module">,
   ModeOpt,
@@ -2041,7 +2048,7 @@ def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement
 
 def const_gather_protocols_list
   : Separate<["-"], "const-gather-protocols-list">, MetaVarName<"<path>">,
-    Flags<[NewDriverOnlyOption, ArgumentIsPath]>,
+    Flags<[NewDriverOnlyOption, ArgumentIsPath, FrontendOption]>,
     HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
 
 def input_paths: Separate<["-", "--"], "input-paths">,
@@ -2340,6 +2347,10 @@ def cache_remarks:  Flag<["-"], "Rcache-compile-job">,
 def cache_disable_replay:  Flag<["-"], "cache-disable-replay">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Skip loading the compilation result from cache">;
+
+def write_output_hash_xattr:  Flag<["-"], "write-output-hash-xattr">,
+  Flags<[FrontendOption, CacheInvariant]>,
+  HelpText<"When caching, write the output file's hash (as determined by the CAS hashing schema) as a file extended attribute.">;
 
 def cas_path: Separate<["-"], "cas-path">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,

@@ -273,6 +273,8 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:
+  case TypeKind::Join:
+  case TypeKind::Meet:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -1006,8 +1008,16 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
     if (dropGlobalActor && extInfo.getGlobalActor())
       extInfo = extInfo.withoutIsolation();
 
-    if (dropIsolation)
-      extInfo = extInfo.withoutIsolation();
+    if (dropIsolation) {
+      // Special case for `isolated` parameters, because even though
+      // the isolation was dropped, the parameter itself was left with
+      // `isolated` bit set. `dropIsolation` is intended only for
+      // mangling of `@preconcurrency` declarations and isolated parameters
+      // don't contribute to the type so it's save to keep the original
+      // isolation here.
+      if (!extInfo.getIsolation().isParameter())
+        extInfo = extInfo.withoutIsolation();
+    }
 
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
     Type resultType = fnType->getResult();
@@ -1464,6 +1474,31 @@ Type TypeBase::withCovariantResultType() {
                            fnType->getExtInfo());
 }
 
+Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
+  if (!hasTypeVariableOrPlaceholder())
+    return Type(this);
+
+  struct Transform : public TypeTransform<Transform> {
+    Transform(ASTContext &ctx) : TypeTransform(ctx) {}
+
+    std::optional<Type> transform(TypeBase *ty, TypePosition) {
+      if (!ty->hasTypeVariableOrPlaceholder())
+        return ty;
+
+      if (isa<TypeVariableType>(ty) || isa<PlaceholderType>(ty))
+        return ErrorType::get(ctx);
+
+      return std::nullopt;
+    }
+    std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+      // Fold away the sendable dependence if present, the function type will
+      // just become non-Sendable.
+      return std::make_pair(Type(), false);
+    }
+  };
+  return Transform(getASTContext()).doIt(this, TypePosition::Invariant);
+}
+
 /// Whether this parameter accepts an unlabeled trailing closure argument
 /// using the more-restrictive forward-scan rule.
 static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
@@ -1676,8 +1711,7 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
 Type TypeBase::getMetatypeInstanceType() {
   if (auto existentialMetaType = getAs<ExistentialMetatypeType>())
     return existentialMetaType->getExistentialInstanceType();
-
-  if (auto metaTy = getAs<AnyMetatypeType>())
+  else if (auto metaTy = getAs<MetatypeType>())
     return metaTy->getInstanceType();
 
   return this;
@@ -1817,7 +1851,17 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
   case TypeKind::BuiltinTuple:
-    llvm_unreachable("these types are always canonical");
+  case TypeKind::SILBlockStorage:
+  case TypeKind::SILBox:
+  case TypeKind::SILFunction:
+  case TypeKind::SILToken:
+  case TypeKind::SILMoveOnlyWrapped:
+  case TypeKind::Join:
+  case TypeKind::Meet:
+    ABORT([&](llvm::raw_ostream &out) {
+      out << "Should be already canonical:\n";
+      dump(out);
+    });
 
 #define SUGARED_TYPE(id, parent) \
   case TypeKind::id: \
@@ -1962,14 +2006,6 @@ CanType TypeBase::computeCanonicalType() {
     assert(Result->isCanonical());
     break;
   }
-
-  case TypeKind::SILBlockStorage:
-  case TypeKind::SILBox:
-  case TypeKind::SILFunction:
-  case TypeKind::SILToken:
-  case TypeKind::SILMoveOnlyWrapped:
-    llvm_unreachable("SIL-only types are always canonical!");
-
   case TypeKind::ProtocolComposition: {
     auto *PCT = cast<ProtocolCompositionType>(this);
     SmallVector<Type, 4> CanProtos;
@@ -3779,6 +3815,12 @@ Type ArchetypeType::getExistentialType() const {
   return genericEnv->maybeApplyOuterContextSubstitutions(existentialType);
 }
 
+bool ArchetypeType::mayHaveIsolatedConformance() const {
+  auto genericEnv = getGenericEnvironment();
+  auto genericSig = genericEnv->getGenericSignature();
+  return !genericSig->prohibitsIsolatedConformance(getInterfaceType());
+}
+
 bool ArchetypeType::requiresClass() const {
   if (auto layout = getLayoutConstraint())
     return layout->isClass();
@@ -3855,7 +3897,6 @@ RecursiveTypeProperties ArchetypeType::archetypeProperties(
   if (superclass) {
     auto superclassProps = superclass->getRecursiveProperties();
     superclassProps.removeHasTypeParameter();
-    superclassProps.removeHasDependentMember();
     properties |= superclassProps;
   }
 
@@ -4709,6 +4750,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:
+  case TypeKind::Join:
+  case TypeKind::Meet:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -4734,7 +4777,6 @@ static RecursiveTypeProperties getBoxRecursiveProperties(
   for (auto &field : Layout->getFields()) {
     auto fieldProps = field.getLoweredType()->getRecursiveProperties();
     fieldProps.removeHasTypeParameter();
-    fieldProps.removeHasDependentMember();
     props |= fieldProps;
   }
   for (auto replacementType : subMap.getReplacementTypes()) {

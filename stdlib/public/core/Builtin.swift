@@ -206,8 +206,7 @@ public func != (
 }
 
 #if !$Embedded
-// Embedded Swift is unhappy about conversions from `Any.Type` to
-// `any (~Copyable & ~Escapable).Type` (rdar://145706221)
+// Embedded Swift doesn't need legacy ABI entrypoints.
 @usableFromInline
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 internal func == (t0: Any.Type?, t1: Any.Type?) -> Bool {

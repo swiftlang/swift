@@ -17,7 +17,7 @@
 import Swift
 
 @_spi(Unwinders)
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, IteratorProtocol {
   public typealias Context = C
   public typealias MemoryReader = M
@@ -129,7 +129,7 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
   private func isAsyncFrame(_ storedFp: Address) -> Bool {
-    #if (os(macOS) || os(iOS) || os(watchOS)) && (arch(arm64) || arch(arm64_32) || arch(x86_64))
+    #if os(anyAppleOS) && (arch(arm64) || arch(arm64_32) || arch(x86_64))
     // On Darwin, we borrow a bit of the frame pointer to indicate async
     // stack frames
     return (storedFp & (1 << 60)) != 0

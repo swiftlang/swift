@@ -307,6 +307,12 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   if (!enableCopyPropagation || !Builder.hasOwnership())
     return;
 
+  // For very large functions OSSA canonicalization can run into noticeable quadratic
+  // behavior. Don't canonicalize functions with more than 100000 SIL instructions.
+  // This limit is large enough to not affect most of real-world SIL functions.
+  if (initialWorklistSize > 100000)
+    return;
+
   llvm::SmallSetVector<SILValue, 16> defsToCanonicalize;
 
   // copyInst was either optimized by a SILCombine visitor or is a copy_value
@@ -407,6 +413,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   addReachableCodeToWorklist(&*F.begin());
 
   SILCombineCanonicalize scCanonicalize(Worklist, *DEBA->get(&F));
+
+  initialWorklistSize = Worklist.size();
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {

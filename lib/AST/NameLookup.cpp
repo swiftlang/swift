@@ -317,10 +317,25 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
     // Don't look at the overrides of operators in protocols. The global
     // lookup of operators means that we can find overriding operators that
     // aren't relevant to the types in hand, and will fail to type check.
-    if (isa<ProtocolDecl>(decl->getDeclContext())) {
-      if (auto func = dyn_cast<FuncDecl>(decl))
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+      if (auto func = dyn_cast<FuncDecl>(decl)) {
         if (func->isOperator())
           continue;
+      } else if (isa<AssociatedTypeDecl>(decl)) {
+        // Associated type members of a @reparentable protocol are "overridden"
+        // in the sense of name-lookup, preferring one in a downstream protocol.
+        //
+        // See a corresponding bit of code in `computeOverriddenAssociatedTypes`
+        // that backs `ValueDecl::getOverriddenDecls`. There, we say that
+        // a @reparentable associated type is never overridden, so that the
+        // associated type root (or anchor) remains with the downstream
+        // protocols as well, because type parameter ordering happens based on
+        // the root.
+        if (proto->getAttrs().hasAttribute<ReparentableAttr>()) {
+          overridden.insert(decl);
+          continue;
+        }
+      }
     }
 
     while (auto overrides = decl->getOverriddenDecl()) {
@@ -2482,35 +2497,20 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
       return false;
   }
 
+  // Apply MemberImportVisibility restrictions.
   if (requireImport) {
-    // Check that there is some import in the originating context that makes
-    // this decl visible.
-    if (!(options & NL_IgnoreMissingImports)) {
-      if (!dc->isDeclImported(decl))
-        return false;
-    }
+    // If the options indicate that visibility should be enforced in this
+    // lookup, check if the decl is imported.
+    bool checkDeclImport = !(options & NL_IgnoreMissingImports);
 
-    // Unlike in Swift, Obj-C allows method overrides to be declared in
-    // extensions (categories), even outside of the module that defines the
-    // type that is being extended. When MemberImportVisibility is enabled,
-    // if these overrides are not filtered out they can hijack name
-    // lookup and cause the compiler to insist that the module that defines
-    // the extension be imported, contrary to developer expectations.
-    //
-    // Filter results belonging to these extensions out, even when ignoring
-    // missing imports, if we're in a context that requires imports to access
-    // member declarations.
-    if (decl->getOverriddenDecl()) {
-      if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
-        if (auto *nominal = extension->getExtendedNominal()) {
-          auto extensionMod = extension->getModuleContext();
-          auto nominalMod = nominal->getModuleContext();
-          if (!extensionMod->isSameModuleLookingThroughOverlays(nominalMod) &&
-              !dc->isDeclImported(extension))
-            return false;
-        }
-      }
-    }
+    // Even when missing imports are being ignored, we still need to filter out
+    // overrides that haven't been imported. Otherwise, removeOverriddenDecls()
+    // could select a canonical declaration that hasn't been imported.
+    if (!checkDeclImport)
+      checkDeclImport |= (decl->getOverriddenDecl() != nullptr);
+
+    if (checkDeclImport && !dc->isDeclImported(decl))
+      return false;
   }
 
   // Check that it has the appropriate ABI role.
@@ -3316,8 +3316,8 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                                        isolated->getBase(), dc, options);
   }
 
-  case TypeReprKind::CallerIsolated: {
-    auto callerIsolated = cast<CallerIsolatedTypeRepr>(typeRepr);
+  case TypeReprKind::NonisolatedNonsending: {
+    auto callerIsolated = cast<NonisolatedNonsendingTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
                                        callerIsolated->getBase(), dc, options);
   }
@@ -3407,7 +3407,7 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::Existential:
   case TypeReprKind::LifetimeDependent:
   case TypeReprKind::Sending:
-  case TypeReprKind::Integer:
+  case TypeReprKind::GenericArgumentExpr:
     return result;
 
   case TypeReprKind::Fixed:

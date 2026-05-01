@@ -76,6 +76,7 @@ namespace swift {
   class ASTPrinter;
   class ASTWalker;
   enum class BuiltinMacroKind: uint8_t;
+  enum class CodeGenerationModel: uint8_t;
   class ConstructorDecl;
   class DestructorDecl;
   class DiagnosticEngine;
@@ -778,7 +779,7 @@ protected:
     HasLazyUnderlyingSubstitutions : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+2+8+1+2,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -849,8 +850,15 @@ protected:
     /// Whether this module has enabled strict memory safety checking.
     StrictMemorySafety : 1,
 
-    /// Whether this module uses deferred code generation in Embedded Swift.
-    DeferredCodeGen : 1
+    /// The code generation model used by this module.
+    CodeGenModel : 2,
+
+    /// Whether this module was compile with "aggressive" CMO i.e
+    /// the flag: -cross-module-optimization.
+    AggressiveCMOEnabled : 1,
+
+    /// The stored library level from deserialized module data (LibraryLevel).
+    StoredLibraryLevel : 2
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1120,6 +1128,21 @@ public:
   /// @_neverEmitIntoClient.
   bool isNeverEmittedIntoClient() const;
 
+  /// Compute the code generation model that was explicitly requested for
+  /// this declaration.
+  ///
+  /// This function queries attributes relevant to the code generation
+  /// model (@export, @inlinable, etc.) but does not apply defaults based
+  /// on Embedded Swift or feature flags.
+  std::optional<CodeGenerationModel>
+  getExplicitCodeGenerationModel() const;
+
+  /// Compute the code generation model for the declaration, combining the
+  /// explicitly-specified information from attributes with defaults
+  /// based on Embedded Swift or feature flags.
+  CodeGenerationModel
+  getEffectiveCodeGenerationModel() const;
+
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
   /// Iterate over the auxiliary declarations for this declaration,
@@ -1223,6 +1246,9 @@ public:
   /// It is an error to call this on a type that does not have either an
   /// *ApplicationMain or an main attribute.
   ArtificialMainKind getArtificialMainKind() const;
+
+  /// Returns true if this can support borrow/mutate accessors.
+  bool canSupportBorrowAccessors() const;
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(const char *filename));
@@ -3192,7 +3218,8 @@ public:
   /// \sa hasOpenAccess
   AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr,
-                       bool treatUsableFromInlineAsPublic = false) const;
+                       bool treatUsableFromInlineAsPublic = false,
+                       bool ignoreImportAccessLevel = false) const;
 
 
   /// Copy the formal access level and @usableFromInline attribute from
@@ -5750,6 +5777,14 @@ public:
   /// list of function decls.
   ObjCRequirementMap getObjCRequiremenMap() const;
 
+  /// True if this protocol is marked for fast casting, i.e. fast conformance
+  /// lookup via the vtable of a conforming class.
+  /// See also SILVTable::ConformanceEntry
+  bool isEligibleForFastCasting() const {
+    // TODO: make this a real attribute
+    return hasSemanticsAttr("fast_cast");
+  }
+
 private:
   void computeKnownProtocolKind() const;
 
@@ -6785,12 +6820,19 @@ public:
   /// @frozen and resides in a resilient module.
   bool isInitExposedToClients() const;
 
+  /// Returns the export level of this var initializer expression.
+  ExportedLevel getInitExposedLevel() const;
+
   /// Determines if this var is exposed as part of the layout of a
-  /// @frozen struct.
+  /// @frozen struct or implicitly in non-library-evolution mode.
   ///
   /// From the standpoint of access control and exportability checking, this
   /// var will behave as if it was public, even if it is internal or private.
-  ExportedLevel isLayoutExposedToClients() const;
+  ///
+  /// If \p forceCheckClasses, don't exclude non-open classes. We use this
+  /// to look at properties with a default value in embedded mode, otherwise
+  /// we can mostly ignore stored properties in classes.
+  ExportedLevel isLayoutExposedToClients(bool forceCheckClasses = false) const;
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
@@ -7992,6 +8034,8 @@ public:
   /// type of the function will be `async` as well.
   bool hasAsync() const { return Bits.AbstractFunctionDecl.Async; }
 
+  void setHasAsync(bool async) { Bits.AbstractFunctionDecl.Async = async; }
+
   /// Determine whether the given function is concurrent.
   ///
   /// A function is concurrent if it has the @Sendable attribute.
@@ -8048,6 +8092,12 @@ public:
   /// \return the synthesized thunk, or null if the base of the call has
   ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
+
+  /// Detect whether this function declaration is an unstructured task
+  /// factory: a `Task` initializer or one of the `detached`,
+  /// `immediate`, or `immediateDetached` factory methods from the
+  /// `_Concurrency` module.
+  bool isUnstructuredTaskFactory() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
@@ -8361,6 +8411,9 @@ public:
         ->getImplicitSelfDecl(createIfNeeded);
   }
   ParamDecl *getImplicitSelfDecl(bool createIfNeeded=true);
+
+  /// Whether the function is a non-static method.
+  bool isInstanceMethod() const { return hasImplicitSelfDecl() && !isStatic(); }
 
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const {
@@ -10130,6 +10183,12 @@ const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 /// Retrieve parameter declaration from the given source at given index, or
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
+
+/// Whether the given \p loc is within a macro expansion relative to
+/// \p parentSF. If the file is itself in a macro expansion, the method
+/// returns \c true if the loc is in a different macro expansion buffer than
+/// the file. If \p parentSF is \c nullptr, \c false is returned.
+bool isMacroExpansionInContext(SourceLoc loc, SourceFile *parentSF);
 
 class ABIRole {
 public:

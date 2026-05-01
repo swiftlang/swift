@@ -389,7 +389,7 @@ actor Dog {
     // CHECK:    cond_br [[IS_SOME]], bb1, bb3
 
     // CHECK:  bb1:
-    // CHECK:    [[FRIEND1_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[FRIEND1_STACK]] : $*Optional<Cat>, #Optional.some!enumelt
+    // CHECK:    [[FRIEND1_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[FRIEND1_STACK]] : $*Optional<Cat>, #Optional.some!enumelt
     // CHECK:    [[FRIEND1_REF:%[0-9]+]] = load [copy] [[FRIEND1_ADDR]] : $*Cat
     // CHECK:    destroy_addr [[FRIEND1_STACK]] : $*Optional<Cat>
     // CHECK:    [[FRIEND1_FOR_LOAD:%[0-9]+]] = begin_borrow [[FRIEND1_REF]] : $Cat
@@ -469,7 +469,7 @@ struct Container {
     // CHECK:       unreachable
 
     // CHECK: [[SOME_BB]]:
-    // CHECK:     [[TUPLE_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[SCRUTINEE]] : $*Optional<(Int, Int)>, #Optional.some!enumelt
+    // CHECK:     [[TUPLE_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[SCRUTINEE]] : $*Optional<(Int, Int)>, #Optional.some!enumelt
     // CHECK:     [[ELM_ADDR:%[0-9]+]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
     // CHECK:     {{%[0-9]+}} = load [trivial] [[ELM_ADDR]] : $*Int
     // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
@@ -514,7 +514,7 @@ struct Container {
     // CHECK:       unreachable
 
     // CHECK: [[SOME_BB]]:
-    // CHECK:     [[TUPLE_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[SCRUTINEE]] : $*Optional<(Int, Int)>, #Optional.some!enumelt
+    // CHECK:     [[TUPLE_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[SCRUTINEE]] : $*Optional<(Int, Int)>, #Optional.some!enumelt
     // CHECK:     [[ELM_ADDR:%[0-9]+]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
     // CHECK:     {{%[0-9]+}} = load [trivial] [[ELM_ADDR]] : $*Int
     // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
@@ -586,7 +586,7 @@ struct Container {
     // CHECK:       unreachable
     //
     // CHECK: [[SOME_BB]]:
-    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[ACCESS]] : $*Optional<Container>, #Optional.some!enumelt
+    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[ACCESS]] : $*Optional<Container>, #Optional.some!enumelt
     // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr [[DATA_ADDR]] : $*Container, #Container.iso
     // CHECK:       {{%[0-9]+}} = load [trivial] [[ELEM_ADDR]] : $*Float
     // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
@@ -611,7 +611,7 @@ struct Container {
     // CHECK:       unreachable
     //
     // CHECK: [[SOME_BB]]:
-    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[ACCESS]] : $*Optional<Container>, #Optional.some!enumelt
+    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[ACCESS]] : $*Optional<Container>, #Optional.some!enumelt
     // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr [[DATA_ADDR]] : $*Container, #Container.iso
     // CHECK:       hop_to_executor {{%[0-9]+}} : $Cat
     // CHECK:       {{%[0-9]+}} = load [copy] [[ELEM_ADDR]] : $*CatBox

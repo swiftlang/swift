@@ -5,8 +5,8 @@
 # Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See https:#swift.org/LICENSE.txt for license information
-# See https:#swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ===----------------------------------------------------------------------===#
 
@@ -189,6 +189,38 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
 
     @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
     @patch("sys.exit", return_value=None)
+    def test_clone_retry_on_exception(self, mock_exit, mock_obtain):
+        """Test that an exception (e.g. concurrent.futures.TimeoutError) is
+        retried rather than propagating and crashing the process."""
+        import concurrent.futures
+
+        call_count = [0]
+
+        def side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 1:
+                raise concurrent.futures.TimeoutError()
+            return obtain_all_additional_swift_sources(*args, **kwargs)
+
+        mock_obtain.side_effect = side_effect
+
+        sys.argv = [
+            "update-checkout",
+            "--config",
+            self.config_path,
+            "--source-root",
+            self.source_root,
+            "--clone",
+            "--max-retries",
+            "1",
+        ]
+        with contextlib.redirect_stdout(StringIO()):
+            main()
+
+        self.assertEqual(call_count[0], 2)
+
+    @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
+    @patch("sys.exit", return_value=None)
     def test_clone_with_retry(self, mock_exit, mock_obtain):
         call_count = [0]
 
@@ -323,3 +355,49 @@ class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
 
         # Then, update using our custom scheme---a subset of the default one.
         self.call(self.base_args + ["--scheme", self.scheme_name])
+
+
+class SchemeWithAdditionalChanges(scheme_mock.SchemeMockTestCase):
+    def __init__(self, *args, **kwargs):
+        super(SchemeWithAdditionalChanges, self).__init__(*args, **kwargs)
+
+    def _add_commit_to_repo1(self):
+        local_repo_path = os.path.join(self.local_path, "repo1")
+        filename = "additional_content.txt"
+        filename_path = os.path.join(local_repo_path, filename)
+        with open(filename_path, "w") as f:
+            f.write("More stuff")
+        self.call(["git", "add", filename], cwd=local_repo_path)
+        self.call(["git", "commit", "-m", "Additional commit"], cwd=local_repo_path)
+        self.call(["git", "push", "origin", "main"], cwd=local_repo_path)
+
+    def test_call_update_checkout_twice_with_additional_commit(self):
+        """
+        Test that calling update checkout a second time will pick up
+        additional commits done after the first time.
+        """
+        update_checkout_command = [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+                "--clone",
+                "--scheme",
+                "main",
+                "--verbose",
+                "--reset-to-remote",
+            ]
+
+        self.call(update_checkout_command)
+        first_commit = self.call(
+            ["git", "rev-parse", "HEAD"], cwd=os.path.join(self.source_root, "repo1")
+        ).strip()
+
+        self._add_commit_to_repo1()
+        self.call(update_checkout_command)
+        second_commit = self.call(
+            ["git", "rev-parse", "HEAD"], cwd=os.path.join(self.source_root, "repo1")
+        ).strip()
+
+        self.assertNotEqual(first_commit, second_commit)

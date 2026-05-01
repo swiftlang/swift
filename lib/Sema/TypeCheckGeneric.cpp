@@ -225,10 +225,17 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     opaqueDecl->setGenericSignature(GenericSignature());
   }
 
+  TypeResolverContext resolverContext = TypeResolverContext::FunctionResult;
+  if (isa<VarDecl>(originatingDecl)) {
+    // Non-opaque result types are resolved against this context, so
+    // replicate that logic here.
+    resolverContext = TypeResolverContext::PatternBindingDecl;
+  }
+
   // Resolving in the context of `opaqueDecl` allows type resolution to create
   // opaque archetypes where needed
   auto interfaceType =
-      TypeResolution::forInterface(opaqueDecl, TypeResolverContext::None,
+      TypeResolution::forInterface(opaqueDecl, resolverContext,
                                    /*unboundTyOpener*/ nullptr,
                                    /*placeholderHandler*/ nullptr,
                                    /*packElementOpener*/ nullptr)

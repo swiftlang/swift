@@ -61,7 +61,7 @@ func testFromSuperclass(v: TestSubclass) {
 
 func testFromMethod(v: TestFromMethod, t: TestFromMethod.Type) {
   let _: Int = v.compute
-  // expected-error@-1 {{cannot convert value of type '@MainActor (@escaping () -> Void) -> Void' to specified type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type '@MainActor @Sendable (@escaping () -> Void) -> Void' to specified type 'Int'}}
 
   let _: Int = t.computeStatic
   // expected-error@-1 {{cannot convert value of type '@MainActor @Sendable (@escaping () -> Void) -> Void' to specified type 'Int'}}

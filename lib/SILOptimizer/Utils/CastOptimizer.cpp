@@ -425,7 +425,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     Builder.createDeallocStack(Loc, Tmp);
 
     Builder.setInsertionPoint(BridgeSuccessBB);
-    auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, outOptionalParam,
+    auto Addr = Builder.createUncheckedInPlaceEnumDataAddr(Loc, outOptionalParam,
                                                         SomeDecl);
 
     Builder.createCopyAddr(Loc, Addr, Dest, IsTake, IsInitialization);
@@ -1343,6 +1343,23 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   return nullptr;
 }
 
+static bool isPrecededByUnconditionalFail(SILInstruction *inst) {
+  // It's fine to just check the previous instruction (and not all preceding
+  // instructions in the block), because - even if another SILCombine optimization
+  // inserts an instruction between the `cond_fail` and the cast - it will not
+  // end in an infinite optimization loop. In worst case two cond_fail instructions
+  // will be generated.
+  if (SILInstruction *pred = inst->getPreviousInstruction()) {
+    if (auto *cf = dyn_cast<CondFailInst>(pred)) {
+      if (auto *literal = dyn_cast<IntegerLiteralInst>(cf->getOperand())) {
+        if (!literal->getValue().isZero())
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
 ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     UnconditionalCheckedCastInst *Inst) {
   SILDynamicCastInst dynamicCast(Inst);
@@ -1353,20 +1370,16 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
       dynamicCast.classifyFeasibility(false /*allowWholeModule*/);
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
+    // Check if the cast was already optimized.
+    if (isPrecededByUnconditionalFail(Inst))
+      return nullptr;
+
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
-    auto *Trap = Builder.createUnconditionalFail(Loc, "failed cast");
-    Inst->replaceAllUsesWithUndef();
-    eraseInstAction(Inst);
-    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
-    auto *UnreachableInst =
-        Builder.createUnreachable(ArtificialUnreachableLocation());
-
-    // Delete everything after the unreachable except for dealloc_stack which we
-    // move before the trap.
-    deleteInstructionsAfterUnreachable(UnreachableInst, Trap);
-
+    // The CondFailOptimization will eventually insert an `unreachable` here
+    // and remove the following dead code (including the cast instruction).
+    Builder.createUnconditionalFail(Loc, "failed cast");
     willFailAction();
     return nullptr;
   }
@@ -1551,19 +1564,16 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
   }
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
+    // Check if the cast was already optimized.
+    if (isPrecededByUnconditionalFail(Inst))
+      return nullptr;
+
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
-    auto *TrapI = Builder.createUnconditionalFail(Loc, "failed cast");
-    eraseInstAction(Inst);
-    Builder.setInsertionPoint(std::next(TrapI->getIterator()));
-    auto *UnreachableInst =
-        Builder.createUnreachable(ArtificialUnreachableLocation());
-
-    // Delete everything after the unreachable except for dealloc_stack which we
-    // move before the trap.
-    deleteInstructionsAfterUnreachable(UnreachableInst, TrapI);
-
+    // The CondFailOptimization will eventually insert an `unreachable` here
+    // and remove the following dead code (including the cast instruction).
+    Builder.createUnconditionalFail(Loc, "failed cast");
     willFailAction();
   }
 

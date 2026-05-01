@@ -15,6 +15,10 @@ class D : C {
 class E {
 }
 
+struct S {
+  var x: Int
+}
+
 // CHECK-LABEL: sil [ossa] @test_cond_fail
 // CHECK: bb0
 // CHECK-NEXT: tuple ()
@@ -26,10 +30,22 @@ bb0(%0 : $Builtin.Int1):
   return %2 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_remove_unconditional_cond_fail :
+// CHECK:         %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    cond_fail %0
+// CHECK:       } // end sil function 'dont_remove_unconditional_cond_fail'
+sil [ossa] @dont_remove_unconditional_cond_fail : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, -1
+  cond_fail %0
+  %2 = tuple ()
+  return %2 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast_addr_fail
-// CHECK: bb0
-// CHECK: unreachable
-// CHECK: }
+// CHECK:         cond_fail
+// CHECK-NEXT:    unconditional_checked_cast_addr
+// CHECK:       } // end sil function 'test_unconditional_checked_cast_addr_fail'
 sil [ossa] @test_unconditional_checked_cast_addr_fail : $@convention(thin) (@in E, @in D) -> @out D {
 bb0(%0 : $*D, %1 : $*E, %2 : $*D):
   unconditional_checked_cast_addr E in %1 : $*E to D in %0 : $*D
@@ -48,5 +64,45 @@ bb0(%0 : @owned $C):
   %3 = unconditional_checked_cast %0a : $C to C
   destroy_value %0 : $C
   return %3 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @no_infinite_optimization_loop_with_failing_cast :
+// CHECK:         %2 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    cond_fail %2
+// CHECK-NEXT:    unconditional_checked_cast_addr
+// CHECK:       } // end sil function 'no_infinite_optimization_loop_with_failing_cast'
+sil [ossa] @no_infinite_optimization_loop_with_failing_cast : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S
+  %1 = alloc_stack $()
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_fail %2, "failed cast"
+  unconditional_checked_cast_addr () in %1 to S in %0
+  dealloc_stack %1
+  dealloc_stack %0
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @no_infinite_optimization_loop_with_failing_cast2 :
+// CHECK:         %2 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    cond_fail %2
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    %5 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    cond_fail %5
+// CHECK-NEXT:    unconditional_checked_cast_addr
+// CHECK:       } // end sil function 'no_infinite_optimization_loop_with_failing_cast2'
+sil [ossa] @no_infinite_optimization_loop_with_failing_cast2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S
+  %1 = alloc_stack $()
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_fail %2, "failed cast"
+  debug_step
+  unconditional_checked_cast_addr () in %1 to S in %0
+  dealloc_stack %1
+  dealloc_stack %0
+  %7 = tuple ()
+  return %7
 }
 

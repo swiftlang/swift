@@ -178,7 +178,7 @@ bb1:
   %2 = init_enum_data_addr %1, #Optional.some!enumelt
   store %0 to [init] %2
   inject_enum_addr %1, #Optional.some!enumelt
-  %7 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %7 = unchecked_inplace_enum_data_addr %1, #Optional.some!enumelt
   %9 = apply undef(%7) : $@convention(thin) (@in_guaranteed T) -> ()
   br bb3
 
@@ -301,7 +301,7 @@ sil [ossa] @enum_with_store : $@convention(thin) (@owned Optional<C>) -> @owned 
 bb0(%0 : @owned $Optional<C>):
   %1 = alloc_stack $Optional<C>
   store %0 to [init] %1
-  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %3 = unchecked_inplace_enum_data_addr %1, #Optional.some!enumelt
   %4 = load [take] %3
   dealloc_stack %1
   return %4
@@ -318,7 +318,7 @@ bb0(%0 : @guaranteed $Optional<C>):
 bb1:
   %2 = copy_value %0
   store %2 to [init] %1
-  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %3 = unchecked_inplace_enum_data_addr %1, #Optional.some!enumelt
   %4 = load [copy] %3
   destroy_value %4
   br bb3
@@ -358,7 +358,7 @@ bb3:
   br bb4
 
 bb4:
-  %12 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %12 = unchecked_inplace_enum_data_addr %1, #Optional.some!enumelt
   copy_addr [take] %12 to [init] %0
   br bb6
 
@@ -391,13 +391,13 @@ bb0(%0 : @owned $MP2):
 
 // CHECK-LABEL: sil [ossa] @store_doesnt_dominate_all_loads :
 // CHECK:         %1 = alloc_stack $Optional<C>
-// CHECK:         unchecked_take_enum_data_addr
+// CHECK:         unchecked_inplace_enum_data_addr
 // CHECK:       } // end sil function 'store_doesnt_dominate_all_loads'
 sil [ossa] @store_doesnt_dominate_all_loads : $@convention(thin) (@owned Optional<C>) -> () {
 bb0(%0 : @owned $Optional<C>):
   %1 = alloc_stack $Optional<C>
   store %0 to [init] %1
-  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %3 = unchecked_inplace_enum_data_addr %1, #Optional.some!enumelt
   cond_br undef, bb1, bb2
 bb1:
   %4 = load [take] %3
@@ -428,7 +428,7 @@ bb0(%0 : @owned $Optional<C>):
   cond_br undef, bb1, bb2
 
 bb1:
-  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %3 = unchecked_inplace_enum_data_addr %1, #Optional.some!enumelt
   %4 = load [copy] %3
   destroy_value %4
   destroy_addr %1
@@ -460,7 +460,7 @@ bb0(%0 : $Optional<Int>):
   cond_br undef, bb1, bb2
 
 bb1:
-  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %3 = unchecked_inplace_enum_data_addr %1, #Optional.some!enumelt
   %4 = load [trivial] %3
   fix_lifetime %4
   br bb3
@@ -501,7 +501,7 @@ bb2:
   br bb1
 
 bb3:
-  %8 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %8 = unchecked_inplace_enum_data_addr %1, #Optional.some!enumelt
   %9 = load [copy] %8
   destroy_value %9
   destroy_addr %1
@@ -523,7 +523,7 @@ bb1:
   cond_br undef, bb2, bb3
 
 bb2:
-  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %3 = unchecked_inplace_enum_data_addr %1, #Optional.some!enumelt
   %4 = load [copy] %3
   destroy_value %4
   destroy_addr %1
@@ -547,7 +547,7 @@ bb5:
 
 // CHECK-LABEL: sil [ossa] @not_a_single_store :
 // CHECK:         %2 = alloc_stack $Optional<C>
-// CHECK:         unchecked_take_enum_data_addr
+// CHECK:         unchecked_inplace_enum_data_addr
 // CHECK:       } // end sil function 'not_a_single_store'
 sil [ossa] @not_a_single_store : $@convention(thin) (@owned Optional<C>, @owned Optional<C>) -> @owned C {
 bb0(%0 : @owned $Optional<C>, %1 : @owned $Optional<C>):
@@ -555,7 +555,7 @@ bb0(%0 : @owned $Optional<C>, %1 : @owned $Optional<C>):
   store %0 to [init] %2
   destroy_addr %2
   store %1 to [init] %2
-  %3 = unchecked_take_enum_data_addr %2, #Optional.some!enumelt
+  %3 = unchecked_inplace_enum_data_addr %2, #Optional.some!enumelt
   %4 = load [take] %3
   dealloc_stack %2
   return %4
@@ -563,7 +563,7 @@ bb0(%0 : @owned $Optional<C>, %1 : @owned $Optional<C>):
 
 // CHECK-LABEL: sil [ossa] @store_and_init :
 // CHECK:         %2 = alloc_stack $Optional<C>
-// CHECK:         unchecked_take_enum_data_addr
+// CHECK:         unchecked_inplace_enum_data_addr
 // CHECK:       } // end sil function 'store_and_init'
 sil [ossa] @store_and_init : $@convention(thin) (@owned Optional<C>, @owned C) -> @owned C {
 bb0(%0 : @owned $Optional<C>, %1 : @owned $C):
@@ -573,7 +573,7 @@ bb0(%0 : @owned $Optional<C>, %1 : @owned $C):
   %5 = init_enum_data_addr %2, #Optional.some!enumelt
   store %1 to [init] %5
   inject_enum_addr %2, #Optional.some!enumelt
-  %8 = unchecked_take_enum_data_addr %2, #Optional.some!enumelt
+  %8 = unchecked_inplace_enum_data_addr %2, #Optional.some!enumelt
   %9 = load [take] %8
   dealloc_stack %2
   return %9

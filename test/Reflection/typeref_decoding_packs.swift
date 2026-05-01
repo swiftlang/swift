@@ -17,6 +17,9 @@
 // RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) | %FileCheck %s
 // RUN: %target-swift-reflection-dump %t/TypesToReflect | %FileCheck %s
 
+// Fails only with Android NDK 28 because of an lld issue
+// XFAIL: OS=linux-android
+
 // CHECK: FIELDS:
 // CHECK: =======
 // CHECK: TypesToReflect.Packed

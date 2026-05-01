@@ -1106,7 +1106,8 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
         auto oldValue = cast<SingleValueInstruction>(Inst);
         auto newValue = cast<SingleValueInstruction>(AvailInst);
-        OwnershipRAUWHelper helper(RAUWFixupContext, oldValue, newValue);
+        OwnershipRAUWHelper helper(RAUWFixupContext, oldValue, newValue,
+                                   /*respectLexicalFlags=*/ false);
         // If RAUW requires cloning the original, then there's no point. If it
         // also requires introducing a copy and new borrow scope, then it's a
         // very bad idea.
@@ -1358,6 +1359,21 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
   // Don't handle any apply instructions that involve substitutions.
   if (ToAI->getSubstitutionMap().getReplacementTypes().size() != 1)
     return false;
+
+  // Bail out if any apply argument (other than the open_existential_addr
+  // itself) has a type that depends on the opened archetype. The operand
+  // replacement below cannot remap such types, which would result in an
+  // apply with mismatched archetypes.
+  auto *FromEnv = From->getDefinedOpenedArchetype()->getGenericEnvironment();
+  for (auto Op : FromAI->getArguments()) {
+    if (Op == From) {
+      continue;
+    }
+    if (Op->getType().hasOpenedExistential() &&
+        Op->getType().getASTType()->hasLocalArchetypeFromEnvironment(FromEnv)) {
+      return false;
+    }
+  }
 
   // Prepare the Apply args.
   SmallVector<SILValue, 8> Args;

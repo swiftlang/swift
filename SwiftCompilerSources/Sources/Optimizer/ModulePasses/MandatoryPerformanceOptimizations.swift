@@ -95,7 +95,17 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       worklist.pushIfNotVisited(f)
     }
   }
-  
+
+  func specializeVTable(for type: Type, instruction: Instruction) {
+    if context.options.enableEmbeddedSwift,
+       type.isClass
+    {
+      Optimizer.specializeVTable(forClassType: type, errorLocation: instruction.location, moduleContext) {
+        worklist.pushIfNotVisited($0)
+      }
+    }
+  }
+
   var changed = true
   while changed {
     changed = runSimplification(on: function, context, preserveDebugInfo: true) { instruction, simplifyCtxt in
@@ -111,21 +121,15 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 
       // Embedded Swift specific transformations
       case let alloc as AllocRefInst:
-        if context.options.enableEmbeddedSwift {
-          specializeVTable(forClassType: alloc.type, errorLocation: alloc.location, moduleContext) {
-            worklist.pushIfNotVisited($0)
-          }
-        }
+        specializeVTable(for: alloc.type, instruction: alloc)
       case let metatype as MetatypeInst:
-        if context.options.enableEmbeddedSwift,
-           metatype.type.representationOfMetatype == .thick {
-          let instanceType = metatype.type.loweredInstanceTypeOfMetatype(in: function)
-          if instanceType.isClass {
-            specializeVTable(forClassType: instanceType, errorLocation: metatype.location, moduleContext) {
-              worklist.pushIfNotVisited($0)
-            }
-          }
+        if metatype.type.representationOfMetatype == .thick {
+          specializeVTable(for: metatype.type.loweredInstanceTypeOfMetatype(in: function), instruction: metatype)
         }
+      case let cast as UnconditionalCheckedCastInst:
+        specializeVTable(for: cast.type, instruction: cast)
+      case let cast as UncheckedRefCastInst:
+        specializeVTable(for: cast.type, instruction: cast)
       case let classMethod as ClassMethodInst:
         if context.options.enableEmbeddedSwift {
           _ = context.specializeClassMethodInst(classMethod)

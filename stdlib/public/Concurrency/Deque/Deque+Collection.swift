@@ -140,7 +140,7 @@ extension _Deque: Sequence {
   ///
   /// - Complexity: O(1) when this instance has a unique reference to its
   ///    underlying storage; O(`count`) otherwise.
-  func withContiguousStorageIfAvailable<R>(
+  @safe func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try unsafe _storage.read { handle in
@@ -412,7 +412,7 @@ extension _Deque: MutableCollection {
   /// - Complexity: O(1) when this instance has a unique reference to its
   ///    underlying storage; O(`count`) otherwise. (Not counting the call to
   ///    `body`.)
-  mutating func withContiguousMutableStorageIfAvailable<R>(
+  @safe mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     _storage.ensureUnique()
@@ -435,7 +435,7 @@ extension _Deque: MutableCollection {
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return try unsafe withContiguousMutableStorageIfAvailable(body)
+    return try withContiguousMutableStorageIfAvailable(body)
   }
 }
 

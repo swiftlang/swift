@@ -403,6 +403,10 @@ BUILTIN_SIL_OPERATION(LegacyCondFail, "condfail", Special)
 /// Fixes the lifetime of any heap references in a value.
 BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
 
+/// result = markDependence<T, V>(value: T, base: V)
+/// Directly translates to the `mark_dependence` SIL instruction.
+BUILTIN_SIL_OPERATION(MarkDependence, "markDependence", Special)
+
 /// isUnique : <T> (inout T[?]) -> Int1
 ///
 /// This builtin takes an inout object reference and returns a boolean. Passing
@@ -541,10 +545,18 @@ BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 /// Returns the number of items in a pack.
 BUILTIN_SIL_OPERATION(PackLength, "packLength", Special)
 
-/// makeBorrow: @lifetime(borrow referent)<T: ~Copyable>(_ referent: borrowing T) -> Borrow<T>
+/// makeBorrow: @lifetime(borrow referent)<T: ~Copyable & ~Escapable>(
+///   _ referent: borrowing T) -> Borrow<T>
 ///
 /// Form a `Builtin.Borrow` referencing the argument.
 BUILTIN_SIL_OPERATION(MakeBorrow, "makeBorrow", Special)
+
+/// borrowAt: <T: ~Copyable & ~Escapable>(_ referent: Builtin.RawPointer) -> T
+///
+/// Access the value stored at `referent` as a guaranteed value.
+///
+/// Assumes natural alignment. Does not assume strict aliasing.
+BUILTIN_SIL_OPERATION(BorrowAt, "borrowAt", Special)
 
 /// dereferenceBorrow: <T: ~Copyable>(_ borrow: Borrow<T>) -> T
 ///
@@ -1184,8 +1196,6 @@ BUILTIN_SANITIZER_OPERATION(TSanInoutAccess, "tsanInoutAccess", "")
 #endif
 
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoin, type_join)
-BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinInout, type_join_inout)
-BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinMeta, type_join_meta)
 BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagnostic)
 
 // BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.
@@ -1226,15 +1236,31 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddPriorityEscalationHandler,
 BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
                        "taskRemovePriorityEscalationHandler", "", Special)
 
-/// Equivalent to calling swift_task_localValuePush.
+/// Equivalent to calling swift_task_localValuePush. Deprecated because
+/// it doesn't properly pair the allocation and deallocation with a
+/// use-def relationship. We no longer use this in the standard library,
+/// but it can't just be removed because it shares a feature test
+/// (BuiltinConcurrencyStackNesting) with other builtins that aren't
+/// deprecated.
 ///
 /// Signature: <Value> (key: Builtin.RawPointer, value: __owned Value) -> ()
 BUILTIN_MISC_OPERATION(TaskLocalValuePush, "taskLocalValuePush", "", Special)
 
-/// Equivalent to calling swift_task_localValuePop.
+/// Equivalent to calling swift_task_localValuePop. Deprecated; see
+/// TaskLocalValuePush.
 ///
 /// Signature: () -> ()
 BUILTIN_MISC_OPERATION(TaskLocalValuePop, "taskLocalValuePop", "", Special)
+
+/// Add a task-local binding within a scope.
+///
+/// Signature: <Value> (UnsafeRawPointer, value: __owned Value) -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION(AddTaskLocalValue, "addTaskLocalValue", "", Special)
+
+/// End the scope of a task-local binding.
+///
+/// Signature: (UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(RemoveTaskLocalValue, "removeTaskLocalValue", "", Special)
 
 /// Equivalent to calling swift_task_cancellationShieldPush.
 ///

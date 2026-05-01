@@ -358,22 +358,43 @@ ModuleDecl *AvailabilityDomain::getModule() const {
   return nullptr;
 }
 
-bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
-  switch (getKind()) {
-  case Kind::Universal:
-    return true;
-  case Kind::SwiftLanguageMode:
-  case Kind::StandaloneSwiftRuntime:
-  case Kind::PackageDescription:
-  case Kind::Embedded:
-  case Kind::Custom:
-    return other == *this;
-  case Kind::Platform:
-    if (getPlatformKind() == other.getPlatformKind())
-      return true;
-    return inheritsAvailabilityFromPlatform(other.getPlatformKind(),
-                                            getPlatformKind());
+/// Returns true if `child` is a strict subset of `parent`.
+static bool domainIsStrictSubsetOf(const AvailabilityDomain &child,
+                                   const AvailabilityDomain &parent) {
+  switch (parent.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::PackageDescription:
+  case AvailabilityDomain::Kind::Embedded:
+    // These domains do not have any children in the lattice.
+    return false;
+  case AvailabilityDomain::Kind::Platform:
+    return inheritsAvailabilityFromPlatform(child.getPlatformKind(),
+                                            parent.getPlatformKind());
+  case AvailabilityDomain::Kind::Custom:
+    // Custom domains do not yet support inheritance relationships.
+    return false;
   }
+}
+
+bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
+  if (other == *this)
+    return true;
+  return domainIsStrictSubsetOf(other, *this);
+}
+
+bool AvailabilityDomain::isSupersetOf(const AvailabilityDomain &other) const {
+  if (other == *this)
+    return false;
+  return domainIsStrictSubsetOf(other, *this);
+}
+
+bool AvailabilityDomain::isRelated(const AvailabilityDomain &other) const {
+  if (other == *this)
+    return true;
+  return domainIsStrictSubsetOf(other, *this) ||
+         domainIsStrictSubsetOf(*this, other);
 }
 
 bool AvailabilityDomain::isRoot() const {
@@ -393,6 +414,7 @@ bool AvailabilityDomain::isRoot() const {
 }
 
 AvailabilityDomain AvailabilityDomain::getRootDomain() const {
+  // Currently, all non-platform domains are root domains.
   if (!isPlatform())
     return *this;
 
@@ -474,17 +496,16 @@ getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
   return Mapping->mapDeprecatedObsoletedAvailabilityVersion(Version);
 }
 
-AvailabilityDomainAndRange AvailabilityDomain::getRemappedDomainAndRange(
-    const llvm::VersionTuple &version, AvailabilityVersionKind versionKind,
-    const ASTContext &ctx) const {
-  auto remappedDomain = getRemappedDomainOrNull(ctx);
-  if (!remappedDomain)
-    return {*this, AvailabilityRange{version}};
+AvailabilityRange AvailabilityDomain::getRemappedRange(
+    AvailabilityDomain toDomain, const llvm::VersionTuple &version,
+    AvailabilityVersionKind versionKind, const ASTContext &ctx) const {
+  // Precondition: The target domain inherits from this domain.
+  DEBUG_ASSERT(contains(toDomain));
 
-  if (getPlatformKind() == PlatformKind::anyAppleOS)
-    return {*remappedDomain, AvailabilityRange{version}};
-
-  if (getPlatformKind() == PlatformKind::iOS) {
+  // Currently, the only visionOS requires remapping versions from iOS.
+  if (getPlatformKind() == PlatformKind::iOS &&
+      AvailabilityDomain::forPlatform(PlatformKind::visionOS)
+          .contains(toDomain)) {
     std::optional<clang::VersionTuple> remappedVersion;
     switch (versionKind) {
     case AvailabilityVersionKind::Introduced:
@@ -500,10 +521,24 @@ AvailabilityDomainAndRange AvailabilityDomain::getRemappedDomainAndRange(
     }
 
     if (remappedVersion)
-      return {*remappedDomain, AvailabilityRange{*remappedVersion}};
+      return AvailabilityRange(*remappedVersion);
   }
 
-  return {*this, AvailabilityRange{version}};
+  // If there isn't a special remapping rule, the default remapping is to keep
+  // the version as-is and we know this is valid because the target domain
+  // inherits from this domain.
+  return AvailabilityRange{version};
+}
+
+AvailabilityDomainAndRange AvailabilityDomain::getRemappedDomainAndRange(
+    const llvm::VersionTuple &version, AvailabilityVersionKind versionKind,
+    const ASTContext &ctx) const {
+  auto remappedDomain = getRemappedDomainOrNull(ctx);
+  if (!remappedDomain)
+    return {*this, AvailabilityRange{version}};
+
+  return {*remappedDomain,
+          getRemappedRange(*remappedDomain, version, versionKind, ctx)};
 }
 
 bool IsCustomAvailabilityDomainPermanentlyEnabled::evaluate(
@@ -661,13 +696,6 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
   if (domain->isCustom() && !hasCustomAvailability) {
     diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,
                    "CustomAvailability");
-    return std::nullopt;
-  }
-
-  if (domain->getPlatformKind() == PlatformKind::anyAppleOS &&
-      !ctx.LangOpts.hasFeature(Feature::AnyAppleOSAvailability)) {
-    diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,
-                   "AnyAppleOSAvailability");
     return std::nullopt;
   }
 

@@ -156,13 +156,13 @@ var bad8 : Double {
 }
 
 protocol BadP {
-  var prop2 : Int { get bogus rethrows set } // expected-error{{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
+  var prop2 : Int { get bogus rethrows set } // expected-error{{expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property}}
 
   // expected-error@+2 {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}}
-  // expected-error@+1 {{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
+  // expected-error@+1 {{expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property}}
   var prop3 : Int { get rethrows bogus set }
 
-  // expected-error@+1 {{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
+  // expected-error@+1 {{expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property}}
   var prop4 : Int { get reasync bogus set }
 
   var prop5 : Int { get throws async } // expected-error {{'async' must precede 'throws'}}

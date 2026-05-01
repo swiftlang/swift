@@ -195,6 +195,16 @@ resume_other_threads()
   os_unfair_lock_unlock(&crashLock);
 }
 
+#define MIN_FD_TO_CLOSE 3
+#define MAX_FD_TO_CLOSE 100
+
+void
+closeFds() {
+  for (int i = MIN_FD_TO_CLOSE; i < MAX_FD_TO_CLOSE; i++) {
+    close(i);
+  }
+}
+
 void
 handle_fatal_signal(int signum,
                     siginfo_t *pinfo,
@@ -251,6 +261,10 @@ handle_fatal_signal(int signum,
 #endif
 
   _swift_displayCrashMessage(signum, pc);
+
+  if (_swift_backtraceSettings.closeFds) {
+    closeFds();
+  }
 
   /* Start the backtracer; this will suspend the process, so there's no need
      to try to suspend other threads from here. */

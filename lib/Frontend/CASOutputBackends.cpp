@@ -21,6 +21,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
+#include "llvm/CASUtil/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Mutex.h"
 #include <optional>
@@ -59,9 +60,10 @@ public:
   Implementation(ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
                  const FrontendInputsAndOutputs &InputsAndOutputs,
                  const FrontendOptions &Opts,
-                 FrontendOptions::ActionType Action)
+                 FrontendOptions::ActionType Action, bool WriteOutputHashXAttr)
       : CAS(CAS), Cache(Cache), BaseKey(BaseKey),
-        InputsAndOutputs(InputsAndOutputs), Opts(Opts), Action(Action) {
+        InputsAndOutputs(InputsAndOutputs), Opts(Opts), Action(Action),
+        WriteOutputHashXAttr(WriteOutputHashXAttr) {
     initBackend(InputsAndOutputs);
   }
 
@@ -126,6 +128,7 @@ private:
   const FrontendInputsAndOutputs &InputsAndOutputs;
   const FrontendOptions &Opts;
   FrontendOptions::ActionType Action;
+  bool WriteOutputHashXAttr;
 
   // Lock for updating output file status.
   llvm::sys::SmartMutex<true> OutputLock;
@@ -142,21 +145,24 @@ private:
 SwiftCASOutputBackend::SwiftCASOutputBackend(
     ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
-    const FrontendOptions &Opts, FrontendOptions::ActionType Action)
+    const FrontendOptions &Opts, FrontendOptions::ActionType Action,
+    bool WriteOutputHashXAttr)
     : Impl(*new SwiftCASOutputBackend::Implementation(
-          CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action)) {}
+          CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action,
+          WriteOutputHashXAttr)) {}
 
 SwiftCASOutputBackend::~SwiftCASOutputBackend() { delete &Impl; }
 
 bool SwiftCASOutputBackend::isStoredDirectly(file_types::ID Kind) {
   return !file_types::isProducedFromDiagnostics(Kind) &&
-         Kind != file_types::TY_Dependencies;
+         Kind != file_types::TY_Dependencies &&
+         Kind != file_types::TY_ConstValues;
 }
 
 IntrusiveRefCntPtr<OutputBackend> SwiftCASOutputBackend::cloneImpl() const {
   return makeIntrusiveRefCnt<SwiftCASOutputBackend>(
       Impl.CAS, Impl.Cache, Impl.BaseKey, Impl.InputsAndOutputs, Impl.Opts,
-      Impl.Action);
+      Impl.Action, Impl.WriteOutputHashXAttr);
 }
 
 Expected<std::unique_ptr<OutputFileImpl>>
@@ -181,16 +187,14 @@ Error SwiftCASOutputBackend::storeCachedDiagnostics(unsigned InputIndex,
                    file_types::ID::TY_CachedDiagnostics);
 }
 
-Error SwiftCASOutputBackend::storeMakeDependenciesFile(StringRef OutputFilename,
-                                                       llvm::StringRef Bytes) {
+Error SwiftCASOutputBackend::storeSupplementaryOutputFile(
+    StringRef OutputFilename, llvm::StringRef Bytes) {
   auto Input = Impl.OutputToInputMap.find(OutputFilename);
   if (Input == Impl.OutputToInputMap.end())
     return llvm::createStringError("InputIndex for output file not found!");
   auto InputIndex = Input->second.first;
-  assert(Input->second.second == file_types::TY_Dependencies &&
-         "wrong output type");
-  return storeImpl(OutputFilename, Bytes, InputIndex,
-                   file_types::TY_Dependencies);
+  auto OutputKind = Input->second.second;
+  return storeImpl(OutputFilename, Bytes, InputIndex, OutputKind);
 }
 
 Error SwiftCASOutputBackend::storeMCCASObjectID(StringRef OutputFilename,
@@ -264,6 +268,13 @@ Error SwiftCASOutputBackend::Implementation::storeImpl(
                           << "\' for input \'" << InputIndex << "\': \'"
                           << CAS.getID(*BytesRef).toString() << "\'\n";);
 
+  // FIXME: this creates an implicit requirement that the output backend is
+  // layered so that SwiftCASOutputBackend is written after the on-disk backend.
+  // The output backend interface currently doesn't let us pass this directly.
+  if (WriteOutputHashXAttr && OutputKind == file_types::TY_Object) {
+    if (auto E = llvm::cas::writeCASHashXAttr(CAS.getID(*BytesRef), Path))
+      return E;
+  }
   if (addProducedOutput(InputIndex, OutputKind, *BytesRef))
     return finalizeCacheKeysFor(InputIndex);
   return Error::success();
@@ -346,7 +357,8 @@ Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
                           << CAS.getID(*CacheKey).toString() << "\' => \'"
                           << CAS.getID(*Result).toString() << "\'\n";);
 
-  if (auto E = Cache.put(CAS.getID(*CacheKey), CAS.getID(*Result))) {
+  if (auto E = Cache.put(CAS.getID(*CacheKey), CAS.getID(*Result),
+                         /*CanBeDistributed=*/true)) {
     // If `SWIFT_STRICT_CAS_ERRORS` environment is set, do not attempt to
     // recover from error.
     if (::getenv("SWIFT_STRICT_CAS_ERRORS"))

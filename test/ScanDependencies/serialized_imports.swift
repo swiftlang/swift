@@ -4,12 +4,12 @@
 
 // Run the scanner once, emitting the serialized scanner cache
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -Rdependency-scan-cache -serialize-dependency-scan-cache -load-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache -module-cache-path %t/module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -enable-cross-import-overlays -module-name deps 2>&1 | %FileCheck %s -check-prefix CHECK-REMARK-SAVE
-// RUN: llvm-bcanalyzer --dump %t/cache.moddepcache > %t/cache.moddepcache.initial.dump.txt
+// RUN: %llvm-bcanalyzer --dump %t/cache.moddepcache > %t/cache.moddepcache.initial.dump.txt
 // RUN: %validate-json %t/deps.json | %FileCheck %s -check-prefix CHECK-IMPORTS
 
 // Run the scanner again, but now re-using previously-serialized cache
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -Rdependency-scan-cache -serialize-dependency-scan-cache -load-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache -module-cache-path %t/module-cache %s -o %t/deps_incremental.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -enable-cross-import-overlays -module-name deps 2>&1 | %FileCheck %s -check-prefix CHECK-REMARK-LOAD
-// RUN: llvm-bcanalyzer --dump %t/cache.moddepcache > %t/cache.moddepcache.dump.txt
+// RUN: %llvm-bcanalyzer --dump %t/cache.moddepcache > %t/cache.moddepcache.dump.txt
 // RUN: %validate-json %t/deps_incremental.json | %FileCheck %s -check-prefix CHECK-IMPORTS
 
 // Ensure that the initial scan, and the secondary scan which just re-used the initial scan's results report

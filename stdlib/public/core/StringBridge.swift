@@ -319,11 +319,15 @@ internal func _cocoaGetCStringTrampoline(
 //
 
 private var kCFStringEncodingASCII: _swift_shims_CFStringEncoding {
-  @inline(__always) get { return 0x0600 }
+  @inline(__always) get { 0x0600 }
 }
 
 private var kCFStringEncodingUTF8: _swift_shims_CFStringEncoding {
-  @inline(__always) get { return 0x8000100 }
+  @inline(__always) get { 0x8000100 }
+}
+
+private var kCFStringEncodingUTF16: _swift_shims_CFStringEncoding {
+  @inline(__always) get { 0x0100 }
 }
 
 internal enum _KnownCocoaString {
@@ -414,7 +418,7 @@ private func _withCocoaASCIIPointer<R>(
       return nil // tagged pointer strings don't support _fastCStringContents
     }
     if let smol = _SmallString(taggedASCIICocoa: str) {
-      return unsafe _StringGuts(smol).withFastUTF8 {
+      return _StringGuts(smol).withFastUTF8 {
         unsafe work($0.baseAddress._unsafelyUnwrappedUnchecked)
       }
     }
@@ -439,7 +443,7 @@ private func _withCocoaUTF8Pointer<R>(
       return nil // tagged pointer strings don't support _fastCStringContents
     }
     if let smol = _SmallString(taggedCocoa: str) {
-      return unsafe _StringGuts(smol).withFastUTF8 {
+      return _StringGuts(smol).withFastUTF8 {
         unsafe work($0.baseAddress._unsafelyUnwrappedUnchecked)
       }
     }
@@ -683,6 +687,10 @@ internal func _SwiftCreateBridgedString_DoNotCall(
     str = unsafe String(decoding: bufPtr, as: Unicode.UTF8.self)
   case kCFStringEncodingASCII:
     str = unsafe String(decoding: bufPtr, as: Unicode.ASCII.self)
+  case kCFStringEncodingUTF16:
+    str = unsafe bufPtr.withMemoryRebound(to: UInt16.self) {
+      unsafe String(decoding: $0, as: Unicode.UTF16.self)
+    }
   default:
     fatalError("Unsupported encoding in shim")
   }

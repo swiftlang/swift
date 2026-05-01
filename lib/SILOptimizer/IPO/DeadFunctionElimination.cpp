@@ -106,6 +106,13 @@ class DeadFunctionAndGlobalElimination {
     if (F->isPossiblyUsedExternally())
       return true;
 
+    // Distributed functions are looked up by name at runtime via the
+    // accessible-function registry. Distributed thunks (TWTE) are dispatched
+    // through the witness table by the distributed accessor. Neither kind
+    // is necessarily referenced from SIL, so both must be kept alive.
+    if (F->isDistributed() || F->isThunk() == IsDistributedThunk)
+      return true;
+
     if (F->getDynamicallyReplacedFunction())
       return true;
 
@@ -196,8 +203,19 @@ class DeadFunctionAndGlobalElimination {
           SILFunction *F = methodWitness.Witness;
           if (F) {
             MethodInfo *MI = getMethodInfo(fd, /*isWitnessMethod*/ true);
-            if (MI->methodIsCalled || !F->isDefinition())
+            if (MI->methodIsCalled || !F->isDefinition()) {
               ensureAlive(F);
+            } else if (fd->isDistributed()
+                       || F->isDistributed()
+                       || F->isThunk() == IsDistributedThunk) {
+              // Distributed method witnesses must be kept alive.
+              // Distributed function accessors dispatch through the witness
+              // table at runtime, which is invisible to static call-site
+              // analysis. So if we wouldn't keep alive the func explicitly here,
+              // the witness thunk can be eliminated (especially with -O + WMO),
+              // and IRGen replaces it with swift_deletedAsyncMethodError.
+              ensureAlive(F);
+            }
           }
         } break;
 
@@ -677,6 +695,18 @@ class DeadFunctionAndGlobalElimination {
       WT->clearMethods_if([this, &changedTable]
                           (const SILWitnessTable::MethodWitness &MW) -> bool {
         if (!isAlive(MW.Witness)) {
+          auto *fd = cast<AbstractFunctionDecl>(MW.Requirement.getDecl());
+          // Distributed method witnesses must never be cleared: the
+          // distributed accessor dispatches through the witness table at
+          // runtime. This is a safety net; makeAlive() should already have
+          // kept the witness alive. rdar://168881945
+          if (fd->isDistributed()
+              || MW.Witness->isDistributed()
+              || MW.Witness->isThunk() == IsDistributedThunk) {
+            LLVM_DEBUG(llvm::dbgs() << "  prevent dead code elimination for distributed/distributed_thunk "
+                                    << MW.Witness->getName() << "\n");
+            return false;
+          }
           LLVM_DEBUG(llvm::dbgs() << "  erase dead witness method "
                                   << MW.Witness->getName() << "\n");
           changedTable = true;

@@ -509,7 +509,8 @@ getActualActorIsolationKind(uint8_t raw) {
   CASE(Unspecified)
   CASE(ActorInstance)
   CASE(Nonisolated)
-  CASE(CallerIsolationInheriting)
+  CASE(NonisolatedConcurrent)
+  CASE(NonisolatedNonsending)
   CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
   CASE(Erased)
@@ -3359,6 +3360,21 @@ getActualDifferentiabilityKind(uint8_t diffKind) {
   }
 }
 
+static std::optional<swift::SILFunctionTypeIsolation>
+getActualSILFunctionTypeIsolation(uint8_t isolation) {
+  switch (isolation) {
+#define CASE(ISOLATION)                                                        \
+  case (uint8_t)serialization::SILFunctionTypeIsolation::ISOLATION:            \
+    return swift::SILFunctionTypeIsolation::for##ISOLATION();
+    CASE(Unknown)
+    CASE(NonisolatedNonsending)
+    CASE(Erased)
+#undef CASE
+  default:
+    return std::nullopt;
+  }
+}
+
 static std::optional<swift::MacroRole> getActualMacroRole(uint8_t context) {
   switch (context) {
 #define MACRO_ROLE(Name, Description)           \
@@ -4328,12 +4344,13 @@ public:
       switch (isoKind) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedConcurrent:
       case ActorIsolation::NonisolatedUnsafe:
         isolation = ActorIsolation::forUnspecified();
         break;
 
-      case ActorIsolation::CallerIsolationInheriting:
-        isolation = ActorIsolation::forCallerIsolationInheriting();
+      case ActorIsolation::NonisolatedNonsending:
+        isolation = ActorIsolation::forNonisolatedNonsending();
         break;
 
       case ActorIsolation::Erased:
@@ -7960,7 +7977,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   bool unimplementable;
   bool sendable;
   bool noescape;
-  bool erasedIsolation;
+  uint8_t rawIsolation;
   bool hasErrorResult;
   unsigned numParams;
   unsigned numYields;
@@ -7974,7 +7991,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   decls_block::SILFunctionTypeLayout::readRecord(
       scratch, sendable, async, rawCoroutineKind, rawCalleeConvention,
       rawRepresentation, pseudogeneric, noescape, unimplementable,
-      erasedIsolation, rawDiffKind, hasErrorResult,
+      rawIsolation, rawDiffKind, hasErrorResult,
       numParams, numYields, numResults, rawInvocationGenericSig,
       rawInvocationSubs, rawPatternSubs, clangFunctionTypeID, variableData);
 
@@ -7996,13 +8013,13 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
     clangFunctionType = clangType.get();
   }
 
-  auto isolation = SILFunctionTypeIsolation::forUnknown();
-  if (erasedIsolation)
-    isolation = SILFunctionTypeIsolation::forErased();
+  auto isolation = getActualSILFunctionTypeIsolation(rawIsolation);
+  if (!isolation)
+    return MF.diagnoseFatal();
 
   auto extInfo = SILFunctionType::ExtInfoBuilder(
                      *representation, pseudogeneric, noescape, sendable, async,
-                     unimplementable, isolation, *diffKind, clangFunctionType,
+                     unimplementable, *isolation, *diffKind, clangFunctionType,
                      /*LifetimeDependenceInfo*/ {})
                      .build();
 
@@ -9587,16 +9604,18 @@ ModuleFile::maybeReadLifetimeDependence() {
 
   unsigned targetIndex;
   unsigned paramIndicesLength;
-  bool isImmortal;
+  bool hasImmortalSpecifier;
   bool isFromAnnotation;
+  bool hasCaptures;
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
   bool hasAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
-      scratch, targetIndex, paramIndicesLength, isImmortal, isFromAnnotation,
-      hasInheritLifetimeParamIndices, hasScopeLifetimeParamIndices,
-      hasAddressableParamIndices, lifetimeDependenceData);
+      scratch, targetIndex, paramIndicesLength, hasImmortalSpecifier,
+      isFromAnnotation, hasCaptures, hasInheritLifetimeParamIndices,
+      hasScopeLifetimeParamIndices, hasAddressableParamIndices,
+      lifetimeDependenceData);
 
   SmallBitVector inheritLifetimeParamIndices(paramIndicesLength, false);
   SmallBitVector scopeLifetimeParamIndices(paramIndicesLength, false);
@@ -9630,9 +9649,13 @@ ModuleFile::maybeReadLifetimeDependence() {
       hasScopeLifetimeParamIndices
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
           : nullptr,
-      targetIndex, isImmortal, isFromAnnotation,
+      targetIndex,
       hasAddressableParamIndices
           ? IndexSubset::get(ctx, addressableParamIndices)
           : nullptr,
-      nullptr);
+      nullptr,
+      LifetimeFlags()
+          .withImmortalSpecifier(hasImmortalSpecifier)
+          .withAnnotated(isFromAnnotation)
+          .withCaptures(hasCaptures));
 }

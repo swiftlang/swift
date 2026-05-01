@@ -41,7 +41,7 @@
 // RUN:   %t/user.swift -o %t/deps2.json -auto-bridging-header-chaining -scanner-output-dir %t -scanner-debug-write-output \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t -enable-library-evolution
 
-// RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -emit-module \
+// RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -scan-dependencies \
 // RUN:   -module-name User -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/user.swift -auto-bridging-header-chaining -o %t/User.swiftmodule \
@@ -60,7 +60,7 @@
 // RUN:   -emit-module -o %t/User.swiftmodule -emit-module-interface-path %t/User.swiftinterface -enable-library-evolution
 
 /// Make sure the emitted content is compatible with original. The embedded header path needs to be original header and no bridging header module leaking into interface.
-// RUN: llvm-bcanalyzer -dump %t/User.swiftmodule | %FileCheck %s --check-prefix CHECK-NO-HEADER
+// RUN: %llvm-bcanalyzer -dump %t/User.swiftmodule | %FileCheck %s --check-prefix CHECK-NO-HEADER
 // CHECK-NO-HEADER-NOT: <IMPORTED_HEADER
 // RUN: %FileCheck %s --check-prefix NO-OBJC-LEAKING --input-file=%t/User.swiftinterface
 // NO-OBJC-LEAKING-NOT: import __ObjC
@@ -72,7 +72,7 @@
 // RUN:   -I %t %t/user2.swift -import-objc-header %t/Bridging2.h -auto-bridging-header-chaining -scanner-output-dir %t -scanner-debug-write-output \
 // RUN:   -o %t/deps3.json
 
-// RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -emit-module \
+// RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -scan-dependencies \
 // RUN:   -module-name User -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/user.swift -auto-bridging-header-chaining -o %t/User.swiftmodule -import-objc-header %t/Bridging2.h \
@@ -153,7 +153,7 @@
 // RUN:   -emit-module -o %t/User3.swiftmodule
 
 /// Verify the encoded here is just the `-import-objc-header` option.
-// RUN: llvm-bcanalyzer -dump %t/User3.swiftmodule | %FileCheck %s --check-prefix CHECK-HEADER
+// RUN: %llvm-bcanalyzer -dump %t/User3.swiftmodule | %FileCheck %s --check-prefix CHECK-HEADER
 // CHECK-HEADER: <IMPORTED_HEADER
 // CHECK-HEADER-SAME: Bridging3.h
 

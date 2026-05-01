@@ -857,7 +857,7 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
 
 static bool rangeContainsPlaceholderEnd(const char *CurPtr,
                                         const char *End) {
-  for (auto SubStr = CurPtr; SubStr != End - 1; ++SubStr) {
+  for (auto SubStr = CurPtr; SubStr < End - 1; ++SubStr) {
     if (SubStr[0] == '\n') {
       return false;
     }

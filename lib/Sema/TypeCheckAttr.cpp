@@ -102,19 +102,34 @@ public:
   /// Emits a diagnostic if there is no availability specified for the given
   /// platform, as required by the given attribute. Returns true if a diagnostic
   /// was emitted.
-  bool diagnoseMissingAvailability(DeclAttribute *attr, PlatformKind platform) {
+  bool diagnoseMissingAvailability(OriginallyDefinedInAttr *attr, PlatformKind platform) {
     auto IntroVer = D->getIntroducedOSVersion(platform);
-    if (IntroVer.has_value())
-      return false;
-
-    if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
-               attr, VD->getName(), prettyPlatformString(platform));
+    if (IntroVer.has_value()) {
+      if (IntroVer.value() > attr->getMovedVersion()) {
+        diagnose(attr->AtLoc,
+                 diag::originally_definedin_must_not_before_available_version);
+        return true;
+      }
     } else {
-      diagnose(attr->AtLoc, diag::attr_requires_availability_for_platform, attr,
-               prettyPlatformString(platform));
+      // Also accept explicit unconditional unavailability as sufficient
+      // availability annotation. This handles the case where @_spi_available is
+      // rewritten to @available(platform, unavailable) in the public
+      // swiftinterface. Only apply this relaxation when parsing a textual
+      // interface file, since meaningful introductory version is necessary for us
+      // to emit linker directives while compiling source code.
+      if (D->getDeclContext()->isInSwiftinterface()) {
+        for (auto semanticAttr :
+             D->getSemanticAvailableAttrs(/*includeInactive=*/true)) {
+          if (semanticAttr.getPlatform() == platform &&
+              semanticAttr.isUnconditionallyUnavailable())
+            return false;
+        }
+      }
+      diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
+               attr, D, prettyPlatformString(platform));
+      return true;
     }
-    return true;
+    return false;
   }
 
   void checkIsolatedDeinitAttr(DeclAttribute *attr) {
@@ -316,6 +331,13 @@ public:
 
   void visitOwnedAttr(OwnedAttr *attr) {
     assert(!D->hasClangNode() && "@_owned on imported declaration?");
+
+    if (!Ctx.LangOpts.hasFeature(Feature::UnderscoreOwned) &&
+        !D->getDeclContext()->isInSwiftinterface()) {
+      Ctx.Diags.diagnose(attr->getLocation(),
+                         diag::attribute_requires_experimental_feature, attr,
+                         "UnderscoreOwned");
+    }
 
     auto *ASD = cast<AbstractStorageDecl>(D);
 
@@ -2420,7 +2442,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
     if (auto enclosingAvailable =
             getSemanticAvailableRangeDeclAndAttr(parent, attr->getDomain())) {
       SemanticAvailableAttr enclosingAttr = enclosingAvailable->first;
-      const Decl *enclosingDecl = enclosingAvailable->second;
+      const Decl *enclosingAvailabilityDecl = enclosingAvailable->second;
       enclosingIntroducedRange = enclosingAttr.getIntroducedRange(Ctx);
       if (enclosingIntroducedRange &&
           !introducedRange->isContainedIn(*enclosingIntroducedRange)) {
@@ -2429,21 +2451,29 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           // Incorrect availability for an implicit declaration is likely a
           // compiler bug so make the diagnostic a warning.
           limit = DiagnosticBehavior::Warning;
-        } else if (enclosingDecl != parent) {
+        } else if (enclosingAvailabilityDecl != parent) {
           // Members of extensions of nominal types with available ranges were
           // not diagnosed previously, so only emit a warning in that case.
           if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
             limit = DiagnosticBehavior::Warning;
         }
-        diagnose(D->isImplicit() ? enclosingDecl->getLoc()
-                                 : parsedAttr->getLocation(),
-                 diag::availability_decl_more_than_enclosing, D)
+        auto diagLoc = parsedAttr->getLocation();
+        if (D->isImplicit()) {
+          // Walk up until we find a non-implicit decl to diagnose.
+          const auto *diagDecl = D;
+          while (diagDecl && diagDecl->isImplicit())
+            diagDecl = diagDecl->parentDeclForAvailability();
+
+          diagLoc = diagDecl ? diagDecl->getLoc()
+                             : enclosingAvailabilityDecl->getLoc();
+        }
+        diagnose(diagLoc, diag::availability_decl_more_than_enclosing, D)
             .limitBehavior(limit);
-        if (D->isImplicit())
-          diagnose(enclosingDecl->getLoc(),
-                   diag::availability_implicit_decl_here, D,
+        if (D->isImplicit()) {
+          diagnose(diagLoc, diag::availability_implicit_decl_here, D,
                    Ctx.getTargetAvailabilityDomain(), *introducedRange);
-        diagnose(enclosingDecl->getLoc(),
+        }
+        diagnose(enclosingAvailabilityDecl->getLoc(),
                  diag::availability_decl_more_than_enclosing_here,
                  Ctx.getTargetAvailabilityDomain(), *enclosingIntroducedRange);
       }
@@ -2463,6 +2493,10 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // experimental feature is enabled.
   auto &ctx = fromModule->getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::AllowRuntimeSymbolDeclarations))
+    return true;
+
+  // Only consider "swift_"-containing symbols.
+  if (!symbol.contains("swift_"))
     return true;
 
   // Swift runtime functions are a private contract between the compiler and
@@ -3137,7 +3171,7 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     if (!concurrencyModule) {
       context.Diags.diagnose(mainFunction->getAsyncLoc(),
                              diag::no_concurrency_module, "async main");
-      auto result = new (context) ErrorExpr(mainFunction->getSourceRange());
+      auto result = new (context) ErrorExpr(mainFunction->getSourceRange(), ErrorType::get(context));
       ASTNode stmts[] = {result};
       auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc(),
                                     /*Implicit*/ true);
@@ -3281,9 +3315,13 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
 
     Type mainActor = context.getMainActorType();
     if (mainActor) {
-      auto extInfo = ASTExtInfoBuilder().withIsolation(
-          FunctionTypeIsolation::forGlobalActor(mainActor))
-        .withThrows(true, throwsTypeVar);
+      auto extInfo =
+          ASTExtInfoBuilder()
+              .withIsolation(FunctionTypeIsolation::forGlobalActor(mainActor))
+              .withThrows(true, throwsTypeVar)
+              .withSendable(context.LangOpts.hasFeature(
+                  Feature::GlobalActorIsolatedTypesUsability));
+
       mainTypes.push_back(FunctionType::get(
           /*params*/ {}, context.TheEmptyTupleType,
           extInfo.build()));
@@ -5090,8 +5128,12 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
 
   auto *VD = cast<ValueDecl>(D);
 
-  // @_implementationOnly on types only applies to non-public types.
-  if (isa<NominalTypeDecl>(D)) {
+  // @_implementationOnly on types only applies to non-public types and
+  // classes stored properties.
+  auto *varDecl = dyn_cast<VarDecl>(VD);
+  if (isa<NominalTypeDecl>(D) ||
+      (varDecl && varDecl->hasStorage() &&
+       isa<ClassDecl>(varDecl->getDeclContext()))) {
     auto access =
         VD->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
@@ -5243,13 +5285,6 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
 
     if (diagnoseMissingAvailability(Attr, Platform))
       return;
-
-    auto IntroVer = D->getIntroducedOSVersion(Platform);
-    if (IntroVer.value() > Attr->getMovedVersion()) {
-      diagnose(AtLoc,
-               diag::originally_definedin_must_not_before_available_version);
-      return;
-    }
   }
 }
 
@@ -5279,6 +5314,162 @@ getAvailableAttrGroups(ArrayRef<const AvailableAttr *> attrs) {
   }
 
   return results;
+}
+
+/// Check for platform availability attributes that could be consolidated using
+/// a single `@available(anyAppleOS ...)` attribute.
+void suggestAnyAppleOSAvailability(const Decl *D,
+                                   ArrayRef<AvailableAttr *> attrs,
+                                   ASTContext &ctx) {
+  auto &diags = ctx.Diags;
+  SourceFile *sf = D->getDeclContext()->getParentSourceFile();
+  if (!sf)
+    return;
+
+  if (!diags.isDiagnosticGroupEnabled(sf,
+                                      DiagGroupID::UseAnyAppleOSAvailability))
+    return;
+
+  // Collect the attributes that could be replaced with an anyAppleOS attribute.
+  llvm::SmallDenseMap<llvm::VersionTuple,
+                      llvm::SmallVector<const AvailableAttr *, 6>>
+      attrsByIntroVersion;
+
+  for (const AvailableAttr *attr : attrs) {
+    auto semAttr = D->getSemanticAvailableAttr(attr);
+    if (!semAttr || !semAttr->isPlatformSpecific())
+      continue;
+
+    if (attr->getKind() != AvailableAttr::Kind::Default)
+      continue;
+
+    auto platform = semAttr->getPlatform();
+
+    // Don't diagnose any declaration that already has an anyAppleOS attribute.
+    if (platform == PlatformKind::anyAppleOS)
+      return;
+
+    if (!inheritsAvailabilityFromPlatform(platform, PlatformKind::anyAppleOS))
+      continue;
+
+    if (isApplicationExtensionPlatform(platform))
+      continue;
+
+    // anyAppleOS only supports versions 26 and later.
+    auto rawIntroduced = attr->getRawIntroduced();
+    if (!rawIntroduced || rawIntroduced->getMajor() < 26)
+      continue;
+
+    attrsByIntroVersion[rawIntroduced->normalize()].push_back(attr);
+  }
+
+  if (attrsByIntroVersion.empty())
+    return;
+
+  llvm::VersionTuple commonVersion;
+  llvm::SmallVector<const AvailableAttr *, 6> attrsToReplace;
+  for (auto &[version, attrList] : attrsByIntroVersion) {
+    // Prefer replacing the longest list of attributes.
+    if (attrList.size() < attrsToReplace.size())
+      continue;
+
+    // If the lists have the same length, prefer the earlier version.
+    if (attrList.size() == attrsToReplace.size()) {
+      if (version > commonVersion)
+        continue;
+    }
+
+    commonVersion = version;
+    attrsToReplace = attrList;
+  }
+
+  if (attrsToReplace.size() < 2)
+    return;
+
+  // Check whether the attributes have any fields besides 'introduced:' and skip
+  // if they do since we don't attempt to judge whether those fields match and
+  // could be consolidated.
+  // FIXME: This is conservative; attrs with matching fields could be merged.
+  for (auto *attr : attrsToReplace) {
+    if (attr->getRawDeprecated() || attr->getRawObsoleted() ||
+        !attr->getMessage().empty() || !attr->getRename().empty())
+      return;
+  }
+
+  auto diag = diags.diagnose(D->getLoc(), diag::availability_use_any_apple_os,
+                             commonVersion);
+
+  // Note each introduced version that could be replaced.
+  for (auto *attr : attrsToReplace) {
+    auto semAttr = D->getSemanticAvailableAttr(attr);
+    if (!semAttr)
+      continue;
+
+    diags.diagnose(semAttr->getIntroducedSourceRange().Start,
+                   diag::availability_decl_is_available_in, D,
+                   semAttr->getDomain(), *semAttr->getIntroduced());
+  }
+
+  auto attrGroups = getAvailableAttrGroups(attrs);
+  if (attrGroups.empty()) {
+    // The attributes are all written in long-form.
+    // FIXME: Generate fix-its for this pattern if it is common enough.
+    return;
+  }
+
+  if (attrGroups.size() > 1) {
+    // The attributes are written in multiple short-form groups.
+    return;
+  }
+
+  // The attributes include a single short-form. If they all belong
+  // to the same group we can emit a fix-it to update it.
+  llvm::SmallSet<const AvailableAttr *, 8> remainingAttrsToSkip;
+  for (auto *attr : attrsToReplace)
+    remainingAttrsToSkip.insert(attr);
+
+  llvm::SmallString<128> replacement;
+  llvm::raw_svector_ostream os(replacement);
+  os << "anyAppleOS " << commonVersion;
+
+  auto groupHead = attrGroups.front();
+
+  // Get the location of the @available attr's right paren.
+  SourceLoc groupEndLoc = groupHead->getEndLoc();
+
+  // Build up the fix-it contents and find the starting source loc for the
+  // availability specs.
+  SourceLoc groupStartLoc = groupHead->getDomainLoc();
+  for (auto *member = groupHead; member != nullptr;
+       member = member->getNextGroupedAvailableAttr()) {
+    // The attributes are enumerated in reverse, so the group's starting loc
+    // is the last domain loc we see.
+    groupStartLoc = member->getDomainLoc();
+    if (remainingAttrsToSkip.erase(member))
+      continue;
+    if (auto semAttr = D->getSemanticAvailableAttr(member)) {
+      os << ", " << platformString(semAttr->getPlatform());
+      if (auto v = member->getRawIntroduced())
+        os << " " << *v;
+    }
+  }
+  os << ", *";
+
+  // Only emit the fix-it if all of the attributes to replace were found in
+  // the group.
+  if (remainingAttrsToSkip.empty()) {
+    // Make sure we have a valid source range in a single buffer. We might not
+    // if some attributes were expanded from an availability macro.
+    if (groupStartLoc.isInvalid() || groupEndLoc.isInvalid())
+      return;
+
+    auto startBuffer = ctx.SourceMgr.findBufferContainingLoc(groupStartLoc);
+    auto endBuffer = ctx.SourceMgr.findBufferContainingLoc(groupEndLoc);
+    if (startBuffer != endBuffer)
+      return;
+
+    diag.fixItReplaceChars(groupStartLoc, groupEndLoc, replacement);
+  }
 }
 
 void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
@@ -5349,6 +5540,8 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
           .fixItInsert(groupEndLoc, ", *");
     }
   }
+
+  suggestAnyAppleOSAvailability(D, attrs, Ctx);
 
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
@@ -5518,7 +5711,7 @@ void AttributeChecker::checkBackDeployedAttrs(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    if (availability.containsUnavailableDomain(Domain)) {
+    if (availability.isUnavailableForDomain(Domain)) {
       diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
                Domain.getRemappedDomain(Ctx));
 
@@ -8148,7 +8341,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       ctx.Diags
           .diagnose(attr->getStartLoc(),
                     diag::nonisolated_unsafe_uneffective_on_funcs, VD)
-          .fixItReplace(attr->getStartLoc(), "nonisolated");
+          .fixItReplace(attr->getRange(), "nonisolated");
     }
 
     (void)getActorIsolation(VD);

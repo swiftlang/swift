@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-ir -o - %s -module-name test \
-// RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN:   -parse-as-library \
 // RUN:   -enable-library-evolution \
 // RUN:   -g \
@@ -8,7 +8,7 @@
 
 // RUN: %FileCheck %s < %t/test.irgen
 
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 public protocol P: ~Copyable { }
 

@@ -169,6 +169,11 @@ But it is possible to write into a custom file by specifying the following
 command-line option: 
 
   `-Xllvm -sil-stats-output-file=your_file_name`
+  
+When multiple processes are used with the same command, you might want to add
+the following command line option to append the PID to the output file name:
+
+  `-Xllvm -sil-stats-per-process-output`
 
 ## The format of the recorded optimizer counters
 
@@ -210,6 +215,11 @@ lost variables per pass. You can then easily open the resulting CSV in Numbers
 to make graphs.
 
 `utils/process-stats-lost-variables csv_file_with_counters > csv_aggregate`
+
+When using per-process output, you can pass all of the files to the same
+script:
+
+`utils/process-stats-lost-variables csv_file_with_counters.* > csv_aggregate`
 
 ## Storing the produced statistics into a database
 

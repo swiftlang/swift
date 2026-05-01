@@ -188,10 +188,10 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
   using Binding = inference::PotentialBinding;
 
   TypeVariableType *TypeVar;
-  llvm::SmallVector<Binding, 8> Bindings;
+  llvm::SmallVector<Binding, 4> Bindings;
   /// The set of defaults to attempt once producer
   /// runs out of direct & transitive bindings.
-  llvm::SmallVector<Constraint *, 4> DelayedDefaults;
+  llvm::SmallVector<Binding, 1> DelayedDefaults;
 
   // The index pointing to the offset in the bindings
   // generator is currently at, `numTries` represents

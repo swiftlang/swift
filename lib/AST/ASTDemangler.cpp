@@ -25,6 +25,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclNameExtractor.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleNameLookup.h"
@@ -583,7 +584,7 @@ Type ASTBuilder::createFunctionType(
     isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
   } else if (extFlags.isIsolatedAny()) {
     isolation = FunctionTypeIsolation::forErased();
-  } else if (extFlags.isNonIsolatedCaller()) {
+  } else if (extFlags.isNonisolatedNonsending()) {
     isolation = FunctionTypeIsolation::forNonIsolatedCaller();
   }
 
@@ -780,9 +781,17 @@ Type ASTBuilder::createImplFunctionType(
   #undef SIMPLE_CASE
   }
 
-  auto isolation = SILFunctionTypeIsolation::forUnknown();
-  if (flags.hasErasedIsolation())
-    isolation = SILFunctionTypeIsolation::forErased();
+  SILFunctionTypeIsolation isolation = SILFunctionTypeIsolation::forUnknown();
+  switch (flags.getIsolation()) {
+#define ISOLATION(CASE)                                                        \
+  case ImplFunctionIsolation::CASE:                                            \
+    isolation = SILFunctionTypeIsolation::for##CASE();                         \
+    break;
+    ISOLATION(Unknown)
+    ISOLATION(NonisolatedNonsending)
+    ISOLATION(Erased)
+#undef ISOLATION
+  }
 
   // There's no representation of this in the mangling because it can't
   // occur in well-formed programs.
@@ -1327,7 +1336,9 @@ llvm::ArrayRef<ModuleDecl *>
 ASTBuilder::findPotentialModules(NodePointer node, ModuleDecl *&scratch) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
 
-  const auto moduleName = node->getText();
+  // Round-trip the module name through getIdentifier to normalize it if a raw
+  // identifier was passed to `-module-abi-name`.
+  const auto moduleName = getIdentifier(node->getText()).str();
 
   if (moduleName == CLANG_HEADER_MODULE_NAME) {
     auto *importer = Ctx.getClangModuleLoader();

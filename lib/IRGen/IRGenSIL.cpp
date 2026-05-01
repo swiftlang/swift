@@ -154,13 +154,11 @@ public:
   enum class Kind {
     /// The first three LoweredValue kinds correspond to a SIL address value.
 
-    /// The LoweredValue of a resilient, generic, or loadable typed alloc_stack
-    /// keeps an optional stackrestore point in addition to the address of the
-    /// allocated buffer. For all other address values the stackrestore point is
-    /// just null.
-    /// If the stackrestore point is set (currently, this might happen for
-    /// opaque types: generic and resilient) the deallocation of the stack must
-    /// reset the stack pointer to this point.
+    /// An address.
+    Address,
+
+    /// The address of a local state allocation, together with enough
+    /// information to deallocate it.
     StackAddress,
 
     /// A @box together with the address of the box value.
@@ -196,7 +194,8 @@ private:
   using ExplosionVector = SmallVector<llvm::Value *, 4>;
   using SingletonExplosion = llvm::Value*;
 
-  using Members = ExternalUnionMembers<StackAddress,
+  using Members = ExternalUnionMembers<Address,
+                                       StackAddress,
                                        OwnedAddress,
                                        DynamicallyEnforcedAddress,
                                        ExplosionVector,
@@ -208,6 +207,7 @@ private:
   
   static Members::Index getMemberIndexForKind(Kind kind) {
     switch (kind) {
+    case Kind::Address: return Members::indexOf<Address>();
     case Kind::StackAddress: return Members::indexOf<StackAddress>();
     case Kind::OwnedAddress: return Members::indexOf<OwnedAddress>();
     case Kind::DynamicallyEnforcedAddress: return Members::indexOf<DynamicallyEnforcedAddress>();
@@ -231,8 +231,8 @@ public:
 
   /// Create an address value without a stack restore point.
   LoweredValue(const Address &address)
-      : kind(Kind::StackAddress) {
-    Storage.emplace<StackAddress>(kind, address);
+      : kind(Kind::Address) {
+    Storage.emplace<Address>(kind, address);
   }
 
   /// Create an address value with an optional stack restore point.
@@ -301,7 +301,8 @@ public:
   }
   
   bool isAddress() const {
-    return (kind == Kind::StackAddress ||
+    return (kind == Kind::Address ||
+            kind == Kind::StackAddress ||
             kind == Kind::DynamicallyEnforcedAddress);
   }
   bool isBoxWithAddress() const {
@@ -319,7 +320,9 @@ public:
   }
 
   Address getAnyAddress() const {
-    if (kind == LoweredValue::Kind::StackAddress) {
+    if (kind == LoweredValue::Kind::Address) {
+      return Storage.get<Address>(kind);
+    } else if (kind == LoweredValue::Kind::StackAddress) {
       return Storage.get<StackAddress>(kind).getAddress();
     } else {
       return getDynamicallyEnforcedAddress().Addr;
@@ -1346,6 +1349,8 @@ public:
   void visitSelectEnumAddrInst(SelectEnumAddrInst *i);
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *i);
   void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *i);
+  void visitUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnumDataAddrInst *i);
+  void visitUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
   void visitObjCProtocolInst(ObjCProtocolInst *i);
   void visitMetatypeInst(MetatypeInst *i);
@@ -1848,6 +1853,10 @@ getCOrObjCEntryPointArgumentEmission(IRGenSILFunction &IGF,
 void LoweredValue::getExplosion(IRGenFunction &IGF, SILType type,
                                 Explosion &ex) const {
   switch (kind) {
+  case Kind::Address:
+    ex.add(Storage.get<Address>(kind).getAddress());
+    return;
+
   case Kind::StackAddress:
     ex.add(Storage.get<StackAddress>(kind).getAddressPointer());
     return;
@@ -1886,6 +1895,7 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, SILType type,
 llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF,
                                                  SILType type) const {
   switch (kind) {
+  case Kind::Address:
   case Kind::StackAddress:
   case Kind::DynamicallyEnforcedAddress:
   case Kind::CoroutineState:
@@ -2608,7 +2618,7 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
   if (CurSILFn->getLinkage() == SILLinkage::Shared) {
-    if (CurSILFn->markedAsAlwaysEmitIntoClient() &&
+    if (CurSILFn->isAlwaysEmitIntoClient() &&
         CurSILFn->hasOpaqueResultTypeWithAvailabilityConditions()) {
       auto *V = CurSILFn->getLocation().castToASTNode<ValueDecl>();
       auto *opaqueResult = V->getOpaqueResultTypeDecl();
@@ -3598,6 +3608,7 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
   }
 
   case LoweredValue::Kind::EmptyExplosion:
+  case LoweredValue::Kind::Address:
   case LoweredValue::Kind::OwnedAddress:
   case LoweredValue::Kind::StackAddress:
   case LoweredValue::Kind::DynamicallyEnforcedAddress:
@@ -3746,9 +3757,9 @@ static void emitBuiltinStackAlloc(IRGenSILFunction &IGF,
 
   // Emit a static alloca if the size is constant.
   if (auto *constSize = dyn_cast<llvm::ConstantInt>(size)) {
-    auto stackAddress = IGF.createAlloca(IGF.IGM.Int8Ty, constSize, align,
-                                         "temp_alloc");
-    IGF.setLoweredStackAddress(i, {stackAddress});
+    auto stackAddress =
+      IGF.emitStaticByteArrayAlloca(constSize, align, "temp_alloc");
+    IGF.setLoweredStackAddress(i, stackAddress);
     return;
   }
 
@@ -3766,7 +3777,7 @@ static void emitBuiltinStackDealloc(IRGenSILFunction &IGF,
   auto stackAddress = IGF.getLoweredStackAddress(address);
 
   if (stackAddress.getAddress().isValid()) {
-    IGF.emitDeallocateDynamicAlloca(stackAddress, false);
+    IGF.emitStackDeallocation(stackAddress);
   }
 }
 
@@ -3893,9 +3904,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   // NOTE: We cannot just drop_front since we could be between the indirect
   // results and the parameters.
   std::optional<unsigned> implicitIsolatedParameterIndex;
-  if (auto actorIsolation = site.getFunction()->getActorIsolation();
-      actorIsolation && actorIsolation->isCallerIsolationInheriting() &&
-      site.isCallerIsolationInheriting()) {
+  if (site.isNonisolatedNonsending()) {
     auto *iso = site.getIsolatedArgumentOperandOrNullPtr();
     assert(iso);
     implicitIsolatedParameterIndex = site.getAppliedArgIndex(*iso);
@@ -4150,6 +4159,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
   auto fnType = v->getType().castTo<SILFunctionType>();
 
   switch (lv.kind) {
+  case LoweredValue::Kind::Address:
   case LoweredValue::Kind::StackAddress:
   case LoweredValue::Kind::DynamicallyEnforcedAddress:
   case LoweredValue::Kind::OwnedAddress:
@@ -4386,7 +4396,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   auto closureStackAddr = emitFunctionPartialApplication(
       *this, *CurSILFn, calleeFn, innerContext, llArgs, params,
       i->getSubstitutionMap(), origCalleeTy, i->getSubstCalleeType(),
-      i->getType().castTo<SILFunctionType>(), function, false);
+      i->getType().castTo<SILFunctionType>(), function, false,
+      i->isStackAllocationNested());
   setLoweredExplosion(v, function);
 
   if (closureStackAddr) {
@@ -5630,7 +5641,8 @@ void IRGenSILFunction::visitUncheckedEnumDataInst(swift::UncheckedEnumDataInst *
   setLoweredExplosion(i, data);
 }
 
-void IRGenSILFunction::visitUncheckedTakeEnumDataAddrInst(swift::UncheckedTakeEnumDataAddrInst *i) {
+void IRGenSILFunction::visitUncheckedTakeEnumDataAddrInst(
+                                      swift::UncheckedTakeEnumDataAddrInst *i) {
   Address enumAddr = getLoweredAddress(i->getOperand());
   Address dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
                                                     i->getOperand()->getType(),
@@ -5638,6 +5650,74 @@ void IRGenSILFunction::visitUncheckedTakeEnumDataAddrInst(swift::UncheckedTakeEn
                                                     i->getElement());
   setLoweredAddress(i, dataAddr);
 }
+
+void IRGenSILFunction::visitUncheckedInPlaceEnumDataAddrInst(
+                                  swift::UncheckedInPlaceEnumDataAddrInst *i) {
+  Address enumAddr = getLoweredAddress(i->getOperand());
+  // Since this instruction is only available on types where the projection
+  // operation is known to be nondestructive, we can apply the projection
+  // unconditionally.
+  Address dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
+                                                    i->getOperand()->getType(),
+                                                    enumAddr,
+                                                    i->getElement());
+  setLoweredAddress(i, dataAddr);
+}
+
+void IRGenSILFunction::visitUncheckedBorrowEnumDataAddrInst(
+                                    swift::UncheckedBorrowEnumDataAddrInst *i) {
+    
+  Address enumAddr = getLoweredAddress(i->getEnum());
+  Address dataAddr;
+
+  auto enumTy = i->getEnum()->getType();
+  // If we know the project operation is nondestructive, then we can do the
+  // projection in place without using the scratch space.
+  if (!UncheckedEnumDataAddrInstBase::isDestructive(
+                                     enumTy.getEnumOrBoundGenericEnum(),
+                                     this->CurSILFn)) {
+    dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
+                                                        enumTy, enumAddr,
+                                                        i->getElement());
+  } else {
+    Address scratchAddr = getLoweredAddress(i->getScratch());
+
+    // Otherwise, we need to look at the runtime properties of the type in
+    // question. If the type is bitwise-borrowable, the enum layout may use
+    // spare bit packing, but we can safely memcpy the representation to the
+    // scratch space and mask the spare bits in the scratch space. If the type
+    // is not bitwise-borrowable, we never do spare bit packing, so can apply
+    // the projection in-place.
+    auto &enumTI = getTypeInfo(i->getEnum()->getType());
+    auto isBB = enumTI.getIsBitwiseBorrowable(*this, enumTy);
+    auto origBlock = Builder.GetInsertBlock();
+    auto bbBlock = createBasicBlock("enum.bitwiseBorrowable");
+    auto contBlock = createBasicBlock("enum.project");
+
+    Builder.CreateCondBr(isBB, bbBlock, contBlock);
+
+    {
+      Builder.emitBlock(bbBlock);
+      // Since the payload is bitwise-borrowable, copy the bits to the scratch
+      // space.
+      Builder.CreateMemCpy(scratchAddr, enumAddr, enumTI.getSize(*this, enumTy));
+      Builder.CreateBr(contBlock);
+    }
+
+    Builder.emitBlock(contBlock);
+    auto bufferPhi = Builder.CreatePHI(enumAddr->getType(), 2);
+    bufferPhi->addIncoming(enumAddr.getAddress(), origBlock);
+    bufferPhi->addIncoming(scratchAddr.getAddress(), bbBlock);
+
+    auto bufferAddr = enumTI.getAddressForPointer(bufferPhi);
+    dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
+                                                        enumTy, bufferAddr,
+                                                        i->getElement());
+  }
+
+  setLoweredAddress(i, dataAddr);
+}
+
 
 void IRGenSILFunction::visitInjectEnumAddrInst(swift::InjectEnumAddrInst *i) {
   Address enumAddr = getLoweredAddress(i->getOperand());
@@ -6682,7 +6762,13 @@ void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
   setLoweredStackAddress(i, addr);
 }
 
-void IRGenSILFunction::visitAllocPackMetadataInst(AllocPackMetadataInst *i) {}
+void IRGenSILFunction::visitAllocPackMetadataInst(AllocPackMetadataInst *i) {
+  // alloc_pack_metadata is meant to control pack metadata just for the
+  // next instruction. As long as we enter these scopes prior to
+  // every such instruction, we can just treat this as global state
+  // on the IGF.
+  packMetadataIsNested = i->isStackAllocationNested();
+}
 
 static void
 buildTailArrays(IRGenSILFunction &IGF,
@@ -6697,6 +6783,11 @@ buildTailArrays(IRGenSILFunction &IGF,
 }
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
+  // We can ignore isStackAllocationNested() here because we currently only
+  // use static allocas for the stack promotion optimization. If we ever do
+  // want to try dynamic allocations, we'll need to pay attention
+  // (probably by just disabling the optimization).
+
   int StackAllocSize = -1;
   if (i->canAllocOnStack()) {
     estimateStackSize();
@@ -6720,6 +6811,11 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
+  // We can ignore isStackAllocationNested() here because we currently only
+  // use static allocas for the stack promotion optimization. If we ever do
+  // want to try dynamic allocations, we'll need to pay attention
+  // (probably by just disabling the optimization).
+
   int StackAllocSize = -1;
   if (i->canAllocOnStack()) {
     assert(i->isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType());
@@ -6753,7 +6849,9 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   if (auto *closure = dyn_cast<PartialApplyInst>(i->getOperand())) {
     assert(closure->isOnStack());
     auto stackAddr = LoweredPartialApplyAllocations[i->getOperand()];
-    emitDeallocateDynamicAlloca(stackAddr, closure->isStackAllocationNested());
+    if (stackAddr.isValid()) {
+      emitStackDeallocation(stackAddr);
+    }
     return;
   }
   if (isaResultOf<BeginApplyInst>(i->getOperand())) {
@@ -6771,9 +6869,8 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   auto allocatedType = asi->getType();
   const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
   StackAddress stackAddr = getLoweredStackAddress(asi);
-  auto isNested = asi->isStackAllocationNested();
 
-  allocatedTI.deallocateStack(*this, stackAddr, allocatedType, isNested);
+  allocatedTI.deallocateStack(*this, stackAddr, allocatedType);
 }
 
 void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {
@@ -7915,7 +8012,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
       argsBufAlign = Builder.CreateOr(argsBufAlign, alignMask);
     }
 
-    dynamicArgsBuf = emitDynamicAlloca(IGM.Int8Ty, argsBufSize, Alignment(16));
+    dynamicArgsBuf = emitStackAllocation(argsBufSize, Alignment(16));
     
     Address argsBuf = dynamicArgsBuf->getAddress();
     
@@ -7953,7 +8050,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   call->setDoesNotThrow();
 
   if (dynamicArgsBuf) {
-    emitDeallocateDynamicAlloca(*dynamicArgsBuf);
+    emitStackDeallocation(*dynamicArgsBuf);
   }
 
   auto loweredKeyPathTy = IGM.getLoweredType(I->getKeyPathType());
@@ -8562,13 +8659,23 @@ bool IRGenSILFunction::shouldUseDispatchThunk(SILDeclRef method) {
   AccessLevel methodAccess = method.getDecl()->getEffectiveAccess();
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
   bool shouldUseDispatchThunk = false;
-  // Because typechecking for the debugger has more lax rules, check the access
-  // level of the getter to decide whether to use a dispatch thunk for the
-  // debugger.
+  bool isResilient =
+      IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal);
   bool inDebugger = classDecl->getASTContext().LangOpts.DebuggerSupport;
-  bool shouldUseDispatchThunkIfInDebugger = methodAccess >= AccessLevel::Public;
-  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal) &&
-      (!inDebugger || shouldUseDispatchThunkIfInDebugger)) {
+  bool shouldUseDispatchThunkIfInDebugger = false;
+  if (inDebugger && isResilient) {
+    // Because typechecking for the debugger has more lax rules, check the
+    // access level of the method to decide whether to use a dispatch thunk for
+    // the debugger.
+    shouldUseDispatchThunkIfInDebugger = methodAccess >= AccessLevel::Public;
+
+    // This is only legal if the method actually has a vtable.
+    auto hasVtable =
+        IGM.getClassMetadataLayout(classDecl).getStoredMethodInfoIfPresent(
+            method);
+    shouldUseDispatchThunkIfInDebugger |= !hasVtable;
+  }
+  if (isResilient && (!inDebugger || shouldUseDispatchThunkIfInDebugger)) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().VirtualFunctionElimination) {
     // For VFE, use a thunk if the target class is in another module. This
@@ -8642,14 +8749,14 @@ void IRGenSILFunction::visitObjCMethodInst(swift::ObjCMethodInst *i) {
 void IRGenSILFunction::visitGetAsyncContinuationInst(
     GetAsyncContinuationInst *i) {
   Explosion out;
-  emitGetAsyncContinuation(i->getLoweredResumeType(), StackAddress(), out,
+  emitGetAsyncContinuation(i->getLoweredResumeType(), Address(), out,
                            i->throws());
   setLoweredExplosion(i, out);
 }
 
 void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
     GetAsyncContinuationAddrInst *i) {
-  auto resultAddr = getLoweredStackAddress(i->getOperand());
+  auto resultAddr = getLoweredAddress(i->getOperand());
   Explosion out;
   emitGetAsyncContinuation(i->getLoweredResumeType(), resultAddr, out,
                            i->throws());

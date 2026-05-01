@@ -122,13 +122,6 @@ void swift::checkEmbeddedRestrictionsInSignature(
   if (!behavior)
     return;
 
-  // Untyped throws is not permitted.
-  SourceLoc throwsLoc = func->getThrowsLoc();
-  if (throwsLoc.isValid() && !func->getThrownTypeRepr() &&
-      !func->hasPolymorphicEffect(EffectKind::Throws)) {
-    diagnoseUntypedThrowsInEmbedded(func, throwsLoc);
-  }
-
   // If we're in a class, one cannot have a non-final generic function.
   if (auto classDecl = dyn_cast<ClassDecl>(func->getDeclContext())) {
     if (!classDecl->isSemanticallyFinal() &&
@@ -142,19 +135,6 @@ void swift::checkEmbeddedRestrictionsInSignature(
         .limitBehavior(defaultEmbeddedLimitationForError(func, func->getLoc()));
     }
   }
-}
-
-void swift::diagnoseUntypedThrowsInEmbedded(
-    const DeclContext *dc, SourceLoc throwsLoc) {
-  // If we are not supposed to diagnose Embedded Swift limitations, do nothing.
-  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, throwsLoc);
-  if (!behavior)
-    return;
-
-  dc->getASTContext().Diags.diagnose(
-      throwsLoc, diag::untyped_throws_in_embedded_swift)
-    .limitBehavior(*behavior)
-    .fixItInsertAfter(throwsLoc, "(<#thrown error type#>)");
 }
 
 void swift::diagnoseGenericMemberOfExistentialInEmbedded(

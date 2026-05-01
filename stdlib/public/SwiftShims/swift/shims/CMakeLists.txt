@@ -126,6 +126,9 @@ else()
   set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION_MAJOR}")
 endif()
 
+# Normalize the path.
+cmake_path(CONVERT "${clang_headers_location}" TO_CMAKE_PATH_LIST clang_headers_location NORMALIZE)
+
 add_custom_command_target(unused_var
     COMMAND
       "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTLIB_DIR}"
@@ -170,6 +173,7 @@ if(NOT SWIFT_BUILT_STANDALONE)
 
   foreach(target
       symlink_clang_headers
+      symlink_clang_headers_static
       clang-builtin-headers
       clang-resource-dir-symlink
       clang-builtin-headers-in-clang-resource-dir)

@@ -86,6 +86,15 @@ public extension Sequence {
   }
 
   var first: Element? { first(where: { _ in true }) }
+
+  func countExceeds(_ n: Int) -> Bool {
+    for (idx, _) in self.enumerated() {
+      if idx > n {
+        return true
+      }
+    }
+    return false
+  }
 }
 
 // Also make the lazy sequences a CollectionLikeSequence if the underlying sequence is one.

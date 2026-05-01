@@ -132,6 +132,8 @@ class SILType;
 class SILArgument;
 class SILPhiArgument;
 class SILUndef;
+class StackAllocation;
+class StackDeallocation;
 class Stmt;
 class StringLiteralExpr;
 class ValueDecl;
@@ -873,8 +875,9 @@ public:
   /// instruction.
   bool isAllocatingStack() const;
 
-  /// The stack allocation produced by the instruction, if any.
-  SILValue getStackAllocation() const;
+  /// Return the kind of stack allocation instruction this is, or std::nullopt
+  /// if it is not a stack allocation instruction.
+  std::optional<StackAllocation> getStackAllocation() const;
 
   /// Returns the kind of stack memory that should be allocated. There are
   /// certain (unfortunate) situations in which "stack" allocations may become
@@ -888,6 +891,10 @@ public:
   /// Returns true if this is the deallocation of a stack allocating instruction.
   /// The first operand must be the allocating instruction.
   bool isDeallocatingStack() const;
+
+  /// Return the kind of stack deallocation instruction this is, or
+  /// std::nullopt if it is not a stack deallocation instruction.
+  std::optional<StackDeallocation> getStackDeallocation() const;
 
   /// Whether IRGen lowering of this instruction may result in emitting packs of
   /// metadata or witness tables.
@@ -2312,11 +2319,25 @@ class AllocPackMetadataInst final
           AllocationInst> {
   friend SILBuilder;
 
-  AllocPackMetadataInst(SILDebugLocation loc, SILType elementType)
+  USE_SHARED_UINT8;
+
+  AllocPackMetadataInst(SILDebugLocation loc, SILType elementType,
+                        StackAllocationIsNested_t isNested)
       : NullaryInstructionWithTypeDependentOperandsBase(
-            loc, {}, elementType.getAddressType()) {}
+            loc, {}, elementType.getAddressType()) {
+    sharedUInt8().AllocPackMetadataInst.isNested = bool(isNested);
+  }
 
 public:
+  StackAllocationIsNested_t isStackAllocationNested() const {
+    return StackAllocationIsNested_t(
+             sharedUInt8().AllocPackMetadataInst.isNested);
+  }
+
+  void setStackAllocationIsNested(StackAllocationIsNested_t isNested) {
+    sharedUInt8().AllocPackMetadataInst.isNested = bool(isNested);
+  }
+
   /// The instruction which may trigger on-stack pack metadata when IRGen
   /// lowering.
   SILInstruction *getIntroducer() { return getNextInstruction(); }
@@ -2334,6 +2355,7 @@ protected:
                    SILDebugLocation DebugLoc,
                    SILType ObjectType,
                    bool objc, bool canBeOnStack, bool isBare,
+                   StackAllocationIsNested_t isNested,
                    ArrayRef<SILType> ElementTypes);
 
   SILType *getTypeStorage();
@@ -2360,6 +2382,14 @@ public:
 
   void setStackAllocatable(bool OnStack = true) {
     sharedUInt8().AllocRefInstBase.onStack = OnStack;
+  }
+
+  StackAllocationIsNested_t isStackAllocationNested() const {
+    return StackAllocationIsNested_t(sharedUInt8().AllocRefInstBase.isNested);
+  }
+
+  void setStackAllocationIsNested(StackAllocationIsNested_t isNested) {
+    sharedUInt8().AllocRefInstBase.isNested = bool(isNested);
   }
 
   ArrayRef<SILType> getTailAllocatedTypes() const {
@@ -2421,10 +2451,11 @@ class AllocRefInst final
   AllocRefInst(SILDebugLocation DebugLoc, SILFunction &F,
                SILType ObjectType,
                bool objc, bool canBeOnStack, bool isBare,
+               StackAllocationIsNested_t isNested,
                ArrayRef<SILType> ElementTypes,
                ArrayRef<SILValue> AllOperands)
       : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ObjectType,
-                        objc, canBeOnStack, isBare, ElementTypes) {
+                        objc, canBeOnStack, isBare, isNested, ElementTypes) {
     assert(AllOperands.size() >= ElementTypes.size());
     std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
                             getTrailingObjects<SILType>());
@@ -2433,6 +2464,7 @@ class AllocRefInst final
   static AllocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
                               SILType ObjectType,
                               bool objc, bool canBeOnStack, bool isBare,
+                              StackAllocationIsNested_t isNested,
                               ArrayRef<SILType> ElementTypes,
                               ArrayRef<SILValue> ElementCountOperands);
 
@@ -2472,10 +2504,12 @@ class AllocRefDynamicInst final
                       SILType ty,
                       bool objc,
                       bool canBeOnStack,
+                      StackAllocationIsNested_t isNested,
                       ArrayRef<SILType> ElementTypes,
                       ArrayRef<SILValue> AllOperands)
       : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ty, objc,
-                                            canBeOnStack, /*isBare=*/ false, ElementTypes) {
+                                            canBeOnStack, /*isBare=*/ false,
+                                            isNested, ElementTypes) {
     assert(AllOperands.size() >= ElementTypes.size() + 1);
     std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
                             getTrailingObjects<SILType>());
@@ -2484,7 +2518,7 @@ class AllocRefDynamicInst final
   static AllocRefDynamicInst *
   create(SILDebugLocation DebugLoc, SILFunction &F,
          SILValue metatypeOperand, SILType ty, bool objc,
-         bool canBeOnStack,
+         bool canBeOnStack, StackAllocationIsNested_t isNested,
          ArrayRef<SILType> ElementTypes,
          ArrayRef<SILValue> ElementCountOperands);
 
@@ -2732,7 +2766,7 @@ protected:
         SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
         Substitutions(subs.getCanonical()) {
-    assert(!!subs == !!callee->getType().castTo<SILFunctionType>()
+    ASSERT(!!subs == !!callee->getType().castTo<SILFunctionType>()
         ->getInvocationGenericSignature());
 
     // Initialize the operands.
@@ -3240,6 +3274,8 @@ class PartialApplyInst final
                              ApplyInstBase<PartialApplyInst,
                                            SingleValueInstruction>>,
       public llvm::TrailingObjects<PartialApplyInst, Operand> {
+  USE_SHARED_UINT8;
+
   friend SILBuilder;
 
 public:
@@ -3254,6 +3290,7 @@ private:
                    ArrayRef<SILValue> Args,
                    ArrayRef<SILValue> TypeDependentOperands,
                    SILType ClosureType,
+                   StackAllocationIsNested_t IsNested,
                    const GenericSpecializationInformation *SpecializationInfo);
 
   static PartialApplyInst *
@@ -3261,7 +3298,7 @@ private:
          SubstitutionMap Substitutions, ParameterConvention CalleeConvention,
          SILFunctionTypeIsolation ResultIsolation, SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo,
-         OnStackKind onStack);
+         OnStackKind onStack, StackAllocationIsNested_t isNested);
 
 public:
   /// Return the result function type of this partial apply.
@@ -3280,6 +3317,13 @@ public:
 
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
+  }
+
+  StackAllocationIsNested_t isStackAllocationNested() const {
+    return StackAllocationIsNested_t(sharedUInt8().PartialApplyInst.isNested);
+  }
+  void setStackAllocationIsNested(StackAllocationIsNested_t isNested) {
+    sharedUInt8().PartialApplyInst.isNested = bool(isNested);
   }
   
   /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
@@ -7146,6 +7190,7 @@ class UncheckedEnumDataInst
       : UnaryInstructionBase(DebugLoc, Operand, ResultTy,
                              forwardingOwnershipKind),
         Element(Element) {
+    assert(Element->getPayloadInterfaceType());
     sharedUInt32().UncheckedEnumDataInst.caseIndex = InvalidCaseIndex;
   }
 
@@ -7244,6 +7289,63 @@ public:
   }
 };
 
+/// Base class for instructions that project the payload from an enum in
+/// memory.
+class UncheckedEnumDataAddrInstBase
+  : public SingleValueInstruction
+{
+  enum : unsigned { InvalidCaseIndex = ~unsigned(0) };
+
+  EnumElementDecl *Element;
+  USE_SHARED_UINT32;
+
+protected:
+  UncheckedEnumDataAddrInstBase(SILInstructionKind Kind,
+                                SILDebugLocation DebugLoc,
+                                EnumElementDecl *Element, SILType ResultTy)
+    : SingleValueInstruction(Kind, DebugLoc, ResultTy),
+      Element(Element)
+  {
+    sharedUInt32().UncheckedEnumDataAddrInstBase.caseIndex = InvalidCaseIndex;
+  }
+
+public:
+  /// Returns true if the projection operation is possibly destructive for
+  /// instances of the given enum declaration.
+  ///
+  /// If true, the `UncheckedInPlaceEnumDataAddr` instruction variant
+  /// is not available for instances of the given enum.
+  static bool isDestructive(EnumDecl *forEnum, SILFunction *F);
+
+  EnumElementDecl *getElement() const { return Element; }
+
+  unsigned getCaseIndex() {
+    unsigned idx = sharedUInt32().UncheckedEnumDataAddrInstBase.caseIndex;
+    if (idx != InvalidCaseIndex)
+      return idx;
+
+    unsigned index = getCachedCaseIndex(getElement());
+    sharedUInt32().UncheckedEnumDataAddrInstBase.caseIndex = index;
+    return index;
+  }
+
+  EnumDecl *getEnumDecl() const {
+    auto *E = getEnum()->getType().getEnumOrBoundGenericEnum();
+    assert(E && "Operand of unchecked_take_enum_data_addr must be of enum"
+                " type");
+    return E;
+  }
+
+  /// Return the value of the base enum operand that will be projected.
+  SILValue getEnum() const;
+
+  static bool classof(SILNodePointer node) {
+    SILNodeKind kind = node->getKind();
+    return (unsigned)kind >= (unsigned)SILNodeKind::First_UncheckedEnumDataAddrInstBase
+        && (unsigned)kind <= (unsigned)SILNodeKind::Last_UncheckedEnumDataAddrInstBase;
+  }
+};
+
 /// Project an enum's payload data without checking the case of the enum or
 /// moving it in memory.
 ///
@@ -7254,48 +7356,70 @@ public:
 /// static method returns true for enums where this is potentially the case.
 class UncheckedTakeEnumDataAddrInst
   : public UnaryInstructionBase<SILInstructionKind::UncheckedTakeEnumDataAddrInst,
-                                SingleValueInstruction>
+                                UncheckedEnumDataAddrInstBase>
 {
   friend SILBuilder;
-  enum : unsigned { InvalidCaseIndex = ~unsigned(0) };
-
-  EnumElementDecl *Element;
-  USE_SHARED_UINT32;
 
   UncheckedTakeEnumDataAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
                                 EnumElementDecl *Element, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), Element(Element) {
-    sharedUInt32().UncheckedTakeEnumDataAddrInst.caseIndex = InvalidCaseIndex;
-  }
+      : UnaryInstructionBase(DebugLoc, Operand, Element, ResultTy)
+  {}
 
 public:
-  // Returns true if the projection operation is possibly destructive for
-  // instances of the given enum declaration.
-  static bool isDestructive(EnumDecl *forEnum, SILModule &M);
+  SILValue getEnum() const { return getOperand(); }
+};
 
-  // Returns true if this projection operation is possibly destructive.
-  bool isDestructive() const {
-    return isDestructive(Element->getParentEnum(), getModule());
-  }
+/// Project an enum's payload data without checking the case of the enum or
+/// moving it in memory, with the intent of borrowing the payload.
+/// The instruction is given the address of a scratch area where the representation
+/// may be bitwise-copied if projection would invalidate the original value.
+/// The result address is thus dependent on both the original enum operand and
+/// the scratch operand.
+class UncheckedBorrowEnumDataAddrInst
+  : public InstructionBase<SILInstructionKind::UncheckedBorrowEnumDataAddrInst,
+                           UncheckedEnumDataAddrInstBase>
+{
+  enum OperandIndex {
+    Enum,
+    Scratch,
+  };
+  friend SILBuilder;
+  FixedOperandList<2> Operands;
 
-  EnumElementDecl *getElement() const { return Element; }
+  UncheckedBorrowEnumDataAddrInst(SILDebugLocation DebugLoc,
+                                  SILValue Enum, SILValue Scratch,
+                                  EnumElementDecl *Element, SILType ResultTy)
+    : InstructionBase(DebugLoc, Element, ResultTy),
+      Operands(this, Enum, Scratch)
+  {}
 
-  unsigned getCaseIndex() {
-    unsigned idx = sharedUInt32().UncheckedTakeEnumDataAddrInst.caseIndex;
-    if (idx != InvalidCaseIndex)
-      return idx;
+public:
+  SILValue getEnum() const { return Operands[OperandIndex::Enum].get(); }
+  SILValue getScratch() const { return Operands[OperandIndex::Scratch].get(); }
 
-    unsigned index = getCachedCaseIndex(getElement());
-    sharedUInt32().UncheckedTakeEnumDataAddrInst.caseIndex = index;
-    return index;
-  }
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+};
 
-  EnumDecl *getEnumDecl() const {
-    auto *E = getOperand()->getType().getEnumOrBoundGenericEnum();
-    assert(E && "Operand of unchecked_take_enum_data_addr must be of enum"
-                " type");
-    return E;
-  }
+/// Project an enum's payload data without checking the case of the enum or
+/// moving it in memory.
+///
+/// This performs the projection in-place without modifying the value. As such,
+/// this instruction is only valid for enums for which 
+/// UncheckedEnumDataAddrInstBase::isDestructive returns false.
+class UncheckedInPlaceEnumDataAddrInst
+  : public UnaryInstructionBase<SILInstructionKind::UncheckedInPlaceEnumDataAddrInst,
+                                UncheckedEnumDataAddrInstBase>
+{
+  friend SILBuilder;
+  UncheckedInPlaceEnumDataAddrInst(SILDebugLocation DebugLoc,
+                                  SILValue Enum,
+                                  EnumElementDecl *Element, SILType ResultTy)
+    : UnaryInstructionBase(DebugLoc, Enum, Element, ResultTy)
+  {}
+
+public:
+  SILValue getEnum() const { return getOperand(); }
 };
 
 /// Common base class for the select_enum and select_enum_addr instructions,
@@ -9824,6 +9948,7 @@ public:
   AllocPackMetadataInst *getAllocation() {
     return cast<AllocPackMetadataInst>(getOperand().getDefiningInstruction());
   }
+
   /// The instruction which may trigger on-stack pack metadata when IRGen
   /// lowering.
   SILInstruction *getIntroducer() { return getAllocation()->getIntroducer(); }

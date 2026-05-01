@@ -609,6 +609,9 @@ public class PublicClassUser {
 
   @export(interface)
   private func privateFunc(h: HiddenLayout) {}
+
+  @export(interface)
+  deinit {}
 }
 
 open class OpenClassUser {
@@ -616,33 +619,36 @@ open class OpenClassUser {
   public init() { fatalError() }
 
   private var ta: TA
-  // expected-non-library-evolution-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because it was imported via the internal bridging header}}
+  // expected-non-library-evolution-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in a property declaration member of an open class because it was imported via the internal bridging header}}
 
   public var publicField: RestrictedType
   // expected-error @-1 {{property cannot be declared public because its type uses an internal type}}
   // expected-note @-2 {{struct 'RestrictedType' is imported by this file as 'internal' from bridging header}}
 
   private var privateField: RestrictedType
-  // expected-non-library-evolution-error @-1 {{cannot use struct 'RestrictedType' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
+  // expected-non-library-evolution-error @-1 {{cannot use struct 'RestrictedType' in a property declaration member of an open class; it was imported via the internal bridging header}}
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-non-library-evolution-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of an open class; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-non-library-evolution-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of an open class; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-non-library-evolution-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of an open class; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   @export(interface)
   private func privateFunc(h: HiddenLayout) {}
+
+  @export(interface)
+  deinit {}
 }
 
 @_fixed_layout
@@ -689,6 +695,9 @@ public class FixedClassUser {
 
   @export(interface)
   private func privateFunc(h: HiddenLayout) {}
+
+  @export(interface)
+  deinit {}
 }
 
 internal class InternalClassUser {
@@ -715,6 +724,9 @@ internal class InternalClassUser {
   private var j: HiddenProtocol
 
   private func privateFunc(h: HiddenLayout) {} // expected-embedded-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  @export(interface)
+  deinit {}
 }
 
 private class PrivateClassUser {
@@ -741,6 +753,9 @@ private class PrivateClassUser {
   private var j: HiddenProtocol
 
   private func privateFunc(h: HiddenLayout) {} // expected-embedded-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  @export(interface)
+  deinit {}
 }
 
 @_implementationOnly

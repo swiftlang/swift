@@ -2303,18 +2303,8 @@ internal func parse_float64(_ span: Span<UInt8>) -> Optional<Float64> {
           let sdigits = sign == .minus ? -Double(digits) : Double(digits)
           return sdigits / doublePowersOf10_exact[Int(-base10Exponent)]
         }
-      } else if base10Exponent == 0 {
-        // At most 19 digits with a zero exponent, we can use
-        // a single correctly-rounded int64-to-double conversion.
-        if unparsedDigitCount == 0 {
-          switch sign {
-          case .plus:
-            return Double(digits)
-          case .minus:
-            return Double(-Int64(truncatingIfNeeded: digits))
-          }
-        }
-      } else if unparsedDigitCount == 0 {
+      }
+      else if unparsedDigitCount == 0 {
         // At most 19 digits with a positive exponent; a little
         // prep work lets us use a single correctly-rounded FMA:
         let lowMask = UInt64(0x7ff)

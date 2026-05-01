@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend  -module-name serialize_attr -emit-module -parse-as-library -o %t %s
-// RUN: llvm-bcanalyzer %t/serialize_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/serialize_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -enable-sil-verify-all %t/serialize_attr.swiftmodule | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode

@@ -534,6 +534,7 @@ extension RawSpan {
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
   @_transparent
+  @safe
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -867,3 +868,30 @@ extension RawSpan {
     extracting(droppingFirst: k)
   }
 }
+
+extension RawSpan {
+  @available(SwiftStdlib 6.4, *)
+  @_transparent
+  public var _span: Span<UInt8> {
+    @lifetime(copy self)
+    get {
+      let buf = unsafe UnsafeBufferPointer(
+        start: _pointer?.assumingMemoryBound(to: UInt8.self), 
+        count: _count)
+      let span = unsafe Span(_unsafeElements: buf)
+      return unsafe _overrideLifetime(span, copying: self)
+    }
+  }
+}
+
+#if !SPAN_COMPATIBILITY_STUB
+@available(SwiftStdlib 6.4, *)
+extension RawSpan: BorrowingSequence {
+  @available(SwiftStdlib 6.4, *)
+  @inlinable
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> SpanIterator<UInt8> {
+    SpanIterator(self._span)
+  }
+}
+#endif

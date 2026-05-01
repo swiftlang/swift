@@ -141,8 +141,10 @@ struct BacktraceSettings {
   Symbolication    symbolicate;
   bool             suppressWarnings;
   OutputFormat     format;
+  bool             inBacktracer;
   const char      *swiftBacktracePath;
   const char      *outputPath;
+  bool             closeFds;
 };
 
 SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings;

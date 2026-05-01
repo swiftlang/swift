@@ -198,13 +198,23 @@ struct AliasAnalysis {
 
     case is InjectEnumAddrInst,
          is UncheckedTakeEnumDataAddrInst,
+         is UncheckedInPlaceEnumDataAddrInst,
          is InitExistentialAddrInst,
          is DeinitExistentialAddrInst,
          is FixLifetimeInst,
          is ClassifyBridgeObjectInst,
          is ValueToBridgeObjectInst,
+         is UncheckedInPlaceEnumDataAddrInst,
+         is UncheckedTakeEnumDataAddrInst,
          is DeallocStackInst:
       if memLoc.mayAlias(with: (inst as! UnaryInstruction).operand.value, self) {
+        return inst.memoryEffects
+      }
+      return .noEffects
+
+    case let ubeda as UncheckedBorrowEnumDataAddrInst:
+      // The borrow won't modify the enum, but will write to the scratch space.
+      if memLoc.mayAlias(with: ubeda.scratch, self) {
         return inst.memoryEffects
       }
       return .noEffects
@@ -278,8 +288,8 @@ struct AliasAnalysis {
       }
       return effects
 
-    case let apply as FullApplySite:
-      return getApplyEffect(of: apply, on: memLoc)
+    case isFullApplySite:
+      return getApplyEffect(of: inst as! FullApplySite, on: memLoc)
 
     case let partialApply as PartialApplyInst:
       return getPartialApplyEffect(of: partialApply, on: memLoc)
@@ -442,6 +452,9 @@ struct AliasAnalysis {
       }
       return .noEffects
     default:
+      if builtin.memoryEffects == .noEffects {
+        return .noEffects
+      }
       return defaultEffects(of: builtin, on: memLoc)
     }
   }
@@ -848,7 +861,7 @@ private struct EscapesToInstructionVisitor : EscapeVisitor {
     if user == target {
       return .abort
     }
-    if user is ReturnInstruction {
+    if user.isReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }

@@ -1715,6 +1715,12 @@ public:
         auto globalActor = newFnTy->getGlobalActor();
         auto addedActor = oldFnTy->getExtInfo().withGlobalActor(globalActor);
 
+        // With `GlobalActorIsolatedTypesUsability` enabled `@MainActor` always
+        // implies `@Sendable`.
+        if (oldFnTy->getASTContext().LangOpts.hasFeature(
+                Feature::GlobalActorIsolatedTypesUsability))
+          addedActor = addedActor.withSendable();
+
         return oldFnTy->withExtInfo(addedActor) == newFnTy;
       }
     }
@@ -1734,11 +1740,11 @@ public:
           return false;
 
         // old type MUST NOT have nonisolated(nonsending).
-        if (oldFnTy->getIsolation().isNonIsolatedCaller())
+        if (oldFnTy->getIsolation().isNonisolatedNonsending())
           return false;
 
         // new type MUST nonisolated(nonsending)
-        if (!newFnTy->getIsolation().isNonIsolatedCaller())
+        if (!newFnTy->getIsolation().isNonisolatedNonsending())
           return false;
 
         // See if setting isolation of old type to nonisolated(nonsending)
@@ -2100,10 +2106,18 @@ static void emitRawApply(SILGenFunction &SGF,
     else
       errorAddrOrType = substFnConv.getSILErrorType(SGF.getTypeExpansionContext());
 
-    SILBasicBlock *errorBB =
-      SGF.getTryApplyErrorDest(loc, substFnType, prevExecutor,
-                                *errorAddrOrType,
-                               options.contains(ApplyFlags::DoesNotThrow));
+    bool suppressErrorPath = options.contains(ApplyFlags::DoesNotThrow);
+
+    // If we're constructing a no-throw function and emitting a throws(Never)
+    // try_apply, we also want to emit the error branch as unreachable.
+    if (!suppressErrorPath &&
+        !SGF.F.getLoweredFunctionType()->hasErrorResult() &&
+        substFnType->getErrorResult().getInterfaceType()->isNever()) {
+      suppressErrorPath = true;
+    }
+
+    SILBasicBlock *errorBB = SGF.getTryApplyErrorDest(
+        loc, substFnType, prevExecutor, *errorAddrOrType, suppressErrorPath);
 
     options -= ApplyFlags::DoesNotThrow;
     SGF.B.createTryApply(loc, fnValue, subs, argValues, normalBB, errorBB,
@@ -3177,7 +3191,8 @@ done:
 
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
-      case ActorIsolation::CallerIsolationInheriting:
+      case ActorIsolation::NonisolatedConcurrent:
+      case ActorIsolation::NonisolatedNonsending:
       case ActorIsolation::NonisolatedUnsafe:
         llvm_unreachable("Not isolated");
       }
@@ -3485,6 +3500,11 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     return ManagedValue();
   };
   
+  // See through opaque value placeholders, e.g. the for-each sequence.
+  if (auto *OV = dyn_cast<OpaqueValueExpr>(expr)) {
+    if (auto *underlying = OpaqueExprs.lookup(OV))
+      expr = underlying;
+  }
   if (auto le = dyn_cast<LoadExpr>(expr)) {
     expr = le->getSubExpr();
   }
@@ -3493,6 +3513,23 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
       if (auto addr = getVariableAddressableBuffer(param, expr,
                                                    ownership)) {
         return ManagedValue::forBorrowedAddressRValue(addr);
+      }
+    }
+  }
+  if (auto ae = dyn_cast<ApplyExpr>(expr)) {
+    if (auto declRef = ae->getFn()->getReferencedDecl()) {
+      if (declRef.getDecl()->getModuleContext()->isBuiltinModule()) {
+        auto &builtinInfo
+          = SGM.M.getBuiltinInfo(declRef.getDecl()->getBaseIdentifier());
+        // TODO: Support things like Builtin.makeBorrow(Builtin.borrowAt(p)).
+        // We should call a SGF.tryEmitBuiltinAsAddres() helper here. But
+        // CallEmission does not have a way to query ahead of time whether its
+        // result will be loaded into its RValue result.
+        if (builtinInfo.ID == BuiltinValueKind::BorrowAt) {
+          SGM.diagnose(expr, diag::not_implemented,
+                       "Builtin.borrowAt must be direclty returned from a "
+                       "borrow accessor");
+        }
       }
     }
   }
@@ -5481,9 +5518,6 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
   // Get the callee type information.
   auto calleeTypeInfo = callee.getTypeInfo(SGF);
 
-  std::optional<ManagedValue> self;
-  auto fnValue = callee.getFnValue(SGF, self);
-
   // Evaluate the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
   std::optional<SILLocation> uncurriedLoc;
@@ -5493,6 +5527,12 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
       uncurriedArgs, uncurriedLoc);
 
   auto selfArgMV = uncurriedArgs.back();
+
+  std::optional<ManagedValue> self;
+  if (callee.requiresSelfValueForDispatch()) {
+    self = selfArgMV;
+  }
+  auto fnValue = callee.getFnValue(SGF, self);
 
   // Strip the unnecessary copy_value + mark_unresolved_non_copyable_value +
   // begin_borrow instructions added for move-only self argument.
@@ -5793,10 +5833,17 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     }
   }
 
-  SILValue rawResult = SGF.B.createBuiltin(
+  auto rawResult = SGF.B.createBuiltin(
       loc, builtinName,
       substConv.getSILResultType(SGF.getTypeExpansionContext()),
       callee.getSubstitutions(), rawArgs);
+
+  // Handle some special cases for specific builtins.
+  if (builtinName.is(getBuiltinName(BuiltinValueKind::AddTaskLocalValue))) {
+    SGF.addEmissionFinalizer([rawResult](SILGenFunction &SGF) {
+      SGF.finalizeAddTaskLocalValue(rawResult);
+    });
+  }
 
   if (argScope.has_value())
     std::move(argScope)->pop();
@@ -6195,7 +6242,8 @@ RValue SILGenFunction::emitApply(
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedConcurrent:
+    case ActorIsolation::NonisolatedNonsending:
     case ActorIsolation::NonisolatedUnsafe:
       llvm_unreachable("Not isolated");
       break;
@@ -6397,8 +6445,15 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   SILBasicBlock *normalBB = createBasicBlock();
   B.createTryApply(loc, fn, subs, args, normalBB, errorBB);
 
-  // Emit the rethrow logic.
-  {
+  if (!F.getLoweredFunctionType()->hasErrorResult()) {
+    // Thunks to convert from throws(Never) to non-throwing functions
+    // can end up here. Since the callee cannot actually throw, emit
+    // an unreachable in the error branch.
+    ASSERT(silFnType->getErrorResult().getInterfaceType()->isNever());
+    B.emitBlock(errorBB);
+    B.createUnreachable(loc);
+  } else {
+    // Emit the rethrow logic.
     B.emitBlock(errorBB);
 
     Scope scope(Cleanups, CleanupLocation(loc));
@@ -7413,6 +7468,17 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
     if (selfParam.isConsumedInCaller() || base.getType().isAddressOnly(SGF.F)) {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
+      
+      // If the base is move only and a +0 value, then the copy we're about to emit is invalid
+      // and will later be diagnosed by the move checker. We'll mark the base as unresolved
+      // to give the move checker a chance to salvage things if it can eliminate the copy.
+      if (selfParam.isConsumedInCaller() && !shouldTake && base.getType().isMoveOnly() &&
+          !isa<MarkUnresolvedNonCopyableValueInst>(base.getValue())) {
+          auto marked = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+              loc, base.getValue(),
+              MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+          base = ManagedValue::forBorrowedAddressRValue(marked);
+      }
 
       auto isGuaranteed = selfParam.isGuaranteedInCaller();
 

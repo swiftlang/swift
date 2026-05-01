@@ -3,6 +3,9 @@
 // RUN: %empty-directory(%t)
 import _Differentiation
 
+// Missing the field on FreeBSD (rdar://173266760)
+// XFAIL: OS=freebsd
+
 // RUN: %target-build-swift -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/AutoDiffTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
 // RUN: %target-build-swift -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/AutoDiffTypes.swift %S/Inputs/main.swift -emit-module -emit-executable -module-name TypesToReflect -o %t/TypesToReflect
 
@@ -14,4 +17,3 @@ import _Differentiation
 // CHECK: TypesToReflect.HasAutoDiffTypes
 // CHECK: aFunction: @differentiable(reverse) (Swift.Float) -> Swift.Float
 // CHECK: (function differentiable=reverse
-

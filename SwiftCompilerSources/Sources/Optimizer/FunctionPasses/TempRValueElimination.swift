@@ -109,12 +109,18 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
     return
   }
 
-  liverange.moveDebugValuesIntoLiverange(of: allocStack, after: copy.loadingInstruction)
+  liverange.moveDebugValuesIntoLiverange(debugUsers: allocStackUses.debugUsers, after: copy.loadingInstruction)
   liverange.extendAccessScopes()
 
   if !copy.isTakeOfSource {
     removeDestroys(users: allocStackUses.users, context)
   }
+
+  // Dead projection instructions can appear outside of the liverange in case they were only
+  // used by an (now deleted) `debug_value` or `destroy_addr` instruction.
+  // We need to delete such dead projections to avoid use-after-consume ownership violations.
+  var deadProjectionDeleter = DeadProjectionDeleter(context: context)
+  _ = deadProjectionDeleter.walkDownUses(ofAddress: allocStack, path: UnusedWalkingPath())
 
   allocStack.uses.ignore(usersOfType: DeallocStackInst.self).replaceAll(with: copy.sourceAddress, context)
 
@@ -158,6 +164,11 @@ private extension AllocStackInst {
 
     liferange.insert(contentsOf: uses.ignore(usersOfType: DeallocStackInst.self).lazy.map { $0.instruction })
 
+    guard liferange.exitBlocks.isEmpty else {
+      // If there is no use on a path leaving the liverange, we don't know how the value is destroyed there.
+      return false
+    }
+
     for use in uses {
       switch use.instruction {
       case is DeallocStackInst, is DestroyAddrInst:
@@ -178,10 +189,12 @@ private extension AllocStackInst {
 /// Collects all uses of the `alloc_stack`.
 private struct UseCollector : AddressDefUseWalker {
   private(set) var users: Stack<Instruction>
+  private(set) var debugUsers: Stack<DebugValueInst>
   private let copy: CopyLikeInstruction
 
   init(copy: CopyLikeInstruction, _ context: FunctionPassContext) {
     self.users = Stack(context)
+    self.debugUsers = Stack(context)
     self.copy = copy
   }
 
@@ -192,17 +205,14 @@ private struct UseCollector : AddressDefUseWalker {
     return true
   }
 
-  public mutating func walkDown(address operand: Operand, path: UnusedWalkingPath) -> WalkResult {
+  mutating func walkDown(address operand: Operand, path: UnusedWalkingPath) -> WalkResult {
     switch operand.instruction {
     case let openExistential as OpenExistentialAddrInst:
       if !openExistential.isImmutable {
         return.abortWalk
       }
-    case let takeEnum as UncheckedTakeEnumDataAddrInst:
-      // In certain cases, `unchecked_take_enum_data_addr` invalidates the underlying memory.
-      if takeEnum.mayBeDestructive {
-        return .abortWalk
-      }
+    case is UncheckedTakeEnumDataAddrInst:
+      return .abortWalk
     case let beginAccess as BeginAccessInst:
       if beginAccess.accessKind != .read {
         return .abortWalk
@@ -279,7 +289,11 @@ private struct UseCollector : AddressDefUseWalker {
       users.append(address.instruction)
       return .continueWalk
 
-    case is DebugValueInst, is DeallocStackInst:
+    case let debugValue as DebugValueInst:
+      debugUsers.append(debugValue)
+      return .continueWalk
+
+    case is DeallocStackInst:
       return .continueWalk
 
     default:
@@ -297,12 +311,13 @@ private struct UseCollector : AddressDefUseWalker {
     return .continueWalk
   }
 
-  public mutating func unmatchedPath(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+  mutating func unmatchedPath(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     return .abortWalk
   }
 
   mutating func deinitialize() {
     users.deinitialize()
+    debugUsers.deinitialize()
   }
 }
 
@@ -414,17 +429,15 @@ private struct Liverange {
   }
 
   /// Move `debug_value` instructions, which are located _before_ the copy instruction, after the copy instruction.
-  func moveDebugValuesIntoLiverange(of allocStack: AllocStackInst, after: Instruction) {
-    for user in allocStack.users {
-      if !liverange.hasBeenPushed(user) {
-        switch user {
-        case let debugValue as DebugValueInst:
-          debugValue.move(before: after.next!, context)
-        case is DeallocStackInst, is DestroyAddrInst, is CopyAddrInst:
-          break
-        default:
-          fatalError("moving this kind of instruction is currently not supported")
-        }
+  func moveDebugValuesIntoLiverange(debugUsers: Stack<DebugValueInst>, after copy: Instruction) {
+    for debugValue in debugUsers where !liverange.hasBeenPushed(debugValue) {
+      if debugValue.operand.value is AllocStackInst {
+        debugValue.move(before: copy.next!, context)
+      } else {
+        // If the operand of the `debugValue` is a projection, the projection can be located after the `copy`.
+        // Therefore we cannot move the `debugValue` immediately after the `copy`.
+        // It's not ideal to delete the `debugValue`, however this is a very rare case.
+        context.erase(instruction: debugValue)
       }
     }
   }
@@ -485,6 +498,22 @@ private struct Liverange {
     }
   }
 
+}
+
+private struct DeadProjectionDeleter : AddressDefUseWalker {
+  let context: FunctionPassContext
+
+  mutating func walkDown(address operand: Operand, path: UnusedWalkingPath) -> WalkResult {
+    _ = walkDownDefault(address: operand, path: path)
+    if operand.instruction.isTriviallyDead {
+      context.erase(instruction: operand.instruction)
+    }
+    return .continueWalk
+  }
+
+  mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    return .continueWalk
+  }
 }
 
 private extension Instruction {

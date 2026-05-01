@@ -878,6 +878,8 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
           case AccessorKind::Read:
           case AccessorKind::Modify:
+          case AccessorKind::YieldingBorrow:
+          case AccessorKind::YieldingMutate:
           case AccessorKind::Get:
           case AccessorKind::DistributedGet:
           case AccessorKind::Set:
@@ -2212,7 +2214,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     nestedRepr = lifetime->getBase();
   }
 
-  if (auto callerIsolated = dyn_cast<CallerIsolatedTypeRepr>(nestedRepr)) {
+  if (auto callerIsolated = dyn_cast<NonisolatedNonsendingTypeRepr>(nestedRepr)) {
     nestedRepr = callerIsolated->getBase();
   }
 
@@ -2505,6 +2507,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     auto sig = AFD->getGenericSignature();
     bool hasSelf = AFD->hasImplicitSelfDecl();
+    bool isInstanceMethod = AFD->isInstanceMethod();
 
     AnyFunctionType::ExtInfoBuilder infoBuilder;
 
@@ -2546,6 +2549,16 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       SmallVector<AnyFunctionType::Param, 4> argTy;
       AFD->getParameters()->getParams(argTy);
 
+      // If we don't have the concurrency library, reject the use of 'async'.
+      ASTContext &ctx = AFD->getASTContext();
+      if (AFD->hasAsync() &&
+          AFD->getLoc(/*SerializedOK=*/false).isValid() &&
+          !ctx.getLoadedModule(ctx.Id_Concurrency) &&
+          !ctx.SILOpts.ParseStdlib) {
+        ctx.Diags.diagnose(
+            AFD->getAsyncLoc(), diag::no_concurrency_module, "async");
+      }
+
       maybeAddParameterIsolation(infoBuilder, argTy);
       infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
       infoBuilder = infoBuilder.withSendable(AFD->isSendable());
@@ -2558,8 +2571,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
           infoBuilder = infoBuilder.withSendingResult();
       }
 
-      // Lifetime dependencies only apply to the outer function type.
-      if (!hasSelf && lifetimeDependenceInfo.has_value()) {
+      // Lifetime dependencies only apply to the outer function type for
+      // instance methods.
+      if (lifetimeDependenceInfo.has_value() && !isInstanceMethod) {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
@@ -2579,7 +2593,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto selfParam = computeSelfParam(AFD);
       AnyFunctionType::ExtInfoBuilder selfInfoBuilder;
       maybeAddParameterIsolation(selfInfoBuilder, {selfParam});
-      if (lifetimeDependenceInfo.has_value()) {
+      if (lifetimeDependenceInfo.has_value() && isInstanceMethod) {
         selfInfoBuilder =
             selfInfoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
@@ -2729,13 +2743,27 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
       // or lazy type-checking, regular type-checking should go through the
       // StmtChecker and assign types before querying this, otherwise we could
       // end up double-type-checking.
-      //
-      // FIXME: We ought to be able to enable the following assert once we've
-      // fixed cases where we currently allow forward references to variables to
-      // kick interface type requests
-      // (https://github.com/swiftlang/swift/pull/85141).
-      // ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
-      //        Context.TypeCheckerOpts.EnableLazyTypecheck);
+      // FIXME: The check for 'IsForSourceKit' is a hack to workaround cases
+      // where we're doing cursor info in an invalid extension, we ought to
+      // still be type-checking decls in invalid extensions.
+      auto inSecondaryScriptFile = [&]() -> bool {
+        // FIXME: We can hit this when lazily type-checking decls in a
+        // main.swift when it's a secondary file, avoid asserting since the
+        // DeclChecker won't be run on the file. We only need to handle the
+        // secondary case since main files are always type-checked first when
+        // primary.
+        //
+        // Once we fix script variables to either be consistently local or
+        // global we can remove this.
+        auto *SF = VD->getDeclContext()->getOutermostParentSourceFile();
+        return SF && SF->isScriptMode() && !SF->isPrimary() &&
+          !SF->getParentModule()->getPrimarySourceFiles().empty();
+      };
+      ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
+             Context.LangOpts.IsForSourceKit ||
+             Context.TypeCheckerOpts.EnableLazyTypecheck ||
+             inSecondaryScriptFile() &&
+             "Querying VarDecl's type before type-checking parent stmt");
 
       // Try type checking parent control statement.
       if (auto condStmt = dyn_cast<LabeledConditionalStmt>(parentStmt)) {

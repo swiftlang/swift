@@ -1980,8 +1980,8 @@ namespace {
           return Type();
 
         // Thrown type inferred from context.
-        if (auto contextualType = CS.getContextualType(
-                closure, /*forConstraint=*/false)) {
+        if (auto contextualType =
+                CS.getContextualType(closure, /*forConstraint=*/false)) {
           if (auto fnType = contextualType->getAs<AnyFunctionType>()) {
             if (Type thrownErrorTy = fnType->getThrownError())
               return thrownErrorTy;
@@ -2052,12 +2052,9 @@ namespace {
         if (hasIsolatedParameter(closureParams))
           return FunctionTypeIsolation::forParameter();
 
-        // Honor an explicit global actor.  This is suppressed if the
-        // closure is async (but should it be?).
-        if (!extInfo.isAsync()) {
-          if (auto actorType = getExplicitGlobalActor(closure))
-            return FunctionTypeIsolation::forGlobalActor(actorType);
-        }
+        // Honor an explicit global actor.
+        if (auto actorType = getExplicitGlobalActor(closure))
+          return FunctionTypeIsolation::forGlobalActor(actorType);
 
         if (closure->getAttrs().hasAttribute<ConcurrentAttr>()) {
           return FunctionTypeIsolation::forNonIsolated();
@@ -3639,12 +3636,7 @@ namespace {
       return member == "trigger_fallback_diagnostic";
     }
 
-    enum class TypeOperation { None,
-                               Join,
-                               JoinInout,
-                               JoinMeta,
-                               JoinNonexistent,
-    };
+    enum class TypeOperation { None, Join };
 
     static TypeOperation getTypeOperation(UnresolvedDotExpr *UDE,
                                           ASTContext &Context) {
@@ -3658,9 +3650,6 @@ namespace {
       return llvm::StringSwitch<TypeOperation>(
                  UDE->getName().getBaseIdentifier().str())
           .Case("type_join", TypeOperation::Join)
-          .Case("type_join_inout", TypeOperation::JoinInout)
-          .Case("type_join_meta", TypeOperation::JoinMeta)
-          .Case("type_join_nonexistent", TypeOperation::JoinNonexistent)
           .Default(TypeOperation::None);
     }
 
@@ -3668,81 +3657,23 @@ namespace {
       auto *lhs = Args->getExpr(0);
       auto *rhs = Args->getExpr(1);
 
-      switch (op) {
-      case TypeOperation::None:
-        llvm_unreachable(
-            "We should have a valid type operation at this point!");
+      ASSERT(op == TypeOperation::Join &&
+             "We should have a valid type operation at this point!");
 
-      case TypeOperation::Join: {
-        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsMeta || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
+      auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
+      auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
+      if (!lhsMeta || !rhsMeta)
+        ABORT("Unexpected argument types for Builtin.type_join!");
 
-        auto &ctx = lhsMeta->getASTContext();
+      auto &ctx = CS.getASTContext();
 
-        auto join =
-            Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
+      auto join =
+          Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
 
-        if (!join)
-          return ErrorType::get(ctx);
+      if (!join)
+        return ErrorType::get(ctx);
 
-        return MetatypeType::get(*join, ctx)->getCanonicalType();
-      }
-
-      case TypeOperation::JoinInout: {
-        auto lhsInOut = CS.getType(lhs)->getAs<InOutType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsInOut || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
-
-        auto &ctx = lhsInOut->getASTContext();
-
-        auto join =
-            Type::join(lhsInOut, rhsMeta->getInstanceType());
-
-        if (!join)
-          return ErrorType::get(ctx);
-
-        return MetatypeType::get(*join, ctx)->getCanonicalType();
-      }
-
-      case TypeOperation::JoinMeta: {
-        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsMeta || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join!");
-
-        auto &ctx = lhsMeta->getASTContext();
-
-        auto join = Type::join(lhsMeta, rhsMeta);
-
-        if (!join)
-          return ErrorType::get(ctx);
-
-        return *join;
-      }
-
-      case TypeOperation::JoinNonexistent: {
-        auto lhsMeta = CS.getType(lhs)->getAs<MetatypeType>();
-        auto rhsMeta = CS.getType(rhs)->getAs<MetatypeType>();
-        if (!lhsMeta || !rhsMeta)
-          llvm_unreachable("Unexpected argument types for Builtin.type_join_nonexistent!");
-
-        auto &ctx = lhsMeta->getASTContext();
-
-        auto join =
-            Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
-
-        // Verify that we could not compute a join.
-        if (join)
-          llvm_unreachable("Unexpected result from join - it should not have been computable!");
-
-        // The return value is unimportant.
-        return MetatypeType::get(ctx.getAnyExistentialType())->getCanonicalType();
-      }
-      }
-      llvm_unreachable("unhandled operation");
+      return MetatypeType::get(*join, ctx)->getCanonicalType();
     }
 
     /// Assuming that we are solving for code completion, assign \p expr a fresh
@@ -4034,7 +3965,6 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
                                            Pattern *typeCheckedPattern,
                                            bool shouldBindPatternVarsOneWay) {
   auto &ctx = cs.getASTContext();
-  bool isBorrowing = ctx.LangOpts.hasFeature(Feature::BorrowingForLoop);
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getSequence();
 
@@ -4043,9 +3973,7 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
   // contextual type for diagnostics.
   auto *sequenceProto = TypeChecker::getProtocol(
       ctx, stmt->getForLoc(),
-      isAsync ? KnownProtocolKind::AsyncSequence
-              : (isBorrowing ? KnownProtocolKind::BorrowingSequence
-                             : KnownProtocolKind::Sequence));
+      isAsync ? KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
   if (!sequenceProto)
     return true;
 

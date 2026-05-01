@@ -1,5 +1,5 @@
 // We need Objective-C support for this test
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(anyAppleOS)
 
 import Foundation
 import RoundTrip

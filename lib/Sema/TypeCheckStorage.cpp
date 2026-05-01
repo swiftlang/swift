@@ -3013,13 +3013,8 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
     }
   }
 
-  // Non-stable modules have no ABI to keep stable.
-  if (storage->getModuleContext()->getResilienceStrategy() !=
-      ResilienceStrategy::Resilient)
-    return false;
-
   // Non-exported storage has no ABI to keep stable.
-  if (isExported(storage) == ExportedLevel::None)
+  if (isExported(storage) != ExportedLevel::Exported)
     return false;
 
   // The non-underscored accessor is not present, the underscored accessor
@@ -4451,7 +4446,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   if (borrow || mutate) {
     if (auto *extDecl = dyn_cast<ExtensionDecl>(DC)) {
       auto extNominal = extDecl->getExtendedNominal();
-      if (!isa<StructDecl>(extNominal)) {
+      if (!isa<StructDecl>(extNominal) && !isa<EnumDecl>(extNominal) &&
+          !isa<ClassDecl>(extNominal)) {
         if (borrow) {
           storage->getASTContext().Diags.diagnose(
               borrow->getLoc(),

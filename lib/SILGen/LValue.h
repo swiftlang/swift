@@ -105,6 +105,7 @@ public:
     AddressorKind,              // var/subscript addressor
     CoroutineAccessorKind,      // coroutine accessor
     ValueKind,                  // random base pointer as an lvalue
+    OptionalAddressKind,            // optional address projection
     PhysicalKeyPathApplicationKind, // applying a key path
     BorrowValueKind,            // load_borrow the base rvalue for a projection
     BorrowMutateKind,           // borrow and mutate accessor
@@ -127,6 +128,7 @@ public:
     FirstLogicalKind = GetterSetterKind,
     FirstTranslationKind = OrigToSubstKind,
   };
+
 private:
   const KindTy Kind : 8;
 
@@ -496,6 +498,10 @@ public:
   /// abstraction pattern, make an l-value trafficking in values
   /// following the substituted abstraction pattern.
   void addOrigToSubstComponent(SILType loweredResultType);
+
+  /// Add a force value expr component that will apply a force value expr to the
+  /// LValue.
+  void addForceValueComponent(bool isObject, bool isImplicitOptional);
 
   typedef std::vector<std::unique_ptr<PathComponent>>::iterator iterator;
   typedef std::vector<std::unique_ptr<PathComponent>>::const_iterator

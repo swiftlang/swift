@@ -51,6 +51,15 @@ struct Plus100Eagle: Bird {
   }
 }
 
+// A non-bird seed eater. Relies on the default implementation for containsChirps.
+struct Human: SeedEater {
+  public func eatSeed(_ food: Int) -> Int { 0 }
+  public typealias Kind = UInt
+  public var seedKinds: UInt {
+    get { 0 }
+  }
+}
+
 extension UInt: @retroactive AsInt {
   public func asInt() -> Int { return Int(self) }
 }
@@ -77,6 +86,11 @@ ProtocolAddReparentedTest.test("Some Types") {
     expectEqual(SomeType.feed(💯, clientVersion), base + 100)
     expectEqual(SomeType.count(💯, clientVersion), base + 100)
   }
+
+  do {
+    expectEqual(willChirp(Human()), false)
+    expectEqual(willChirp(Plus100Eagle()), true)
+  }
   #endif
 }
 
@@ -102,6 +116,21 @@ ProtocolAddReparentedTest.test("Existential Types") {
     expectEqual(ExistentialType.count(💯, clientVersion), base + 100)
   }
   #endif
+}
+
+
+struct MultiParentConformer: MultiParent {
+  func helloA() -> Int { clientVersion }
+  func helloC() -> Int { clientVersion }
+  func helloE() -> Int { clientVersion }
+}
+
+ProtocolAddReparentedTest.test("MultiParent") {
+  let mpc = MultiParentConformer()
+  // 3 methods defined in client, 1 in the library, and the library *might* be new and provide the 5th one.
+  let ans = (3 * clientVersion) + 10 + libraryVersion()
+  expectEqual(library_testMultiParent_someType(mpc), ans)
+  expectEqual(library_testMultiParent_anyType(mpc), ans)
 }
 
 runAllTests()

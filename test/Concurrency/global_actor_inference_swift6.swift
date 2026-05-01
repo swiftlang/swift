@@ -67,13 +67,11 @@ struct WrapperOnActor<Wrapped: Sendable> {
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
 
-  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
   public var wrappedValue: Wrapped // expected-note {{property declared here}}
 
   public var accessCount: Int
 
   nonisolated public init(wrappedValue: Wrapped) {
-    // expected-error@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a nonisolated context}}
     self.wrappedValue = wrappedValue
   }
 }
@@ -172,8 +170,7 @@ struct S2: InferMainActorInherited {
 // expected-error@+2{{conformance of 'S3' to protocol 'InferMainActorInherited' involves isolation mismatches and can cause data races}}
 @SomeGlobalActor
 struct S3: InferenceConflict {
-  // expected-note@-1{{mark all declarations used in the conformance 'nonisolated'}}
-  // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
   nonisolated func g() { }
 }
 
@@ -181,6 +178,7 @@ extension S3 {
 
   func f() { }
   // expected-note@-1{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot satisfy main actor-isolated requirement}}
+  // expected-note@-2{{mark instance method 'f()' 'nonisolated'}}{{3-3=nonisolated }}
 }
 
 @MainActor
@@ -206,13 +204,13 @@ protocol InferenceConflictWithSuperclass: MainActorSuperclass, InferSomeGlobalAc
 // expected-error@+1{{conformance of 'C2' to protocol 'InferenceConflictWithSuperclass' crosses into main actor-isolated code and can cause data races}}
 class C2: MainActorSuperclass, InferenceConflictWithSuperclass {
   //expected-note@-1 {{turn data races into runtime errors with '@preconcurrency'}}
-  // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
-  // expected-note@-3{{isolate this conformance to the main actor with '@MainActor'}}
+  // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
 
   func f() {}
 
   func g() {}
   // expected-note@-1 {{main actor-isolated instance method 'g()' cannot satisfy nonisolated requirement}}
+  // expected-note@-2{{mark instance method 'g()' 'nonisolated'}}{{3-3=nonisolated }}
 }
 
 

@@ -52,7 +52,7 @@ public func nonEscaping(_ len: CInt) -> UnsafeBufferPointer<CInt> {
 @_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
 public func lifetimeDependentCopy(_ p: Span<CInt>, _ len2: CInt) -> Span<CInt> {
     let len1 = CInt(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeBufferPointer {
+    let _pPtr = p.withUnsafeBufferPointer {
         unsafe $0
     }
     defer {

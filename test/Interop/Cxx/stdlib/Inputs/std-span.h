@@ -201,4 +201,19 @@ struct IMMORTAL_FRT DependsOnSelfFRT {
   }
 };
 
+struct NonCopyable {
+  NonCopyable(int n) : number(n) {}
+  NonCopyable(const NonCopyable &other) = delete;
+  NonCopyable(NonCopyable &&other) = default;
+  ~NonCopyable() {}
+  int number;
+};
+
+using SpanOfNonCopyable = std::span<NonCopyable>;
+
+inline SpanOfNonCopyable makeSpanOfNonCopyable() {
+  static NonCopyable arr[]{1, 2, 3};
+  return SpanOfNonCopyable(arr);
+}
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H

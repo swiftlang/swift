@@ -68,6 +68,8 @@ protected:
     : super(IGM), Target(target), VTable(vtable) {}
 
 public:
+  const SILVTable *getVTable() const { return VTable; }
+
   bool isPureObjC() const {
     return Target->getObjCImplementationDecl();
   }
@@ -77,8 +79,7 @@ public:
   // The regular `layout` method can be used for layout tasks for which the
   // actual superclass pointer is not relevant.
   void layoutEmbedded(CanType classTy) {
-    if (IGM.isEmbeddedWithExistentials())
-      asImpl().addValueWitnessTable();
+    asImpl().addValueWitnessTable();
     asImpl().noteAddressPoint();
     asImpl().addEmbeddedSuperclass(classTy);
     asImpl().addDestructorFunction();
@@ -91,8 +92,7 @@ public:
                   "Adjustment index must be synchronized with this layout");
 
     if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-      if (IGM.isEmbeddedWithExistentials())
-        asImpl().addValueWitnessTable();
+      asImpl().addValueWitnessTable();
       asImpl().noteAddressPoint();
       asImpl().addSuperclass();
       asImpl().addDestructorFunction();
@@ -110,6 +110,8 @@ public:
       asImpl().addClassDataPointer();
       return;
     }
+
+    asImpl().addConformanceTable();
 
     // Pointer to layout string
     asImpl().addLayoutStringPointer();
@@ -290,6 +292,16 @@ public:
   void addNominalTypeDescriptor() { addPointer(); }
   void addIVarDestroyer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
+
+  void addConformanceTable() {
+    if (!this->VTable)
+      return;
+    
+    for (unsigned i = 0, e = this->VTable->getConformances().size(); i < e; ++i) {
+      addPointer();
+    }
+  }
+
   void addLayoutStringPointer() { addPointer(); }
   void addDestructorFunction() { addPointer(); }
   void addSuperclass() { addPointer(); }

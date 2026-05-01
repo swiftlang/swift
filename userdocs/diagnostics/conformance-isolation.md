@@ -20,15 +20,15 @@ struct MyData: P {
 This code will produce an error similar to:
 
 ```swift
-| @MainActor
-| struct MyData: P {
-|        |- error: conformance of 'MyData' to protocol 'P' crosses into main actor-isolated code and can cause data races
-|        |- note: isolate this conformance to the main actor with '@MainActor'
-|        |- note: mark all declarations used in the conformance 'nonisolated'
-|        `- note: turn data races into runtime errors with '@preconcurrency'
-|   func f() { }
-|        `- note: main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement
-| }
+@MainActor
+struct MyData: P {
+            // |- error: conformance of 'MyData' to protocol 'P' crosses into main actor-isolated code and can cause data races
+            // |- note: isolate this conformance to the main actor with '@MainActor'
+            // `- note: turn data races into runtime errors with '@preconcurrency'
+  func f() { }
+    // |- note: main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement
+    // `- note: mark instance method 'f()' 'nonisolated'
+}
 ```
 
 There are several options for resolving this error, as indicated by the notes:
@@ -41,6 +41,14 @@ There are several options for resolving this error, as indicated by the notes:
   }
   ```
 
+* If the protocol requirements themselves are meant to always be used from the correct isolation domain (for example, the main actor) but the protocol itself did not describe that requirement, the conformance can be marked with `@preconcurrency`. This approach moves isolation checking into a run-time assertion, which will produce a fatal error if an operation is called without already being on the right actor. A `@preconcurrency` conformance can be written as follows:
+  ```swift
+  @MainActor
+  struct MyData: @preconcurrency P {
+    func f() { }
+  }
+  ```
+
 * If the conformance needs to be usable anywhere, then each of the operations used to satisfy its requirements must be marked `nonisolated`. This means that they will not have access to any actor-specific operations or state, because these operations can be called concurrently from anywhere. The result would look like this:
   ```swift
   @MainActor
@@ -49,10 +57,30 @@ There are several options for resolving this error, as indicated by the notes:
   }
   ```
 
-* If the protocol requirements themselves are meant to always be used from the correct isolation domain (for example, the main actor) but the protocol itself did not describe that requirement, the conformance can be marked with `@preconcurrency`. This approach moves isolation checking into a run-time assertion, which will produce a fatal error if an operation is called without already being on the right actor. A `@preconcurrency` conformance can be written as follows:
-  ```swift
-  @MainActor
-  struct MyData: @preconcurrency P {
-    func f() { }
-  }
-  ```
+## Stored Properties
+
+When conforming to a protocol that has read only properties, there is an additional option; defining properties as `nonisolated let`. This makes them immutable and concurrently accessible. For example:
+
+```swift
+@MainActor
+class MyModel: ObservableObject, Identifiable {
+  var id = UUID()
+   // |- note: main actor-isolated property 'id' cannot satisfy nonisolated requirement
+   // `- note: change property 'id' to a 'nonisolated let' constant
+  var count = 0
+}
+```
+
+By changing `id` from `var` to `nonisolated let`, any generic code that works with `Identifiable` can safely read `id` from any isolation region:
+
+```swift
+@MainActor
+class MyModel: ObservableObject, Identifiable {
+  nonisolated let id = UUID()
+  var count = 0
+}
+```
+
+## See Also
+
+- [Isolated conformances](isolated-conformances.md)

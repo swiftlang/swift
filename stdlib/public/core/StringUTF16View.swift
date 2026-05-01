@@ -728,14 +728,6 @@ extension String.Index {
   }
 }
 
-// Breadcrumb-aware acceleration
-extension _StringGuts {
-  @inline(__always)
-  fileprivate func _useBreadcrumbs(forEncodedOffset offset: Int) -> Bool {
-    return hasBreadcrumbs && offset >= _StringBreadcrumbs.breadcrumbStride
-  }
-}
-
 extension String.UTF16View {
   
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
@@ -775,7 +767,7 @@ extension String.UTF16View {
   internal func _utf16Distance(from start: Index, to end: Index) -> Int {
     _internalInvariant(end.transcodedOffset == 0 || end.transcodedOffset == 1)
         
-    return unsafe (end.transcodedOffset - start.transcodedOffset) + _guts.withFastUTF8(
+    return (end.transcodedOffset - start.transcodedOffset) + _guts.withFastUTF8(
       range: start._encodedOffset ..< end._encodedOffset
     ) { utf8 in
       let rawBuffer = UnsafeRawBufferPointer(utf8)
@@ -863,18 +855,17 @@ extension String.UTF16View {
     if idx == startIndex { return 0 }
 
     let idx = _utf16AlignNativeIndex(idx)
+    
+    // Simple and common: endIndex aka `length`.
+    if idx == endIndex {
+      return _guts.getUTF16Count()
+    }
 
     guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
       return _utf16Distance(from: startIndex, to: idx)
     }
 
     let breadcrumbs = unsafe _guts.loadUnmanagedBreadcrumbs()
-
-    // Simple and common: endIndex aka `length`.
-    if idx == endIndex {
-      return unsafe breadcrumbs._withUnsafeGuaranteedRef { $0.utf16Length }
-    }
-
     return unsafe breadcrumbs._withUnsafeGuaranteedRef { crumbs in
       // Otherwise, find the nearest lower-bound breadcrumb and count from there
       // FIXME: Starting from the upper-bound crumb when that is closer would
@@ -906,16 +897,24 @@ extension String.UTF16View {
         _encodedOffset: offset
       )._scalarAligned._encodingIndependent
     }
+    
+    let useCrumbs = _guts._useBreadcrumbs(forEncodedOffset: offset)
+    
+    if _guts.hasOneCrumb || useCrumbs {
+      // Simple and common: endIndex aka `length`.
+      let utf16Count = _guts.getUTF16Count()
+      if offset == utf16Count {
+        _internalInvariant(endIndex == _index(
+          startIndex, offsetBy: offset)._knownUTF8)
+        return endIndex
+      }
+    }
 
-    guard _guts._useBreadcrumbs(forEncodedOffset: offset) else {
+    guard useCrumbs else {
       return _index(startIndex, offsetBy: offset)._knownUTF8
     }
 
-    // Simple and common: endIndex aka `length`.
     let breadcrumbs = unsafe _guts.loadUnmanagedBreadcrumbs()
-    let utf16Count = unsafe breadcrumbs._withUnsafeGuaranteedRef { $0.utf16Length }
-    if offset == utf16Count { return endIndex }
-
     // Otherwise, find the nearest lower-bound breadcrumb and advance that
     // FIXME: Starting from the upper-bound crumb when that is closer would cut
     // the average cost of the subsequent iteration by 50%.
@@ -925,7 +924,7 @@ extension String.UTF16View {
     _internalInvariant(crumb._canBeUTF8 && crumb._encodedOffset <= _guts.count)
     if remaining == 0 { return crumb }
 
-    return unsafe _guts.withFastUTF8 { utf8 in
+    return _guts.withFastUTF8 { utf8 in
       var readIdx = crumb._encodedOffset
       let readEnd = utf8.count
       _internalInvariant(readIdx < readEnd)
@@ -997,7 +996,7 @@ extension String.UTF16View {
     if _slowPath(range.isEmpty) { return }
     
     let isASCII = _guts.isASCII
-    return unsafe _guts.withFastUTF8 { utf8 in
+    return _guts.withFastUTF8 { utf8 in
       var writeIdx = 0
       let writeEnd = buffer.count
       var readIdx = range.lowerBound._encodedOffset

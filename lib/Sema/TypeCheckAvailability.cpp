@@ -265,6 +265,25 @@ const {
     }
   }
 
+  // Allow references to hidden dependencies from `@c/objc @implementation`
+  // decl signatures.
+  if (getDeclContext()->isInObjCImplementationContext()) {
+    switch (originKind) {
+    case DisallowedOriginKind::None:
+    case DisallowedOriginKind::NonPublicImport:
+    case DisallowedOriginKind::InternalBridgingHeaderImport:
+    case DisallowedOriginKind::ImplementationOnly:
+    case DisallowedOriginKind::SPIOnly:
+      return DiagnosticBehavior::Ignore;
+    case DisallowedOriginKind::SPIImported:
+    case DisallowedOriginKind::SPILocal:
+    case DisallowedOriginKind::MissingImport:
+    case DisallowedOriginKind::FragileCxxAPI:
+    case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
+      break;
+    }
+  }
+
   // Exportability checking for non-library-evolution was introduced late,
   // downgrade errors to warnings by default.
   auto &ctx = DC->getASTContext();
@@ -852,9 +871,7 @@ static void fixAvailabilityByAddingVersionCheck(
       .fixItReplace(RangeToWrap, IfText);
 }
 
-/// Emit suggested Fix-Its for a reference with to an unavailable symbol
-/// requiting the given OS version range.
-static void fixAvailability(SourceRange ReferenceRange,
+void swift::fixAvailability(SourceRange ReferenceRange,
                             const DeclContext *ReferenceDC,
                             AvailabilityDomain Domain,
                             const AvailabilityRange &RequiredAvailability,

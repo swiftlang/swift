@@ -45,9 +45,7 @@ extension SerialExecutor {
   ///   - line: The line number to print if the assertion fails The default value is
   ///           the line where this method was called.
   @available(SwiftStdlib 5.1, *)
-  #if !$Embedded
   @backDeployed(before: SwiftStdlib 5.9)
-  #endif
   @_unavailableInEmbedded
   public func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
@@ -94,9 +92,7 @@ extension Actor {
   ///   - line: The line number to print if the assertion fails The default is
   ///           where this method was called.
   @available(SwiftStdlib 5.1, *)
-  #if !$Embedded
   @backDeployed(before: SwiftStdlib 5.9)
-  #endif
   @_unavailableInEmbedded
   public nonisolated func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
@@ -144,9 +140,7 @@ extension GlobalActor {
   ///   - line: The line number to print if the assertion fails The default is
   ///           where this method was called.
   @available(SwiftStdlib 5.1, *)
-  #if !$Embedded
   @backDeployed(before: SwiftStdlib 5.9)
-  #endif
   @_unavailableInEmbedded
   public static func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
@@ -186,9 +180,7 @@ extension SerialExecutor {
   ///   - line: The line number to print if the assertion fails The default is
   ///           where this method was called.
   @available(SwiftStdlib 5.1, *)
-  #if !$Embedded
   @backDeployed(before: SwiftStdlib 5.9)
-  #endif
   @_unavailableInEmbedded
   public func assertIsolated(
       _ message: @autoclosure () -> String = String(),
@@ -235,9 +227,7 @@ extension Actor {
   ///   - line: The line number to print if the assertion fails The default is
   ///           where this method was called.
   @available(SwiftStdlib 5.1, *)
-  #if !$Embedded
   @backDeployed(before: SwiftStdlib 5.9)
-  #endif
   @_unavailableInEmbedded
   public nonisolated func assertIsolated(
       _ message: @autoclosure () -> String = String(),
@@ -283,9 +273,7 @@ extension GlobalActor {
   ///   - line: The line number to print if the assertion fails The default is
   ///           where this method was called.
   @available(SwiftStdlib 5.1, *)
-  #if !$Embedded
   @backDeployed(before: SwiftStdlib 5.9)
-  #endif
   @_unavailableInEmbedded
   public static func assertIsolated(
       _ message: @autoclosure () -> String = String(),

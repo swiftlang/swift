@@ -539,7 +539,8 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
     llvm_unreachable("decl cannot have dynamic isolation");
 
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedConcurrent:
+  case ActorIsolation::NonisolatedNonsending:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     return false;
@@ -3565,6 +3566,7 @@ private:
     WrongWritability,
     WrongRequiredAttr,
     WrongForeignErrorConvention,
+    WrongParameterOwnership,
     WrongSendability,
 
     Match,
@@ -3897,10 +3899,20 @@ private:
       if (reqCtor->isRequired() != cast<ConstructorDecl>(cand)->isRequired())
         return MatchOutcome::WrongRequiredAttr;
 
-    if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req))
+    if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req)) {
+      auto candAFD = cast<AbstractFunctionDecl>(cand);
       if (reqAFD->getForeignErrorConvention() !=
-              cast<AbstractFunctionDecl>(cand)->getForeignErrorConvention())
+          candAFD->getForeignErrorConvention())
         return MatchOutcome::WrongForeignErrorConvention;
+      for (auto [reqParam, candParam] :
+           llvm::zip(*reqAFD->getParameters(), *candAFD->getParameters())) {
+        // In case the ObjC owership is unowned and the swift is owned, the ObjC
+        // thunk will make the necessary adjustment.
+        if (reqParam->getValueOwnership() != candParam->getValueOwnership() &&
+            reqParam->getValueOwnership() != ValueOwnership::Default)
+          return MatchOutcome::WrongParameterOwnership;
+      }
+    }
 
     // If we got here, everything matched. But at what quality?
     if (explicitObjCName)
@@ -4017,6 +4029,10 @@ private:
     case MatchOutcome::WrongType:
       diagnose(cand, diag::objc_implementation_type_mismatch,
                cand, getMemberType(cand), getMemberType(req));
+      return;
+
+    case MatchOutcome::WrongParameterOwnership:
+      diagnose(cand, diag::objc_implementation_ownership_mismatch, cand);
       return;
 
     case MatchOutcome::WrongWritability:

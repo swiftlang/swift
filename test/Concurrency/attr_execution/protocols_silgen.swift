@@ -19,10 +19,10 @@ protocol Q {
 }
 
 struct AllDefault : P {
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen10AllDefaultVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed AllDefault) -> () {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen10AllDefaultVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed AllDefault) -> () {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[SELF:%.*]] : $*AllDefault):
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
-  // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen10AllDefaultV10callerTestyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, AllDefault) -> ()
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen10AllDefaultV10callerTestyyYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, AllDefault) -> ()
   // CHECK:   apply [[FUNC]]([[ACTOR]], [[LOAD]])
   // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen10AllDefaultVAA1PA2aDP10callerTestyyYaFTW'
@@ -46,10 +46,10 @@ struct AllDefault : P {
 }
 
 struct AllCaller : P {
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen9AllCallerVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed AllCaller) -> () {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen9AllCallerVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed AllCaller) -> () {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[SELF:%.*]] : $*AllCaller):
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
-  // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen9AllCallerV10callerTestyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, AllCaller) -> ()
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen9AllCallerV10callerTestyyYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, AllCaller) -> ()
   // CHECK:   apply [[FUNC]]([[ACTOR]], [[LOAD]])
   // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen9AllCallerVAA1PA2aDP10callerTestyyYaFTW'
@@ -58,7 +58,7 @@ struct AllCaller : P {
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen9AllCallerVAA1PA2aDP14concurrentTestyyYaFTW : $@convention(witness_method: P) @async (@in_guaranteed AllCaller) -> () {
   // CHECK: bb0([[SELF:%.*]] : $*AllCaller):
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
-  // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen9AllCallerV14concurrentTestyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, AllCaller) -> ()
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen9AllCallerV14concurrentTestyyYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, AllCaller) -> ()
   // CHECK:   [[NIL:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
   // CHECK:   [[NIL_CAST:%.*]] = unchecked_value_cast [[NIL]] to $Builtin.ImplicitActor
   // CHECK:   hop_to_executor [[NIL_CAST]]
@@ -69,7 +69,7 @@ struct AllCaller : P {
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen9AllCallerVAA1PA2aDP13mainActorTestyyYaFTW : $@convention(witness_method: P) @async (@in_guaranteed AllCaller) -> () {
   // CHECK: bb0([[SELF:%.*]] : $*AllCaller):
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
-  // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen9AllCallerV13mainActorTestyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, AllCaller) -> ()
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen9AllCallerV13mainActorTestyyYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, AllCaller) -> ()
   // CHECK:   [[MAIN_ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
   // CHECK:   [[EXIS_MAIN_ACTOR:%.*]] = init_existential_ref [[MAIN_ACTOR]]
   // CHECK:   [[OPT_MAIN_ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[EXIS_MAIN_ACTOR]]
@@ -82,7 +82,7 @@ struct AllCaller : P {
 }
 
 struct AllConcurrent : P {
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen13AllConcurrentVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed AllConcurrent) -> () {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen13AllConcurrentVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed AllConcurrent) -> () {
   // CHECK: bb0([[ACTOR]] : @guaranteed $Builtin.ImplicitActor, [[SELF:%.*]] :
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen13AllConcurrentV10callerTestyyYaF : $@convention(method) @async (AllConcurrent) -> ()
@@ -109,7 +109,7 @@ struct AllConcurrent : P {
 }
 
 struct AllMainActor : P {
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen12AllMainActorVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed AllMainActor) -> () {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen12AllMainActorVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed AllMainActor) -> () {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[SELF:%.*]] :
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen12AllMainActorV10callerTestyyYaF : $@convention(method) @async (AllMainActor) -> ()
@@ -145,7 +145,7 @@ struct TestWitnessWithStorage: Q {
   // CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen22TestWitnessWithStorageV02fnD0yyF : $@convention(method) (@guaranteed TestWitnessWithStorage) -> ()
   func fnTest() {}
 
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen22TestWitnessWithStorageVAA1QA2aDP4testSSvgTW : $@convention(witness_method: Q) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed TestWitnessWithStorage) -> (@owned String, @error any Error)
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen22TestWitnessWithStorageVAA1QA2aDP4testSSvgTW : $@convention(witness_method: Q) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed TestWitnessWithStorage) -> (@owned String, @error any Error)
   // CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Builtin.ImplicitActor, [[SELF:%.*]] : $*TestWitnessWithStorage):
   // CHECK-NEXT: [[BORROWED_SELF:%.*]] = load_borrow [[SELF]]
   // CHECK: [[WITNESS:%.*]] = function_ref @$s21attr_execution_silgen22TestWitnessWithStorageV4testSSvg : $@convention(method) (@guaranteed TestWitnessWithStorage) -> @owned String
@@ -155,7 +155,7 @@ struct TestWitnessWithStorage: Q {
   // CHECK-NEXT: return [[RESULT]]
   // CHECK-NEXT: } // end sil function '$s21attr_execution_silgen22TestWitnessWithStorageVAA1QA2aDP4testSSvgTW'
 
-  // CHECK: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen22TestWitnessWithStorageVAA1QA2aDP02fnD0yyYaFTW : $@convention(witness_method: Q) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed TestWitnessWithStorage) -> ()
+  // CHECK: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen22TestWitnessWithStorageVAA1QA2aDP02fnD0yyYaFTW : $@convention(witness_method: Q) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed TestWitnessWithStorage) -> ()
   // CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Builtin.ImplicitActor, [[SELF:%.*]] : $*TestWitnessWithStorage):
   // CHECK-NEXT: [[BORROWED_SELF]] = load_borrow [[SELF]]
   // CHECK: [[WITNESS:%.*]] = function_ref @$s21attr_execution_silgen22TestWitnessWithStorageV02fnD0yyF : $@convention(method) (@guaranteed TestWitnessWithStorage) -> ()
@@ -171,7 +171,7 @@ struct TestSyncWitness: Q {
   // CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen15TestSyncWitnessV4testSSvg : $@convention(method) (TestSyncWitness) -> @owned String
   var test: String { "" }
 
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen15TestSyncWitnessVAA1QA2aDP4testSSvgTW : $@convention(witness_method: Q) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed TestSyncWitness) -> (@owned String, @error any Error)
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen15TestSyncWitnessVAA1QA2aDP4testSSvgTW : $@convention(witness_method: Q) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed TestSyncWitness) -> (@owned String, @error any Error)
   // CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Builtin.ImplicitActor, [[SELF:%.*]] : $*TestSyncWitness):
   // CHECK-NEXT: [[BORROWED_SELF:%.*]] = load [trivial] [[SELF]]
   // CHECK: [[WITNESS:%.*]] = function_ref @$s21attr_execution_silgen15TestSyncWitnessV4testSSvg : $@convention(method) (TestSyncWitness) -> @owned String

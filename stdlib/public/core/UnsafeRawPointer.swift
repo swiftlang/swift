@@ -1469,7 +1469,7 @@ extension UnsafeMutableRawPointer {
       "storeBytes only supports storing the bytes of BitwiseCopyable types."
     )
 
-    unsafe withUnsafePointer(to: value) { source in
+    withUnsafePointer(to: value) { source in
       // FIXME: to be replaced by _memcpy when conversions are implemented.
       unsafe Builtin.int_memcpy_RawPointer_RawPointer_Int64(
         (self + offset)._rawValue,
@@ -1504,7 +1504,7 @@ extension UnsafeMutableRawPointer {
       "storeBytes to misaligned raw pointer")
 
     var temp = value
-    unsafe withUnsafeMutablePointer(to: &temp) { source in
+    withUnsafeMutablePointer(to: &temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue
       // FIXME: to be replaced by _memcpy when conversions are implemented.
       unsafe Builtin.int_memcpy_RawPointer_RawPointer_Int64(

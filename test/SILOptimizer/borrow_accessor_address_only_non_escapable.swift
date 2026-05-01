@@ -1,7 +1,6 @@
-// RUN: %target-swift-emit-sil -enable-experimental-feature Lifetimes -enable-experimental-feature BorrowAndMutateAccessors -verify %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature Lifetimes -verify %s
 
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 struct Butt<T: ~Escapable>: ~Escapable {
 	var x: T

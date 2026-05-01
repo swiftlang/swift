@@ -45,7 +45,6 @@ public distributed actor DA {
   // CHECK-NEXT:    get
   // CHECK-NEXT:  }
   // CHECK:       public init(actorSystem system: Library::DA.Library::ActorSystem)
-  // CHECK:       @available(iOS 16.0, tvOS 16.0, watchOS 9.0, macOS 13.0, *)
   // CHECK-NEXT:  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency::UnownedSerialExecutor {
   // CHECK-NEXT:    get
   // CHECK-NEXT:  }
@@ -56,21 +55,20 @@ public distributed actor DA {
 // CHECK-NEXT: distributed public actor DAG<ActorSystem> where ActorSystem : Distributed::DistributedActorSystem, ActorSystem.SerializationRequirement == any Swift::Decodable & Swift::Encodable {
 @available(SwiftStdlib 6.0, *)
 public distributed actor DAG<ActorSystem> where ActorSystem: DistributedActorSystem<any Codable> {
-  // CHECK: @_compilerInitialized nonisolated final public let id: ActorSystem.ActorID
-  // CHECK: nonisolated final public let actorSystem: ActorSystem
+  // CHECK:      @_compilerInitialized nonisolated final public let id: ActorSystem.ActorID
+  // CHECK:      nonisolated final public let actorSystem: ActorSystem
 
-// CHECK: public static func resolve(id: ActorSystem.ActorID, using system: ActorSystem) throws -> Library::DAG<ActorSystem>
-// CHECK: public typealias ID = ActorSystem.ActorID
-// CHECK: public typealias SerializationRequirement = any Swift::Decodable & Swift::Encodable
-// CHECK: {{@objc deinit|deinit}}
-// CHECK: nonisolated public var hashValue: Swift::Int {
-// CHECK:   get
-// CHECK: }
-// CHECK: public init(actorSystem system: ActorSystem)
-// CHECK: @available(iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, macOS 15.0, *)
-// CHECK: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency::UnownedSerialExecutor {
-// CHECK:   get
-// CHECK: }
+  // CHECK:      public static func resolve(id: ActorSystem.ActorID, using system: ActorSystem) throws -> Library::DAG<ActorSystem>
+  // CHECK:      public typealias ID = ActorSystem.ActorID
+  // CHECK:      public typealias SerializationRequirement = any Swift::Decodable & Swift::Encodable
+  // CHECK:      {{@objc deinit|deinit}}
+  // CHECK:      nonisolated public var hashValue: Swift::Int {
+  // CHECK:        get
+  // CHECK:      }
+  // CHECK:      public init(actorSystem system: ActorSystem)
+  // CHECK-NEXT: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency::UnownedSerialExecutor {
+  // CHECK-NEXT:   get
+  // CHECK-NEXT: }
 }
 
 // CHECK-NOT: #if compiler(>=5.3) && $Actors

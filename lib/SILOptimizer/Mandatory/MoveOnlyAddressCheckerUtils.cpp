@@ -1137,7 +1137,7 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     }
   }
 
-  if (isa<UncheckedTakeEnumDataAddrInst>(stripAccessMarkers(operand))) {
+  if (isa<UncheckedEnumDataAddrInstBase>(stripAccessMarkers(operand))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding enum projection as init!\n");
     return true;
@@ -1662,7 +1662,7 @@ shouldVisitAsEndPointUse(Operand *op) {
   }
   // An unchecked_take_enum_data_addr consumes all bits except the remaining
   // element's.
-  if (isa<UncheckedTakeEnumDataAddrInst>(op->getUser())) {
+  if (isa<UncheckedEnumDataAddrInstBase>(op->getUser())) {
     return TransitiveAddressWalkerTransitiveUseVisitation::BothUserAndUses;
   }
   return TransitiveAddressWalkerTransitiveUseVisitation::OnlyUses;
@@ -2823,15 +2823,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
 #ifndef NDEBUG
   if (user->mayWriteToMemory()) {
-    // TODO: `unchecked_take_enum_addr` should inherently be understood as
-    // non-side-effecting when it's nondestructive.
-    auto ue = dyn_cast<UncheckedTakeEnumDataAddrInst>(user);
-    if (!ue || ue->isDestructive()) {
-      llvm::errs() << "Found a write classified as a liveness use?!\n";
-      llvm::errs() << "Use: " << *user;
-      user->getFunction()->dump();
-      llvm_unreachable("standard failure");
-    }
+    llvm::errs() << "Found a write classified as a liveness use?!\n";
+    llvm::errs() << "Use: " << *user;
+    user->getFunction()->dump();
+    llvm_unreachable("standard failure");
   }
 #endif
   for (auto leafRange : leafRanges) {

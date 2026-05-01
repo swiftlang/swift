@@ -41,7 +41,7 @@ public func myFunc(_ ptr: UnsafeRawBufferPointer?) {
 @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func myFunc2(_ ptr: inout MutableRawSpan?) {
     let len = CInt(exactly: ptr?.byteCount ?? 0)!
-    let _ptrPtr = unsafe ptr?.withUnsafeMutableBytes {
+    let _ptrPtr = ptr?.withUnsafeMutableBytes {
         unsafe $0
     }
     defer {
@@ -57,13 +57,13 @@ public func myFunc2(_ ptr: inout MutableRawSpan?) {
 public func myFunc3(_ ptr: inout MutableRawSpan?, _ ptr2: inout MutableRawSpan?) {
     let len = CInt(exactly: ptr?.byteCount ?? 0)!
     let len2 = CInt(exactly: ptr2?.byteCount ?? 0)!
-    let _ptrPtr = unsafe ptr?.withUnsafeMutableBytes {
+    let _ptrPtr = ptr?.withUnsafeMutableBytes {
         unsafe $0
     }
     defer {
         _fixLifetime(ptr)
     }
-    let _ptr2Ptr = unsafe ptr2?.withUnsafeMutableBytes {
+    let _ptr2Ptr = ptr2?.withUnsafeMutableBytes {
         unsafe $0
     }
     defer {
@@ -78,7 +78,7 @@ public func myFunc3(_ ptr: inout MutableRawSpan?, _ ptr2: inout MutableRawSpan?)
 @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func myFunc4(_ ptr: inout MutableRawSpan?) -> MutableRawSpan? {
     let len = CInt(exactly: ptr?.byteCount ?? 0)!
-    let _ptrPtr = unsafe ptr?.withUnsafeMutableBytes {
+    let _ptrPtr = ptr?.withUnsafeMutableBytes {
         unsafe $0
     }
     defer {

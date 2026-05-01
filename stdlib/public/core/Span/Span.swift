@@ -701,6 +701,7 @@ extension Span where Element: ~Copyable  {
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
   @_transparent
+  @safe
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -736,6 +737,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
   @_transparent
+  @safe
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -926,3 +928,15 @@ extension Span where Element: ~Copyable {
     extracting(droppingFirst: k)
   }
 }
+
+#if !SPAN_COMPATIBILITY_STUB
+@available(SwiftStdlib 6.4, *)
+extension Span: BorrowingSequence where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  @inlinable
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> SpanIterator<Element> {
+    SpanIterator(self)
+  }
+}
+#endif

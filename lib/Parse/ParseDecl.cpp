@@ -1286,9 +1286,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   } else {
     diagnoseExpectLanguage();
     DiscardAttribute = true;
-    while (Tok.isNot(tok::r_paren)) {
-      consumeToken();
-    }
+    skipUntilDeclRBrace(tok::r_paren, tok::NUM_TOKENS);
   }
 
   rParenLoc = Tok.getLoc();
@@ -1301,7 +1299,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   auto AttrRange = SourceRange(Loc, rParenLoc);
 
   // Reject duplicate attributes with the same kind.
-  if (ExternAttr::find(Attributes, kind)) {
+  if (!DiscardAttribute && ExternAttr::find(Attributes, kind)) {
     diagnose(Loc, diag::duplicate_attribute, false);
     DiscardAttribute = true;
   }
@@ -1927,13 +1925,18 @@ static PlatformKind getPlatformFromDomainOrIdentifier(
 
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
     llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions,
-    bool &ParsedUnrecognizedPlatformName) {
+    bool &WasEmpty) {
   // Check for availability macros first.
   if (peekAvailabilityMacroName()) {
     SmallVector<AvailabilitySpec *, 4> Specs;
     ParserStatus MacroStatus = parseAvailabilityMacro(Specs);
     if (MacroStatus.isError())
       return MacroStatus;
+
+    if (Specs.size() == 1 && Specs.front()->isWildcard()) {
+      WasEmpty = true;
+      return makeParserSuccess();
+    }
 
     for (auto *Spec : Specs) {
       auto Platform =
@@ -1962,7 +1965,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   // Parse the platform name.
   StringRef platformText = Tok.getText();
   auto MaybePlatform = platformFromString(platformText);
-  ParsedUnrecognizedPlatformName = ParsedUnrecognizedPlatformName || !MaybePlatform.has_value();
+  WasEmpty = WasEmpty || !MaybePlatform.has_value();
   SourceLoc PlatformLoc = Tok.getLoc();
   consumeToken();
 
@@ -2025,7 +2028,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
   SourceLoc RightLoc;
   ParserStatus Status;
   bool SuppressLaterDiags = false;
-  bool ParsedUnrecognizedPlatformName = false;
+  bool EmptyPlatformAndVersions = false;
   llvm::SmallVector<PlatformAndVersion, 4> PlatformAndVersions;
 
   {
@@ -2048,7 +2051,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
             Status, tok::r_paren, LeftLoc, RightLoc,
             /*AllowSepAfterLast=*/false, [&]() -> ParserStatus {
               return parsePlatformVersionInList(AtAttrName, PlatformAndVersions,
-                                                ParsedUnrecognizedPlatformName);
+                                                EmptyPlatformAndVersions);
             });
       } while (Result == ParseListItemResult::Continue);
     }
@@ -2062,7 +2065,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
     return false;
   }
 
-  if (PlatformAndVersions.empty() && !ParsedUnrecognizedPlatformName) {
+  if (PlatformAndVersions.empty() && !EmptyPlatformAndVersions) {
     diagnose(Loc, diag::attr_availability_need_platform_version, AtAttrName);
     return false;
   }
@@ -3442,7 +3445,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     StringRef AttrName = "@_originallyDefinedIn";
     bool SuppressLaterDiags = false;
-    bool ParsedUnrecognizedPlatformName = false;
+    bool EmptyPlatformAndVersions = false;
     if (parseList(tok::r_paren, LeftLoc, RightLoc,
                   /*AllowSepAfterLast=*/false,
                   diag::originally_defined_in_missing_rparen,
@@ -3484,7 +3487,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       // Parse 'OSX 13.13'.
       case NextSegmentKind::PlatformVersion: {
         ParserStatus ListItemStatus = parsePlatformVersionInList(
-            AttrName, PlatformAndVersions, ParsedUnrecognizedPlatformName);
+            AttrName, PlatformAndVersions, EmptyPlatformAndVersions);
         if (ListItemStatus.isErrorOrHasCompletion())
           SuppressLaterDiags = true;
         return ListItemStatus;
@@ -3499,7 +3502,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    if (PlatformAndVersions.empty() && !ParsedUnrecognizedPlatformName) {
+    if (PlatformAndVersions.empty() && !EmptyPlatformAndVersions) {
       diagnose(AtLoc, diag::attr_availability_need_platform_version, AttrName);
       return makeParserSuccess();
     }
@@ -5528,7 +5531,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
 
       auto kwLoc = P.consumeToken();
 
-      if (CallerIsolatedLoc.isValid()) {
+      if (NonisolatedNonsendingLoc.isValid()) {
         P.diagnose(kwLoc, diag::nonisolated_nonsending_repeated)
             .fixItRemove(SpecifierLoc);
       }
@@ -5555,7 +5558,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         continue;
       }
 
-      CallerIsolatedLoc = kwLoc;
+      NonisolatedNonsendingLoc = kwLoc;
       continue;
     }
 
@@ -8274,15 +8277,9 @@ bool Parser::parseAccessorAfterIntroducer(
                                           /*underscored*/ false));
   }
 
-  if (requiresFeatureBorrowAndMutateAccessors(Kind) &&
-      !Context.LangOpts.hasFeature(Feature::BorrowAndMutateAccessors)) {
-    diagnose(Tok, diag::accessor_requires_borrow_and_mutate_accessors,
-             getAccessorNameForDiagnostic(Kind, /*article*/ false,
-                                          /*underscored*/ false));
-  }
-
   if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
-    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InExtension) &&
+    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InEnum) &&
+        !Flags.contains(PD_InClass) && !Flags.contains(PD_InExtension) &&
         !Flags.contains(PD_InProtocol)) {
       diagnose(Tok, diag::borrow_mutate_accessor_not_supported_in_decl,
                getAccessorNameForDiagnostic(Kind, /*article*/ true,
@@ -8408,7 +8405,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
       // parsingLimitedSyntax mode cannot have a body.
       if (parsingLimitedSyntax) {
-        diagnose(Tok, diag::expected_getreadset_in_protocol);
+        diagnose(Tok, diag::expected_getreadborrowsetmutate_in_protocol);
         Status |= makeParserError();
         break;
       }
@@ -8442,10 +8439,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     // avoid having to deal with them everywhere.
     if (parsingLimitedSyntax && !isAllowedWhenParsingLimitedSyntax(
                                     Kind, SF.Kind == SourceFileKind::SIL)) {
-      auto diag = diag::expected_getreadset_in_protocol;
-      if (Context.LangOpts.hasFeature(Feature::BorrowAndMutateAccessors)) {
-        diag = diag::expected_getreadborrowsetmutate_in_protocol;
-      }
+      auto diag = diag::expected_getreadborrowsetmutate_in_protocol;
       diagnose(Loc, diag);
       continue;
     }

@@ -128,6 +128,7 @@ class Object: Interface {
   // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
 
   var baz: Int = 42 // expected-note{{main actor-isolated property 'baz' cannot satisfy nonisolated requirement}}
+  // expected-note@-1{{change property 'baz' to a 'nonisolated let' constant}}{{3-6=nonisolated let}}
 }
 
 
@@ -334,14 +335,12 @@ struct WrapperOnActor<Wrapped: Sendable> {
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
   
-  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
-  public var wrappedValue: Wrapped
+  public var wrappedValue: Wrapped // expected-minimal-targeted-note {{mutation of this property is only permitted within the actor}}
 
   public var accessCount: Int
 
   nonisolated public init(wrappedValue: Wrapped) {
-    // expected-warning@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.wrappedValue = wrappedValue
+    self.wrappedValue = wrappedValue // expected-minimal-targeted-warning {{main actor-isolated property 'wrappedValue' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 }
 

@@ -18,7 +18,6 @@
 #include "Relation.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -580,8 +579,13 @@ bool CompareDeclSpecializationRequest::evaluate(
   // A non-generic declaration is more specialized than a generic declaration.
   if (auto func1 = dyn_cast<AbstractFunctionDecl>(decl1)) {
     auto func2 = cast<AbstractFunctionDecl>(decl2);
-    if (func1->hasGenericParamList() != func2->hasGenericParamList())
-      return completeResult(func2->hasGenericParamList());
+    bool func1IsGeneric =
+        func1->hasGenericParamList() && !isGenericOnlyOverThrownType(func1);
+    bool func2IsGeneric =
+        func2->hasGenericParamList() && !isGenericOnlyOverThrownType(func2);
+
+    if (func1IsGeneric != func2IsGeneric)
+      return completeResult(func2IsGeneric);
   }
 
   if (auto subscript1 = dyn_cast<SubscriptDecl>(decl1)) {
@@ -735,6 +739,21 @@ bool CompareDeclSpecializationRequest::evaluate(
                      cast<ProtocolDecl>(outerDC1)->getDeclaredInterfaceType(),
                      locator);
     break;
+  }
+
+  // throws vs. typed throws. We are calling decl2 by passing parameters from
+  // decl1 as arguments, decl1 is affectively a context for decl2 call, let's
+  // see if that's well-formed in presence of typed throws.
+  if (isa<AbstractFunctionDecl>(decl1) && isa<AbstractFunctionDecl>(decl2)) {
+    auto thrownError1 =
+        openedType1->castTo<FunctionType>()->getEffectiveThrownErrorType();
+    auto thrownError2 =
+        openedType2->castTo<FunctionType>()->getEffectiveThrownErrorType();
+
+    if (thrownError1 && thrownError2) {
+      cs.addConstraint(ConstraintKind::Subtype, *thrownError2, *thrownError1,
+                       locator);
+    }
   }
 
   bool fewerEffectiveParameters = false;

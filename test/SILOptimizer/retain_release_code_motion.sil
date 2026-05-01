@@ -3,9 +3,11 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: concurrency
 
 import Builtin
 import Swift
+import _Concurrency
 
 struct Int {
   var value : Builtin.Int64

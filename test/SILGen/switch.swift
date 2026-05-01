@@ -959,7 +959,7 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
     a()
 
   // CHECK: [[IS_LEFT]]:
-  // CHECK:   [[P:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
+  // CHECK:   [[P:%.*]] = unchecked_inplace_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
   case .Left(_):
   // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1byyF
   // CHECK-NEXT: apply [[FUNC]](
@@ -968,7 +968,7 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
     b()
 
   // CHECK: [[IS_RIGHT]]:
-  // CHECK:   [[STR_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Right!enumelt
+  // CHECK:   [[STR_ADDR:%.*]] = unchecked_inplace_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Right!enumelt
   // CHECK:   [[STR:%.*]] = load [take] [[STR_ADDR]]
   case .Right(_):
   // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1cyyF
@@ -978,7 +978,7 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
     c()
 
   // CHECK: [[IS_BOTH]]:
-  // CHECK:   [[P_STR_TUPLE:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Both!enumelt
+  // CHECK:   [[P_STR_TUPLE:%.*]] = unchecked_inplace_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Both!enumelt
   case .Both(_):
   // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1dyyF
   // CHECK-NEXT: apply [[FUNC]](
@@ -1379,7 +1379,7 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 // CHECK: [[HAS_TUP_1_BB]]:
 // CHECK-NEXT: [[OPT_ANY_ADDR:%.*]] = alloc_stack $Optional<Any>
 // CHECK-NEXT: copy_addr [[TUP_1]] to [init] [[OPT_ANY_ADDR]]
-// CHECK-NEXT: [[SOME_ANY_ADDR:%.*]] = unchecked_take_enum_data_addr [[OPT_ANY_ADDR]]
+// CHECK-NEXT: [[SOME_ANY_ADDR:%.*]] = unchecked_inplace_enum_data_addr [[OPT_ANY_ADDR]]
 // CHECK-NEXT: [[ANYOBJECT_ADDR:%.*]] = alloc_stack $AnyObject
 // CHECK-NEXT: checked_cast_addr_br copy_on_success Any in {{%.*}} : $*Any to AnyObject in {{%.*}} : $*AnyObject, [[IS_ANY_BB:bb[0-9]+]], [[ISNOT_ANY_BB:bb[0-9]+]]
 //
@@ -1481,7 +1481,7 @@ func testVoidType() {
 // CHECK:   switch_enum_addr [[SWITCH_ENUM_ARG]] : $*MultipleAddressOnlyCaseEnum<T>, case #MultipleAddressOnlyCaseEnum.a!enumelt: [[BB_A:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.b!enumelt: [[BB_B:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.c!enumelt: [[BB_C:bb[0-9]+]]
 //
 // CHECK: [[BB_A]]:
-// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
+// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_inplace_enum_data_addr [[SWITCH_ENUM_ARG]]
 // CHECK:   [[CASE_BODY_VAR_A:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_A]]
 // CHECK:   copy_addr [[CASE_BODY_VAR_A]] to [init] [[AB_PHI]]
@@ -1489,7 +1489,7 @@ func testVoidType() {
 // CHECK:   br [[BB_AB:bb[0-9]+]]
 //
 // CHECK: [[BB_B]]:
-// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
+// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_inplace_enum_data_addr [[SWITCH_ENUM_ARG]]
 // CHECK:   [[CASE_BODY_VAR_B:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   copy_addr [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_B]]
 // CHECK:   [[FUNC_CMP:%.*]] = function_ref @$sSzsE2eeoiySbx_qd__tSzRd__lFZ :
@@ -1521,7 +1521,7 @@ func testVoidType() {
 // CHECK:   br [[BB_AB_CONT]]
 //
 // CHECK: [[BB_C]]:
-// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
+// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_inplace_enum_data_addr [[SWITCH_ENUM_ARG]]
 // CHECK:   [[CASE_BODY_VAR_C:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_C]]
 // CHECK:   copy_addr [[CASE_BODY_VAR_C]] to [init] [[ABBC_PHI]]

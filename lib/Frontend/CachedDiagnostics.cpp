@@ -346,7 +346,8 @@ unsigned DiagnosticSerializer::getFileIDFromBufferID(SourceManager &SM,
                          IsFileBacked ? "" : FileContent};
 
   // Add file to serializing source manager.
-  unsigned NewIdx = SrcMgr.addMemBufferCopy(Buf.Buffer.get());
+  unsigned NewIdx =
+      SrcMgr.addMemBufferCopy(Buf.Buffer->getBuffer(), remapFilePath(Filename));
   FileMapper[&SrcMgr].insert({CurrentFileID, NewIdx});
 
   Files.emplace_back(std::move(File));
@@ -473,13 +474,13 @@ DiagnosticSerializer::convertDiagnosticInfo(SourceManager &SM,
   };
 
   std::vector<std::string> educationalNotes;
-  if (!Info.CategoryDocumentationURL.empty())
-    educationalNotes.push_back(Info.CategoryDocumentationURL);
+  if (!Info.getCategoryDocumentationURL().empty())
+    educationalNotes.push_back(Info.getCategoryDocumentationURL().str());
   return {(uint32_t)Info.ID,
           convertSourceLoc(SM, Info.Loc),
           (uint8_t)Info.Kind,
           std::string(Text.data(), Text.size()),
-          Info.Category.str(),
+          Info.getCategoryName().str(),
           convertSourceLoc(SM, Info.BufferIndirectlyCausingDiagnostic),
           convertDiagnosticInfoArray(Info.ChildDiagnosticInfo),
           educationalNotes,
@@ -628,7 +629,7 @@ llvm::Error DiagnosticSerializer::deserializeDiagnosticInfo(
                                   FixIts,
                                   Info.IsChildNote};
   if (Info.EducationalNotePaths.size() == 1)
-    DeserializedInfo.CategoryDocumentationURL = Info.EducationalNotePaths[0];
+    DeserializedInfo.setCategoryDocumentationURL(Info.EducationalNotePaths[0]);
   return callback(DeserializedInfo);
 }
 

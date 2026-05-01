@@ -1,9 +1,9 @@
-// RUN: %target-swift-emit-sil %s -DBAD_COPY -verify -sil-verify-all -enable-experimental-feature SuppressedAssociatedTypes
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature SuppressedAssociatedTypes) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature SuppressedAssociatedTypes) | %FileCheck %s
+// RUN: %target-swift-emit-sil %s -DBAD_COPY -verify -sil-verify-all -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature SuppressedAssociatedTypesWithDefaults) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature SuppressedAssociatedTypesWithDefaults) | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 
 class Backend {

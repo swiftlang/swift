@@ -7,7 +7,7 @@
 // include type checker errors so we can test the SIL part of the pipeline. Put type checker errors into
 // async_initializer.swift.
 
-// CHECK-LABEL: sil hidden [ossa] @$s11initializer1fyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s11initializer1fyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor):
 // CHECK:  hop_to_executor [[ACTOR]]
 // CHECK: } // end sil function '$s11initializer1fyyYaF'
@@ -16,15 +16,15 @@ func g() {}
 
 class Fruit {
   // Fruit.__allocating_init()
-  // Isolation: caller_isolation_inheriting
-  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s11initializer5FruitCACyYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick Fruit.Type) -> @owned Fruit {
+  // Isolation: nonisolated(nonsending)
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s11initializer5FruitCACyYacfC : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick Fruit.Type) -> @owned Fruit {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor
   // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s11initializer5FruitCACyYacfC'
 
   // Fruit.init()
-  // Isolation: caller_isolation_inheriting
-  // CHECK-LABEL: sil hidden [ossa] @$s11initializer5FruitCACyYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned Fruit) -> @owned Fruit {
+  // Isolation: nonisolated(nonsending)
+  // CHECK-LABEL: sil hidden [ossa] @$s11initializer5FruitCACyYacfc : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned Fruit) -> @owned Fruit {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Builtin.ImplicitActor,
   // CHECK:   hop_to_executor [[ARG]]
   // CHECK: } // end sil function '$s11initializer5FruitCACyYacfc'
@@ -59,15 +59,15 @@ class Banana: Fruit {
   // await test(Banana.self)
 
   // Banana.__allocating_init()
-  // Isolation: caller_isolation_inheriting
-  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s11initializer6BananaCACyYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick Banana.Type) -> @owned Banana {
+  // Isolation: nonisolated(nonsending)
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s11initializer6BananaCACyYacfC : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick Banana.Type) -> @owned Banana {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor,
   // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s11initializer6BananaCACyYacfC'
 
   // Banana.init()
-  // Isolation: caller_isolation_inheriting
-  // CHECK-LABEL: sil hidden [ossa] @$s11initializer6BananaCACyYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned Banana) -> @owned Banana {
+  // Isolation: nonisolated(nonsending)
+  // CHECK-LABEL: sil hidden [ossa] @$s11initializer6BananaCACyYacfc : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned Banana) -> @owned Banana {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor,
   // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s11initializer6BananaCACyYacfc'
@@ -78,19 +78,19 @@ class Banana: Fruit {
 
 class MyType {
   // MyType.__allocating_init(_:)
-  // Isolation: caller_isolation_inheriting
+  // Isolation: nonisolated(nonsending)
   //
-  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s11initializer6MyTypeCyACyyYaYCXEYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @thick MyType.Type) -> @owned MyType {
-  // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $@noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s11initializer6MyTypeCyACyyYaYCXEYacfC : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @thick MyType.Type) -> @owned MyType {
+  // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $@caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   // CHECK:   hop_to_executor [[ACTOR]]
-  // CHECK:   [[FUNC:%.*]] = function_ref @$s11initializer6MyTypeCyACyyYaYCXEYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @owned MyType) -> @owned MyType
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s11initializer6MyTypeCyACyyYaYCXEYacfc : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @owned MyType) -> @owned MyType
   // CHECK:   apply [[FUNC]]([[ACTOR]], [[ARG]], {{%.*}}) :
   // CHECK: } // end sil function '$s11initializer6MyTypeCyACyyYaYCXEYacfC'
 
   // MyType.init(_:)
-  // Isolation: caller_isolation_inheriting
-  // CHECK-LABEL: sil hidden [ossa] @$s11initializer6MyTypeCyACyyYaYCXEYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @owned MyType) -> @owned MyType {
-  // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $@noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), [[SELF:%.*]] : @owned $MyType):
+  // Isolation: nonisolated(nonsending)
+  // CHECK-LABEL: sil hidden [ossa] @$s11initializer6MyTypeCyACyyYaYCXEYacfc : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @owned MyType) -> @owned MyType {
+  // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $@caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), [[SELF:%.*]] : @owned $MyType):
   // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK:   [[ARG_C:%.*]] = copy_value [[ARG]]
   // CHECK:   [[ARG_B:%.*]] = begin_borrow [[ARG_C]]
@@ -102,10 +102,10 @@ class MyType {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s11initializer4beepyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s11initializer4beepyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor):
 // CHECK:   hop_to_executor [[ACTOR]]
-// CHECK:   [[FUNC:%.*]] = function_ref @$s11initializer6MyTypeCyACyyYaYCXEYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @thick MyType.Type) -> @owned MyType
+// CHECK:   [[FUNC:%.*]] = function_ref @$s11initializer6MyTypeCyACyyYaYCXEYacfC : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @thick MyType.Type) -> @owned MyType
 // CHECK:   apply [[FUNC]]([[ACTOR]], {{%.*}}, {{%.*}})
 // CHECK:   hop_to_executor [[ACTOR]]
 // CHECK:   hop_to_executor [[ACTOR]]
@@ -116,9 +116,9 @@ func beep() async {
 }
 
 // thunk for @escaping @callee_guaranteed () -> ()
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIeg_BAIegHgIL_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIeg_BAIeNgHgIL_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @callee_guaranteed () -> ()) -> () {
 // CHECK: hop_to_executor
-// CHECK: } // end sil function '$sIeg_BAIegHgIL_TR'
+// CHECK: } // end sil function '$sIeg_BAIeNgHgIL_TR'
 
 actor A {
   // CHECK-LABEL: sil hidden [ossa] @$s11initializer1ACACyYacfc : $@convention(method) @async (@sil_isolated @owned A) -> @owned A {
@@ -140,7 +140,7 @@ protocol AsyncDefaultConstructable {
 struct Location {
   var x : Int
   var y : Int
-  // CHECK-LABEL: sil hidden [ossa] @$s11initializer8LocationVACyYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thin Location.Type) -> Location {
+  // CHECK-LABEL: sil hidden [ossa] @$s11initializer8LocationVACyYacfC : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thin Location.Type) -> Location {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor,
   // CHECK: hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s11initializer8LocationVACyYacfC'
@@ -152,21 +152,21 @@ struct Location {
 
 extension Location: AsyncDefaultConstructable {}
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s11initializer8LocationVAA25AsyncDefaultConstructableA2aDPxyYacfCTW : $@convention(witness_method: AsyncDefaultConstructable) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick Location.Type) -> @out Location {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s11initializer8LocationVAA25AsyncDefaultConstructableA2aDPxyYacfCTW : $@convention(witness_method: AsyncDefaultConstructable) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick Location.Type) -> @out Location {
 // CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*Location, [[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor,
-// CHECK:   [[FUNC:%.*]] = function_ref @$s11initializer8LocationVACyYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thin Location.Type) -> Location
+// CHECK:   [[FUNC:%.*]] = function_ref @$s11initializer8LocationVACyYacfC : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thin Location.Type) -> Location
 // CHECK:   apply [[FUNC]]([[ACTOR]],
 // CHECK:   hop_to_executor [[ACTOR]]
 // CHECK: } // end sil function '$s11initializer8LocationVAA25AsyncDefaultConstructableA2aDPxyYacfCTW'
 
-// CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s11initializer12ExplicitTestCACyYaKcfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick ExplicitTest.Type) -> (@owned ExplicitTest, @error any Error) {
+// CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s11initializer12ExplicitTestCACyYaKcfC : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick ExplicitTest.Type) -> (@owned ExplicitTest, @error any Error) {
 // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor,
 // CHECK:   hop_to_executor [[ACTOR]]
-// CHECK:   [[FUNC:%.*]] = function_ref @$s11initializer12ExplicitTestCACyYaKcfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned ExplicitTest) -> (@owned ExplicitTest, @error any Error)
+// CHECK:   [[FUNC:%.*]] = function_ref @$s11initializer12ExplicitTestCACyYaKcfc : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned ExplicitTest) -> (@owned ExplicitTest, @error any Error)
 // CHECK:   try_apply [[FUNC]]([[ACTOR]], {{%.*}})
 // CHECK: } // end sil function '$s11initializer12ExplicitTestCACyYaKcfC'
 
-// CHECK-LABEL: sil hidden [ossa] @$s11initializer12ExplicitTestCACyYaKcfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned ExplicitTest) -> (@owned ExplicitTest, @error any Error) {
+// CHECK-LABEL: sil hidden [ossa] @$s11initializer12ExplicitTestCACyYaKcfc : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned ExplicitTest) -> (@owned ExplicitTest, @error any Error) {
 // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor,
 // CHECK:   hop_to_executor [[ACTOR]]
 // CHECK: } // end sil function '$s11initializer12ExplicitTestCACyYaKcfc'
