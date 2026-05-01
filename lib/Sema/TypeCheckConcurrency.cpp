@@ -6537,11 +6537,16 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
             inferred.preconcurrency());
       }
 
-      // Add nonisolated attribute
-      addAttributesForActorIsolation(value, inferred);
+      // NonisolatedAttr cannot appear on AccessorDecl (see DeclAttr.def).
+      // Skip adding the attribute but preserve the correct isolation value.
+      if (!isa<AccessorDecl>(value))
+        addAttributesForActorIsolation(value, inferred);
       break;
     case ActorIsolation::NonisolatedNonsending:
-      addAttributesForActorIsolation(value, inferred);
+      // NonisolatedAttr cannot appear on AccessorDecl (see DeclAttr.def).
+      // Skip adding the attribute but preserve the correct isolation value.
+      if (!isa<AccessorDecl>(value))
+        addAttributesForActorIsolation(value, inferred);
       break;
     case ActorIsolation::Erased:
       llvm_unreachable("cannot infer erased isolation");

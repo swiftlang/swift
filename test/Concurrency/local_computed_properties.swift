@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o - -verify -strict-concurrency=complete -enable-actor-data-race-checks -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-module -o /dev/null -strict-concurrency=complete -disable-availability-checking
 
 // Test that local computed properties and lazy vars inherit actor isolation
 // from their enclosing context, just like local functions.
@@ -75,4 +76,33 @@ func testNonisolated() {
     return 42
   }
   _ = counter
+}
+
+// =============================================================================
+// if #available
+// =============================================================================
+
+// Local accessors inside if #available inherit isolation from the enclosing
+// context. Regression test: NonisolatedAttr must not be added to AccessorDecl
+// (it is invalid there per DeclAttr.def), which previously caused a crash
+// during -emit-module serialization. rdar://175548302
+
+// CHECK-LABEL: // getter of prop #1 in withAvailability()
+// CHECK-NEXT:  // Isolation: nonisolated
+func withAvailability() {
+  if #available(macOS 10.15, *) {
+    var prop: some Equatable { 0 }
+    _ = prop
+  }
+}
+
+extension MainActorClass {
+  // CHECK-LABEL: // getter of prop #1 in MainActorClass.withMainActorAndAvailability()
+  // CHECK-NEXT:  // Isolation: global_actor. type: MainActor
+  func withMainActorAndAvailability() {
+    if #available(macOS 10.15, *) {
+      var prop: NS { NS() }
+      _ = prop
+    }
+  }
 }
