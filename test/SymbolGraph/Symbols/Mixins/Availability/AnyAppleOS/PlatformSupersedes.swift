@@ -3,6 +3,7 @@
 // RUN: %target-swift-symbolgraph-extract -module-name PlatformSupersedes -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/PlatformSupersedes.symbols.json
 
+// CHECK-LABEL: "symbols": [
 // CHECK-LABEL: "precise": "s:18PlatformSupersedes1SV",
 // CHECK: "availability": [
 // CHECK-NEXT: {

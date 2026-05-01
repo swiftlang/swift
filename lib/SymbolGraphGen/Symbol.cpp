@@ -686,15 +686,34 @@ getPlatformsToExpand(SemanticAvailableAttr AvAttr) {
   return {};
 }
 
+static bool
+isAvailabilityDomainActive(AvailabilityDomain Domain,
+                           std::optional<PlatformKind> ActivePlatform) {
+  if (!ActivePlatform)
+    return true;
+
+  if (!Domain.isPlatform())
+    return true;
+
+  auto Platform = Domain.getPlatformKind();
+  return Platform == *ActivePlatform ||
+         inheritsAvailabilityFromPlatform(*ActivePlatform, Platform);
+}
+
 /// Expands a single availability attribute into one or more Availability
 /// structs.
-void expandInferredAvailabilityAttr(SemanticAvailableAttr AvAttr,
-                                    SmallVectorImpl<Availability> &Expanded) {
+void expandInferredAvailabilityAttr(
+    SemanticAvailableAttr AvAttr, SmallVectorImpl<Availability> &Expanded,
+    std::optional<PlatformKind> ActivePlatform) {
   if (auto Platforms = getPlatformsToExpand(AvAttr)) {
     for (auto Platform : *Platforms) {
+      auto PlatformDomain = AvailabilityDomain::forPlatform(Platform);
+      if (!isAvailabilityDomainActive(PlatformDomain, ActivePlatform))
+        continue;
+
       Availability InferredAvailability(AvAttr);
-      InferredAvailability.Domain = Availability::getDomainDescription(
-          AvailabilityDomain::forPlatform(Platform));
+      InferredAvailability.Domain =
+          Availability::getDomainDescription(PlatformDomain);
       // FIXME: [availability] Versions should be remapped, too.
       // Version remapping is unnecessary at the moment because only anyAppleOS
       // availability gets expanded and anyAppleOS doesn't require version
@@ -718,28 +737,35 @@ void expandInferredAvailabilityAttr(SemanticAvailableAttr AvAttr,
 /// duplicate \c \@available attributes on the same declaration.
 void getAvailabilities(const Decl *D,
                        llvm::StringMap<Availability> &Availabilities,
-                       bool IsParent) {
+                       bool IsParent,
+                       std::optional<PlatformKind> ActivePlatform) {
   // DeclAttributes is a linked list in reverse order from where they
   // appeared in the source. Let's re-reverse them.
   SmallVector<SemanticAvailableAttr, 8> AvAttrs;
   for (auto Attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
+    if (!isAvailabilityDomainActive(Attr.getDomain(), ActivePlatform))
+      continue;
+
     AvAttrs.push_back(Attr);
   }
 
   // Now go through them in source order.
   for (auto AvAttr : llvm::reverse(AvAttrs)) {
     SmallVector<Availability, 5> ExpandedAvailabilities;
-    expandInferredAvailabilityAttr(AvAttr, ExpandedAvailabilities);
+    expandInferredAvailabilityAttr(AvAttr, ExpandedAvailabilities,
+                                   ActivePlatform);
     for (auto &Avail : ExpandedAvailabilities)
       insertAvailability(Avail, Availabilities, IsParent);
   }
 }
 
-/// Get the availabilities of a declaration, considering all of its
-/// parent context's except for the module.
+/// Get the availabilities of a declaration, considering all of its parent
+/// context's except for the module. If \p ActivePlatform is non-null, only
+/// include availability relevant to the active platform.
 void getInheritedAvailabilities(const Decl *D,
-llvm::StringMap<Availability> &Availabilities) {
-  getAvailabilities(D, Availabilities, /*IsParent*/false);
+                                llvm::StringMap<Availability> &Availabilities,
+                                std::optional<PlatformKind> ActivePlatform) {
+  getAvailabilities(D, Availabilities, /*IsParent*/ false, ActivePlatform);
 
   auto CurrentContext = D->getDeclContext();
   while (CurrentContext) {
@@ -747,7 +773,8 @@ llvm::StringMap<Availability> &Availabilities) {
       if (isa<ModuleDecl>(Parent)) {
         return;
       }
-      getAvailabilities(Parent, Availabilities, /*IsParent*/true);
+      getAvailabilities(Parent, Availabilities, /*IsParent*/ true,
+                        ActivePlatform);
     }
     CurrentContext = CurrentContext->getParent();
   }
@@ -757,7 +784,8 @@ llvm::StringMap<Availability> &Availabilities) {
 
 void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
   llvm::StringMap<Availability> Availabilities;
-  getInheritedAvailabilities(D, Availabilities);
+  getInheritedAvailabilities(D, Availabilities,
+                             Graph->Walker.Options.ActivePlatform);
 
   // If we were asked to filter the availability platforms for the output graph,
   // perform that filtering here.
