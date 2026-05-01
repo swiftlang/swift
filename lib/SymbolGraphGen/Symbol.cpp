@@ -639,6 +639,75 @@ void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
 }
 
 namespace {
+/// Insert or merge a single Availability entry into a domain map, using
+/// either parent-inheritance or duplicate-attribute rules.
+void insertAvailability(Availability NewAvailability,
+                        llvm::StringMap<Availability> &Availabilities,
+                        bool IsParent) {
+  if (NewAvailability.empty())
+    return;
+  auto Existing = Availabilities.find(NewAvailability.Domain);
+  if (Existing != Availabilities.end()) {
+    // There are different rules for filling in missing components or replacing
+    // existing components from a parent's @available attribute compared to
+    // duplicate @available attributes on the same declaration. See the
+    // respective methods below for an explanation for the replacement/filling
+    // rules.
+    // FIXME: [availability] Use compiler's logic to synthesize availability.
+    // Some of this merge logic is out-of-sync with how the compiler determines
+    // availability when multiple attributes apply to the same platform.
+    if (IsParent) {
+      Existing->getValue().updateFromParent(NewAvailability);
+    } else {
+      Existing->getValue().updateFromDuplicate(NewAvailability);
+    }
+  } else {
+    // There are no availabilities for this domain yet, so either inherit the
+    // parent's in its entirety or set it from this declaration.
+    Availabilities.insert({NewAvailability.Domain, NewAvailability});
+  }
+}
+
+std::optional<ArrayRef<PlatformKind>>
+getPlatformsToExpand(SemanticAvailableAttr AvAttr) {
+  // For now, only expand platform availability for anyAppleOS attributes.
+  if (AvAttr.getDomain().contains(
+          AvailabilityDomain::forPlatform(PlatformKind::anyAppleOS))) {
+    static const PlatformKind ApplePlatforms[] = {
+      PlatformKind::macOS,
+      PlatformKind::iOS,
+      PlatformKind::watchOS,
+      PlatformKind::tvOS,
+      PlatformKind::visionOS,
+    };
+    return ApplePlatforms;
+  }
+
+  return {};
+}
+
+/// Expands a single availability attribute into one or more Availability
+/// structs.
+void expandInferredAvailabilityAttr(SemanticAvailableAttr AvAttr,
+                                    SmallVectorImpl<Availability> &Expanded) {
+  if (auto Platforms = getPlatformsToExpand(AvAttr)) {
+    for (auto Platform : *Platforms) {
+      Availability InferredAvailability(AvAttr);
+      InferredAvailability.Domain = Availability::getDomainDescription(
+          AvailabilityDomain::forPlatform(Platform));
+      // FIXME: [availability] Versions should be remapped, too.
+      // Version remapping is unnecessary at the moment because only anyAppleOS
+      // availability gets expanded and anyAppleOS doesn't require version
+      // remapping (yet).
+      Expanded.push_back(InferredAvailability);
+    }
+    return;
+  }
+
+  // Just convert the attribute directly.
+  Expanded.push_back(Availability(AvAttr));
+}
+
 /// Get the availabilities for each domain on a declaration without walking
 /// up the parent hierarchy.
 ///
@@ -652,37 +721,17 @@ void getAvailabilities(const Decl *D,
                        bool IsParent) {
   // DeclAttributes is a linked list in reverse order from where they
   // appeared in the source. Let's re-reverse them.
-  SmallVector<SemanticAvailableAttr, 4> AvAttrs;
-  for (auto Attr : D->getSemanticAvailableAttrs(/*includeInactive=*/true)) {
+  SmallVector<SemanticAvailableAttr, 8> AvAttrs;
+  for (auto Attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
     AvAttrs.push_back(Attr);
   }
-  std::reverse(AvAttrs.begin(), AvAttrs.end());
 
   // Now go through them in source order.
-  for (auto AvAttr : AvAttrs) {
-    Availability NewAvailability(AvAttr);
-    if (NewAvailability.empty()) {
-      continue;
-    }
-    auto ExistingAvailability = Availabilities.find(NewAvailability.Domain);
-    if (ExistingAvailability != Availabilities.end()) {
-      // There are different rules for filling in missing components
-      // or replacing existing components from a parent's @available
-      // attribute compared to duplicate @available attributes on the
-      // same declaration.
-      // See the respective methods below for an explanation for the
-      // replacement/filling rules.
-      if (IsParent) {
-        ExistingAvailability->getValue().updateFromParent(NewAvailability);
-      } else {
-        ExistingAvailability->getValue().updateFromDuplicate(NewAvailability);
-      }
-    } else {
-      // There are no availabilities for this domain yet, so either
-      // inherit the parent's in its entirety or set it from this declaration.
-      Availabilities.insert(std::make_pair(NewAvailability.Domain,
-                                           NewAvailability));
-    }
+  for (auto AvAttr : llvm::reverse(AvAttrs)) {
+    SmallVector<Availability, 5> ExpandedAvailabilities;
+    expandInferredAvailabilityAttr(AvAttr, ExpandedAvailabilities);
+    for (auto &Avail : ExpandedAvailabilities)
+      insertAvailability(Avail, Availabilities, IsParent);
   }
 }
 
@@ -734,10 +783,18 @@ void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
     return;
   }
 
-  OS.attributeArray("availability", [&]{
-    for (const auto &Availability : Availabilities) {
-      Availability.getValue().serialize(OS);
-    }
+  OS.attributeArray("availability", [&] {
+    // Sort the availability entries to ensure that they are emitted in a stable
+    // order.
+    SmallVector<Availability, 8> SortedAvailabilities;
+    for (const auto &A : Availabilities)
+      SortedAvailabilities.push_back(A.getValue());
+    llvm::sort(SortedAvailabilities,
+               [](const Availability &A, const Availability &B) {
+                 return A.Domain < B.Domain;
+               });
+    for (const auto &A : SortedAvailabilities)
+      A.serialize(OS);
   });
 }
 
