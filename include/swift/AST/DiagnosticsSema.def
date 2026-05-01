@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -8437,6 +8437,18 @@ NOTE(add_generic_parameter_non_bitwise_copyable_conformance,none,
      (Type))
 ERROR(bitwise_copyable_outside_module,none,
       "conformance to 'BitwiseCopyable' must occur in the same module as %kind0",
+      (const ValueDecl *))
+ERROR(convertible_to_bytes_outside_stdlib,none,
+      "type conforming to 'ConvertibleToBytes' must be defined in the standard library module",
+      (const ValueDecl *))
+ERROR(convertible_to_bytes_outside_module,none,
+      "conformance to 'ConvertibleToBytes' must occur in the same module as %kind0",
+      (const ValueDecl *))
+ERROR(convertible_from_bytes_outside_stdlib,none,
+      "type conforming to 'ConvertibleFromBytes' must be defined in the standard library module",
+      (const ValueDecl *))
+ERROR(convertible_from_bytes_outside_module,none,
+      "conformance to 'ConvertibleFromBytes' must occur in the same module as %kind0",
       (const ValueDecl *))
 ERROR(suppress_inferrable_protocol_extension,none,
       "conformance to inferrable protocol %0 cannot be suppressed in an extension", (const ProtocolDecl *))

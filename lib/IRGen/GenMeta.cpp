@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -7645,6 +7645,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Escapable:
   case KnownProtocolKind::BitwiseCopyable:
   case KnownProtocolKind::SendableMetatype:
+  case KnownProtocolKind::ConvertibleToBytes:
+  case KnownProtocolKind::ConvertibleFromBytes:
     return SpecialProtocol::None;
   }
 

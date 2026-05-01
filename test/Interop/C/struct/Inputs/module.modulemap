@@ -22,3 +22,11 @@ module NoncopyableStructs {
 module ReturnForeignReference {
   header "return-foreign-reference.h"
 }
+
+module OpaquePointerImport {
+  header "opaque-pointer-import.h"
+}
+
+module OpaquePointerImportAPINotes {
+  header "opaque-pointer-import-apinotes.h"
+}
