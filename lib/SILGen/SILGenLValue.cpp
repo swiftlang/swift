@@ -2997,6 +2997,16 @@ LValue SILGenFunction::emitLValue(Expr *e, SGFAccessKind accessKind,
   // reabstraction component.
   auto substFormalType = r.getSubstFormalType();
   auto loweredSubstType = getLoweredType(substFormalType);
+  // For C function pointer fields with Clang type info, use the LValue's
+  // orig formal type to prevent a spurious OrigToSubstComponent that trigger
+  // reabstraction.
+  if (r.getOrigFormalType().isClangType()) {
+    if (auto fnType = substFormalType->lookThroughSingleOptionalType()
+                          ->getAs<AnyFunctionType>())
+      if (fnType->getRepresentation() ==
+              FunctionTypeRepresentation::CFunctionPointer)
+        loweredSubstType = getLoweredType(r.getOrigFormalType(), substFormalType);
+  }
   if (r.getTypeOfRValue() != loweredSubstType.getObjectType()) {
     // Logical components always re-abstract back to the substituted
     // type.
@@ -6063,7 +6073,34 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
 
   // Otherwise, force the RHS now to preserve evaluation order.
   auto srcLoc = src.getLocation();
-  RValue srcValue = std::move(src).getAsRValue(*this);
+  RValue srcValue = [&]() -> RValue {
+    // When assigning to a C function pointer field, emit the RHS with a
+    // conversion context carrying the Clang type. This allows
+    // emitCFunctionPointer to use the correct conventions.
+    if (dest.getOrigFormalType().isClangType()) {
+      auto substType = dest.getSubstFormalType();
+      if (auto fnType = substType->lookThroughSingleOptionalType()
+                            ->getAs<AnyFunctionType>()) {
+        if (fnType->getRepresentation() ==
+            FunctionTypeRepresentation::CFunctionPointer) {
+          auto origType = dest.getOrigFormalType();
+          auto loweredTy = getLoweredType(origType, substType);
+          auto conversion = Conversion::getBridging(
+              Conversion::BridgeToObjC, src.getSubstRValueType(), substType,
+              loweredTy, origType);
+          // Use a ConvertingInitialization to carry the Clang type info
+          // through SGFContext to emitCFunctionPointer.
+          ConvertingInitialization init(conversion, SGFContext());
+          ManagedValue mv =
+              std::move(src).getAsSingleValue(*this, SGFContext(&init));
+          if (mv.isInContext())
+            mv = init.finishEmission(*this, srcLoc, mv);
+          return RValue(*this, srcLoc, substType, mv);
+        }
+      }
+    }
+    return std::move(src).getAsRValue(*this);
+  }();
 
   // Peephole: instead of materializing and then assigning into a
   // translation component, untransform the value first.
