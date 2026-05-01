@@ -6264,12 +6264,21 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
                            i->usesMoveableValueDebugInfo(), Copy);
   }
 
+  // For alloc_stack operands, createAddr now adds op_deref for SIL-level
+  // uniformity, but IRGen still handles alloc_stack addresses the same as
+  // before (no op_deref in the LLVM expression). Strip the op_deref here
+  // so the emitted LLVM IR is unchanged.
+  SILDebugVariable AdjustedVarInfo = *VarInfo;
+  if (IsAddrVal && isa<AllocStackInst>(SILVal) &&
+      AdjustedVarInfo.DIExpr.startsWithDeref())
+    AdjustedVarInfo.DIExpr.eraseElement(AdjustedVarInfo.DIExpr.element_begin());
+
   bindArchetypes(DbgTy.getType());
   if (!IGM.DebugInfo)
     return;
 
   emitDebugVariableDeclaration(
-      Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), *VarInfo,
+      Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), AdjustedVarInfo,
       Indirection, AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
 }
 

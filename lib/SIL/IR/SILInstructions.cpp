@@ -475,11 +475,8 @@ DebugValueInst *
 DebugValueInst::createAddr(SILDebugLocation DebugLoc, SILValue Operand,
                            SILModule &M, SILDebugVariable Var,
                            UsesMoveableValueDebugInfo_t wasMoved, bool trace) {
-  // For alloc_stack, debug_value is used to annotate the associated
-  // memory location, so we shouldn't attach op_deref.
-  if (!isa<AllocStackInst>(Operand))
-    Var.DIExpr.prependElements(
-      {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+  Var.DIExpr.prependElements(
+    {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
   return DebugValueInst::create(DebugLoc, Operand, M, Var, DontPoisonRefs,
                                 wasMoved, trace);
 }
