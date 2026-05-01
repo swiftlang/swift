@@ -131,8 +131,29 @@ computeMemorySILType(MarkUninitializedInst *MUI, SILValue Address) {
   return {MemorySILType, VDecl->isLet()};
 }
 
+static SingleValueInstruction *
+findUninitializedValue(MarkUninitializedInst *MemoryInst) {
+  SingleValueInstruction *inst = MemoryInst;
+  SILValue projectBoxUser = inst;
+
+  // Check for a project_box instruction (possibly via a borrow).
+  if (auto *bbi = projectBoxUser->getSingleUserOfType<BeginBorrowInst>()) {
+    projectBoxUser = bbi;
+  }
+  if (auto pbi = projectBoxUser->getSingleUserOfType<ProjectBoxInst>()) {
+    inst = pbi;
+  }
+
+  // Access move-only values through their marker.
+  if (auto mui = inst->getSingleUserOfType<MarkUnresolvedNonCopyableValueInst>()) {
+    inst = mui;
+  }
+
+  return inst;
+}
+
 DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
-    : MemoryInst(MI) {
+    : MemoryInst(MI), uninitializedValue(findUninitializedValue(MI)) {
   auto &Module = MI->getModule();
 
   SILValue Address = MemoryInst;
@@ -184,29 +205,8 @@ SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
   return &*getFunction().begin()->begin();
 }
 
-static SingleValueInstruction *
-getUninitializedValue(MarkUninitializedInst *MemoryInst) {
-  SingleValueInstruction *inst = MemoryInst;
-  SILValue projectBoxUser = inst;
-  
-  // Check for a project_box instruction (possibly via a borrow).
-  if (auto *bbi = projectBoxUser->getSingleUserOfType<BeginBorrowInst>()) {
-    projectBoxUser = bbi;
-  }
-  if (auto pbi = projectBoxUser->getSingleUserOfType<ProjectBoxInst>()) {
-    inst = pbi;
-  }
-
-  // Access move-only values through their marker.
-  if (auto mui = inst->getSingleUserOfType<MarkUnresolvedNonCopyableValueInst>()) {
-    inst = mui;
-  }
-
-  return inst;
-}
-
 SingleValueInstruction *DIMemoryObjectInfo::getUninitializedValue() const {
-  return ::getUninitializedValue(MemoryInst);
+  return uninitializedValue;
 }
 
 /// Given a symbolic element number, return the type of the element.
@@ -563,7 +563,7 @@ SingleValueInstruction *DIMemoryObjectInfo::findUninitializedSelfValue() const {
       // be some kind of `self` (root, delegating, derived etc.)
       // see \c MarkUninitializedInst::Kind for more details.
       if (!isVariableOrResult(MUI))
-        return ::getUninitializedValue(MUI);
+        return findUninitializedValue(MUI);
     }
   }
   return nullptr;
