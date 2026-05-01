@@ -586,10 +586,13 @@ ModuleDependencyScanner::ModuleDependencyScanner(
       ScanCompilerInvocation.getSearchPathOptions().ScannerPrefixMapper;
   if (!ScannerPrefixMapper.empty()) {
     PrefixMapper = std::make_unique<llvm::PrefixMapper>();
+    ReversePrefixMapping = std::make_unique<llvm::PrefixMapper>();
     SmallVector<llvm::MappedPrefix, 4> Prefixes;
     llvm::MappedPrefix::transformPairs(ScannerPrefixMapper, Prefixes);
     PrefixMapper->addRange(Prefixes);
     PrefixMapper->sort();
+    ReversePrefixMapping->addInverseRange(Prefixes);
+    ReversePrefixMapping->sort();
   }
 
   if (CAS)
@@ -1883,40 +1886,57 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
   llvm::SmallString<256> chainedHeaderBuffer;
   llvm::raw_svector_ostream outOS(chainedHeaderBuffer);
 
-  // If prefix mapping is used, don't try to import header since that will add
-  // a path-relative component into dependency scanning and defeat the purpose
-  // of prefix mapping. Additionally, if everything is prefix mapped, the
-  // embedded header path is also prefix mapped, thus it can't be found anyway.
   auto FS = ScanASTContext.SourceMgr.getFileSystem();
 
+  llvm::StringSet<> SeenBridgingHeader;
+
+  // Chaining bridging header together. If the header can be found in file
+  // system, chain the header by include the file directly. Otherwise, directly
+  // importing the preprocessed file content. If prefix mapping is used,
+  // including the prefix mapped path because clang dependency scanner knows how
+  // to remap the path to look for the actual file.
   auto chainBridgingHeader = [&](StringRef moduleName, StringRef headerPath,
                                  StringRef binaryModulePath) -> llvm::Error {
-    auto remapped = remapPath(headerPath);
-    outOS << "#if __has_include(\"" << remapped << "\")\n";
-    outOS << "#import \"" << remapped << "\"\n";
-    outOS << "#else\n";
+    // Ideally, the check can be done in dependency scanner via `__has_include`
+    // but that will return error if the path returns permission error. Since
+    // this is a hard-coded path from upstream binary module, thus user can't
+    // workaround it. Do the check when generating the header using a reverse
+    // prefix mapping.
+    std::string lookupPath = ReversePrefixMapping
+                                 ? ReversePrefixMapping->mapToString(headerPath)
+                                 : headerPath.str();
 
-    if (binaryModulePath.empty()) {
-      outOS << "#error failed to find bridging header for module " << moduleName
-            << "\n";
-    } else {
-      // Extract the embedded bridging header
-      auto moduleBuf = FS->getBufferForFile(binaryModulePath);
-      if (!moduleBuf)
-        return llvm::errorCodeToError(moduleBuf.getError());
+    // Check to see if the bridging header has been included before. This is a
+    // workaround for legacy code that uses the same bridging header (without
+    // header guard) for multiple modules and they are depending on each other.
+    if (!SeenBridgingHeader.insert(lookupPath).second)
+      return llvm::Error::success();
 
-      auto content = extractEmbeddedBridgingHeaderContent(
-          std::move(*moduleBuf), /*headerPath=*/"", ScanASTContext);
-      if (!content)
-        return llvm::createStringError("can't load embedded header from " +
-                                       binaryModulePath);
-
-      outOS << "# 1 \"<module-" << moduleName
-            << "-embedded-bridging-header>\" 1\n";
-      outOS << content->getBuffer() << "\n";
+    // Use openFileForRead to check if file can be open (with permission).
+    if (FS->openFileForRead(lookupPath)) {
+      outOS << "#include \"" << remapPath(headerPath) << "\"\n";
+      return llvm::Error::success();
     }
 
-    outOS << "#endif\n";
+    if (binaryModulePath.empty())
+      return llvm::createStringError(
+          "No fallback binary module for bridging header in module " +
+          moduleName);
+
+    // Extract the embedded bridging header
+    auto moduleBuf = FS->getBufferForFile(binaryModulePath);
+    if (!moduleBuf)
+      return llvm::errorCodeToError(moduleBuf.getError());
+
+    auto content = extractEmbeddedBridgingHeaderContent(
+        std::move(*moduleBuf), /*headerPath=*/"", ScanASTContext);
+    if (!content)
+      return llvm::createStringError("can't load embedded header from " +
+                                     binaryModulePath);
+
+    outOS << "# 1 \"<module-" << moduleName
+          << "-embedded-bridging-header>\" 1\n";
+    outOS << content->getBuffer() << "\n";
 
     return llvm::Error::success();
   };
