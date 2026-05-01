@@ -539,6 +539,7 @@ function(add_pure_swift_host_tool name)
   if(NOT APSHT_SWIFT_COMPONENT STREQUAL no_component)
     add_dependencies(${APSHT_SWIFT_COMPONENT} ${name})
     swift_install_in_component(TARGETS ${name}
+      EXPORT SwiftTargets
       COMPONENT ${APSHT_SWIFT_COMPONENT}
       RUNTIME DESTINATION bin)
     swift_is_installing_component(${APSHT_SWIFT_COMPONENT} is_installing)

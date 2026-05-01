@@ -29,24 +29,15 @@ if(SWIFT_CONFIG_EXPORTS)
   export(TARGETS ${SWIFT_CONFIG_EXPORTS} FILE "${SWIFT_EXPORTS_FILE}")
 endif()
 
-# -----------------------------------------------------------------------------
-# Install-tree exports file (generated in build dir, installed as a normal file)
-# -----------------------------------------------------------------------------
-set(SWIFT_EXPORTS_INSTALL_FILE "${swift_cmake_builddir}/SwiftExports.cmake")
-if(SWIFT_EXPORTS)
-  export(TARGETS ${SWIFT_EXPORTS} FILE "${SWIFT_EXPORTS_INSTALL_FILE}")
-  swift_install_in_component(
-      CODE
-        "set(_dest \"\")\n"
-        "if(DEFINED ENV{DESTDIR})\n"
-        "  set(_dest \"$ENV{DESTDIR}\")\n"
-        "endif()\n"
-        "set(_src \"${SWIFT_EXPORTS_INSTALL_FILE}\")\n"
-        "set(_dst \"\${_dest}\${CMAKE_INSTALL_PREFIX}/${SWIFT_INSTALL_PACKAGE_DIR}\")\n"
-        "file(MAKE_DIRECTORY \"\${_dst}\")\n"
-        "file(COPY \"\${_src}\" DESTINATION \"\${_dst_dir}\")\n"
-      COMPONENT dev)
-endif()
+# -------------------------
+# Install-tree exports file
+# -------------------------
+
+swift_install_in_component(
+  EXPORT SwiftTargets
+  DESTINATION "${SWIFT_INSTALL_PACKAGE_DIR}"
+  FILE "SwiftExports.cmake"
+  COMPONENT dev)
 
 # Generate a build-tree SwiftConfig.cmake as well (useful for in-tree consumers).
 # Keep existing SWIFT_CONFIG_CODE + version variables, but avoid hardcoding build

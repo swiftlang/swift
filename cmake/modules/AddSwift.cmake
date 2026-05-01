@@ -862,6 +862,7 @@ function(add_swift_host_library name)
   add_dependencies(dev ${name})
   if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     swift_install_in_component(TARGETS ${name}
+      EXPORT SwiftTargets
       ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
       LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
       RUNTIME DESTINATION bin COMPONENT dev)
@@ -1055,6 +1056,7 @@ function(add_swift_host_tool executable)
   if(NOT ASHT_SWIFT_COMPONENT STREQUAL "no_component")
     add_dependencies(${ASHT_SWIFT_COMPONENT} ${executable})
     swift_install_in_component(TARGETS ${executable}
+                               EXPORT SwiftTargets
                                RUNTIME
                                  DESTINATION bin
                                  COMPONENT ${ASHT_SWIFT_COMPONENT}
