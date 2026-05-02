@@ -2045,7 +2045,7 @@ public:
   }
 
   MetatypeRepresentation visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
-    return MetatypeRepresentation::Unknown;
+    return MetatypeRepresentation::Thick;
   }
 
   MetatypeRepresentation visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OP) {
