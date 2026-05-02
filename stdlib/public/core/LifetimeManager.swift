@@ -346,3 +346,17 @@ public func _overrideLifetime<
 ) -> T {
   dependent
 }
+
+/// Unsafely discard any lifetime dependency on the `dependent` inout
+/// argument. Return a value identical to `dependent` with a lifetime dependency
+/// on the caller's borrow scope of the `source` argument.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(dependent: borrow source)
+public func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: inout T, borrowing source: borrowing U
+) {}

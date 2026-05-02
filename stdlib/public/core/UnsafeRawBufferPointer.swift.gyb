@@ -464,14 +464,16 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T : BitwiseCopyable>(
+  @lifetime(borrow self)
+  public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
     _debugPrecondition(offset >= 0, "${Self}.load with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
       "${Self}.load out of bounds")
-    return unsafe baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
+    let value = unsafe baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
+    return unsafe _overrideLifetime(value, borrowing: self)
   }
 
   @_alwaysEmitIntoClient
@@ -1283,10 +1285,11 @@ extension ${Self} {
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
 @safe
-public func withUnsafeMutableBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
+public func withUnsafeMutableBytes<T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable>(
   of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
+  unsafe _overrideLifetime(&value, borrowing: ())
   let pointer = UnsafeMutableRawPointer(Builtin.addressof(&value))
   return try unsafe body(unsafe .init(start: pointer, count: MemoryLayout<T>.size))
 }
@@ -1315,11 +1318,12 @@ func __abi_se0413_withUnsafeMutableBytes<T, Result>(
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
 public func _withUnprotectedUnsafeMutableBytes<
-  T: ~Copyable, E: Error, Result: ~Copyable
+  T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable
 >(
   of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
+  unsafe _overrideLifetime(&value, borrowing: ())
 #if $BuiltinUnprotectedAddressOf
   let pointer = UnsafeMutableRawPointer(Builtin.unprotectedAddressOf(&value))
 #else
@@ -1353,10 +1357,11 @@ public func _withUnprotectedUnsafeMutableBytes<
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
 @safe
-public func withUnsafeBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
+public func withUnsafeBytes<T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable>(
   of value: inout T,
   _ body: (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
+  unsafe _overrideLifetime(&value, borrowing: ())
   let address = UnsafeRawPointer(Builtin.addressof(&value))
   return try unsafe body(unsafe .init(start: address, count: MemoryLayout<T>.size))
 }
@@ -1384,11 +1389,12 @@ func __abi_se0413_withUnsafeBytes<T, Result>(
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
 public func _withUnprotectedUnsafeBytes<
-  T: ~Copyable, E: Error, Result: ~Copyable
+  T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable
 >(
   of value: inout T,
   _ body: (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
+  unsafe _overrideLifetime(&value, borrowing: ())
 #if $BuiltinUnprotectedAddressOf
   let p = UnsafeRawPointer(Builtin.unprotectedAddressOf(&value))
 #else
@@ -1416,6 +1422,10 @@ public func _withUnprotectedUnsafeBytes<
 ///     If you want to mutate a value by writing through a pointer, use
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
+//
+// FIXME: Support `T: ~Copyable & ~Escapable` when we have an _overrideLifetime
+// that returns a borrowed value. This requires compiler support for emitting
+// tracking Builtin.Borrow<T> as ~Escapable.
 @_alwaysEmitIntoClient
 @safe
 public func withUnsafeBytes<
@@ -1449,6 +1459,10 @@ func __abi_se0413_withUnsafeBytes<T, Result>(
 ///
 /// This function is similar to `withUnsafeBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
+//
+// FIXME: Support `T: ~Copyable & ~Escapable` when we have an _overrideLifetime
+// that returns a borrowed value. This requires compiler support for emitting
+// tracking Builtin.Borrow<T> as ~Escapable.
 @_alwaysEmitIntoClient
 public func _withUnprotectedUnsafeBytes<
   T: ~Copyable, E: Error, Result: ~Copyable
