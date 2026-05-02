@@ -14,8 +14,10 @@
 import Swift
 #endif
 
-// OutputRawSpan is a reference to a contiguous region of memory which starts
-// some number of initialized bytes, followed by uninitialized memory.
+/// `OutputRawSpan` is a reference to a contiguous region of memory which starts
+/// with some number of initialized bytes, followed by uninitialized memory.
+/// It provides operations to access the bytes it stores,
+/// as well as to append and to remove bytes.
 @safe
 @frozen
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -24,12 +26,13 @@ public struct OutputRawSpan: ~Copyable, ~Escapable {
   @usableFromInline
   internal let _pointer: UnsafeMutableRawPointer?
 
+  /// The total number of bytes that this output span can contain.
   public let capacity: Int
 
   @usableFromInline
   internal var _count: Int
 
-  /// Create an OutputRawSpan with zero capacity
+  /// Create an OutputRawSpan with zero capacity.
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init() {
@@ -166,6 +169,8 @@ extension OutputRawSpan {
 extension OutputRawSpan {
 
   /// Append a single byte to this span.
+  ///
+  /// - Parameter value: The byte to append.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func append(_ value: UInt8) {
@@ -175,6 +180,10 @@ extension OutputRawSpan {
   }
 
   /// Remove the last byte from this span.
+  ///
+  /// Returns the last byte. The `OutputRawSpan` must not be empty.
+  ///
+  /// - Returns: The removed byte.
   @_alwaysEmitIntoClient
   @discardableResult
   @lifetime(self: copy self)
@@ -184,19 +193,22 @@ extension OutputRawSpan {
     return unsafe _tail().load(as: UInt8.self)
   }
 
-  /// Remove the last N elements, returning the memory they occupy
-  /// to the uninitialized state.
+  /// Remove the last n bytes from this span, returning the memory
+  /// they occupy to the uninitialized state.
   ///
-  /// `n` must not be greater than `count`
+  /// `n` must not be greater than `byteCount`.
+  ///
+  /// - Parameter n: The number of bytes to remove.
+  ///     `n` must not be negative or greater than `byteCount`.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
-  public mutating func removeLast(_ k: Int) {
-    _precondition(k >= 0, "Can't remove a negative number of bytes")
-    _precondition(k <= _count, "OutputRawSpan underflow")
-    _count &-= k
+  public mutating func removeLast(_ n: Int) {
+    _precondition(n >= 0, "Can't remove a negative number of bytes")
+    _precondition(n <= _count, "OutputRawSpan underflow")
+    _count &-= n
   }
 
-  /// Remove all this span's elements and return its memory
+  /// Remove all this span's bytes and return its memory
   /// to the uninitialized state.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
@@ -211,6 +223,10 @@ extension OutputRawSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
   /// Appends the given value's bytes to this span's bytes.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - type: The type of the value.
   @_alwaysEmitIntoClient
   @unsafe
   @lifetime(self: copy self)
@@ -223,6 +239,12 @@ extension OutputRawSpan {
   }
 
   /// Appends the given value's bytes repeatedly to this span's bytes.
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The value to store as raw bytes.
+  ///   - count: The number of copies of `repeatedValue` to append
+  ///       to this span.
+  ///   - type: The type of the instance to store repeatedly.
   @_alwaysEmitIntoClient
   @unsafe
   @lifetime(self: copy self)
@@ -286,13 +308,17 @@ extension OutputRawSpan {
   /// 1. The inout integer passed in as the second argument must be the exact
   ///     number of initialized bytes in the buffer passed in as the first
   ///     argument.
-  /// 2. These initialized elements must be located in a single contiguous
+  /// 2. These initialized bytes must be located in a single contiguous
   ///     region starting at the beginning of the buffer. The rest of the buffer
   ///     must hold uninitialized memory.
   ///
   /// This function cannot verify these two invariants, and therefore
   /// this is an unsafe operation. Violating the invariants of `OutputRawSpan`
   /// may result in undefined behavior.
+  ///
+  /// - Parameter body: A closure that can read from and write to the
+  ///     buffer and update the initialized count.
+  /// - Returns: The return value of the `body` closure.
   @_alwaysEmitIntoClient
   @_transparent
   @lifetime(self: copy self)
@@ -321,8 +347,7 @@ extension OutputRawSpan {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
-  /// Consume the output span (relinquishing its control over the buffer it is
-  /// addressing), and return the number of initialized bytes in it.
+  /// Consume the output span and return the number of initialized bytes.
   ///
   /// This method should be invoked in the scope where the `OutputRawSpan` was
   /// created, when it is time to commit the contents of the updated buffer
@@ -349,8 +374,7 @@ extension OutputRawSpan {
     return _count
   }
 
-  /// Consume the output span (relinquishing its control over the buffer it is
-  /// addressing), and return the number of initialized bytes in it.
+  /// Consume the output span and return the number of initialized bytes.
   ///
   /// This method should be invoked in the scope where the `OutputRawSpan` was
   /// created, when it is time to commit the contents of the updated buffer
