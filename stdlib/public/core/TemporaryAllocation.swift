@@ -36,7 +36,9 @@ internal func _byteCountForTemporaryAllocation<T: ~Copyable>(
   // emitting equivalent compile-time diagnostics because the call to
   // Builtin.stackAlloc() becomes unreachable.
   if _isComputed(capacity) {
-    _precondition(capacity >= 0, "Allocation capacity must be greater than or equal to zero")
+    _precondition(
+      capacity >= 0, "Allocation capacity must be greater than or equal to zero"
+    )
   }
   let stride = MemoryLayout<T>.stride
   let (byteCount, overflow) = capacity.multipliedReportingOverflow(by: stride)
@@ -62,7 +64,9 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
   // non-power-of-two alignments.
   if _isComputed(alignment) {
     _precondition(alignment > 0, "Alignment value must be greater than zero")
-    _precondition(_isPowerOf2(alignment), "Alignment value must be a power of two")
+    _precondition(
+      _isPowerOf2(alignment), "Alignment value must be a power of two"
+    )
   }
 
   // If the alignment is larger than MaximumAlignment, the allocation is always
@@ -97,7 +101,8 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
 /// - Parameters:
 ///   - type: The type of the elements in the buffer being temporarily
 ///     allocated. For untyped buffers, use `Int8.self`.
-///   - capacity: The number of elements to allocate. `capacity` must not be negative.
+///   - capacity: The number of elements to allocate. `capacity` must not be
+///     negative.
 ///   - alignment: The alignment of the new, temporary region of allocated
 ///     memory, in bytes. `alignment` must be a whole power of 2.
 ///   - body: A closure to invoke and to which the allocated buffer pointer
@@ -120,7 +125,9 @@ internal func _withUnsafeTemporaryAllocation<
   let byteCount = _byteCountForTemporaryAllocation(of: type, capacity: capacity)
 
   guard _isStackAllocationSafe(byteCount: byteCount, alignment: alignment) else {
-    return _fallBackToHeapAllocation(byteCount: byteCount, alignment: alignment, body)
+    return _fallBackToHeapAllocation(
+      byteCount: byteCount, alignment: alignment, body
+    )
   }
 
   // This declaration must come BEFORE Builtin.stackAlloc() or
@@ -133,7 +140,7 @@ internal func _withUnsafeTemporaryAllocation<
     MemoryLayout<T>.stride._builtinWordValue,
     alignment._builtinWordValue
   )
-  
+
   // The multiple calls to Builtin.stackDealloc() are because defer { } produces
   // a child function at the SIL layer and that conflicts with the verifier's
   // idea of a stack allocation's lifetime.
@@ -155,7 +162,9 @@ internal func _withUnprotectedUnsafeTemporaryAllocation<
   let byteCount = _byteCountForTemporaryAllocation(of: type, capacity: capacity)
 
   guard _isStackAllocationSafe(byteCount: byteCount, alignment: alignment) else {
-    return _fallBackToHeapAllocation(byteCount: byteCount, alignment: alignment, body)
+    return _fallBackToHeapAllocation(
+      byteCount: byteCount, alignment: alignment, body
+    )
   }
 
   // This declaration must come BEFORE Builtin.unprotectedStackAlloc() or
@@ -250,6 +259,44 @@ public func withUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
   }
 
   return try result.get()
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_alwaysEmitIntoClient @_transparent
+public func withTemporaryAllocation<T: ~Copyable, R: ~Copyable, E: Error>(
+  of type: T.Type,
+  capacity: Int,
+  _ body: (inout OutputSpan<T>) throws(E) -> R
+) throws(E) -> R where T : ~Copyable, R : ~Copyable {
+  try withUnsafeTemporaryAllocation(of: type, capacity: capacity) {
+    (buffer) throws(E) in
+    var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+    defer {
+      let initializedCount = unsafe span.finalize(for: buffer)
+      span = OutputSpan()
+      unsafe buffer.extracting(..<initializedCount).deinitialize()
+    }
+
+    return try body(&span)
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_alwaysEmitIntoClient @_transparent
+public func withTemporaryAllocation<R: ~Copyable, E: Error>(
+  byteCount: Int,
+  alignment: Int,
+  _ body: (inout OutputRawSpan) throws(E) -> R
+) throws(E) -> R where R: ~Copyable {
+  try withUnsafeTemporaryAllocation(byteCount: byteCount, alignment: alignment) {
+    (buffer) throws(E) in
+    var span = unsafe OutputRawSpan(buffer: buffer, initializedCount: 0)
+    defer {
+      _ = unsafe span.finalize(for: buffer)
+      span = OutputRawSpan()
+    }
+    return try body(&span)
+  }
 }
 
 /// Provides scoped access to a raw buffer pointer with the specified byte count
