@@ -916,8 +916,8 @@ public:
 private:
   const NominalTypeDecl *NTD;
 
-  void addField(reflection::FieldRecordFlags flags,
-                Type type, StringRef name) {
+  void addField(reflection::FieldRecordFlags flags, Type type,
+                std::optional<StringRef> name) {
     B.addInt32(flags.getRawValue());
 
     if (!type) {
@@ -940,8 +940,8 @@ private:
       }
     }
 
-    if (IGM.IRGen.Opts.EnableReflectionNames) {
-      auto fieldName = IGM.getAddrOfFieldName(name);
+    if (IGM.IRGen.Opts.EnableReflectionNames && name) {
+      auto fieldName = IGM.getAddrOfFieldName(*name);
       B.addRelativeAddress(fieldName);
     } else {
       B.addInt32(0);
@@ -1003,11 +1003,13 @@ private:
     if (hasPayload && (decl->isIndirect() || enumDecl->isIndirect()))
       flags.setIsIndirectCase();
 
-    Type interfaceType = decl->isAvailableDuringLowering()
-                             ? decl->getPayloadInterfaceType()
-                             : nullptr;
-
-    addField(flags, interfaceType, decl->getBaseIdentifier().str());
+    // TODO: [availability] Unavailable elements should be skipped entirely.
+    if (decl->isAvailableDuringLowering()) {
+      addField(flags, decl->getPayloadInterfaceType(),
+               decl->getBaseIdentifier().str());
+    } else {
+      addField(flags, Type(), std::nullopt);
+    }
   }
 
   void layoutEnum() {

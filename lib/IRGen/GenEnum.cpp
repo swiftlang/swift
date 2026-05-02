@@ -6429,6 +6429,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   // fixed-size from this resilience scope.
   ResilienceExpansion layoutScope =
       TC.IGM.getResilienceExpansionForLayout(theEnum);
+  // TODO: [availability] Only enumerate the elements available during lowering.
   for (auto elt : theEnum->getAllElements()) {
     ++numElements;
 

@@ -102,7 +102,7 @@ def check_test_file(file_path, lines, existing_swift_features):
 def find_matches(swift_src_root):
     # Look for every `REQUIRES` line that mentions `swift_feature_` in the
     # test directories.
-    # Look for every `RUN` line that mentions `-enable-experimental-feature` or
+    # Look for every `RUN` or `DEFINE` line that mentions `-enable-experimental-feature` or
     # `-enable-upcoming-feature` in the test directories.
     output = subprocess.check_output(
         [
@@ -120,6 +120,10 @@ def find_matches(swift_src_root):
             # Be careful to not use RUN with a colon after it or Lit will pick
             # it up.
             "RUN[:].*-enable-(experimental|upcoming)-feature",
+            "-e",
+            # Be careful to not use DEFINE with a colon after it or Lit will pick
+            # it up.
+            "DEFINE[:].*-enable-(experimental|upcoming)-feature",
             "--",
             "test",
             "validation-test",
