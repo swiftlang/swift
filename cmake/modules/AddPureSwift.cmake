@@ -402,6 +402,15 @@ function(add_pure_swift_host_library name)
       "SHELL:-Xlinker --build-id=sha1")
   endif()
 
+  if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
+    swift_install_in_component(TARGETS ${name}
+      EXPORT SwiftTargets
+      ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+      LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+      RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+      COMPONENT dev)
+  endif()
+
   # Export this target.
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
 endfunction()
@@ -499,11 +508,13 @@ function(add_pure_swift_host_tool name)
     target_link_libraries(${name} PUBLIC swiftSwiftOnoneSupport)
   endif()
 
-  # Make sure we can use the host libraries.
   target_include_directories(${name} PUBLIC
-    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+    "$<BUILD_INTERFACE:${SWIFT_HOST_LIBRARIES_DEST_DIR}>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_LIBDIR}/swift/host>")
+
   target_link_directories(${name} PUBLIC
-    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+    "$<BUILD_INTERFACE:${SWIFT_HOST_LIBRARIES_DEST_DIR}>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_LIBDIR}/swift/host>")
 
   if(LLVM_USE_LINKER)
     target_link_options(${name} PRIVATE
