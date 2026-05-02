@@ -2142,6 +2142,13 @@ public final class TestSuite {
       return self
     }
 
+    public func requireCapability(
+      _ capability: TestRunnerCapability
+    ) -> _TestBuilder {
+      _data._skip.append(.missingCapability(capability))
+      return self
+    }
+
     public func stdin(_ stdinText: String, eof: Bool = false) -> _TestBuilder {
       _data._stdinText = stdinText
       _data._stdinEndsWithEOF = eof
@@ -2264,6 +2271,22 @@ public enum StdLibVersion: String {
       return if #available(SwiftStdlib 6.3, *)  { true } else { false }
     case .stdlib_6_4:
       return if #available(SwiftStdlib 6.4, *)  { true } else { false }
+    }
+  }
+}
+
+public enum TestRunnerCapability: String {
+  case crashTesting = "crash testing"
+
+  var isMissing: Bool {
+    switch self {
+    case .crashTesting:
+      switch _getRunningOSVersion() {
+      case .wasi:
+        return true
+      default:
+        return false
+      }
     }
   }
 }
@@ -2481,6 +2504,8 @@ public enum TestRunPredicate : CustomStringConvertible {
   case nativeRuntime(/*reason:*/ String)
 
   case minimumStdlib(StdLibVersion)
+
+  case missingCapability(TestRunnerCapability)
   
   public var description: String {
     switch self {
@@ -2608,6 +2633,9 @@ public enum TestRunPredicate : CustomStringConvertible {
       
     case .minimumStdlib(let version):
       return "Requires Swift \(version.rawValue)'s standard library"
+
+    case .missingCapability(let capability):
+      return "Requires \(capability.rawValue)"
     }
   }
 
@@ -3007,6 +3035,9 @@ public enum TestRunPredicate : CustomStringConvertible {
       
     case .minimumStdlib(let version):
       return !version.isAvailable
+
+    case .missingCapability(let capability):
+      return capability.isMissing
     }
   }
 }
