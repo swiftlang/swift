@@ -561,7 +561,7 @@ extension AsyncThrowingStream {
 @safe
 final class _UnfoldingStorage<Element, Failure: Error>: @unchecked Sendable {
   typealias Produce = @Sendable () async throws(Failure) -> Element? // TODO: This needs to have `nonisolated(nonsending)` in order to execute on the caller's actor
-  typealias OnCancel = (() -> Void)?
+  typealias OnCancel = (@Sendable () -> Void)?
 
   enum State {
     case producing(
@@ -577,7 +577,7 @@ final class _UnfoldingStorage<Element, Failure: Error>: @unchecked Sendable {
 
   init(
     produce: @escaping Produce,
-    onCancel: sending OnCancel
+    onCancel: OnCancel
   ) {
     unsafe self.lock = unsafe UnsafeMutableRawPointer.allocate(
       byteCount: _lockWordCount() * MemoryLayout<UnsafeRawPointer>.stride,
