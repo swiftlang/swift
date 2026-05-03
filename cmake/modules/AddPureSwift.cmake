@@ -369,7 +369,8 @@ function(add_pure_swift_host_library name)
     # Install the Swift module into the appropriate location.
     Swift_MODULE_DIRECTORY ${module_dir}
     # NOTE: workaround for CMake not setting up include flags.
-    INTERFACE_INCLUDE_DIRECTORIES ${module_dir})
+    INTERFACE_INCLUDE_DIRECTORIES
+      "$<BUILD_INTERFACE:${module_dir}>;$<INSTALL_INTERFACE:lib${LLVM_LIBDIR_SUFFIX}/swift/host>")
 
   # Workaround to touch the library and its objects so that we don't
   # continually rebuild (again, see corresponding change in swift-syntax).

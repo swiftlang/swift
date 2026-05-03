@@ -59,7 +59,14 @@ foreach(lib ${compiler_swiftsyntax_libs})
 endforeach()
 
 swift_install_in_component(TARGETS ${compiler_swiftsyntax_libs}
+  EXPORT SwiftTargets
   ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
   LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
   RUNTIME DESTINATION "bin" COMPONENT compiler-swift-syntax-lib)
+
+# Also register them in SWIFT_EXPORTS so the build-tree export includes them:
+foreach(_lib ${compiler_swiftsyntax_libs})
+  set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${_lib})
+endforeach()
+
 add_dependencies(compiler-swift-syntax-lib ${compiler_swiftsyntax_libs})

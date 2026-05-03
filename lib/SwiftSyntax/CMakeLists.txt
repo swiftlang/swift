@@ -66,9 +66,13 @@ if(CMAKE_SYSTEM_NAME MATCHES Windows)
                              COMPONENT swift-syntax-lib)
 else()
   swift_install_in_component(TARGETS ${SWIFT_SYNTAX_MODULES}
+                             EXPORT SwiftTargets
                              LIBRARY
                              DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
                              COMPONENT swift-syntax-lib)
+  foreach(_mod ${SWIFT_SYNTAX_MODULES})
+    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${_mod})
+  endforeach()
 endif()
 
 # Install import libraries in Windows.
