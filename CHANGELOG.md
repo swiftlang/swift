@@ -5,6 +5,18 @@
 
 ## Swift (next)
 
+* The compiler API note `SwiftImportAs` now has support for always importing C structs as `OpaquePointer`. 
+  This can be used to unify the imported C pointer type in situations where the visibility of the struct might differ.
+  For example, the C `FILE` pointer in Android imports differently on API 23 compared to API 24 and above. We can unify that using the new API note:
+  
+  ```
+  ---
+  Name: _stdio
+  Tags:
+  - Name: __sFILE
+    SwiftImportAs: opaque_pointer
+  ```
+
 * When building modules using library evolution, Swift now uses module selectors in module interface files by default,
   improving their robustness against name collisions and ambiguity. Compiler flags previously used to work around these
   issues are disabled in this configuration and can now be removed. If necessary, you can disable this new behavior by
