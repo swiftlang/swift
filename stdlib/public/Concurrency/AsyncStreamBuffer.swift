@@ -588,8 +588,8 @@ extension _AsyncStreamStorage {
       unsafe callAndResume.terminationHandler?(terminationReason)
 
       if let failure = unsafe callAndResume.failure {
-        let consumer = unsafe callAndResume.consumers.popFirst()
-        unsafe consumer?.resume(returning: .failure(failure))
+        let consumer = unsafe callAndResume.consumers.removeFirst()
+        unsafe consumer.resume(returning: .failure(failure))
       }
 
       while let consumer = unsafe callAndResume.consumers.popFirst() {
