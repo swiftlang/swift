@@ -42,7 +42,7 @@
 // WINDOWS: -sdk {{.*}}/Inputs/clang-importer-sdk
 // WINDOWS-NEXT: bin{{/|\\\\}}swift
 // WINDOWS: -sdk {{.*}}/Inputs/clang-importer-sdk
-// WINDOWS: {{.*}}Inputs/clang-importer-sdk{{.*}}swiftrt.o
+// WINDOWS: {{.*}}Inputs/clang-importer-sdk{{.*}}swiftrt{{d?}}.obj
 // WINDOWS: {{-I}} {{.*}}/Inputs/clang-importer-sdk
 
 // WASI-NOT: warning: no such SDK:

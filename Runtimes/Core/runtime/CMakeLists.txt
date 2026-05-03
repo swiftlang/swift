@@ -197,7 +197,20 @@ elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.obj)
 
-  install(TARGETS swiftrtT swiftrt
+  # Debug variant for Windows: stable ABI differs between debug and release;
+  # provide swiftrtd.obj so the driver can link it for debug builds.
+  add_library(swiftrtd OBJECT SwiftRT-COFF.cpp)
+  target_compile_definitions(swiftrtd PRIVATE _DEBUG)
+  target_link_libraries(swiftrtd PRIVATE swiftShims)
+  if(MSVC)
+    set_property(TARGET swiftrtd PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL")
+  endif()
+  install(FILES $<TARGET_OBJECTS:swiftrtd>
+    COMPONENT SwiftCore_runtime
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    RENAME swiftrtd.obj)
+
+  install(TARGETS swiftrtT swiftrt swiftrtd
     EXPORT SwiftCoreTargets
     COMPONENT SwiftCore_runtime)
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")
