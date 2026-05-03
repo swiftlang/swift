@@ -70,18 +70,18 @@ fileprivate struct Disconnected<Value: ~Copyable>: ~Copyable, @unchecked Sendabl
   }
 }
 
-/// The state machine backing `Async{Throwing}Stream`.
+/// The state machine backing the continuation-based variant of `Async{Throwing}Stream`.
 ///
 /// States:
 ///
-///   - `idle`:  The stream is active with no consumers present
-///   and may be accepting new elements.
-///   - `waiting`: The stream is active with consumers present;
-///   new elements are delivered directly to next consumer.
-///   - `draining`: The stream no longer accepts new elements;
-///   future consumers drain the buffered elements.
-///   - `terminated`: The stream is in a terminal state;
-///   no new elements are accepted, and consumers return immediately.
+///   - `idle`:  The stream is active with **no consumers present**,
+///   and may accept new elements (depending on the `BufferingPolicy`).
+///   - `waiting`: The stream is active with **at least one consumer present**,
+///   and new elements are directly delivered to the next consumer.
+///   - `draining`: The stream **no longer accepts new elements**,
+///   new consumers drain the buffered elements.
+///   - `terminated`: The stream is in a terminal state,
+///   **no new elements are accepted**, and **new consumers return immediately**.
 ///
 /// Transitions:
 ///
@@ -97,28 +97,28 @@ fileprivate struct Disconnected<Value: ~Copyable>: ~Copyable, @unchecked Sendabl
 /// Actions:
 ///
 /// - `YieldAction`:
-///   - `resume`:  The next consumer is resumed with the next element, which may be the new element.
+///   - `resume`:  The next consumer is resumed with the newly yielded value.
 ///   - `none`:  No action is taken.
 ///
 /// - `NextAction`:
 ///   - `resume`: The new consumer is resumed.
-///   - `throw`: The new consumer is resumed by throwing an instance of `Failure`.
-///   - `suspend`:  The new consumer is suspended. No action is taken.
+///   - `throw`: The new consumer is resumed by throwing an error of type `Failure`.
+///   - `suspend`:  The new consumer is enqueued. No action is taken.
 ///
 /// - `TerminateAction`:
-///   - `callAndResume`: The `TerminationHandler` is called, and all consumers are resumed.
-///   - `call`: Only the `TerminationHandler` is called.
+///   - `callAndResume`: The `TerminationHandler` is invoked, and all consumers are resumed afterward.
+///   - `call`: Only the `TerminationHandler` is invoked.
 ///   - `none`: No action is taken.
 ///
 /// Behavior:
 /// The state machine is single-consumer–based. However, instead of crashing on concurrent iteration,
-/// the consumer that “loses” the race to `next()` is enqueued in a FIFO queue and eventually resumed.
+/// the consumer that “loses” the race to `next()` is enqueued in a **FIFO queue** and **eventually resumed**.
 ///
-/// Furthermore, when the stream reaches its terminal state and an `onTermination` closure is set,
-/// that closure is invoked **once and then cleared**.
+/// Furthermore, when the stream reaches its terminal state and an onTermination closure is set,
+/// the closure is invoked **exactly once, after which it is cleared**.
 ///
-/// After the stream has reached its terminal state, all subsequent consumers will **immediately return `nil`**,
-/// and **any new value is rejected**.
+/// Once the stream has reached its terminal state, all subsequent consumers will **immediately return nil**,
+/// and any **new values are rejected**.
 @safe
 internal final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Sendable {
   struct Continuation {
@@ -148,7 +148,7 @@ internal final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Se
   @safe
   struct StateMachine: ~Copyable {
     typealias Buffer = _Deque<Element>
-    typealias Consumer = UnsafeContinuation<Result<Element?, Failure>, Never> // TODO: Switch to ~Copyable Continuation type
+    typealias Consumer = UnsafeContinuation<Result<Element?, Failure>, Never> // TODO: Switch to ~Copyable Continuation
     typealias Consumers = _Deque<Consumer> // TODO: Switch to UniqueDeque
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
 
