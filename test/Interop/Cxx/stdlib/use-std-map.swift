@@ -1,16 +1,15 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature BorrowingForLoop)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -enable-experimental-feature BorrowingForLoop)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
 
 // Also test this with a bridging header instead of the StdMap module.
 // RUN: %empty-directory(%t2)
 // RUN: cp %S/Inputs/std-map.h %t2/std-map-bridging-header.h
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature BorrowingForLoop)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=swift-6 -enable-experimental-feature BorrowingForLoop)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=swift-6)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
 
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_BorrowingForLoop
 //
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=freebsd
 
@@ -640,21 +639,6 @@ StdMapTestSuite.test("UnorderedMap.merge(CxxDictionary)") {
   expectEqual(map[3], 6)
   expectEqual(map[4], 7)
 }
-
-// FIXME importing a move-only std::pair into Swift causes a crash in the MoveOnlyChecker, in Linux
-#if os(macOS) || os(Windows)
-StdMapTestSuite.test("MapNonCopyableValue Borrowing Iterators").require(.stdlib_6_4).code {
-  guard #available(SwiftStdlib 6.4, *) else { return }
-
-  let map = initMapNonCopyableValue()
-  var counter = 0
-  for el in map {
-    expectEqual(el.first, el.second.number)
-    counter += 1
-  }
-  expectEqual(counter, 3)
-}
-#endif
 
 // `merging` is implemented by calling `merge`, so we can skip this test
 

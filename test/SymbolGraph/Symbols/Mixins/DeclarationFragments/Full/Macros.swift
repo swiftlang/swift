@@ -31,6 +31,11 @@
 // following declaration/names dumps are edited to handle both situations.
 
 // CHECK-LABEL: "precise": "s:6Macros9stringifyyx_SStxclufm",
+
+// the `declarationFragments` token is part of the `functionSignature` first, so skip that
+// CHECK: "functionSignature"
+// CHECK: "declarationFragments"
+
 // CHECK:      "declarationFragments": [
 // CHECK-NEXT:     {
 // CHECK-NEXT:         "kind": "attribute",

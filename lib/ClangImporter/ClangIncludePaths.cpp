@@ -192,13 +192,21 @@ ClangImporter::createClangArgs(const ClangImporterOptions &ClangImporterOpts,
   }
   llvm::opt::InputArgList clangDriverArgs =
       parseClangDriverArgs(clangDriver, clangArgs);
-  // If an SDK path was explicitly passed to Swift, make sure to pass it to
-  // Clang driver as well. It affects the resulting include paths.
+  // If a sysroot was explicitly passed to Swift, make sure to pass it to the
+  // Clang driver as well. It affects the resulting include paths. Fall back to
+  // the SDK path when no explicit sysroot is present.
   auto sdkPath = SearchPathOpts.getSDKPath();
   if (!sdkPath.empty())
     clangDriver.SysRoot = sdkPath.str();
   if (auto sysroot = SearchPathOpts.getSysRoot())
     clangDriver.SysRoot = sysroot->str();
+  // An explicit --sysroot= or -isysroot in ExtraArgs takes precedence over
+  // the SDK/sysroot set above; --sysroot= is checked first as the canonical
+  // driver-level form.
+  if (const auto *A = clangDriverArgs.getLastArg(
+          clang::driver::options::OPT__sysroot_EQ,
+          clang::driver::options::OPT_isysroot))
+    clangDriver.SysRoot = A->getValue();
   return clangDriverArgs;
 }
 
@@ -423,6 +431,7 @@ static void getLibStdCxxFileMapping(
       "bits/valarray_array.h", "bits/valarray_before.h", "bits/version.h",
       // C++20 and newer:
       "barrier",
+      "bit",
       "compare",
       "concepts",
       "format",
@@ -434,6 +443,11 @@ static void getLibStdCxxFileMapping(
       "span",
       "stop_token",
       "syncstream",
+      // C++23 and newer:
+      "expected",
+      "flat_map",
+      "flat_set",
+      "mdspan",
     };
   std::string additionalHeaderDirectives;
   llvm::raw_string_ostream os(additionalHeaderDirectives);

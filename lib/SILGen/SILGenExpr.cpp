@@ -2008,49 +2008,12 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
                                                 SGFContext C) {
   CanAnyFunctionType destType =
       cast<FunctionType>(e->getType()->getCanonicalType());
-  assert(destType->getIsolation().isNonIsolatedCaller() &&
+  assert(destType->getIsolation().isNonisolatedNonsending() &&
          "Should only call this if destType is non isolated caller");
 
   auto *subExpr = e->getSubExpr();
   CanAnyFunctionType subExprType =
       cast<FunctionType>(subExpr->getType()->getCanonicalType());
-
-  // We are pattern matching the following two patterns:
-  //
-  // Swift 6:
-  //
-  // (fn_cvt_expr type="nonisolated(nonsending) () async -> ()"
-  //   (fn_cvt_expr type="nonisolated(nonsending) @Sendable () async -> ()"
-  //      (declref_expr type="() async -> ()"
-  //
-  // Swift 5:
-  //
-  // (fn_cvt_expr type="nonisolated(nonsending) () async -> ()"
-  //   (declref_expr type="() async -> ()"
-  //
-  // The @Sendable in Swift 6 mode is due to us not representing
-  // nonisolated(nonsending) or @Sendable in the constraint evaluator.
-  //
-  // The reason why we need to evaluate this especially is that otherwise we
-  // generate multiple conversion thunks.
-
-  bool needsSendableConversion = false;
-  if (auto *subCvt = dyn_cast<FunctionConversionExpr>(subExpr)) {
-    auto *subSubExpr = subCvt->getSubExpr();
-    CanAnyFunctionType subSubExprType =
-        cast<FunctionType>(subSubExpr->getType()->getCanonicalType());
-
-    if (subExprType->hasExtInfo() && subExprType->getExtInfo().isSendable() &&
-        subSubExprType->hasExtInfo() &&
-        !subExprType->getExtInfo().isSendable() &&
-        subExprType->withSendable(true) == subSubExprType) {
-      subExpr = subSubExpr;
-
-      // We changed our subExpr... so recompute our srcType.
-      subExprType = cast<FunctionType>(subExpr->getType()->getCanonicalType());
-      needsSendableConversion = true;
-    }
-  }
 
   // Check if the only difference in between our destType and srcType is our
   // isolation and optionally Sendable.
@@ -2065,7 +2028,7 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
     return RValue();
 
   auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
-  if (!decl || !getActorIsolation(decl).isCallerIsolationInheriting())
+  if (!decl || !getActorIsolation(decl).isNonisolatedNonsending())
     return RValue();
 
   // Ok, we found our target.
@@ -2075,12 +2038,6 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
   auto typeContext = SGF.getFunctionTypeInfo(substType);
   ManagedValue result = SGF.emitClosureValue(
       e, silDeclRef, typeContext, declRef->getDeclRef().getSubstitutions());
-  if (needsSendableConversion) {
-    auto funcType = cast<SILFunctionType>(result.getType().getASTType());
-    result = SGF.B.createConvertFunction(
-        e, result,
-        SILType::getPrimitiveObjectType(funcType->withSendable(true)));
-  }
   return RValue(SGF, e, destType, result);
 }
 
@@ -2115,9 +2072,9 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   CanAnyFunctionType subCvtType =
       cast<FunctionType>(subCvt->getType()->getCanonicalType());
 
-  // Src type should be isNonIsolatedCaller and they should only differ in
+  // Src type should be isNonisolatedNonsending and they should only differ in
   // isolation or sendability.
-  if (!subCvtType->getIsolation().isNonIsolatedCaller() ||
+  if (!subCvtType->getIsolation().isNonisolatedNonsending() ||
       subCvtType->withIsolation(destType->getIsolation())
               ->withSendable(destType->isSendable()) != destType)
     return RValue();
@@ -2128,13 +2085,13 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   if (!declRef)
     return RValue();
   auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
-  if (!decl || !getActorIsolation(decl).isCallerIsolationInheriting())
+  if (!decl || !getActorIsolation(decl).isNonisolatedNonsending())
     return RValue();
 
   // Make sure that subCvt/declRefType only differ by isolation and sendability.
   CanAnyFunctionType declRefType =
       cast<FunctionType>(declRef->getType()->getCanonicalType());
-  assert(!declRefType->getIsolation().isNonIsolatedCaller() &&
+  assert(!declRefType->getIsolation().isNonisolatedNonsending() &&
          "This should not be represented in interface types");
   if (declRefType->isSendable() || !subCvtType->isSendable())
     return RValue();
@@ -2287,7 +2244,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // @concurrent back to nonisolated(nonsending). This is done b/c we do
   // not represent nonisolated(nonsending) in interface types, so the actual decl ref
   // will be viewed as @async () -> ().
-  if (destType->getIsolation().isNonIsolatedCaller()) {
+  if (destType->getIsolation().isNonisolatedNonsending()) {
     if (RValue rv = emitFunctionCvtToExecutionCaller(e, C))
       return rv;
   }
@@ -2631,7 +2588,7 @@ RValue RValueEmitter::visitSingleValueStmtExpr(SingleValueStmtExpr *E,
     return SGF.emitEmptyTupleRValue(E, C);
   }
   auto &lowering = SGF.getTypeLowering(E->getType());
-  auto resultAddr = SGF.emitTemporaryAllocation(E, lowering.getLoweredType());
+  SILValue resultAddr = SGF.getBufferForExprResult(E, lowering.getLoweredType(), C);
 
   // Collect the target exprs that will be used for initialization.
   SmallVector<Expr *, 4> scratch;
@@ -2643,7 +2600,8 @@ RValue RValueEmitter::visitSingleValueStmtExpr(SingleValueStmtExpr *E,
   SGF.SingleValueStmtInitStack.push_back(std::move(initInfo));
   SWIFT_DEFER { SGF.SingleValueStmtInitStack.pop_back(); };
   emitStmt();
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(resultAddr));
+
+  return RValue(SGF, E, SGF.manageBufferForExprResult(resultAddr, lowering, C));
 }
 
 RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
@@ -3336,7 +3294,8 @@ static bool canEmitClosureFunctionUnderConversion(
 ///
 /// TODO: ideally, our prolog/epilog emission would be able to handle
 /// all possible subtype and reabstraction conversions.
-static bool canEmitSpecializedClosureFunction(CanAnyFunctionType closureType,
+static bool canEmitSpecializedClosureFunction(const AbstractClosureExpr *closure,
+                                        CanAnyFunctionType closureType,
                                         const FunctionTypeInfo &contextInfo) {
   auto destType = contextInfo.FormalType;
 
@@ -3351,6 +3310,14 @@ static bool canEmitSpecializedClosureFunction(CanAnyFunctionType closureType,
   if (hasOpaqueThrownError(contextInfo.OrigType) &&
       (closureType->isThrowing() != destType->isThrowing() ||
        closureType.getThrownError() != destType.getThrownError()))
+    return false;
+
+  // If the closure has a different thrown error type than the destination,
+  // we cannot emit the closure directly because the SIL function type
+  // (derived from the closure's own type) will have a different error
+  // type than what the body expects (derived from the destination type).
+  if (closureType.getThrownError() != destType.getThrownError() &&
+      !isa<ClosureExpr>(closure))
     return false;
 
   return true;
@@ -3368,7 +3335,7 @@ ManagedValue RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
 
   // If we can emit the closure with all of the specialized type information,
   // that's great.
-  if (canEmitSpecializedClosureFunction(closureType, *info)) {
+  if (canEmitSpecializedClosureFunction(e, closureType, *info)) {
     return emitClosureReference(e, *info);
   }
 
@@ -3388,7 +3355,7 @@ ManagedValue RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
     auto erasureInfo = SGF.getFunctionTypeInfo(erasedClosureType);
 
     // Emit the closure under that conversion.  This should always succeed.
-    assert(canEmitSpecializedClosureFunction(closureType, erasureInfo));
+    assert(canEmitSpecializedClosureFunction(e, closureType, erasureInfo));
     auto erasedResult = emitClosureReference(e, erasureInfo);
 
     // Narrow the original conversion to start from the erased closure type.
@@ -3816,7 +3783,8 @@ static SILFunction *getOrCreateKeypathThunk(SILGenModule &SGM,
                                             RegularLocation loc) {
   SILGenFunctionBuilder builder(SGM);
   auto thunk = builder.getOrCreateSharedFunction(
-      loc, name, signature, IsBare, IsNotTransparent,
+      loc, name, signature, ActorIsolation::forUnspecified(), IsBare,
+      IsNotTransparent,
       (expansion == ResilienceExpansion::Minimal ? IsSerialized
                                                  : IsNotSerialized),
       ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
@@ -4326,16 +4294,16 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       .mangleKeyPathEqualsHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
     equals = builder.getOrCreateSharedFunction(
-        loc, name, signature, IsBare, IsNotTransparent,
-        (expansion == ResilienceExpansion::Minimal
-         ? IsSerialized
-         : IsNotSerialized),
+        loc, name, signature, ActorIsolation::forUnspecified(), IsBare,
+        IsNotTransparent,
+        (expansion == ResilienceExpansion::Minimal ? IsSerialized
+                                                   : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
         IsNotRuntimeAccessible);
     if (!equals->empty()) {
       return;
     }
-    
+
     SILGenFunction subSGF(SGM, *equals, SGM.SwiftModule);
     equals->setGenericEnvironment(genericEnv);
     auto entry = equals->begin();
@@ -4502,16 +4470,16 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       .mangleKeyPathHashHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
     hash = builder.getOrCreateSharedFunction(
-        loc, name, signature, IsBare, IsNotTransparent,
-        (expansion == ResilienceExpansion::Minimal
-         ? IsSerialized
-         : IsNotSerialized),
+        loc, name, signature, ActorIsolation::forUnspecified(), IsBare,
+        IsNotTransparent,
+        (expansion == ResilienceExpansion::Minimal ? IsSerialized
+                                                   : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
         IsNotRuntimeAccessible);
     if (!hash->empty()) {
       return;
     }
-    
+
     SILGenFunction subSGF(SGM, *hash, SGM.SwiftModule);
     hash->setGenericEnvironment(genericEnv);
     auto entry = hash->begin();
@@ -5410,7 +5378,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
           SILValue addr =
               addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
           auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
-          input = SGF.B.createUncheckedTakeEnumDataAddr(
+          input = SGF.B.createUncheckedInPlaceEnumDataAddr(
               loc, input, someDecl, input.getType().getOptionalObjectType());
           SGF.B.createCopyAddr(loc, input.getValue(), addr, IsNotTake,
                                IsInitialization);
@@ -6185,7 +6153,7 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
   assert(eltTy);
   SILValue address = optValue.forward(*this);
   return emitManagedBufferWithCleanup(
-      B.createUncheckedTakeEnumDataAddr(loc, address, someDecl, eltTy));
+      B.createUncheckedInPlaceEnumDataAddr(loc, address, someDecl, eltTy));
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
@@ -7330,9 +7298,8 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     optTemp->finishInitialization(SGF);
 
     if (subType.isLoadable(SGF.F) || !SGF.useLoweredAddresses()) {
-      ManagedValue value = SGF.B.createLoadTake(E, optTemp->getManagedAddress());
-      if (value.getType().isTrivial(SGF.F))
-        return RValue(SGF, {value}, subType.getASTType());
+      ManagedValue value =
+          SGF.B.createLoadTake(E, optTemp->getManagedAddress());
       return RValue(SGF, {value}, subType.getASTType());
     }
 
@@ -7541,7 +7508,7 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
 
   auto isolation = getRealActorIsolationOfContext(SGF.FunctionDC);
 
-  if (isolation == ActorIsolation::CallerIsolationInheriting) {
+  if (isolation == ActorIsolation::NonisolatedNonsending) {
     auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
     assert(isolatedArg &&
            "Caller Isolation Inheriting without isolated parameter");

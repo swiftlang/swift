@@ -346,14 +346,22 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType
   NominalType_getDeclaredInterfaceType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType NominalType_getSelfInterfaceType() const;
+  BRIDGED_INLINE void NominalType_getAllProtocols(
+          void * _Nonnull resultArray,
+          void (* _Nonnull appendFn)(void * _Nonnull resultArray, BridgedDeclObj protocol)) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Enum_getRawType() const;
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj Class_getSuperclassDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
   BRIDGED_INLINE bool Class_isForeign() const;
   BRIDGED_INLINE bool ProtocolDecl_requiresClass() const;
   BRIDGED_INLINE bool ProtocolDecl_isMarkerProtocol() const;
+  BRIDGED_INLINE bool ProtocolDecl_isEligibleForFastCasting() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj ProtocolDecl_getSuperClassDecl() const;
+  BRIDGED_INLINE SwiftInt ProtocolDecl_getNumInheritedProtocols() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj ProtocolDecl_getInheritedProtocols(SwiftInt index) const;
   BRIDGED_INLINE bool AbstractFunction_isOverridden() const;
   BRIDGED_INLINE bool Constructor_isInheritable() const;
   BRIDGED_INLINE bool Destructor_isIsolated() const;
@@ -365,6 +373,8 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef AccessorDecl_getKindName() const;
   BRIDGED_INLINE void GenericContext_setGenericSignature(BridgedGenericSignature genericSignature) const;
   BRIDGED_INLINE void ValueDecl_setAccess(swift::AccessLevel accessLevel) const;
+  BRIDGED_INLINE bool ValueDecl_hasOpenAccess(BridgedDeclContext useDC) const;
+  BRIDGED_INLINE bool ValueDecl_hasOpenAccess() const;
   BRIDGED_INLINE void NominalTypeDecl_addMember(BridgedDeclObj member) const;
 };
 
@@ -2760,9 +2770,9 @@ BridgedSendingTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedTypeRepr base,
                                     swift::SourceLoc specifierLoc);
 
-SWIFT_NAME("BridgedCallerIsolatedTypeRepr.createParsed(_:base:specifierLoc:)")
-BridgedCallerIsolatedTypeRepr
-BridgedCallerIsolatedTypeRepr_createParsed(BridgedASTContext cContext,
+SWIFT_NAME("BridgedNonisolatedNonsendingTypeRepr.createParsed(_:base:specifierLoc:)")
+BridgedNonisolatedNonsendingTypeRepr
+BridgedNonisolatedNonsendingTypeRepr_createParsed(BridgedASTContext cContext,
                                            BridgedTypeRepr base,
                                            swift::SourceLoc specifierLoc);
 

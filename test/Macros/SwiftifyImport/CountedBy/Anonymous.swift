@@ -49,7 +49,7 @@ public func myFunc2(_ _myFunc2_param0: UnsafeBufferPointer<CInt>, _ _myFunc2_par
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func myFunc3(_ _myFunc3_param0: Span<CInt>) {
     let _myFunc3_param1 = CInt(exactly: _myFunc3_param0.count)!
-    let __myFunc3_param0Ptr = unsafe _myFunc3_param0.withUnsafeBufferPointer {
+    let __myFunc3_param0Ptr = _myFunc3_param0.withUnsafeBufferPointer {
         unsafe $0
     }
     defer {
@@ -64,7 +64,7 @@ public func myFunc3(_ _myFunc3_param0: Span<CInt>) {
 @_alwaysEmitIntoClient @_lifetime(_myFunc4_param0: copy _myFunc4_param0) @_disfavoredOverload
 public func myFunc4(_ _myFunc4_param0: inout MutableSpan<CInt>) {
     let _myFunc4_param1 = CInt(exactly: _myFunc4_param0.count)!
-    let __myFunc4_param0Ptr = unsafe _myFunc4_param0.withUnsafeMutableBufferPointer {
+    let __myFunc4_param0Ptr = _myFunc4_param0.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 989; // cmo immutable ast fix
+const uint16_t SWIFTMODULE_VERSION_MINOR = 997; // ActorIsolation::Kind: split Nonisolated from NonisolatedConcurrent
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -578,14 +578,15 @@ using DefaultArgumentField = BCFixed<4>;
 enum class ActorIsolation : uint8_t {
   Unspecified = 0,
   ActorInstance,
-  Nonisolated,
+  NonisolatedConcurrent,
   NonisolatedUnsafe,
   GlobalActor,
   GlobalActorUnsafe,
   Erased,
-  CallerIsolationInheriting,
+  NonisolatedNonsending,
+  Nonisolated,
 };
-using ActorIsolationField = BCFixed<3>;
+using ActorIsolationField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -730,6 +731,14 @@ enum class FunctionTypeIsolation : uint8_t {
   GlobalActorOffset, // Add this to the global actor type ID
 };
 using FunctionTypeIsolationField = TypeIDField;
+
+enum class SILFunctionTypeIsolation : uint8_t {
+  Unknown,
+  NonisolatedNonsending,
+  Erased,
+};
+// An extra bit here to future-proof.
+using SILFunctionTypeIsolationField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -1001,9 +1010,10 @@ namespace options_block {
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
     STRICT_MEMORY_SAFETY,
-    DEFERRED_CODE_GEN,
+    CODE_GENERATION_MODEL,
     OSLOG_STRING_SECTION_NAME,
     AGGRESSIVE_CMO,
+    LIBRARY_LEVEL,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1104,8 +1114,9 @@ namespace options_block {
     STRICT_MEMORY_SAFETY
   >;
 
-  using DeferredCodeGenLayout = BCRecordLayout<
-    DEFERRED_CODE_GEN
+  using CodeGenerationModelLayout = BCRecordLayout<
+    CODE_GENERATION_MODEL,
+    BCFixed<2>
   >;
 
   using AggressiveCMOEnabledLayout = BCRecordLayout<
@@ -1125,6 +1136,11 @@ namespace options_block {
   using SwiftInterfaceCompilerVersionLayout = BCRecordLayout<
     SWIFT_INTERFACE_COMPILER_VERSION,
     BCBlob // version tuple
+  >;
+
+  using LibraryLevelLayout = BCRecordLayout<
+    LIBRARY_LEVEL,
+    BCFixed<2>
   >;
 }
 
@@ -1501,7 +1517,7 @@ namespace decls_block {
     BCFixed<1>,                         // pseudogeneric?
     BCFixed<1>,                         // noescape?
     BCFixed<1>,                         // unimplementable?
-    BCFixed<1>,                         // erased isolation?
+    SILFunctionTypeIsolationField,      // isolation
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
     BCVBR<6>,                           // number of parameters
@@ -2379,8 +2395,9 @@ namespace decls_block {
       BCRecordLayout<LIFETIME_DEPENDENCE,
                      BCVBR<4>,           // targetIndex
                      BCVBR<4>,           // paramIndicesLength
-                     BCFixed<1>,         // isImmortal
+                     BCFixed<1>,         // hasImmortalSpecifier
                      BCFixed<1>,         // isFromAnnotation
+                     BCFixed<1>,         // hasCaptures
                      BCFixed<1>,         // hasInheritLifetimeParamIndices
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
                      BCFixed<1>,         // hasAddressableParamIndices

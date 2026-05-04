@@ -47,7 +47,7 @@ extension String {
       if repaired {
         fatalError("Encoding failed")
       }
-      return try unsafe arg.withUnsafeBufferPointer {
+      return try arg.withUnsafeBufferPointer {
         return try unsafe body($0)
       }
     }

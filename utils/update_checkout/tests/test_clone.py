@@ -189,6 +189,38 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
 
     @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
     @patch("sys.exit", return_value=None)
+    def test_clone_retry_on_exception(self, mock_exit, mock_obtain):
+        """Test that an exception (e.g. concurrent.futures.TimeoutError) is
+        retried rather than propagating and crashing the process."""
+        import concurrent.futures
+
+        call_count = [0]
+
+        def side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 1:
+                raise concurrent.futures.TimeoutError()
+            return obtain_all_additional_swift_sources(*args, **kwargs)
+
+        mock_obtain.side_effect = side_effect
+
+        sys.argv = [
+            "update-checkout",
+            "--config",
+            self.config_path,
+            "--source-root",
+            self.source_root,
+            "--clone",
+            "--max-retries",
+            "1",
+        ]
+        with contextlib.redirect_stdout(StringIO()):
+            main()
+
+        self.assertEqual(call_count[0], 2)
+
+    @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
+    @patch("sys.exit", return_value=None)
     def test_clone_with_retry(self, mock_exit, mock_obtain):
         call_count = [0]
 

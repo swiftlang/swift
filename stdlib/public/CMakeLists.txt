@@ -197,10 +197,12 @@ set(EMBEDDED_STDLIB_TARGET_TRIPLES)
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
   if(SWIFT_WASI_SYSROOT_PATH)
-    # Don't attempt to build any other Embedded Swift stdlib triples
-    # when building for WASI.
+    # Also include none-wasm triples, which don't require a sysroot.
+    # Skip non-Wasm targets.
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "wasm32    wasm32-unknown-wasip1  wasm32-unknown-wasip1"
+      "wasm32    wasm32-unknown-wasip1    wasm32-unknown-wasip1"
+      "wasm32    wasm32-unknown-none-wasm  wasm32-unknown-none-wasm"
+      "wasm64    wasm64-unknown-none-wasm  wasm64-unknown-none-wasm"
     )
   else()
     if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
@@ -211,6 +213,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
         "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
         "armv7m   armv7m-apple-none-macho   armv7m-apple-none-macho"
         "armv7em  armv7em-apple-none-macho  armv7em-apple-none-macho"
+        "armv8m.main   armv8m.main-apple-none-macho   armv8m.main-apple-none-macho"
+        "armv8.1m.main armv8.1m.main-apple-none-macho armv8.1m.main-apple-none-macho"
       )
     endif()
     if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
@@ -230,6 +234,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
         "armv6m   armv6m-none-none-eabi     armv6m-none-none-eabi"
         "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
         "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
+        "armv8m.main  armv8m.main-none-none-eabi    armv8m.main-none-none-eabi"
+        "armv8.1m.main  armv8.1m.main-none-none-eabi    armv8.1m.main-none-none-eabi"
       )
     endif()
     if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)

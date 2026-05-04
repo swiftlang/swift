@@ -351,7 +351,7 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
 #endif
 }
 
-const char *swift_task_getTaskName(AsyncTask *task) {
+const char *swift::swift_task_getTaskName(AsyncTask *task) {
   if (!task) {
     return nullptr;
   }
@@ -2406,6 +2406,13 @@ static bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
                             TaskExecutorRef currentTaskExecutor,
                             TaskExecutorRef newTaskExecutor) {
   if (currentSerialExecutor.getIdentity() != newSerialExecutor.getIdentity()) {
+    // If the target is the generic executor and the task has a preferred
+    // task executor whose identity matches our current serial executor,
+    // we're already running where task executor preference would switch to on enqueue.
+    if (newSerialExecutor.isGeneric() && newTaskExecutor.isDefined() &&
+        currentSerialExecutor.getIdentity() == newTaskExecutor.getIdentity()) {
+      return false;
+    }
     return true; // must switch, new isolation context
   }
 

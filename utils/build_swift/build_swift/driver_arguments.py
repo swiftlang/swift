@@ -856,8 +856,8 @@ def create_argument_parser():
 
     # Wasm options
 
-    option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
-           help='build the stdlib for WebAssembly target into a'
+    option(['--build-wasi-stdlib'], toggle_true('build_wasistdlib'),
+           help='build the stdlib for WASI target into a'
                 'separate build directory ')
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
@@ -1193,6 +1193,11 @@ def create_argument_parser():
                 'Then re-builds the TSan runtime (compiler-rt) using this '
                 'freshly-built Clang and runs the TSan libdispatch tests.')
 
+    option('--continue-on-test-failure', toggle_true,
+           help='Continue building and testing remaining products even if '
+                'tests fail for a product. A non-zero exit code is still '
+                'returned at the end if any test failures occurred.')
+
     option('--skip-test-osx', toggle_false('test_osx'),
            help='skip testing Swift stdlibs for Mac OS X')
     option('--skip-test-linux', toggle_false('test_linux'),
@@ -1442,8 +1447,8 @@ def create_argument_parser():
            help='skip testing swift_inspect')
     option('--skip-test-swiftdocc', toggle_false('test_swiftdocc'),
            help='skip testing swift-docc')
-    option('--skip-test-wasm-stdlib', toggle_false('test_wasmstdlib'),
-           help='skip testing stdlib for WebAssembly')
+    option('--skip-test-wasi-stdlib', toggle_false('test_wasistdlib'),
+           help='skip testing stdlib for WASI')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')

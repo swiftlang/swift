@@ -7,6 +7,12 @@
 // RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK2 %s < %t/output6.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output6.sil
 
+// Turning on force verification of analyses is exposing:
+// rdar://175520775 (RegionAnalysis crashes saying it cannot handle `assign` instruction)
+// TODO: %target-swift-frontend -primary-file %s -O -Xllvm -sil-verify-force-analysis=true -swift-version 6 -Xllvm -sil-print-types -emit-sil >%t/output2.sil
+// TODO: %FileCheck --check-prefix=CHECK --check-prefix=CHECK2 %s < %t/output2.sil
+// TODO: %FileCheck -check-prefix=CHECK-ALL %s < %t/output2.sil
+
 // RUN: %target-build-swift -O %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT -check-prefix=CHECK5-OUTPUT
 
@@ -471,7 +477,7 @@ func testOptionalChain(_ s: SimpleStruct) -> Int? {
 // CHECK: switch_enum [[O:%[0-9]+]]
 // CHECK: bb{{.*}}:
 //         Unwrap value
-//     CHECK: [[U:%[0-9]+]] = unchecked_take_enum_data_addr [[E2]]
+//     CHECK: [[U:%[0-9]+]] = unchecked_inplace_enum_data_addr [[E2]]
 //     CHECK: [[SE:%[0-9]+]] = struct_element_addr [[U]]
 //     CHECK: [[I:%[0-9]+]] = load [[SE]]
 //     CHECK: [[R1:%[0-9]+]] = enum $Optional<Int>, #Optional.some!enumelt, [[I]]
@@ -544,7 +550,7 @@ func testGetOptionalForce(_ s: SimpleStruct) -> Int {
 // CHECK: [[R2:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[R1]]
 // CHECK: [[F:%[0-9]+]] = select_enum [[O:%[0-9]+]]
 // CHECK: cond_fail [[F]]
-// CHECK: [[E2:%[0-9]+]] = unchecked_take_enum_data_addr [[R2]]
+// CHECK: [[E2:%[0-9]+]] = unchecked_inplace_enum_data_addr [[R2]]
 // CHECK: [[E3:%[0-9]+]] = struct_element_addr [[E2]]
 // CHECK: [[I:%[0-9]+]] = load [[E3]]
 // CHECK: end_access [[R2]]

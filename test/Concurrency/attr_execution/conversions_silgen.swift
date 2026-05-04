@@ -44,10 +44,10 @@ func globalConcurrentFuncSendableKlass(_ x: SendableKlass) async -> SendableKlas
 // MARK: Tests //
 /////////////////
 
-// CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen33testCallerToConcurrentNonIsolatedyyyyYaYCcYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
-// CHECK: bb0([[FUNC:%.*]] : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
+// CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen33testCallerToConcurrentNonIsolatedyyyyYaYCcYaF : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+// CHECK: bb0([[FUNC:%.*]] : @guaranteed $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
 // CHECK:   [[FUNC_COPY:%.*]] = copy_value [[FUNC]]
-// CHECK:   [[THUNK:%.*]] = function_ref @$sBAIegHgIL_IegH_TR : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
+// CHECK:   [[THUNK:%.*]] = function_ref @$sBAIeNgHgIL_IegH_TR : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
 // CHECK:   partial_apply [callee_guaranteed] [[THUNK]]([[FUNC_COPY]])
 // CHECK: } // end sil function '$s21attr_execution_silgen33testCallerToConcurrentNonIsolatedyyyyYaYCcYaF'
 public func testCallerToConcurrentNonIsolated(_ x: nonisolated(nonsending) @escaping () async -> ()) async {
@@ -58,18 +58,18 @@ public func testCallerToConcurrentNonIsolated(_ x: nonisolated(nonsending) @esca
 // This thunk is used to convert a caller to a concurrent function. So, we pass in .none as the
 // isolated parameter.
 //
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBAIegHgIL_IegH_TR : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
-// CHECK: bb0([[FUNC:%.*]] : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBAIeNgHgIL_IegH_TR : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+// CHECK: bb0([[FUNC:%.*]] : @guaranteed $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
 // CHECK:   [[ENUM:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK:   hop_to_executor [[ENUM]]
 // CHECK:   [[CAST:%.*]] = unchecked_value_cast [[ENUM]] to $Builtin.ImplicitActor
 // CHECK:   apply [[FUNC]]([[CAST]])
-// CHECK: } // end sil function '$sBAIegHgIL_IegH_TR'
+// CHECK: } // end sil function '$sBAIeNgHgIL_IegH_TR'
 
-// CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen31testCallerToConcurrentMainActoryyyyYaYCcYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
-// CHECK: bb0([[FUNC:%.*]] : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
+// CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen31testCallerToConcurrentMainActoryyyyYaYCcYaF : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+// CHECK: bb0([[FUNC:%.*]] : @guaranteed $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
 // CHECK:   [[FUNC_COPY:%.*]] = copy_value [[FUNC]]
-// CHECK:   [[THUNK:%.*]] = function_ref @$sBAIegHgIL_IegH_TR : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
+// CHECK:   [[THUNK:%.*]] = function_ref @$sBAIeNgHgIL_IegH_TR : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
 // CHECK:   partial_apply [callee_guaranteed] [[THUNK]]([[FUNC_COPY]])
 // CHECK: } // end sil function '$s21attr_execution_silgen31testCallerToConcurrentMainActoryyyyYaYCcYaF'
 @MainActor
@@ -81,8 +81,8 @@ public func testCallerToConcurrentMainActor(_ x: nonisolated(nonsending) @escapi
 // CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen33testConcurrentToCallerNonIsolatedyyyyYacYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> () {
 // CHECK: bb0([[FUNC:%.*]] : @guaranteed $@async @callee_guaranteed () -> ()):
 // CHECK:   [[FUNC_COPY:%.*]] = copy_value [[FUNC]]
-// CHECK:   [[THUNK:%.*]] = function_ref @$sIegH_BAIegHgIL_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed () -> ()) -> ()
-// CHECK:   partial_apply [callee_guaranteed] [[THUNK]]([[FUNC_COPY]])
+// CHECK:   [[THUNK:%.*]] = function_ref @$sIegH_BAIeNgHgIL_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed () -> ()) -> ()
+// CHECK:   partial_apply [callee_guaranteed] [nonisolated_nonsending] [[THUNK]]([[FUNC_COPY]])
 // CHECK: } // end sil function '$s21attr_execution_silgen33testConcurrentToCallerNonIsolatedyyyyYacYaF'
 public func testConcurrentToCallerNonIsolated(_ x: @escaping @concurrent () async -> ()) async {
   let y: nonisolated(nonsending) () async -> () = x
@@ -92,17 +92,17 @@ public func testConcurrentToCallerNonIsolated(_ x: @escaping @concurrent () asyn
 // This thunk has the "surface" of an @caller function, but just ignores the
 // isolated parameter and calls the concurrent funciton.
 //
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIegH_BAIegHgIL_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIegH_BAIeNgHgIL_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed () -> ()) -> () {
 // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[FUNC:%.*]] : @guaranteed $@async @callee_guaranteed () -> ()):
 // CHECK:   apply [[FUNC]]
 // CHECK:   hop_to_executor [[ACTOR]]
-// CHECK: } // end sil function '$sIegH_BAIegHgIL_TR'
+// CHECK: } // end sil function '$sIegH_BAIeNgHgIL_TR'
 
 // CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen42testConcurrentToCallerNonIsolatedMainActoryyyyYacYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> () {
 // CHECK: bb0([[FUNC:%.*]] :
 // CHECK:   [[FUNC_COPY:%.*]] = copy_value [[FUNC]]
-// CHECK:   [[THUNK:%.*]] = function_ref @$sIegH_BAIegHgIL_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed () -> ()) -> ()
-// CHECK:   partial_apply [callee_guaranteed] [[THUNK]]([[FUNC_COPY]])
+// CHECK:   [[THUNK:%.*]] = function_ref @$sIegH_BAIeNgHgIL_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed () -> ()) -> ()
+// CHECK:   partial_apply [callee_guaranteed] [nonisolated_nonsending] [[THUNK]]([[FUNC_COPY]])
 // CHECK: } // end sil function '$s21attr_execution_silgen42testConcurrentToCallerNonIsolatedMainActoryyyyYacYaF'
 @MainActor
 public func testConcurrentToCallerNonIsolatedMainActor(_ x: @escaping @concurrent () async -> ()) async {
@@ -136,8 +136,8 @@ public func testConcurrentToConcurrent(_ x: @escaping @concurrent () async -> ()
   await z()
 }
 
-// CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen012testCallerToE0yyyyYaYCcYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
-// CHECK: bb0([[FUNC:%.*]] : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
+// CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen012testCallerToE0yyyyYaYCcYaF : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+// CHECK: bb0([[FUNC:%.*]] : @guaranteed $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
 // CHECK:   [[COPY:%.*]] = copy_value [[FUNC]]
 // CHECK:   [[Y:%.*]] = move_value [lexical] [var_decl] [[COPY]]
 // CHECK:   [[BORROW_Y:%.*]] = begin_borrow [[Y]]
@@ -154,8 +154,8 @@ public func testCallerToCaller(_ x: nonisolated(nonsending) @escaping () async -
   await z()
 }
 
-// CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen24testCallerLocalVariablesyyyyYaYCcYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
-// CHECK: bb0([[PARAM:%.*]] : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
+// CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen24testCallerLocalVariablesyyyyYaYCcYaF : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+// CHECK: bb0([[PARAM:%.*]] : @guaranteed $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
 // CHECK:   [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK:   hop_to_executor [[ACTOR]]
 // CHECK:   [[PARAM_COPY:%.*]] = copy_value [[PARAM]]
@@ -192,16 +192,16 @@ public func testConcurrentLocalVariables(_ x: @escaping @concurrent () async -> 
   await y2()
 }
 
-// CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen34testCallerConcurrentLocalVariablesyyyyYaYCcYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
-// CHECK: bb0([[PARAM:%.*]] : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
+// CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen34testCallerConcurrentLocalVariablesyyyyYaYCcYaF : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+// CHECK: bb0([[PARAM:%.*]] : @guaranteed $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
 // CHECK:   [[PARAM_COPY:%.*]] = copy_value [[PARAM]]
-// CHECK:   [[THUNK_1:%.*]] = function_ref @$sBAIegHgIL_IegH_TR : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
+// CHECK:   [[THUNK_1:%.*]] = function_ref @$sBAIeNgHgIL_IegH_TR : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK_1]]([[PARAM_COPY]])
 // CHECK:   [[Y:%.*]] = move_value [lexical] [var_decl] [[PA]]
 // CHECK:   [[Y_B:%.*]] = begin_borrow [[Y]]
 // CHECK:   [[Y_B_C:%.*]] = copy_value [[Y_B]]
-// CHECK:   [[THUNK_2:%.*]] = function_ref @$sIegH_BAIegHgIL_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed () -> ()) -> ()
-// CHECK:   [[PA_2:%.*]] = partial_apply [callee_guaranteed] [[THUNK_2]]([[Y_B_C]])
+// CHECK:   [[THUNK_2:%.*]] = function_ref @$sIegH_BAIeNgHgIL_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed () -> ()) -> ()
+// CHECK:   [[PA_2:%.*]] = partial_apply [callee_guaranteed] [nonisolated_nonsending] [[THUNK_2]]([[Y_B_C]])
 // CHECK: } // end sil function '$s21attr_execution_silgen34testCallerConcurrentLocalVariablesyyyyYaYCcYaF'
 public func testCallerConcurrentLocalVariables(_ x: nonisolated(nonsending) @escaping () async -> ()) async {
   let y: @concurrent () async -> () = x
@@ -212,12 +212,12 @@ public func testCallerConcurrentLocalVariables(_ x: nonisolated(nonsending) @esc
 // CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen34testConcurrentCallerLocalVariablesyyyyYacYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> () {
 // CHECK: bb0([[PARAM:%.*]] : @guaranteed $@async @callee_guaranteed () -> ()):
 // CHECK:   [[PARAM_C:%.*]] = copy_value [[PARAM]]
-// CHECK:   [[THUNK_1:%.*]] = function_ref @$sIegH_BAIegHgIL_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed () -> ()) -> ()
-// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK_1]]([[PARAM_C]])
+// CHECK:   [[THUNK_1:%.*]] = function_ref @$sIegH_BAIeNgHgIL_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed () -> ()) -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [nonisolated_nonsending] [[THUNK_1]]([[PARAM_C]])
 // CHECK:   [[Y:%.*]] = move_value [lexical] [var_decl] [[PA]]
 // CHECK:   [[Y_B:%.*]] = begin_borrow [[Y]]
 // CHECK:   [[Y_B_C:%.*]] = copy_value [[Y_B]]
-// CHECK:   [[THUNK_2:%.*]] = function_ref @$sBAIegHgIL_IegH_TR : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
+// CHECK:   [[THUNK_2:%.*]] = function_ref @$sBAIeNgHgIL_IegH_TR : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
 // CHECK:   [[PA_2:%.*]] = partial_apply [callee_guaranteed] [[THUNK_2]]([[Y_B_C]])
 // CHECK: } // end sil function '$s21attr_execution_silgen34testConcurrentCallerLocalVariablesyyyyYacYaF'
 public func testConcurrentCallerLocalVariables(_ x: @escaping @concurrent () async -> ()) async {
@@ -226,13 +226,13 @@ public func testConcurrentCallerLocalVariables(_ x: @escaping @concurrent () asy
   await y2()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen22globalActorConversionsyyyyYac_yyYaYCctYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> (), @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
-// CHECK: bb0([[X:%.*]] : @guaranteed $@async @callee_guaranteed () -> (), [[Y:%.*]] : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
-// CHECK:   [[GLOBAL_CALLER_FUNC:%.*]] = function_ref @$s21attr_execution_silgen16globalCallerFuncyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
-// FIVE:    [[TTFI:%.*]] = thin_to_thick_function [[GLOBAL_CALLER_FUNC]] to $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
-// FIVE:    [[THUNK:%.*]] = function_ref @$sBAIegHgIL_IegH_TRScMTU : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen22globalActorConversionsyyyyYac_yyYaYCctYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> (), @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+// CHECK: bb0([[X:%.*]] : @guaranteed $@async @callee_guaranteed () -> (), [[Y:%.*]] : @guaranteed $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
+// CHECK:   [[GLOBAL_CALLER_FUNC:%.*]] = function_ref @$s21attr_execution_silgen16globalCallerFuncyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// FIVE:    [[TTFI:%.*]] = thin_to_thick_function [[GLOBAL_CALLER_FUNC]] to $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// FIVE:    [[THUNK:%.*]] = function_ref @$sBAIeNgHgIL_IegH_TRScMTU : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
 // FIVE:    [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[TTFI]]) :
-// SIX:     [[THUNK:%.*]] = function_ref @$sBAIetHgIL_IeghH_TRScMTU : $@convention(thin) @Sendable @async (@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
+// SIX:     [[THUNK:%.*]] = function_ref @$sBAIeNtHgIL_IeghH_TRScMTU : $@convention(thin) @Sendable @async (@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
 // SIX:     [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[GLOBAL_CALLER_FUNC]]) :
 // CHECK:   [[V1:%.*]] = move_value [lexical] [var_decl] [[PA]]
 // CHECK:   [[V1_B:%.*]] = begin_borrow [[V1]]
@@ -259,7 +259,7 @@ public func testConcurrentCallerLocalVariables(_ x: @escaping @concurrent () asy
 // FIVE:   apply [[V3_B_C_B]]()
 
 // FIVE:   [[Y_C:%.*]] = copy_value [[Y]]
-// FIVE:   [[THUNK:%.*]] = function_ref @$sBAIegHgIL_IegH_TRScMTU : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
+// FIVE:   [[THUNK:%.*]] = function_ref @$sBAIeNgHgIL_IegH_TRScMTU : $@convention(thin) @async (@guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
 // FIVE:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[Y_C]])
 // FIVE:   [[V4:%.*]] = move_value [lexical] [var_decl] [[PA]]
 // FIVE:   [[V4_B:%.*]] = begin_borrow [[V4]]
@@ -269,16 +269,16 @@ public func testConcurrentCallerLocalVariables(_ x: @escaping @concurrent () asy
 
 // CHECK: } // end sil function '$s21attr_execution_silgen22globalActorConversionsyyyyYac_yyYaYCctYaF'
 
-// SIX-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBAIetHgIL_IeghH_TRScMTU : $@convention(thin) @Sendable @async (@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
-// SIX: bb0([[FUNC:%.*]] : $@convention(thin) @async (@sil_isolated
+// SIX-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBAIeNtHgIL_IeghH_TRScMTU : $@convention(thin) @Sendable @async (@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+// SIX: bb0([[FUNC:%.*]] : $@convention(thin) @caller_isolated @async (@sil_isolated
 // SIX:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
 // SIX:   [[E:%.*]] = init_existential_ref [[ACTOR]] : $MainActor : $MainActor, $any Actor
 // SIX:   [[E_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[E]]
 // SIX:   hop_to_executor [[E_OPT]]
 // SIX:   [[E_OPT_B:%.*]] = begin_borrow [[E_OPT]]
 // SIX:   [[E_OPT_B_CAST:%.*]] = unchecked_value_cast [[E_OPT_B]] to $Builtin.ImplicitActor
-// SIX:   apply [[FUNC]]([[E_OPT_B_CAST]]) : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
-// SIX: } // end sil function '$sBAIetHgIL_IeghH_TRScMTU'
+// SIX:   apply [[FUNC]]([[E_OPT_B_CAST]]) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// SIX: } // end sil function '$sBAIeNtHgIL_IeghH_TRScMTU'
 
 func globalActorConversions(_ x: @escaping @concurrent () async -> (),
                             _ y: nonisolated(nonsending) @escaping () async -> ()) async {
@@ -297,13 +297,13 @@ func globalActorConversions(_ x: @escaping @concurrent () async -> (),
 #endif
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen23globalActorConversions2yyyAA13SendableKlassCYac_yADYaYCctYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed SendableKlass) -> (), @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> () {
-// CHECK: bb0([[X:%.*]] : @guaranteed $@async @callee_guaranteed (@guaranteed SendableKlass) -> (), [[Y:%.*]] : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()):
-// CHECK:   [[GLOBAL_CALLER_FUNC:%.*]] = function_ref @$s21attr_execution_silgen29globalCallerFuncSendableKlassyyAA0gH0CYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()
-// FIVE:    [[TTFI:%.*]] = thin_to_thick_function [[GLOBAL_CALLER_FUNC]] to $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()
-// FIVE:    [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCIegHgILg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen23globalActorConversions2yyyAA13SendableKlassCYac_yADYaYCctYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed SendableKlass) -> (), @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> () {
+// CHECK: bb0([[X:%.*]] : @guaranteed $@async @callee_guaranteed (@guaranteed SendableKlass) -> (), [[Y:%.*]] : @guaranteed $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()):
+// CHECK:   [[GLOBAL_CALLER_FUNC:%.*]] = function_ref @$s21attr_execution_silgen29globalCallerFuncSendableKlassyyAA0gH0CYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()
+// FIVE:    [[TTFI:%.*]] = thin_to_thick_function [[GLOBAL_CALLER_FUNC]] to $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()
+// FIVE:    [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCIeNgHgILg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> ()
 // FIVE:    [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[TTFI]]) :
-// SIX:     [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCIetHgILg_ACIeghHg_TRScMTU : $@convention(thin) @Sendable @async (@guaranteed SendableKlass, @convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> ()
+// SIX:     [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCIeNtHgILg_ACIeghHg_TRScMTU : $@convention(thin) @Sendable @async (@guaranteed SendableKlass, @convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> ()
 // SIX:     [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[GLOBAL_CALLER_FUNC]]) :
 // CHECK:   [[V1:%.*]] = move_value [lexical] [var_decl] [[PA]]
 // CHECK:   [[V1_B:%.*]] = begin_borrow [[V1]]
@@ -330,7 +330,7 @@ func globalActorConversions(_ x: @escaping @concurrent () async -> (),
 // FIVE:   apply [[V3_B_C_B]]({{%.*}})
 
 // FIVE:   [[Y_C:%.*]] = copy_value [[Y]]
-// FIVE:   [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCIegHgILg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> ()
+// FIVE:   [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCIeNgHgILg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> ()
 // FIVE:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[Y_C]])
 // FIVE:   [[V4:%.*]] = move_value [lexical] [var_decl] [[PA]]
 // FIVE:   [[V4_B:%.*]] = begin_borrow [[V4]]
@@ -340,7 +340,7 @@ func globalActorConversions(_ x: @escaping @concurrent () async -> (),
 
 // CHECK: } // end sil function '$s21attr_execution_silgen23globalActorConversions2yyyAA13SendableKlassCYac_yADYaYCctYaF'
 
-// FIVE-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCIegHgILg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> () {
+// FIVE-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCIeNgHgILg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> () {
 // FIVE: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : @guaranteed
 // FIVE:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
 // FIVE:   [[E:%.*]] = init_existential_ref [[ACTOR]] : $MainActor : $MainActor, $any Actor
@@ -349,10 +349,10 @@ func globalActorConversions(_ x: @escaping @concurrent () async -> (),
 // FIVE:   [[E_OPT_B:%.*]] = begin_borrow [[E_OPT]]
 // FIVE:   [[E_OPT_B_CAST:%.*]] = unchecked_value_cast [[E_OPT_B]] to $Builtin.ImplicitActor
 // FIVE:   apply [[FUNC]]([[E_OPT_B_CAST]], [[ARG]])
-// FIVE: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCIegHgILg_ACIegHg_TRScMTU'
+// FIVE: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCIeNgHgILg_ACIegHg_TRScMTU'
 
-// SIX-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCIetHgILg_ACIeghHg_TRScMTU : $@convention(thin) @Sendable @async (@guaranteed SendableKlass, @convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> () {
-// SIX: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()):
+// SIX-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCIeNtHgILg_ACIeghHg_TRScMTU : $@convention(thin) @Sendable @async (@guaranteed SendableKlass, @convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> () {
+// SIX: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()):
 // SIX:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
 // SIX:   [[E:%.*]] = init_existential_ref [[ACTOR]] : $MainActor : $MainActor, $any Actor
 // SIX:   [[E_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[E]]
@@ -360,15 +360,15 @@ func globalActorConversions(_ x: @escaping @concurrent () async -> (),
 // SIX:   [[E_OPT_B:%.*]] = begin_borrow [[E_OPT]]
 // SIX:   [[E_OPT_B_CAST:%.*]] = unchecked_value_cast [[E_OPT_B]] to $Builtin.ImplicitActor
 // SIX:   apply [[FUNC]]([[E_OPT_B_CAST]], [[ARG]])
-// SIX: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCIetHgILg_ACIeghHg_TRScMTU'
+// SIX: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCIeNtHgILg_ACIeghHg_TRScMTU'
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCIegHgILg_ACIegHg_TR : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCIeNgHgILg_ACIegHg_TR : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : @guaranteed
 // CHECK:   [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK:   hop_to_executor [[ACTOR]]
 // CHECK:   [[ACTOR_CAST:%.*]] = unchecked_value_cast [[ACTOR]] to $Builtin.ImplicitActor
 // CHECK:   apply [[FUNC]]([[ACTOR_CAST]], [[ARG]])
-// CHECK: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCIegHgILg_ACIegHg_TR'
+// CHECK: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCIeNgHgILg_ACIegHg_TR'
 func globalActorConversions2(_ x: @escaping @concurrent (SendableKlass) async -> (),
                              _ y: nonisolated(nonsending) @escaping (SendableKlass) async -> ()) async {
   let v1: @MainActor (SendableKlass) async -> Void = globalCallerFuncSendableKlass
@@ -385,13 +385,13 @@ func globalActorConversions2(_ x: @escaping @concurrent (SendableKlass) async ->
   await v5(SendableKlass())
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen23globalActorConversions3yyAA13SendableKlassCADYac_A2DYaYCctYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed SendableKlass) -> @owned SendableKlass, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> () {
-// CHECK: bb0([[X:%.*]] : @guaranteed $@async @callee_guaranteed (@guaranteed SendableKlass) -> @owned SendableKlass, [[Y:%.*]] : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass):
-// CHECK:   [[GLOBAL_CALLER_FUNC:%.*]] = function_ref @$s21attr_execution_silgen29globalCallerFuncSendableKlassyAA0gH0CADYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass
-// FIVE:    [[TTFI:%.*]] = thin_to_thick_function [[GLOBAL_CALLER_FUNC]] to $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass
-// FIVE:    [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCACIegHgILgo_A2CIegHgo_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass
-// FIVE:    [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[TTFI]])
-// SIX:     [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCACIetHgILgo_A2CIeghHgo_TRScMTU : $@convention(thin) @Sendable @async (@guaranteed SendableKlass, @convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass
+// CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen23globalActorConversions3yyAA13SendableKlassCADYac_A2DYaYCctYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@guaranteed SendableKlass) -> @owned SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> () {
+// CHECK: bb0([[X:%.*]] : @guaranteed $@async @callee_guaranteed (@guaranteed SendableKlass) -> @owned SendableKlass, [[Y:%.*]] : @guaranteed $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass):
+// CHECK:   [[GLOBAL_CALLER_FUNC:%.*]] = function_ref @$s21attr_execution_silgen29globalCallerFuncSendableKlassyAA0gH0CADYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass
+// FIVE:    [[TTFI:%.*]] = thin_to_thick_function [[GLOBAL_CALLER_FUNC]] to $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass
+// FIVE:    [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCACIeNgHgILgo_A2CIegHgo_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass
+// FIVE:    [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[TTFI]]) :
+// SIX:     [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCACIeNtHgILgo_A2CIeghHgo_TRScMTU : $@convention(thin) @Sendable @async (@guaranteed SendableKlass, @convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass
 // SIX:     [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[GLOBAL_CALLER_FUNC]])
 // CHECK:   [[V1:%.*]] = move_value [lexical] [var_decl] [[PA]]
 // CHECK:   [[V1_B:%.*]] = begin_borrow [[V1]]
@@ -417,7 +417,7 @@ func globalActorConversions2(_ x: @escaping @concurrent (SendableKlass) async ->
 // FIVE:   apply [[V3_B_C_B]]({{%.*}})
 
 // FIVE:   [[Y_C:%.*]] = copy_value [[Y]]
-// FIVE:   [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCACIegHgILgo_A2CIegHgo_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass
+// FIVE:   [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCACIeNgHgILgo_A2CIegHgo_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass
 // FIVE:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[Y_C]])
 // FIVE:   [[V4:%.*]] = move_value [lexical] [var_decl] [[PA]]
 // FIVE:   [[V4_B:%.*]] = begin_borrow [[V4]]
@@ -426,12 +426,12 @@ func globalActorConversions2(_ x: @escaping @concurrent (SendableKlass) async ->
 // FIVE:   apply [[V4_B_C_B]]({{%.*}})
 
 // CHECK:  [[Y_C:%.*]] = copy_value [[Y]]
-// CHECK:  [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCACIegHgILgo_A2CIegHgo_TR : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass
+// CHECK:  [[THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen13SendableKlassCACIeNgHgILgo_A2CIegHgo_TR : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass
 // CHECK:  [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[Y_C]])
 // CHECK:  [[V5:%.*]] = move_value [lexical] [var_decl] [[PA]]
 // CHECK: } // end sil function '$s21attr_execution_silgen23globalActorConversions3yyAA13SendableKlassCADYac_A2DYaYCctYaF'
 
-// FIVE-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCACIegHgILgo_A2CIegHgo_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass {
+// FIVE-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCACIeNgHgILgo_A2CIegHgo_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass {
 // FIVE: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : @guaranteed
 // FIVE:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
 // FIVE:   [[E:%.*]] = init_existential_ref [[ACTOR]] : $MainActor : $MainActor, $any Actor
@@ -440,10 +440,10 @@ func globalActorConversions2(_ x: @escaping @concurrent (SendableKlass) async ->
 // FIVE:   [[E_OPT_B:%.*]] = begin_borrow [[E_OPT]]
 // FIVE:  [[E_OPT_B_CAST:%.*]] = unchecked_value_cast [[E_OPT_B]] to $Builtin.ImplicitActor
 // FIVE:   apply [[FUNC]]([[E_OPT_B_CAST]], [[ARG]])
-// FIVE: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCACIegHgILgo_A2CIegHgo_TRScMTU'
+// FIVE: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCACIeNgHgILgo_A2CIegHgo_TRScMTU'
 
-// SIX-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCACIetHgILgo_A2CIeghHgo_TRScMTU : $@convention(thin) @Sendable @async (@guaranteed SendableKlass, @convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass {
-// SIX: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass):
+// SIX-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCACIeNtHgILgo_A2CIeghHgo_TRScMTU : $@convention(thin) @Sendable @async (@guaranteed SendableKlass, @convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass {
+// SIX: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass):
 // SIX:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
 // SIX:   [[E:%.*]] = init_existential_ref [[ACTOR]] : $MainActor : $MainActor, $any Actor
 // SIX:   [[E_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[E]]
@@ -451,13 +451,13 @@ func globalActorConversions2(_ x: @escaping @concurrent (SendableKlass) async ->
 // SIX:   [[E_OPT_B:%.*]] = begin_borrow [[E_OPT]]
 // SIX:   [[E_OPT_B_CAST:%.*]] = unchecked_value_cast [[E_OPT_B]] to $Builtin.ImplicitActor
 // SIX:   apply [[FUNC]]([[E_OPT_B_CAST]], [[ARG]])
-// SIX: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCACIetHgILgo_A2CIeghHgo_TRScMTU'
+// SIX: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCACIeNtHgILgo_A2CIeghHgo_TRScMTU'
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCACIegHgILgo_A2CIegHgo_TR : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCACIeNgHgILgo_A2CIegHgo_TR : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : @guarantee
 // CHECK: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK: hop_to_executor [[ACTOR]]
-// CHECK: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCACIegHgILgo_A2CIegHgo_TR'
+// CHECK: } // end sil function '$sBA21attr_execution_silgen13SendableKlassCACIeNgHgILgo_A2CIegHgo_TR'
 func globalActorConversions3(_ x: @escaping @concurrent (SendableKlass) async -> SendableKlass,
                              _ y: nonisolated(nonsending) @escaping (SendableKlass) async -> SendableKlass) async {
   let v1: @MainActor (SendableKlass) async -> SendableKlass = globalCallerFuncSendableKlass
@@ -478,12 +478,12 @@ func globalActorConversions3(_ x: @escaping @concurrent (SendableKlass) async ->
 // CHECK: bb0([[X:%.*]] : @guaranteed $@Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> (), [[Y:%.*]] : @guaranteed $@Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()):
 
 // CHECK:   [[X_C:%.*]] = copy_value [[X]]
-// CHECK:   [[THUNK:%.*]] = function_ref @$s21attr_execution_silgen16NonSendableKlassCIeghg_BAACIegHgILg_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> ()) -> ()
-// CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[X_C]])
+// CHECK:   [[THUNK:%.*]] = function_ref @$s21attr_execution_silgen16NonSendableKlassCIeghg_BAACIeNgHgILg_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> ()) -> ()
+// CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] [nonisolated_nonsending] [[THUNK]]([[X_C]])
 
 // CHECK:   [[Y_C:%.*]] = copy_value [[Y]]
-// CHECK:   [[THUNK:%.*]] = function_ref @$s21attr_execution_silgen13SendableKlassCIeghg_BAACIegHgILg_TRScMTU : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()) -> ()
-// CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[Y_C]])
+// CHECK:   [[THUNK:%.*]] = function_ref @$s21attr_execution_silgen13SendableKlassCIeghg_BAACIeNgHgILg_TRScMTU : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()) -> ()
+// CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] [nonisolated_nonsending] [[THUNK]]([[Y_C]])
 
 // CHECK:   [[Y_C:%.*]] = copy_value [[Y]]
 // CHECK:   [[THUNK:%.*]] = function_ref @$s21attr_execution_silgen13SendableKlassCIeghg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()) -> ()
@@ -491,20 +491,20 @@ func globalActorConversions3(_ x: @escaping @concurrent (SendableKlass) async ->
 
 // CHECK: } // end sil function '$s21attr_execution_silgen26conversionsFromSyncToAsyncyyyAA16NonSendableKlassCYbc_yAA0jK0CYbScMYcctYaF'
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s21attr_execution_silgen16NonSendableKlassCIeghg_BAACIegHgILg_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s21attr_execution_silgen16NonSendableKlassCIeghg_BAACIeNgHgILg_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> ()) -> () {
 // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor
 // CHECK: apply {{%.*}}({{%.*}}) : $@Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> ()
 // CHECK: hop_to_executor [[ACTOR]]
-// CHECK: } // end sil function '$s21attr_execution_silgen16NonSendableKlassCIeghg_BAACIegHgILg_TR'
+// CHECK: } // end sil function '$s21attr_execution_silgen16NonSendableKlassCIeghg_BAACIeNgHgILg_TR'
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s21attr_execution_silgen13SendableKlassCIeghg_BAACIegHgILg_TRScMTU : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s21attr_execution_silgen13SendableKlassCIeghg_BAACIeNgHgILg_TRScMTU : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()) -> () {
 // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : @guaranteed $@Sendable @callee_guaranteed
 // CHECK:   [[MAIN_ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
 // CHECK:   [[MAIN_ACTOR_B:%.*]] = begin_borrow [[MAIN_ACTOR]]
 // CHECK:   hop_to_executor [[MAIN_ACTOR_B]]
 // CHECK:   apply [[FUNC]]([[ARG]])
 // CHECK:   hop_to_executor [[ACTOR]]
-// CHECK: } // end sil function '$s21attr_execution_silgen13SendableKlassCIeghg_BAACIegHgILg_TRScMTU'
+// CHECK: } // end sil function '$s21attr_execution_silgen13SendableKlassCIeghg_BAACIeNgHgILg_TRScMTU'
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s21attr_execution_silgen13SendableKlassCIeghg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : @guaranteed $@Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()):
@@ -523,7 +523,7 @@ func conversionsFromSyncToAsync(_ x: @escaping @Sendable (NonSendableKlass) -> V
 }
 
 func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) async -> Void) {
-  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCcfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCcfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
   // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Builtin.ImplicitActor):
   // CHECK: hop_to_executor [[EXECUTOR]]
   let _: nonisolated(nonsending) () async -> Void = {
@@ -532,7 +532,7 @@ func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) asy
 
   func testParam(_: nonisolated(nonsending) () async throws -> Void) {}
 
-  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCXEfU0_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @error any Error {
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCXEfU0_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @error any Error {
   // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Builtin.ImplicitActor):
   // CHECK: hop_to_executor [[EXECUTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCXEfU0_'
@@ -544,13 +544,13 @@ func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) asy
   // CHECK: } // end sil function '$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaXEfU1_'
   testParam { @concurrent in _ = 42 }
 
-  // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIgH_BAs5Error_pIegHgILzo_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error {
+  // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIgH_BAs5Error_pIeNgHgILzo_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[FUNC:%.*]] : @guaranteed $@noescape @async @callee_guaranteed () -> ()):
   // CHECK:   apply [[FUNC]]()
   // CHECK:   hop_to_executor [[ACTOR]]
-  // CHECK: } // end sil function '$sIgH_BAs5Error_pIegHgILzo_TR'
+  // CHECK: } // end sil function '$sIgH_BAs5Error_pIeNgHgILzo_TR'
 
-  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFySiYaYCcfU2_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> () {
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFySiYaYCcfU2_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> () {
   // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, %1 : $Int):
   // CHECK: hop_to_executor [[EXECUTOR]]
   fn = { _ in }
@@ -560,11 +560,11 @@ func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) asy
   // CHECK: hop_to_executor [[GENERIC_EXECUTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFySiYacfU3_'
 
-  // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiIegHy_BASiIegHgILy_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int, @guaranteed @async @callee_guaranteed (Int) -> ()) -> () {
+  // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiIegHy_BASiIeNgHgILy_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int, @guaranteed @async @callee_guaranteed (Int) -> ()) -> () {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : $Int, [[FUNC:%.*]] : @guaranteed $@async @callee_guaranteed (Int) -> ()):
   // CHECK:  apply [[FUNC]]([[ARG]])
   // CHECK:  hop_to_executor [[ACTOR]]
-  // CHECK: } // end sil function '$sSiIegHy_BASiIegHgILy_TR'
+  // CHECK: } // end sil function '$sSiIegHy_BASiIeNgHgILy_TR'
   fn = { @concurrent _ in }
 }
 
@@ -618,7 +618,7 @@ func testConvertToThrowing(isolation: isolated (any Actor)? = #isolation) async 
   //   preserve isolation on return.
   // CHECK-NEXT:    hop_to_executor [[ACTOR_BORROW]]
 
-  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen21testConvertToThrowing9isolationyScA_pSgYi_tYaFyyYaYCXEfU_ : $@convention(thin) @async @substituted <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (@out τ_0_0, @error any Error) for <()>
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen21testConvertToThrowing9isolationyScA_pSgYi_tYaFyyYaYCXEfU_ : $@convention(thin) @caller_isolated @async @substituted <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (@out τ_0_0, @error any Error) for <()>
   // CHECK:      bb0(
   // CHECK-NEXT:   debug_value
   //   This hop is unnecessary because nonisolated(nonsending) should
@@ -634,14 +634,14 @@ func testConvertToThrowing(isolation: isolated (any Actor)? = #isolation) async 
 }
 
 func testSendableClosureNonisolatedNonSendingInference() {
-  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen49testSendableClosureNonisolatedNonSendingInferenceyyFySiYaYbYCcfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen49testSendableClosureNonisolatedNonSendingInferenceyyFySiYaYbYCcfU_ : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()
   // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, %1 : $Int):
   // CHECK: hop_to_executor [[EXECUTOR]]
   // CHECK: // end sil function '$s21attr_execution_silgen49testSendableClosureNonisolatedNonSendingInferenceyyFySiYaYbYCcfU_'
   let _: nonisolated(nonsending) @Sendable (Int) async -> Void = { _ in }
 
-  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen49testSendableClosureNonisolatedNonSendingInferenceyyFyS2SYaKYCcYaYbYCcfU0_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String) -> (@owned String, @error any Error)) -> @error any Error
-  // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String) -> (@owned String, @error any Error)):
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen49testSendableClosureNonisolatedNonSendingInferenceyyFyS2SYaKYCcYaYbYCcfU0_ : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String) -> (@owned String, @error any Error)) -> @error any Error
+  // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String) -> (@owned String, @error any Error)):
   // CHECK: hop_to_executor [[EXECUTOR]]
   // CHECK: // end sil function '$s21attr_execution_silgen49testSendableClosureNonisolatedNonSendingInferenceyyFyS2SYaKYCcYaYbYCcfU0_'
   let _: nonisolated(nonsending) @Sendable (
@@ -650,7 +650,7 @@ func testSendableClosureNonisolatedNonSendingInference() {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen014testSendableToE35ConversionWithNonisilatedNonsendingyyF : $@convention(thin) () -> ()
-// CHECK: [[TEST_REF:%.*]] = function_ref @$s21attr_execution_silgen014testSendableToE35ConversionWithNonisilatedNonsendingyyF0D0L_7closureyS2SYaKYCc_tYaYbKF : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String) -> (@owned String, @error any Error)) -> @error any Error
+// CHECK: [[TEST_REF:%.*]] = function_ref @$s21attr_execution_silgen014testSendableToE35ConversionWithNonisilatedNonsendingyyF0D0L_7closureyS2SYaKYCc_tYaYbKF : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String) -> (@owned String, @error any Error)) -> @error any Error
 // CHECK: // end sil function '$s21attr_execution_silgen014testSendableToE35ConversionWithNonisilatedNonsendingyyF'
 func testSendableToSendableConversionWithNonisilatedNonsending() {
   @Sendable nonisolated(nonsending) func test(
@@ -673,25 +673,25 @@ func testNonisolatedNonsendingClosureInGlobalActorContext() {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF0D0L_yyYaF : $@convention(thin) @async () -> ()
-  // CHECK: [[CLOSURE:%.*]] = function_ref @$s21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF0D0L_yyYaFyAaByyF11NonSendableL_CYuYaYbYCcfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @guaranteed NonSendable) -> ()
-  // CHECK: [[THICK_CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE]] to $@Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @guaranteed NonSendable) -> ()
-  // CHECK: [[CLOSURE_THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF11NonSendableL_CIeghHgILgT_BAADIeghHgILxT_TR : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @owned NonSendable, @guaranteed @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @guaranteed NonSendable) -> ()) -> ()
-  // CHECK: [[THUNKED_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_THUNK]]([[THICK_CLOSURE]])
-  // CHECK: [[COMPUTE:%.*]] = function_ref @$s21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF1SL_V7compute7closureyyAaByyF11NonSendableL_CnYuYaYbYCc_tYaFZ : $@convention(method) @async (@guaranteed @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @owned NonSendable) -> (), @thin S.Type) -> ()
-  // CHECK: apply [[COMPUTE]]([[THUNKED_CLOSURE]], {{.*}}) : $@convention(method) @async (@guaranteed @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @owned NonSendable) -> (), @thin S.Type) -> ()
+  // CHECK: [[CLOSURE:%.*]] = function_ref @$s21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF0D0L_yyYaFyAaByyF11NonSendableL_CYuYaYbYCcfU_ : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @guaranteed NonSendable) -> ()
+  // CHECK: [[THICK_CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE]] to $@caller_isolated @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @guaranteed NonSendable) -> ()
+  // CHECK: [[CLOSURE_THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF11NonSendableL_CIeNghHgILgT_BAADIeNghHgILxT_TR : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @owned NonSendable, @guaranteed @caller_isolated @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @guaranteed NonSendable) -> ()) -> ()
+  // CHECK: [[THUNKED_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [nonisolated_nonsending] [[CLOSURE_THUNK]]([[THICK_CLOSURE]])
+  // CHECK: [[COMPUTE:%.*]] = function_ref @$s21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF1SL_V7compute7closureyyAaByyF11NonSendableL_CnYuYaYbYCc_tYaFZ : $@convention(method) @async (@guaranteed @caller_isolated @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @owned NonSendable) -> (), @thin S.Type) -> ()
+  // CHECK: apply [[COMPUTE]]([[THUNKED_CLOSURE]], {{.*}}) : $@convention(method) @async (@guaranteed @caller_isolated @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @owned NonSendable) -> (), @thin S.Type) -> ()
   // CHECK: } // end sil function '$s21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF0D0L_yyYaF'
   @MainActor
   func test() async {
     // CHECK: // closure #1 in test #1 () in testNonisolatedNonsendingClosureInGlobalActorContext()
-    // CHECK: // Isolation: caller_isolation_inheriting
+    // CHECK: // Isolation: nonisolated(nonsending)
     await S.compute { _ in
     }
   }
 }
 
 // CHECK-LABEL: // localVariableAssignmentConversion()
-// CHECK: // Isolation: caller_isolation_inheriting
-// CHECK: sil hidden [ossa] @$s21attr_execution_silgen33localVariableAssignmentConversionyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK: // Isolation: nonisolated(nonsending)
+// CHECK: sil hidden [ossa] @$s21attr_execution_silgen33localVariableAssignmentConversionyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK: bb0([[ACTOR:%.*]] : @guaranteed
 // CHECK:   [[GLOBAL_ACTOR_FUNC:%.*]] = function_ref @$s21attr_execution_silgen29globalGlobalActorIsolatedFuncyyYaF : $@convention(thin) @async () -> ()
 // FIVE:    [[GLOBAL_ACTOR_FUNC_TT_CVT:%.*]] = thin_to_thick_function [[GLOBAL_ACTOR_FUNC]] to $@async @callee_guaranteed () -> ()
@@ -700,10 +700,10 @@ func testNonisolatedNonsendingClosureInGlobalActorContext() {
 // CHECK:   [[MV_VALUE:%.*]] = move_value [lexical] [var_decl] [[GLOBAL_ACTOR_FUNC_TT_CVT]]
 // CHECK:   debug_value [[MV_VALUE]], let, name "c1"
 
-// CHECK:   [[NONISOLATED_NONSENDING_FUNC:%.*]] = function_ref @$s21attr_execution_silgen16globalCallerFuncyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
-// FIVE:    [[NONISOLATED_NONSENDING_FUNC_CVT_TT:%.*]] = thin_to_thick_function [[NONISOLATED_NONSENDING_FUNC]] to $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
-// SIX:     [[NONISOLATED_NONSENDING_FUNC_CVT:%.*]] = convert_function [[NONISOLATED_NONSENDING_FUNC]] to $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
-// SIX:     [[NONISOLATED_NONSENDING_FUNC_CVT_TT:%.*]] = thin_to_thick_function [[NONISOLATED_NONSENDING_FUNC_CVT]] to $@Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// CHECK:   [[NONISOLATED_NONSENDING_FUNC:%.*]] = function_ref @$s21attr_execution_silgen16globalCallerFuncyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// FIVE:    [[NONISOLATED_NONSENDING_FUNC_CVT_TT:%.*]] = thin_to_thick_function [[NONISOLATED_NONSENDING_FUNC]] to $@caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// SIX:     [[NONISOLATED_NONSENDING_FUNC_CVT:%.*]] = convert_function [[NONISOLATED_NONSENDING_FUNC]] to $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// SIX:     [[NONISOLATED_NONSENDING_FUNC_CVT_TT:%.*]] = thin_to_thick_function [[NONISOLATED_NONSENDING_FUNC_CVT]] to $@caller_isolated @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
 // CHECK:   [[MV_VALUE:%.*]] = move_value [lexical] [var_decl] [[NONISOLATED_NONSENDING_FUNC_CVT_TT]]
 // CHECK:   debug_value [[MV_VALUE]], let, name "c2"
 // CHECK: } // end sil function '$s21attr_execution_silgen33localVariableAssignmentConversionyyYaF'
@@ -721,8 +721,8 @@ func testConversionsToSendable() {
 
   func testActorCapture(a: A) {
     // CHECK: // closure #1 in testActorCapture #1 (a:) in testConversionsToSendable()
-    // CHECK: // Isolation: caller_isolation_inheriting
-    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D12ActorCaptureL_1ayAaByyF1AL_C_tFyyYaYbYCcfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed A) -> ()
+    // CHECK: // Isolation: nonisolated(nonsending)
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D12ActorCaptureL_1ayAaByyF1AL_C_tFyyYaYbYCcfU_ : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed A) -> ()
     let _: nonisolated(nonsending) @Sendable () async -> Void = {
       _ = await a.test()
     }
@@ -730,8 +730,8 @@ func testConversionsToSendable() {
 
   func testIsolatedParameter(isolation: isolated (any Actor)?) async {
     // CHECK: // closure #1 in testIsolatedParameter #1 (isolation:) in testConversionsToSendable()
-    // CHECK: // Isolation: caller_isolation_inheriting
-    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D17IsolatedParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCcfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Optional<any Actor>) -> ()
+    // CHECK: // Isolation: nonisolated(nonsending)
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D17IsolatedParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCcfU_ : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Optional<any Actor>) -> ()
     let _: nonisolated(nonsending) @Sendable () async -> Void = {
       _ = isolation
     }
@@ -746,8 +746,8 @@ func testConversionsToSendable() {
 
     // Here on the other hand the parameter is `@Sendable` which means that closure cannot be isolated to its parent context and can assume `nonisolated(nonsending)` isolation.
     // CHECK: // closure #3 in testIsolatedParameter #1 (isolation:) in testConversionsToSendable()
-    // CHECK: // Isolation: caller_isolation_inheriting
-    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D17IsolatedParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCXEfU1_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Optional<any Actor>) -> ()
+    // CHECK: // Isolation: nonisolated(nonsending)
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D17IsolatedParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCXEfU1_ : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Optional<any Actor>) -> ()
     await sendableCompute {
       _ = isolation
     }
@@ -760,8 +760,8 @@ func testConversionsToSendable() {
     @Sendable func local(_: isolated (any Actor)? = nil) async { }
 
     // CHECK: // closure #1 in testCaptureWithParameter #1 (isolation:) in testConversionsToSendable()
-    // CHECK: // Isolation: caller_isolation_inheriting
-    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCXEfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+    // CHECK: // Isolation: nonisolated(nonsending)
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCXEfU_ : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
     // CHECK: hop_to_executor %0
     // CHECK: [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK: [[LOCAL:%.*]] = function_ref @$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaF5localL_yyAEYiYaYbF
@@ -773,8 +773,8 @@ func testConversionsToSendable() {
     }
 
     // CHECK: // closure #2 in testCaptureWithParameter #1 (isolation:) in testConversionsToSendable()
-    // CHECK: // Isolation: caller_isolation_inheriting
-    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCXEfU0_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Optional<any Actor>) -> ()
+    // CHECK: // Isolation: nonisolated(nonsending)
+    // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaFyyYaYbYCXEfU0_ : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Optional<any Actor>) -> ()
     // CHECK: hop_to_executor %0
     // CHECK: [[LOCAL:%.*]] = function_ref @$s21attr_execution_silgen25testConversionsToSendableyyF0D20CaptureWithParameterL_9isolationyScA_pSgYi_tYaF5localL_yyAEYiYaYbF
     // CHECK: apply [[LOCAL]](%1) : $@convention(thin) @Sendable @async (@sil_isolated @guaranteed Optional<any Actor>) -> ()
@@ -799,8 +799,8 @@ func testConversionsToSendable() {
 
     func testSelfCapture() async {
       // CHECK: // closure #1 in testSelfCapture() in A #1 in testConversionsToSendable()
-      // CHECK: // Isolation: caller_isolation_inheriting
-      // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF1AL_C0D11SelfCaptureyyYaFyyYaYbYCXEfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed A) -> ()
+      // CHECK: // Isolation: nonisolated(nonsending)
+      // CHECK: sil private [ossa] @$s21attr_execution_silgen25testConversionsToSendableyyF1AL_C0D11SelfCaptureyyYaFyyYaYbYCXEfU_ : $@convention(thin) @caller_isolated @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed A) -> ()
       await sendableCompute {
         _ = self
       }

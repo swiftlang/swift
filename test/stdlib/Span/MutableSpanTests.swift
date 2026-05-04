@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2025 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -642,4 +642,143 @@ suite.test("MutableSpan Sendability")
 
   let span = MutableSpan(_unsafeElements: buffer)
   send(span)
+}
+
+suite.test("init(mutating:)")
+.require(.stdlib_6_4).code {
+  let capacity = 4
+  var array = ContiguousArray(0..<capacity)
+  array.withUnsafeMutableBytes {
+    expectEqual($0.count, capacity * MemoryLayout<Int>.stride)
+    var mutableBytes = unsafe MutableRawSpan(_unsafeBytes: $0)
+    var typed = MutableSpan<Int>(mutating: &mutableBytes)
+    expectEqual(typed.count, capacity)
+    for i in 0..<capacity {
+      typed[i] = i+1
+    }
+  }
+  for i in 0..<capacity {
+    expectEqual(array[i], i+1)
+  }
+}
+
+suite.test("init(mutating:) traps on misaligned pointer")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int>.stride * 2 + 1,
+    alignment: MemoryLayout<Int>.alignment
+  )
+  defer { unsafe buffer.deallocate() }
+  let misaligned = unsafe UnsafeMutableRawBufferPointer(
+    start: buffer.baseAddress! + 1,
+    count: MemoryLayout<Int>.stride * 2
+  )
+  _ = unsafe misaligned.initializeMemory(
+    as: UInt8.self, fromContentsOf: repeatElement(0, count: misaligned.count)
+  )
+  var raw = unsafe MutableRawSpan(_unsafeBytes: misaligned)
+
+  expectCrashLater()
+  _ = MutableSpan<Int>(mutating: &raw)
+}
+
+suite.test("init(mutating:) traps on byteCount not multiple of stride")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int>.stride + 1,
+    alignment: MemoryLayout<Int>.alignment
+  )
+  defer { unsafe buffer.deallocate() }
+  _ = unsafe buffer.initializeMemory(
+    as: UInt8.self, fromContentsOf: repeatElement(0, count: buffer.count)
+  )
+  var raw = unsafe MutableRawSpan(_unsafeBytes: buffer)
+
+  expectCrashLater()
+  _ = MutableSpan<Int>(mutating: &raw)
+}
+
+suite.test("init(mutableBytes:)")
+.require(.stdlib_6_4).code {
+  let capacity = 4
+  var array = ContiguousArray(0..<capacity)
+  array.withUnsafeMutableBytes {
+    expectEqual($0.count, capacity * MemoryLayout<Int>.stride)
+    let rawSpan = unsafe MutableRawSpan(_unsafeBytes: $0)
+    var typed = MutableSpan<Int>(mutableBytes: rawSpan)
+    expectEqual(typed.count, capacity)
+    for i in 0..<capacity {
+      typed[i] = i+1
+    }
+  }
+  for i in 0..<capacity {
+    expectEqual(array[i], i+1)
+  }
+}
+
+suite.test("init(mutableBytes:) traps on misaligned pointer")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int>.stride * 2 + 1,
+    alignment: MemoryLayout<Int>.alignment
+  )
+  defer { unsafe buffer.deallocate() }
+  let misaligned = unsafe UnsafeMutableRawBufferPointer(
+    start: buffer.baseAddress! + 1,
+    count: MemoryLayout<Int>.stride * 2
+  )
+  _ = unsafe misaligned.initializeMemory(
+    as: UInt8.self, fromContentsOf: repeatElement(0, count: misaligned.count)
+  )
+  let raw = unsafe MutableRawSpan(_unsafeBytes: misaligned)
+
+  expectCrashLater()
+  _ = MutableSpan<Int>(mutableBytes: raw)
+}
+
+suite.test("init(mutableBytes:) traps on byteCount not multiple of stride")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int>.stride + 1,
+    alignment: MemoryLayout<Int>.alignment
+  )
+  defer { unsafe buffer.deallocate() }
+  _ = unsafe buffer.initializeMemory(
+    as: UInt8.self, fromContentsOf: repeatElement(0, count: buffer.count)
+  )
+  let raw = unsafe MutableRawSpan(_unsafeBytes: buffer)
+
+  expectCrashLater()
+  _ = MutableSpan<Int>(mutableBytes: raw)
+}
+
+suite.test("safe bytes property")
+.require(.stdlib_6_4).code {
+  let capacity = 4
+  var array = ContiguousArray(0..<capacity)
+  let first = {
+    let bytes = $0.bytes
+    expectEqual(bytes.byteCount, capacity * MemoryLayout<Int>.stride)
+    return bytes.load(fromByteOffset: 0, as: Int.self)
+  }(array.mutableSpan)
+
+  expectEqual(first, array[0])
+}
+
+suite.test("safe mutableBytes property")
+.require(.stdlib_6_4).code {
+  let capacity = 4
+  var array = ContiguousArray(0..<capacity)
+  expectEqual(array[0], 0)
+
+  _ = { (span: consuming MutableSpan) in
+    var bytes = span.mutableBytes
+    expectEqual(bytes.byteCount, capacity * MemoryLayout<Int>.stride)
+    bytes.storeBytes(of: 42, toByteOffset: 0, as: Int.self)
+  }(array.mutableSpan)
+  expectEqual(array[0], 42)
 }

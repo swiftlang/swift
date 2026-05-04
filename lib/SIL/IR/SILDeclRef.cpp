@@ -19,6 +19,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILLinkage.h"
@@ -1211,14 +1212,18 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  // If the declaration is marked as never being emitted into the client, it
-  // has a unique definition.
-  if (decl->isNeverEmittedIntoClient())
-    return false;
+  // Explicit attributes to control whether the implementation can be
+  // duplicated.
+  if (auto explicitModel = decl->getExplicitCodeGenerationModel()) {
+    switch (*explicitModel) {
+    case CodeGenerationModel::Inlinable:
+    case CodeGenerationModel::Implementation:
+      return true;
 
-  /// Always-emit-into-client means that we have a non-unique definition.
-  if (decl->isAlwaysEmittedIntoClient())
-    return true;
+    case CodeGenerationModel::Interface:
+      return false;
+    }
+  }
 
   // If the declaration is marked in a manner that indicates that other
   // systems will expect it to have a symbol, then it has a unique definition.
@@ -1247,7 +1252,7 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
 
   /// With deferred code generation, declarations are emitted as late as
   /// possible, so they must have non-unique definitions.
-  if (module->deferredCodeGen())
+  if (module->codeGenerationModel() == CodeGenerationModel::Implementation)
     return true;
 
   // If the declaration is not from the main module, treat its definition as

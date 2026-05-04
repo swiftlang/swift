@@ -14,6 +14,7 @@
 
 import Dispatch
 import StdlibUnittest
+@_spi(ExperimentalScheduling) import _Concurrency
 
 @available(SwiftStdlib 6.3, *)
 actor MyActor {

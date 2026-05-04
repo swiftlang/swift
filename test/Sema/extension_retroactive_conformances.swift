@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -swift-version 5 -DLIBRARY %s -emit-module -module-name Library -o %t/Library.swiftmodule
-// RUN: %target-typecheck-verify-swift -swift-version 5 -I %t
+// RUN: %target-typecheck-verify-swift -swift-version 5 -I %t -verify-additional-file Library.SampleComposition3 -verify-additional-file Library.SampleComposition4
 
 #if LIBRARY
 // Define a couple protocols with no requirements that're easy to conform to
@@ -8,6 +8,7 @@ public protocol SampleProtocol1 {}
 public protocol SampleProtocol2 {}
 public protocol SampleProtocol1a: SampleProtocol1 {}
 public protocol SampleProtocol1b: SampleProtocol1 {}
+public protocol SampleProtocol1aa: SampleProtocol1a {}
 
 public protocol SampleProtocol3<A> {
   associatedtype A
@@ -38,6 +39,66 @@ public struct GenericSample1<T> {}
 public struct Sample9 {}
 public struct Sample9a {}
 public struct Sample9b {}
+
+public struct SampleComposition1 {}
+public struct SampleComposition2 {}
+public struct SampleComposition3 {}
+public struct SampleComposition4 {}
+public struct SampleParameterized1 {}
+public struct SampleParameterized2 {}
+public struct SampleTransitive1 {}
+public struct SampleUnavailable1 {}
+public struct SampleUnavailable2 {}
+public struct SampleUnavailable3 {}
+public struct SampleUnavailable4 {}
+public struct SampleComposition5 {}
+
+@available(*, unavailable)
+extension SampleComposition1: SampleProtocol1 & SampleProtocol2 {}
+
+@available(*, unavailable)
+extension SampleComposition2: SampleProtocol1 & SampleProtocol2 {}
+
+@available(*, unavailable)
+extension SampleComposition3: SampleProtocol1a & SampleProtocol1b {}
+
+@available(*, unavailable)
+extension SampleComposition4: SampleProtocol1 & SampleProtocol2 {}
+
+@available(*, unavailable)
+extension SampleParameterized1: SampleProtocol3<Int> {}
+
+@available(*, unavailable)
+extension SampleParameterized2: SampleProtocol3<Int> & SampleProtocol1 {}
+
+@available(*, unavailable)
+extension SampleTransitive1: SampleProtocol1aa {}
+
+@available(*, unavailable)
+extension SampleUnavailable1: SampleProtocol1 {}
+
+@available(*, unavailable)
+extension SampleUnavailable2: SampleProtocol1 {}
+
+@available(*, unavailable)
+extension SampleUnavailable2: SampleProtocol2 {}
+
+@available(*, unavailable)
+extension SampleUnavailable3: SampleProtocol1 {}
+
+@available(*, unavailable)
+extension SampleUnavailable3: SampleProtocol2 {}
+
+@available(*, unavailable)
+extension SampleUnavailable4: SampleProtocol1 {}
+
+@available(*, unavailable)
+extension SampleComposition5: SampleProtocol1 & SampleProtocol2 {}
+
+@_semantics("fast_cast")
+public protocol FastCast {}
+
+public class C {}
 
 #else
 
@@ -149,5 +210,57 @@ extension Sample9a: @retroactive SampleProtocol3<Int> {}
 extension Sample9b: Library.SampleProtocol3<Int> {}
 // expected-warning@-1 {{extension declares a conformance of imported type 'Sample9b' to imported protocol 'SampleProtocol3'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
 // expected-note@-2 {{add '@retroactive' to silence this warning}}
+
+// Unavailable protocol composition conformances should not suggest @retroactive.
+extension SampleComposition1: SampleProtocol1 {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'SampleComposition1' to imported protocol 'SampleProtocol1'; the owners of 'Library' have marked this conformance as unavailable}}
+
+extension SampleComposition2: SampleProtocol1 & SampleProtocol2 {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'SampleComposition2' to imported protocols 'SampleProtocol1', 'SampleProtocol2'; the owners of 'Library' have marked these conformances as unavailable}}
+
+// SampleProtocol1a & SampleProtocol1b are unavailable via composition, including inherited SampleProtocol1.
+// TODO: SampleComposition3 and 4 are arguably too noisy, look into how we could make this more clear and concise.
+extension SampleComposition3: SampleProtocol1a {} // expected-error {{conformance of 'SampleComposition3' to 'SampleProtocol1' is unavailable}}
+// expected-note@Library.SampleComposition3:2 {{conformance of 'SampleComposition3' to 'SampleProtocol1' has been explicitly marked unavailable here}}
+// expected-warning@-2 {{extension declares a conformance of imported type 'SampleComposition3' to imported protocol 'SampleProtocol1a'; the owners of 'Library' have marked this conformance as unavailable}}
+
+// SampleProtocol1 and SampleProtocol2 are unavailable. SampleProtocol1a is not, so it gets the retroactive warning.
+extension SampleComposition4: SampleProtocol2 & SampleProtocol1a {} // expected-error {{conformance of 'SampleComposition4' to 'SampleProtocol1' is unavailable}}
+// expected-note@Library.SampleComposition4:2 {{conformance of 'SampleComposition4' to 'SampleProtocol1' has been explicitly marked unavailable here}}
+// expected-warning@-2 {{extension declares a conformance of imported type 'SampleComposition4' to imported protocol 'SampleProtocol2'; the owners of 'Library' have marked this conformance as unavailable}}
+// expected-warning@-3 {{extension declares a conformance of imported type 'SampleComposition4' to imported protocol 'SampleProtocol1a'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
+// expected-note@-4 {{add '@retroactive' to silence this warning}} {{1-1=extension SampleComposition4: @retroactive SampleProtocol1a {\}\n}}
+
+// Unavailable parameterized protocol conformances should also not suggest @retroactive.
+extension SampleParameterized1: SampleProtocol3<Int> {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'SampleParameterized1' to imported protocol 'SampleProtocol3'; the owners of 'Library' have marked this conformance as unavailable}}
+
+// Parameterized protocols in unavailable compositions should also be handled.
+extension SampleParameterized2: SampleProtocol3<Int> & SampleProtocol1 {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'SampleParameterized2' to imported protocols 'SampleProtocol3', 'SampleProtocol1'; the owners of 'Library' have marked these conformances as unavailable}}
+
+// Transitive inherited protocols should also be recognized as unavailable.
+extension SampleTransitive1: SampleProtocol1 {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'SampleTransitive1' to imported protocol 'SampleProtocol1'; the owners of 'Library' have marked this conformance as unavailable}}
+
+// Single-protocol unavailable conformance.
+extension SampleUnavailable1: SampleProtocol1 {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'SampleUnavailable1' to imported protocol 'SampleProtocol1'; the owners of 'Library' have marked this conformance as unavailable}}
+
+// Multiple separate unavailable extensions on the same type, conformed via composition.
+extension SampleUnavailable2: SampleProtocol1 & SampleProtocol2 {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'SampleUnavailable2' to imported protocols 'SampleProtocol1', 'SampleProtocol2'; the owners of 'Library' have marked these conformances as unavailable}}
+
+// Comma-separated conformance to unavailable protocols.
+extension SampleUnavailable3: SampleProtocol1, SampleProtocol2 {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'SampleUnavailable3' to imported protocols 'SampleProtocol1', 'SampleProtocol2'; the owners of 'Library' have marked these conformances as unavailable}}
+
+// TODO: Should @retroactive be able to suppress the warning when we know the protocol is explicitly unavailable?
+extension SampleUnavailable4: @retroactive SampleProtocol1 {}
+
+// @retroactive on a composition suppresses the unavailable warning for all the protocols in the composition.
+extension SampleComposition5: @retroactive SampleProtocol1 & SampleProtocol2 {}
+
+extension C: FastCast {} // expected-error {{cannot add retroactive conformance for a fast-cast protocol 'FastCast'}}
 
 #endif

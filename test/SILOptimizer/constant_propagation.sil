@@ -1247,7 +1247,8 @@ class AnObject {}
 // CHECK:  alloc_stack $AnObject
 // CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
 // CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
-// CHECK:  unreachable
+// CHECK:  unconditional_checked_cast
+// CHECK:  } // end sil function 'replace_unconditional_check_cast_failure'
 
 sil @replace_unconditional_check_cast_failure : $@convention(thin) (Builtin.Int1, @guaranteed AnObject) -> (@out Value) {
 bb0(%2 : $*Value, %0 : $Builtin.Int1, %1 : $AnObject):

@@ -12,8 +12,8 @@ var _i: Int = 0
 
 // CHECK:      #if compiler(>=5.3) && $CoroutineAccessors
 // CHECK-NEXT: public var i: Swift::Int {
-// CHECK-NEXT:   read
-// CHECK-NEXT:   modify
+// CHECK-NEXT:   yielding borrow
+// CHECK-NEXT:   yielding mutate
 // CHECK-NEXT: }
 // CHECK-NEXT: #else
 // CHECK-NEXT: public var i: Swift::Int {

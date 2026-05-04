@@ -21,7 +21,7 @@
 /// Test @_spi: Should pass by adding @_spi
 // RUN: %target-swift-frontend -module-name Lib2 %t/FileLib2.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-path %t/Lib2.swiftmodule
 // RUN: test -f %t/Lib2.swiftmodule
-// RUN: llvm-bcanalyzer -dump %t/Lib2.swiftmodule > %t/Lib2.dump.txt
+// RUN: %llvm-bcanalyzer -dump %t/Lib2.swiftmodule > %t/Lib2.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK-REAL-NAME %s < %t/Lib2.dump.txt
 // CHECK-REAL-NAME-NOT: XLogging
 // CHECK-REAL-NAME: AppleLogging
@@ -39,7 +39,7 @@
 // RUN: test -f %t/AppleLoggingEnablePrivate.swiftmodule
 
 // RUN: %target-swift-frontend -module-name Lib4 %t/FileLib4.swift -module-alias XLogging=AppleLoggingEnablePrivate -I %t -emit-module -emit-module-path %t/Lib4.swiftmodule
-// RUN: llvm-bcanalyzer -dump %t/Lib4.swiftmodule > %t/Lib4.dump.txt
+// RUN: %llvm-bcanalyzer -dump %t/Lib4.swiftmodule > %t/Lib4.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK-REAL-NAME4 %s < %t/Lib4.dump.txt
 // CHECK-REAL-NAME4-NOT: XLogging
 // CHECK-REAL-NAME4: AppleLoggingEnablePrivate
@@ -51,7 +51,7 @@
 // RUN: test -f %t/AppleLoggingEnableTesting.swiftmodule
 
 // RUN: %target-swift-frontend -module-name Lib5 %t/FileLib5.swift -module-alias XLogging=AppleLoggingEnableTesting -I %t -emit-module -emit-module-path %t/Lib5.swiftmodule
-// RUN: llvm-bcanalyzer -dump %t/Lib5.swiftmodule > %t/Lib5.dump.txt
+// RUN: %llvm-bcanalyzer -dump %t/Lib5.swiftmodule > %t/Lib5.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK-REAL-NAME5 %s < %t/Lib5.dump.txt
 // CHECK-REAL-NAME5-NOT: XLogging
 // CHECK-REAL-NAME5: AppleLoggingEnableTesting

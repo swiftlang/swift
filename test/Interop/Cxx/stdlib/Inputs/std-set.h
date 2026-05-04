@@ -23,4 +23,18 @@ struct NonCopyable {
 
 using SetOfNonCopyable = std::set<NonCopyable>;
 
+struct NonDefaultInitComparator {
+  int dummy;
+  NonDefaultInitComparator(int d) : dummy(d) {}
+  bool operator()(int a, int b) const { return a < b; }
+};
+
+using SetOfCIntWithCustomComparator =
+    std::set<int, NonDefaultInitComparator>;
+
+inline SetOfCIntWithCustomComparator initSetOfCIntWithCustomComparator() {
+  return SetOfCIntWithCustomComparator({1, 5, 3},
+                                       NonDefaultInitComparator(0));
+}
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SET_H

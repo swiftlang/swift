@@ -586,31 +586,6 @@ bb0(%0 : $Builtin.Int1):
   return %2 : $()
 }
 
-// rdar://121599876 (SILCombine should delete instructions in blocks dominated by cond_fail -1)
-// CHECK-LABEL: sil @cond_fail_end_scope : $@convention(thin) (@inout Builtin.Int32, Builtin.Int1) -> () {
-// CHECK: cond_fail
-// CHECK-NEXT:   unreachable
-// CHECK-LABEL: } // end sil function 'cond_fail_end_scope'
-sil @cond_fail_end_scope : $@convention(thin) (@inout Builtin.Int32, Builtin.Int1) -> () {
-entry(%0 : $*Builtin.Int32, %1 : $Builtin.Int1):
-  %true = integer_literal $Builtin.Int1, -1
-  cond_fail %true : $Builtin.Int1
-  %access = begin_access [read] [static] %0 : $*Builtin.Int32
-  cond_br %1, left, right
-
-left:
-  end_access %access : $*Builtin.Int32
-  br end
-
-right:
-  end_access %access : $*Builtin.Int32
-  br end
-
-end:
-  %99 = tuple ()
-  return %99 : $()
-}
-
 // CHECK-LABEL: sil @release_then_retain_peephole
 // CHECK: bb0
 // CHECK-NOT: strong_release
@@ -1336,7 +1311,7 @@ bb0(%0 : $*FakeOptional<B>):
   switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   debug_value %2 : $*B  // should not prevent the optimization
   %3 = load %2 : $*B
   return %3 : $B
@@ -1911,10 +1886,10 @@ bb0(%0 : $Int):
   return %8 : $()
 }
 
-//CHECK-LABEL: @remove_pointer_compare_to_zero_NE
-//CHECK-NOT: apply
-//CHECK: cond_fail
-//CHECK: unreachable
+// CHECK-LABEL: sil @remove_pointer_compare_to_zero_NE
+// CHECK:         %1 = integer_literal $Builtin.Int1, -1
+// CHECK:         cond_fail %1
+// CHECK:       } // end sil function 'remove_pointer_compare_to_zero_NE'
 sil @remove_pointer_compare_to_zero_NE : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = string_literal utf8 "ss"
@@ -2415,21 +2390,6 @@ sil public_external [serialized] @materializeForSetClosure : $@convention(thin) 
 bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContainer<T>, %3 : $@thick GenContainer<T>.Type):
   unreachable
 }
-
-// CHECK-LABEL:   sil @remove_dead_code_after_cond_fail :
-// CHECK:           [[Ref:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT:      cond_fail [[Ref]]
-// CHECK-NEXT:      unreachable
-// CHECK: } // end sil function 'remove_dead_code_after_cond_fail'
-sil @remove_dead_code_after_cond_fail : $@convention(thin) () -> (Int32) {
-bb0:
-  %0 = integer_literal $Builtin.Int32, -2
-  %1 = integer_literal $Builtin.Int1, -1
-  cond_fail %1 : $Builtin.Int1
-  %3 = struct $Int32 (%0 : $Builtin.Int32)
-  return %3 : $Int32
-}
-
 
 // CHECK-LABEL:   sil @dont_remove_code_after_cond_fail
 // CHECK:         bb0([[Cond:%.*]] : $Builtin.Int1):

@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "../../IRGen/IRGenModule.h"
+#include "../../IRGen/GenClass.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -73,7 +74,7 @@ void SILPassManager::runSwiftModuleVerification() {
 
 
 //===----------------------------------------------------------------------===//
-//                           OptimizerBridging
+//                           BridgedPassContext
 //===----------------------------------------------------------------------===//
 
 bool BridgedPassContext::tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const {
@@ -170,6 +171,14 @@ bool BridgedPassContext::canMakeStaticObjectReadOnly(BridgedType type) const {
     return IGM->canMakeStaticObjectReadOnly(type.unbridged());
   }
   return false;
+}
+
+bool BridgedPassContext::hasClassFixedMetadataLayout(BridgedDeclObj classDecl) const {
+  SILPassManager *pm = invocation->getPassManager();
+  auto *igm = pm->getIRGenModule();
+  if (!igm)
+    return false;
+  return igm->getClassMetadataStrategy(classDecl.getAs<swift::ClassDecl>()) == swift::irgen::ClassMetadataStrategy::Fixed;
 }
 
 OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
@@ -452,7 +461,7 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
       // classes (the classSubclassScope), because that may incorrectly
       // influence the linkage.
       getSpecializedLinkage(original, original->getLinkage()), specializedName.unbridged(),
-      ClonedTy,
+      ClonedTy, original->getActorIsolation(),
       preserveGenericSignature ? original->getGenericEnvironment() : nullptr,
       original->getLocation(), makeBare ? IsBare : original->isBare(), original->isTransparent(),
       original->getSerializedKind(), IsNotDynamic, IsNotDistributed,

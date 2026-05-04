@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,8 +29,8 @@ suite.test("Initialize with Span<Int>")
 
   let capacity = 4
   Array(0..<capacity).withUnsafeBufferPointer {
-    let intSpan = Span(_unsafeElements: $0)
-    var span = RawSpan(_elements: intSpan)
+    let intSpan = unsafe Span(_unsafeElements: $0)
+    var span = unsafe RawSpan(unsafeElements: intSpan)
     expectEqual(span.byteCount, capacity*MemoryLayout<Int>.stride)
     expectFalse(span.isEmpty)
 
@@ -40,8 +40,8 @@ suite.test("Initialize with Span<Int>")
 
   let a: [Int] = []
   a.withUnsafeBufferPointer {
-    let intSpan = Span(_unsafeElements: $0)
-    let span = RawSpan(_elements: intSpan)
+    let intSpan = unsafe Span(_unsafeElements: $0)
+    let span = unsafe RawSpan(unsafeElements: intSpan)
     expectTrue(span.isEmpty)
   }
 }
@@ -277,8 +277,8 @@ suite.test("withUnsafeBytes()")
   let capacity = 4
   let array = Array(0..<capacity)
   array.withUnsafeBufferPointer {
-    let intSpan = Span(_unsafeElements: $0)
-    let span = RawSpan(_elements: intSpan)
+    let intSpan = unsafe Span(_unsafeElements: $0)
+    let span = unsafe RawSpan(unsafeElements: intSpan)
     array.withUnsafeBytes {  b1 in
       span.withUnsafeBytes { b2 in
         expectTrue(b1.elementsEqual(b2))
@@ -342,4 +342,125 @@ suite.test("RawSpan Sendability")
 
   let span = RawSpan(_unsafeBytes: buffer)
   send(span)
+}
+
+suite.test("RawSpan safe loading")
+.require(.stdlib_6_4).code {
+
+  let array = ContiguousArray(repeating: UInt8.zero, count: 64)
+  let bytes = array.span.bytes
+
+  let u8 = bytes.load(fromByteOffset: 0, as: UInt8.self)
+  expectEqual(u8, 0)
+
+  let i8 = bytes.load(fromByteOffset: 0, as: Int8.self)
+  expectEqual(i8, 0)
+
+  let i64 = bytes.load(fromByteOffset: 37, as: Int64.self)
+  expectEqual(i64, 0)
+}
+
+suite.test("RawSpan safe loading bounds underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+
+  let array = ContiguousArray(repeating: UInt8.zero, count: 64)
+  let bytes = array.span.bytes
+
+  expectCrashLater()
+  _ = bytes.load(fromByteOffset: -1, as: Int64.self)
+}
+
+suite.test("RawSpan safe loading bounds overflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+
+  let array = ContiguousArray(repeating: UInt8.zero, count: 64)
+  let bytes = array.span.bytes
+
+  expectCrashLater()
+  _ = bytes.load(fromByteOffset: 59, as: Int64.self)
+}
+
+suite.test("RawSpan safe loading with ByteOrder")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { expectTrue(false); return }
+
+  var array = ContiguousArray<UInt8>(repeating: 0, count: 8)
+  array[0] = 0x01
+  array[1] = 0x02
+  let bytes = array.span.bytes
+
+  let big = bytes.load(fromByteOffset: 0, as: UInt16.self, .bigEndian)
+  expectEqual(big, 0x0102)
+
+  let little = bytes.load(fromByteOffset: 0, as: UInt16.self, .littleEndian)
+  expectEqual(little, 0x0201)
+
+  let native = bytes.load(fromByteOffset: 0, as: UInt16.self, .native)
+  let unqualified = bytes.load(fromByteOffset: 0, as: UInt16.self)
+  expectEqual(native, unqualified)
+}
+
+suite.test("RawSpan subscript")
+.require(.stdlib_6_4).code {
+  let array: ContiguousArray<UInt8> = [10, 20, 30, 40]
+  let bytes = array.span.bytes
+  expectEqual(bytes[0], 10)
+  expectEqual(bytes[1], 20)
+  expectEqual(bytes[3], 40)
+}
+
+suite.test("RawSpan subscript bounds underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+  let array: ContiguousArray<UInt8> = [10, 20, 30, 40]
+  let bytes = array.span.bytes
+
+  expectCrashLater()
+  _ = bytes[-1]
+}
+
+suite.test("RawSpan subscript bounds overflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+  let array: ContiguousArray<UInt8> = [10, 20, 30, 40]
+  let bytes = array.span.bytes
+
+  expectCrashLater()
+  _ = bytes[4]
+}
+
+suite.test("RawSpan unchecked subscript")
+.require(.stdlib_6_4).code {
+  let array: ContiguousArray<UInt8> = [10, 20, 30, 40]
+  let bytes = array.span.bytes.extracting(first: 3)
+  expectEqual(unsafe bytes[unchecked: 0], 10)
+  expectEqual(unsafe bytes[unchecked: 3], 40)
+}
+
+suite.test("RawSpan init(elements:)")
+.require(.stdlib_6_4).code {
+  let capacity = 4
+  let array = ContiguousArray(0..<capacity)
+  let bytes = array.span.bytes
+  expectEqual(bytes.byteCount, capacity * MemoryLayout<Int>.stride)
+}
+
+suite.test("Typed Span")
+.require(.stdlib_6_4).code {
+  let array = ContiguousArray(repeating: UInt64.zero, count: 64)
+  let bytes = array.span.bytes
+
+  let su8 = Span<UInt8>(viewing: bytes)
+  expectEqual(su8[0], 0)
+
+  let si8 = Span<Int8>(viewing: bytes)
+  expectEqual(si8[0], 0)
+
+  let i8 = bytes.load(fromByteOffset: 0, as: Int8.self)
+  expectEqual(i8, 0)
+
+  let i64 = bytes.load(fromByteOffset: 59, as: Int64.self)
+  expectEqual(i64, 0)
 }

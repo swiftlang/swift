@@ -1129,12 +1129,18 @@ private:
   }
 
   /// Returns true if the given function overload is safe to emit in the current
-  /// C++ lexical scope.
-  bool canPrintOverloadOfFunction(const AbstractFunctionDecl *funcDecl) const {
+  /// C++ lexical scope. If \p cxxNameOverride is non-empty, it is used as the
+  /// C++ function name instead of the default name derived from the
+  /// declaration.
+  bool
+  canPrintOverloadOfFunction(const AbstractFunctionDecl *funcDecl,
+                             StringRef cxxNameOverride = StringRef()) const {
     assert(outputLang == OutputLanguageMode::Cxx);
     auto &overloads =
         owningPrinter.getCxxDeclEmissionScope().emittedFunctionOverloads;
-    auto cxxName = cxx_translation::getNameForCxx(funcDecl);
+    auto cxxName = cxxNameOverride.empty()
+                       ? cxx_translation::getNameForCxx(funcDecl)
+                       : cxxNameOverride;
     auto paramTypes = getCxxParamTypes(funcDecl);
     auto [overloadIt, inserted] = overloads.try_emplace(
         cxxName,
@@ -1195,8 +1201,24 @@ private:
         if (!dispatchInfo)
           return;
       }
-      // FIXME: handle getters/setters ambiguities here too.
-      if (!isa<AccessorDecl>(AFD)) {
+      // Check for naming conflicts between accessors and explicit methods
+      // using the unified emittedFunctionOverloads map.
+      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+        // Subscript accessors emit as operator[] and cannot conflict with
+        // named methods, so skip the overload check for them.
+        if (!SD) {
+          std::string remappedName = remapPropertyName(accessor, resultTy);
+          if (!canPrintOverloadOfFunction(AFD, remappedName)) {
+            auto comment = ("  // skip emitting accessor method for \'" +
+                            accessor->getStorage()->getBaseIdentifier().str() +
+                            "\'. \'" + remappedName + "\' already declared.\n")
+                               .str();
+            os << comment;
+            owningPrinter.outOfLineDefinitionsOS << comment;
+            return;
+          }
+        }
+      } else {
         if (!canPrintOverloadOfFunction(AFD))
           return;
       }

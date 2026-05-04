@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature BorrowingForLoop)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -enable-experimental-feature BorrowingForLoop)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature BorrowingForLoop)
 
 // Also test this with a bridging header instead of the StdVector module.
 // RUN: %empty-directory(%t2)
@@ -11,15 +8,11 @@
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=swift-6)
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature BorrowingForLoop)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=swift-6 -enable-experimental-feature BorrowingForLoop)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature BorrowingForLoop)
 
 // FIXME: also run in C++20 mode when conformance works properly on UBI platform (rdar://109366764):
 // %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=gnu++20)
 //
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_BorrowingForLoop
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
@@ -218,53 +211,26 @@ StdVectorTestSuite.test("VectorOfImmortalRefPtr").require(.stdlib_5_8).code {
     expectEqual(v[0]?.value, 123)
 }
 
-StdVectorTestSuite.test("VectorOfInt borrowing for loop").require(.stdlib_6_4).code {
-    guard #available(SwiftStdlib 6.4, *) else { return }
-    let constArr : [Int32] = [1, 2, 3]
-    let constVec = Vector(constArr)
-    expectEqual(constVec.size(), constArr.count)
-    var counter = 0
-    for el in constVec {
-        expectEqual(el, constArr[counter])
-        counter += 1
-    }
-    expectEqual(counter, 3)
+StdVectorTestSuite.test("Subscript of VectorOfNonCopyable") {
+    var v = makeVectorOfNonCopyable()
+    expectEqual(v.size(), 3)
+    expectFalse(v.empty())
 
-    var mutArr : [Int32] = [4, 5, 6, 7]
-    var mutVec = Vector(mutArr)
-    expectEqual(mutVec.size(), mutArr.count)
-    counter = 0
-    for el in mutVec {
-        expectEqual(el, mutArr[counter])
-        counter += 1
+    func getNumber(_ x: borrowing NonCopyable) -> Int32 {
+        return x.number
     }
-    expectEqual(counter, 4)
+
+    expectEqual(getNumber(v[0]), 1)
+    expectEqual(getNumber(v[1]), 2)
+    expectEqual(getNumber(v[2]), 3)
+
+    v[0] = NonCopyable(3)
+    v[1] = NonCopyable(4)
+
+    expectEqual(getNumber(v[0]), 3)
+    expectEqual(getNumber(v[1]), 4)
+    expectEqual(getNumber(v[2]), 3)
 }
 
-#if hasFeature(BorrowingForLoop)
-
-StdVectorTestSuite.test("VectorOfNonCopyable borrowing for loop").require(.stdlib_6_4).code {
-    guard #available(SwiftStdlib 6.4, *) else { return }
-    let constVec = makeVectorOfNonCopyable()
-    let arr : [Int32] = [1, 2, 3]
-    expectEqual(constVec.size(), arr.count)
-    var counter = 0
-    for el in constVec {
-        expectEqual(el.number, arr[counter])
-        counter += 1
-    }
-    expectEqual(counter, 3)
-
-    var mutVec = makeVectorOfNonCopyable()
-    expectEqual(mutVec.size(), arr.count)
-    counter = 0
-    for el in mutVec {
-        expectEqual(el.number, arr[counter])
-        counter += 1
-    }
-    expectEqual(counter, 3)
-}
-
-#endif
 
 runAllTests()

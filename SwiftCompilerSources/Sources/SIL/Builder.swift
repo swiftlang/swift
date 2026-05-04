@@ -253,13 +253,14 @@ public struct Builder {
     return notifyNew(allocPack.getAs(AllocPackInst.self))
   }
 
-  public func createAllocPackMetadata() -> AllocPackMetadataInst {
-    let allocPackMetadata = bridged.createAllocPackMetadata()
+  public func createAllocPackMetadata(nested: Bool = true) -> AllocPackMetadataInst {
+    let allocPackMetadata = bridged.createAllocPackMetadata(nested)
     return notifyNew(allocPackMetadata.getAs(AllocPackMetadataInst.self))
   }
 
-  public func createAllocPackMetadata(_ packType: Type) -> AllocPackMetadataInst {
-    let allocPackMetadata = bridged.createAllocPackMetadata(packType.bridged)
+  public func createAllocPackMetadata(_ packType: Type,
+                                      nested: Bool = true) -> AllocPackMetadataInst {
+    let allocPackMetadata = bridged.createAllocPackMetadata(packType.bridged, nested)
     return notifyNew(allocPackMetadata.getAs(AllocPackMetadataInst.self))
   }
 
@@ -566,6 +567,19 @@ public struct Builder {
                                               caseIndex: Int) -> UncheckedTakeEnumDataAddrInst {
     let uteda = bridged.createUncheckedTakeEnumDataAddr(enumAddress.bridged, caseIndex)
     return notifyNew(uteda.getAs(UncheckedTakeEnumDataAddrInst.self))
+  }
+
+  public func createUncheckedBorrowEnumDataAddr(enumAddress: Value,
+                                              scratchAddress: Value,
+                                              caseIndex: Int) -> UncheckedBorrowEnumDataAddrInst {
+    let uteda = bridged.createUncheckedBorrowEnumDataAddr(enumAddress.bridged, scratchAddress.bridged, caseIndex)
+    return notifyNew(uteda.getAs(UncheckedBorrowEnumDataAddrInst.self))
+  }
+
+  public func createUncheckedInPlaceEnumDataAddr(enumAddress: Value,
+                                              caseIndex: Int) -> UncheckedInPlaceEnumDataAddrInst {
+    let uteda = bridged.createUncheckedInPlaceEnumDataAddr(enumAddress.bridged, caseIndex)
+    return notifyNew(uteda.getAs(UncheckedInPlaceEnumDataAddrInst.self))
   }
 
   public func createInitEnumDataAddr(enumAddress: Value, caseIndex: Int, type: Type) -> InitEnumDataAddrInst {

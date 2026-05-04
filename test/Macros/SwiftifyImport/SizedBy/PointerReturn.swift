@@ -61,7 +61,7 @@ public func nonEscaping(_ len: CInt) -> UnsafeRawBufferPointer {
 @_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
 public func lifetimeDependentCopy(_ p: RawSpan, _ len2: CInt) -> RawSpan {
     let len1 = CInt(exactly: p.byteCount)!
-    let _pPtr = unsafe p.withUnsafeBytes {
+    let _pPtr = p.withUnsafeBytes {
         unsafe $0
     }
     defer {
@@ -85,7 +85,7 @@ public func lifetimeDependentBorrow(_ p: borrowing UnsafeRawBufferPointer, _ len
 @_alwaysEmitIntoClient @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
 public func lifetimeDependentCopyMut(_ p: inout MutableRawSpan, _ len2: CInt) -> MutableRawSpan {
     let len1 = CInt(exactly: p.byteCount)!
-    let _pPtr = unsafe p.withUnsafeMutableBytes {
+    let _pPtr = p.withUnsafeMutableBytes {
         unsafe $0
     }
     defer {

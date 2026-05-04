@@ -17,6 +17,7 @@
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -116,9 +117,24 @@ public:
   void printAvailability() {
     if (!hasMacroParameter("spanAvailability"))
       return;
+
+    ValueDecl *D = getKnownSingleDecl(SwiftContext, "Span");
+    const SemanticAvailableAttributes availabilityAttrs =
+        D->getSemanticAvailableAttrs(/*includingInactive=*/true);
+    if (availabilityAttrs.empty())
+      return; // don't print availability when targeting embedded
+
     printSeparator();
     out << "spanAvailability: ";
-    printAvailabilityOfType("Span");
+    out << "\"";
+    llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
+    for (auto attr : availabilityAttrs) {
+      auto introducedOpt = attr.getIntroduced();
+      if (!introducedOpt.has_value()) continue;
+      printSeparator();
+      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
+    }
+    out << "\"";
   }
 private:
   bool hasMacroParameter(StringRef ParamName) const {
@@ -126,19 +142,6 @@ private:
       if (Param->getArgumentName().str() == ParamName)
         return true;
     return false;
-  }
-
-  void printAvailabilityOfType(StringRef Name) {
-    ValueDecl *D = getKnownSingleDecl(SwiftContext, Name);
-    out << "\"";
-    llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
-    for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
-      auto introducedOpt = attr.getIntroduced();
-      if (!introducedOpt.has_value()) continue;
-      printSeparator();
-      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
-    }
-    out << "\"";
   }
 
 protected:
@@ -579,17 +582,24 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     bool returnHasLifetimeInfo = false;
     if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(ClangDecl)) {
       DLOG("Found lifetimebound attribute on implicit 'this'\n");
-      if (!dependsOnClass(
-              MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
-        if (returnValueCanBeNonEscapable) {
-          printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
-                                           true);
-          returnHasLifetimeInfo = true;
+      if (Self.SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers)) {
+        if (!dependsOnClass(
+                MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
+          if (returnValueCanBeNonEscapable) {
+            printer.printLifetimeboundReturn(
+                SwiftifyInfoPrinter::SELF_PARAM_INDEX, true);
+            returnHasLifetimeInfo = true;
+          } else {
+            DLOG("lifetimebound ignored because return value is escapable");
+          }
         } else {
-          DLOG("lifetimebound ignored because return value is escapable");
+          DLOG("lifetimebound ignored because it depends on class with "
+               "refcount\n");
         }
       } else {
-        DLOG("lifetimebound ignored because it depends on class with refcount\n");
+        DLOG("lifetimebound not yet supported by stable feature-set - "
+             "skipping\n");
+        return false;
       }
     }
 

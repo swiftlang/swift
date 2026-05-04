@@ -1203,6 +1203,8 @@ sil-vtable ::= 'sil_vtable' identifier '{' sil-vtable-entry* '}'
 sil-vtable ::= 'sil_vtable' sil-type '{' sil-vtable-entry* '}'
 
 sil-vtable-entry ::= sil-decl-ref ':' sil-linkage? sil-function-name
+sil-vtable-entry ::= 'conformance' protocol-conformance
+sil-vtable-entry ::= 'no_conformance' protocol-decl
 ```
 
 SIL represents dynamic dispatch for class methods using the
@@ -1263,6 +1265,22 @@ overridden methods in the SIL vtable for a derived class (such as
 
 In case the SIL function is a thunk, the function name is preceded with
 the linkage of the original implementing function.
+
+In addition to method entries, a vtable can also contain conformance entries.
+Conformance entries are used for fast conformance lookup, which doesn't
+need to query the runtime's conformance lookup table.
+A conformance entry specifies if the class conforms or does not conform to a
+protocol. At runtime, a type cast instruction to an existential can directly
+load the witness table pointer from the vtable. If null, the class does not
+conform to the protocol.
+
+```
+sil_vtable $C {
+  conformance C : P   // C conforms to protocol P
+  no_conformance Q    // C does not conform to protocol Q
+  // ...
+}
+```
 
 If the vtable refers to a specialized class, a SIL type specifies the
 bound generic class type:

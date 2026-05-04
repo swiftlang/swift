@@ -201,6 +201,8 @@ if(SWIFT_ENABLE_BACKTRACING)
             message(STATUS "Using get-cpu-context.S for target ${target}")
             target_sources(${target}
               PRIVATE get-cpu-context.S)
+            target_compile_options(${target} PRIVATE
+              "$<$<COMPILE_LANGUAGE:ASM>:-target;${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}>")
           endif()
         endif()
       endforeach()

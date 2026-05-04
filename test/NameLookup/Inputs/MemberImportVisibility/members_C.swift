@@ -49,7 +49,23 @@ open class DerivedClassInC: DerivedClassInB {
   public func asDerivedClassInB() -> DerivedClassInB { return self }
 }
 
-extension ProtocolInA {
+extension ProtocolInA2 {
+  public func defaultedRequirementInC() { }
+}
+
+extension ProtocolInA3 {
+  public func defaultedRequirementInBAndC() { }
+}
+
+extension StructInA1 {
+  public struct WitnessedInC { }
+}
+
+public protocol ProtocolInC1: ProtocolInB1 { }
+
+public protocol ProtocolInC2: ProtocolInB2 { }
+
+extension ProtocolInC2 {
   public func defaultedRequirementInC() { }
 }
 

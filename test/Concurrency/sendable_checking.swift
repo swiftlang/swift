@@ -96,7 +96,7 @@ public actor MyActor: MyProto {
   func g(ns1: NS1) async {
     await nonisolatedAsyncFunc1(ns1)
     // expected-tns-ni-warning @-1 {{sending 'ns1' risks causing data races}}
-    // expected-tns-ni-note @-2 {{sending 'self'-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-tns-ni-note @-2 {{sending 'self'-isolated 'ns1' to @concurrent global function 'nonisolatedAsyncFunc1' risks causing data races between @concurrent and 'self'-isolated uses}}
     _ = await nonisolatedAsyncFunc2()
   }
 }
@@ -113,8 +113,8 @@ struct WrapClass<T: NSClass> {
 
 extension WrapClass: Sendable where T: Sendable { }
 
-// expected-warning@+2 {{conformance of 'SendableSubclass' to protocol 'Sendable' is already unavailable}}
-// expected-note@+1 {{'SendableSubclass' inherits conformance to protocol 'Sendable' from superclass here}}
+// expected-warning@+2 {{'SendableSubclass' inherits an unavailable 'Sendable' conformance; conforming here risks data races}}
+// expected-note@+1 {{'SendableSubclass' inherits unavailable conformance to protocol 'Sendable' from superclass here}}
 class SendableSubclass: NSClass, @unchecked Sendable { }
 
 @available(SwiftStdlib 5.1, *)
@@ -367,12 +367,12 @@ func callNonisolatedAsyncClosure(
 ) async {
   await g(ns)
   // expected-tns-ni-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-tns-ni-note @-2 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-tns-ni-note @-2 {{sending main actor-isolated 'ns' to @concurrent callee risks causing data races between @concurrent and main actor-isolated uses}}
 
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
   // expected-tns-ni-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-tns-ni-note @-2 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-tns-ni-note @-2 {{sending main actor-isolated 'ns' to @concurrent callee risks causing data races between @concurrent and main actor-isolated uses}}
 }
 #endif
 

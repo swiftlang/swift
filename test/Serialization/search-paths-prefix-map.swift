@@ -11,7 +11,7 @@
 // RUN:   -Xcc -I%t/includejoined -Xcc -isystem%t/systemjoined -Xcc -F%t/fwjoined \
 // RUN:   -Xcc -D -Xcc donotprefixme -prefix-serialized-debugging-options \
 // RUN:   -debug-prefix-map %t/sdk=SDKROOT -debug-prefix-map %t=SRC -debug-prefix-map donotprefixme=ERROR
-// RUN: llvm-bcanalyzer -dump %t/prefixed.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer -dump %t/prefixed.swiftmodule | %FileCheck %s
 
 import has_xref
 
@@ -46,6 +46,6 @@ numeric(42)
 // RUN:   -I %t -F %t/Frameworks \
 // RUN:   -Xcc -I -Xcc %t/include \
 // RUN:   -debug-prefix-map %t=TESTPREFIX
-// RUN: llvm-bcanalyzer -dump %t/unprefixed.swiftmodule | %FileCheck --check-prefix=UNPREFIXED %s
+// RUN: %llvm-bcanalyzer -dump %t/unprefixed.swiftmodule | %FileCheck --check-prefix=UNPREFIXED %s
 
 // UNPREFIXED-NOT: TESTPREFIX

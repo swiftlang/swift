@@ -981,15 +981,14 @@ struct ImmutableAddressUseVerifier {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
         }
         break;
-      case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
-        if (!cast<UncheckedTakeEnumDataAddrInst>(inst)->isDestructive()) {
-          for (auto result : inst->getResults()) {
-            llvm::copy(result->getUses(), std::back_inserter(worklist));
-          }
-          break;
-        }
+      case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
         return true;
-      }
+      case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+      case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
+        for (auto result : inst->getResults()) {
+          llvm::copy(result->getUses(), std::back_inserter(worklist));
+        }
+        break;
       case SILInstructionKind::TuplePackElementAddrInst: {
         if (&cast<TuplePackElementAddrInst>(inst)->getOperandRef(
               TuplePackElementAddrInst::TupleOperand) == use) {
@@ -1053,6 +1052,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   ModuleDecl *M;
   const SILFunction &F;
   CalleeCache *calleeCache;
+  DominanceInfo *Dominance;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
   InstructionIndices instIndices;
@@ -1148,7 +1148,7 @@ public:
 
 private:
   VerifierErrorEmitter ErrorEmitter;
-  std::unique_ptr<DominanceInfo> Dominance;
+  std::unique_ptr<DominanceInfo> LocalDominance = nullptr;
 
   /// TODO: LifetimeCompletion: Remove.
   std::shared_ptr<DeadEndBlocks> DEBlocks;
@@ -1420,14 +1420,13 @@ public:
   }
 
   SILVerifier(const SILFunction &F, CalleeCache *calleeCache,
-              bool SingleFunction, bool checkLinearLifetime)
-      : M(F.getModule().getSwiftModule()), F(F),
-        calleeCache(calleeCache),
-        fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
-        instIndices(const_cast<SILFunction *>(&F)),
+              DominanceInfo *dominanceInfo = nullptr,
+              bool SingleFunction = true, bool checkLinearLifetime = true)
+      : M(F.getModule().getSwiftModule()), F(F), calleeCache(calleeCache),
+        Dominance(dominanceInfo), fnConv(F.getConventionsInContext()),
+        TC(F.getModule().Types), instIndices(const_cast<SILFunction *>(&F)),
         SingleFunction(SingleFunction),
-        checkLinearLifetime(checkLinearLifetime),
-        Dominance(nullptr) {
+        checkLinearLifetime(checkLinearLifetime) {
     if (F.isExternalDeclaration())
       return;
 
@@ -1439,7 +1438,10 @@ public:
               "Basic blocks must end with a terminator instruction");
     }
 
-    Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
+    if (!Dominance) {
+      LocalDominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
+      Dominance = LocalDominance.get();
+    }
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
@@ -3963,26 +3965,44 @@ public:
     }
   }
 
-  void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
-    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
-    require(ud, "UncheckedTakeEnumDataAddrInst must take an enum operand");
+  void checkUncheckedEnumDataAddrInst(UncheckedEnumDataAddrInstBase *UI) {
+    EnumDecl *ud = UI->getEnum()->getType().getEnumOrBoundGenericEnum();
+    require(ud, "instruction must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
-            "UncheckedTakeEnumDataAddrInst case must be a case of the enum operand type");
+            "instruction case must be a case of the enum operand type");
     require(UI->getElement()->getPayloadInterfaceType(),
-            "UncheckedTakeEnumDataAddrInst case must have a data type");
-    require(UI->getOperand()->getType().isAddress(),
-            "UncheckedTakeEnumDataAddrInst must take an address operand");
+            "instruction case must have a data type");
+    require(UI->getEnum()->getType().isAddress(),
+            "instruction must take an address operand");
     require(UI->getType().isAddress(),
-            "UncheckedTakeEnumDataAddrInst must produce an address");
+            "instruction must produce an address");
 
-    SILType caseTy = UI->getOperand()->getType().getEnumElementType(
+    SILType caseTy = UI->getEnum()->getType().getEnumElementType(
         UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
     if (UI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(caseTy, UI->getType(),
-                      "UncheckedTakeEnumDataAddrInst result "
+                      "instruction result "
                       "does not match type of enum case");
     }
+  }
+
+  void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
+    checkUncheckedEnumDataAddrInst(UI);
+  }
+  void checkUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDataAddrInst *UI) {
+    checkUncheckedEnumDataAddrInst(UI);
+
+    require(UI->getEnum()->getType() == UI->getScratch()->getType(),
+            "scratch memory must be of the same type as the original enum");
+  }
+  void checkUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnumDataAddrInst *UI) {
+    checkUncheckedEnumDataAddrInst(UI);
+    
+    require(!UncheckedEnumDataAddrInstBase::isDestructive(UI->getEnumDecl(),
+                                                          UI->getFunction()),
+            "unchecked_in_place_enum_data_addr can only be used for enums whose "
+            "projection operation is nondestructive");
   }
 
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
@@ -7550,7 +7570,7 @@ static bool verificationEnabled(const SILModule &M) {
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify(CalleeCache *calleeCache,
+void SILFunction::verify(CalleeCache *calleeCache, DominanceInfo *dominanceInfo,
                          bool SingleFunction, bool isCompleteOSSA,
                          bool checkLinearLifetime) const {
   if (!verificationEnabled(getModule()))
@@ -7563,7 +7583,8 @@ void SILFunction::verify(CalleeCache *calleeCache,
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier verifier(*this, calleeCache, SingleFunction, checkLinearLifetime);
+  SILVerifier verifier(*this, calleeCache, dominanceInfo, SingleFunction,
+                       checkLinearLifetime);
   verifier.verify(isCompleteOSSA);
 }
 
@@ -7572,8 +7593,10 @@ void SILFunction::verifyCriticalEdges() const {
     return;
 
   SILVerifier(*this, /*calleeCache=*/nullptr,
-                     /*SingleFunction=*/true,
-                     /*checkLinearLifetime=*/ false).verifyBranches(this);
+              /*dominanceInfo=*/nullptr,
+              /*SingleFunction=*/true,
+              /*checkLinearLifetime=*/false)
+      .verifyBranches(this);
 }
 
 /// Validate that all SILUndef in \p f have f as a parent.
@@ -7721,8 +7744,9 @@ void SILVTable::verify(const SILModule &M) const {
       // function must be compatible with being used as the requirement
       // type.
       SILVerifier(*entry.getImplementation(), /*calleeCache=*/nullptr,
-                                              /*SingleFunction=*/true,
-                                              /*checkLinearLifetime=*/ false)
+                  /*dominanceInfo=*/nullptr,
+                  /*SingleFunction=*/true,
+                  /*checkLinearLifetime=*/false)
           .requireABICompatibleFunctionTypes(
               entry.getImplementation()->getLoweredFunctionType(),
               baseInfo.getSILType().castTo<SILFunctionType>(),
@@ -7833,6 +7857,7 @@ void SILWitnessTable::verify(const SILModule &mod) const {
       }
 
       SILVerifier verifier(*witnessFunction, /*calleeCache=*/nullptr,
+                           /*dominanceInfo*/ nullptr,
                            /*SingleFunction=*/true,
                            /*checkLinearLifetime=*/false);
       SILVerifier::VerifierErrorEmitterGuard guard(&verifier, this);
@@ -7885,6 +7910,7 @@ void SILDefaultWitnessTable::verify(const SILModule &mod) const {
       }
 
       SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
+                  /*dominanceInfo=*/nullptr,
                   /*SingleFunction=*/true,
                   /*checkLinearLifetime=*/false)
           .requireABICompatibleFunctionTypes(
@@ -7945,7 +7971,8 @@ void SILModule::verify(CalleeCache *calleeCache,
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify(calleeCache, /*singleFunction*/ false, isCompleteOSSA, checkLinearLifetime);
+    f.verify(calleeCache, /*dominanceInfo=*/nullptr, /*singleFunction*/ false,
+             isCompleteOSSA, checkLinearLifetime);
   }
 
   // Check all globals.

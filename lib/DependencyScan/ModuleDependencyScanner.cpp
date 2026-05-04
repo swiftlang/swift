@@ -218,6 +218,12 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
           getClangScanningFS(globalScanningService, CAS, ScanASTContext)),
       CAS(CAS), ActionCache(ActionCache),
       diagnosticReporter(DiagnosticReporter) {
+  assert(globalScanningService.ClangScanningService->getCAS() == CAS &&
+         "Need to be the same CAS instance");
+  assert(globalScanningService.ClangScanningService->getActionCache() ==
+             ActionCache &&
+         "Need to be the same ActionCache instance");
+
   // Instantiate a worker-specific diagnostic engine and copy over
   // the scanner's diagnostic consumers (expected to be thread-safe).
   workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(ScanASTContext.SourceMgr);
@@ -534,7 +540,6 @@ ModuleDependencyScanner::create(SwiftDependencyScanningService &service,
       std::unique_ptr<ModuleDependencyScanner>(new ModuleDependencyScanner(
           service, cache, instance->getInvocation(), instance->getSILOptions(),
           instance->getASTContext(), *instance->getDependencyTracker(),
-          instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
           instance->getDiags(),
           instance->getInvocation().getFrontendOptions().ParallelDependencyScan,
           instance->getInvocation()
@@ -560,33 +565,34 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     ModuleDependenciesCache &Cache,
     const CompilerInvocation &ScanCompilerInvocation,
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
-    swift::DependencyTracker &DependencyTracker,
-    std::shared_ptr<llvm::cas::ObjectStore> CAS,
-    std::shared_ptr<llvm::cas::ActionCache> ActionCache,
-    DiagnosticEngine &Diagnostics, bool ParallelScan,
-    bool EmitScanRemarks)
+    swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics,
+    bool ParallelScan, bool EmitScanRemarks)
     : ScanCompilerInvocation(ScanCompilerInvocation),
       ScanASTContext(ScanASTContext),
       ScanDiagnosticReporter(Diagnostics, EmitScanRemarks),
       ModuleOutputPath(ScanCompilerInvocation.getFrontendOptions()
-                       .ExplicitModulesOutputPath),
+                           .ExplicitModulesOutputPath),
       SDKModuleOutputPath(ScanCompilerInvocation.getFrontendOptions()
-                          .ExplicitSDKModulesOutputPath),
+                              .ExplicitSDKModulesOutputPath),
       DependencyCache(Cache),
       NumThreads(ParallelScan
                      ? llvm::hardware_concurrency().compute_thread_count()
                      : 1),
-      ScanningThreadPool(llvm::hardware_concurrency(NumThreads)), CAS(CAS),
-      ActionCache(ActionCache) {
+      ScanningThreadPool(llvm::hardware_concurrency(NumThreads)),
+      CAS(ScanningService.ClangScanningService->getCAS()),
+      ActionCache(ScanningService.ClangScanningService->getActionCache()) {
   // Setup prefix mapping.
   auto &ScannerPrefixMapper =
       ScanCompilerInvocation.getSearchPathOptions().ScannerPrefixMapper;
   if (!ScannerPrefixMapper.empty()) {
     PrefixMapper = std::make_unique<llvm::PrefixMapper>();
+    ReversePrefixMapping = std::make_unique<llvm::PrefixMapper>();
     SmallVector<llvm::MappedPrefix, 4> Prefixes;
     llvm::MappedPrefix::transformPairs(ScannerPrefixMapper, Prefixes);
     PrefixMapper->addRange(Prefixes);
     PrefixMapper->sort();
+    ReversePrefixMapping->addInverseRange(Prefixes);
+    ReversePrefixMapping->sort();
   }
 
   if (CAS)
@@ -1880,40 +1886,57 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
   llvm::SmallString<256> chainedHeaderBuffer;
   llvm::raw_svector_ostream outOS(chainedHeaderBuffer);
 
-  // If prefix mapping is used, don't try to import header since that will add
-  // a path-relative component into dependency scanning and defeat the purpose
-  // of prefix mapping. Additionally, if everything is prefix mapped, the
-  // embedded header path is also prefix mapped, thus it can't be found anyway.
   auto FS = ScanASTContext.SourceMgr.getFileSystem();
 
+  llvm::StringSet<> SeenBridgingHeader;
+
+  // Chaining bridging header together. If the header can be found in file
+  // system, chain the header by include the file directly. Otherwise, directly
+  // importing the preprocessed file content. If prefix mapping is used,
+  // including the prefix mapped path because clang dependency scanner knows how
+  // to remap the path to look for the actual file.
   auto chainBridgingHeader = [&](StringRef moduleName, StringRef headerPath,
                                  StringRef binaryModulePath) -> llvm::Error {
-    auto remapped = remapPath(headerPath);
-    outOS << "#if __has_include(\"" << remapped << "\")\n";
-    outOS << "#import \"" << remapped << "\"\n";
-    outOS << "#else\n";
+    // Ideally, the check can be done in dependency scanner via `__has_include`
+    // but that will return error if the path returns permission error. Since
+    // this is a hard-coded path from upstream binary module, thus user can't
+    // workaround it. Do the check when generating the header using a reverse
+    // prefix mapping.
+    std::string lookupPath = ReversePrefixMapping
+                                 ? ReversePrefixMapping->mapToString(headerPath)
+                                 : headerPath.str();
 
-    if (binaryModulePath.empty()) {
-      outOS << "#error failed to find bridging header for module " << moduleName
-            << "\n";
-    } else {
-      // Extract the embedded bridging header
-      auto moduleBuf = FS->getBufferForFile(binaryModulePath);
-      if (!moduleBuf)
-        return llvm::errorCodeToError(moduleBuf.getError());
+    // Check to see if the bridging header has been included before. This is a
+    // workaround for legacy code that uses the same bridging header (without
+    // header guard) for multiple modules and they are depending on each other.
+    if (!SeenBridgingHeader.insert(lookupPath).second)
+      return llvm::Error::success();
 
-      auto content = extractEmbeddedBridgingHeaderContent(
-          std::move(*moduleBuf), /*headerPath=*/"", ScanASTContext);
-      if (!content)
-        return llvm::createStringError("can't load embedded header from " +
-                                       binaryModulePath);
-
-      outOS << "# 1 \"<module-" << moduleName
-            << "-embedded-bridging-header>\" 1\n";
-      outOS << content->getBuffer() << "\n";
+    // Use openFileForRead to check if file can be open (with permission).
+    if (FS->openFileForRead(lookupPath)) {
+      outOS << "#include \"" << remapPath(headerPath) << "\"\n";
+      return llvm::Error::success();
     }
 
-    outOS << "#endif\n";
+    if (binaryModulePath.empty())
+      return llvm::createStringError(
+          "No fallback binary module for bridging header in module " +
+          moduleName);
+
+    // Extract the embedded bridging header
+    auto moduleBuf = FS->getBufferForFile(binaryModulePath);
+    if (!moduleBuf)
+      return llvm::errorCodeToError(moduleBuf.getError());
+
+    auto content = extractEmbeddedBridgingHeaderContent(
+        std::move(*moduleBuf), /*headerPath=*/"", ScanASTContext);
+    if (!content)
+      return llvm::createStringError("can't load embedded header from " +
+                                     binaryModulePath);
+
+    outOS << "# 1 \"<module-" << moduleName
+          << "-embedded-bridging-header>\" 1\n";
+    outOS << content->getBuffer() << "\n";
 
     return llvm::Error::success();
   };
@@ -2195,6 +2218,19 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   if (!SDKPath.empty()) {
     swiftArgs.push_back("-sdk");
     swiftArgs.push_back(SDKPath.str());
+  }
+
+  // Pass the -target flag so the Swift frontend uses the correct target
+  // triple for the -direct-clang-cc1-module-build action.
+  swiftArgs.push_back("-target");
+  swiftArgs.push_back(ScanASTContext.LangOpts.Target.str());
+
+  // If the scanner was invoked with -clang-target, forward it so the
+  // frontend can distinguish the Clang target from the Swift target
+  // (e.g. zippered Mac Catalyst builds).
+  if (ScanASTContext.LangOpts.ClangTarget.has_value()) {
+    swiftArgs.push_back("-clang-target");
+    swiftArgs.push_back(ScanASTContext.LangOpts.ClangTarget->str());
   }
 
   // Add args reported by the scanner.

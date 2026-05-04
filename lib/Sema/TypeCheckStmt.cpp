@@ -2088,6 +2088,31 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       callee = dyn_cast<AbstractFunctionDecl>(
                  dynMemberRef->getMember().getDecl());
     
+    // If the callee is an unstructured Task factory, warn if the operation
+    // closure can throw a non-Never error warn about discarding the error.
+    if (callee && !call->isImplicit() && callee->isUnstructuredTaskFactory()) {
+      for (auto arg : *call->getArgs()) {
+        auto argTy = arg.getExpr()->getType();
+        if (!argTy)
+          continue;
+        auto *fnTy = argTy->getAs<AnyFunctionType>();
+        if (!fnTy || !fnTy->isThrowing())
+          continue;
+
+        // throws(Never) is fine to discard, don't warn. Bare `throws` has
+        // a null thrown-error type and always warns.
+        auto thrownError = fnTy->getThrownError();
+        if (thrownError && thrownError->isUninhabited())
+          continue;
+
+        DE.diagnose(fn->getLoc(),
+                    diag::expression_unused_throwing_unstructured_task, callee);
+        DE.diagnose(fn->getLoc(),
+                    diag::expression_unused_throwing_unstructured_task_silence);
+        return;
+      }
+    }
+
     // If the callee explicitly allows its result to be ignored, then don't
     // complain.
     if (callee && callee->getAttrs().getAttribute<DiscardableResultAttr>())
@@ -3445,16 +3470,7 @@ bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
     return false;
   }
 
-  // Always try to use BorrowingSequence for sequences that conform to
-  // CxxBorrowingSequence when it is available.
-  if (auto cxxBorrowingSequence =
-          ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence)) {
-    if (auto conf = lookupConformance(seqTy, cxxBorrowingSequence)) {
-      return !conf.getAvailabilityConstraint(dc, loc);
-    }
-  }
-
-  // Else, always prefer conformance to Sequence over BorrowingSequence when
+  // Always prefer conformance to Sequence over BorrowingSequence when
   // both are available.
   if (lookupConformance(seqTy, ctx.getProtocol(KnownProtocolKind::Sequence))) {
     return false;

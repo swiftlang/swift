@@ -92,7 +92,7 @@ extension CxxSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @unsafe
   public init(_ span: Span<Element>) {
-    let p = unsafe span.withUnsafeBufferPointer {
+    let p = span.withUnsafeBufferPointer {
         unsafe $0
     }
     defer {
@@ -158,7 +158,7 @@ extension CxxMutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @unsafe
   public init(_ span: consuming MutableSpan<Element>) {
-    let p = unsafe span.withUnsafeMutableBufferPointer {
+    let p = span.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {

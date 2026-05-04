@@ -3294,7 +3294,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // Support conversion from `nonisolated(nonsending)` to a function type
   // with an isolated parameter.
   if (subKind == ConstraintKind::Subtype &&
-      func1->getIsolation().isNonIsolatedCaller() &&
+      func1->getIsolation().isNonisolatedNonsending() &&
       func2->getIsolation().isParameter()) {
     // `nonisolated(nonsending)` function gets an implicit isolation parameter
     // introduced during SILGen and thunk is going to forward an isolation from
@@ -6880,7 +6880,13 @@ bool ConstraintSystem::repairFailures(
           auto *overloadTy =
               simplifyType(overload->boundType)->castTo<FunctionType>();
           auto *argList = getArgumentList(argLoc);
-          ASSERT(argList);
+          // If the argument was synthesized by the solver, let's fail. This can
+          // happen when a parameter type is optional and (currently) inference
+          // would try both optional and non-optional bindings for the new
+          // argument which cases a mismatch in one of the conversion cases.
+          if (!argList || argList->size() <= argIdx)
+            return false;
+
           conversionsOrFixes.push_back(AllowArgumentMismatch::create(
               *this, getType(argList->getExpr(argIdx)),
               overloadTy->getParams()[paramIdx].getPlainType(), argLoc));
@@ -11607,7 +11613,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                                  alreadyDiagnosed, locator);
 
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
-      auto impact = 2;
+      auto impact = 4;
       // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
@@ -11619,7 +11625,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         // Increasing the impact for missing member in any argument position
         // which may be less likely than other potential mistakes
         if (getArgumentLocator(anchorExpr))
-          impact += 1;
+          impact += 5;
       }
 
       if (recordFix(fix, impact))

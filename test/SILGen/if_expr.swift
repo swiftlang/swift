@@ -706,3 +706,19 @@ func testNestedFallthrough2() throws -> Int {
   }
   return x
 }
+
+// MARK: In-place Init
+
+// If expression with address-only generic type writes directly to @out
+
+// CHECK-LABEL: sil hidden [ossa] @$s7if_expr27testIfExprReturnNoTemporaryyxx_xtlF : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
+// CHECK:       bb0([[RETURN:%0]] : $*T, [[X:%1]] : $*T, [[Y:%2]] : $*T):
+// CHECK-NOT:   alloc_stack $T
+// CHECK:       cond_br {{%[0-9]+}}, [[TRUEBB:bb[0-9]+]], [[FALSEBB:bb[0-9]+]]
+// CHECK:       [[TRUEBB]]:
+// CHECK:       copy_addr [[X]] to [init] [[RETURN]] : $*T
+// CHECK:       [[FALSEBB]]:
+// CHECK:       copy_addr [[Y]] to [init] [[RETURN]] : $*T
+func testIfExprReturnNoTemporary<T>(_ x: T, _ y: T) -> T {
+  if Bool.random() { x } else { y }
+}

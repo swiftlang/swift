@@ -404,11 +404,18 @@ actor MyActor {
     await transferToMainIndirect(nonIsolatedUnsafeVarObject)
     // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
+    // We used to emit a warning here since we would leave
+    // nonIsolatedUnsafeLetObject as propagated MainActor isolation, but we do
+    // not anymore.
     let x = nonIsolatedUnsafeLetObject
     await transferToMainDirect(x)
-    // expected-warning @-1 {{sending 'x' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and 'self'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+
+  func testMultipleAccessesAreIndependent() async {
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
+    print(x)
+    print(nonIsolatedUnsafeLetObject)
   }
 }
 
@@ -426,11 +433,18 @@ final actor MyFinalActor {
     await transferToMainIndirect(nonIsolatedUnsafeVarObject)
     // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
+    // We used to emit a warning here since we would leave
+    // nonIsolatedUnsafeLetObject as propagated MainActor isolation, but we do
+    // not anymore.
     let x = nonIsolatedUnsafeLetObject
     await transferToMainDirect(x)
-    // expected-warning @-1 {{sending 'x' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and 'self'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+
+  func testMultipleAccessesAreIndependent() async {
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
+    print(x)
+    print(nonIsolatedUnsafeLetObject)
   }
 }
 
@@ -565,6 +579,19 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
     // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     print(x)
   }
+
+  func testMultipleAccessesAreIndependent() async {
+    // We do not emit errors here since every time that we access
+    // nonIsolatedUnsafeLetObject in SILGen, we reaccess and load a new value
+    // from a struct_element_addr. Since the root type is Sendable, this ensures
+    // that we in a certain sense simulate a sendable value. The best way to do
+    // that is to actually represent it at the SIL value as a Sendable value,
+    // but that is a much more invasive change.
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
+    print(x)
+    print(nonIsolatedUnsafeLetObject)
+  }
 }
 
 @CustomActor class CustomActorNonIsolatedUnsafeFieldKlass {
@@ -581,14 +608,26 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
     await transferToMainIndirect(nonIsolatedUnsafeVarObject)
     // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
-    // x is treated as global actor 'CustomActor' isolated since the
-    // nonisolated(unsafe) only applies to nonIsolatedUnsafeLetObject.
+    // We used to emit a warning here just on passing 'x' since we would leave
+    // nonIsolatedUnsafeLetObject as propagated MainActor isolation, but we do
+    // not anymore.
     let x = nonIsolatedUnsafeLetObject
-    await transferToMainDirect(x)
-    // expected-warning @-1 {{sending 'x' risks causing data races}}
-    // expected-note @-2 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMainDirect(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local global actor 'CustomActor'-isolated uses}}
+    print(x) // expected-note {{access can happen concurrently}}
+  }
+
+  func testMultipleAccessesAreIndependent() async {
+    // We do not emit errors here since every time that we access
+    // nonIsolatedUnsafeLetObject in SILGen, we reaccess and load a new value
+    // from a struct_element_addr. Since the root type is Sendable, this ensures
+    // that we in a certain sense simulate a sendable value. The best way to do
+    // that is to actually represent it at the SIL value as a Sendable value,
+    // but that is a much more invasive change.
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
     print(x)
+    print(nonIsolatedUnsafeLetObject)
   }
 }
 
@@ -606,13 +645,23 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
     await transferToMainIndirect(nonIsolatedUnsafeVarObject)
     // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
-    // 'x' is treated as global actor 'CustomActor'-isolated.
     let x = nonIsolatedUnsafeLetObject
-    await transferToMainDirect(x)
-    // expected-warning @-1 {{sending 'x' risks causing data races}}
-    // expected-note @-2 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMainDirect(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local global actor 'CustomActor'-isolated uses}}
+    print(x) // expected-note {{access can happen concurrently}}
+  }
+
+  func testMultipleAccessesAreIndependent() async {
+    // We do not emit errors here since every time that we access
+    // nonIsolatedUnsafeLetObject in SILGen, we reaccess and load a new value
+    // from a struct_element_addr. Since the root type is Sendable, this ensures
+    // that we in a certain sense simulate a sendable value. The best way to do
+    // that is to actually represent it at the SIL value as a Sendable value,
+    // but that is a much more invasive change.
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
     print(x)
+    print(nonIsolatedUnsafeLetObject)
   }
 }
 
@@ -626,35 +675,36 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
 
   func test() async {
     await transferToMainDirect(nonIsolatedUnsafeLetObject)
-    // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainDirect(nonIsolatedUnsafeVarObject)
-    // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainIndirect(nonIsolatedUnsafeLetObject)
-    // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainIndirect(nonIsolatedUnsafeVarObject)
-    // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
-    // 'x' is treated as global actor 'CustomActor'-isolated.
     let x = nonIsolatedUnsafeLetObject
-    await transferToMainDirect(x)
-    // expected-warning @-1 {{sending 'x' risks causing data races}}
-    // expected-note @-2 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMainDirect(x) // expected-warning {{sending 'x' risks causing data races; this is an error in the Swift 6 language mode}}
+    // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local global actor 'CustomActor'-isolated uses}}
 
     let x2 = nonIsolatedUnsafeVarObject
     await transferToMainDirect(x2)
-    // expected-warning @-1 {{sending 'x2' risks causing data races}}
-    // expected-note @-2 {{sending global actor 'CustomActor'-isolated 'x2' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
     let x3 = nonIsolatedUnsafeVarComputedObject
-    await transferToMainDirect(x3)
-    // expected-warning @-1 {{sending 'x3' risks causing data races}}
-    // expected-note @-2 {{sending global actor 'CustomActor'-isolated 'x3' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
-    // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMainDirect(x3) // expected-warning {{sending 'x3' risks causing data races; this is an error in the Swift 6 language mode}}
+    // expected-note @-1 {{sending global actor 'CustomActor'-isolated 'x3' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
 
-    print(x)
+    print(x) // expected-note {{access can happen concurrently}}
   }
+
+  func testMultipleAccessesAreIndependent() async {
+    // We do not emit errors here since every time that we access
+    // nonIsolatedUnsafeLetObject in SILGen, we reaccess and load a new value
+    // from a struct_element_addr. Since the root type is Sendable, this ensures
+    // that we in a certain sense simulate a sendable value. The best way to do
+    // that is to actually represent it at the SIL value as a Sendable value,
+    // but that is a much more invasive change.
+    let x = nonIsolatedUnsafeLetObject
+    await transferToMainDirect(nonIsolatedUnsafeLetObject)
+    print(x)
+    print(nonIsolatedUnsafeLetObject)
+  }  
 }
 
 @CustomActor enum CustomActorNonIsolatedUnsafeComputedEnum {
@@ -845,8 +895,7 @@ func closureTests() async {
 
   func testLetOneNSVariableError() async {
     let x = NonSendableKlass()
-    sendingClosure { _ = x } // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
-    // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+    sendingClosure { _ = x } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
     sendingClosure { _ = x } // expected-note {{access can happen concurrently}}
   }
 
@@ -859,9 +908,8 @@ func closureTests() async {
   func testLetOneNSVariableSVariableError() async {
     let x = NonSendableKlass()
     let y = CustomActorInstance()
-    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
-      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
-      _ = x
+    sendingClosure {
+      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
       _ = y
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
@@ -886,10 +934,9 @@ func closureTests() async {
   func testLetTwoNSVariableError() async {
     let x = NonSendableKlass()
     let y = NonSendableKlass()
-    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
-      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
-      _ = x
-      _ = y
+    sendingClosure {
+      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -900,10 +947,9 @@ func closureTests() async {
   func testLetTwoNSVariableError2() async {
     nonisolated(unsafe) let x = NonSendableKlass()
     let y = NonSendableKlass()
-    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
-      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
-      _ = x
-      _ = y
+    sendingClosure {
+      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -928,8 +974,7 @@ func closureTests() async {
     var x = NonSendableKlass()
     x = NonSendableKlass()
 
-    sendingClosure { _ = x } // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
-    // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+    sendingClosure { _ = x } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
     sendingClosure { _ = x } // expected-note {{access can happen concurrently}}
   }
 
@@ -946,9 +991,8 @@ func closureTests() async {
     x = NonSendableKlass()
     var y = CustomActorInstance()
     y = CustomActorInstance()
-    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
-      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
-      _ = x
+    sendingClosure {
+      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
       _ = y
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
@@ -977,10 +1021,9 @@ func closureTests() async {
     x = NonSendableKlass()
     var y = NonSendableKlass()
     y = NonSendableKlass()
-    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
-      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
-      _ = x
-      _ = y
+    sendingClosure {
+      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -993,10 +1036,9 @@ func closureTests() async {
     x = NonSendableKlass()
     var y = NonSendableKlass()
     y = NonSendableKlass()
-    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
-      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
-      _ = x
-      _ = y
+    sendingClosure {
+      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -1021,12 +1063,7 @@ func closureTests() async {
 
   func testWithTaskDetached() async {
     let x1 = NonSendableKlass()
-    Task.detached { _ = x1 }
-    // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-    // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
-    // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-    // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
-
+    Task.detached { _ = x1 } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x1' which is accessed later by code in the current task}}
     Task.detached { _ = x1 } // expected-note {{access can happen concurrently}}
 
     nonisolated(unsafe) let x2 = NonSendableKlass()
@@ -1040,13 +1077,15 @@ func closureTests() async {
 
     nonisolated(unsafe) let x4a = NonSendableKlass()
     let x4b = NonSendableKlass()
-    Task.detached { _ = x4a; _ = x4b }
-    // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-    // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
-    // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-    // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+    Task.detached {
+      _ = x4a; // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x4a' which is accessed later by code in the current task}}
+      _ = x4b // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x4b' which is accessed later by code in the current task}}
+    }
 
-    Task.detached { _ = x4a; _ = x4b } // expected-note {{access can happen concurrently}}
+    Task.detached { // expected-note {{access can happen concurrently}}
+      _ = x4a
+      _ = x4b
+    }
   }
 
   // The reason why this works is that we do not infer nonisolated(unsafe)

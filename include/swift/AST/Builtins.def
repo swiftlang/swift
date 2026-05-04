@@ -545,10 +545,18 @@ BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 /// Returns the number of items in a pack.
 BUILTIN_SIL_OPERATION(PackLength, "packLength", Special)
 
-/// makeBorrow: @lifetime(borrow referent)<T: ~Copyable>(_ referent: borrowing T) -> Borrow<T>
+/// makeBorrow: @lifetime(borrow referent)<T: ~Copyable & ~Escapable>(
+///   _ referent: borrowing T) -> Borrow<T>
 ///
 /// Form a `Builtin.Borrow` referencing the argument.
 BUILTIN_SIL_OPERATION(MakeBorrow, "makeBorrow", Special)
+
+/// borrowAt: <T: ~Copyable & ~Escapable>(_ referent: Builtin.RawPointer) -> T
+///
+/// Access the value stored at `referent` as a guaranteed value.
+///
+/// Assumes natural alignment. Does not assume strict aliasing.
+BUILTIN_SIL_OPERATION(BorrowAt, "borrowAt", Special)
 
 /// dereferenceBorrow: <T: ~Copyable>(_ borrow: Borrow<T>) -> T
 ///

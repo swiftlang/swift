@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
-
-// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
+// RUN: %target-typecheck-verify-swift
 
 protocol P<Primary> {
   associatedtype Primary: ~Copyable
@@ -176,9 +174,31 @@ protocol Pushable<Element> {
 
 struct Stack<Scope: Pushable> {}
 
-func push<Val>(_ s: Stack<Val>, _ v: Val)
-  where Val.Element: ~Copyable {} // expected-error {{'Val.Element' required to be 'Copyable' but is marked with '~Copyable'}}
+func push<Scope>(_ s: Stack<Scope>)
+  where Scope.Element: ~Copyable {} // expected-error {{'Scope.Element' required to be 'Copyable' but is marked with '~Copyable'}}
+
+struct StackOfNC<Scope: Pushable> where Scope.Element: ~Copyable {}
+
+func pushOfNC<Scope, Val>(_ s: StackOfNC<Scope>, _ v: consuming Val)
+  where Val: ~Copyable, Val == Scope.Element {}
 
 protocol Stackable<Element>: Pushable {}
 
 extension Stackable where Element: ~Copyable {} // expected-error {{'Self.Element' required to be 'Copyable' but is marked with '~Copyable'}}
+
+protocol Recur<Assoc>: ~Copyable {
+    associatedtype Assoc: Recur, ~Copyable where Assoc.Assoc: ~Copyable
+}
+
+func doCopy<T>(_ t: T) {}
+
+func foo<T: Recur>(_ base: T,
+                   _ lvl1: T.Assoc,
+                   _ lvl2: T.Assoc.Assoc,  // expected-error {{parameter of noncopyable type 'T.Assoc.Assoc' must specify ownership}} // expected-note 3{{add}}
+                   _ lvl3: T.Assoc.Assoc.Assoc // expected-error {{parameter of noncopyable type 'T.Assoc.Assoc.Assoc' must specify ownership}} // expected-note 3{{add}}
+                   ) {}
+
+protocol Dog {
+    associatedtype A
+}
+protocol Hotdog: Dog where Self.A: ~Copyable {} // expected-error {{'Self.A' required to be 'Copyable' but is marked with '~Copyable'}}

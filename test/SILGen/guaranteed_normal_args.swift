@@ -170,7 +170,7 @@ struct ReabstractionThunkTest : Protocol {
 // result.
 extension FakeDictionary {
   // CHECK-LABEL: sil hidden [ossa] @$ss14FakeDictionaryV20makeSureToCopyTuplesyyF : $@convention(method) <Key, Value> (FakeDictionary<Key, Value>) -> () {
-  // CHECK:   [[INDUCTION_VAR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<(Key, Value)>, #Optional.some!enumelt
+  // CHECK:   [[INDUCTION_VAR:%.*]] = unchecked_inplace_enum_data_addr {{%.*}} : $*Optional<(Key, Value)>, #Optional.some!enumelt
   // CHECK:   [[X:%.*]] = alloc_stack [lexical] [var_decl] $(Key, Value), let, name "x"
   // CHECK:   [[X_0:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 0
   // CHECK:   [[X_1:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 1

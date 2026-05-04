@@ -5627,6 +5627,16 @@ CanSILFunctionType SILFunctionType::get(
   assert(!ext.isPseudogeneric() || genericSig ||
          coroutineKind != SILCoroutineKind::None);
 
+  // Make sure that the invariant that `nonisolated(nonsending)` function
+  // always has an implicit leading parameter is maintained.
+#ifndef NDEBUG
+  if (ext.hasNonisolatedNonsendingIsolation()) {
+    assert(llvm::any_of(params, [](const auto &param) {
+      return param.hasOption(SILParameterInfo::Flag::ImplicitLeading);
+    }));
+  }
+#endif
+
   patternSubs = patternSubs.getCanonical();
   invocationSubs = invocationSubs.getCanonical();
 

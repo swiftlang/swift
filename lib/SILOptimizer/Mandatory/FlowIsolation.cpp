@@ -462,14 +462,14 @@ public:
     //     _ = y // But not here b/c y is @CustomActor.
     //   }
     //
-    if (auto funcIsolation = rafi->getFunction()->getActorIsolation();
-        funcIsolation && funcIsolation->isActorIsolated()) {
+    auto funcIsolation = rafi->getFunction()->getActorIsolation();
+    if (funcIsolation.isActorIsolated()) {
       // If our use is Non-Sendable, then we can rely on region isolation.
       if (SILIsolationInfo::isNonSendable(i->get())) {
         if (auto iso = isolationInfoCache.getIsolationInfoAtInst(i->getUser(),
                                                                  i->get())) {
           if (iso->isActorIsolated() &&
-              iso->getActorIsolation() == *funcIsolation) {
+              iso->getActorIsolation() == funcIsolation) {
             LLVM_DEBUG(llvm::dbgs() << "isolated use that is safe b/c value is "
                                        "isolated to same as constructor: "
                                     << "Op Num. " << i->getOperandNumber()
@@ -487,7 +487,7 @@ public:
           if (auto *decl = proj.getVarDecl(svi->getOperand(0)->getType())) {
             if (auto declIsolation = swift::getActorIsolation(decl);
                 declIsolation && declIsolation.isActorIsolated() &&
-                declIsolation == *funcIsolation) {
+                declIsolation == funcIsolation) {
               LLVM_DEBUG(llvm::dbgs()
                          << "isolated use that is safe b/c value is "
                             "isolated to same as constructor. Op Num: "
@@ -740,12 +740,12 @@ void BlockInfo::diagnoseAll(FunctionInfo &info, bool forDeinit,
 
     auto *user = use->getUser();
     StringRef isolation = "nonisolated";
-    if (auto functionIsolation = user->getFunction()->getActorIsolation();
-        functionIsolation && functionIsolation->isActorIsolated()) {
+    auto functionIsolation = user->getFunction()->getActorIsolation();
+    if (functionIsolation.isActorIsolated()) {
       SmallString<64> temp;
       {
         llvm::raw_svector_ostream os(temp);
-        functionIsolation->printForDiagnostics(os);
+        functionIsolation.printForDiagnostics(os);
       }
 
       isolation =
@@ -1051,9 +1051,15 @@ void FunctionInfo::analyze(SILValue selfParam) {
         // Ignore these.
         continue;
       default:
+#if false        
         // Anything we do not understand mark as a property use to be
         // conservative.
         markPropertyUse(operand, true /*default*/);
+#else
+        // For now if we do not understand something, just ignore it to restore
+        // the previous behavior.
+        markIgnored(user);
+#endif
         continue;
       }
   }

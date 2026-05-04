@@ -1286,9 +1286,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   } else {
     diagnoseExpectLanguage();
     DiscardAttribute = true;
-    while (Tok.isNot(tok::r_paren)) {
-      consumeToken();
-    }
+    skipUntilDeclRBrace(tok::r_paren, tok::NUM_TOKENS);
   }
 
   rParenLoc = Tok.getLoc();
@@ -1301,7 +1299,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   auto AttrRange = SourceRange(Loc, rParenLoc);
 
   // Reject duplicate attributes with the same kind.
-  if (ExternAttr::find(Attributes, kind)) {
+  if (!DiscardAttribute && ExternAttr::find(Attributes, kind)) {
     diagnose(Loc, diag::duplicate_attribute, false);
     DiscardAttribute = true;
   }
@@ -5533,7 +5531,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
 
       auto kwLoc = P.consumeToken();
 
-      if (CallerIsolatedLoc.isValid()) {
+      if (NonisolatedNonsendingLoc.isValid()) {
         P.diagnose(kwLoc, diag::nonisolated_nonsending_repeated)
             .fixItRemove(SpecifierLoc);
       }
@@ -5560,7 +5558,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         continue;
       }
 
-      CallerIsolatedLoc = kwLoc;
+      NonisolatedNonsendingLoc = kwLoc;
       continue;
     }
 

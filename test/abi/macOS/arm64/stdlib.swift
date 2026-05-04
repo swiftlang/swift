@@ -1259,15 +1259,15 @@ Added: _$sSlss17BorrowingSequenceRzrlE31_customContainsEquatableElementySbSg0F0S
 // Necessary for Distributed to compute distributed remote reference object size
 Added: __ZN5swift26getResilientMetadataBoundsEPKNS_21TargetClassDescriptorINS_9InProcessEEE
 
-// Borrow
-Added: _$ss6BorrowVMa
-Added: _$ss6BorrowVMn
-Added: _$ss6BorrowVsRi_zrlE7builtinxBWvg
+// Ref
+Added: _$ss3RefVMa
+Added: _$ss3RefVMn
+Added: _$ss3RefVsRi_zrlE7builtinxBWvg
 
-// Inout
-Added: _$ss5InoutVMa
-Added: _$ss5InoutVMn
-Added: _$ss5InoutVsRi_zrlE7pointerSpyxGvg
+// MutableRef
+Added: _$ss10MutableRefVMa
+Added: _$ss10MutableRefVMn
+Added: _$ss10MutableRefVsRi_zrlE7pointerSpyxGvg
 
 // SE-0514 Hashable Conformance for Dictionary.Keys, CollectionOfOne and EmptyCollection
 Added: _$sSD4KeysV9hashValueSivpMV
@@ -1280,5 +1280,28 @@ Added: _$ss15EmptyCollectionV9hashValueSivpMV
 Added: _$ss15EmptyCollectionVyxGSHsMc
 Added: _$ss15EmptyCollectionVyxGSHsWP
 
+// SE-0525 RawSpan and safe-loading API
+Added: _$ss9ByteOrderO2eeoiySbAB_ABtFZ
+Added: _$ss9ByteOrderO4hash4intoys6HasherVz_tF
+Added: _$ss9ByteOrderO6nativeABvgZ
+Added: _$ss9ByteOrderO6nativeABvpZMV
+Added: _$ss9ByteOrderO9hashValueSivg
+Added: _$ss9ByteOrderO9hashValueSivpMV
+Added: _$ss9ByteOrderOMa
+Added: _$ss9ByteOrderOMn
+Added: _$ss9ByteOrderON
+Added: _$ss9ByteOrderOSHsMc
+Added: _$ss9ByteOrderOSHsWP
+Added: _$ss9ByteOrderOSQsMc
+Added: _$ss9ByteOrderOSQsWP
+
 // Wrapper for SWIFT_CONCURRENCY_TRACING_SUBSYSTEM environment variable
 Added: _concurrencyTracingSubsystem
+
+// UniqueBox type metadata accessor
+Added: _$ss9UniqueBoxVMa
+// UniqueBox type descriptor
+Added: _$ss9UniqueBoxVMn
+// UniqueBox.pointer getter
+Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
+

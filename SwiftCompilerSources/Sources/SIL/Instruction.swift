@@ -144,8 +144,26 @@ public class Instruction : CustomStringConvertible, Hashable {
     return bridged.mayHaveSideEffects()
   }
 
-  public final var mayAccessPointer: Bool {
-    return bridged.mayAccessPointer()
+  public final var mayAccessPointerOrGlobal: Bool {
+    guard mayReadOrWriteMemory else {
+      return false
+    }
+    switch self {
+    case is BuiltinInst:
+      // Consider all builtins that read/write memory to access pointers.
+      return true
+    case let endBorrow as EndBorrowInst:
+      switch endBorrow.borrow {
+      case let loadBorrow as LoadBorrowInst:
+        return FindPointerOrGlobalWalker.mayAccessPointerOrGlobal(loadBorrow.address)
+      default:
+        return false
+      }
+    default:
+      return operands.contains { op in
+        FindPointerOrGlobalWalker.mayAccessPointerOrGlobal(op.value)
+      }
+    }
   }
 
   /// True if arbitrary functions may be called by this instruction.
@@ -161,8 +179,13 @@ public class Instruction : CustomStringConvertible, Hashable {
     return bridged.maySynchronize()
   }
 
-  public final var mayBeDeinitBarrierNotConsideringSideEffects: Bool {
-    return bridged.mayBeDeinitBarrierNotConsideringSideEffects()
+  public final var isDeinitBarrier: Bool {
+    switch self {
+    case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst:
+      return true
+    default:
+      return mayAccessPointerOrGlobal || mayLoadWeakOrUnowned || maySynchronize
+    }
   }
 
   public final var isEndOfScopeMarker: Bool {
@@ -203,6 +226,30 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   public var bridged: BridgedInstruction {
     BridgedInstruction(SwiftObject(self))
+  }
+}
+
+/// Returns `abortWalk` if the address stems from a raw pointer or a global variable.
+/// We cannot simply use `AccessPath` for this because `AccessPath` looks through
+/// `address_to_pointer` - `pointer_to_address` pairs.
+private struct FindPointerOrGlobalWalker : AddressUseDefWalker {
+
+  static func mayAccessPointerOrGlobal(_ value: Value) -> Bool {
+    guard value.type.isAddress else {
+      return false
+    }
+    var walker = FindPointerOrGlobalWalker()
+    return walker.walkUp(address: value, path: UnusedWalkingPath()) == .abortWalk
+  }
+
+  func rootDef(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    let accessBase = AccessBase(baseAddress: address)
+    switch accessBase {
+    case .box, .stack, .class, .tail, .argument, .yield, .storeBorrow, .index:
+      return .continueWalk
+    case .global, .pointer, .unidentified:
+      return .abortWalk
+    }
   }
 }
 
@@ -297,6 +344,7 @@ public class MultipleValueInstruction : Instruction {
 }
 
 /// Instructions, which have a single operand (not including type-dependent operands).
+@_semantics("fast_cast")
 public protocol UnaryInstruction : Instruction {
   var operand: Operand { get }
 }
@@ -310,6 +358,7 @@ extension UnaryInstruction {
 //===----------------------------------------------------------------------===//
 
 /// Only one of the operands may have an address type.
+@_semantics("fast_cast")
 public protocol StoringInstruction : Instruction {
   var operands: OperandArray { get }
 }
@@ -371,6 +420,7 @@ final public class AssignInst : Instruction, StoringInstruction {
 final public class AssignOrInitInst : Instruction, StoringInstruction {}
 
 /// Instruction that copy or move from a source to destination address.
+@_semantics("fast_cast")
 public protocol SourceDestAddrInstruction : Instruction {
   var sourceOperand: Operand { get }
   var destinationOperand: Operand { get }
@@ -472,7 +522,8 @@ final public class HopToExecutorInst : Instruction, UnaryInstruction {}
 final public class FixLifetimeInst : Instruction, UnaryInstruction {}
 
 // See C++ VarDeclCarryingInst
-public protocol VarDeclInstruction {
+@_semantics("fast_cast")
+public protocol VarDeclInstruction : Instruction {
   var varDecl: VarDecl? { get }
 }
 
@@ -574,6 +625,7 @@ extension Value {
   }
 }
 
+@_semantics("fast_cast")
 public protocol DebugVariableInstruction : VarDeclInstruction {
   typealias DebugVariable = BridgedSILDebugVariable
 
@@ -587,6 +639,7 @@ public protocol DebugVariableInstruction : VarDeclInstruction {
 /// (`alloc_stack`).
 /// When we are moving code onto an unknown instruction (such as the start of a
 /// basic block), we want to ignore any meta instruction that might be there.
+@_semantics("fast_cast")
 public protocol MetaInstruction: Instruction {}
 
 final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariableInstruction, MetaInstruction {
@@ -718,6 +771,7 @@ final public class InjectEnumAddrInst : Instruction, UnaryInstruction, EnumInstr
 //                      no-value deallocation instructions
 //===----------------------------------------------------------------------===//
 
+@_semantics("fast_cast")
 public protocol Deallocation : Instruction {
   var allocatedValue: Value { get }
 }
@@ -747,6 +801,7 @@ final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, De
 //                           single-value instructions
 //===----------------------------------------------------------------------===//
 
+@_semantics("fast_cast")
 public protocol LoadInstruction: SingleValueInstruction, UnaryInstruction {}
 
 extension LoadInstruction {
@@ -872,6 +927,7 @@ class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {
   }
 }
 
+@_semantics("fast_cast")
 public protocol IndexingInstruction: SingleValueInstruction {
   var base: Value { get }
   var index: Value { get }
@@ -894,8 +950,14 @@ final public class IndexRawPointerInst : SingleValueInstruction, IndexingInstruc
 final public
 class TailAddrInst : SingleValueInstruction, IndexingInstruction {}
 
+/// An instruction that initializes an existential
+@_semantics("fast_cast")
+public protocol InitExistentialInstruction: Instruction {
+  var conformances: ConformanceArray { get }
+}
+
 final public
-class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {
+class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
   public var instance: Value { operand.value }
 
   public var conformances: ConformanceArray {
@@ -913,13 +975,17 @@ class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public
-class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
+class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitExistentialValueInst_getConformances())
+  }
+}
 
 final public
 class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
+class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
   public var conformances: ConformanceArray {
     ConformanceArray(bridged: bridged.InitExistentialAddrInst_getConformances())
   }
@@ -947,8 +1013,12 @@ final public
 class OpenExistentialBoxValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {
+class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
   public var metatype: Value { operand.value }
+
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitExistentialMetatypeInst_getConformances())
+  }
 }
 
 final public
@@ -1105,7 +1175,8 @@ class StructElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { bridged.StructElementAddrInst_fieldIndex() }
 }
 
-public protocol EnumInstruction : AnyObject {
+@_semantics("fast_cast")
+public protocol EnumInstruction : Instruction {
   var caseIndex: Int { get }
 }
 
@@ -1126,20 +1197,22 @@ final public class InitEnumDataAddrInst : SingleValueInstruction, UnaryInstructi
   public var caseIndex: Int { bridged.InitEnumDataAddrInst_caseIndex() }
 }
 
-final public class UncheckedTakeEnumDataAddrInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
-  public var `enum`: Value { operand.value }
-  public var caseIndex: Int { bridged.UncheckedTakeEnumDataAddrInst_caseIndex() }
+public class UncheckedEnumDataAddrInstBase : SingleValueInstruction, EnumInstruction {
+  public var `enum`: Value { fatalError("implemented in subclasses") }
+  public final var caseIndex: Int { bridged.UncheckedEnumDataAddrInstBase_caseIndex() }
+}
 
-  /// True, if this instruction invalidates the operand memory value.
-  /// This happens for certain enum kinds because the enum tag must be cleared before the payload may be used.
-  public var isDestructive: Bool { bridged.UncheckedTakeEnumDataAddrInst_isDestructive() }
+final public class UncheckedTakeEnumDataAddrInst : UncheckedEnumDataAddrInstBase, UnaryInstruction {
+  public override var `enum`: Value { operand.value }
+}
 
-  /// True, if this instruction may invalidate the operand memory value.
-  public var mayBeDestructive: Bool {
-    return isDestructive ||
-           // We don't know the layout of resilient enums. So be conservative and assume they are destructive.
-           self.enum.type.nominal!.isResilient(in: parentFunction)
-  }
+final public class UncheckedInPlaceEnumDataAddrInst : UncheckedEnumDataAddrInstBase, UnaryInstruction {
+  public override var `enum`: Value { operand.value }
+}
+
+final public class UncheckedBorrowEnumDataAddrInst : UncheckedEnumDataAddrInstBase {
+  public override var `enum`: Value { operands[0].value }
+  public var scratch: Value { operands[1].value }
 }
 
 final public class SelectEnumInst : SingleValueInstruction {
@@ -1267,6 +1340,7 @@ public enum MarkDependenceKind: Int32 {
   case NonEscaping = 2
 }
 
+@_semantics("fast_cast")
 public protocol MarkDependenceInstruction: Instruction {
   var dependenceKind: MarkDependenceKind { get }
 }
@@ -1344,6 +1418,7 @@ final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
 
 final public class ProjectExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
 
+@_semantics("fast_cast")
 public protocol CopyingInstruction : SingleValueInstruction, UnaryInstruction, OwnershipTransitionInstruction {}
 
 final public class CopyValueInst : SingleValueInstruction, CopyingInstruction {
@@ -1572,6 +1647,7 @@ final public class InitBlockStorageHeaderInst: SingleValueInstruction {}
 //                      single-value allocation instructions
 //===----------------------------------------------------------------------===//
 
+@_semantics("fast_cast")
 public protocol Allocation : SingleValueInstruction { }
 
 final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVariableInstruction, MetaInstruction {
@@ -1671,6 +1747,7 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 /// An instruction whose side effects extend across a scope including other instructions. These are always paired with a
 /// scope ending instruction such as `begin_access` (ending with `end_access`) and `begin_borrow` (ending with
 /// `end_borrow`).
+@_semantics("fast_cast")
 public protocol ScopedInstruction: Instruction {
   var scopeEndingOperands: LazyFilterSequence<UseList> { get }
 
@@ -1689,6 +1766,7 @@ extension Instruction {
 
 /// Single-value instructions beginning a borrow-scope which end with an `end_borrow` or a branch to a re-borrow phi.
 /// See also `BeginBorrowValue` which represents all kind of `Value`s which begin a borrow scope.
+@_semantics("fast_cast")
 public protocol BeginBorrowInstruction : SingleValueInstruction, ScopedInstruction {
 }
 
@@ -1930,6 +2008,7 @@ final public class PackLengthInst : SingleValueInstruction {
   }
 }
 
+@_semantics("fast_cast")
 public protocol AnyPackIndexInst : SingleValueInstruction {
   var indexedPackType: CanonicalType { get }
 }
@@ -1983,8 +2062,30 @@ public class TermInst : Instruction {
 final public class UnreachableInst : TermInst {
 }
 
-public protocol ReturnInstruction: TermInst {
+// Note: Constraining `ReturnInstruction` on `Instruction` rather than on `TermInst` allows fast casting
+//       from `Instruction` to `ReturnInstruction`. This has a significant impact on compile time.
+@_semantics("fast_cast")
+public protocol ReturnInstruction: Instruction {
   var returnedValue: Value { get }
+}
+
+public extension Instruction {
+  /// To be used for fast type casting to `isReturnInstruction` in time critical code.
+  /// This is a workaround for the slow runtime type casts. After toolchain builders are
+  /// upgraded to a compiler version which includes the fix for this problem
+  /// (https://github.com/swiftlang/swift/pull/88270), we don't need this anymore and
+  /// the regular `as isReturnInstruction` casts can be used instead.
+  var isReturnInstruction: Bool {
+    self is ReturnInst || self is ReturnBorrowInst
+  }
+}
+
+/// For pattern matching in switch statements.
+public struct IsReturnInstruction {}
+public let isReturnInstruction = IsReturnInstruction()
+
+public func ~= (pattern: IsReturnInstruction, value: Instruction) -> Bool {
+  return value.isReturnInstruction
 }
 
 final public class ReturnInst : TermInst, UnaryInstruction, ReturnInstruction {
@@ -2225,6 +2326,7 @@ final public class IgnoredUseInst : Instruction, UnaryInstruction {
 final public class ImplicitActorToOpaqueIsolationCastInst
   : SingleValueInstruction, UnaryInstruction {}
 
+@_semantics("fast_cast")
 public protocol MakeBorrowInstruction
   : SingleValueInstruction, UnaryInstruction {
   var referent: Value { get }

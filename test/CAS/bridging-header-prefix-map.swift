@@ -1,3 +1,4 @@
+// REQUIRES: objc_interop
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
@@ -59,7 +60,7 @@
 // RUN:   -scanner-output-dir %t/header-1 -I %t > %t/bridging-header1.h
 // RUN: %FileCheck %s --input-file=%t/bridging-header1.h --check-prefix=HEADER
 
-// HEADER: # 1 "<module-Test-embedded-bridging-header>" 1
+// HEADER: #include "/^header/Bridging.h"
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name User -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \

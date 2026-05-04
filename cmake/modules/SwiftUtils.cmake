@@ -190,13 +190,18 @@ function(swift_create_post_build_symlink target)
     set(cmake_symlink_option "${SWIFT_COPY_OR_SYMLINK}")
   endif()
 
+  set(comment_arg)
+  if(CS_COMMENT)
+    set(comment_arg COMMENT "${CS_COMMENT}")
+  endif()
+
   add_custom_command(TARGET "${target}" POST_BUILD
     COMMAND
       "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
       "${CS_SOURCE}"
       "${CS_DESTINATION}"
     WORKING_DIRECTORY "${CS_WORKING_DIRECTORY}"
-    COMMENT "${CS_COMMENT}")
+    ${comment_arg})
 endfunction()
 
 # Once swift-frontend is built, if the standalone (early) swift-driver has been built,

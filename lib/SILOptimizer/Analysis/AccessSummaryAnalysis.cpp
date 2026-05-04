@@ -507,6 +507,25 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
     if (isa<BeginAccessInst>(I) && isa<EndAccessInst>(User))
       continue;
 
+    if (auto md = MarkDependenceInstruction(User)) {
+      // The base of a mark_dependence or mark_dependence_addr] is a
+      // begin_access. That creates a dependency on any part of the base value
+      // accessed inside this access scope. If, in addition to this dependency,
+      // the begin_access only has a single projection use, then we assume that
+      // only the sub-object at that projection can be accessed with the scope.
+      //
+      // FIXME: this isn't strictly safe because the dependency could, in
+      // theory, represent an access to other parts of the base, and those
+      // accesses may be invisible to the compiler. That is never expected
+      // happen when we have a single projection use. But to be safe, the base
+      // of the mark_dependency should really be the projection address instead
+      // to ensure that no other parts of the base can be accessed. Then we can
+      // remove this special case.
+      if (md.getBase() == Use->get()) {
+        continue;
+      }
+    }
+
     // Ignore sanitizer instrumentation when looking for a single projection
     // user. This ensures that we're able to find a single projection subpath
     // even when sanitization is enabled.

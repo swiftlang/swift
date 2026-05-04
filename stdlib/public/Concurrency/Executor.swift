@@ -35,31 +35,9 @@ public protocol Executor: AnyObject, Sendable {
   @available(StdlibDeploymentTarget 5.9, *)
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-
-  #if os(WASI) || !$Embedded
-  /// `true` if this is the main executor.
-  #if !os(Windows)
-  @_weakLinked
-  #endif
-  @available(StdlibDeploymentTarget 6.3, *)
-  var isMainExecutor: Bool { get }
-  #endif // os(WASI) || !$Embedded
-
-  #if !$Embedded
-  /// Return this executable as a SchedulingExecutor, or nil if that is
-  /// unsupported.
-  ///
-  /// Executors that implement SchedulingExecutor should provide their
-  /// own copy of this method, which will allow the compiler to avoid a
-  /// potentially expensive runtime cast.
-  #if !os(Windows)
-  @_weakLinked
-  #endif
-  @available(StdlibDeploymentTarget 6.3, *)
-  var asSchedulingExecutor: (any SchedulingExecutor)? { get }
-  #endif
 }
 
+@_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.3, *)
 public protocol SchedulingExecutor: Executor {
 
@@ -148,7 +126,7 @@ extension Executor {
   @_weakLinked
   #endif
   @available(StdlibDeploymentTarget 6.3, *)
-  public var asSchedulingExecutor: (any SchedulingExecutor)? {
+  internal var asSchedulingExecutor: (any SchedulingExecutor)? {
     return self as? SchedulingExecutor
   }
   #endif
@@ -168,6 +146,7 @@ extension Executor where Self: Equatable {
 }
 
 extension Executor {
+
   #if os(WASI) || !$Embedded
   // This defaults to `false` so that existing third-party Executor
   // implementations will work as expected.
@@ -175,12 +154,19 @@ extension Executor {
   @_weakLinked
   #endif
   @available(StdlibDeploymentTarget 6.3, *)
-  public var isMainExecutor: Bool { false }
+  internal var isMainExecutor: Bool {
+    #if os(WASI) || !$Embedded
+    return self is MainExecutor
+    #else
+    return false
+    #endif
+  }
   #endif // os(WASI) || !$Embedded
 
 }
 
 // Delay support
+@_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.3, *)
 extension SchedulingExecutor {
 
@@ -884,6 +870,26 @@ extension UnownedTaskExecutor: Equatable {
     unsafe unsafeBitCast(lhs.executor, to: (Int, Int).self) == unsafeBitCast(rhs.executor, to: (Int, Int).self)
   }
 }
+
+@_unavailableInEmbedded
+@available(SwiftStdlib 6.0, *)
+extension UnownedTaskExecutor {
+  /// Hash the executor identity into the given hasher.
+  ///
+  /// This function is available independently from the `Hashable` conformance,
+  /// allowing back-deployment to older runtimes when implementing `Hashable`
+  /// in user code
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    let (ident, impl) = unsafe unsafeBitCast(self.executor, to: (Int, Int).self)
+    hasher.combine(ident)
+    hasher.combine(impl)
+  }
+}
+
+@_unavailableInEmbedded
+@available(SwiftStdlib 6.4, *)
+extension UnownedTaskExecutor: Hashable {}
 
 /// Returns either `true` or will CRASH if called from a different executor
 /// than the passed `executor`.

@@ -407,7 +407,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
 
 protected:
   enum { NumAFTExtInfoBits = 16 };
-  enum { NumSILExtInfoBits = 14 };
+  enum { NumSILExtInfoBits = 15 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -5488,6 +5488,9 @@ public:
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
+  bool hasNonisolatedNonsendingIsolation() const {
+    return getExtInfo().hasNonisolatedNonsendingIsolation();
+  }
   bool hasErasedIsolation() const { return getExtInfo().hasErasedIsolation(); }
   SILFunctionTypeIsolation getIsolation() const {
     return getExtInfo().getIsolation();

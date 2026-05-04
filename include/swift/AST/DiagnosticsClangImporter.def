@@ -282,6 +282,9 @@ ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
 ERROR(foreign_reference_types_retain_release_not_an_instance_function, none,
       "specified %select{retain|release}0 function '%1' is a static function; expected an instance function",
       (bool, StringRef))
+ERROR(foreign_reference_type_unreachable, none,
+      "foreign reference type '%0' has unreachable definition",
+      (StringRef))
 
 GROUPED_WARNING(unannotated_cxx_func_returning_frt, ForeignReferenceType, none,
         "cannot infer ownership of foreign reference value returned by %0",

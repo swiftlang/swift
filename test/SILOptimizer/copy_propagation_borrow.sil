@@ -985,7 +985,6 @@ bb0:
 // CHECK: [[INSTANCE:%.*]] = apply
 // CHECK-NEXT:  [[COPY:%[^,]+]] = copy_value [[INSTANCE]] : $HasObjectAndInt
 // CHECK-NEXT:  begin_borrow
-// CHECK-NEXT:  destructure_struct
 // CHECK-NEXT:  end_borrow
 // CHECK-NEXT:  ([[OBJECT:%[^,]+]], {{%[^,]+}}) = destructure_struct [[COPY]] : $HasObjectAndInt
 // CHECK-NEXT:  [[BORROW:%[^,]+]] = begin_borrow [[OBJECT]] : $C

@@ -163,6 +163,7 @@ extension _StringGuts {
   }
 
   @_alwaysEmitIntoClient @inline(__always)
+  @safe
   internal func withFastUTF8<R, E: Error>(
     _ f: (UnsafeBufferPointer<UInt8>) throws(E) -> R
   ) throws(E) -> R {
@@ -185,16 +186,17 @@ extension _StringGuts {
   internal func __rethrows_withFastUTF8<R>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) throws -> R {
-    return try unsafe self.withFastUTF8(f)
+    return try self.withFastUTF8(f)
   }
 #endif // !hasFeature(Embedded)
 
   @_alwaysEmitIntoClient @inline(__always)
+  @safe
   internal func withFastUTF8<R, E: Error>(
     range: Range<Int>,
     _ f: (UnsafeBufferPointer<UInt8>) throws(E) -> R
   ) throws(E) -> R {
-    return try unsafe self.withFastUTF8 { wholeUTF8 throws(E) in
+    return try self.withFastUTF8 { wholeUTF8 throws(E) in
       return try unsafe f(unsafe UnsafeBufferPointer(rebasing: wholeUTF8[range]))
     }
   }
@@ -212,7 +214,7 @@ extension _StringGuts {
     range: Range<Int>,
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) throws -> R {
-    return try unsafe self.withFastUTF8(range: range, f)
+    return try self.withFastUTF8(range: range, f)
   }
 #endif // !hasFeature(Embedded)
 
@@ -220,7 +222,7 @@ extension _StringGuts {
   internal func withFastCChar<R, E: Error>(
     _ f: (UnsafeBufferPointer<CChar>) throws(E) -> R
   ) throws(E) -> R {
-    return try unsafe self.withFastUTF8 { utf8 throws(E) in
+    return try self.withFastUTF8 { utf8 throws(E) in
       return try unsafe utf8.withMemoryRebound(to: CChar.self, f)
     }
   }
@@ -303,7 +305,7 @@ extension _StringGuts {
     _ body: (UnsafePointer<Int8>) throws(E) -> Result
   ) throws(E) -> Result {
     _internalInvariant(!_object.isFastZeroTerminated)
-    return try unsafe String(self).utf8CString.withUnsafeBufferPointer { buffer throws(E) in
+    return try String(self).utf8CString.withUnsafeBufferPointer { buffer throws(E) in
       let ptr = unsafe buffer.baseAddress._unsafelyUnwrappedUnchecked
       return try unsafe body(ptr)
     }
@@ -332,7 +334,7 @@ extension _StringGuts {
   internal func copyUTF8(into mbp: UnsafeMutableBufferPointer<UInt8>) -> Int? {
     let ptr = unsafe mbp.baseAddress._unsafelyUnwrappedUnchecked
     if _fastPath(self.isFastUTF8) {
-      return unsafe self.withFastUTF8 { utf8 in
+      return self.withFastUTF8 { utf8 in
         guard utf8.count <= mbp.count else { return nil }
 
         let utf8Start = unsafe utf8.baseAddress._unsafelyUnwrappedUnchecked

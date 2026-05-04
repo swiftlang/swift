@@ -151,3 +151,5 @@ extension Int {
     self.init(bitPattern: UInt(bitPattern: objectID))
   }
 }
+
+extension ObjectIdentifier: ConvertibleToBytes {}

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %S/Inputs/def_clang_function_types.swift -use-clang-function-types
-// RUN: llvm-bcanalyzer %t/def_clang_function_types.swiftmodule | %FileCheck -check-prefix=CHECK-BCANALYZER %s
+// RUN: %llvm-bcanalyzer %t/def_clang_function_types.swiftmodule | %FileCheck -check-prefix=CHECK-BCANALYZER %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -use-clang-function-types -experimental-print-full-convention -emit-sil -sil-debug-serialization -I %t %s -O | %FileCheck %s
 
 import def_clang_function_types

@@ -361,8 +361,8 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   }
 
   // This one returns the address of its enum payload.
-  if (auto *dai = dyn_cast<UncheckedTakeEnumDataAddrInst>(value)) {
-    auto enumVal = getConstAddrAndLoadResult(dai->getOperand());
+  if (auto *dai = dyn_cast<UncheckedEnumDataAddrInstBase>(value)) {
+    auto enumVal = getConstAddrAndLoadResult(dai->getEnum());
     if (!enumVal.isConstant())
       return enumVal;
     return createMemoryObject(value, enumVal.getEnumPayloadValue());

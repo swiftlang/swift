@@ -287,11 +287,13 @@ static const char * const GenericParamNames[] = {
   "Z"
 };
 
-static GenericTypeParamDecl*
-createGenericParam(ASTContext &ctx, const char *name, unsigned index,
-                   bool isParameterPack = false) {
+static GenericTypeParamDecl *createGenericParam(ASTContext &ctx,
+                                                const Twine &name,
+                                                unsigned index,
+                                                bool isParameterPack = false) {
+  SmallString<2> StrBuf;
   ModuleDecl *M = ctx.TheBuiltinModule;
-  Identifier ident = ctx.getIdentifier(name);
+  Identifier ident = ctx.getIdentifier(name.toStringRef(StrBuf));
 
   auto paramKind = GenericTypeParamKind::Type;
 
@@ -308,12 +310,12 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index,
 static GenericParamList *getGenericParams(ASTContext &ctx,
                                           unsigned numParameters,
                                           bool areParameterPacks = false) {
-  assert(numParameters <= std::size(GenericParamNames));
-
+  const unsigned numNamedParams = std::size(GenericParamNames);
   SmallVector<GenericTypeParamDecl *, 2> genericParams;
   for (unsigned i = 0; i != numParameters; ++i)
-    genericParams.push_back(createGenericParam(ctx, GenericParamNames[i], i,
-                                               areParameterPacks));
+    genericParams.push_back(createGenericParam(
+        ctx, i < numNamedParams ? GenericParamNames[i] : "T" + Twine(i), i,
+        areParameterPacks));
 
   auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
@@ -2453,6 +2455,17 @@ static ValueDecl *getMakeBorrow(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getBorrowAt(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+
+  auto T = makeGenericParam(0);
+
+  builder.addParameter(makeConcrete(ctx.TheRawPointerType));
+  builder.setResult(T);
+
+  return builder.build(id);
+}
+
 static ValueDecl *getDereferenceBorrow(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
 
@@ -3585,6 +3598,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::MakeBorrow:
     return getMakeBorrow(Context, Id);
+
+  case BuiltinValueKind::BorrowAt:
+    return getBorrowAt(Context, Id);
 
   case BuiltinValueKind::DereferenceBorrow:
     return getDereferenceBorrow(Context, Id);

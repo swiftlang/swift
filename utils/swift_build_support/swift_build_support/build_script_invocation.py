@@ -198,6 +198,9 @@ class BuildScriptInvocation(object):
         if args.test_paths:
             impl_args += ["--test-paths", " ".join(args.test_paths)]
 
+        if args.continue_on_test_failure:
+            impl_args += ["--continue-on-test-failure=1"]
+
         if toolchain.ninja:
             impl_args += ["--ninja-bin=%s" % toolchain.ninja]
         if args.distcc:
@@ -680,20 +683,19 @@ class BuildScriptInvocation(object):
         builder.begin_pipeline()
 
         builder.add_product(products.WASISysroot,
-                            is_enabled=self.args.build_wasmstdlib)
+                            is_enabled=self.args.build_wasistdlib)
 
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
 
         builder.add_product(products.WasmKit,
                             is_enabled=self.args.build_wasmkit)
-        builder.add_product(products.WasmStdlib,
-                            is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmThreadsStdlib,
-                            is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WASIStdlib,
+                            is_enabled=self.args.build_wasistdlib)
+        builder.add_product(products.WASIThreadsStdlib,
+                            is_enabled=self.args.build_wasistdlib)
         builder.add_product(products.WASISwiftSDK,
-                            is_enabled=self.args.build_wasmstdlib)
-
+                            is_enabled=self.args.build_wasistdlib)
         builder.add_product(products.SwiftFoundationTests,
                             is_enabled=self.args.build_foundation)
         builder.add_product(products.FoundationTests,
@@ -757,6 +759,14 @@ class BuildScriptInvocation(object):
                                         env=self.impl_env, echo=True)
             return
 
+        # Accumulates test failures when --continue-on-test-failure is set.
+        self._test_failures = []
+        self._failed_targets_file = os.path.join(
+            self.workspace.build_root, '.swift-build-failed-test-targets')
+        # Clear any stale file from a previous run.
+        if os.path.exists(self._failed_targets_file):
+            os.remove(self._failed_targets_file)
+
         # Otherwise, we compute and execute the individual actions ourselves.
         # Compute the list of hosts to operate on.
         all_host_names = [
@@ -799,6 +809,11 @@ class BuildScriptInvocation(object):
 
         # And then perform the rest of the non-core epilogue actions.
 
+        # If any test failures were deferred, report them now and exit.
+        if self._test_failures:
+            self._print_test_failure_summary()
+            raise SystemExit(f"ERROR: {len(self._test_failures)} test action(s) failed.\n")
+
         # Extract symbols...
         for host_target in all_hosts:
             self._execute_extract_symbols_action(host_target)
@@ -834,7 +849,22 @@ class BuildScriptInvocation(object):
         # Test...
         for host_target in all_hosts:
             for product_class in pipeline:
-                self._execute_test_action(host_target, product_class)
+                try:
+                    self._execute_test_action(host_target, product_class)
+                except SystemExit as e:
+                    if os.path.exists(self._failed_targets_file):
+                        with open(self._failed_targets_file) as f:
+                            subtargets = [
+                                line.strip() for line in f if line.strip()]
+                        os.remove(self._failed_targets_file)
+                    else:
+                        subtargets = []
+                    self._test_failures.append((
+                        f"Running tests for {product_class.product_name()}",
+                        subtargets))
+                    if not self.args.continue_on_test_failure:
+                        self._print_test_failure_summary()
+                        raise
 
         # Install...
         for host_target in all_hosts:
@@ -856,6 +886,13 @@ class BuildScriptInvocation(object):
             for product_class in pipeline:
                 # Execute clean, build, test, install
                 self.execute_product_build_steps(product_class, host_target)
+
+    def _print_test_failure_summary(self):
+        print("\nERROR: The following test actions failed:")
+        for label, subtargets in self._test_failures:
+            print(f"  - {label}")
+            for subtarget in subtargets:
+                print(f"    - {subtarget}")
 
     def _execute_build_action(self, host_target, product_class):
         action_name = "{}-{}-build".format(host_target.name,
@@ -920,9 +957,16 @@ class BuildScriptInvocation(object):
         if product.should_test(host_target):
             log_message = "Running tests for %s" % product_name
             print("--- {} ---".format(log_message), flush=True)
-            with log_time_in_scope(log_message):
-                product.test(host_target)
-            print("--- Finished tests for %s ---" % product_name, flush=True)
+            try:
+                with log_time_in_scope(log_message):
+                    product.test(host_target)
+                print("--- Finished tests for %s ---" % product_name,
+                      flush=True)
+            except SystemExit as e:
+                self._test_failures.append((log_message, []))
+                if not self.args.continue_on_test_failure:
+                    self._print_test_failure_summary()
+                    raise
         # Install the product if it should be installed specifically, or
         # if it should be built and `install_all` is set to True.
         # The exception is select before_build_script_impl products

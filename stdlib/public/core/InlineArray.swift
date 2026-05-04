@@ -629,3 +629,10 @@ extension InlineArray: BorrowingSequence where Element: ~Copyable {
     SpanIterator(self.span)
   }
 }
+
+@available(SwiftStdlib 6.2, *)
+extension InlineArray: ConvertibleToBytes
+  where Element: ConvertibleToBytes {}
+@available(SwiftStdlib 6.2, *)
+extension InlineArray: ConvertibleFromBytes
+  where Element: ConvertibleFromBytes {}

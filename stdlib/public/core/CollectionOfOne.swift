@@ -231,3 +231,8 @@ extension CollectionOfOne: Equatable where Element: Equatable {}
 
 @available(SwiftStdlib 6.4, *)
 extension CollectionOfOne: Hashable where Element: Hashable {}
+
+extension CollectionOfOne: ConvertibleToBytes
+  where Element: ConvertibleToBytes {}
+extension CollectionOfOne: ConvertibleFromBytes
+  where Element: ConvertibleFromBytes {}

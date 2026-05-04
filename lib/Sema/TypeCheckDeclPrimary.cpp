@@ -476,6 +476,29 @@ static void checkInheritanceClause(
       }
 
       if (canHaveSuperclass) {
+        // Check for self-referential generic superclass in Embedded Swift.
+        // A class like `class Tree: ManagedBuffer<Int, Tree>` creates a
+        // circular metadata dependency that cannot be resolved statically.
+        if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+          if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+                  classDecl, inherited.getSourceRange().Start,
+                  /*wasAlwaysEmbeddedError=*/true)) {
+            if (auto superBGT = inheritedTy->getAs<BoundGenericClassType>()) {
+              for (auto arg : superBGT->getGenericArgs()) {
+                if (auto *nominal = arg->getAnyNominal()) {
+                  if (nominal == classDecl) {
+                    diags.diagnose(
+                        inherited.getSourceRange().Start,
+                        diag::self_referential_superclass_in_embedded_swift,
+                        classDecl->getDeclaredInterfaceType(), inheritedTy)
+                      .limitBehavior(*behavior);
+                  }
+                }
+              }
+            }
+          }
+        }
+
         // Record the superclass.
         superclassTy = inheritedTy;
         superclassRange = inherited.getSourceRange();
@@ -1827,12 +1850,38 @@ static void diagnoseRetroactiveConformances(
   // We better only be conforming it to protocols declared within this module.
   llvm::SmallMapVector<ProtocolDecl *, bool, 8> protocols;
   llvm::SmallPtrSet<ProtocolDecl *, 2> protocolsWithRetroactiveAttr;
+  llvm::SmallPtrSet<ProtocolDecl *, 4> unavailableProtocols;
+
+  // Collect the protocols with unavailable extensions; we shouldn't diagnose
+  // these as needing @retroactive, since they are unavailable.
+  for (auto *otherExt : extendedNominalDecl->getExtensions()) {
+    if (otherExt == ext || !otherExt->isUnavailable())
+      continue;
+    for (const auto &inherited : otherExt->getInherited().getEntries()) {
+      auto inheritedTy = inherited.getType();
+      if (inheritedTy.isNull() || !inheritedTy->isExistentialType())
+        continue;
+
+      auto layout = inheritedTy->getExistentialLayout();
+      for (auto *proto : layout.getProtocols()) {
+        unavailableProtocols.insert(proto);
+        for (auto *inherited : proto->getAllInheritedProtocols())
+          unavailableProtocols.insert(inherited);
+      }
+    }
+  }
 
   for (auto *conformance : ext->getLocalConformances()) {
     auto *proto = conformance->getProtocol();
+    bool isRetroactive = conformance->isRetroactive();
     bool inserted = protocols.insert(std::make_pair(
-        proto, conformance->isRetroactive())).second;
+        proto, isRetroactive)).second;
     ASSERT(inserted);
+
+    if (isRetroactive && proto->isEligibleForFastCasting()) {
+      ext->diagnose(diag::retroactive_fast_cast, proto);
+      return;
+    }
 
     if (proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype)) {
       protocolsWithRetroactiveAttr.insert(proto);
@@ -1904,16 +1953,46 @@ static void diagnoseRetroactiveConformances(
   }
 
   // Remove protocols that are reachable through a @retroactive conformance.
+  // Separate unavailable protocols, and ignore unavailable Sendable since that
+  // is handled by TypeCheckProtocol.
   SmallSetVector<ProtocolDecl *, 4> externalProtocols;
+  SmallSetVector<ProtocolDecl *, 4> unavailableExternalProtocols;
   for (auto pair : protocols) {
-    if (pair.second && !protocolsWithRetroactiveAttr.count(pair.first))
+    if (!pair.second || protocolsWithRetroactiveAttr.count(pair.first))
+      continue;
+
+    if (unavailableProtocols.count(pair.first)) {
+      // TypeCheckProtocol handles sendable.
+      if (!pair.first->isSpecificProtocol(KnownProtocolKind::Sendable))
+        unavailableExternalProtocols.insert(pair.first);
+    } else {
       externalProtocols.insert(pair.first);
+    }
   }
 
   // If we didn't find any violations, we're done.
-  if (externalProtocols.empty()) {
+  if (externalProtocols.empty() && unavailableExternalProtocols.empty()) {
     return;
   }
+
+  // Diagnose unavailable non-Sendable protocols.
+  if (!unavailableExternalProtocols.empty()) {
+    llvm::SmallString<32> unavailableList;
+    {
+      llvm::raw_svector_ostream os(unavailableList);
+      llvm::interleaveComma(
+          unavailableExternalProtocols, os,
+          [&os](ProtocolDecl *proto) { os << "'" << proto->getName() << "'"; });
+    }
+    ext->diagnose(diag::extension_retroactive_conformance_unavailable,
+                  extendedNominalDecl->getName(),
+                  unavailableExternalProtocols.size() == 1,
+                  unavailableList.str(), extTypeModule->getName());
+  }
+
+  // If there are no non-unavailable retroactive conformances, we're done.
+  if (externalProtocols.empty())
+    return;
 
   // Diagnose the list of protocols we're introducing a conformance to.
 
@@ -1941,6 +2020,8 @@ static void diagnoseRetroactiveConformances(
   // declaration to silence the warning. Each one of these gets removed from the
   // externalProtocols list, and that might end up being all of them.
   for (const InheritedEntry &entry : ext->getInherited().getEntries()) {
+    // TODO: Handle compositions where all protocols could have `@retroactive `
+    // inserted. A composition won't have a nominal type.
     auto protoDecl =
         dyn_cast_or_null<ProtocolDecl>(entry.getType()->getAnyNominal());
     TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
@@ -2292,6 +2373,15 @@ public:
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
+    }
+    // Report import of an IPI module from a non-IPI module.
+    if (target && target->getLibraryLevel() == LibraryLevel::IPI &&
+        Ctx.LangOpts.LibraryLevel > LibraryLevel::IPI &&
+        !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+        ID->getAccessLevel() == AccessLevel::Public) {
+      auto importer = ID->getModuleContext();
+      Ctx.Diags.diagnose(ID, diag::error_import_of_ipi_module,
+                         target->getName(), importer->getName());
     }
 
     // Preconcurrency imports aren't strictly memory-safe when we have strict

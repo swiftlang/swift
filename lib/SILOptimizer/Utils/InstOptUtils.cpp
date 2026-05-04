@@ -141,6 +141,23 @@ bool swift::canTriviallyDeleteOSSAEndScopeInst(SILInstruction *i) {
          !opValue->getType().isMoveOnly();
 }
 
+/// Return true if \p inst is a forwarding operation that destructures an owned
+/// move-only value. Such instructions must not be deleted because they end
+/// the lifetime of their operand.
+bool swift::canDeleteDeadMoveOnlyOwnedDestructureInst(SILInstruction *inst) {
+  auto forwardingOperation = ForwardingOperation(inst);
+  if (!forwardingOperation || !forwardingOperation.isOwnedValueDestructure()) {
+    return true;
+  }
+  auto *singleForwardingOp = forwardingOperation.getSingleForwardingOperand();
+  ASSERT(singleForwardingOp);
+  if (!singleForwardingOp->get()->getType().isMoveOnly()) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
@@ -180,17 +197,15 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   if (isa<BorrowedFromInst>(inst))
     return false;
 
-  // A dead `destructure_struct` with an owned argument can appear for a non-copyable or
-  // non-escapable struct which has only trivial elements. The instruction is not trivially
-  // dead because it ends the lifetime of its operand.
-  if (isa<DestructureStructInst>(inst) &&
-      inst->getOperand(0)->getOwnershipKind() == OwnershipKind::Owned) {
+  if (!canDeleteDeadMoveOnlyOwnedDestructureInst(inst)) {
     return false;
   }
 
-  // These invalidate enums so "write" memory, but that is not an essential
+  // These invalidate enums, or use scratch space to avoid invalidating the
+  // original, so "write" memory, but that is not an essential
   // operation so we can remove these if they are trivially dead.
-  if (isa<UncheckedTakeEnumDataAddrInst>(inst))
+  if (isa<UncheckedTakeEnumDataAddrInst>(inst)
+      || isa<UncheckedBorrowEnumDataAddrInst>(inst))
     return true;
 
   // An ossa end scope instruction is trivially dead if its operand has
@@ -594,11 +609,6 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// to avoid any divergence between the check and the implementation in the
 /// future.
 ///
-/// \p usePoints are required when \p value has guaranteed ownership. It must be
-/// the last users of the returned, casted value. A usePoint cannot be a
-/// BranchInst (a phi is never the last guaranteed user). \p builder's current
-/// insertion point must dominate all \p usePoints. \p usePoints must
-/// collectively post-dominate \p builder's current insertion point.
 ///
 /// NOTE: The implementation of this function is very closely related to the
 /// rules checked by SILVerifier::requireABICompatibleFunctionTypes. It must
@@ -606,12 +616,8 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// areABICompatibleParamsOrReturns()).
 std::pair<SILValue, bool /* changedCFG */>
 swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
-                                    SILLocation loc,
-                                    SILValue value, SILType srcTy,
-                                    SILType destTy,
-                                    ArrayRef<SILInstruction *> usePoints) {
-  assert(value->getOwnershipKind() != OwnershipKind::Guaranteed ||
-         !usePoints.empty() && "guaranteed value must have use points");
+                                    SILLocation loc, SILValue value,
+                                    SILType srcTy, SILType destTy) {
 
   // No cast is required if types are the same.
   if (srcTy == destTy)
@@ -689,7 +695,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
     // Cast the unwrapped value.
     SILValue castedUnwrappedValue;
     std::tie(castedUnwrappedValue, std::ignore) = castValueToABICompatibleType(
-      builder, pm, loc, unwrappedValue, optionalSrcTy, optionalDestTy, usePoints);
+        builder, pm, loc, unwrappedValue, optionalSrcTy, optionalDestTy);
     // Wrap into optional. An owned value is forwarded through the cast and into
     // the Optional. A borrowed value will have a nested borrow for the
     // rewrapped Optional.
@@ -720,8 +726,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
         builder->createOptionalSome(loc, value, loweredOptionalSrcType);
     // Cast the wrapped value.
     return castValueToABICompatibleType(builder, pm, loc, wrappedValue,
-                                        wrappedValue->getType(), destTy,
-                                        usePoints);
+                                        wrappedValue->getType(), destTy);
   }
 
   // Handle tuple types.
@@ -734,7 +739,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
       bool neededCFGChange;
       std::tie(element, neededCFGChange) = castValueToABICompatibleType(
           builder, pm, loc, element, srcTy.getTupleElementType(idx),
-          destTy.getTupleElementType(idx), usePoints);
+          destTy.getTupleElementType(idx));
       changedCFG |= neededCFGChange;
       expectedTuple.push_back(element);
     };
@@ -2168,20 +2173,29 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
   return SILUndef::get(insertionPoint->getFunction(), ty);
 }
 
+static bool findUnreferenceableStorageInType(SILType ty, SILFunction *func) {
+  if (auto *structDecl = ty.getStructOrBoundGenericStruct()) {
+    return swift::findUnreferenceableStorage(structDecl, ty, func);
+  }
+  if (auto tupleTy = ty.getAs<TupleType>()) {
+    for (unsigned i = 0, e = tupleTy->getNumElements(); i < e; ++i) {
+      if (findUnreferenceableStorageInType(ty.getTupleElementType(i), func))
+        return true;
+    }
+  }
+  return false;
+}
+
 bool swift::findUnreferenceableStorage(StructDecl *decl, SILType structType,
                                        SILFunction *func) {
   if (decl->hasUnreferenceableStorage()) {
     return true;
   }
-  // Check if any fields have unreferenceable stoage
   for (auto *field : decl->getStoredProperties()) {
     TypeExpansionContext tec = *func;
     auto fieldTy = structType.getFieldType(field, func->getModule(), tec);
-    if (auto *fieldStructDecl = fieldTy.getStructOrBoundGenericStruct()) {
-      if (findUnreferenceableStorage(fieldStructDecl, fieldTy, func)) {
-        return true;
-      }
-    }
+    if (findUnreferenceableStorageInType(fieldTy, func))
+      return true;
   }
   return false;
 }

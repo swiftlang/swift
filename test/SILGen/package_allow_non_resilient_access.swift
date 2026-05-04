@@ -8,7 +8,7 @@
 // RUN:   -enable-library-evolution \
 // RUN:   -experimental-allow-non-resilient-access \
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule
-// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+// RUN: %llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
 // CHECK-ON: ALLOW_NON_RESILIENT_ACCESS
 
 /// By default, Client accesses decls in Utils resiliently.
@@ -28,7 +28,7 @@
 // RUN:   -enable-testing \
 // RUN:   -experimental-allow-non-resilient-access \
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule
-// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+// RUN: %llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
 // CHECK-ON: ALLOW_NON_RESILIENT_ACCESS
 
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -experimental-package-bypass-resilience | %FileCheck %s --check-prefixes=CHECK,CHECK-NONRES
@@ -45,7 +45,7 @@
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
 // RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-1
 // CHECK-DIAG-1: warning: ignoring -experimental-skip-non-exportable-decls (overridden by -allow-non-resilient-access)
-// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+// RUN: %llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
 
 /// Override -experimental-skip-non-inlinable-function-bodies-without-types with warning
 // RUN: rm -rf %t/Utils.swiftmodule
@@ -58,7 +58,7 @@
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
 // RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-2
 // CHECK-DIAG-2: warning: ignoring -experimental-skip-non-inlinable-function-bodies-without-types (overridden by -allow-non-resilient-access)
-// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+// RUN: %llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
 
 /// Override -experimental-skip-non-inlinable-function-bodies with warning
 // RUN: rm -rf %t/Utils.swiftmodule
@@ -71,7 +71,7 @@
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
 // RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-3
 // CHECK-DIAG-3: warning: ignoring -experimental-skip-non-inlinable-function-bodies (overridden by -allow-non-resilient-access)
-// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+// RUN: %llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
 
 /// Override -experimental-skip-all-function-bodies with warning
 // RUN: rm -rf %t/Utils.swiftmodule
@@ -84,7 +84,7 @@
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
 // RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-4
 // CHECK-DIAG-4: warning: ignoring -experimental-skip-all-function-bodies (overridden by -allow-non-resilient-access)
-// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+// RUN: %llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
 
 /// Override -experimental-lazy-typecheck with warning
 // RUN: rm -rf %t/Utils.swiftmodule
@@ -97,7 +97,7 @@
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
 // RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-5
 // CHECK-DIAG-5: warning: ignoring -experimental-lazy-typecheck (overridden by -allow-non-resilient-access)
-// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+// RUN: %llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
 
 /// Override -tbd-is-installapi with warning
 // RUN: rm -rf %t/Utils.swiftmodule
@@ -110,7 +110,7 @@
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
 // RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-TBD
 // CHECK-DIAG-TBD: warning: ignoring -tbd-is-installapi (overridden by -allow-non-resilient-access)
-// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+// RUN: %llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
 
 /// Build Utils interface files.
 // RUN: rm -rf %t/Utils.swiftmodule
@@ -131,7 +131,7 @@
 // RUN: %t/Utils.package.swiftinterface -o %t/Utils.swiftmodule \
 // RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-INTERFACE
 // CHECK-DIAG-INTERFACE: warning: ignoring -allow-non-resilient-access (overridden by -compile-module-from-interface)
-// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-OFF
+// RUN: %llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-OFF
 // CHECK-OFF-NOT: ALLOW_NON_RESILIENT_ACCESS
 
 /// Client can't bypass resilience when accessing decls in an interface module.

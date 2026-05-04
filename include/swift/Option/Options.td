@@ -2048,7 +2048,7 @@ def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement
 
 def const_gather_protocols_list
   : Separate<["-"], "const-gather-protocols-list">, MetaVarName<"<path>">,
-    Flags<[NewDriverOnlyOption, ArgumentIsPath]>,
+    Flags<[NewDriverOnlyOption, ArgumentIsPath, FrontendOption]>,
     HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
 
 def input_paths: Separate<["-", "--"], "input-paths">,

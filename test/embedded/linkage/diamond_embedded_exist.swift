@@ -2,10 +2,10 @@
 // RUN: split-file %S/diamond.swift %t
 
 // Test:  Main drives code generation
-// RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
-// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
-// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
-// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
+// RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o %target-embedded-posix-shim -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
@@ -15,17 +15,16 @@
 // RUN: split-file %s %t
 
 // Test:  Main drives most code generation but Root.swift references PointClass.
-// RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
-// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
-// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
-// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library -enable-experimental-feature EmbeddedExistentials
+// RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o %target-embedded-posix-shim -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedExistentials
 // REQUIRES: swift_feature_DeferredCodeGen
 
 //--- Root.swift

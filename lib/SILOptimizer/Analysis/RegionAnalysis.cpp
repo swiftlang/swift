@@ -293,7 +293,7 @@ struct AddressBaseComputingVisitor
         break;
       case ProjectionKind::Enum: {
         // NOTE: Preserves immutability prefix path.
-        auto op = cast<UncheckedTakeEnumDataAddrInst>(projInst)->getOperand();
+        auto op = cast<UncheckedEnumDataAddrInstBase>(projInst)->getEnum();
 
         // If our operand is Sendable and our field is non-Sendable and we have
         // not stashed a value yet, stash value.
@@ -433,6 +433,8 @@ static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   case SILInstructionKind::RawPointerToRefInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
     return true;
   }
@@ -2983,7 +2985,7 @@ public:
         // locations (which is how we grab our AST information).
         !(applyExpr && applyExpr->getIsolationCrossing()
                            ->getCalleeIsolation()
-                           .isNonisolated());
+                           .isNonisolatedOrConcurrent());
 
     for (auto result : applyResults) {
       if (auto lookupResult = tryToTrackValue(result)) {
@@ -4138,6 +4140,8 @@ PartitionOpTranslator::visitProjection(SingleValueInstruction *proj) {
 EMIT_PROJECTION(StructElementAddrInst)
 EMIT_PROJECTION(TupleElementAddrInst)
 EMIT_PROJECTION(UncheckedTakeEnumDataAddrInst)
+EMIT_PROJECTION(UncheckedBorrowEnumDataAddrInst)
+EMIT_PROJECTION(UncheckedInPlaceEnumDataAddrInst)
 
 #undef EMIT_PROJECTION
 

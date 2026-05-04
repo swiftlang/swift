@@ -54,8 +54,8 @@ public:
   llvm::Error storeCachedDiagnostics(unsigned InputIndex,
                                      llvm::StringRef Bytes);
 
-  llvm::Error storeMakeDependenciesFile(StringRef OutputFilename,
-                                        llvm::StringRef Bytes);
+  llvm::Error storeSupplementaryOutputFile(StringRef OutputFilename,
+                                           llvm::StringRef Bytes);
 
   /// Store the MCCAS CASID \p ID as the object file output for the input
   /// that corresponds to the \p OutputFilename

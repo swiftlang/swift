@@ -651,6 +651,7 @@ extension _ArrayBuffer {
   }
 
   @_alwaysEmitIntoClient @inline(never)
+  @safe
   internal func withUnsafeBufferPointer_nonNative<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -674,13 +675,14 @@ extension _ArrayBuffer {
       return try unsafe body(
         UnsafeBufferPointer(start: firstElementAddress, count: count))
     }
-    return try unsafe ContiguousArray(self).withUnsafeBufferPointer(body)
+    return try ContiguousArray(self).withUnsafeBufferPointer(body)
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
   @_alwaysEmitIntoClient
+  @safe
   internal func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -689,7 +691,7 @@ extension _ArrayBuffer {
       return try unsafe body(
         UnsafeBufferPointer(start: firstElementAddress, count: count))
     }
-    return try unsafe withUnsafeBufferPointer_nonNative(body)
+    return try withUnsafeBufferPointer_nonNative(body)
   }
 
   // Superseded by the typed-throws version of this function, but retained
@@ -699,7 +701,7 @@ extension _ArrayBuffer {
   internal mutating func __abi_withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    return try unsafe withUnsafeMutableBufferPointer(body)
+    return try withUnsafeMutableBufferPointer(body)
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
@@ -707,6 +709,7 @@ extension _ArrayBuffer {
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
   @_alwaysEmitIntoClient
+  @safe
   internal mutating func withUnsafeMutableBufferPointer<R, E>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {

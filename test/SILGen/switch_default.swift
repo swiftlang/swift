@@ -17,11 +17,11 @@ enum Enum {
 // CHECK: [[SOME_BB]]:
 // CHECK:    [[STACK_1:%.*]] = alloc_stack $Optional<Enum>
 // CHECK:    copy_addr [[STACK]] to [init] [[STACK_1]]
-// CHECK:    [[TAKEN_ADDR:%.*]] = unchecked_take_enum_data_addr [[STACK_1]]
+// CHECK:    [[TAKEN_ADDR:%.*]] = unchecked_inplace_enum_data_addr [[STACK_1]]
 // CHECK:    switch_enum_addr [[TAKEN_ADDR]] : $*Enum, case #Enum.value2!enumelt: [[VALUE2_BB:bb[0-9]*]], default [[DEFAULT_BB_2:bb[0-9]*]]
 //
 // CHECK: [[VALUE2_BB]]:
-// CHECK:    [[TAKEN_TAKEN_ADDR:%.*]] = unchecked_take_enum_data_addr [[TAKEN_ADDR]]
+// CHECK:    [[TAKEN_TAKEN_ADDR:%.*]] = unchecked_inplace_enum_data_addr [[TAKEN_ADDR]]
 // CHECK:    destroy_addr [[TAKEN_TAKEN_ADDR]]
 // CHECK:    dealloc_stack [[STACK_1]]
 // CHECK:    destroy_addr [[STACK]]

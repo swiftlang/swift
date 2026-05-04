@@ -34,7 +34,7 @@ class WASISysroot(product.Product):
     def should_build(self, host_target):
         # WASI sysroot should always be built if standard library is being
         # built for WebAssembly.
-        return self.args.build_wasmstdlib
+        return self.args.build_wasistdlib
 
     def should_test(self, host_target):
         return False
@@ -181,6 +181,10 @@ class WASISysroot(product.Product):
         cmake.cmake_options.define('CMAKE_INSTALL_LIBDIR:PATH', '/lib')
         cmake.cmake_options.define('CMAKE_BUILD_TYPE:STRING', self.args.build_variant)
         cmake.cmake_options.define('CMAKE_C_COMPILER:FILEPATH', cc_path)
+        cmake.cmake_options.define('CMAKE_C_COMPILER_TARGET:STRING', target_triple)
+        # wasi-libc IS the C library, so there's nothing to link against during
+        # CMake's compiler check. Skip it.
+        cmake.cmake_options.define('CMAKE_C_COMPILER_WORKS:BOOL', 'TRUE')
         cmake.cmake_options.define('CMAKE_AR:FILEPATH', ar_path)
         cmake.cmake_options.define('CMAKE_NM:FILEPATH', nm_path)
         cmake.cmake_options.define('CMAKE_RANLIB:FILEPATH', ranlib_path)

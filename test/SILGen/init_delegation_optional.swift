@@ -80,7 +80,7 @@ extension Optional {
     // CHECK-NEXT: br bb3
     //
     // CHECK: [[SOME_BB]]:
-    // CHECK-NEXT: [[RESULT_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: [[RESULT_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: [[OUT_SOME_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
@@ -133,7 +133,7 @@ extension Optional {
     // CHECK-NEXT: br bb5
     //
     // CHECK: [[SOME_BB]]:
-    // CHECK-NEXT: [[RESULT_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: [[RESULT_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: [[OUT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
@@ -189,7 +189,7 @@ extension Optional {
     // CHECK-NEXT: switch_enum_addr [[OPT_OPT_RESULT_ADDR]] : {{.*}}, case #Optional.some!enumelt: [[OPT_OPT_SOME_BB:bb[0-9]]], case #Optional.none!enumelt: [[OPT_OPT_NONE_BB:bb[0-9]]]
     //
     // CHECK: [[OPT_OPT_SOME_BB]]:
-    // CHECK-NEXT: [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[OPT_OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: [[DATA_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[OPT_OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [[DATA_ADDR]] to [init] [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: destroy_addr [[DATA_ADDR]]
     // CHECK-NEXT: br bb5
@@ -209,7 +209,7 @@ extension Optional {
     // CHECK-NEXT: br bb8
     //
     // CHECK: [[OPT_SOME_BB]]:
-    // CHECK-NEXT: [[RESULT_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[OPT_RESULT_ADDR]] : $*Optional<Optional<Wrapped>>, #Optional.some!enumelt
+    // CHECK-NEXT: [[RESULT_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[OPT_RESULT_ADDR]] : $*Optional<Optional<Wrapped>>, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: dealloc_stack [[OPT_OPT_RESULT_ADDR]]
@@ -261,7 +261,7 @@ extension Optional {
     // CHECK: unreachable
     //
     // CHECK: [[SOME_BB]]:
-    // CHECK-NEXT: [[TMP_RESULT_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[TMP_OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: [[TMP_RESULT_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[TMP_OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [take] [[TMP_RESULT_ADDR]] to [init] [[OPT_RESULT_DATA_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: dealloc_stack [[TMP_OPT_RESULT_ADDR]]
@@ -277,7 +277,7 @@ extension Optional {
     // CHECK-NEXT: br bb7
     //
     // CHECK: [[SOME_BB]]:
-    // CHECK-NEXT: [[RESULT_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: [[RESULT_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: [[OUT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
@@ -330,7 +330,7 @@ extension Optional {
     // CHECK-NEXT: br bb4
     //
     // CHECK: [[SOME_BB]]:
-    // CHECK-NEXT: [[RESULT_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: [[RESULT_ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: [[OUT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt

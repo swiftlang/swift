@@ -66,7 +66,8 @@ let tempLValueElimination = FunctionPass(name: "temp-lvalue-elimination") {
 
 private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassContext) {
   guard let allocStack = copy.sourceAddress as? AllocStackInst,
-        allocStack.isDeallocatedInSameBlock(as: copy)
+        allocStack.isDeallocatedInSameBlock(as: copy),
+        !allocStack.parentFunction.hasOwnership || !allocStack.hasDynamicLifetime
   else {
     return
   }
@@ -266,18 +267,34 @@ private func combineWithDestroy(copy: CopyAddrInst, _ context: FunctionPassConte
   }
 }
 
+private struct MovableProjection {
+  var instruction: SingleValueInstruction
+  var base: Value
+
+  init<Inst>(_ inst: Inst) where Inst: SingleValueInstruction & UnaryInstruction {
+    self.instruction = inst
+    self.base = inst.operand.value
+  }
+
+  init<Inst>(_ inst: Inst, _ base: Value) where Inst: SingleValueInstruction {
+    self.instruction = inst
+    self.base = base
+  }
+}
+
 private extension Value {
-  var isMovableProjection: (SingleValueInstruction & UnaryInstruction)? {
+  var isMovableProjection: MovableProjection? {
     switch self {
-      case let projectionInst as InitEnumDataAddrInst:          return projectionInst
-      case let projectionInst as StructElementAddrInst:         return projectionInst
-      case let projectionInst as TupleElementAddrInst:          return projectionInst
-      case let projectionInst as UncheckedTakeEnumDataAddrInst: return projectionInst
-      case let projectionInst as InitExistentialAddrInst:       return projectionInst
-      case let projectionInst as RefElementAddrInst:            return projectionInst
-      case let projectionInst as RefTailAddrInst:               return projectionInst
-      case let projectionInst as ProjectBoxInst:                return projectionInst
-      default: return nil
+      case let projectionInst as InitEnumDataAddrInst:    MovableProjection(projectionInst)
+      case let projectionInst as StructElementAddrInst:   MovableProjection(projectionInst)
+      case let projectionInst as TupleElementAddrInst:    MovableProjection(projectionInst)
+      case let projectionInst as InitExistentialAddrInst: MovableProjection(projectionInst)
+      case let projectionInst as RefElementAddrInst:      MovableProjection(projectionInst)
+      case let projectionInst as RefTailAddrInst:         MovableProjection(projectionInst)
+      case let projectionInst as ProjectBoxInst:          MovableProjection(projectionInst)
+      case let projectionInst as UncheckedEnumDataAddrInstBase:
+        MovableProjection(projectionInst, projectionInst.enum)
+      default: nil
     }
   }
 }
@@ -285,8 +302,8 @@ private extension Value {
 private func collectMovableProjections(of address: Value, in projections: inout InstructionSet) -> Value {
   var a = address
   while let projection = a.isMovableProjection {
-    projections.insert(projection)
-    a = projection.operand.value
+    projections.insert(projection.instruction)
+    a = projection.base
   }
   return a
 }
@@ -300,11 +317,11 @@ private func moveProjections(
   var a = address
   var ip = insertionPoint
   while let projection = a.isMovableProjection,
-        worklist.hasBeenPushed(projection)
+        worklist.hasBeenPushed(projection.instruction)
   {
-    projection.move(before: ip, context)
-    a = projection.operand.value
-    ip = projection
+    projection.instruction.move(before: ip, context)
+    a = projection.base
+    ip = projection.instruction
   }
 }
 

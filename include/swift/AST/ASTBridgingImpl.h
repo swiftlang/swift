@@ -255,6 +255,10 @@ BridgedASTType BridgedDeclObj::Class_getSuperclass() const {
   return {getAs<swift::ClassDecl>()->getSuperclass().getPointer()};
 }
 
+OptionalBridgedDeclObj BridgedDeclObj::Class_getSuperclassDecl() const {
+  return {getAs<swift::ClassDecl>()->getSuperclassDecl()};
+}
+
 BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
   return {getAs<swift::ClassDecl>()->getDestructor()};
 }
@@ -269,6 +273,24 @@ bool BridgedDeclObj::ProtocolDecl_requiresClass() const {
 
 bool BridgedDeclObj::ProtocolDecl_isMarkerProtocol() const {
   return getAs<swift::ProtocolDecl>()->isMarkerProtocol();
+}
+
+bool BridgedDeclObj::ProtocolDecl_isEligibleForFastCasting() const {
+  return getAs<swift::ProtocolDecl>()->isEligibleForFastCasting();
+}
+
+OptionalBridgedDeclObj BridgedDeclObj::ProtocolDecl_getSuperClassDecl() const {
+  return {getAs<swift::ProtocolDecl>()->getSuperclassDecl()};
+}
+
+SwiftInt BridgedDeclObj::ProtocolDecl_getNumInheritedProtocols() const {
+  auto *protocolDecl = getAs<swift::ProtocolDecl>();
+  return (SwiftInt)protocolDecl->getAllInheritedProtocols().size();
+}
+
+BridgedDeclObj BridgedDeclObj::ProtocolDecl_getInheritedProtocols(SwiftInt index) const {
+  auto *protocolDecl = getAs<swift::ProtocolDecl>();
+  return {protocolDecl->getAllInheritedProtocols()[index]};
 }
 
 bool BridgedDeclObj::AbstractFunction_isOverridden() const {
@@ -306,12 +328,29 @@ BridgedASTType BridgedDeclObj::NominalType_getSelfInterfaceType() const {
   return { getAs<swift::NominalTypeDecl>()->getSelfInterfaceType().getPointer()};
 }
 
+void BridgedDeclObj::NominalType_getAllProtocols(
+        void * _Nonnull resultArray,
+        void (* _Nonnull appendFn)(void * _Nonnull resultArray, BridgedDeclObj protocol)) const {
+  auto allProtocols = getAs<swift::NominalTypeDecl>()->getAllProtocols(/*sorted=*/ false);
+  for (auto *protoDecl : allProtocols) {
+    appendFn(resultArray, {protoDecl});
+  }
+}
+
 void BridgedDeclObj::GenericContext_setGenericSignature(BridgedGenericSignature genericSignature) const {
   getAs<swift::GenericContext>()->setGenericSignature(genericSignature.unbridged());
 }
 
 void BridgedDeclObj::ValueDecl_setAccess(swift::AccessLevel accessLevel) const {
   getAs<swift::ValueDecl>()->setAccess(accessLevel);
+}
+
+bool BridgedDeclObj::ValueDecl_hasOpenAccess(BridgedDeclContext useDC) const {
+  return getAs<swift::ValueDecl>()->hasOpenAccess(useDC.unbridged());
+}
+
+bool BridgedDeclObj::ValueDecl_hasOpenAccess() const {
+  return getAs<swift::ValueDecl>()->hasOpenAccess(/*useDC=*/ nullptr);
 }
 
 void BridgedDeclObj::NominalTypeDecl_addMember(BridgedDeclObj member) const {

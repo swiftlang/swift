@@ -871,6 +871,9 @@ mangled in to disambiguate.
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
 
   ISOLATION ::= 'A'                          // @isolated(any)
+#if SWIFT_RUNTIME_VERSION >= 6.4
+  ISOLATION ::= 'N'                          // nonisolated(nonsending)
+#endif
 
   DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable
   DIFFERENTIABILITY-KIND ::= 'l'             // @differentiable(_linear)

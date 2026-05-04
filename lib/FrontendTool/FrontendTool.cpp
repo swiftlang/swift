@@ -627,6 +627,41 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
   }
 }
 
+/// Write const values JSON to disk (and store into CAS when caching is
+/// enabled). When CAS is active, compact JSON is stored to CAS and
+/// prefix-remapped pretty-printed JSON is written to disk. Without CAS,
+/// pretty-printed JSON is written directly.
+/// Returns true on error.
+static bool writeConstValues(CompilerInstance &Instance,
+                             const std::vector<ConstValueTypeInfo> &ConstValues,
+                             StringRef ConstValuesFilePath) {
+  return withOutputPath(
+      Instance.getDiags(), Instance.getOutputBackend(), ConstValuesFilePath,
+      [&](llvm::raw_ostream &OS) {
+        if (!Instance.supportCaching()) {
+          // Caching not enabled, write output directly.
+          writeAsJSONToFile(ConstValues, OS);
+          return false;
+        }
+        // Using CAS, the path need to be remapped.
+        std::string Buffer;
+        llvm::raw_string_ostream BufferOS(Buffer);
+        writeAsJSONToFile(ConstValues, BufferOS, /*Compact=*/true);
+        if (auto err =
+                Instance.getCASOutputBackend().storeSupplementaryOutputFile(
+                    ConstValuesFilePath, Buffer)) {
+          Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
+                                       "storing const values file",
+                                       toString(std::move(err)));
+          return true;
+        }
+        remapConstValuesJSON(
+            Buffer, OS,
+            Instance.getInvocation().getFrontendOptions().CacheReplayPrefixMap);
+        return false;
+      });
+}
+
 static bool emitConstValuesForWholeModuleIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
@@ -651,14 +686,10 @@ static bool emitConstValuesForWholeModuleIfNeeded(
       Instance.getFileSystem(), Protocols);
   if (!inputParseSuccess)
     return true;
-  auto ConstValues = gatherConstValuesForModule(Protocols,
-                                                Instance.getMainModule());
 
-  return withOutputPath(Instance.getDiags(), Instance.getOutputBackend(),
-                        ConstValuesFilePath, [&](llvm::raw_ostream &OS) {
-                          writeAsJSONToFile(ConstValues, OS);
-                          return false;
-                        });
+  return writeConstValues(
+      Instance, gatherConstValuesForModule(Protocols, Instance.getMainModule()),
+      ConstValuesFilePath);
 }
 
 static void emitConstValuesForAllPrimaryInputsIfNeeded(
@@ -684,12 +715,8 @@ static void emitConstValuesForAllPrimaryInputsIfNeeded(
     if (ConstValuesFilePath.empty())
       continue;
 
-    auto ConstValues = gatherConstValuesForPrimary(Protocols, SF);
-    withOutputPath(Instance.getDiags(), Instance.getOutputBackend(),
-                   ConstValuesFilePath, [&](llvm::raw_ostream &OS) {
-                     writeAsJSONToFile(ConstValues, OS);
-                     return false;
-                   });
+    writeConstValues(Instance, gatherConstValuesForPrimary(Protocols, SF),
+                     ConstValuesFilePath);
   }
 }
 
@@ -739,12 +766,13 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
 }
 
 static bool writeAPIDescriptor(ModuleDecl *M, StringRef OutputPath,
-                               llvm::vfs::OutputBackend &Backend) {
-  return withOutputPath(M->getDiags(), Backend, OutputPath,
-                        [&](raw_ostream &OS) -> bool {
-                          writeAPIJSONFile(M, OS, /*PrettyPrinted=*/false);
-                          return false;
-                        });
+                               llvm::vfs::OutputBackend &Backend,
+                               const TBDGenOptions &TBDOpts) {
+  return withOutputPath(
+      M->getDiags(), Backend, OutputPath, [&](raw_ostream &OS) -> bool {
+        writeAPIJSONFile(M, OS, TBDOpts, /*PrettyPrinted=*/false);
+        return false;
+      });
 }
 
 static bool writeAPIDescriptorIfNeeded(CompilerInstance &Instance) {
@@ -762,8 +790,10 @@ static bool writeAPIDescriptorIfNeeded(CompilerInstance &Instance) {
   const std::string &APIDescriptorPath =
       Invocation.getAPIDescriptorPathForWholeModule();
 
+  const auto &TBDOpts = Invocation.getTBDGenOptions();
+
   return writeAPIDescriptor(Instance.getMainModule(), APIDescriptorPath,
-                            Instance.getOutputBackend());
+                            Instance.getOutputBackend(), TBDOpts);
 }
 
 static bool performCompileStepsPostSILGen(

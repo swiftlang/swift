@@ -124,7 +124,7 @@ extension _StringGuts {
     // strings or foreign strings that provide contiguous UTF-8 access.
     if _fastPath(isFastUTF8) {
       let isASCII = self.isASCII
-      let storage = unsafe self.withFastUTF8 {
+      let storage = self.withFastUTF8 {
         unsafe __StringStorage.create(
           initializingFrom: $0,
           codeUnitCapacity: growthTarget,
@@ -220,7 +220,7 @@ extension _StringGuts {
       return asSmall
     }
     if isFastUTF8 {
-      return unsafe withFastUTF8 { unsafe _SmallString($0)! }
+      return withFastUTF8 { unsafe _SmallString($0)! }
     }
     return _foreignConvertedToSmall()
   }
@@ -337,14 +337,14 @@ extension _StringGuts {
     if isUniqueNative {
       if let repl = newElements as? String {
         if repl._guts.isFastUTF8 {
-          return unsafe repl._guts.withFastUTF8 {
+          return repl._guts.withFastUTF8 {
             unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._guts.isASCII)
           }
         }
       } else if let repl = newElements as? Substring {
         if repl._wholeGuts.isFastUTF8 {
-          return unsafe repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
+          return repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
             unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._wholeGuts.isASCII)
           }
@@ -380,14 +380,14 @@ extension _StringGuts {
     if isUniqueNative {
       if let repl = newElements as? String.UnicodeScalarView {
         if repl._guts.isFastUTF8 {
-          return unsafe repl._guts.withFastUTF8 {
+          return repl._guts.withFastUTF8 {
             unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._guts.isASCII)
           }
         }
       } else if let repl = newElements as? Substring.UnicodeScalarView {
         if repl._wholeGuts.isFastUTF8 {
-          return unsafe repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
+          return repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
             unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._wholeGuts.isASCII)
           }

@@ -101,6 +101,23 @@ public func takeCopier(f: @_lifetime(io: copy io) @_lifetime(copy inview) (_ inv
 @inlinable
 public func takeCopierUnannotated(f: (consuming AnotherView) -> AnotherView) {}
 
+// Function type lifetime dependencies are printed as they appeared in Swift.
+// Internal labels are preserved when a function type has explicit lifetime
+// dependence information, since these may be used to refer to the sources and
+// targets of lifetimes.
+
+public typealias LabelledNE2NE = @_lifetime(copy ne) (_ ne: AnotherView) -> AnotherView
+public typealias InferredNE2NE = (AnotherView) -> AnotherView
+public typealias InferredLabelledNE2NE = (_ ne: AnotherView) -> AnotherView
+
+public typealias NamedLifetimeType = @_lifetime(copy ne) (_ ne: AnotherView, _ ne2: AnotherView) -> AnotherView
+public typealias InferredLifetimeType = (_ ne: AnotherView, AnotherView) -> AnotherView
+public typealias ImmortalLifetimeType = @_lifetime(immortal) (_ ne: AnotherView, _ ne2: AnotherView) -> AnotherView
+public typealias CapturesLifetimeType = @_lifetime(captures) (_ ne: AnotherView, _ ne2: AnotherView) -> AnotherView
+
+public typealias MixedLifetimeType = @_lifetime(copy ne0) (_ ne0: AnotherView, _ neio: inout AnotherView) -> AnotherView
+public typealias NestedLifetimeType = @_lifetime(neo: copy ne0) (_ nei: inout AnotherView, _ ne0: AnotherView, _ neo: inout AnotherView) -> (_ ne1: AnotherView) -> AnotherView
+
 public typealias ExplicitNestedType = @_lifetime(copy ne0) @_lifetime(ne1: copy ne0) ((AnotherView) -> AnotherView, _ ne0: consuming AnotherView, _ ne1: inout AnotherView) -> AnotherView
 
 @inlinable

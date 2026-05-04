@@ -376,6 +376,10 @@ __swift_bool swift_stdlib_isStackAllocationSafe(__swift_size_t byteCount,
   // been measured for its performance characteristics. In particular, if the
   // platform-specific functions we need to use end up calling malloc(), it's
   // pointless to use them.
+  //
+  // NOTE: If this is ever updated to do an actual computation, the standard
+  // library function must also be updated to start calling into this runtime
+  // hook again.
   return false;
 
 #if 0

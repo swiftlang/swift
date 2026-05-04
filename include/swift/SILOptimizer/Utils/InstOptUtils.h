@@ -132,6 +132,11 @@ bool isInstructionTriviallyDead(SILInstruction *inst);
 
 bool canTriviallyDeleteOSSAEndScopeInst(SILInstruction *inst);
 
+/// Return true if \p inst is a forwarding operation that destructures an owned
+/// move-only value. Such instructions must not be deleted because they end
+/// the lifetime of their operand.
+bool canDeleteDeadMoveOnlyOwnedDestructureInst(SILInstruction *inst);
+
 /// Return true if this is a release instruction that's not going to
 /// free the object.
 bool isIntermediateRelease(SILInstruction *inst, EpilogueARCFunctionInfo *erfi);
@@ -190,16 +195,10 @@ SILValue getConcreteValueOfExistentialBoxAddr(SILValue addr,
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
 /// - both types are tuple-types and some of the elements need to be casted.
-///
-/// \p usePoints is required when \p value has guaranteed ownership. It must be
-/// the last users of the returned, casted value. A usePoint cannot be a
-/// BranchInst (a phi is never the last guaranteed user). \p builder's current
-/// insertion point must dominate all \p usePoints.
 std::pair<SILValue, bool /* changedCFG */>
 castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
-                             SILLocation Loc,
-                             SILValue value, SILType srcTy, SILType destTy,
-                             ArrayRef<SILInstruction *> usePoints);
+                             SILLocation Loc, SILValue value, SILType srcTy,
+                             SILType destTy);
 
 /// Returns true if the layout of a generic nominal type is dependent on its generic parameters.
 /// This is usually the case. Some examples, where they layout is _not_ dependent:

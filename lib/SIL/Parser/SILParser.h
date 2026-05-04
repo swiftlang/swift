@@ -101,12 +101,15 @@ public:
   /// getGlobalNameForReference - Given a reference to a global name, look it
   /// up and return an appropriate SIL function.
   SILFunction *getGlobalNameForReference(Identifier Name, CanSILFunctionType Ty,
+                                         ActorIsolation isolation,
                                          SourceLoc Loc,
                                          bool IgnoreFwdRef = false);
   /// getGlobalNameForDefinition - Given a definition of a global name, look
   /// it up and return an appropriate SIL function.
   SILFunction *getGlobalNameForDefinition(Identifier Name,
-                                          CanSILFunctionType Ty, SourceLoc Loc);
+                                          CanSILFunctionType Ty,
+                                          ActorIsolation isolation,
+                                          SourceLoc Loc);
 
   /// getBBForDefinition - Return the SILBasicBlock for a definition of the
   /// specified block.

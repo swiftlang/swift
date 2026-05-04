@@ -65,6 +65,7 @@ private func registerSwiftPasses() {
   // Module passes
   registerPass(mandatoryAllocBoxToStack, { mandatoryAllocBoxToStack.run($0) })
   registerPass(mandatoryPerformanceOptimizations, { mandatoryPerformanceOptimizations.run($0) })
+  registerPass(conformanceCheckOptimization, { conformanceCheckOptimization.run($0) })
   registerPass(diagnoseUnknownConstValues, { diagnoseUnknownConstValues.run($0)})
   registerPass(readOnlyGlobalVariablesPass, { readOnlyGlobalVariablesPass.run($0) })
   registerPass(stackProtection, { stackProtection.run($0) })
@@ -80,6 +81,7 @@ private func registerSwiftPasses() {
   registerPass(constantCapturePropagation, { constantCapturePropagation.run($0) })
   registerPass(computeEscapeEffects, { computeEscapeEffects.run($0) })
   registerPass(computeSideEffects, { computeSideEffects.run($0) })
+  registerPass(condFailOptimization, { condFailOptimization.run($0) })
   registerPass(diagnoseInfiniteRecursion, { diagnoseInfiniteRecursion.run($0) })
   registerPass(destroyHoisting, { destroyHoisting.run($0) })
   registerPass(mandatoryDestroyHoisting, { mandatoryDestroyHoisting.run($0) })

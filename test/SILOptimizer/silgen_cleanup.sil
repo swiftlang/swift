@@ -404,7 +404,7 @@ sil [ossa] @narrowLoadThroughProjectionSequence : $@convention(thin) () -> () {
 // CHECK:         [[OUTER_ACCESS:%.*]] = begin_access [read] [static] [no_nested_conflict] [[MARK_0]]
 //
 // CHECK:       bb1:
-// CHECK:         [[PROJECTION:%.*]] = unchecked_take_enum_data_addr [[OUTER_ACCESS]] : $*NonDestructive<T>, #NonDestructive.some!enumelt
+// CHECK:         [[PROJECTION:%.*]] = unchecked_inplace_enum_data_addr [[OUTER_ACCESS]] : $*NonDestructive<T>, #NonDestructive.some!enumelt
 // CHECK:         [[MARK_1:%.*]] = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] [[PROJECTION]]
 // CHECK-LABEL: } // end sil function 'nondestructive_scoped_access'
 sil [ossa] @nondestructive_scoped_access : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed NonDestructive<T>) -> () {
@@ -414,7 +414,7 @@ bb0(%0 : $*NonDestructive<T>):
   switch_enum_addr %3, case #NonDestructive.some!enumelt: bb1, case #NonDestructive.none!enumelt: bb2
 
 bb1:
-  %5 = unchecked_take_enum_data_addr %3, #NonDestructive.some!enumelt
+  %5 = unchecked_inplace_enum_data_addr %3, #NonDestructive.some!enumelt
   %6 = begin_access [read] [static] [no_nested_conflict] %5
   %7 = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] %6
   end_access %6

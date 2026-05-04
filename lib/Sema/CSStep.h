@@ -884,8 +884,13 @@ public:
     if (HadFailure)
       restoreBestScore();
 
-    if (OuterTimeRemaining)
-      CS.Timer.emplace(CS, *OuterTimeRemaining);
+    if (OuterTimeRemaining) {
+      const auto &opts = CS.getASTContext().TypeCheckerOpts;
+      CS.Timer.emplace(CS, *OuterTimeRemaining,
+                       opts.WarnLongExpressionTypeChecking,
+                       opts.WarnLongExpressionTypeCheckingScopes,
+                       opts.WarnLongExpressionTypeCheckingTrail);
+    }
   }
 
   StepResult resume(bool prevFailed) override;

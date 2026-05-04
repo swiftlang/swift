@@ -205,7 +205,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
   SILGenFunctionBuilder builder(*this);
   auto thunk = builder.createFunction(
       SILLinkage::Private, name, overrideInfo.SILFnType,
-      genericEnv, loc,
+      ActorIsolation::forUnspecified(), genericEnv, loc,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
       IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
@@ -718,13 +718,20 @@ public:
 } // end anonymous namespace
 
 SILWitnessTable *
-SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
+SILGenModule::getWitnessTable(RootProtocolConformance *conformance) {
   // If we've already emitted this witness table, return it.
   auto found = emittedWitnessTables.find(conformance);
   if (found != emittedWitnessTables.end())
     return found->second;
 
-  SILWitnessTable *table = SILGenConformance(*this, conformance).emit();
+  SILWitnessTable *table;
+
+  if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
+    table = SILGenConformance(*this, normal).emit();
+  } else {
+    auto self = cast<SelfProtocolConformance>(conformance);
+    table = emitSelfConformanceWitnessTable(self->getProtocol());
+  }
   emittedWitnessTables.insert({conformance, table});
 
   return table;
@@ -884,10 +891,12 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   SILGenFunctionBuilder builder(*this);
   f = builder.createFunction(
-      linkage, nameBuffer, witnessSILFnType, genericEnv,
-      SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent,
+      linkage, nameBuffer, witnessSILFnType,
+      getSILFunctionTypeActorIsolation(reqtSubstTy, requirement, witnessRef),
+      genericEnv, SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent,
       serializedKind, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-      ProfileCounter(), thunkKind, SubclassScope::NotApplicable, InlineStrategy);
+      ProfileCounter(), thunkKind, SubclassScope::NotApplicable,
+      InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
@@ -920,11 +929,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
                           witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
-
-  if (auto isolation = getSILFunctionTypeActorIsolation(
-          reqtSubstTy, requirement, witnessRef)) {
-    f->setActorIsolation(*isolation);
-  }
 
   return f;
 }
@@ -977,8 +981,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   SILGenFunctionBuilder builder(SGM);
   auto *f = builder.createFunction(
-      linkage, name, witnessSILFnType, genericEnv,
-      SILLocation(requirement.getDecl()), IsNotBare, IsTransparent,
+      linkage, name, witnessSILFnType, ActorIsolation::forUnspecified(),
+      genericEnv, SILLocation(requirement.getDecl()), IsNotBare, IsTransparent,
       IsSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
       ProfileCounter(), IsThunk, SubclassScope::NotApplicable, InlineDefault);
 
@@ -1022,7 +1026,7 @@ public:
       serialized(getConformanceSerializedKind(conformance)) {
   }
 
-  void emit() {
+  SILWitnessTable *emit() {
     PrettyStackTraceConformance trace("generating SIL witness table",
                                       conformance);
 
@@ -1030,7 +1034,7 @@ public:
     visitProtocolDecl(conformance->getProtocol());
 
     // Create the witness table.
-    (void) SILWitnessTable::create(SGM.M, linkage, serialized, conformance,
+    return SILWitnessTable::create(SGM.M, linkage, serialized, conformance,
                                    entries, /*conditional*/ {}, /*specialized=*/false);
   }
 
@@ -1060,9 +1064,9 @@ public:
 };
 }
 
-void SILGenModule::emitSelfConformanceWitnessTable(ProtocolDecl *protocol) {
+SILWitnessTable *SILGenModule::emitSelfConformanceWitnessTable(ProtocolDecl *protocol) {
   auto conformance = getASTContext().getSelfConformance(protocol);
-  SILGenSelfConformanceWitnessTable(*this, conformance).emit();
+  return SILGenSelfConformanceWitnessTable(*this, conformance).emit();
 }
 
 namespace {
@@ -1307,9 +1311,10 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
           .SILFnType;
   auto loc = replacement.getAsRegularLocation();
   auto *function = builder.getOrCreateFunction(
-      loc, name, SILLinkage::Shared, replacementTy, IsBare, IsNotTransparent,
-      IsSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-      ProfileCounter(), IsNotThunk);
+      loc, name, SILLinkage::Shared, replacementTy,
+      ActorIsolation::forUnspecified(), IsBare, IsNotTransparent, IsSerialized,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(),
+      IsNotThunk);
 
   if (!function->empty())
     return function;
@@ -1474,7 +1479,10 @@ public:
         if (!SF || SF->Kind != SourceFileKind::Interface)
           SGM.emitDefaultWitnessTable(protocol);
       }
-      if (protocol->requiresSelfConformanceWitnessTable()) {
+
+      // Self-conformance witness tables are emitted lazily in Embedded Swift.
+      if (protocol->requiresSelfConformanceWitnessTable() &&
+          !SGM.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
         SGM.emitSelfConformanceWitnessTable(protocol);
       }
       return;

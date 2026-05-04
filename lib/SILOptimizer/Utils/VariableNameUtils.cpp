@@ -497,9 +497,9 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       continue;
     }
 
-    if (auto *utedai = dyn_cast<UncheckedTakeEnumDataAddrInst>(searchValue)) {
+    if (auto *utedai = dyn_cast<UncheckedEnumDataAddrInstBase>(searchValue)) {
       variableNamePath.push_back(getNameFromDecl(utedai->getElement()));
-      searchValue = utedai->getOperand();
+      searchValue = utedai->getEnum();
       continue;
     }
 

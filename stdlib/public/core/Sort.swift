@@ -247,7 +247,7 @@ extension MutableCollection where Self: RandomAccessCollection {
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {
     let didSortUnsafeBuffer: Void? =
-      try unsafe withContiguousMutableStorageIfAvailable { buffer in
+      try withContiguousMutableStorageIfAvailable { buffer in
         try unsafe buffer._stableSortImpl(by: areInIncreasingOrder)
       }
     if didSortUnsafeBuffer == nil {

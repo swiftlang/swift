@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -O -emit-ir -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend %s -emit-ir -gdwarf-types -o - | %FileCheck %s --check-prefix=DWARF
+// RUN: %target-swift-frontend %s -O -emit-ir -g -debug-info-format=codeview -o - | %FileCheck %s --check-prefix=CV
 public struct S<T> {
   let t : T
 }
@@ -42,8 +43,13 @@ public let inner = S2<Double>.Inner(t:4.2)
 // DWARF-DAG: ![[PARAMS4]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Double"{{.*}} size: 64, {{.*}}runtimeLang: DW_LANG_Swift,{{.*}} identifier: "$sSdD")
 
 // DWARF-DAG: ![[SPECIFICATION:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Inner", {{.*}}elements: ![[ELEMENTS1:[0-9]+]], runtimeLang: DW_LANG_Swift, identifier: "$s18BoundGenericStruct2S2V5InnerVyx_GD")
-// DWARF-DAG: !DICompositeType(tag: DW_TAG_structure_type, {{.*}}line: 26, size: 64, {{.*}}specification: ![[SPECIFICATION]]
+// DWARF-DAG: !DICompositeType(tag: DW_TAG_structure_type, {{.*}}line: 27, size: 64, {{.*}}specification: ![[SPECIFICATION]]
 
 // DWARF-DAG: ![[ELEMENTS1]] = !{![[ELEMENTS2:[0-9]+]]}
 
 // DWARF-DAG: ![[ELEMENTS2]] = !DIDerivedType(tag: DW_TAG_member, name: "t"
+
+// In CodeView, the sized container's member is named with the mangled name
+// so that it survives CodeView emission (unnamed members are dropped).
+// CV: !DIDerivedType(tag: DW_TAG_member, name: "$s18BoundGenericStruct1SVySiGD", {{.*}}baseType: ![[INNER:[0-9]+]]
+// CV: ![[INNER]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s18BoundGenericStruct1SVySiGD", {{.*}}DIFlagFwdDecl

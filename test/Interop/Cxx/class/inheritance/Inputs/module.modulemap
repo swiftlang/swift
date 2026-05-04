@@ -58,3 +58,8 @@ module ProtectedSpecialMember {
   header "protected-special-member.h"
   requires cplusplus
 }
+
+module InheritedStringField {
+  header "inherited-string-field.h"
+  requires cplusplus
+}

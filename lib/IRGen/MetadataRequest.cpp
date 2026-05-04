@@ -1082,6 +1082,21 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
     if (requiresForeignTypeMetadata(nominal))
       return MetadataAccessStrategy::ForeignAccessor;
 
+    // @objc @implementation classes *should* be treated like imported ObjC
+    // classes, meaning they should use non-unique accessors. However, previous
+    // versions of the Swift compiler incorrectly emitted a public unique
+    // accessor, and clients which knew about the implementation (i.e. which had
+    // a swiftmodule that hadn't been generated from a swiftinterface) could
+    // sometimes use it.
+    //
+    // To improve this situation without breaking ABI, we'll use a non-unique
+    // accessor for classes implemented outside the main module, and fall
+    // through otherwise.
+    if (isa<ClassDecl>(nominal) && nominal->getObjCImplementationDecl()
+          && !nominal->getObjCImplementationDecl()
+                ->getModuleContext()->isMainModule())
+      return MetadataAccessStrategy::NonUniqueAccessor;
+
     // If the type doesn't guarantee that it has an access function,
     // we might have to use a non-unique accessor.
 
@@ -1451,7 +1466,7 @@ getFunctionTypeFlags(CanFunctionType type) {
   if (isolation.isErased())
     extFlags = extFlags.withIsolatedAny();
 
-  if (isolation.isNonIsolatedCaller())
+  if (isolation.isNonisolatedNonsending())
     extFlags = extFlags.withNonIsolatedCaller();
 
   auto flags = FunctionTypeFlags()
@@ -2037,6 +2052,10 @@ namespace {
       if (auto metatype = tryGetLocal(type, request))
         return metatype;
 
+      if (IGF.IGM.isEmbeddedWithExistentials()) {
+        return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
+      }
+
       auto instMetadata =
         IGF.emitAbstractTypeMetadataRef(type.getInstanceType());
 
@@ -2096,7 +2115,8 @@ namespace {
 
       // These currently aren't wrapped in ExistentialType, but we
       // can future-proof against them ending up in this path.
-      if (type->isAny() || type->isAnyObject())
+      if (!type->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+          (type->isAny() || type->isAnyObject()))
         return emitSingletonExistentialTypeMetadata(type);
 
       auto metadata = emitExistentialTypeMetadata(type);
@@ -2123,6 +2143,11 @@ namespace {
     }
 
     llvm::Value *emitExistentialTypeMetadata(CanExistentialType type) {
+      if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        llvm::Constant *result = IGF.IGM.getAddrOfTypeMetadata(type);
+        return result;
+      }
+
       auto layout = type.getExistentialLayout();
 
       if (!layout.getParameterizedProtocols().empty()) {
@@ -2244,19 +2269,16 @@ namespace {
     MetadataResponse
     visitProtocolCompositionType(CanProtocolCompositionType type,
                                  DynamicMetadataRequest request) {
-      if (type->isAny() || type->isAnyObject())
-        return emitSingletonExistentialTypeMetadata(type);
-
-      assert(false && "constraint type should be wrapped in existential type");
+      if (type->isAny() || type->isAnyObject()) {
+        if (!type->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+          return emitSingletonExistentialTypeMetadata(type);
+      } else {
+        assert(false && "constraint type should be wrapped in existential type");
+      }
 
       CanExistentialType existential(
           ExistentialType::get(type)->castTo<ExistentialType>());
-
-      if (auto metatype = tryGetLocal(existential, request))
-        return metatype;
-
-      auto metadata = emitExistentialTypeMetadata(existential);
-      return setLocal(type, MetadataResponse::forComplete(metadata));
+      return visitExistentialType(existential, request);
     }
 
 
@@ -3422,15 +3444,6 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 MetadataResponse
 IRGenFunction::emitTypeMetadataRef(CanType type,
                                    DynamicMetadataRequest request) {
-  auto &langOpts = type->getASTContext().LangOpts;
-  if (langOpts.hasFeature(Feature::Embedded) &&
-      !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
-      !isMetadataAllowedInEmbedded(type)) {
-    llvm::errs() << "Metadata pointer requested in embedded Swift for type "
-                 << type << "\n";
-    llvm::report_fatal_error("metadata used in embedded mode");
-  }
-
   type = IGM.getRuntimeReifiedType(type);
   // Look through any opaque types we're allowed to.
   type = IGM.substOpaqueTypesWithUnderlyingTypes(type);
@@ -3444,7 +3457,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   if (type->hasArchetype() ||
       !shouldTypeMetadataAccessUseAccessor(IGM, type) ||
       isa<PackType>(type) ||
-      langOpts.hasFeature(Feature::Embedded)) {
+      IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 

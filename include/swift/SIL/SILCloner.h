@@ -325,7 +325,7 @@ public:
   /// corresponding structural index in the remapped pack type.
   unsigned getOpStructuralPackIndex(CanPackType origPackType,
                                     unsigned origIndex) {
-    ASSERT(origIndex < origPackType->getNumElements());
+    ASSERT(origIndex <= origPackType->getNumElements());
     unsigned newIndex = 0;
     for (unsigned i = 0; i != origIndex; ++i) {
       auto origComponentType = origPackType.getElementType(i);
@@ -1087,7 +1087,9 @@ void SILCloner<ImplClass>::visitAllocPackMetadataInst(
     AllocPackMetadataInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createAllocPackMetadata(
-                                    getOpLocation(Inst->getLoc())));
+                                    getOpLocation(Inst->getLoc()),
+                                    getOpType(Inst->getType()),
+                                    Inst->isStackAllocationNested()));
 }
 
 template<typename ImplClass>
@@ -2573,6 +2575,28 @@ SILCloner<ImplClass>::visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAd
   recordClonedInstruction(
       Inst, getBuilder().createUncheckedTakeEnumDataAddr(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                Inst->getElement(), getOpType(Inst->getType())));
+}
+  
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnumDataAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createUncheckedInPlaceEnumDataAddr(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                Inst->getElement(), getOpType(Inst->getType())));
+}
+  
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDataAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createUncheckedBorrowEnumDataAddr(
+                getOpLocation(Inst->getLoc()),
+                getOpValue(Inst->getEnum()),
+                getOpValue(Inst->getScratch()),
                 Inst->getElement(), getOpType(Inst->getType())));
 }
   

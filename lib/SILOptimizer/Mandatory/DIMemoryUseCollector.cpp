@@ -131,8 +131,29 @@ computeMemorySILType(MarkUninitializedInst *MUI, SILValue Address) {
   return {MemorySILType, VDecl->isLet()};
 }
 
+static SingleValueInstruction *
+findUninitializedValue(MarkUninitializedInst *MemoryInst) {
+  SingleValueInstruction *inst = MemoryInst;
+  SILValue projectBoxUser = inst;
+
+  // Check for a project_box instruction (possibly via a borrow).
+  if (auto *bbi = projectBoxUser->getSingleUserOfType<BeginBorrowInst>()) {
+    projectBoxUser = bbi;
+  }
+  if (auto pbi = projectBoxUser->getSingleUserOfType<ProjectBoxInst>()) {
+    inst = pbi;
+  }
+
+  // Access move-only values through their marker.
+  if (auto mui = inst->getSingleUserOfType<MarkUnresolvedNonCopyableValueInst>()) {
+    inst = mui;
+  }
+
+  return inst;
+}
+
 DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
-    : MemoryInst(MI) {
+    : MemoryInst(MI), uninitializedValue(findUninitializedValue(MI)) {
   auto &Module = MI->getModule();
 
   SILValue Address = MemoryInst;
@@ -184,29 +205,8 @@ SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
   return &*getFunction().begin()->begin();
 }
 
-static SingleValueInstruction *
-getUninitializedValue(MarkUninitializedInst *MemoryInst) {
-  SingleValueInstruction *inst = MemoryInst;
-  SILValue projectBoxUser = inst;
-  
-  // Check for a project_box instruction (possibly via a borrow).
-  if (auto *bbi = projectBoxUser->getSingleUserOfType<BeginBorrowInst>()) {
-    projectBoxUser = bbi;
-  }
-  if (auto pbi = projectBoxUser->getSingleUserOfType<ProjectBoxInst>()) {
-    inst = pbi;
-  }
-
-  // Access move-only values through their marker.
-  if (auto mui = inst->getSingleUserOfType<MarkUnresolvedNonCopyableValueInst>()) {
-    inst = mui;
-  }
-
-  return inst;
-}
-
 SingleValueInstruction *DIMemoryObjectInfo::getUninitializedValue() const {
-  return ::getUninitializedValue(MemoryInst);
+  return uninitializedValue;
 }
 
 /// Given a symbolic element number, return the type of the element.
@@ -563,7 +563,7 @@ SingleValueInstruction *DIMemoryObjectInfo::findUninitializedSelfValue() const {
       // be some kind of `self` (root, delegating, derived etc.)
       // see \c MarkUninitializedInst::Kind for more details.
       if (!isVariableOrResult(MUI))
-        return ::getUninitializedValue(MUI);
+        return findUninitializedValue(MUI);
     }
   }
   return nullptr;
@@ -1114,12 +1114,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       llvm_unreachable("bad access kind");
     }
 
-    // unchecked_take_enum_data_addr takes the address of the payload of an
+    // unchecked_*_enum_data_addr takes the address of the payload of an
     // optional, which could be used to update the payload. So, visit the
     // users of this instruction and ensure that there are no overwrites to an
     // immutable optional. Note that this special handling is for checking
     // immutability and is not for checking initialization before use.
-    if (auto *enumDataAddr = dyn_cast<UncheckedTakeEnumDataAddrInst>(User)) {
+    if (auto *enumDataAddr = dyn_cast<UncheckedEnumDataAddrInstBase>(User)) {
       // Keep track of the fact that we're inside of an enum. This informs our
       // recursion that tuple stores should not be treated as a partial
       // store. This is needed because if the enum has data it would be accessed

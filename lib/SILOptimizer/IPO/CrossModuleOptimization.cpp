@@ -513,6 +513,11 @@ bool CrossModuleOptimization::canSerializeFunction(
   // it to true at the end of this function.
   canSerializeFlags[function] = false;
 
+  // We can't serialize a function that explicitly opted out of being
+  // serialized.
+  if (function->isNeverEmitIntoClient())
+    return false;
+
   if (everything) {
     canSerializeFlags[function] = true;
     return true;

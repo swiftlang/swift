@@ -6059,6 +6059,9 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
 
+  using ThunkGenFlag = SILGenFunction::ThunkGenFlag;
+  auto options = SILGenFunction::ThunkGenOptions();
+
   SmallVector<ManagedValue, 8> params;
   SmallVector<ManagedValue, 8> indirectResults;
   SmallVector<ManagedValue, 1> indirectErrorResults;
@@ -6088,10 +6091,11 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
   // Forward the implicit isolation parameter.
   if (implicitIsolationParam.isValid()) {
     argValues.push_back(implicitIsolationParam.getValue());
+    options |= ThunkGenFlag::CalleeHasImplicitIsolatedParam;
   }
 
    // Add the rest of the arguments.
-  forwardFunctionArguments(SGF, loc, fnType, params, argValues);
+  forwardFunctionArguments(SGF, loc, fnType, params, argValues, options);
 
   auto fun = fnType->isCalleeGuaranteed() ? fnValue.borrow(SGF, loc).getValue()
                                           : fnValue.forward(SGF);
@@ -6250,7 +6254,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   auto loc = F.getLocation();
   SILGenFunctionBuilder fb(SGM);
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
+    loc, name, thunkDeclType, F.getActorIsolation(), IsBare, IsTransparent, IsSerialized,
       ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible);
 
@@ -6608,13 +6612,13 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   // linkage of derivative thunks so we can serialize them (the original
   // function itself might be HiddenExternal in this case if we only have
   // declaration without definition).
-  auto linkage = originalFn->markedAsAlwaysEmitIntoClient()
+  auto linkage = originalFn->isAlwaysEmitIntoClient()
                      ? SILLinkage::PublicNonABI
                      : stripExternalFromLinkage(originalFn->getLinkage());
 
   auto *thunk = fb.getOrCreateFunction(
-      loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
-      customDerivativeFn->getSerializedKind(),
+      loc, name, linkage, thunkFnTy, customDerivativeFn->getActorIsolation(),
+      IsBare, IsNotTransparent, customDerivativeFn->getSerializedKind(),
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->isDistributed(),
       customDerivativeFn->isRuntimeAccessible(),
@@ -7165,6 +7169,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
       switch (baseIsolation) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedConcurrent:
       case ActorIsolation::NonisolatedUnsafe:
         return emitNonIsolatedIsolation(loc).getValue();
       case ActorIsolation::Erased:
@@ -7175,11 +7180,12 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
         return emitGlobalActorIsolation(loc, globalActor).getValue();
       }
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::CallerIsolationInheriting: {
+      case ActorIsolation::NonisolatedNonsending: {
         auto derivedIsolation = getDerivedIsolation();
         switch (derivedIsolation) {
         case ActorIsolation::Unspecified:
         case ActorIsolation::Nonisolated:
+        case ActorIsolation::NonisolatedConcurrent:
         case ActorIsolation::NonisolatedUnsafe:
           return emitNonIsolatedIsolation(loc).getValue();
         case ActorIsolation::Erased:
@@ -7191,7 +7197,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
           return emitGlobalActorIsolation(loc, globalActor).getValue();
         }
         case ActorIsolation::ActorInstance:
-        case ActorIsolation::CallerIsolationInheriting: {
+        case ActorIsolation::NonisolatedNonsending: {
           auto isolatedArg = F.maybeGetIsolatedArgument();
           assert(isolatedArg);
           return isolatedArg;
@@ -7206,8 +7212,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     // If our derived isolation is caller isolation inheriting and our base
     // isn't, we need to insert a hop so that derived can assume that it does
     // not have to hop in its prologue.
-    if (!baseIsolation.isCallerIsolationInheriting() &&
-        getDerivedIsolation().isCallerIsolationInheriting()) {
+    if (!baseIsolation.isNonisolatedNonsending() &&
+        getDerivedIsolation().isNonisolatedNonsending()) {
       B.createHopToExecutor(loc, args.back(), false /*mandatory*/);
     }
   }
@@ -7675,6 +7681,7 @@ void SILGenFunction::emitProtocolWitness(
       switch (reqtIsolation) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedConcurrent:
       case ActorIsolation::NonisolatedUnsafe:
         return emitNonIsolatedIsolation(loc).getValue();
       case ActorIsolation::Erased:
@@ -7685,11 +7692,12 @@ void SILGenFunction::emitProtocolWitness(
         return emitGlobalActorIsolation(loc, globalActor).getValue();
       }
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::CallerIsolationInheriting: {
+      case ActorIsolation::NonisolatedNonsending: {
         auto witnessIsolation = getWitnessIsolation();
         switch (witnessIsolation) {
         case ActorIsolation::Unspecified:
         case ActorIsolation::Nonisolated:
+        case ActorIsolation::NonisolatedConcurrent:
         case ActorIsolation::NonisolatedUnsafe:
           return emitNonIsolatedIsolation(loc).getValue();
         case ActorIsolation::Erased:
@@ -7701,7 +7709,7 @@ void SILGenFunction::emitProtocolWitness(
           return emitGlobalActorIsolation(loc, globalActor).getValue();
         }
         case ActorIsolation::ActorInstance:
-        case ActorIsolation::CallerIsolationInheriting: {
+        case ActorIsolation::NonisolatedNonsending: {
           auto isolatedArg = F.maybeGetIsolatedArgument();
           assert(isolatedArg);
           return isolatedArg;
@@ -7717,8 +7725,8 @@ void SILGenFunction::emitProtocolWitness(
     // isolation is caller isolation inheriting, hop onto the reqtIsolation so
     // that it is safe for our witness to assume that it is already on its
     // actor.
-    if (!reqtIsolation.isCallerIsolationInheriting() &&
-        getWitnessIsolation().isCallerIsolationInheriting()) {
+    if (!reqtIsolation.isNonisolatedNonsending() &&
+        getWitnessIsolation().isNonisolatedNonsending()) {
       B.createHopToExecutor(loc, args.back(), false /*mandatory*/);
     }
   }

@@ -49,6 +49,7 @@ KNOWN_SETTINGS=(
     verbose-build                                 ""                "print the commands executed during the build"
     check-args-only                               ""                "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
     only-execute                                  "all"             "Only execute the named action (see implementation)"
+    continue-on-test-failure                      ""                "continue building and testing remaining targets even if a test target fails"
     check-incremental-compilation                 "0"               "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
     enable-array-cow-checks                       "0"               "set tp 1 compile the stdlib with Array COW checks enabled (only relevant for assert builds)"
 
@@ -339,7 +340,9 @@ function call() {
     if [[ ! ${DRY_RUN} ]]; then
         { set -x; } 2>/dev/null
         "$@"
+        local exit_code=$?
         { set +x; } 2>/dev/null
+        return $exit_code
     fi
 }
 
@@ -2334,6 +2337,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
                     -DFoundation_DIR=$(build_directory ${host} foundation)/cmake/modules
                     -DSwiftTesting_DIR=$(build_directory ${host} swifttesting)/cmake/modules
+                    -DSwiftTestingMacros_DIR=$(build_directory ${host} swifttestingmacros)/cmake/modules
                     -DLLVM_DIR=$(build_directory ${host} llvm)/lib/cmake/llvm
 
                     -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE:PATH=${LIBDISPATCH_SOURCE_DIR}
@@ -2607,6 +2611,8 @@ tests_busted ()
     echo "*** Failed while running tests for $1 $2"
 }
 
+all_failed_targets=()
+
 for host in "${ALL_HOSTS[@]}"; do
     # Skip this pass when the only action to execute can't match.
     if ! [[ $(should_execute_host_actions_for_phase ${host} test) ]]; then
@@ -2821,14 +2827,21 @@ for host in "${ALL_HOSTS[@]}"; do
         for target in "${results_targets[@]}"; do
             if [[ "${target}" != "" ]]; then
                 echo "--- ${target} ---"
-                trap "tests_busted ${product} '(${target})'" ERR
 
                 test_target="$target"
                 if [[ ${test_target} == check-swift* ]] && [[ "${TEST_PATHS}" ]]; then
                     test_target="${test_target}-custom"
                 fi
 
-                call "${build_cmd[@]}" ${test_target}
+                if [[ "${CONTINUE_ON_TEST_FAILURE}" ]]; then
+                    call "${build_cmd[@]}" ${test_target} || {
+                        tests_busted ${product} "(${target})"
+                        all_failed_targets+=("${target}")
+                    }
+                else
+                    trap "tests_busted ${product} '(${target})'" ERR
+                    call "${build_cmd[@]}" ${test_target}
+                fi
 
                 echo "-- ${target} finished --"
             fi
@@ -2839,6 +2852,16 @@ for host in "${ALL_HOSTS[@]}"; do
     done
 done
 # END OF TEST PHASE
+
+if [[ ${#all_failed_targets[@]} -gt 0 ]]; then
+    # Save failed test targets to a text file and exit with an error.
+    # The text file is later used by build-script to print test summaries.
+    for t in "${all_failed_targets[@]}"; do
+        printf "%s\n" "${t}" \
+            >> "${BUILD_DIR}/.swift-build-failed-test-targets"
+    done
+    exit 1
+fi
 
 
 LIPO_SRC_DIRS=()

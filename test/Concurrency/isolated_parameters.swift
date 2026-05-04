@@ -218,7 +218,7 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
 @MainActor func callFromMainActor(ns: NotSendable) async {
   await optionalIsolated(ns, to: nil)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending main actor-isolated 'ns' to nonisolated global function 'optionalIsolated(_:to:)' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-note @-2 {{sending main actor-isolated 'ns' to @concurrent global function 'optionalIsolated(_:to:)' risks causing data races between @concurrent and main actor-isolated uses}}
 
   optionalIsolatedSync(ns, to: nil)
 
@@ -331,6 +331,19 @@ public actor MyActorIsolatedParameterMerge {
 // rdar://138394497
 class ClassWithIsolatedAsyncInitializer {
     init(isolation: isolated (any Actor)? = #isolation) async {}
+}
+
+// Subscripts
+struct SubscriptTest {
+  subscript(x: isolated (any Actor)? = #isolation) -> Int { return 0 }
+}
+
+func f1(x: (any Actor)?) async {
+  _ = await SubscriptTest()[x]
+}
+
+func f2() async {
+  _ = await SubscriptTest()[]
 }
 
 // https://github.com/swiftlang/swift/issues/80992

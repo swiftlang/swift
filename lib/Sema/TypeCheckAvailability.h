@@ -87,7 +87,9 @@ enum class ExportabilityReason : unsigned {
   PublicVarDecl,
   ImplicitlyPublicVarDecl,
   ImplicitlyPublicVarDeclOpenClass,
-  ImplicitlyPublicVarDeclClassDeinit,
+  ImplicitlyPublicVarDeclMissingAttribute,
+  ImplicitlyPublicVarDeclMissingDeinit,
+  ImplicitlyPublicVarDeclMissingAttributeAndDeinit,
   AssociatedValue,
   ImplicitlyPublicAssociatedValue,
 };

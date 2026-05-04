@@ -60,7 +60,7 @@ func inlinableCaller(_ s: inout S<Z>) {
   s.x = Z()
 }
 
-// CHECK-LABEL: sil non_abi [serialized] [ossa] @$s11back_deploy10aeicCalleryyAA1SVyAA1ZVGzF
+// CHECK-LABEL: sil non_abi [serialized] [export_implementation] [ossa] @$s11back_deploy10aeicCalleryyAA1SVyAA1ZVGzF
 @_alwaysEmitIntoClient
 func aeicCaller(_ s: inout S<Z>) {
   // CHECK: function_ref @$s11back_deploy8someFuncyyFTwb : $@convention(thin) () -> ()

@@ -1362,3 +1362,186 @@ func testNestedClosuresMixedSendability() {
     }
   }
 }
+
+// Inner closure in this example gets specialized and it's important to make sure that it gets the right isolation
+// and the reference to `ns` doesn't get diagnosed.
+func testCaptureWithClosureSpecialization() {
+  @MainActor func test(_: @escaping @MainActor () async -> Void) async {}
+
+  @MainActor
+  class Test {
+    func compute() async {
+      var ns: KlassNonsendable? = .init()
+      // expected-warning@-1 {{variable 'ns' was never mutated; consider changing to 'let' constant}}
+
+      await test {
+        if let ns {
+          Task {
+            await Self.takesNS(ns)
+          }
+        }
+      }
+    }
+
+    static func takesNS(_: KlassNonsendable) async {}
+  }
+}
+
+////////////////////////////////
+// MARK: Use After Send Tests //
+////////////////////////////////
+//
+// These exist in other places (e.x.: transfernonsendable.swift), but I would
+// like to put some here as well that are more exhaustive.
+
+func useAfterFreeClosureTests() {
+  func acceptsSendingClosure(_ x: sending () -> ()) {}
+  func acceptsEscapingSendingClosure(_ x: sending @escaping () -> ()) {}
+  func acceptsAutoclosureSendingClosure(_ x: sending @autoclosure () -> ()) {}
+  func acceptsAutoclosureEscapingSendingClosure(_ x: sending @autoclosure @escaping () -> ()) {}
+
+  func simpleTestMutableCopyableNonsendable() {
+    var x = KlassNonsendable()
+    x = KlassNonsendable()
+    acceptsSendingClosure {
+      _ = x // expected-error {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+    }
+    useValue(x) // expected-note {{access can happen concurrently}}
+  }
+
+  // In this case, we do not error since we are not escaping x meaning that we
+  // stack promote it. Since we stack promote it, we know that the memory cannot
+  // escape, so the value is ok to be written to since we are not escaping a
+  // non-Sendable box.
+  func simpleTestMutableCopyableSendable() {
+    var x = KlassSendable()
+    x = KlassSendable()
+    acceptsSendingClosure {
+      useValue(x)
+      x = KlassSendable()
+    }
+    useValue(x)
+    x = KlassSendable()
+    _ = x
+  }
+
+  func simpleTestMutableNoncopyableNonsendable() {
+    var x = NoncopyableStructNonsendable()
+    x = NoncopyableStructNonsendable()
+    acceptsSendingClosure {
+      _ = x // expected-error {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+      x = NoncopyableStructNonsendable()
+    }
+    useValue(x) // expected-note {{access can happen concurrently}}
+  }
+
+  // In this case, we do not error since we are not escaping x meaning that we
+  // stack promote it. Since we stack promote it, we know that the memory cannot
+  // escape, so the value is ok to be written to since we are not escaping a
+  // non-Sendable box.
+  func simpleTestMutableNoncopyableSendable() {
+    var x = NoncopyableStructSendable()
+    x = NoncopyableStructSendable()
+    acceptsSendingClosure {
+      _ = x
+      x = NoncopyableStructSendable()
+    }
+    x = NoncopyableStructSendable()
+  }
+
+  func simpleTestEscapingClosureMutableCopyableNonsendable() {
+    var x = KlassNonsendable()
+    x = KlassNonsendable()
+    acceptsEscapingSendingClosure {
+      _ = x // expected-error {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+    }
+    useValue(x) // expected-note {{access can happen concurrently}}
+  }
+
+  func simpleTestEscapingClosureMutableCopyableSendable() {
+    var x = KlassSendable()
+    x = KlassSendable()
+    acceptsEscapingSendingClosure {
+      x = KlassSendable() // expected-error {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'x' which is accessed later by code in the current task}}
+    }
+    x = KlassSendable() // expected-note {{access can happen concurrently}}
+    _ = x
+  }
+
+  func simpleTestEscapingClosureMutableNoncopyableNonsendable() {
+    var x = NoncopyableStructNonsendable()
+    x = NoncopyableStructNonsendable()
+    acceptsEscapingSendingClosure {
+      x = NoncopyableStructNonsendable() // expected-error {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+    }
+    useValue(x) // expected-note {{access can happen concurrently}}
+  }
+
+  func simpleTestEscapingClosureMutableNoncopyableSendable() {
+    var x = NoncopyableStructSendable() // expected-warning {{variable 'x' was written to, but never read}}
+    x = NoncopyableStructSendable()
+    acceptsEscapingSendingClosure {
+      x = NoncopyableStructSendable() // expected-error {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'x' which is accessed later by code in the current task}}
+    }
+    x = NoncopyableStructSendable() // expected-note {{access can happen concurrently}}
+  }
+
+  func simpleTestAutoclosureMutableCopyableNonsendable() {
+    var x = KlassNonsendable()
+    x = KlassNonsendable()
+    acceptsAutoclosureSendingClosure(useValue(x)) // expected-error {{'x' cannot be captured by 'sending' @autoclosure parameter because 'x' is accessed later in the current task}}
+    useValue(x) // expected-note {{access can happen concurrently}}
+  }
+
+  func simpleTestAutoclosureMutableCopyableSendable() {
+    var x = KlassSendable()
+    x = KlassSendable()
+    acceptsAutoclosureSendingClosure(useValue(x))
+    useValue(x)
+    x = KlassSendable()
+    _ = x
+  }
+
+  func simpleTestAutoclosureMutableNoncopyableNonsendable() {
+    var x = NoncopyableStructNonsendable()
+    x = NoncopyableStructNonsendable()
+    acceptsAutoclosureSendingClosure(useValue(x)) // expected-error {{'x' cannot be captured by 'sending' @autoclosure parameter because 'x' is accessed later in the current task}}
+    useValue(x) // expected-note {{access can happen concurrently}}
+  }
+
+  func simpleTestAutoclosureMutableNoncopyableSendable() {
+    var x = NoncopyableStructSendable()
+    x = NoncopyableStructSendable()
+    acceptsAutoclosureSendingClosure(useValue(x))
+    x = NoncopyableStructSendable()
+  }
+
+  func simpleTestEscapingAutoclosureMutableCopyableNonsendable() {
+    var x = KlassNonsendable()
+    x = KlassNonsendable()
+    acceptsAutoclosureEscapingSendingClosure(useValue(x)) // expected-error {{'x' cannot be captured by 'sending' @autoclosure parameter because 'x' is accessed later in the current task}}
+    useValue(x) // expected-note {{access can happen concurrently}}
+  }
+
+  func simpleTestEscapingAutoclosureMutableCopyableSendable() {
+    var x = KlassSendable()
+    x = KlassSendable()
+    acceptsAutoclosureEscapingSendingClosure(useValue(x)) // expected-error {{mutable var 'x' cannot be captured by 'sending' @autoclosure parameter because 'x' is accessed later in the current task}}
+    x = KlassSendable() // expected-note {{access can happen concurrently}}
+    _ = x
+  }
+
+  func simpleTestEscapingAutoclosureMutableNoncopyableNonsendable() {
+    var x = NoncopyableStructNonsendable()
+    x = NoncopyableStructNonsendable()
+    acceptsAutoclosureEscapingSendingClosure(useValue(x)) // expected-error {{'x' cannot be captured by 'sending' @autoclosure parameter because 'x' is accessed later in the current task}}
+    useValue(x) // expected-note {{access can happen concurrently}}
+  }
+
+  func simpleTestEscapingAutoclosureMutableNoncopyableSendable() {
+    var x = NoncopyableStructSendable()
+    x = NoncopyableStructSendable()
+    acceptsAutoclosureEscapingSendingClosure(useValue(x)) // expected-error {{mutable var 'x' cannot be captured by 'sending' @autoclosure parameter because 'x' is accessed later in the current task}}
+    x = NoncopyableStructSendable() // expected-note {{access can happen concurrently}}
+  }
+}

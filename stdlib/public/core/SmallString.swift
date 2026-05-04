@@ -157,7 +157,7 @@ extension _SmallString {
 
     // No bits should be set between the last code unit and the discriminator
     var copy = self
-    unsafe withUnsafeBytes(of: &copy._storage) {
+    withUnsafeBytes(of: &copy._storage) {
       unsafe _internalInvariant(
         $0[count..<_SmallString.capacity].allSatisfy { $0 == 0 })
     }
@@ -271,7 +271,7 @@ extension _SmallString {
   fileprivate mutating func withMutableCapacity<E: Error>(
     _ f: (UnsafeMutableRawBufferPointer) throws(E) -> Int
   ) throws(E) {
-    let len = try unsafe withUnsafeMutableBytes(of: &_storage) { buffer throws(E) in
+    let len = try withUnsafeMutableBytes(of: &_storage) { buffer throws(E) in
       try unsafe f(.init(start: buffer.baseAddress, count: _SmallString.capacity))
     }
 

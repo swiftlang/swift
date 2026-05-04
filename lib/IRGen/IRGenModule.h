@@ -318,6 +318,13 @@ private:
 public:
   /// The set of eagerly emitted opaque types.
   llvm::SmallPtrSet<OpaqueTypeDecl *, 4> EmittedNonLazyOpaqueTypeDecls;
+
+  /// A record of all ExtensionDescriptors emitted for protocol-to-protocol
+  /// conformances, as two such LinkEntity's can be unequal
+  /// (point to different extensions of the same protocol) but name the same
+  /// symbol ultimately, because the two extensions may have the same
+  /// generic signature, etc.
+  llvm::DenseSet<ExtensionDecl*> AllConformanceOfProtocolExtensionDescriptors;
 private:
 
   /// The queue of lazy field metadata records to emit.
@@ -1795,7 +1802,8 @@ public:
   llvm::GlobalValue *defineTypeMetadata(
       CanType concreteType, bool isPattern, bool isConstant,
       ConstantInitFuture init, llvm::StringRef section = {},
-      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {},
+      unsigned numConformanceEntries = 0);
 
   TypeEntityReference
   getContextDescriptorEntityReference(const LinkEntity &entity);

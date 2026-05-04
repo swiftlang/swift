@@ -428,7 +428,7 @@ public:
           builder.createCopyAddr(loc, optAddr, tempAddr, IsNotTake, IsInitialization);
           
           // Unwrap the optional.
-          auto objAddr = builder.createUncheckedTakeEnumDataAddr(loc, tempAddr, someDecl, objType);
+          auto objAddr = builder.createUncheckedInPlaceEnumDataAddr(loc, tempAddr, someDecl, objType);
           
           callback(objAddr);
           
@@ -452,7 +452,7 @@ public:
           auto objAddr = builder.createAllocStack(loc, objType);
           
           // Unwrap the optional and copy it to the new buffer.
-          auto unwrappedAddr = builder.createUncheckedTakeEnumDataAddr(loc, optAddr, someDecl, objType);
+          auto unwrappedAddr = builder.createUncheckedInPlaceEnumDataAddr(loc, optAddr, someDecl, objType);
           builder.createCopyAddr(loc, unwrappedAddr, objAddr, IsTake, IsInitialization);
           
           callback(objAddr);
@@ -510,7 +510,7 @@ public:
       builder.createCopyAddr(loc, optAddr, tempAddr, IsNotTake, IsInitialization);
       
       // Unwrap the optional.
-      auto objAddr = builder.createUncheckedTakeEnumDataAddr(loc, tempAddr, someDecl, objType);
+      auto objAddr = builder.createUncheckedInPlaceEnumDataAddr(loc, tempAddr, someDecl, objType);
       BeginAccessInst *origBeginAccess = beginAccess;
       
       // at the end of the projection, callback will store a value in optionalChainResult

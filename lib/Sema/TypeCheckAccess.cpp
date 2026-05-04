@@ -25,6 +25,7 @@
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ExportKind.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -2178,9 +2179,12 @@ swift::getDisallowedOriginKind(const Decl *decl,
           Feature::AssumeResilientCxxTypes))
     return DisallowedOriginKind::FragileCxxAPI;
 
-  // Implementation-only memory layouts for non-library-evolution mode.
-  if (isa<NominalTypeDecl>(decl) &&
-      decl->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+  // Implementation-only declarations for non-library-evolution mode.
+  auto varDecl = dyn_cast<VarDecl>(decl);
+  if (decl->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+      (isa<NominalTypeDecl>(decl) ||
+       (varDecl && varDecl->hasStorage() &&
+        isa<ClassDecl>(varDecl->getDeclContext()))))
     return DisallowedOriginKind::ImplementationOnlyMemoryLayout;
 
   // Report non-public import last as it can be ignored by the caller.
@@ -2299,7 +2303,8 @@ public:
   }
 
   /// Pick the appropriate \c ExportabilityReason for stored properties.
-  ExportabilityReason getVarDeclExportabilityReason() const {
+  ExportabilityReason
+  getVarDeclExportabilityReason(const VarDecl *varDecl) const {
     // If explicit use library-evolution style reason.
     if (Where.getExportedLevel() != ExportedLevel::ImplicitlyExported)
       return ExportabilityReason::PublicVarDecl;
@@ -2309,8 +2314,26 @@ public:
     if (CD) {
       if (CD->getFormalAccess() == AccessLevel::Open)
         return ExportabilityReason::ImplicitlyPublicVarDeclOpenClass;
-      else if (CD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
-        return ExportabilityReason::ImplicitlyPublicVarDeclClassDeinit;
+
+      if (CD->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        // Check whether an embedded requirement is missing.
+        bool hasAttr = varDecl &&
+            varDecl->getAttrs().hasAttribute<ImplementationOnlyAttr>();
+        bool hasDeinit = false;
+        if (auto *destructor = CD->getDestructor())
+          if (destructor->isNeverEmittedIntoClient())
+            hasDeinit = true;
+
+        if (!hasDeinit && !hasAttr)
+          return ExportabilityReason::
+              ImplicitlyPublicVarDeclMissingAttributeAndDeinit;
+        else if (!hasDeinit)
+          return ExportabilityReason::
+              ImplicitlyPublicVarDeclMissingDeinit;
+        else if (!hasAttr)
+          return ExportabilityReason::
+              ImplicitlyPublicVarDeclMissingAttribute;
+      }
     }
 
     return ExportabilityReason::ImplicitlyPublicVarDecl;
@@ -2414,7 +2437,8 @@ public:
     if (seenVars.count(theVar))
       return;
 
-    auto reason = getVarDeclExportabilityReason();
+    auto reason = getVarDeclExportabilityReason(theVar);
+
     checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar,
               reason);
 
@@ -2437,7 +2461,8 @@ public:
       anyVar = V;
     });
 
-    auto reason = getVarDeclExportabilityReason();
+    auto reason = getVarDeclExportabilityReason(anyVar);
+
     checkType(TP->hasType() ? TP->getType() : Type(),
               TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD,
               reason);

@@ -1860,7 +1860,7 @@ bb0(%0 : $Optional<A>, %1 : @guaranteed $OptionalKlassWrapper):
   switch_enum_addr %2 : $*Optional<A>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
-  %5 = unchecked_take_enum_data_addr %2 : $*Optional<A>, #Optional.some!enumelt
+  %5 = unchecked_inplace_enum_data_addr %2 : $*Optional<A>, #Optional.some!enumelt
   %6 = load [trivial] %5 : $*A
   br bb3(%6 : $A)
 
@@ -2055,3 +2055,46 @@ bb9:
   return %23
 }
 
+struct NCWrapper : ~Copyable {
+  var val: Builtin.Int64
+  deinit
+}
+
+enum NCOptional : ~Copyable {
+  case some(NCWrapper)
+  case none
+}
+
+// CHECK-LABEL: sil [ossa] @test_switch_enum_thread_overconsume :
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'test_switch_enum_thread_overconsume'
+sil [ossa] @test_switch_enum_thread_overconsume : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %stk = alloc_stack $NCWrapper
+  cond_br undef, bb_init, bb_none
+
+bb_init:
+  %w = struct $NCWrapper (%0 : $Builtin.Int64)
+  %some = enum $NCOptional, #NCOptional.some!enumelt, %w : $NCWrapper
+  br bb_switch(%some : $NCOptional)
+
+bb_none:
+  %none = enum $NCOptional, #NCOptional.none!enumelt
+  br bb_switch(%none : $NCOptional)
+
+bb_switch(%opt : @owned $NCOptional):
+  switch_enum %opt : $NCOptional, case #NCOptional.some!enumelt: bb_some, case #NCOptional.none!enumelt: bb_use_none
+
+bb_some(%val : @owned $NCWrapper):
+  store %val to [init] %stk : $*NCWrapper
+  destroy_addr %stk : $*NCWrapper
+  br bb_exit
+
+bb_use_none:
+  br bb_exit
+
+bb_exit:
+  dealloc_stack %stk : $*NCWrapper
+  %r = tuple ()
+  return %r : $()
+}

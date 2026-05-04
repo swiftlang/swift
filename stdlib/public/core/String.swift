@@ -424,7 +424,7 @@ extension String {
     C: Collection
   >(_ input: C) -> (result: String, repairsMade: Bool) {
     _internalInvariant(C.Element.self == UInt8.self)
-    return unsafe Array(input).withUnsafeBufferPointer {
+    return Array(input).withUnsafeBufferPointer {
       unsafe UnsafeRawBufferPointer($0).withMemoryRebound(to: UInt8.self) {
         unsafe String._fromUTF8Repairing($0)
       }
@@ -545,7 +545,7 @@ extension String {
       }
     )
     if error { return nil }
-    self = unsafe transcoded.withUnsafeBufferPointer{
+    self = transcoded.withUnsafeBufferPointer{
       unsafe String._uncheckedFromUTF8($0, asciiPreScanResult: isASCII)
     }
   }
@@ -644,6 +644,7 @@ extension String {
 #if hasFeature(Embedded)
   @_alwaysEmitIntoClient @inline(__always)
   @available(SwiftStdlib 5.3, *)
+  @safe
   public init<E: Error>(
     unsafeUninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
@@ -675,6 +676,7 @@ extension String {
 #else
   @_alwaysEmitIntoClient @inline(__always)
   @available(SwiftStdlib 5.3, *)
+  @safe
   public init<E: Error>(
     unsafeUninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
@@ -759,6 +761,7 @@ extension String {
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient // (Primarily @inlinable) fast-path: already C-string compatible
+  @safe
   public func withCString<Result, E: Error>(
     _ body: (UnsafePointer<Int8>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -776,7 +779,7 @@ extension String {
   internal func __rethrows_withCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) throws -> Result {
-    return try unsafe withCString(body)
+    return try withCString(body)
   }
 #endif // !hasFeature(Embedded)
 
@@ -798,12 +801,13 @@ extension String {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
   @inline(__always) // Eliminate dynamic type check when possible
+  @safe
   public func withCString<Result, TargetEncoding: Unicode.Encoding, E: Error>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
   ) throws(E) -> Result {
     if targetEncoding == UTF8.self {
-      return try unsafe self.withCString {
+      return try self.withCString {
         (cPtr: UnsafePointer<CChar>) throws(E) -> Result  in
         _internalInvariant(UInt8.self == TargetEncoding.CodeUnit.self)
         let ptr = unsafe UnsafeRawPointer(cPtr).assumingMemoryBound(
@@ -827,7 +831,7 @@ extension String {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) throws -> Result {
-    return try unsafe withCString(encodedAs: targetEncoding, body)
+    return try withCString(encodedAs: targetEncoding, body)
   }
 #endif // !hasFeature(Embedded)
 
@@ -1140,7 +1144,7 @@ extension String {
   @_effects(releasenone)
   public func lowercased() -> String {
     if _fastPath(_guts.isFastASCII) {
-      return unsafe _guts.withFastUTF8 { utf8 in
+      return _guts.withFastUTF8 { utf8 in
         return unsafe String(_uninitializedCapacity: utf8.count) { buffer in
           for i in 0 ..< utf8.count {
             unsafe buffer[i] = unsafe _lowercaseASCII(utf8[i])
@@ -1174,7 +1178,7 @@ extension String {
   @_effects(releasenone)
   public func uppercased() -> String {
     if _fastPath(_guts.isFastASCII) {
-      return unsafe _guts.withFastUTF8 { utf8 in
+      return _guts.withFastUTF8 { utf8 in
         return unsafe String(_uninitializedCapacity: utf8.count) { buffer in
           for i in 0 ..< utf8.count {
             unsafe buffer[i] = unsafe _uppercaseASCII(utf8[i])

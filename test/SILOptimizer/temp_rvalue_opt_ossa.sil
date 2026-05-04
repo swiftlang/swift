@@ -543,7 +543,7 @@ bb2:
   br bb5
 
 bb3:
-  %27 = unchecked_take_enum_data_addr %10 : $*Optional<Element>, #Optional.some!enumelt
+  %27 = unchecked_inplace_enum_data_addr %10 : $*Optional<Element>, #Optional.some!enumelt
   %28 = init_enum_data_addr %0 : $*Optional<Element>, #Optional.some!enumelt
   copy_addr [take] %27 to [init] %28 : $*Element
   dealloc_stack %10 : $*Optional<Element>
@@ -698,7 +698,7 @@ bb0(%0 : $*Klass):
 sil [ossa] @getP : $@convention(thin) () -> @out Optional<P>
 
 // CHECK-LABEL: sil [ossa] @handle_open_existential_addr : $@convention(thin) () -> () {
-// CHECK: [[P:%.*]] = unchecked_take_enum_data_addr
+// CHECK: [[P:%.*]] = unchecked_inplace_enum_data_addr
 // CHECK-NOT: copy_addr
 // CHECK: open_existential_addr immutable_access [[P]]
 // CHECK: }
@@ -710,7 +710,7 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
+  %9 = unchecked_inplace_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [init] %10 : $*P
   %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self
@@ -743,7 +743,7 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
+  %9 = unchecked_inplace_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [init] %10 : $*P
   destroy_addr %2 : $*Optional<P>
@@ -777,7 +777,7 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
+  %9 = unchecked_inplace_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [init] %10 : $*P
   %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637", P) Self
@@ -1074,12 +1074,12 @@ bb3:
 // CHECK: } // end sil function 'unchecked_take_enum_data_addr_rvalue_simple'
 sil [ossa] @unchecked_take_enum_data_addr_rvalue_simple : $@convention(thin) <B> (@in_guaranteed Optional<GS<B>>, @inout Optional<GS<B>>) -> () {
 bb0(%0 : $*Optional<GS<B>>, %1 : $*Optional<GS<B>>):
-  %0a = unchecked_take_enum_data_addr %0 : $*Optional<GS<B>>, #Optional.some!enumelt
+  %0a = unchecked_inplace_enum_data_addr %0 : $*Optional<GS<B>>, #Optional.some!enumelt
   %2 = struct_element_addr %0a : $*GS<B>, #GS._value
   %3 = load [trivial] %2 : $*Builtin.Int64
   %4 = alloc_stack $Optional<GS<B>>
   copy_addr %1 to [init] %4 : $*Optional<GS<B>>
-  %4a = unchecked_take_enum_data_addr %4 : $*Optional<GS<B>>, #Optional.some!enumelt
+  %4a = unchecked_inplace_enum_data_addr %4 : $*Optional<GS<B>>, #Optional.some!enumelt
   %6 = struct_element_addr %4a : $*GS<B>, #GS._value
   %7 = load [trivial] %6 : $*Builtin.Int64
   %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
@@ -1096,12 +1096,12 @@ bb0(%0 : $*Optional<GS<B>>, %1 : $*Optional<GS<B>>):
 // CHECK: } // end sil function 'unchecked_take_enum_data_addr_store_rvalue_simple'
 sil [ossa] @unchecked_take_enum_data_addr_store_rvalue_simple : $@convention(thin) (@in_guaranteed Optional<GS<Klass>>, @owned Optional<GS<Klass>>) -> () {
 bb0(%0 : $*Optional<GS<Klass>>, %1 : @owned $Optional<GS<Klass>>):
-  %0a = unchecked_take_enum_data_addr %0 : $*Optional<GS<Klass>>, #Optional.some!enumelt
+  %0a = unchecked_inplace_enum_data_addr %0 : $*Optional<GS<Klass>>, #Optional.some!enumelt
   %2 = struct_element_addr %0a : $*GS<Klass>, #GS._value
   %3 = load [trivial] %2 : $*Builtin.Int64
   %4 = alloc_stack $Optional<GS<Klass>>
   store %1 to [init] %4 : $*Optional<GS<Klass>>
-  %4a = unchecked_take_enum_data_addr %4 : $*Optional<GS<Klass>>, #Optional.some!enumelt
+  %4a = unchecked_inplace_enum_data_addr %4 : $*Optional<GS<Klass>>, #Optional.some!enumelt
   %6 = struct_element_addr %4a : $*GS<Klass>, #GS._value
   %7 = load [trivial] %6 : $*Builtin.Int64
   %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
@@ -1372,7 +1372,7 @@ bb0(%0 : $*NCWithDeinit):
 // CHECK-LABEL: sil [ossa] @test_temprvoborrowboundary1 :
 // CHECK-NOT:     alloc_stack
 // CHECK-NOT:     copy_addr
-// CHECK:         [[ADDR:%.*]] = unchecked_take_enum_data_addr %0 : $*FakeOptional<NonTrivialStruct>, #FakeOptional.some!enumelt
+// CHECK:         [[ADDR:%.*]] = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<NonTrivialStruct>, #FakeOptional.some!enumelt
 // CHECK:         [[ELE:%.*]] = struct_element_addr [[ADDR]] : $*NonTrivialStruct, #NonTrivialStruct.val
 // CHECK:         [[LD:%.*]] = load_borrow [[ELE]] : $*Klass
 // CHECK:         end_borrow [[LD]] : $Klass
@@ -1381,7 +1381,7 @@ bb0(%0 : $*NCWithDeinit):
 sil [ossa] @test_temprvoborrowboundary1 : $@convention(thin) (@in FakeOptional<NonTrivialStruct>) -> () {
 bb0(%0 : $*FakeOptional<NonTrivialStruct>):
   %1 = alloc_stack $NonTrivialStruct
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<NonTrivialStruct>, #FakeOptional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<NonTrivialStruct>, #FakeOptional.some!enumelt
   copy_addr [take] %2 to [init] %1 : $*NonTrivialStruct
   %4 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
   %5 = load_borrow %4 : $*Klass
@@ -1399,7 +1399,7 @@ bb0(%0 : $*FakeOptional<NonTrivialStruct>):
 sil [ossa] @test_temprvoborrowboundary2 : $@convention(thin) (@in FakeOptional<NonTrivialStruct>) -> () {
 bb0(%0 : $*FakeOptional<NonTrivialStruct>):
   %1 = alloc_stack $NonTrivialStruct
-  %2 = unchecked_take_enum_data_addr %0, #FakeOptional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0, #FakeOptional.some!enumelt
   copy_addr [take] %2 to [init] %1
   %4 = struct_element_addr %1, #NonTrivialStruct.val
   %5 = load_borrow %4
@@ -1824,7 +1824,7 @@ bb0(%0 : $*Optional<S>, %1 : $Int):
   switch_enum_addr %2, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb3
 
 bb1:
-  %5 = unchecked_take_enum_data_addr %2, #Optional.some!enumelt
+  %5 = unchecked_inplace_enum_data_addr %2, #Optional.some!enumelt
   %6 = struct_element_addr %5, #S.i
   %7 = load [trivial] %6
   destroy_addr %5

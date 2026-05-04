@@ -23,4 +23,10 @@ TemplatesTestSuite.test("typedeffed-template-template-parameter") {
 //   expectEqual(templatedWrappedMagicInt.getValuePlusTwiceTheArg(10), 62)
 // }
 
+TemplatesTestSuite.test("template-template-parameter-distinct-names") {
+  var x = HasTraits1()
+  var y = HasTraits2()
+  var z = HasNestedTraits()
+}
+
 runAllTests()

@@ -2139,8 +2139,9 @@ void importer::finalizeLookupTable(
             nameImporter.getClangContext().getSourceManager(), diagLoc);
 
         DiagnosticEngine &swiftDiags = nameImporter.getContext().Diags;
-        if (decl->getOwningModule()->IsSystem)
-          continue;
+        if (const auto *owningModule = decl->getOwningModule())
+          if (owningModule->IsSystem)
+            continue;
         swiftDiags.diagnose(swiftSourceLoc, diag::unresolvable_clang_decl,
                             decl->getNameAsString(), swiftName->getName());
         StringRef moduleName =

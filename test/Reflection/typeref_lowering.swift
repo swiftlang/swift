@@ -6,6 +6,9 @@
 // XFAIL: OS=windows-msvc
 // RUN: %empty-directory(%t)
 
+// rdar://173266760
+// XFAIL: OS=freebsd
+
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
 
@@ -1415,5 +1418,3 @@ $1_12TypeLowering10SimpleEnumOBVBW
 // CHECK-32:         (builtin_borrow
 // CHECK-32-NEXT:      (struct TypeLowering.Big))
 // CHECK-32-NEXT:    (borrow size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)
-
-

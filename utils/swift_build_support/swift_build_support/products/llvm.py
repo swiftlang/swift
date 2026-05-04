@@ -361,7 +361,7 @@ class LLVM(cmake_product.CMakeProduct):
             llvm_cmake_options.define(
                 f'BUILTINS_{builtins_runtimes_target_for_darwin}_'
                 'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:'
-                'STRING', 'armv6 armv6m armv7 armv7m armv7em')
+                'STRING', 'armv6 armv6m armv7 armv7m armv7em armv8m.main armv8.1m.main')
 
         llvm_enable_projects = ['clang']
         llvm_enable_runtimes = []
@@ -429,11 +429,6 @@ class LLVM(cmake_product.CMakeProduct):
             # This supports scenarios where tests are run
             # outside of `build-script` (e.g. with `run-test`)
             build_targets.append('LLVMTestingSupport')
-
-        build_root = os.path.dirname(self.build_dir)
-        host_machine_target = targets.StdlibDeploymentTarget.host_target().name
-        host_build_dir = os.path.join(build_root, 'llvm-{}'.format(
-            host_machine_target))
 
         if self.is_cross_compile_target(host_target):
             build_root = os.path.dirname(self.build_dir)

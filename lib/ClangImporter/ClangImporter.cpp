@@ -389,9 +389,11 @@ public:
 
   bool sawDependency(StringRef Filename, bool FromClangModule,
                      bool IsSystem, bool IsClangModuleFile,
+                     bool IsDirectModuleImport,
                      bool IsMissing) override {
     if (!clang::DependencyCollector::sawDependency(Filename, FromClangModule,
                                                    IsSystem, IsClangModuleFile,
+                                                   IsDirectModuleImport,
                                                    IsMissing))
       return false;
     // Currently preserving older ClangImporter behavior of ignoring .pcm
@@ -404,11 +406,13 @@ public:
   }
 
   void maybeAddDependency(StringRef Filename, bool FromModule, bool IsSystem,
-                          bool IsModuleFile, bool IsMissing) override {
+                          bool IsModuleFile, bool IsDirectModuleImport,
+                          bool IsMissing) override {
     if (FileCollector)
       FileCollector->addFile(Filename);
     clang::DependencyCollector::maybeAddDependency(
-        Filename, FromModule, IsSystem, IsModuleFile, IsMissing);
+        Filename, FromModule, IsSystem, IsModuleFile, IsDirectModuleImport,
+        IsMissing);
   }
 };
 } // end anonymous namespace
@@ -737,19 +741,22 @@ void importer::getNormalInvocationArguments(
       invocationArgStrs.push_back("-isystem");
       invocationArgStrs.push_back(std::string(path.str()));
     } else {
-      // On Darwin, Clang uses -isysroot to specify the include
-      // system root. On other targets, it seems to use --sysroot.
+      // Darwin uses -isysroot; other targets use --sysroot=. The distinction
+      // matters because the Clang driver sets D.SysRoot only from --sysroot=,
+      // not -isysroot. Toolchain helpers such as AddClangSystemIncludeArgs and
+      // AddClangCXXStdlibIncludeArgs read D.SysRoot to build include paths, so
+      // omitting --sysroot= on non-Darwin produces broken paths. The driver
+      // automatically forwards --sysroot= to CC1 as -isysroot.
       if (triple.isOSDarwin()) {
         invocationArgStrs.push_back("-isysroot");
         invocationArgStrs.push_back(searchPathOpts.getSDKPath().str());
       } else {
-        if (auto sysroot = searchPathOpts.getSysRoot()) {
-          invocationArgStrs.push_back("--sysroot");
-          invocationArgStrs.push_back(sysroot->str());
-        } else {
-          invocationArgStrs.push_back("--sysroot");
-          invocationArgStrs.push_back(searchPathOpts.getSDKPath().str());
-        }
+        std::string sysroot;
+        if (auto s = searchPathOpts.getSysRoot())
+          sysroot = s->str();
+        else
+          sysroot = searchPathOpts.getSDKPath().str();
+        invocationArgStrs.emplace_back("--sysroot=" + sysroot);
       }
     }
   }
@@ -817,6 +824,20 @@ void importer::getNormalInvocationArguments(
 
   if (!LangOpts.DisableSafeInteropWrappers)
     invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
+
+  if (ctx.SILOpts.Sanitizers & SanitizerKind::Address)
+    invocationArgStrs.push_back("-fsanitize=address");
+  if (ctx.SILOpts.Sanitizers & SanitizerKind::Thread)
+    invocationArgStrs.push_back("-fsanitize=thread");
+  if (ctx.SILOpts.Sanitizers & SanitizerKind::Undefined)
+    invocationArgStrs.push_back("-fsanitize=undefined");
+  if (ctx.SILOpts.Sanitizers & SanitizerKind::MemTagStack) {
+    invocationArgStrs.push_back("-fsanitize=memtag-stack");
+    invocationArgStrs.push_back("-Xclang");
+    invocationArgStrs.push_back("-target-feature");
+    invocationArgStrs.push_back("-Xclang");
+    invocationArgStrs.push_back("+mte");
+  }
 }
 
 static void
@@ -2252,7 +2273,7 @@ bool ClangImporter::emitBridgingPCH(
   FrontendOpts.ProgramAction = clang::frontend::GeneratePCH;
 
   auto action = wrapActionForIndexingIfEnabled(
-      FrontendOpts, std::make_unique<clang::GeneratePCHAction>());
+      FrontendOpts, std::make_unique<clang::GeneratePCHAction>(/*SetOnlyIfDifferent=*/true));
   emitInstance->ExecuteAction(*action);
 
   if (emitInstance->getDiagnostics().hasErrorOccurred() &&
@@ -2316,7 +2337,7 @@ bool ClangImporter::emitPrecompiledModule(
 
   auto action = wrapActionForIndexingIfEnabled(
       FrontendOpts,
-      std::make_unique<clang::GenerateModuleFromModuleMapAction>());
+      std::make_unique<clang::GenerateModuleFromModuleMapAction>(/*SetOnlyIfDifferent=*/true));
   emitInstance->ExecuteAction(*action);
 
   if (emitInstance->getDiagnostics().hasErrorOccurred() &&
@@ -2777,64 +2798,37 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
   }
 }
 
-bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
-  switch (platformKind) {
-  case PlatformKind::macOS:
-    return name == "macos";
-  case PlatformKind::macOSApplicationExtension:
-    return name == "macos" || name == "macos_app_extension";
+std::optional<PlatformKind>
+PlatformAvailability::platformKindIfRelevant(StringRef platformName) const {
+  auto result =
+      llvm::StringSwitch<std::optional<PlatformKind>>(platformName)
+          .Case("anyappleos", PlatformKind::anyAppleOS)
+          .Case("ios", PlatformKind::iOS)
+          .Case("macos", PlatformKind::macOS)
+          .Case("maccatalyst", PlatformKind::macCatalyst)
+          .Case("tvos", PlatformKind::tvOS)
+          .Case("watchos", PlatformKind::watchOS)
+          .Case("xros", PlatformKind::visionOS)
+          .Case("visionos", PlatformKind::visionOS)
+          .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
+          .Case("maccatalyst_app_extension",
+                PlatformKind::macCatalystApplicationExtension)
+          .Case("macos_app_extension", PlatformKind::macOSApplicationExtension)
+          .Case("tvos_app_extension", PlatformKind::tvOSApplicationExtension)
+          .Case("watchos_app_extension",
+                PlatformKind::watchOSApplicationExtension)
+          .Case("xros_app_extension",
+                PlatformKind::visionOSApplicationExtension)
+          .Case("android", PlatformKind::Android)
+          .Default(std::nullopt);
 
-  case PlatformKind::iOS:
-    return name == "ios";
-  case PlatformKind::iOSApplicationExtension:
-    return name == "ios" || name == "ios_app_extension";
-
-  case PlatformKind::macCatalyst:
-    return name == "ios" || name == "maccatalyst";
-  case PlatformKind::macCatalystApplicationExtension:
-    return name == "ios" || name == "ios_app_extension" ||
-           name == "maccatalyst" || name == "maccatalyst_app_extension";
-
-  case PlatformKind::tvOS:
-    return name == "tvos";
-  case PlatformKind::tvOSApplicationExtension:
-    return name == "tvos" || name == "tvos_app_extension";
-
-  case PlatformKind::watchOS:
-    return name == "watchos";
-  case PlatformKind::watchOSApplicationExtension:
-    return name == "watchos" || name == "watchos_app_extension";
-
-  case PlatformKind::visionOS:
-    return name == "xros" || name == "visionos";
-  case PlatformKind::visionOSApplicationExtension:
-    return name == "xros" || name == "xros_app_extension" ||
-           name == "visionos" || name == "visionos_app_extension";
-
-  case PlatformKind::DriverKit:
-    return name == "driverkit";
-
-  case PlatformKind::Swift:
-  case PlatformKind::anyAppleOS:
-    break; // Unexpected
-
-  case PlatformKind::FreeBSD:
-    return name == "freebsd";
-
-  case PlatformKind::OpenBSD:
-    return name == "openbsd";
-
-  case PlatformKind::Windows:
-    return name == "windows";
-
-  case PlatformKind::Android:
-    return name == "android";
-
-  case PlatformKind::none:
-    return false;
+  if (result) {
+    if (platformKind == *result ||
+        inheritsAvailabilityFromPlatform(platformKind, *result))
+      return result;
   }
 
-  llvm_unreachable("Unexpected platform");
+  return std::nullopt;
 }
 
 bool PlatformAvailability::treatDeprecatedAsUnavailable(
@@ -3868,6 +3862,29 @@ void ClangImporter::lookupTypeDecl(
         if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported)) {
           foundViaClang = true;
           receiver(importedType);
+        }
+      }
+    }
+  }
+
+  // In C++ language mode, CF_OPTIONS/NS_OPTIONS have a different expansion. If
+  // the tag lookup didn't find anything, try an ordinary name lookup for the
+  // typedef and resolve it to the anonymous enum.
+  if (!foundViaClang && kind == ClangTypeKind::Tag &&
+      !Impl.DisableSourceImport &&
+      Impl.SwiftContext.LangOpts.EnableCXXInterop) {
+    clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
+                                     clang::Sema::LookupOrdinaryName);
+    if (sema.LookupName(lookupResult, /*Scope=*/sema.TUScope)) {
+      for (auto clangDecl : lookupResult) {
+        if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(clangDecl)) {
+          auto qualType = Impl.getClangASTContext().getTypedefType(typedefDecl);
+          if (auto optionSetEnum = findOptionSetEnum(qualType, Impl)) {
+            if (auto typeDecl = optionSetEnum.getType()->getAnyNominal()) {
+              foundViaClang = true;
+              receiver(typeDecl);
+            }
+          }
         }
       }
     }
@@ -5907,6 +5924,7 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked=*/true};
 }
 
+namespace {
 // How should the synthesized C++ method that returns the field of interest
 // from the base class should return the value - by value, or by reference.
 enum ReferenceReturnTypeBehaviorForBaseAccessorSynthesis {
@@ -5914,6 +5932,7 @@ enum ReferenceReturnTypeBehaviorForBaseAccessorSynthesis {
   ReturnByReference,
   ReturnByMutableReference
 };
+} // end anonymous namespace
 
 // Synthesize a C++ method that returns the field of interest from the base
 // class. This lets Clang take care of the cast from the derived class
@@ -5945,7 +5964,7 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
   auto valueReturnType = returnType;
   if (behavior !=
       ReferenceReturnTypeBehaviorForBaseAccessorSynthesis::ReturnByValue) {
-    returnType = clangCtx.getRValueReferenceType(
+    returnType = clangCtx.getLValueReferenceType(
         behavior == ReferenceReturnTypeBehaviorForBaseAccessorSynthesis::
                         ReturnByReference
             ? returnType.withConst()
@@ -5972,6 +5991,7 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
     newMethod->addAttr(clang::CFReturnsRetainedAttr::CreateImplicit(clangCtx));
   }
 
+  clang::Sema::SynthesizedFunctionScope scope(clangSema, newMethod);
   // Create a new Clang diagnostic pool to capture any diagnostics
   // emitted during the construction of the method.
   clang::sema::DelayedDiagnosticPool diagPool{
@@ -6006,12 +6026,8 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
         clang::DeclarationNameInfo(field->getDeclName(),
                                    clang::SourceLocation()),
         valueReturnType, clang::VK_LValue, clang::OK_Ordinary);
-    auto returnCast = clangSema.ImpCastExprToType(memberExpr, valueReturnType,
-                                                  clang::CK_LValueToRValue,
-                                                  clang::VK_PRValue);
-    if (!returnCast.isUsable())
-      return nullptr;
-    return returnCast.get();
+
+    return memberExpr;
   };
 
   llvm::SmallVector<clang::Stmt *, 2> body;
@@ -6043,9 +6059,11 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
   auto fieldExpr = createFieldAccess();
   if (!fieldExpr)
     return nullptr;
-  auto returnStmt = clang::ReturnStmt::Create(clangCtx, clang::SourceLocation(),
-                                              fieldExpr, nullptr);
-  body.push_back(returnStmt);
+  auto returnStmt =
+      clangSema.BuildReturnStmt(clang::SourceLocation(), fieldExpr);
+  if (!returnStmt.isUsable())
+    return nullptr;
+  body.push_back(returnStmt.get());
 
   // Check if there were any Clang errors during the construction
   // of the method body.
@@ -6294,9 +6312,9 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
 
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types, unless the base accessor returns it by value.
-  bool useAddress = contextTy->isNoncopyable() &&
-                    (baseClassVar->getReadImpl() == ReadImplKind::Stored ||
-                     baseClassVar->getAccessor(AccessorKind::Address));
+  bool useAddress = baseClassVar->getAccessor(AccessorKind::Address) ||
+                    (contextTy->isNoncopyable() &&
+                     baseClassVar->getReadImpl() == ReadImplKind::Stored);
 
   ParameterList *bodyParams = nullptr;
   if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
@@ -6444,12 +6462,6 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
   }
 
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    auto contextTy =
-        newContext->mapTypeIntoEnvironment(subscript->getElementInterfaceType());
-    // Subscripts that return non-copyable types are not yet supported.
-    // See: https://github.com/apple/swift/issues/70047.
-    if (contextTy->isNoncopyable())
-      return nullptr;
     auto out = SubscriptDecl::create(
         subscript->getASTContext(), subscript->getName(), subscript->getStaticLoc(),
         subscript->getStaticSpelling(), subscript->getSubscriptLoc(),
@@ -8188,6 +8200,13 @@ bool importer::hasEscapableAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "Escapable");
 }
 
+CxxValueSemanticsKind
+importer::getCxxValueSemanticsKind(const clang::Type *type,
+                                   ClangImporter::Implementation &Impl) {
+  return evaluateOrDefault(Impl.SwiftContext.evaluator,
+                           CxxValueSemantics({type, &Impl}), {});
+}
+
 /// Recursively checks that there are no pointers in any fields or base classes.
 /// Does not check C++ records with specific API annotations.
 static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
@@ -8859,10 +8878,6 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
   // consider desc.decl's safety unspecified should have returned early from the
   // loop. Thus, we can conclude that desc.decl is safe.
   return ExplicitSafety::Safe;
-}
-
-bool ClangDeclExplicitSafety::isCached() const {
-  return isa<clang::RecordDecl>(std::get<0>(getStorage()).decl);
 }
 
 void swift::simple_display(llvm::raw_ostream &out,

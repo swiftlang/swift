@@ -73,6 +73,8 @@ def main():
     next_arg_is_output = False
     compare_time = True
     output_file = None
+    embedded = False
+    wasm = False
 
     for arg in sys.argv:
         if next_arg_is_output:
@@ -84,8 +86,15 @@ def main():
             compare_time = False
         elif arg == '-emit-empty-object-file':
             compare_time = False
+        elif arg == 'Embedded':
+            embedded = True
+        elif arg.startswith('wasm'):
+            wasm = True
         elif arg == '-o':
             next_arg_is_output = True
+
+    if embedded and wasm:
+        compare_time = False
 
     new_args = sys.argv[1:]
 

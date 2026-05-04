@@ -1,7 +1,9 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s
 
 // REQUIRES: OS=macosx
+// REQUIRES: embedded_stdlib
 // REQUIRES: swift_in_compiler
+// REQUIRES: embedded_stdlib
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_TypedAllocation
 

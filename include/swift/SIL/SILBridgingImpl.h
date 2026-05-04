@@ -180,7 +180,8 @@ BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(
           info.getConditionallyAddressableIndices()),
       targetIndex(info.getTargetIndex()),
       hasImmortalSpecifier(info.hasImmortalSpecifier()),
-      fromAnnotation(info.isFromAnnotation()) {}
+      fromAnnotation(info.isFromAnnotation()), hasCaptures(info.hasCaptures()) {
+}
 
 SwiftInt BridgedLifetimeDependenceInfoArray::count() const {
   return lifetimeDependenceInfoArray.unbridged<swift::LifetimeDependenceInfo>().size();
@@ -192,7 +193,8 @@ BridgedLifetimeDependenceInfoArray::at(SwiftInt index) const {
 }
 
 bool BridgedLifetimeDependenceInfo::empty() const {
-  return !hasImmortalSpecifier && inheritLifetimeParamIndices == nullptr &&
+  return !hasImmortalSpecifier && !hasCaptures &&
+         inheritLifetimeParamIndices == nullptr &&
          scopeLifetimeParamIndices == nullptr;
 }
 
@@ -1304,8 +1306,16 @@ BridgedConformanceArray BridgedInstruction::InitExistentialAddrInst_getConforman
   return {getAs<swift::InitExistentialAddrInst>()->getConformances()};
 }
 
+BridgedConformanceArray BridgedInstruction::InitExistentialValueInst_getConformances() const {
+  return {getAs<swift::InitExistentialValueInst>()->getConformances()};
+}
+
 BridgedCanType BridgedInstruction::InitExistentialAddrInst_getFormalConcreteType() const {
   return getAs<swift::InitExistentialAddrInst>()->getFormalConcreteType();
+}
+
+BridgedConformanceArray BridgedInstruction::InitExistentialMetatypeInst_getConformances() const {
+  return {getAs<swift::InitExistentialMetatypeInst>()->getConformances()};
 }
 
 bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
@@ -1408,12 +1418,8 @@ SwiftInt BridgedInstruction::InitEnumDataAddrInst_caseIndex() const {
   return getAs<swift::InitEnumDataAddrInst>()->getCaseIndex();
 }
 
-SwiftInt BridgedInstruction::UncheckedTakeEnumDataAddrInst_caseIndex() const {
-  return getAs<swift::UncheckedTakeEnumDataAddrInst>()->getCaseIndex();
-}
-
-bool BridgedInstruction::UncheckedTakeEnumDataAddrInst_isDestructive() const {
-  return getAs<swift::UncheckedTakeEnumDataAddrInst>()->isDestructive();
+SwiftInt BridgedInstruction::UncheckedEnumDataAddrInstBase_caseIndex() const {
+  return getAs<swift::UncheckedEnumDataAddrInstBase>()->getCaseIndex();
 }
 
 SwiftInt BridgedInstruction::InjectEnumAddrInst_caseIndex() const {
@@ -2213,6 +2219,25 @@ BridgedVTableEntry BridgedVTable::getEntry(SwiftInt index) const {
   return BridgedVTableEntry(vTable->getEntries()[index]);
 }
 
+SwiftInt BridgedVTable::getNumConformanceEntries() const {
+  return SwiftInt(vTable->getConformances().size());
+}
+
+bool BridgedVTable::hasConformance(SwiftInt index) const {
+  auto confEntry = vTable->getConformances()[index];
+  return confEntry.hasConformance();
+}
+
+BridgedDeclObj BridgedVTable::getProtocol(SwiftInt index) const {
+  auto confEntry = vTable->getConformances()[index];
+  return {confEntry.getProtocol()};
+}
+
+BridgedConformance BridgedVTable::getConformance(SwiftInt index) const {
+  auto confEntry = vTable->getConformances()[index];
+  return BridgedConformance(swift::ProtocolConformanceRef(confEntry.getConformance()));
+}
+
 BridgedDeclObj BridgedVTable::getClass() const {
   return vTable->getClass();
 }
@@ -2239,6 +2264,14 @@ void BridgedVTable::replaceEntries(BridgedArrayRef bridgedEntries) const {
     entries.push_back(e.unbridged());
   }
   vTable->replaceEntries(entries);
+}
+
+void BridgedVTable::appendConformance(BridgedDeclObj protocolDecl) const {
+  vTable->appendConformance(protocolDecl.getAs<swift::ProtocolDecl>());
+}
+
+void BridgedVTable::appendConformance(BridgedConformance conformance) const {
+  vTable->appendConformance(conformance.unbridged().getConcrete());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2478,12 +2511,15 @@ BridgedInstruction BridgedBuilder::createAllocPack(BridgedType type) const {
   return {unbridged().createAllocPack(regularLoc(), type.unbridged())};
 }
 
-BridgedInstruction BridgedBuilder::createAllocPackMetadata() const {
-  return {unbridged().createAllocPackMetadata(regularLoc())};
+BridgedInstruction BridgedBuilder::createAllocPackMetadata(bool nested) const {
+  return {unbridged().createAllocPackMetadata(regularLoc(), std::nullopt,
+      swift::StackAllocationIsNested_t(nested))};
 }
 
-BridgedInstruction BridgedBuilder::createAllocPackMetadata(BridgedType type) const {
-  return {unbridged().createAllocPackMetadata(regularLoc(), type.unbridged())};
+BridgedInstruction BridgedBuilder::createAllocPackMetadata(BridgedType type,
+                                                           bool nested) const {
+  return {unbridged().createAllocPackMetadata(regularLoc(), type.unbridged(),
+      swift::StackAllocationIsNested_t(nested))};
 }
 
 BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) const {
@@ -2753,6 +2789,17 @@ BridgedInstruction BridgedBuilder::createUncheckedEnumData(BridgedValue enumVal,
 BridgedInstruction BridgedBuilder::createUncheckedTakeEnumDataAddr(BridgedValue enumAddr, SwiftInt caseIdx) const {
   swift::SILValue en = enumAddr.getSILValue();
   return {unbridged().createUncheckedTakeEnumDataAddr(regularLoc(), en, en->getType().getEnumElement(caseIdx))};
+}
+
+BridgedInstruction BridgedBuilder::createUncheckedInPlaceEnumDataAddr(BridgedValue enumAddr, SwiftInt caseIdx) const {
+  swift::SILValue en = enumAddr.getSILValue();
+  return {unbridged().createUncheckedInPlaceEnumDataAddr(regularLoc(), en, en->getType().getEnumElement(caseIdx))};
+}
+
+BridgedInstruction BridgedBuilder::createUncheckedBorrowEnumDataAddr(BridgedValue enumAddr, BridgedValue scratchAddr, SwiftInt caseIdx) const {
+  swift::SILValue en = enumAddr.getSILValue();
+  swift::SILValue sc = scratchAddr.getSILValue();
+  return {unbridged().createUncheckedBorrowEnumDataAddr(regularLoc(), en, sc, en->getType().getEnumElement(caseIdx))};
 }
 
 BridgedInstruction BridgedBuilder::createInitEnumDataAddr(BridgedValue enumAddr,

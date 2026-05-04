@@ -665,9 +665,16 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   // Bindings cannot be type-checked independently from their context in a
   // closure. If we want to be able to lazily type-check these we'll need to
-  // type-check the entire surrounding expression.
+  // type-check the entire surrounding expression. The only exception to this
+  // is macro expansions since they cannot refer to closure parameters.
+  //
+  // FIXME: We'll likely still have crashers for macro expansions in cases
+  // where e.g the return type of the closure is being queried in the constraint
+  // system.
   if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
-    if (!pattern->isImplicit()) {
+    if (!pattern->isImplicit() &&
+        !swift::isMacroExpansionInContext(pattern->getStartLoc(),
+                                          DC->getParentSourceFile())) {
       // Completion may trigger lazy type-checking, just decline to type-check.
       auto &ctx = CE->getASTContext();
       if (ctx.SourceMgr.hasIDEInspectionTargetBuffer()) {

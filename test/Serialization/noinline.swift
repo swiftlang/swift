@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_noinline.swift
-// RUN: llvm-bcanalyzer %t/def_noinline.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer %t/def_noinline.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sib -I %t %s -o %t/noinline.sib
 // RUN: %target-sil-opt -sil-print-types -performance-linker %t/noinline.sib -I %t -emit-sorted-sil | %FileCheck %s -check-prefix=SIL
 

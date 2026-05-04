@@ -150,7 +150,7 @@
                 "cmark": "gfm",
                 "llbuild": "main",
                 "swift-build": "main",
-                "swift-toolchain-sqlite": "1.0.7",
+                "swift-toolchain-sqlite": "1.0.9",
                 "swift-tools-protocols": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
@@ -197,7 +197,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.3",
+                "swift-subprocess": "0.4",
                 "boringssl": "817ab07ebb53da35afea409ab9328f578492832d"
             }
         },
@@ -703,7 +703,7 @@
                 "cmark": "gfm",
                 "llbuild": "main",
                 "swift-build": "main",
-                "swift-toolchain-sqlite": "1.0.7",
+                "swift-toolchain-sqlite": "1.0.9",
                 "swift-tools-protocols": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
@@ -750,7 +750,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.3"
+                "swift-subprocess": "0.4"
             }
         },
         "next" : {
@@ -764,7 +764,7 @@
                 "cmark": "gfm",
                 "llbuild": "main",
                 "swift-build": "main",
-                "swift-toolchain-sqlite": "1.0.7",
+                "swift-toolchain-sqlite": "1.0.9",
                 "swift-tools-protocols": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
@@ -811,7 +811,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.3"
+                "swift-subprocess": "0.4"
             }
         }
     }

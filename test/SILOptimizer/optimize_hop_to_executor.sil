@@ -14,6 +14,8 @@ actor MyActor {
 
 sil [ossa] @requiredToRunOnActor : $@convention(method) (@guaranteed MyActor) -> ()
 sil [ossa] @anotherAsyncFunction : $@convention(thin) @async () -> ()
+sil [ossa] @nonisolatedNonsendingAsyncFunction : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+sil [ossa] @asyncThrowingFunction : $@convention(thin) @async () -> @error any Error
 sil [ossa] @syncFunction : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil [ossa] @simpleRedundantActor : $@convention(method) @async (@guaranteed MyActor) -> () {
@@ -317,39 +319,55 @@ bb0(%0 : @guaranteed $MyActor):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @simpleCallerIsolationInheritingStopsDCE : $@convention(thin) @async (@guaranteed MyActor) -> () {
+// CHECK-LABEL: sil [ossa] @simpleNonisolatedNonsendingStopsDCE : $@convention(thin) @async (@guaranteed MyActor) -> () {
 // CHECK: hop_to_executor
-// CHECK: } // end sil function 'simpleCallerIsolationInheritingStopsDCE'
-sil [ossa] @simpleCallerIsolationInheritingStopsDCE : $@convention(thin) @async (@guaranteed MyActor) -> () {
+// CHECK: } // end sil function 'simpleNonisolatedNonsendingStopsDCE'
+sil [ossa] @simpleNonisolatedNonsendingStopsDCE : $@convention(thin) @async (@guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor):
   hop_to_executor %0
-  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  %1 = unchecked_value_cast %0 to $Builtin.ImplicitActor
+  %f = function_ref @nonisolatedNonsendingAsyncFunction : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  apply %f(%1) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nonisolatedNonsendingParameterStopsDCE : $@convention(thin) @async (@guaranteed MyActor, @guaranteed @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+// CHECK: hop_to_executor
+// CHECK: } // end sil function 'nonisolatedNonsendingParameterStopsDCE'
+sil [ossa] @nonisolatedNonsendingParameterStopsDCE : $@convention(thin) @async (@guaranteed MyActor, @guaranteed @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $@caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
+  hop_to_executor %0
+  %2 = unchecked_value_cast %0 to $Builtin.ImplicitActor
+  apply %1(%2) : $@caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   %9999 = tuple ()
   return %9999 : $()
 }
 
 // We should eliminate none of the hop_to_executor here since
-// caller_isolation_inheriting @async apply sites do not cross isolation
+// nonisolated(nonsending) @async apply sites do not cross isolation
 // boundaries.
 //
-// CHECK-LABEL: sil [ossa] @simpleCallerIsolationInheritingStopsDCE2 : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+// CHECK-LABEL: sil [ossa] @simpleNonisolatedNonsendingStopsDCE2 : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
 // CHECK: hop_to_executor
 // CHECK: hop_to_executor
 // CHECK: hop_to_executor
-// CHECK: } // end sil function 'simpleCallerIsolationInheritingStopsDCE2'
-sil [ossa] @simpleCallerIsolationInheritingStopsDCE2 : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+// CHECK: } // end sil function 'simpleNonisolatedNonsendingStopsDCE2'
+sil [ossa] @simpleNonisolatedNonsendingStopsDCE2 : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
   hop_to_executor %0
-  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  %actor0 = unchecked_value_cast %0 to $Builtin.ImplicitActor
+  %f = function_ref @nonisolatedNonsendingAsyncFunction : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  apply %f(%actor0) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   hop_to_executor %1
+  %actor1 = unchecked_value_cast %1 to $Builtin.ImplicitActor
   %f2 = function_ref @syncFunction : $@convention(thin) () -> ()
   apply %f2() : $@convention(thin) () -> ()
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  apply %f(%actor1) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   hop_to_executor %2
+  %actor2 = unchecked_value_cast %2 to $Builtin.ImplicitActor
   apply %f2() : $@convention(thin) () -> () 
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  apply %f(%actor2) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   %9999 = tuple ()
   return %9999 : $()
 }
@@ -390,23 +408,24 @@ bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyAc
 // We do not allow for these to be propagated yet through caller isolation
 // inheriting, so we should have all of the hop_to_executor.
 //
-// CHECK-LABEL: sil [ossa] @callerIsolationInheritingStopsAllowsPropagating : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+// CHECK-LABEL: sil [ossa] @nonisolatedNonsendingStopsAllowsPropagating : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
 // CHECK: bb0(
 // CHECK: hop_to_executor
 // CHECK-NOT: hop_to_executor
-// CHECK: } // end sil function 'callerIsolationInheritingStopsAllowsPropagating'
-sil [ossa] @callerIsolationInheritingStopsAllowsPropagating : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+// CHECK: } // end sil function 'nonisolatedNonsendingStopsAllowsPropagating'
+sil [ossa] @nonisolatedNonsendingStopsAllowsPropagating : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
   hop_to_executor %0
-  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  %actor0 = unchecked_value_cast %0 to $Builtin.ImplicitActor
+  %f = function_ref @nonisolatedNonsendingAsyncFunction : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  apply %f(%actor0) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   hop_to_executor %0
   %f2 = function_ref @syncFunction : $@convention(thin) () -> ()
   apply %f2() : $@convention(thin) () -> ()
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  apply %f(%actor0) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   hop_to_executor %0
   apply %f2() : $@convention(thin) () -> () 
-  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  apply %f(%actor0) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   %9999 = tuple ()
   return %9999 : $()
 }
@@ -415,12 +434,12 @@ bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyAc
 // hop_to_executor due to ehre elase. We do eliminate one of the hop_to_executor
 // though.
 //
-// CHECK: sil [isolation "caller_isolation_inheriting"] [ossa] @callerIsolationInheritingStopsReturnDeadEnd : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+// CHECK: sil [isolation "nonisolated(nonsending)"] [ossa] @nonisolatedNonsendingStopsReturnDeadEnd : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
 // CHECK: bb0(
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'callerIsolationInheritingStopsReturnDeadEnd'
-sil [isolation "caller_isolation_inheriting"] [ossa] @callerIsolationInheritingStopsReturnDeadEnd : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+// CHECK: } // end sil function 'nonisolatedNonsendingStopsReturnDeadEnd'
+sil [isolation "nonisolated(nonsending)"] [ossa] @nonisolatedNonsendingStopsReturnDeadEnd : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor):
   hop_to_executor %0
   hop_to_executor %0
@@ -436,4 +455,29 @@ bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyAc
   hop_to_executor %0
   %9999 = tuple ()
   return %9999 : $()
+}
+
+// https://github.com/swiftlang/swift/issues/88259
+
+// CHECK-LABEL: sil [isolation "nonisolated(nonsending)"] [ossa] @nonisolatedNonsendingPreservesHopBeforeThrow : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @error any Error {
+// CHECK: bb1
+// CHECK:   hop_to_executor
+// CHECK:   return
+// CHECK: bb2
+// CHECK:   hop_to_executor
+// CHECK:   throw
+// CHECK: } // end sil function 'nonisolatedNonsendingPreservesHopBeforeThrow'
+sil [isolation "nonisolated(nonsending)"] [ossa] @nonisolatedNonsendingPreservesHopBeforeThrow : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @error any Error {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor):
+  %f = function_ref @asyncThrowingFunction : $@convention(thin) @async () -> @error any Error
+  try_apply %f() : $@convention(thin) @async () -> @error any Error, normal bb1, error bb2
+
+bb1(%result : $()):
+  hop_to_executor %0 : $Builtin.ImplicitActor
+  %ret = tuple ()
+  return %ret: $()
+
+bb2(%error : @owned $any Error):
+  hop_to_executor %0 : $Builtin.ImplicitActor
+  throw %error : $any Error
 }

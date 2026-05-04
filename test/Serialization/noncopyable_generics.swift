@@ -4,7 +4,7 @@
 // RUN:     -emit-module -module-name ncgenerics                               \
 // RUN:     -o %t
 
-// RUN: llvm-bcanalyzer %t/ncgenerics.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer %t/ncgenerics.swiftmodule | %FileCheck %s
 
 // RUN: %target-typecheck-verify-swift -I %t
 

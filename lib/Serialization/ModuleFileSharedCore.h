@@ -419,13 +419,14 @@ private:
     /// Whether this module enabled strict memory safety.
     unsigned StrictMemorySafety : 1;
 
-    /// Whether this module used deferred code generation.
-    unsigned DeferredCodeGen : 1;
+    /// The code generation model used by this module.
+    unsigned CodeGenModel : 2;
 
     /// Whether this module used deferred code generation.
     unsigned AggressiveCMOEnabled : 1;
 
-    // Explicitly pad out to the next word boundary if neccessary.
+    /// Discriminator for library level (LibraryLevel enum).
+    unsigned LibraryLevel : 2;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -447,6 +448,7 @@ private:
       bool isFramework,
       StringRef requiredSDK,
       std::optional<llvm::Triple> target,
+      std::optional<bool> isEmbedded,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
@@ -586,13 +588,14 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
        bool isFramework,
        StringRef requiredSDK, std::optional<llvm::Triple> target,
+       std::optional<bool> isEmbedded,
        PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiredSDK, target, info,
+        requiredSDK, target, isEmbedded, info,
         pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
@@ -696,9 +699,15 @@ public:
 
   bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
 
-  bool deferredCodeGen() const { return Bits.DeferredCodeGen; }
+  CodeGenerationModel codeGenerationModel() const {
+    return static_cast<CodeGenerationModel>(Bits.CodeGenModel);
+  }
 
   bool isAggressiveCMOEnabled() const { return Bits.AggressiveCMOEnabled; }
+
+  LibraryLevel getLibraryLevel() const {
+    return LibraryLevel(Bits.LibraryLevel);
+  }
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///
