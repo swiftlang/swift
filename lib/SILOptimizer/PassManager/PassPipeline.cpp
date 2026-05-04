@@ -112,7 +112,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // This guarantees that stack-promotable boxes have [static] enforcement.
   P.addAccessEnforcementSelection();
 
-#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT
+#if defined(SWIFT_ENABLE_SWIFT_IN_SWIFT) && !defined(__linux__)
   P.addMandatoryAllocBoxToStack();
 #else
   P.addLegacyAllocBoxToStack();
@@ -241,7 +241,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // These diagnostic passes must run before OnoneSimplification because
   // they rely on completely unoptimized SIL.
+  #if !defined(__linux__)
   P.addDiagnoseUnreachable();
+  #endif
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();
   P.addEmitDFDiagnostics();
