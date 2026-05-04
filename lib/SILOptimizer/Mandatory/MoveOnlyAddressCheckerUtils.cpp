@@ -1726,18 +1726,34 @@ struct CopiedLoadBorrowEliminationVisitor
 
       case OperandOwnership::ForwardingConsume:
       case OperandOwnership::DestroyingConsume: {
-        if (auto *dvi = dyn_cast<DestroyValueInst>(nextUse->getUser())) {
-          auto value = dvi->getOperand();
-          auto *pai = dyn_cast_or_null<PartialApplyInst>(
-              value->getDefiningInstruction());
-          if (pai && pai->isOnStack()) {
-            // A destroy_value of an on_stack partial apply isn't actually a
-            // consuming use--it closes a borrow scope.
-            continue;
+        // The closure value from an on-stack partial_apply is borrowed on
+        // behalf of its captures, so its lifetime-ending uses close a borrow
+        // scope rather than consuming the captured value. If the use is a
+        // `convert_function` (forwarding consume, e.g., stripping
+        // `@Sendable` from a `@MainActor`-isolated closure), push its uses
+        // onto the worklist so the terminating destroy is visited.
+        auto *user = nextUse->getUser();
+        if (auto *cfi = dyn_cast<ConvertFunctionInst>(user)) {
+          for (auto *use : cfi->getUses()) {
+            useWorklist.push_back(use);
           }
+          continue;
         }
-        // We can only hit this if our load_borrow was copied.
-        llvm_unreachable("We should never hit this");
+        // Otherwise, walk backward through any convert_function chain to
+        // verify the use is closing the borrow scope of an on-stack
+        // partial_apply.
+        SILValue value = nextUse->get();
+        while (auto *cfi = dyn_cast_or_null<ConvertFunctionInst>(
+                   value->getDefiningInstruction())) {
+          value = cfi->getOperand();
+        }
+        auto *pai = dyn_cast_or_null<PartialApplyInst>(
+            value->getDefiningInstruction());
+        if (!pai || !pai->isOnStack()) {
+          // We can only hit this if our load_borrow was copied.
+          llvm_unreachable("We should never hit this");
+        }
+        continue;
       }
       case OperandOwnership::GuaranteedForwarding: {
         SmallVector<SILValue, 8> forwardedValues;
