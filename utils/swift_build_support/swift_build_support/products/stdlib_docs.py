@@ -17,6 +17,7 @@ from . import swiftdocc
 from . import swiftdoccrender
 from .. import shell
 
+from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
 class StdlibDocs(product.Product):
     @classmethod
@@ -42,14 +43,25 @@ class StdlibDocs(product.Product):
             os.path.dirname(self.build_dir),
             f'swift-{host_target}'
         )
+
+        docc_catalog_path = os.path.join(
+            SWIFT_SOURCE_ROOT,
+            "swift",
+            "stdlib",
+            "stdlib.docc"
+        )
+
         symbol_graph_dir = os.path.join(swift_build_dir, "lib", "symbol-graph")
         output_path = os.path.join(swift_build_dir, "Swift.doccarchive")
 
         docc_action = 'preview' if self.args.preview_stdlib_docs else 'convert'
+        static_hosting_option = '--transform-for-static-hosting' if self.args.stdlib_docs_static_hosting else ''
+        hosting_base_path = self.args.stdlib_docs_hosting_base_path
 
         docc_cmd = [
             docc_path,
             docc_action,
+            docc_catalog_path,
             "--additional-symbol-graph-dir",
             symbol_graph_dir,
             "--output-path",
@@ -60,6 +72,9 @@ class StdlibDocs(product.Product):
             "Swift",
             "--fallback-bundle-identifier",
             "org.swift.swift",
+            static_hosting_option,
+            "--hosting-base-path",
+            hosting_base_path
         ]
 
         shell.call(docc_cmd)
