@@ -2183,25 +2183,46 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
 }
 
 static void dumpGenericSignature(ASTContext &ctx, GenericContext *GC) {
-  if (ctx.TypeCheckerOpts.DebugGenericSignatures) {
-    if (auto sig = GC->getGenericSignature()) {
+  if (!ctx.TypeCheckerOpts.DebugGenericSignatures)
+    return;
+
+  auto *VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl());
+
+  auto dumpSig = [&](GenericSignature sig, bool isOpaque) {
+    llvm::errs() << "\n";
+    if (isOpaque) {
+      llvm::errs() << "Opaque result type of ";
+    }
+    if (VD) {
+      VD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
-      if (auto *VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
-        VD->dumpRef(llvm::errs());
-        llvm::errs() << "\n";
-      } else {
-        GC->printContext(llvm::errs());
+    } else {
+      GC->printContext(llvm::errs());
+    }
+    llvm::errs() << (isOpaque ? "Opaque result signature: "
+                              : "Generic signature: ");
+    PrintOptions Opts = PrintOptions::forDebugging();
+    Opts.ProtocolQualifiedDependentMemberTypes = true;
+    Opts.PrintInverseRequirements =
+        !ctx.TypeCheckerOpts.DebugInverseRequirements;
+    sig->print(llvm::errs(), Opts);
+    llvm::errs() << "\n";
+    llvm::errs() << (isOpaque ? "Canonical opaque result signature: "
+                              : "Canonical generic signature: ");
+    sig.getCanonicalSignature()->print(llvm::errs(), Opts);
+    llvm::errs() << "\n";
+  };
+
+  if (auto sig = GC->getGenericSignature())
+    dumpSig(sig, /*isOpaque=*/false);
+
+  // If we have a ValueDecl, also visit its opaque result type and
+  // dump its signature.
+  if (VD) {
+    if (auto *OTD = VD->getOpaqueResultTypeDecl()) {
+      if (auto sig = OTD->getOpaqueInterfaceGenericSignature()) {
+        dumpSig(sig, /*isOpaque=*/true);
       }
-      llvm::errs() << "Generic signature: ";
-      PrintOptions Opts = PrintOptions::forDebugging();
-      Opts.ProtocolQualifiedDependentMemberTypes = true;
-      Opts.PrintInverseRequirements =
-          !ctx.TypeCheckerOpts.DebugInverseRequirements;
-      sig->print(llvm::errs(), Opts);
-      llvm::errs() << "\n";
-      llvm::errs() << "Canonical generic signature: ";
-      sig.getCanonicalSignature()->print(llvm::errs(), Opts);
-      llvm::errs() << "\n";
     }
   }
 }
