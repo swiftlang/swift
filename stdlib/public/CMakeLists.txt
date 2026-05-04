@@ -213,6 +213,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
         "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
         "armv7m   armv7m-apple-none-macho   armv7m-apple-none-macho"
         "armv7em  armv7em-apple-none-macho  armv7em-apple-none-macho"
+        "armv8m.main   armv8m.main-apple-none-macho   armv8m.main-apple-none-macho"
+        "armv8.1m.main armv8.1m.main-apple-none-macho armv8.1m.main-apple-none-macho"
       )
     endif()
     if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
@@ -232,6 +234,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
         "armv6m   armv6m-none-none-eabi     armv6m-none-none-eabi"
         "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
         "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
+        "armv8m.main  armv8m.main-none-none-eabi    armv8m.main-none-none-eabi"
+        "armv8.1m.main  armv8.1m.main-none-none-eabi    armv8.1m.main-none-none-eabi"
       )
     endif()
     if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
