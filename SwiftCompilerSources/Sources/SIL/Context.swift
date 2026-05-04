@@ -48,6 +48,8 @@ extension Context {
 
   public func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
 
+  public func getBuiltinWordType() -> Type { _bridged.getBuiltinWordType().type }
+
   public func getTupleType(elements: [Type]) -> AST.`Type` {
     return getTupleType(elements: elements.map{ $0.rawType })
   }
