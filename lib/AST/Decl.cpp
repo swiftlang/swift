@@ -13817,3 +13817,8 @@ HiddenTypeLayoutInfoDecl *HiddenTypeLayoutInfoDecl::create(ASTContext &ctx,
                                                     DeclContext *DC) {
   return new (ctx) HiddenTypeLayoutInfoDecl(DC);
 }
+
+void HiddenTypeLayoutInfoDecl::setOriginalXRefPath(
+    ASTContext &ctx, ArrayRef<XRefTypePathPiece> path) {
+  OriginalXRefPath = ctx.AllocateCopy(path);
+}

@@ -565,6 +565,11 @@ private:
   llvm::Expected<Decl *> resolveCrossReference(serialization::ModuleID MID,
                                                uint32_t pathLen);
 
+  /// Reads XREF path piece records for a hidden type whose module was not
+  /// loaded, capturing them so they can be re-emitted during re-serialization.
+  void consumeHiddenTypeXRefPathPieces(
+      uint32_t pathLen, SmallVectorImpl<XRefTypePathPiece> &pieces);
+
   struct AccessorRecord {
     SmallVector<serialization::DeclID, 8> IDs;
   };

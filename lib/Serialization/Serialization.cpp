@@ -2666,6 +2666,24 @@ static const TypeDecl *getHiddenTypeLayoutDeclParentDecl(const Decl *D) {
   return parentDC->getSelfNominalTypeDecl();
 }
 
+void Serializer::writeHiddenTypeXRef(
+    const HiddenTypeLayoutInfoDecl *hidden) {
+  using namespace decls_block;
+  auto path = hidden->getOriginalXRefPath();
+
+  unsigned abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
+  XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                         addDeclBaseNameRef(hidden->getOriginalModuleName()),
+                         /*pathLen=*/path.size());
+
+  abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
+  for (auto &piece : path) {
+    XRefTypePathPieceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addDeclBaseNameRef(piece.Name),
+        /*privateDiscriminator=*/0, piece.InProtocolExt,
+        piece.ImportedFromClang);
+  }
+}
 
 /// Translate from the AST associativity enum to the Serialization enum
 /// values, which are guaranteed to be stable.
@@ -5601,6 +5619,16 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
       ABORT("failed to serialize anything");
     }
   };
+
+  // HiddenTypeLayoutInfoDecl is a synthetic local decl that represents a
+  // hidden type from an unavailable module. During re-serialization, we
+  // emit an XREF to the original type and record a fallback mapping.
+  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(D)) {
+    assert(hidden->hasOriginalXRefInfo() && "Can't re-serialize hidden type info without the original XREF!");
+    scheduleHiddenTypeLayoutSerialization(hidden);
+    writeHiddenTypeXRef(hidden);
+    return;
+  }
 
   if (isDeclXRef(D)) {
     writeCrossReference(D);

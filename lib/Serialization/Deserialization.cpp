@@ -2157,6 +2157,30 @@ findNestedTypeDeclInModule(ModuleDecl *extensionModule,
   return findNestedTypeDeclInModule(nullptr, extensionModule, name, parent);
 }
 
+void ModuleFile::consumeHiddenTypeXRefPathPieces(
+    uint32_t pathLen, SmallVectorImpl<XRefTypePathPiece> &pieces) {
+  using namespace decls_block;
+  for (uint32_t i = 0; i < pathLen; ++i) {
+    auto entry =
+        fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      return;
+    SmallVector<uint64_t, 8> scratch;
+    StringRef blobData;
+    unsigned recordID = fatalIfUnexpected(
+        DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+    assert(recordID == XREF_TYPE_PATH_PIECE &&
+           "only nominal type XREFs should have hidden type fallbacks");
+    IdentifierID IID, privateDiscriminator;
+    bool inProtocolExt, importedFromClang;
+    XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
+                                        inProtocolExt, importedFromClang);
+    assert(!privateDiscriminator &&
+           "hidden types must be visible outside their module");
+    pieces.push_back({getIdentifier(IID), inProtocolExt, importedFromClang});
+  }
+}
+
 Expected<Decl *>
 ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   using namespace decls_block;
@@ -7046,14 +7070,24 @@ DeclDeserializer::getDeclCheckedImpl(
       break;
     }
 
-    if (MF.getContext().LangOpts.hasFeature(Feature::SafeImplementationOnly)) {
+
+    bool isNonLoadedModule =
+        resolved.errorIsA<XRefNonLoadedModuleError>();
+
+    if (isNonLoadedModule && MF.getContext().LangOpts.hasFeature(Feature::SafeImplementationOnly)) {
       auto fallbackIt = MF.HiddenTypeFallbackMap.find(thisDeclID);
       if (fallbackIt != MF.HiddenTypeFallbackMap.end()) {
-        llvm::consumeError(resolved.takeError());
+        SmallVector<XRefTypePathPiece, 2> originalPath;
+        Identifier originalModuleName = MF.getIdentifier(baseModuleID);
+        MF.consumeHiddenTypeXRefPathPieces(pathLen, originalPath);
         auto localDecl =
             MF.getHiddenTypeLayoutInfoDecl(fallbackIt->second);
         if (localDecl) {
+          auto *hidden = localDecl.get();
+          hidden->setOriginalModuleName(originalModuleName);
+          hidden->setOriginalXRefPath(MF.getContext(), originalPath);
           declOrOffset = localDecl.get();
+          llvm::consumeError(resolved.takeError());
           break;
         }
         return localDecl.takeError();

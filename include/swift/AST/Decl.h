@@ -10037,6 +10037,15 @@ public:
   }
 };
 
+
+/// Represents one piece of a serialized cross-reference path, allowing
+/// HiddenTypeLayoutInfoDecl to re-emit an XREF to the original type.
+struct XRefTypePathPiece {
+  Identifier Name;
+  bool InProtocolExt;
+  bool ImportedFromClang;
+};
+
 /// Represents a type which can't be resolved as its defining module is not available,
 /// but for which we still have layout information. This is expected to happen when
 /// a module @_implementationOnly imports a type, and that type contributes to the module's ABI.
@@ -10049,6 +10058,13 @@ class HiddenTypeLayoutInfoDecl final : public TypeDecl {
 
   irgen::HiddenTypeIRABIInfo *ABIInfo = nullptr;
   TypeDecl *ParentDecl = nullptr;
+
+  /// The original module name from the failed XREF, used to re-emit
+  /// an XREF during transitive re-serialization.
+  Identifier OriginalModuleName;
+
+  /// The original XREF path pieces from the failed XREF.
+  ArrayRef<XRefTypePathPiece> OriginalXRefPath;
 
   HiddenTypeLayoutInfoDecl(DeclContext *DC)
       : TypeDecl(DeclKind::HiddenTypeLayoutInfo, DC, Identifier(), SourceLoc(), {}) {
@@ -10065,6 +10081,16 @@ public:
 
   TypeDecl *getParentDecl() const { return ParentDecl; }
   void setParentDecl(TypeDecl *parent) { ParentDecl = parent; }
+
+  Identifier getOriginalModuleName() const { return OriginalModuleName; }
+  void setOriginalModuleName(Identifier name) { OriginalModuleName = name; }
+
+  ArrayRef<XRefTypePathPiece> getOriginalXRefPath() const {
+    return OriginalXRefPath;
+  }
+  void setOriginalXRefPath(ASTContext &ctx, ArrayRef<XRefTypePathPiece> path);
+
+  bool hasOriginalXRefInfo() const { return !OriginalModuleName.empty(); }
 
   SourceRange getSourceRange() const { return SourceRange(); }
 

@@ -39,6 +39,10 @@ namespace swift {
   class HiddenTypeLayoutInfoDecl;
   class SILModule;
 
+  namespace irgen {
+    class HiddenStructTypeIRABIInfo;
+  }
+
   namespace fine_grained_dependencies {
     class SourceFileDepGraph;
   }
@@ -373,6 +377,10 @@ private:
 
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
+
+  /// Writes an XREF for a HiddenTypeLayoutInfoDecl, re-emitting the
+  /// original module/type path that was captured during deserialization.
+  void writeHiddenTypeXRef(const HiddenTypeLayoutInfoDecl *hidden);
 
   /// Schedules a decl for hidden type layout serialization and records
   /// the fallback mapping from the decl's XREF DeclID to its hidden
