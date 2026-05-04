@@ -18,6 +18,7 @@
 // RUN: %FileCheck %s --check-prefix=CHECK-NEGATIVE --input-file=%t/reflection.txt
 
 // REQUIRES: swift_feature_CustomAvailability
+// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
 
 // Every type/member that should be absent from the reflection dump has
 // "Disabled" or "disabled" in its name.

@@ -542,8 +542,24 @@ unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
             foundDiscriminator = discriminator;
         });
 
-    if (foundDiscriminator)
+    if (foundDiscriminator) {
       return *foundDiscriminator;
+    }
+
+    // For computed properties with only an implicit get,
+    // the attr is on the parent VarDecl.
+    if (role == MacroRole::Body) {
+      if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
+        if (auto *var = dyn_cast<VarDecl>(accessor->getStorage())) {
+          if (!var->hasStorage() && !var->isSettable(/*useDC=*/nullptr)) {
+            auto *getter = var->getParsedAccessor(AccessorKind::Get);
+            if (!getter || getter->isImplicitGetter()) {
+              return var->getAttachedMacroDiscriminator(macroName, role, attr);
+            }
+          }
+        }
+      }
+    }
   }
 
   // If that failed, conjure up a discriminator.
