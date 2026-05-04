@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2025 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -261,24 +261,109 @@ suite.test("unsafeLoadUnaligned(as:)")
 }
 
 suite.test("storeBytes(of:as:)")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
+.require(.stdlib_6_2).code {
+  let padded = Padded(storage: (8, 1))
 
   let count = 4
-  var a = Array(repeating: 0, count: count)
-  a.withUnsafeMutableBytes {
-    var span = MutableRawSpan(_unsafeBytes: $0)
-    span.storeBytes(of: .max, as: UInt8.self)
-    span.storeBytes(
-      of: .max, toByteOffset: MemoryLayout<UInt>.stride/2, as: UInt.self
+  var a = ContiguousArray(repeating: padded, count: count)
+  var span = a.mutableSpan
+  var bytes = span.mutableBytes
+
+  bytes.storeBytes(of: .max, toByteOffset: 8,  as: Int8.self)
+  bytes.storeBytes(of: .max, toByteOffset: 16, as: Int64.self)
+
+  expectEqual(a[0].storage.1, .max)
+  expectEqual(a[1].storage.0, .max)
+}
+
+suite.test("storeBytes(of:as:) safe")
+.require(.stdlib_6_4).code {
+
+  var array = ContiguousArray(repeating: UInt8.zero, count: 32)
+  var span = array.mutableSpan
+  var bytes = span.mutableBytes
+  bytes.storeBytes(of: 91, toByteOffset: 0, as: UInt8.self)
+  bytes.storeBytes(of: 0x12345678, toByteOffset: 4, as: UInt32.self)
+  bytes.storeBytes(of: .max, toByteOffset: 8, as: UInt64.self)
+  expectEqual(bytes[0], 91)
+  let u32 = bytes.load(fromByteOffset: 4, as: UInt32.self)
+  expectEqual(u32, 0x12345678)
+  let u64 = bytes.load(fromByteOffset: 8, as: UInt64.self)
+  expectEqual(u64, .max)
+}
+
+suite.test("storeBytes(of:as:) unsafe")
+.require(.stdlib_6_4).code {
+
+  var array = ContiguousArray(
+    repeating: UInt8.zero, count: MemoryLayout<Padded>.stride
+  )
+  var span = array.mutableSpan
+  var bytes = span.mutableBytes
+  let p = Padded(storage: (42, 7))
+  unsafe bytes.storeBytes(of: p, toByteOffset: 0, as: Padded.self)
+  let result = unsafe bytes.unsafeLoad(as: Padded.self)
+  expectEqual(result.storage.0, 42)
+  expectEqual(result.storage.1, 7)
+}
+
+suite.test("storeBytes(repeating:count:as:) safe")
+.require(.stdlib_6_4).code {
+
+  var array = ContiguousArray(
+    repeating: UInt8.zero, count: 8 * MemoryLayout<UInt16>.stride
+  )
+  var span = array.mutableSpan
+  var bytes = span.mutableBytes
+  bytes.storeBytes(repeating: 19999, count: 8, as: UInt16.self)
+  for i in 0..<8 {
+    let v = bytes.load(
+      fromByteOffset: i * MemoryLayout<UInt16>.stride, as: UInt16.self
     )
+    expectEqual(v, 19999)
   }
-  expectEqual(a[0].littleEndian & 0xffff, 0xff)
-  expectEqual(a[0].bigEndian & 0xffff, 0xffff)
+}
+
+suite.test("storeBytes(repeating:count:as:) count zero")
+.require(.stdlib_6_4).code {
+
+  var array = ContiguousArray<UInt8>([0xaa, 0xbb])
+  var span = array.mutableSpan
+  var bytes = span.mutableBytes
+  bytes.storeBytes(repeating: .max, count: 0, as: UInt8.self)
+  expectEqual(bytes[0], 0xaa)
+  expectEqual(bytes[1], 0xbb)
+}
+
+suite.test("storeBytes(repeating:count:as:) negative count")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+
+  var array = ContiguousArray(repeating: UInt8.zero, count: 16)
+  var span = array.mutableSpan
+  var bytes = span.mutableBytes
+  expectCrashLater()
+  bytes.storeBytes(repeating: .max, count: -1, as: UInt8.self)
+}
+
+suite.test("storeBytes(repeating:count:as:) unsafe")
+.require(.stdlib_6_4).code {
+
+  let count = 3
+  var array = ContiguousArray(
+    repeating: UInt8.zero, count: count * MemoryLayout<Padded>.stride
+  )
+  var span = array.mutableSpan
+  var bytes = span.mutableBytes
+  let p = Padded(storage: (99, -1))
+  unsafe bytes.storeBytes(repeating: p, count: count, as: Padded.self)
+  for i in 0..<count {
+    let v = unsafe bytes.unsafeLoad(
+      fromByteOffset: i * MemoryLayout<Padded>.stride, as: Padded.self
+    )
+    expectEqual(v.storage.0, 99)
+    expectEqual(v.storage.1, -1)
+  }
 }
 
 suite.test("_mutatingExtracting()")
@@ -553,6 +638,136 @@ suite.test("MutableRawSpan from UnsafeMutableRawBufferPointer")
 
   let v = b.load(fromByteOffset: 8, as: Int64.self)
   expectNotEqual(v, 1)
+}
+
+suite.test("init(mutating:)")
+.require(.stdlib_6_4).code {
+
+  var array = ContiguousArray(0..<4)
+  var mutableSpan = array.mutableSpan
+  var bytes = MutableRawSpan(mutating: &mutableSpan)
+  expectEqual(bytes.byteCount, 4 * MemoryLayout<Int>.stride)
+  let v = bytes.load(fromByteOffset: MemoryLayout<Int>.stride, as: Int.self)
+  expectEqual(v, 1)
+  bytes.storeBytes(of: Int(42), toByteOffset: 0, as: Int.self)
+  expectEqual(array[0], 42)
+}
+
+suite.test("init(elements:)")
+.require(.stdlib_6_4).code {
+
+  var array = ContiguousArray<UInt32>([0xaa, 0xbb, 0xcc])
+  let bytes = MutableRawSpan(elements: array.mutableSpan)
+  expectEqual(bytes.byteCount, 3 * MemoryLayout<UInt32>.stride)
+  let v = bytes.load(fromByteOffset: MemoryLayout<UInt32>.stride, as: UInt32.self)
+  expectEqual(v, 0xbb)
+}
+
+suite.test("MutableRawSpan subscript")
+.require(.stdlib_6_4).code {
+
+  var array = ContiguousArray<UInt8>([10, 20, 30, 40])
+  var mutableSpan = array.mutableSpan
+  var bytes = mutableSpan.mutableBytes
+  expectEqual(bytes[0], 10)
+  expectEqual(bytes[3], 40)
+  bytes[1] = 99
+  expectEqual(bytes[1], 99)
+  expectEqual(array[1], 99)
+}
+
+suite.test("MutableRawSpan subscript bounds underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+
+  var array = ContiguousArray<UInt8>([10, 20, 30, 40])
+  var mutableSpan = array.mutableSpan
+  let bytes = mutableSpan.mutableBytes
+  expectCrashLater()
+  _ = bytes[-1]
+}
+
+suite.test("MutableRawSpan subscript bounds overflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+
+  var array = ContiguousArray<UInt8>([10, 20, 30, 40])
+  var mutableSpan = array.mutableSpan
+  let bytes = mutableSpan.mutableBytes
+  expectCrashLater()
+  _ = bytes[4]
+}
+
+suite.test("MutableRawSpan unchecked subscript")
+.require(.stdlib_6_4).code {
+
+  var array = ContiguousArray<UInt8>([10, 20, 30, 40])
+  var mutableSpan = array.mutableSpan
+  var bytes = mutableSpan.mutableBytes._consumingExtracting(first: 3)
+  expectEqual(unsafe bytes[unchecked: 0], 10)
+  expectEqual(unsafe bytes[unchecked: 3], 40)
+  unsafe bytes[unchecked: 0] = 77
+  expectEqual(bytes[0], 77)
+}
+
+suite.test("MutableRawSpan safe loading with ByteOrder")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { expectTrue(false); return }
+
+  var array = ContiguousArray<UInt8>(repeating: 0, count: 8)
+  var mutableSpan = array.mutableSpan
+  var bytes = mutableSpan.mutableBytes
+  bytes[0] = 0x01
+  bytes[1] = 0x02
+
+  let big = bytes.load(fromByteOffset: 0, as: UInt16.self, .bigEndian)
+  expectEqual(big, 0x0102)
+
+  let little = bytes.load(fromByteOffset: 0, as: UInt16.self, .littleEndian)
+  expectEqual(little, 0x0201)
+
+  let native = bytes.load(fromByteOffset: 0, as: UInt16.self, .native)
+  let plain = bytes.load(fromByteOffset: 0, as: UInt16.self)
+  expectEqual(native, plain)
+}
+
+suite.test("MutableRawSpan storeBytes with ByteOrder")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { expectTrue(false); return }
+
+  var array = ContiguousArray<UInt8>(repeating: 0, count: 8)
+  var mutableSpan = array.mutableSpan
+  var bytes = mutableSpan.mutableBytes
+
+  bytes.storeBytes(of: 0x0102, toByteOffset: 0, as: UInt16.self, .bigEndian)
+  expectEqual(bytes[0], 0x01)
+  expectEqual(bytes[1], 0x02)
+
+  bytes.storeBytes(of: 0x0304, toByteOffset: 2, as: UInt16.self, .littleEndian)
+  expectEqual(bytes[2], 0x04)
+  expectEqual(bytes[3], 0x03)
+
+  bytes.storeBytes(of: 0x0506, toByteOffset: 4, as: UInt16.self, .native)
+  let native = bytes.load(fromByteOffset: 4, as: UInt16.self)
+  expectEqual(native, 0x0506)
+}
+
+suite.test("MutableRawSpan storeBytes repeating with ByteOrder")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { expectTrue(false); return }
+
+  var array = ContiguousArray<UInt8>(repeating: 0, count: 8)
+  var mutableSpan = array.mutableSpan
+  var bytes = mutableSpan.mutableBytes
+
+  bytes.storeBytes(
+    repeating: UInt16(0x0102), count: 4, as: UInt16.self, .bigEndian
+  )
+  for i in 0..<4 {
+    let offset = i * MemoryLayout<UInt16>.stride
+    expectEqual(bytes[offset], 0x01)
+    expectEqual(bytes[offset + 1], 0x02)
+  }
 }
 
 private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}

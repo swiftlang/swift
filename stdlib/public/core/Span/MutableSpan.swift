@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -175,6 +175,62 @@ extension MutableSpan where Element: BitwiseCopyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
+  /// Mutate untyped memory as a typed span.
+  ///
+  /// The `byteCount` of `mutableBytes` must be a multiple of `Element`'s stride,
+  /// and the starting address of `mutableBytes` must be well-aligned for
+  /// the type of `Element`. If either of these requirements is not met,
+  /// this initializer will trap at runtime.
+  ///
+  /// - Parameter mutableBytes: A raw span to reinterpret as typed elements.
+  @_alwaysEmitIntoClient
+  @_lifetime(&mutableBytes)
+  public init(mutating mutableBytes: inout MutableRawSpan) {
+    _precondition(
+      unsafe ((Int(bitPattern: mutableBytes._pointer) &
+        (MemoryLayout<Element>.alignment &- 1)) == 0),
+      "baseAddress must be properly aligned to access Element"
+    )
+    let byteCount = mutableBytes.byteCount
+    let stride = MemoryLayout<Element>.stride
+    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
+    _precondition(remainder == 0, "Span must contain a whole number of elements")
+    self = unsafe _overrideLifetime(
+      MutableSpan(_unchecked: mutableBytes._pointer, count: count),
+      mutating: &mutableBytes
+    )
+  }
+
+  /// Convert a raw span to a typed span.
+  ///
+  /// The `byteCount` of `mutableBytes` must be a multiple of `Element`'s stride,
+  /// and the starting address of `mutableBytes` must be well-aligned for
+  /// the type of `Element`. If either of these requirements is not met,
+  /// this initializer will trap at runtime.
+  ///
+  /// - Parameter mutableBytes: A raw span to reinterpret as typed elements.
+  @_alwaysEmitIntoClient
+  @_lifetime(copy mutableBytes)
+  public init(mutableBytes: consuming MutableRawSpan) {
+    _precondition(
+      unsafe ((Int(bitPattern: mutableBytes._pointer) &
+        (MemoryLayout<Element>.alignment &- 1)) == 0),
+      "baseAddress must be properly aligned to access Element"
+    )
+    let byteCount = mutableBytes.byteCount
+    let stride = MemoryLayout<Element>.stride
+    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
+    _precondition(remainder == 0, "Span must contain a whole number of elements")
+    self = unsafe _overrideLifetime(
+      MutableSpan(_unchecked: mutableBytes._pointer, count: count),
+      copying: mutableBytes
+    )
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -210,8 +266,9 @@ extension MutableSpan where Element: ~Copyable {
 extension RawSpan {
 
   @_alwaysEmitIntoClient
+  @unsafe
   @lifetime(borrow mutableSpan)
-  public init<Element: BitwiseCopyable>(
+  public init<Element>(
     _mutableSpan mutableSpan: borrowing MutableSpan<Element>
   ) {
     let pointer = unsafe mutableSpan._pointer
@@ -262,7 +319,7 @@ extension MutableSpan where Element: ~Copyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension MutableSpan where Element: BitwiseCopyable {
+extension MutableSpan where Element: Copyable {
 
   /// Construct a raw span over the memory represented by this span.
   ///
@@ -273,9 +330,14 @@ extension MutableSpan where Element: BitwiseCopyable {
   public var bytes: RawSpan {
     @lifetime(borrow self)
     borrowing get {
-      RawSpan(_mutableSpan: self)
+      unsafe RawSpan(_mutableSpan: self)
     }
   }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan where Element: BitwiseCopyable {
 
   /// Construct a mutable raw span over the memory represented by this span.
   ///
@@ -290,7 +352,39 @@ extension MutableSpan where Element: BitwiseCopyable {
   public var mutableBytes: MutableRawSpan {
     @lifetime(&self)
     mutating get {
-      MutableRawSpan(_elements: &self)
+      unsafe MutableRawSpan(_elements: &self)
+    }
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan where Element: ConvertibleToBytes {
+  /// A raw span over the memory represented by this span.
+  ///
+  /// - Returns: A RawSpan over the memory represented by this span.
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var bytes: RawSpan {
+    @_lifetime(borrow self)
+    borrowing get {
+      RawSpan(elements: self.span)
+    }
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan where Element: ConvertibleToBytes & ConvertibleFromBytes {
+  /// A mutable raw span over the memory represented by this span.
+  ///
+  /// - Returns: A MutableRawSpan over the memory represented by this span.
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var mutableBytes: MutableRawSpan {
+    @_lifetime(&self)
+    mutating get {
+      MutableRawSpan(mutating: &self)
     }
   }
 }
@@ -322,7 +416,7 @@ extension MutableSpan where Element: ~Copyable {
     @lifetime(self: copy self)
     unsafeMutableAddress {
       _checkIndex(position)
-       return unsafe _unsafeAddressOfElement(unchecked: position)
+      return unsafe _unsafeAddressOfElement(unchecked: position)
     }
   }
 
@@ -478,7 +572,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    try RawSpan(_mutableSpan: self).withUnsafeBytes(body)
+    try unsafe RawSpan(_mutableSpan: self).withUnsafeBytes(body)
   }
 
   /// Calls the given closure with a mutable pointer to the underlying bytes
@@ -847,8 +941,15 @@ extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(&self)
   mutating public func _mutatingExtracting(_: UnboundedRange) -> Self {
-    let newSpan = unsafe Self(_unchecked: _pointer, count: _count)
-    return unsafe _overrideLifetime(newSpan, mutating: &self)
+    unsafe _overrideLifetime(
+      Self(_unchecked: _pointer, count: _count), mutating: &self
+    )
+  }
+
+  @_alwaysEmitIntoClient @inline(__always)
+  internal var _reborrowed: Self {
+    @_lifetime(&self)
+    mutating get { _mutatingExtracting(...) }
   }
 
   /// Constructs a new span over all the items of this span.

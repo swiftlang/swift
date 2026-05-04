@@ -1494,6 +1494,8 @@ where Element: ~Copyable {
       + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
   }
 }
+
+extension Unsafe${Mutable}BufferPointer: ConvertibleToBytes {}
 %end
 
 // ${'Local Variables'}:

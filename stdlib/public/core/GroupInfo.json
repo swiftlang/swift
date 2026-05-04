@@ -268,6 +268,7 @@
     "Equatable.swift",
     "Comparable.swift",
     "Codable.swift",
+    "ByteOrder.swift",
     "FullyInhabited.swift",
     "LegacyABI.swift",
     "MigrationSupport.swift",

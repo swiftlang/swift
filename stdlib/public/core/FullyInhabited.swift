@@ -40,65 +40,22 @@
 /// raw bytes.
 public typealias FullyInhabited = ConvertibleToBytes & ConvertibleFromBytes
 
-extension UInt8:   ConvertibleToBytes, ConvertibleFromBytes {}
-extension Int8:    ConvertibleToBytes, ConvertibleFromBytes {}
-extension UInt16:  ConvertibleToBytes, ConvertibleFromBytes {}
-extension Int16:   ConvertibleToBytes, ConvertibleFromBytes {}
-extension UInt32:  ConvertibleToBytes, ConvertibleFromBytes {}
-extension Int32:   ConvertibleToBytes, ConvertibleFromBytes {}
-extension UInt64:  ConvertibleToBytes, ConvertibleFromBytes {}
-extension Int64:   ConvertibleToBytes, ConvertibleFromBytes {}
-extension UInt:    ConvertibleToBytes, ConvertibleFromBytes {}
-extension Int:     ConvertibleToBytes, ConvertibleFromBytes {}
-
-@available(SwiftStdlib 6.0, *)
-extension UInt128: ConvertibleToBytes, ConvertibleFromBytes {}
-@available(SwiftStdlib 6.0, *)
-extension Int128:  ConvertibleToBytes, ConvertibleFromBytes {}
-
-//extension Float16: ConvertibleToBytes, ConvertibleFromBytes {}
-extension Float32: ConvertibleToBytes, ConvertibleFromBytes {} // `Float`
-extension Float64: ConvertibleToBytes, ConvertibleFromBytes {} // `Double`
-
-@available(StdlibDeploymentTarget 5.7, *)
-extension Duration: ConvertibleToBytes, ConvertibleFromBytes {}
-
-@available(SwiftStdlib 6.2, *)
-extension InlineArray: ConvertibleToBytes
-  where Element: ConvertibleToBytes {}
-@available(SwiftStdlib 6.2, *)
-extension InlineArray: ConvertibleFromBytes
-  where Element: ConvertibleFromBytes {}
-
-extension CollectionOfOne: ConvertibleToBytes
-  where Element: ConvertibleToBytes {}
-extension CollectionOfOne: ConvertibleFromBytes
-  where Element: ConvertibleFromBytes {}
-
-extension ClosedRange: ConvertibleToBytes
-  where Bound: ConvertibleToBytes {}
-extension Range: ConvertibleToBytes
-  where Bound: ConvertibleToBytes {}
-
-extension PartialRangeFrom: ConvertibleToBytes
-  where Bound: ConvertibleToBytes {}
-extension PartialRangeFrom.Iterator: ConvertibleToBytes
-  where Bound: ConvertibleToBytes {}
-extension PartialRangeThrough: ConvertibleToBytes
-  where Bound: ConvertibleToBytes {}
-extension PartialRangeUpTo: ConvertibleToBytes
-  where Bound: ConvertibleToBytes {}
-
-extension Bool: ConvertibleToBytes {}
-extension ObjectIdentifier: ConvertibleToBytes {}
-
-extension UnsafePointer: ConvertibleToBytes {}
-extension UnsafeMutablePointer: ConvertibleToBytes {}
-extension UnsafeRawPointer: ConvertibleToBytes {}
-extension UnsafeMutableRawPointer: ConvertibleToBytes {}
-extension OpaquePointer: ConvertibleToBytes {}
-
-extension UnsafeBufferPointer: ConvertibleToBytes {}
-extension UnsafeMutableBufferPointer: ConvertibleToBytes {}
-extension UnsafeRawBufferPointer: ConvertibleToBytes {}
-extension UnsafeMutableRawBufferPointer: ConvertibleToBytes {}
+/// Returns the bits of the given instance, interpreted as having the specified
+/// type.
+///
+/// `T` and `U` must have the same-sized memory representation.
+/// If they don't, this function will trap.
+///
+/// - Parameters:
+///   - original: The instance to cast to `type`.
+///   - type: The type to cast `original` to.
+/// - Returns: A new instance of type `U`, cast from `original`.
+@_alwaysEmitIntoClient
+@_transparent
+public func bitCast<T, U>(
+  _ original: T, to type: U.Type
+) -> U where T: ConvertibleToBytes, U: ConvertibleFromBytes {
+  _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
+    "Can't bitCast between types of different sizes")
+  return Builtin.reinterpretCast(original)
+}

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,10 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults)
+// RUN: %target-run-stdlib-swift
 
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 import StdlibUnittest
 
@@ -213,7 +212,7 @@ suite.test("RawSpan from Span")
   let array = Array(0..<count)
   array.withUnsafeBufferPointer {
     let span = Span(_unsafeElements: $0)
-    let raw  = RawSpan(_elements: span)
+    let raw  = RawSpan(unsafeElements: span)
     expectEqual(raw.byteCount, span.count*MemoryLayout<Int>.stride)
   }
 }
@@ -650,4 +649,81 @@ suite.test("Span Sendability")
 
   let span = Span(_unsafeElements: buffer)
   send(span)
+}
+
+suite.test("init(viewing:)")
+.require(.stdlib_6_4).code {
+
+  let capacity = 4
+  let a = ContiguousArray(0..<capacity)
+  a.withUnsafeBufferPointer {
+    let raw = unsafe RawSpan(_unsafeBytes: UnsafeRawBufferPointer($0))
+    let span = Span<Int>(viewing: raw)
+    expectEqual(span.count, capacity)
+    for i in 0..<capacity {
+      expectEqual(span[i], i)
+    }
+  }
+}
+
+suite.test("init(viewing:) traps on misaligned pointer")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int>.stride * 2 + 1,
+    alignment: MemoryLayout<Int>.alignment
+  )
+  defer { unsafe buffer.deallocate() }
+  _ = unsafe buffer.initializeMemory(
+    as: UInt8.self, fromContentsOf: repeatElement(0, count: buffer.count)
+  )
+  let misaligned = unsafe UnsafeRawBufferPointer(rebasing: buffer.dropFirst())
+  expectEqual(misaligned.count, MemoryLayout<Int>.stride * 2)
+
+  let raw = unsafe RawSpan(_unsafeBytes: misaligned)
+
+  expectCrashLater()
+  _ = Span<Int>(viewing: raw)
+}
+
+suite.test("init(viewing:) traps on non-stride byteCount")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_4).code {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int>.stride + 1,
+    alignment: MemoryLayout<Int>.alignment
+  )
+  defer { unsafe buffer.deallocate() }
+  _ = unsafe buffer.initializeMemory(
+    as: UInt8.self, fromContentsOf: repeatElement(0, count: buffer.count)
+  )
+  let raw = unsafe RawSpan(_unsafeBytes: buffer)
+
+  expectCrashLater()
+  _ = Span<Int>(viewing: raw)
+}
+
+suite.test("safe bytes property")
+.require(.stdlib_6_4).code {
+  let capacity = 4
+  let array = ContiguousArray(0..<capacity)
+  let bytes = array.span.bytes
+  expectEqual(bytes.byteCount, capacity * MemoryLayout<Int>.stride)
+  for i in 0..<capacity {
+    let value = bytes.load(fromByteOffset: i*MemoryLayout<Int>.stride, as: Int.self)
+    expectEqual(value, array[i])
+  }
+}
+
+suite.test("safe bytes round-trip")
+.require(.stdlib_6_4).code {
+  let capacity = 4
+  let a = ContiguousArray(0..<capacity)
+  let span = a.span
+  let bytes = span.bytes
+  let roundTripped = Span<Int>(viewing: bytes)
+  expectEqual(roundTripped.count, capacity)
+  for i in 0..<capacity {
+    expectEqual(roundTripped[i], span[i])
+  }
 }

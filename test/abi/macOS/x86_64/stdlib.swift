@@ -1275,6 +1275,22 @@ Added: _$ss15EmptyCollectionV9hashValueSivpMV
 Added: _$ss15EmptyCollectionVyxGSHsMc
 Added: _$ss15EmptyCollectionVyxGSHsWP
 
+// SE-0525 RawSpan and safe-loading API
+Added: _$ss9ByteOrderO2eeoiySbAB_ABtFZ
+Added: _$ss9ByteOrderO4hash4intoys6HasherVz_tF
+Added: _$ss9ByteOrderO6nativeABvgZ
+Added: _$ss9ByteOrderO6nativeABvpZMV
+Added: _$ss9ByteOrderO6nativeABvpZMV
+Added: _$ss9ByteOrderO9hashValueSivg
+Added: _$ss9ByteOrderO9hashValueSivpMV
+Added: _$ss9ByteOrderOMa
+Added: _$ss9ByteOrderOMn
+Added: _$ss9ByteOrderON
+Added: _$ss9ByteOrderOSHsMc
+Added: _$ss9ByteOrderOSHsWP
+Added: _$ss9ByteOrderOSQsMc
+Added: _$ss9ByteOrderOSQsWP
+
 // Wrapper for SWIFT_CONCURRENCY_TRACING_SUBSYSTEM environment variable
 Added: _concurrencyTracingSubsystem
 

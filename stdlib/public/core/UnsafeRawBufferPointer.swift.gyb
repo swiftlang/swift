@@ -1261,6 +1261,8 @@ extension ${Self} {
 %  end # mutable
 }
 
+extension Unsafe${Mutable}RawBufferPointer: ConvertibleToBytes {}
+
 % end # for mutable
 
 /// Invokes the given closure with a mutable buffer pointer covering the raw

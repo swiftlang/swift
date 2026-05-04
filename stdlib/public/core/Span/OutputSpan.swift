@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -362,6 +362,49 @@ extension OutputSpan {
       as: Element.self, repeating: repeatedValue, count: count
     )
     _count &+= count
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension OutputSpan {
+  /// Appends to the span as raw bytes.
+  ///
+  /// Inside the closure, initialize elements by appending to `rawSpan`.
+  /// If the available memory in `self` is less than `n`, this
+  /// function will trap before calling the closure.
+  /// After the closure returns, the number of bytes initialized
+  /// determines the number of `Element` instances added to `self`.
+  ///
+  /// If the closure throws an error, the elements appended
+  /// until that point will remain initialized.
+  ///
+  /// - Parameters:
+  ///   - n: The number of elements (of type `Element`) to initialize.
+  ///   - initializer: A closure that initializes new elements.
+  ///     - Parameters:
+  ///       - rawSpan: An `OutputRawSpan` with enough bytes to initialize
+  ///         the specified number of additional elements.
+  @_alwaysEmitIntoClient
+  @_lifetime(self: copy self)
+  public mutating func append<E: Error>(
+    upTo n: Int,
+    initializingWith initializer:
+      (_ rawSpan: inout OutputRawSpan) throws(E) -> Void
+  ) throws(E) where Element: ConvertibleFromBytes {
+    _precondition(n <= freeCapacity, "OutputSpan capacity overflow")
+    let stride = MemoryLayout<Element>.stride
+    let rawBuffer = unsafe UnsafeMutableRawBufferPointer(
+      start: _tail(), count: n &* stride
+    )
+    var span = unsafe OutputRawSpan(buffer: rawBuffer, initializedCount: 0)
+    defer {
+      let initialized = unsafe span.finalize(for: rawBuffer)
+      let (q, r) = initialized.quotientAndRemainder(dividingBy: stride)
+      _count &+= q &+ (r >= MemoryLayout<Element>.size ? 1 : 0)
+      span = .init()
+    }
+    try initializer(&span)
   }
 }
 

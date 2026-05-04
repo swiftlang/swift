@@ -169,6 +169,8 @@ public struct OpaquePointer {
 @available(*, unavailable)
 extension OpaquePointer: Sendable {}
 
+extension OpaquePointer: ConvertibleToBytes {}
+
 extension OpaquePointer {
   /// Creates a new `OpaquePointer` from the given address, specified as a bit
   /// pattern.

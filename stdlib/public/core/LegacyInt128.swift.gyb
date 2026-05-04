@@ -859,6 +859,9 @@ private func _wideDivide42<F: FixedWidthInteger & UnsignedInteger>(
 extension _UInt128: UnsignedInteger {}
 extension _Int128: SignedNumeric, SignedInteger {}
 
+extension _UInt128: ConvertibleToBytes, ConvertibleFromBytes {}
+extension _Int128: ConvertibleToBytes, ConvertibleFromBytes {}
+
 %{
 # This finds the magic numbers for signed division by a constant, following
 # the algorithm described in [Warren 2013, page 212].
