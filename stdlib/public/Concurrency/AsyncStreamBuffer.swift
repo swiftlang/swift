@@ -265,6 +265,22 @@ internal final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Se
 }
 
 extension _AsyncStreamStorage.StateMachine {
+  enum BufferingNewestDecision {
+    case append
+    case dropOldestValue
+    case dropNewValue
+
+    init(bufferCount: Int, limit: Int) {
+      if bufferCount < limit && limit > .zero {
+        self = .append
+      } else if bufferCount >= limit && limit > .zero {
+        self = .dropOldestValue
+      } else {
+        self = .dropNewValue
+      }
+    }
+  }
+
   func getOnTermination() -> TerminationHandler? {
     switch unsafe self.state { // TODO: Return a TerminationHandler only in certain states
     case .idle(let idle):
@@ -311,33 +327,37 @@ extension _AsyncStreamStorage.StateMachine {
         return unsafe .none(yieldResult: .enqueued(remaining: .max))
 
       case .bufferingOldest(let limit):
-        switch idle.buffer.count < limit {
-        case true:
+        if idle.buffer.count < limit {
           idle.buffer.append(value)
           let count = idle.buffer.count
           unsafe self = .init(state: .idle(idle))
           return unsafe .none(yieldResult: .enqueued(remaining: limit - count))
 
-        case false:
+        } else {
           unsafe self = .init(state: .idle(idle))
           return unsafe .none(yieldResult: .dropped(value))
         }
 
       case .bufferingNewest(let limit):
-        switch limit {
-        case _ where idle.buffer.count < limit && limit > .zero:
+        let decision = BufferingNewestDecision(
+          bufferCount: idle.buffer.count,
+          limit: limit
+        )
+
+        switch decision {
+        case .append:
           idle.buffer.append(value)
           let count = idle.buffer.count
           unsafe self = .init(state: .idle(idle))
           return unsafe .none(yieldResult: .enqueued(remaining: limit - count))
 
-        case _ where idle.buffer.count >= limit && limit > .zero:
+        case .dropOldestValue:
           let droppedValue = idle.buffer.removeFirst()
           idle.buffer.append(value)
           unsafe self = .init(state: .idle(idle))
           return unsafe .none(yieldResult: .dropped(droppedValue))
 
-        default:
+        case .dropNewValue:
           unsafe self = .init(state: .idle(idle))
           return unsafe .none(yieldResult: .dropped(value))
         }
@@ -347,15 +367,14 @@ extension _AsyncStreamStorage.StateMachine {
       let bufferingPolicy = unsafe waiting.bufferingPolicy
       let consumer = unsafe waiting.consumers.removeFirst()
 
-      switch unsafe waiting.consumers.isEmpty {
-      case true:
+      if unsafe waiting.consumers.isEmpty {
         unsafe self = .init(state: .idle(.init(
           buffer: [],
           bufferingPolicy: waiting.bufferingPolicy,
           terminationHandler: waiting.terminationHandler.take()
         )))
 
-      case false:
+      } else {
         unsafe self = .init(state: .waiting(waiting))
       }
 
@@ -388,8 +407,7 @@ extension _AsyncStreamStorage.StateMachine {
   mutating func next(_ consumer: consuming Consumer) -> NextAction {
     switch unsafe consume self.state {
     case .idle(var idle):
-      switch idle.buffer.isEmpty {
-      case true:
+      if idle.buffer.isEmpty {
         unsafe self = .init(state: .waiting(.init(
           consumers: [consumer],
           bufferingPolicy: idle.bufferingPolicy,
@@ -397,7 +415,7 @@ extension _AsyncStreamStorage.StateMachine {
         )))
         return unsafe .suspend
 
-      case false:
+      } else {
         let element = idle.buffer.removeFirst()
         unsafe self = .init(state: .idle(idle))
         return unsafe .resume(
@@ -434,8 +452,7 @@ extension _AsyncStreamStorage.StateMachine {
         }
       }
 
-      switch draining.buffer.isEmpty {
-      case true:
+      if draining.buffer.isEmpty {
         unsafe self = .init(state: .terminated(.init(
           failure: draining.failure,
           terminationHandler: draining.terminationHandler.take()
@@ -445,7 +462,7 @@ extension _AsyncStreamStorage.StateMachine {
           element: element
         )
 
-      case false:
+      } else {
         unsafe self = .init(state: .draining(draining))
         return unsafe .resume(
           consumer: consumer,
@@ -475,14 +492,13 @@ extension _AsyncStreamStorage.StateMachine {
   mutating func terminate(_ failure: consuming Failure?) -> TerminateAction {
     switch unsafe consume self.state {
     case .idle(var idle):
-      switch idle.buffer.isEmpty {
-      case true:
+      if idle.buffer.isEmpty {
         unsafe self = .init(state: .terminated(.init(failure: failure)))
         return unsafe .call(
           terminationHandler: idle.terminationHandler.take()
         )
 
-      case false:
+      } else {
         unsafe self = .init(state: .draining(.init(
           buffer: idle.buffer,
           failure: failure,
