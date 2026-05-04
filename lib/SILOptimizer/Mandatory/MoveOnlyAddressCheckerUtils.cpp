@@ -1152,6 +1152,35 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     return true;
   }
 
+  // SILGen sometimes emits two stacked `mark_unresolved_non_copyable_value`s
+  // on the same underlying address — an outer mark whose check kind permits
+  // initialization (e.g. `[consumable_and_assignable]` or
+  // `[initable_but_not_consumable]`) gates the init store, and an inner
+  // `[no_consume_or_assign]` mark layered on top gates the binding's reads.
+  // This is what's emitted for, among other things, a captured `let` of a
+  // noncopyable type initialized in conditional branches before the
+  // capturing closure runs. When checking the inner mark, the outer mark's
+  // init store has already happened, so the inner mark sees an initialized
+  // address.
+  if (auto *parentMark =
+          dyn_cast<MarkUnresolvedNonCopyableValueInst>(operand)) {
+    switch (parentMark->getCheckKind()) {
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::
+        ConsumableAndAssignable:
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::
+        InitableButNotConsumable:
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Adding stacked mark over init-permitting parent as "
+                    "init!\n");
+      return true;
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::Invalid:
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign:
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::
+        AssignableButNotConsumable:
+      break;
+    }
+  }
+
   // Assume a strict-checked value initialized before the check.
   if (address->isStrict()) {
     LLVM_DEBUG(llvm::dbgs()
