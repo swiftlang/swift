@@ -691,8 +691,6 @@ def main_normal():
         print_note('Using toolchain {}'.format(xcrun_toolchain))
         args.darwin_xcrun_toolchain = xcrun_toolchain
 
-    dump_current_checkout()
-
     toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
     os.environ['TOOLCHAINS'] = args.darwin_xcrun_toolchain
 
@@ -784,6 +782,7 @@ def main_normal():
 # -----------------------------------------------------------------------------
 
 def main():
+    dump_current_checkout()
     if not SWIFT_SOURCE_ROOT:
         fatal_error(
             "could not infer source root directory " +
