@@ -658,8 +658,8 @@ def dump_current_checkout():
     print(20 * "=", "begin current checkout:")
     subprocess.run(
      [file_path, "--dump-hashes"],
-     cwd=base_path 
-    ) 
+     cwd=base_path
+    )
     print(os.linesep + 20 * "=", "end current checkout:")
 
 # -----------------------------------------------------------------------------
