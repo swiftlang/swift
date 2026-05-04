@@ -2440,8 +2440,10 @@ static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
   // there and tail-call the task.  We don't want these frames to
   // potentially accumulate linearly.
   if (oldTracking) {
+    auto newTaskExecutor = task->getPreferredTaskExecutor();
     oldTracking->setActiveExecutor(executor);
-    oldTracking->setTaskExecutor(task->getPreferredTaskExecutor());
+    oldTracking->setTaskExecutor(newTaskExecutor);
+    concurrency::trace::task_switch_executor(task, executor, newTaskExecutor);
 
     return task->runInFullyEstablishedContext(); // 'return' forces tail call
   }

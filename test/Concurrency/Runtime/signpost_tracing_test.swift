@@ -516,6 +516,29 @@ tests.test("CustomSerialExecutorKind") {
   )
 }
 
+// Test the task_switch_executor signpost, emitted when a task hops
+// executors without suspending (inside a single job_run interval).
+tests.test("TaskSwitchExecutor") {
+  actor Inner {
+    func work() -> Int { return 1 }
+  }
+  actor Outer {
+    let inner: Inner
+    init(inner: Inner) { self.inner = inner }
+    func callInner() async -> Int { return await inner.work() }
+  }
+
+  let monitor = await SignpostMonitor.start()
+  let inner = Inner()
+  let outer = Outer(inner: inner)
+
+  let _ = await outer.callInner()
+
+  await monitor.expectAllSignpostsReceived(
+    [ExpectedSignpost(name: "task_switch_executor", type: .event)]
+  )
+}
+
 // Test executorKind for a task executor (executorKind=4).
 tests.test("TaskExecutorKind") {
   final class MyTaskExecutor: TaskExecutor {
