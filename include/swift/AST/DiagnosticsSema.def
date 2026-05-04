@@ -7709,6 +7709,12 @@ WARNING(debug_long_closure_body, none,
 WARNING(debug_long_expression, none,
         "expression took %0ms to type-check (limit: %1ms)",
         (unsigned, unsigned))
+WARNING(debug_long_expression_scopes, none,
+        "expression took %0 scope(s) to type-check (limit: %1)",
+        (unsigned, unsigned))
+WARNING(debug_long_expression_trail, none,
+        "expression took %0 trail step(s) to type-check (limit: %1)",
+        (unsigned, unsigned))
 
 //------------------------------------------------------------------------------
 // MARK: Pattern match diagnostics

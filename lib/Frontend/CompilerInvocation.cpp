@@ -2006,6 +2006,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                              Opts.WarnLongFunctionBodies);
   setUnsignedIntegerArgument(OPT_warn_long_expression_type_checking,
                              Opts.WarnLongExpressionTypeChecking);
+  setUnsignedIntegerArgument(OPT_warn_long_expression_type_checking_scopes,
+                             Opts.WarnLongExpressionTypeCheckingScopes);
+  setUnsignedIntegerArgument(OPT_warn_long_expression_type_checking_trail,
+                             Opts.WarnLongExpressionTypeCheckingTrail);
   setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ,
                              Opts.ExpressionTimeoutThreshold);
   setUnsignedIntegerArgument(OPT_dynamic_member_lookup_depth_limit_EQ,

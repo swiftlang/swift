@@ -911,6 +911,18 @@ def warn_long_expression_type_checking : Separate<["-"], "warn-long-expression-t
 def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-type-checking=">,
   Alias<warn_long_expression_type_checking>;
 
+def warn_long_expression_type_checking_scopes : Separate<["-"], "warn-long-expression-type-checking-scopes">,
+  MetaVarName<"<n>">,
+  HelpText<"Warns when type-checking an expression uses more than <n> solver scopes">;
+def warn_long_expression_type_checking_scopes_EQ : Joined<["-"], "warn-long-expression-type-checking-scopes=">,
+  Alias<warn_long_expression_type_checking_scopes>;
+
+def warn_long_expression_type_checking_trail : Separate<["-"], "warn-long-expression-type-checking-trail">,
+  MetaVarName<"<n>">,
+  HelpText<"Warns when type-checking an expression uses more than <n> solver trail steps">;
+def warn_long_expression_type_checking_trail_EQ : Joined<["-"], "warn-long-expression-type-checking-trail=">,
+  Alias<warn_long_expression_type_checking_trail>;
+
 def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
   HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
 
