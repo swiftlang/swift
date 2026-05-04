@@ -12,11 +12,6 @@
 
 #if arch(arm) || arch(arm64) || arch(arm64_32)
 
-@inline(__always)
-var _tries: Int {
-  100
-}
-
 #if arch(arm)
 
 // The following are acceptable operands to the aarch64 hint intrinsic from
@@ -58,20 +53,8 @@ func _wfe() {
 
 #elseif arch(i386) || arch(x86_64)
 
-@inline(__always)
-var _tries: Int {
-  1000
-}
-
 @_extern(c, "llvm.x86.sse2.pause")
 func _pause()
-
-#else
-
-@inline(__always)
-var _tries: Int {
-  100
-}
 
 #endif
 
