@@ -678,6 +678,7 @@ def main_normal():
                                       args.build_script_impl_args)
         except ValueError as e:
             exit_rejecting_arguments(e, parser)
+
         if '--check-args-only' in args.build_script_impl_args:
             return 0
 
