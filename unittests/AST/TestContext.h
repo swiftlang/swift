@@ -13,9 +13,13 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SILOptions.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/CASOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 
 #include "llvm/TargetParser/Host.h"
