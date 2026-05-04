@@ -45,7 +45,6 @@ split_embedded_sources(
   EMBEDDED BidirectionalCollection.swift
   EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
-  EMBEDDED Borrow.swift
   EMBEDDED BorrowingSequence.swift
     NORMAL BridgeObjectiveC.swift
   EMBEDDED BridgeStorage.swift
@@ -102,7 +101,6 @@ split_embedded_sources(
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
   EMBEDDED InlineArray.swift
-  EMBEDDED Inout.swift
   EMBEDDED InputStream.swift
   EMBEDDED Instant.swift
   EMBEDDED Int128.swift
@@ -123,6 +121,7 @@ split_embedded_sources(
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
+  EMBEDDED MutableRef.swift
   EMBEDDED NFC.swift
   EMBEDDED NFD.swift
   EMBEDDED NativeDictionary.swift
@@ -146,6 +145,7 @@ split_embedded_sources(
   EMBEDDED RangeReplaceableCollection.swift
   EMBEDDED RangeSet.swift
   EMBEDDED RangeSetRanges.swift
+  EMBEDDED Ref.swift
     NORMAL ReflectionMirror.swift
   EMBEDDED Repeat.swift
   EMBEDDED Result.swift
@@ -351,7 +351,6 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AllowUnsa
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SuppressedAssociatedTypesWithDefaults")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Reparenting")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Lifetimes")
-list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowInout")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAndMutateAccessors")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 

@@ -1254,15 +1254,15 @@ Added: _$sSlss17BorrowingSequenceRzrlE31_customContainsEquatableElementySbSg0F0S
 // Necessary for Distributed to compute distributed remote reference object size
 Added: __ZN5swift26getResilientMetadataBoundsEPKNS_21TargetClassDescriptorINS_9InProcessEEE
 
-// Borrow
-Added: _$ss6BorrowVMa
-Added: _$ss6BorrowVMn
-Added: _$ss6BorrowVsRi_zrlE7builtinxBWvg
+// Ref
+Added: _$ss3RefVMa
+Added: _$ss3RefVMn
+Added: _$ss3RefVsRi_zrlE7builtinxBWvg
 
-// Inout
-Added: _$ss5InoutVMa
-Added: _$ss5InoutVMn
-Added: _$ss5InoutVsRi_zrlE7pointerSpyxGvg
+// MutableRef
+Added: _$ss10MutableRefVMa
+Added: _$ss10MutableRefVMn
+Added: _$ss10MutableRefVsRi_zrlE7pointerSpyxGvg
 
 // SE-0514 Hashable Conformance for Dictionary.Keys, CollectionOfOne and EmptyCollection
 Added: _$sSD4KeysV9hashValueSivpMV

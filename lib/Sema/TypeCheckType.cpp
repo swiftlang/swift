@@ -2273,32 +2273,6 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
   }
 }
 
-/// Diagnose when this is one of the Borrow or Inout types, which currently require
-/// an experimental feature to use.
-static void diagnoseBorrowInoutType(TypeDecl *typeDecl, SourceLoc loc,
-                                    const DeclContext *dc) {
-  if (loc.isInvalid())
-    return;
-
-  if (!typeDecl->isStdlibDecl())
-    return;
-
-  ASTContext &ctx = typeDecl->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::BorrowInout))
-    return;
-
-  auto nameString = typeDecl->getName().str();
-  if (nameString != "Borrow" && nameString != "Inout")
-    return;
-
-  // Don't require this in the standard library or _Concurrency library.
-  auto module = dc->getParentModule();
-  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
-    return;
-
-  ctx.Diags.diagnose(loc, diag::borrow_inout_experimental, nameString);
-}
-
 /// Diagnose when this is one of the BorrowingSequence types, which currently require
 /// an experimental feature to use.
 static void diagnoseBorrowingSequenceType(TypeDecl *typeDecl, SourceLoc loc,
@@ -2429,7 +2403,6 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       return ErrorType::get(ctx);
     }
 
-    diagnoseBorrowInoutType(currentDecl, repr->getLoc(), DC);
     diagnoseBorrowingSequenceType(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);

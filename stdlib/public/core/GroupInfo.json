@@ -283,8 +283,8 @@
     "InlineArray.swift",
     "_InlineArray.swift",
     "Exclusivity.swift",
-    "Borrow.swift",
-    "Inout.swift",
+    "Ref.swift",
+    "MutableRef.swift",
     "UniqueBox.swift"
   ],
   "Result": [

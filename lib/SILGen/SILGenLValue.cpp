@@ -5694,22 +5694,27 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
         projection =
             emitLoad(loc, projection.getValue(), origFormalType,
                      substFormalType, rvalueTL, C, IsNotTake, isBaseGuaranteed);
-      } else if (isReadAccessResultOwned(src.getAccessKind()) &&
-          !projection.isPlusOneOrTrivial(*this)) {
+      } else {
+        bool isPlusZeroOk = isBaseGuaranteed ? C.isGuaranteedPlusZeroOk()
+                                             : C.isImmediatePlusZeroOk();
+        if (!projection.isPlusOneOrTrivial(*this) &&
+            (isReadAccessResultOwned(src.getAccessKind()) ||
+             (src.getAccessKind() == SGFAccessKind::BorrowedAddressRead &&
+              !isPlusZeroOk))) {
+          // Before we copy, if we have a move only wrapped value, unwrap the
+          // value using a guaranteed moveonlywrapper_to_copyable.
+          if (projection.getType().isMoveOnlyWrapped()) {
+            // We are assuming we always get a guaranteed value here.
+            assert(projection.getValue()->getOwnershipKind() ==
+                   OwnershipKind::Guaranteed);
+            // We use SILValues here to ensure we get a tight scope around our
+            // copy.
+            projection = B.createGuaranteedMoveOnlyWrapperToCopyableValue(
+                loc, projection);
+          }
 
-        // Before we copy, if we have a move only wrapped value, unwrap the
-        // value using a guaranteed moveonlywrapper_to_copyable.
-        if (projection.getType().isMoveOnlyWrapped()) {
-          // We are assuming we always get a guaranteed value here.
-          assert(projection.getValue()->getOwnershipKind() ==
-                 OwnershipKind::Guaranteed);
-          // We use SILValues here to ensure we get a tight scope around our
-          // copy.
-          projection =
-              B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, projection);
+          projection = projection.copy(*this, loc);
         }
-
-        projection = projection.copy(*this, loc);
       }
 
       result = RValue(*this, loc, substFormalType, projection);

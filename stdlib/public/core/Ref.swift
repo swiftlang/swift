@@ -13,11 +13,11 @@
 /// A safe reference allowing in-place reads to a shared value.
 @available(SwiftStdlib 6.4, *)
 @frozen
-public struct Borrow<Value: ~Copyable>: Copyable, ~Escapable {
+public struct Ref<Value: ~Copyable>: Copyable, ~Escapable {
   @usableFromInline
   let builtin: Builtin.Borrow<Value>
 
-  /// Initializes an instance of `Borrow` with the given borrowed value. This
+  /// Initializes an instance of `Ref` with the given borrowed value. This
   /// creates a constant reference to that value preventing writes on the 
   /// original value while this reference is still active.
   @available(SwiftStdlib 6.4, *)
@@ -28,13 +28,13 @@ public struct Borrow<Value: ~Copyable>: Copyable, ~Escapable {
     builtin = Builtin.makeBorrow(value)
   }
 
-  /// Unsafely initializes an instance of `Borrow` using the given
+  /// Unsafely initializes an instance of `Ref` using the given
   /// 'unsafeAddress' as the reference based on the borrowed lifetime of the
   /// given 'owner' argument.
   ///
   /// - Parameter unsafeAddress: The address to use to reference an instance of
   ///                            type `Value`.
-  /// - Parameter owner: The owning instance that this `Borrow` instance's
+  /// - Parameter owner: The owning instance that this `Ref` instance's
   ///                    lifetime is based on.
   @available(SwiftStdlib 6.4, *)
   @unsafe
@@ -50,7 +50,7 @@ public struct Borrow<Value: ~Copyable>: Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Borrow where Value: ~Copyable {
+extension Ref where Value: ~Copyable {
   /// Dereferences the constant reference allowing for in-place reads to the
   /// underlying value.
   @available(SwiftStdlib 6.4, *)

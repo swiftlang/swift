@@ -610,9 +610,6 @@ EXPERIMENTAL_FEATURE(SourceWarningControl, true)
 /// Allows a `get` returning a noncopyable type have owned semantics in opaque interfaces.
 EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
 
-/// Allows the standard library `Borrow` and `Inout` types to be used.
-EXPERIMENTAL_FEATURE(BorrowInout, true)
-
 /// Allow access to the BorrowingSequence protocols/types outside the stdlib.
 EXPERIMENTAL_FEATURE(BorrowingSequence, true)
 

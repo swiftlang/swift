@@ -14,11 +14,11 @@
 @available(SwiftStdlib 6.4, *)
 @frozen
 @safe
-public struct Inout<Value: ~Copyable>: ~Copyable, ~Escapable {
+public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
   @usableFromInline
   let pointer: UnsafeMutablePointer<Value>
 
-  /// Initializes an instance of `Inout` with the given mutable value. This
+  /// Initializes an instance of `MutableRef` with the given mutable value. This
   /// creates a mutable reference to that value preventing writes to the
   /// original value while this mutable reference is still active.
   @available(SwiftStdlib 6.4, *)
@@ -29,13 +29,13 @@ public struct Inout<Value: ~Copyable>: ~Copyable, ~Escapable {
     unsafe pointer = UnsafeMutablePointer(Builtin.unprotectedAddressOf(&value))
   }
 
-  /// Unsafely initializes an instance of `Inout` using the given
+  /// Unsafely initializes an instance of `MutableRef` using the given
   /// 'unsafeAddress' as the mutable reference based on the mutating lifetime of
   /// the given 'owner' argument.
   ///
   /// - Parameter unsafeAddress: The address to use to mutably reference an
   ///                            instance of type `Value`.
-  /// - Parameter owner: The owning instance that this `Inout` instance's
+  /// - Parameter owner: The owning instance that this `MutableRef` instance's
   ///                    lifetime is based on.
   @available(SwiftStdlib 6.4, *)
   @unsafe
@@ -51,7 +51,7 @@ public struct Inout<Value: ~Copyable>: ~Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Inout where Value: ~Copyable {
+extension MutableRef where Value: ~Copyable {
   /// Dereferences the mutable reference allowing for in-place reads and writes
   /// to the underlying value.
   @available(SwiftStdlib 6.4, *)

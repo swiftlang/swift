@@ -1,10 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-run-simple-swift(-enable-builtin-module -enable-experimental-feature Lifetimes -enable-experimental-feature BorrowInout)
+// RUN: %target-run-simple-swift(-enable-builtin-module -enable-experimental-feature Lifetimes)
 
 // REQUIRES: executable_test
 // REQUIRES: synchronization
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: swift_feature_BorrowInout
 
 import Builtin
 import Synchronization
@@ -21,11 +20,11 @@ struct Foo: ~Copyable {
 
 @available(SwiftStdlib 6.4, *)
 struct BorrowingAtomic: ~Escapable {
-  let atomic: Borrow<Atomic<Int>>
+  let atomic: Ref<Atomic<Int>>
 
   @_lifetime(borrow a)
   init(_ a: borrowing Atomic<Int>) {
-    atomic = Borrow(a)
+    atomic = Ref(a)
   }
 
   func load() -> Int {
@@ -39,31 +38,31 @@ struct BorrowingAtomic: ~Escapable {
 
 extension Optional where Wrapped: ~Copyable {
   @available(SwiftStdlib 6.4, *)
-  mutating func mutate() -> Inout<Wrapped>? {
+  mutating func mutate() -> MutableRef<Wrapped>? {
     if self == nil {
       return nil
     }
 
     let ptr = UnsafeMutablePointer<Wrapped>(Builtin.unprotectedAddressOf(&self))
-    return Inout(unsafeAddress: ptr, mutating: &self)
+    return MutableRef(unsafeAddress: ptr, mutating: &self)
   }
 
   @available(SwiftStdlib 6.4, *)
   @_lifetime(&self)
-  mutating func insert(_ new: consuming Wrapped) -> Inout<Wrapped> {
+  mutating func insert(_ new: consuming Wrapped) -> MutableRef<Wrapped> {
     self = .some(new)
     return mutate()._consumingUnsafelyUnwrap()
   }
 }
 
-let suite = TestSuite("BorrowInout")
+let suite = TestSuite("RefMutableRef")
 
 if #available(SwiftStdlib 6.4, *) {
-suite.test("Borrow") {
+suite.test("Ref") {
   var foo = Foo()
 
   do {
-    let borrowFoo = Borrow(foo)
+    let borrowFoo = Ref(foo)
 
     expectEqual(borrowFoo.value.x, 128)
   }
@@ -84,7 +83,7 @@ suite.test("Borrow") {
 }
 
 if #available(SwiftStdlib 6.4, *) {
-suite.test("Inout") {
+suite.test("MutableRef") {
   var x: _? = 123
 
   var y = x.mutate()!
