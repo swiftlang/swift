@@ -764,7 +764,9 @@ BridgedASTType::MetatypeRepresentation BridgedASTType::getRepresentationOfMetaty
 }
 
 BridgedOptionalInt BridgedASTType::getValueOfIntegerType() const {
-  return getFromAPInt(unbridged()->getAs<swift::IntegerType>()->getValue());
+  if (auto *intType = unbridged()->getAs<swift::IntegerType>())
+    return getFromAPInt(intType->getValue());
+  return BridgedOptionalInt();
 }
 
 BridgedSubstitutionMap BridgedASTType::getContextSubstitutionMap() const {
