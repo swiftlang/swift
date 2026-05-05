@@ -115,7 +115,6 @@
 /include/swift/Sema/                               @hborla @slavapestov @xedin @hamishknight @kathygray-pl
 /include/swift/Sema/CS*                            @hborla @xedin @hamishknight @kathygray-pl
 /include/swift/Sema/Constraint*                    @hborla @xedin @hamishknight @kathygray-pl
-/include/swift/Serialization/                      @xymus
 /include/swift/Serialization/SerializedModuleLoader* @artemcm
 /include/swift/SwiftRemoteMirror/                  @slavapestov
 /include/swift/SymbolGraphGen/                     @QuietMisdreavus
@@ -187,7 +186,6 @@
 /lib/Sema/TypeCheckDistributed*                     @hborla @ktoso @xedin
 /lib/Sema/TypeCheckProtocol*                        @AnthonyLatsis @hborla @slavapestov
 /lib/Sema/TypeCheckType*                            @AnthonyLatsis @hborla @slavapestov @xedin @hamishknight
-/lib/Serialization/                                 @xymus
 /lib/Serialization/SerializedModuleLoader*          @artemcm
 /lib/SwiftRemoteMirror/                             @slavapestov
 /lib/SymbolGraphGen                                 @QuietMisdreavus
@@ -248,7 +246,6 @@
 /test/ScanDependencies/                             @artemcm
 /test/Sema/                                         @hborla @slavapestov @xedin @hamishknight
 /test/Sema/moveonly*                                @kavon
-/test/Serialization/                                @xymus
 /test/SourceKit/                                    @hamishknight @rintaro
 /test/SymbolGraph/                                  @QuietMisdreavus
 /test/abi/                                          @swiftlang/standard-librarians
@@ -329,5 +326,4 @@
 /validation-test/SILGen/                  @jckarter
 /validation-test/SILOptimizer/            @eeckstein
 /validation-test/Sema/                    @hborla @slavapestov @xedin @hamishknight
-/validation-test/Serialization/           @xymus
 /validation-test/stdlib/                  @swiftlang/standard-librarians
