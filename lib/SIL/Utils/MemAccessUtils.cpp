@@ -1417,7 +1417,7 @@ public:
              // we see it
              || isa<MoveOnlyWrapperToCopyableAddrInst>(projectedAddr) ||
              isa<CopyableToMoveOnlyWrapperAddrInst>(projectedAddr) ||
-             isGuaranteedAddressReturn(projectedAddr));
+             isAddressReturn(projectedAddr));
     }
     return sourceAddr->get();
   }
@@ -2032,7 +2032,7 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
         && visitSingleValueUser(svi, dfs) == IgnoredUse) {
       return true;
     }
-    if (isGuaranteedAddressReturn(svi)) {
+    if (isAddressReturn(svi)) {
       pushUsers(svi, dfs);
     }
   }

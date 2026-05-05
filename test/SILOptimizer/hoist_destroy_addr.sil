@@ -1394,7 +1394,7 @@ bb0(%0 : $*Vector, %1 : @owned $AnyObject):
   return %4
 }
 
-sil [ossa] @borrow_data : $@convention(method) (@in_guaranteed S) -> @guaranteed X {
+sil [ossa] @borrow_data1 : $@convention(method) (@in_guaranteed S) -> @guaranteed X {
 bb0(%0 : $*S):
   %2 = struct_element_addr %0 : $*S, #S.x
   %3 = load_borrow %2 : $*X
@@ -1411,7 +1411,7 @@ bb0(%0 : $*S):
 sil shared [noinline] [ossa] @test_borrow1 : $@convention(thin) (@inout S, Int) -> () {
 bb0(%0 : $*S, %1 : $Int):
   %2 = alloc_stack $X
-  %3 = function_ref @borrow_data : $@convention(method) (@in_guaranteed S) -> @guaranteed X
+  %3 = function_ref @borrow_data1 : $@convention(method) (@in_guaranteed S) -> @guaranteed X
   %4 = apply %3(%0) : $@convention(method) (@in_guaranteed S) -> @guaranteed X
   %5 = copy_value %4
   store %5 to [init] %2
@@ -1421,5 +1421,31 @@ bb0(%0 : $*S, %1 : $Int):
   dealloc_stack %2
   %11 = tuple ()
   return %11
+}
+
+sil [ossa] @borrow_data2 : $@convention(method) (@in_guaranteed S) -> @guaranteed_address X {
+bb0(%0 : $*S):
+  %1 = struct_element_addr %0 : $*S, #S.x
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow2 :
+// CHECK:         [[RESULT:%[0-9]+]] = apply {{%[0-9]+}}(%0)
+// CHECK-NEXT:    [[COPY:%[0-9]+]] = load [copy] [[RESULT]]
+// CHECK:         destroy_addr %0
+// CHECK-LABEL: } // end sil function 'test_borrow2'
+sil [ossa] @test_borrow2 : $@convention(thin) (@inout S) -> () {
+bb0(%0 : $*S):
+  %1 = alloc_stack $X
+  %2 = function_ref @borrow_data2 : $@convention(method) (@in_guaranteed S) -> @guaranteed_address X
+  %3 = apply %2(%0) : $@convention(method) (@in_guaranteed S) -> @guaranteed_address X
+  %4 = load [copy] %3 : $*X
+  store %4 to [init] %1 : $*X
+  %6 = load [take] %1 : $*X
+  %7 = struct $S (%6 : $X)
+  store %7 to [assign] %0 : $*S
+  dealloc_stack %1 : $*X
+  %10 = tuple ()
+  return %10 : $()
 }
 
