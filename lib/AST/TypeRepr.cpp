@@ -795,7 +795,54 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
 
   Printer << "(";
 
-  for (unsigned i = 0, e = Bits.TupleTypeRepr.NumElements; i != e; ++i) {
+  unsigned NumElements = Bits.TupleTypeRepr.NumElements;
+
+  // Compact printing for homogeneous unlabeled tuples with 5+ elements.
+  // Mirrors the compaction in TypePrinter::visitTupleType, but operates 
+  // on the syntactic TypeRepr rather than the resolved Type. Two 
+  // unlabeled elements are considered homogeneous if their printed 
+  // forms match exactly. This is stricter than the Type-based check, 
+  // which uses isEqual and coalesces differently-sugared-but-equal 
+  // types. The stricter form is appropriate here since the TypeRepr 
+  // path appears in contexts where resolved types are not available.
+  if (Opts.PrintHomogeneousTuplesCompactly && NumElements > 4) {
+    bool AllUnlabeled = true;
+    for (unsigned i = 0; i != NumElements; ++i) {
+      if (!getElementName(i).empty() || isNamedParameter(i)) {
+        AllUnlabeled = false;
+        break;
+      }
+    }
+
+    if (AllUnlabeled) {
+      SmallString<32> FirstStr;
+      {
+        llvm::raw_svector_ostream OS(FirstStr);
+        StreamPrinter SP(OS);
+        printTypeRepr(getElementType(0), SP, Opts);
+      }
+
+      bool IsHomogeneous = true;
+      for (unsigned i = 1; i != NumElements; ++i) {
+        SmallString<32> EltStr;
+        llvm::raw_svector_ostream OS(EltStr);
+        StreamPrinter SP(OS);
+        printTypeRepr(getElementType(i), SP, Opts);
+        if (StringRef(EltStr) != StringRef(FirstStr)) {
+          IsHomogeneous = false;
+          break;
+        }
+      }
+
+      if (IsHomogeneous) {
+        printTypeRepr(getElementType(0), Printer, Opts);
+        Printer << " /* ... repeated " << NumElements << " times ... */)";
+        return;
+      }
+    }
+  }
+
+  for (unsigned i = 0, e = NumElements; i != e; ++i) {
     if (i) Printer << ", ";
     Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
     auto name = getElementName(i);
