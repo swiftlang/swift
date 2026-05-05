@@ -6201,6 +6201,7 @@ namespace {
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeLiteral(), "compileTimeLiteral");
       printFlag(paramFlags.isConstValue(), "constValue");
+      printFlag(paramFlags.isSending(), "sending");
       printFlag(getDumpString(paramFlags.getValueOwnership()));
     }
 
