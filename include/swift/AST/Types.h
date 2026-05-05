@@ -3526,6 +3526,10 @@ public:
     bool hasInternalLabel() const { return !InternalLabel.empty(); }
     Identifier getInternalLabel() const { return InternalLabel; }
 
+    bool hasValidInternalLabel() const {
+      return hasInternalLabel() && !InternalLabel.hasDollarPrefix();
+    }
+
     /// Return true if argument name is valid and matches \c paramName.
     ///
     /// The three tests to check if argument name is valid are:

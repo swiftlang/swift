@@ -538,8 +538,13 @@ formatLifetimeDependence(LifetimeDependenceInfo const &info,
   // Get a string identifier for a parameter at the given index.
   auto getIdentifier = [&](unsigned index) -> std::string {
     if (params) {
-      if (index < params->size() && (*params)[index].hasInternalLabel()) {
-        return (*params)[index].getInternalLabel().get();
+      if (index < params->size()) {
+        auto &param = (*params)[index];
+        if (param.hasValidInternalLabel())
+          return param.getInternalLabel().get();
+        if (param.hasLabel())
+          return param.getLabel().get();
+        return "$" + std::to_string(index);
       }
       if (index == selfIndex) {
         return "self";
@@ -7351,8 +7356,7 @@ public:
         Printer.printStructurePost(PrintStructureKind::FunctionParameter);
       };
 
-      bool hasValidInternalLabel = Param.hasInternalLabel() &&
-                                   !Param.getInternalLabel().hasDollarPrefix();
+      bool hasValidInternalLabel = Param.hasValidInternalLabel();
 
       if ((Options.AlwaysTryPrintParameterLabels || printExternalLabels ||
            printAllLabels) &&
@@ -7377,6 +7381,8 @@ public:
         Printer.printName(Param.getInternalLabel(),
                           PrintNameContext::FunctionParameterLocal);
         Printer << ": ";
+      } else if (printAllLabels && !Options.IsForSwiftInterface) {
+        Printer << "_ $" << i << ": ";
       }
 
       if (Options.PrintInSILBody) {
@@ -7398,10 +7404,10 @@ public:
     Printer << ")";
   }
 
-  static bool shouldPrintLabelsForLifetimeAttributes(AnyFunctionType const *T) {
-    // If the type has explicit lifetime dependencies, print the labels, because
-    // explicit lifetimes use them to describe their sources and targets.
-    return T->hasExplicitLifetimeDependencies();
+  bool shouldPrintLabelsForLifetimeAttributes(AnyFunctionType const *T) const {
+    if (Options.IsForSwiftInterface)
+      return T->hasExplicitLifetimeDependencies();
+    return T->hasLifetimeDependencies();
   }
 
   void visitFunctionType(FunctionType *T,
