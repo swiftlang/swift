@@ -538,12 +538,12 @@ extension AsyncThrowingStream {
   }
 }
 
-/// The state machine backing `Async{Throwing}Stream`'s unfolding variant.
+/// The state machine backing the unfolding variant of `Async{Throwing}Stream`.
 ///
 /// States:
 ///
-///   - `producing`: The stream calls the `produce` closure on consumer demand.
-///   - `terminated`: The stream is in a terminal state and immediately returns `nil`.
+///   - `producing`: The stream is active and invokes the `produce` closure, producing the next element on consumer demand.
+///   - `terminated`: The stream is in a terminal state and **immediately returns `nil`** on consumer demand.
 ///
 /// Transitions:
 ///
@@ -555,9 +555,14 @@ extension AsyncThrowingStream {
 /// ```
 ///
 /// Behavior:
-/// The stream can reach its terminal state either by producing `nil` or when a task with a consumer present is canceled.
-/// The `onCancel` closure will be invoked at most **once**, and only if the consumer task was cancelled and an `onCancel` closure was set. It is then **cleared**.
-/// Once a terminal state is reached, the installed `produce` and `onCancel` closures are **cleared**, and subsequent calls will **immediately return `nil`**.
+/// The state machine is single-consumer–based and invokes the `produce` closure in response to demand.
+/// On concurrent iteration, `produce` is invoked concurrently.
+///
+/// The stream reaches its terminal state either when **`produce` returns nil** or
+/// when the **task of an active consumer is cancelled**.
+///
+/// The `onCancel` closure is invoked **at most once** and is **cleared afterward**.
+/// However, it is only invoked if the stream is **terminated due to task cancellation**.
 @safe
 final class _UnfoldingStorage<Element, Failure: Error>: @unchecked Sendable {
   typealias Produce = @Sendable () async throws(Failure) -> Element? // TODO: This needs to have `nonisolated(nonsending)` in order to execute on the caller's actor
