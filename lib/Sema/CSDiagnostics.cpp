@@ -6065,11 +6065,13 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
   }
 
   auto argRange = [&](unsigned argIdx, Identifier label) -> SourceRange {
+    assert(argIdx < args->size() && "Argument index out of bounds");
     auto range = args->getExpr(argIdx)->getSourceRange();
     if (!label.empty())
       range.Start = args->getLabelLoc(argIdx);
 
     unsigned paramIdx = argBindings[argIdx];
+    assert(paramIdx < Bindings.size() && "Parameter index out of bounds");
     if (Bindings[paramIdx].size() > 1)
       range.End = args->getExpr(Bindings[paramIdx].back())->getEndLoc();
 
@@ -6108,6 +6110,7 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
     } else {
       // For all other arguments, start is the next token past
       // the previous argument.
+      assert(ArgIdx > 0 && ArgIdx <= args->size() && "Argument index out of bounds");
       removalStartLoc = args->getExpr(ArgIdx - 1)->getEndLoc();
     }
 
