@@ -290,6 +290,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::UnknownOS:
     return "none";
   case llvm::Triple::UEFI:
+    return "uefi";
   case llvm::Triple::LiteOS:
   case llvm::Triple::Managarm:
     llvm_unreachable("unsupported OS");

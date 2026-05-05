@@ -452,6 +452,8 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
     return std::make_unique<toolchains::GenericUnix>(*this, target);
   case llvm::Triple::WASI:
     return std::make_unique<toolchains::WebAssembly>(*this, target);
+  case llvm::Triple::UEFI:
+    return std::make_unique<toolchains::UEFI>(*this, target);
   case llvm::Triple::UnknownOS:
     return std::make_unique<toolchains::GenericUnix>(*this, target);
   default:
