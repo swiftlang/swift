@@ -2245,6 +2245,17 @@ public struct StaticFooFuncMacro: DeclarationMacro {
   }
 }
 
+public struct ProtocolRequirementMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func macroRequirement() -> Int",
+    ]
+  }
+}
+
 public struct SelfAlwaysEqualOperator: DeclarationMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,

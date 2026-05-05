@@ -610,10 +610,30 @@ func testLocalVarsFromDeclarationMacros() {
 
 // Variadic macro
 @freestanding(declaration, names: arbitrary) macro emptyDecl(_: String...) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
+@freestanding(declaration, names: named(macroRequirement())) macro protocolRequirement() = #externalMacro(module: "MacroDefinition", type: "ProtocolRequirementMacro")
 
 struct TakesVariadic {
   #emptyDecl("foo", "bar")
 }
+
+protocol HasEmptyDeclarationMacro {
+  #emptyDecl("protocol")
+}
+
+protocol HasMacroRequirement {
+  #protocolRequirement()
+}
+
+struct SatisfiesMacroRequirement: HasMacroRequirement {
+  func macroRequirement() -> Int { 88791 }
+}
+
+func callMacroRequirement(_ value: any HasMacroRequirement) -> Int {
+  value.macroRequirement()
+}
+
+// CHECK: 88791
+print(callMacroRequirement(SatisfiesMacroRequirement()))
 
 // Funkiness with static functions introduced via macro expansions.
 @freestanding(declaration, names: named(foo())) public macro staticFooFunc() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")

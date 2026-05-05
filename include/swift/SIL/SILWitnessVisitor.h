@@ -106,8 +106,9 @@ public:
     if (asDerived().shouldVisitRequirementSignatureOnly())
       return;
 
-    // Visit the witnesses for the direct members of a protocol.
-    for (Decl *member : protocol->getMembers()) {
+    // Visit the witnesses for the members of a protocol, including those
+    // introduced by freestanding declaration macro expansions.
+    for (Decl *member : protocol->getAllMembers()) {
       ASTVisitor<T>::visit(member);
     }
   }
@@ -179,6 +180,10 @@ public:
 
   void visitTypeAliasDecl(TypeAliasDecl *tad) {
     // We don't care about these by themselves for witnesses.
+  }
+
+  void visitMacroExpansionDecl(MacroExpansionDecl *) {
+    // The expanded declarations are visited through getAllMembers().
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {
