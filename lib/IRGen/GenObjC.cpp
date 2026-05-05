@@ -1268,8 +1268,10 @@ void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
                                            VarDecl *property, std::string &s) {
   // FIXME: Property encoding differs in slight ways that aren't publicly
   // exposed from Clang.
-  IGM.getClangASTContext()
-    .getObjCEncodingForPropertyType(getObjCPropertyType(IGM, property), s);
+  auto clangType = getObjCPropertyType(IGM, property);
+  if (clangType.isNull())
+    return;
+  IGM.getClangASTContext().getObjCEncodingForPropertyType(clangType, s);
 }
 
 static void
@@ -1428,6 +1430,7 @@ irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM, VarDecl *property) {
   auto clangType = getObjCPropertyType(IGM, property);
   if (clangType.isNull()) {
     descriptor.typeEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    descriptor.impl = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     descriptor.silFunction = nullptr;
     return descriptor;
   }
@@ -1508,6 +1511,7 @@ irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   clangType = getObjCPropertyType(IGM, property);
   if (clangType.isNull()) {
     descriptor.typeEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    descriptor.impl = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     descriptor.silFunction = nullptr;
     return descriptor;
   }

@@ -1152,6 +1152,35 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     return true;
   }
 
+  // SILGen sometimes emits two stacked `mark_unresolved_non_copyable_value`s
+  // on the same underlying address — an outer mark whose check kind permits
+  // initialization (e.g. `[consumable_and_assignable]` or
+  // `[initable_but_not_consumable]`) gates the init store, and an inner
+  // `[no_consume_or_assign]` mark layered on top gates the binding's reads.
+  // This is what's emitted for, among other things, a captured `let` of a
+  // noncopyable type initialized in conditional branches before the
+  // capturing closure runs. When checking the inner mark, the outer mark's
+  // init store has already happened, so the inner mark sees an initialized
+  // address.
+  if (auto *parentMark =
+          dyn_cast<MarkUnresolvedNonCopyableValueInst>(operand)) {
+    switch (parentMark->getCheckKind()) {
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::
+        ConsumableAndAssignable:
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::
+        InitableButNotConsumable:
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Adding stacked mark over init-permitting parent as "
+                    "init!\n");
+      return true;
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::Invalid:
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign:
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::
+        AssignableButNotConsumable:
+      break;
+    }
+  }
+
   // Assume a strict-checked value initialized before the check.
   if (address->isStrict()) {
     LLVM_DEBUG(llvm::dbgs()
@@ -1726,18 +1755,34 @@ struct CopiedLoadBorrowEliminationVisitor
 
       case OperandOwnership::ForwardingConsume:
       case OperandOwnership::DestroyingConsume: {
-        if (auto *dvi = dyn_cast<DestroyValueInst>(nextUse->getUser())) {
-          auto value = dvi->getOperand();
-          auto *pai = dyn_cast_or_null<PartialApplyInst>(
-              value->getDefiningInstruction());
-          if (pai && pai->isOnStack()) {
-            // A destroy_value of an on_stack partial apply isn't actually a
-            // consuming use--it closes a borrow scope.
-            continue;
+        // The closure value from an on-stack partial_apply is borrowed on
+        // behalf of its captures, so its lifetime-ending uses close a borrow
+        // scope rather than consuming the captured value. If the use is a
+        // `convert_function` (forwarding consume, e.g., stripping
+        // `@Sendable` from a `@MainActor`-isolated closure), push its uses
+        // onto the worklist so the terminating destroy is visited.
+        auto *user = nextUse->getUser();
+        if (auto *cfi = dyn_cast<ConvertFunctionInst>(user)) {
+          for (auto *use : cfi->getUses()) {
+            useWorklist.push_back(use);
           }
+          continue;
         }
-        // We can only hit this if our load_borrow was copied.
-        llvm_unreachable("We should never hit this");
+        // Otherwise, walk backward through any convert_function chain to
+        // verify the use is closing the borrow scope of an on-stack
+        // partial_apply.
+        SILValue value = nextUse->get();
+        while (auto *cfi = dyn_cast_or_null<ConvertFunctionInst>(
+                   value->getDefiningInstruction())) {
+          value = cfi->getOperand();
+        }
+        auto *pai = dyn_cast_or_null<PartialApplyInst>(
+            value->getDefiningInstruction());
+        if (!pai || !pai->isOnStack()) {
+          // We can only hit this if our load_borrow was copied.
+          llvm_unreachable("We should never hit this");
+        }
+        continue;
       }
       case OperandOwnership::GuaranteedForwarding: {
         SmallVector<SILValue, 8> forwardedValues;
