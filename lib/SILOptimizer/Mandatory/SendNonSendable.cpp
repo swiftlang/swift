@@ -70,6 +70,18 @@ static llvm::cl::opt<bool> ForceTypedErrors(
                    "it easier to test typed errors"),
     llvm::cl::Hidden);
 
+static llvm::cl::opt<bool> ForceTypedSrcErrors(
+    "sil-regionbasedisolation-force-use-of-typed-src-errors",
+    llvm::cl::desc("Force the usage of typed instead of named errors for the "
+                   "src side of incompatible region merge diagnostics"),
+    llvm::cl::Hidden);
+
+static llvm::cl::opt<bool> ForceTypedDstErrors(
+    "sil-regionbasedisolation-force-use-of-typed-dst-errors",
+    llvm::cl::desc("Force the usage of typed instead of named errors for the "
+                   "dst side of incompatible region merge diagnostics"),
+    llvm::cl::Hidden);
+
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
@@ -217,6 +229,39 @@ inferNameAndRootHelper(SILValue value) {
   if (ForceTypedErrors)
     return {};
   return VariableNameInferrer::inferNameAndRoot(value);
+}
+
+/// Attempt to infer a type for \p value. Used as a fallback when name inference
+/// fails for cross-isolation merge diagnostics. Prefers AST-level types from
+/// expressions or declarations, then falls back to the SIL value's type.
+static std::optional<Type> inferTypeHelper(SILValue value) {
+  if (auto *svi = dyn_cast<SingleValueInstruction>(value)) {
+    if (auto *expr = svi->getLoc().getAsASTNode<Expr>())
+      return expr->findOriginalType();
+  }
+  if (auto *arg = dyn_cast<SILFunctionArgument>(value)) {
+    if (auto *decl = arg->getDecl())
+      return decl->getInterfaceType();
+  }
+  return value->getType().getObjectType().getASTType();
+}
+
+/// Like inferNameHelper but also returns none when ForceTypedSrcErrors is set.
+/// Used for the src (task-isolated) side of incompatible region merge
+/// diagnostics to allow testing the typed-src-only path.
+static std::optional<Identifier> inferMergeSrcNameHelper(SILValue value) {
+  if (ForceTypedErrors || ForceTypedSrcErrors)
+    return {};
+  return VariableNameInferrer::inferName(value);
+}
+
+/// Like inferNameHelper but also returns none when ForceTypedDstErrors is set.
+/// Used for the dst (actor-isolated) side of incompatible region merge
+/// diagnostics to allow testing the typed-dst-only path.
+static std::optional<Identifier> inferMergeDstNameHelper(SILValue value) {
+  if (ForceTypedErrors || ForceTypedDstErrors)
+    return {};
+  return VariableNameInferrer::inferName(value);
 }
 
 /// Sometimes we use a store_borrow + temporary to materialize a borrowed value
@@ -3943,14 +3988,8 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitUnknown() {
 
   // We should always be able to find a name for an inout sending param. If we
   // do not, emit an unknown pattern error.
-  auto srcName = inferNameHelper(srcRegionValue.getValue());
-  if (!srcName) {
-    return emitUnknownPatternError();
-  }
-  auto dstName = inferNameHelper(dstRegionValue.getValue());
-  if (!dstName) {
-    return emitUnknownPatternError();
-  }
+  auto srcName = inferMergeSrcNameHelper(srcRegionValue.getValue());
+  auto dstName = inferMergeDstNameHelper(dstRegionValue.getValue());
 
   if (!srcIsolationInfo)
     return emitUnknownPatternError();
@@ -3960,16 +3999,74 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitUnknown() {
   auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
   auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
 
-  diagnoseError(op->getUser(),
-                diag::regionbasedisolation_merge_region_failure_error_unknown,
-                *srcName, srcIsolationStr, *dstName, dstIsolationStr,
-                !srcIsolation->isTaskIsolated())
-      .limitBehaviorIf(getBehaviorLimit());
-  diagnoseNote(
-      op->getUser(),
-      diag::regionbasedisolation_merge_region_failure_error_unknown_note,
-      *srcName, srcIsolationStr, *dstName, dstIsolationStr,
-      !srcIsolation->isTaskIsolated());
+  if (srcName && dstName) {
+    diagnoseError(op->getUser(),
+                  diag::regionbasedisolation_merge_region_failure_error_unknown,
+                  *srcName, srcIsolationStr, *dstName, dstIsolationStr,
+                  !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::regionbasedisolation_merge_region_failure_error_unknown_note,
+        *srcName, srcIsolationStr, *dstName, dstIsolationStr,
+        !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  auto srcType = srcName ? std::optional<Type>()
+                         : inferTypeHelper(srcRegionValue.getValue());
+  auto dstType = dstName ? std::optional<Type>()
+                         : inferTypeHelper(dstRegionValue.getValue());
+
+  if (srcName && dstType) {
+    diagnoseError(
+        op->getUser(),
+        diag::regionbasedisolation_merge_region_failure_error_unknown_dst_type,
+        *srcName, srcIsolationStr, *dstType, dstIsolationStr,
+        !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_unknown_dst_type_note,
+        *srcName, srcIsolationStr, *dstType, dstIsolationStr,
+        !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  if (dstName && srcType) {
+    diagnoseError(
+        op->getUser(),
+        diag::regionbasedisolation_merge_region_failure_error_unknown_src_type,
+        *srcType, srcIsolationStr, *dstName, dstIsolationStr,
+        !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_unknown_src_type_note,
+        *srcType, srcIsolationStr, *dstName, dstIsolationStr,
+        !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  if (srcType && dstType) {
+    diagnoseError(
+        op->getUser(),
+        diag::regionbasedisolation_merge_region_failure_error_unknown_both_type,
+        *srcType, srcIsolationStr, *dstType, dstIsolationStr,
+        !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_unknown_both_type_note,
+        *srcType, srcIsolationStr, *dstType, dstIsolationStr,
+        !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  return emitUnknownPatternError();
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitAssign() {
@@ -3994,27 +4091,79 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitAssign() {
 
   // We should always be able to find a name for an inout sending param. If we
   // do not, emit an unknown pattern error.
-  auto srcName = inferNameHelper(srcRegionValue.getValue());
-  if (!srcName) {
-    return emitUnknownPatternError();
-  }
-  auto dstName = inferNameHelper(dstRegionValue.getValue());
-  if (!dstName) {
-    return emitUnknownPatternError();
-  }
+  auto srcName = inferMergeSrcNameHelper(srcRegionValue.getValue());
+  auto dstName = inferMergeDstNameHelper(dstRegionValue.getValue());
 
   auto srcIsolationStr = srcIsolationInfo.printForDiagnostics(getFunction());
   auto dstIsolationStr = dstIsolationInfo.printForDiagnostics(getFunction());
-  diagnoseError(op->getUser(),
-                diag::regionbasedisolation_merge_region_failure_error_assign,
-                *srcName, srcIsolationStr, *dstName, dstIsolationStr,
-                !srcIsolation->isTaskIsolated())
-      .limitBehaviorIf(getBehaviorLimit());
-  diagnoseNote(
-      op->getUser(),
-      diag::regionbasedisolation_merge_region_failure_error_assign_note,
-      *srcName, srcIsolationStr, dstIsolationStr,
-      !srcIsolation->isTaskIsolated());
+
+  if (srcName && dstName) {
+    diagnoseError(op->getUser(),
+                  diag::regionbasedisolation_merge_region_failure_error_assign,
+                  *srcName, srcIsolationStr, *dstName, dstIsolationStr,
+                  !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::regionbasedisolation_merge_region_failure_error_assign_note,
+        *srcName, srcIsolationStr, dstIsolationStr,
+        !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  auto srcType = srcName ? std::optional<Type>()
+                         : inferTypeHelper(srcRegionValue.getValue());
+  auto dstType = dstName ? std::optional<Type>()
+                         : inferTypeHelper(dstRegionValue.getValue());
+
+  if (srcName && dstType) {
+    diagnoseError(
+        op->getUser(),
+        diag::regionbasedisolation_merge_region_failure_error_assign_dst_type,
+        *srcName, srcIsolationStr, *dstType, dstIsolationStr,
+        !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::regionbasedisolation_merge_region_failure_error_assign_note,
+        *srcName, srcIsolationStr, dstIsolationStr,
+        !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  if (dstName && srcType) {
+    diagnoseError(
+        op->getUser(),
+        diag::regionbasedisolation_merge_region_failure_error_assign_src_type,
+        *srcType, srcIsolationStr, *dstName, dstIsolationStr,
+        !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_assign_src_type_note,
+        *srcType, srcIsolationStr, dstIsolationStr,
+        !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  if (srcType && dstType) {
+    diagnoseError(
+        op->getUser(),
+        diag::regionbasedisolation_merge_region_failure_error_assign_both_type,
+        *srcType, srcIsolationStr, *dstType, dstIsolationStr,
+        !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_assign_src_type_note,
+        *srcType, srcIsolationStr, dstIsolationStr,
+        !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  return emitUnknownPatternError();
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitNonisolatedFunction() {
@@ -4038,14 +4187,8 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitNonisolatedFunction() {
 
   // We should always be able to find a name for an inout sending param. If we
   // do not, emit an unknown pattern error.
-  auto srcName = inferNameHelper(srcRegionValue.getValue());
-  if (!srcName) {
-    return emitUnknownPatternError();
-  }
-  auto dstName = inferNameHelper(dstRegionValue.getValue());
-  if (!dstName) {
-    return emitUnknownPatternError();
-  }
+  auto srcName = inferMergeSrcNameHelper(srcRegionValue.getValue());
+  auto dstName = inferMergeDstNameHelper(dstRegionValue.getValue());
 
   auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
   auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
@@ -4056,18 +4199,79 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitNonisolatedFunction() {
   if (!declRef)
     return emitUnknownPatternError();
 
-  diagnoseError(
-      op->getUser(),
-      diag::regionbasedisolation_merge_region_failure_error_nonisolatedfunction,
-      *srcName, srcIsolationStr, *dstName, dstIsolationStr, declRef.getDecl(),
-      !srcIsolation->isTaskIsolated())
-      .limitBehaviorIf(getBehaviorLimit());
-  diagnoseNote(
-      op->getUser(),
-      diag::
-          regionbasedisolation_merge_region_failure_error_nonisolatedfunction_note,
-      *srcName, srcIsolationStr, *dstName, dstIsolationStr, declRef.getDecl(),
-      !srcIsolation->isTaskIsolated());
+  if (srcName && dstName) {
+    diagnoseError(
+        op->getUser(),
+        diag::regionbasedisolation_merge_region_failure_error_nonisolatedfunction,
+        *srcName, srcIsolationStr, *dstName, dstIsolationStr, declRef.getDecl(),
+        !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_nonisolatedfunction_note,
+        *srcName, srcIsolationStr, *dstName, dstIsolationStr, declRef.getDecl(),
+        !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  auto srcType = srcName ? std::optional<Type>()
+                         : inferTypeHelper(srcRegionValue.getValue());
+  auto dstType = dstName ? std::optional<Type>()
+                         : inferTypeHelper(dstRegionValue.getValue());
+
+  if (srcName && dstType) {
+    diagnoseError(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_nonisolatedfunction_dst_type,
+        *srcName, srcIsolationStr, *dstType, dstIsolationStr,
+        declRef.getDecl(), !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_nonisolatedfunction_dst_type_note,
+        *srcName, srcIsolationStr, *dstType, dstIsolationStr,
+        declRef.getDecl(), !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  if (dstName && srcType) {
+    diagnoseError(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_nonisolatedfunction_src_type,
+        *srcType, srcIsolationStr, *dstName, dstIsolationStr,
+        declRef.getDecl(), !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_nonisolatedfunction_src_type_note,
+        *srcType, srcIsolationStr, *dstName, dstIsolationStr,
+        declRef.getDecl(), !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  if (srcType && dstType) {
+    diagnoseError(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_nonisolatedfunction_both_type,
+        *srcType, srcIsolationStr, *dstType, dstIsolationStr,
+        declRef.getDecl(), !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_nonisolatedfunction_both_type_note,
+        *srcType, srcIsolationStr, *dstType, dstIsolationStr,
+        declRef.getDecl(), !srcIsolation->isTaskIsolated());
+    return;
+  }
+
+  return emitUnknownPatternError();
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitIsolatedFunction() {
@@ -4096,32 +4300,19 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitIsolatedFunction() {
 
   // We should always be able to find a name for an inout sending param. If we
   // do not, emit an unknown pattern error.
-  auto srcName = inferNameHelper(srcRegionValue.getValue());
+  auto srcName = inferMergeSrcNameHelper(srcRegionValue.getValue());
   if (!srcName) {
-    if (auto *svi =
-            dyn_cast<SingleValueInstruction>(srcRegionValue.getValue())) {
-      if (auto *expr = svi->getLoc().getAsASTNode<Expr>()) {
-        diagnoseError(
-            op->getUser(),
-            diag::
-                regionbasedisolation_merge_region_failure_error_functionisolation_type,
-            expr->findOriginalType(), srcIsolationStr, declRef.getDecl(),
-            dstIsolationStr, !srcIsolation->isTaskIsolated())
-            .limitBehaviorIf(getBehaviorLimit());
-        return;
-      }
-    }
-    if (auto *arg = dyn_cast<SILFunctionArgument>(srcRegionValue.getValue())) {
-      diagnoseError(
-          op->getUser(),
-          diag::
-              regionbasedisolation_merge_region_failure_error_functionisolation_type,
-          arg->getDecl()->getInterfaceType(), srcIsolationStr,
-          declRef.getDecl(), dstIsolationStr, !srcIsolation->isTaskIsolated())
-          .limitBehaviorIf(getBehaviorLimit());
-      return;
-    }
-    return emitUnknownPatternError();
+    auto srcType = inferTypeHelper(srcRegionValue.getValue());
+    if (!srcType)
+      return emitUnknownPatternError();
+    diagnoseError(
+        op->getUser(),
+        diag::
+            regionbasedisolation_merge_region_failure_error_functionisolation_type,
+        *srcType, srcIsolationStr, declRef.getDecl(),
+        dstIsolationStr, !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    return;
   }
   diagnoseError(
       op->getUser(),
@@ -4169,9 +4360,18 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitCast() {
 
   // We should always be able to find a name for an inout sending param. If we
   // do not, emit an unknown pattern error.
-  auto srcName = inferNameHelper(srcRegionValue.getValue());
-  if (!srcName)
-    return emitUnknownPatternError();
+  auto srcName = inferMergeSrcNameHelper(srcRegionValue.getValue());
+  if (!srcName) {
+    auto srcType = inferTypeHelper(srcRegionValue.getValue());
+    if (!srcType)
+      return emitUnknownPatternError();
+    diagnoseError(op->getUser(),
+                  diag::regionbasedisolation_merge_region_failure_error_cast_type,
+                  *srcType, srcIsolationStr, cast.getTargetFormalType(),
+                  dstIsolationStr, !srcIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+    return;
+  }
   diagnoseError(op->getUser(),
                 diag::regionbasedisolation_merge_region_failure_error_cast,
                 *srcName, srcIsolationStr, cast.getTargetFormalType(),
