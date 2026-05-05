@@ -45,7 +45,8 @@ public:
     MemberReference,
     InterpolatedString,
     NilLiteral,
-    Runtime
+    Runtime,
+    MemberFunctionCall
   };
 
   ValueKind getKind() const { return Kind; }
@@ -457,6 +458,31 @@ public:
 private:
   std::string Label;
   swift::Type Type;
+  std::vector<FunctionParameter> Parameters;
+};
+
+/// A method invocation representation on an instance of a type
+/// let foo = Foo().someThing()
+///
+class MemberFunctionCallValue : public CompileTimeValue {
+public:
+  MemberFunctionCallValue(std::string Label,
+                          std::shared_ptr<CompileTimeValue> BaseValue,
+                          std::vector<FunctionParameter> Parameters)
+      : CompileTimeValue(ValueKind::MemberFunctionCall), Label(Label),
+        BaseValue(BaseValue), Parameters(Parameters) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::MemberFunctionCall;
+  }
+
+  std::string getLabel() const { return Label; }
+  std::shared_ptr<CompileTimeValue> getBaseValue() const { return BaseValue; }
+  std::vector<FunctionParameter> getParameters() const { return Parameters; }
+
+private:
+  std::string Label;
+  std::shared_ptr<CompileTimeValue> BaseValue;
   std::vector<FunctionParameter> Parameters;
 };
 
