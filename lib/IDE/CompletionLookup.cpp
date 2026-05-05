@@ -1471,7 +1471,7 @@ static StringRef getTypeAnnotationString(const NominalTypeDecl *NTD,
 
   assert(stash.empty());
   llvm::raw_svector_ostream OS(stash);
-  llvm::interleave(attrRoleStrs, OS, ", ");
+  llvm::interleaveComma(attrRoleStrs, OS);
   return {stash.data(), stash.size()};
 }
 
@@ -1695,7 +1695,7 @@ static StringRef getTypeAnnotationString(const MacroDecl *MD,
 
   assert(stash.empty());
   llvm::raw_svector_ostream OS(stash);
-  llvm::interleave(roleStrs, OS, ", ");
+  llvm::interleaveComma(roleStrs, OS);
   return {stash.data(), stash.size()};
 }
 
