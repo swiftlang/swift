@@ -179,10 +179,10 @@ extension Optional where Wrapped: ~Copyable {
   @_alwaysEmitIntoClient
   @_lifetime(borrow self)
   @_transparent
-  public func borrow() -> Borrow<Wrapped>? {
+  public func borrow() -> Ref<Wrapped>? {
     switch self {
     case .some(let wrapped):
-      return Borrow(wrapped)
+      return Ref(wrapped)
 
     case .none:
       return nil
@@ -195,7 +195,7 @@ extension Optional where Wrapped: ~Copyable {
   @_alwaysEmitIntoClient
   @_lifetime(&self)
   @_transparent
-  public mutating func mutate() -> Inout<Wrapped>? {
+  public mutating func mutate() -> MutableRef<Wrapped>? {
     if self == nil {
       return nil
     }
@@ -203,7 +203,7 @@ extension Optional where Wrapped: ~Copyable {
     let ptr = unsafe UnsafeMutablePointer<Wrapped>(
       Builtin.unprotectedAddressOf(&self)
     )
-    return unsafe Inout(unsafeAddress: ptr, mutating: &self)
+    return unsafe MutableRef(unsafeAddress: ptr, mutating: &self)
   }
 
   /// Sets the value of the optional to the passed in new value while returning
@@ -218,9 +218,9 @@ extension Optional where Wrapped: ~Copyable {
   @_alwaysEmitIntoClient
   @_lifetime(&self)
   @_transparent
-  public mutating func insert(_ new: consuming Wrapped) -> Inout<Wrapped> {
+  public mutating func insert(_ new: consuming Wrapped) -> MutableRef<Wrapped> {
     self = .some(new)
-    return unsafe mutate().unsafelyUnwrap()
+    return unsafe mutate().unsafelyUnwrapped
   }
 }
 
@@ -414,48 +414,13 @@ extension Optional where Wrapped: ~Escapable {
   @unsafe
   @_preInverseGenerics
   public var unsafelyUnwrapped: Wrapped {
-    // FIXME: Generalize this for ~Copyable wrapped types. Note that the current
-    // implementation is copying the value, so that generalization will need to
-    // be emitted into clients -- `@_preInverseGenerics` will not cut it.
     @inline(__always)
     @lifetime(copy self)
-    get {
+    consuming get {
       if let x = self {
         return x
       }
       _debugPreconditionFailure("unsafelyUnwrapped of nil optional")
-    }
-  }
-}
-
-extension Optional where Wrapped: ~Copyable & ~Escapable {
-  /// The wrapped value of this instance, unwrapped without checking whether
-  /// the instance is `nil`.
-  ///
-  /// The `unsafelyUnwrap` method provides the same value as the forced
-  /// unwrap operator (postfix `!`). However, in optimized builds (`-O`), no
-  /// check is performed to ensure that the current instance actually has a
-  /// value. Accessing this method in the case of a `nil` value is a serious
-  /// programming error and could lead to undefined behavior or a runtime
-  /// error.
-  ///
-  /// In debug builds (`-Onone`), the `unsafelyUnwrap` method has the same
-  /// behavior as using the postfix `!` operator and triggers a runtime error
-  /// if the instance is `nil`.
-  ///
-  /// - Warning: This method trades safety for performance.  Use
-  ///   `unsafelyUnwrap` only when you are confident that this instance
-  ///   will never be equal to `nil` and only after you've tried using the
-  ///   postfix `!` operator.
-  @lifetime(copy self)
-  @unsafe
-  @_alwaysEmitIntoClient
-  public consuming func unsafelyUnwrap() -> Wrapped {
-    switch consume self {
-    case .some(let x):
-      return x
-    case .none:
-      _debugPreconditionFailure("unsafelyUnwrap of nil optional")
     }
   }
 }
@@ -471,28 +436,12 @@ extension Optional where Wrapped: ~Escapable {
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
     @lifetime(copy self)
-    get {
+    consuming get {
       if let x = self {
         return x
       }
       _internalInvariantFailure("_unsafelyUnwrappedUnchecked of nil optional")
     }
-  }
-}
-
-extension Optional where Wrapped: ~Copyable & ~Escapable {
-  /// - Returns: `unsafelyUnwrapped`.
-  ///
-  /// This version is for internal stdlib use; it avoids any checking
-  /// overhead for users, even in Debug builds.
-  @lifetime(copy self)
-  @unsafe
-  @_alwaysEmitIntoClient
-  internal consuming func _uncheckedUnwrap() -> Wrapped {
-    if let x = self {
-      return x
-    }
-    _internalInvariantFailure("_uncheckedUnwrap of nil optional")
   }
 }
 
@@ -682,7 +631,7 @@ extension Optional: Equatable where Wrapped: Equatable & ~Copyable & ~Escapable 
 }
 
 @_preInverseGenerics
-extension Optional: Hashable where Wrapped: Hashable & ~Copyable {
+extension Optional: Hashable where Wrapped: Hashable & ~Copyable & ~Escapable {
   // Note: This explicit `hashValue` applies @_preInverseGenerics to emulate the
   // original compiler-synthesized version.
   @_preInverseGenerics
