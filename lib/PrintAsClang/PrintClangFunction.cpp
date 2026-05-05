@@ -1685,6 +1685,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   if (result.isUnsupported())
     return;
 
+  printCxxReturnsRetainedAttribute(os, resultTy);
   declAndTypePrinter.printAvailability(os, FD);
   if (!isDefinition) {
     os << ";\n";
@@ -1758,6 +1759,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
       printFunctionSignature(accessor, signature, accessorName, resultTy,
                              FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too!");
+  printCxxReturnsRetainedAttribute(os, resultTy);
   declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
@@ -1796,6 +1798,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
       printFunctionSignature(accessor, signature, "operator []", resultTy,
                              FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too!");
+  printCxxReturnsRetainedAttribute(os, resultTy);
   declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
@@ -1925,4 +1928,41 @@ void DeclAndTypeClangFunctionPrinter::printTypeName(
       delegate, moduleContext, declPrinter,
       FunctionSignatureTypeUse::TypeReference);
   typePrinter.visit(ty, std::nullopt, /*isInOut=*/false);
+}
+
+void DeclAndTypeClangFunctionPrinter::printCxxReturnsRetainedAttribute(
+    raw_ostream &os, Type resultTy) {
+  if (resultTy->isVoid())
+    return;
+
+  // A function returning NSString? generates a thunk returning `NSString
+  // *_Nullable`.
+  Type unwrapped = resultTy->lookThroughSingleOptionalType();
+
+  if (auto *classDecl = unwrapped->getClassOrBoundGenericClass()) {
+    if (classDecl->hasClangNode()) {
+      if (isa<clang::ObjCContainerDecl>(classDecl->getClangDecl())) {
+        os << " NS_RETURNS_RETAINED";
+        return;
+      }
+      if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+        os << " CF_RETURNS_RETAINED";
+        return;
+      }
+      if (classDecl->isForeignReferenceType()) {
+        os << " SWIFT_RETURNS_RETAINED";
+        return;
+      }
+    }
+
+    // Swift class, no annotation.
+    return;
+  }
+
+  // ObjC existential types (id, etc.), the thunks use __bridge_transfer just
+  // like ObjC classes, so emit NS_RETURNS_RETAINED too.
+  if (unwrapped->isObjCExistentialType()) {
+    os << " NS_RETURNS_RETAINED";
+    return;
+  }
 }

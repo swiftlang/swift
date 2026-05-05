@@ -40,6 +40,6 @@ public enum MyEnum {
 // CHECK: SWIFT_EXTERN void $s17UseCoreFoundation12testDispatch1xySo21OS_dispatch_semaphoreC_tF(dispatch_semaphore_t _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // testDispatch(x:)
 
 // CHECK: SWIFT_INLINE_THUNK swift::Optional<in_addr> networkThing() noexcept SWIFT_SYMBOL("s:17UseCoreFoundation12networkThingSo7in_addrVSgyF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK: SWIFT_INLINE_THUNK CFDateRef _Nullable returnsCFDate() noexcept SWIFT_SYMBOL("s:17UseCoreFoundation13returnsCFDateSo0E3RefaSgyF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK CFDateRef _Nullable returnsCFDate() noexcept SWIFT_SYMBOL("s:17UseCoreFoundation13returnsCFDateSo0E3RefaSgyF") SWIFT_WARN_UNUSED_RESULT CF_RETURNS_RETAINED {
 // CHECK: SWIFT_INLINE_THUNK void takesCFDate(CFDateRef _Nullable x) noexcept SWIFT_SYMBOL("s:17UseCoreFoundation11takesCFDate1xySo0E3RefaSg_tF") {
 // CHECK: SWIFT_INLINE_THUNK void testDispatch(dispatch_semaphore_t _Nonnull x) noexcept SWIFT_SYMBOL("s:17UseCoreFoundation12testDispatch1xySo21OS_dispatch_semaphoreC_tF") {

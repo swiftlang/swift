@@ -133,21 +133,21 @@ public class KVOCookieMonster {
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 
-// CHECK: SWIFT_INLINE_THUNK id <ObjCProtocol> _Nonnull retObjCProtocol() noexcept SWIFT_SYMBOL("s:9UseObjCTy03retB9CProtocolSo0bE0_pyF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK id <ObjCProtocol> _Nonnull retObjCProtocol() noexcept SWIFT_SYMBOL("s:9UseObjCTy03retB9CProtocolSo0bE0_pyF") SWIFT_WARN_UNUSED_RESULT NS_RETURNS_RETAINED {
 // CHECK-NEXT:  return (__bridge_transfer id <ObjCProtocol>)(__bridge void *)UseObjCTy::_impl::$s9UseObjCTy03retB9CProtocolSo0bE0_pyF();
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif // defined(__OBJC__)
 
 // CHECK: #if defined(__OBJC__)
-// CHECK-NEXT: SWIFT_INLINE_THUNK id <ObjCProtocol> _Nullable retObjCProtocolNullable() noexcept SWIFT_SYMBOL("s:9UseObjCTy03retB17CProtocolNullableSo0bE0_pSgyF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT: SWIFT_INLINE_THUNK id <ObjCProtocol> _Nullable retObjCProtocolNullable() noexcept SWIFT_SYMBOL("s:9UseObjCTy03retB17CProtocolNullableSo0bE0_pSgyF") SWIFT_WARN_UNUSED_RESULT NS_RETURNS_RETAINED {
 // CHECK-NEXT: return (__bridge_transfer id <ObjCProtocol>)(__bridge void *)UseObjCTy::_impl::$s9UseObjCTy03retB17CProtocolNullableSo0bE0_pSgyF();
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif // defined(__OBJC__)
 
-// CHECK: SWIFT_INLINE_THUNK ObjCKlass *_Nonnull retObjClass() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK ObjCKlass *_Nonnull retObjClass() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT NS_RETURNS_RETAINED {
 // CHECK-NEXT: return (__bridge_transfer ObjCKlass *)(__bridge void *)UseObjCTy::_impl::$s9UseObjCTy03retB5ClassSo0B6CKlassCyF();
 
-// CHECK: SWIFT_INLINE_THUNK ObjCKlass *_Nullable retObjClassNullable() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK ObjCKlass *_Nullable retObjClassNullable() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT NS_RETURNS_RETAINED {
 // CHECK-NEXT: return (__bridge_transfer ObjCKlass *)(__bridge void *)UseObjCTy::_impl::$s9UseObjCTy03retB13ClassNullableSo0B6CKlassCSgyF();
 
 // CHECK: void takeObjCClass(ObjCKlass *_Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) {
