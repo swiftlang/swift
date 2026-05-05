@@ -50,7 +50,7 @@ func applyBorrow(nc: borrowing NC, borrow: (borrowing NC) -> NE) -> NE {
 }
 
 func testBorrow(nc: consuming NC) {
-  let borrowed = applyBorrow(nc: nc, borrow: borrow) // expected-error{{cannot convert value of type '@_lifetime(borrow 0) (borrowing NC) -> NE' to expected argument type '@_lifetime(captures) (borrowing NC) -> NE'}}
+  let borrowed = applyBorrow(nc: nc, borrow: borrow) // expected-error{{cannot convert value of type '@_lifetime(borrow $0) (_ $0: borrowing NC) -> NE' to expected argument type '@_lifetime(captures) (_ $0: borrowing NC) -> NE'}}
   _ = consume nc
   _ = transfer(borrowed)
 }
@@ -336,12 +336,12 @@ func takeCopying0Captures(
 
 func callLifetimeFunctions() {
   takeCopying0(f: copying0) // OK
-  takeCopying0(f: copying1) // expected-error{{cannot convert value of type '@_lifetime(copy 1) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeCopying0(f: copying01) // expected-error{{cannot convert value of type '@_lifetime(copy 0, copy 1) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying0(f: copying1) // expected-error{{cannot convert value of type '@_lifetime(copy $1) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying0(f: copying01) // expected-error{{cannot convert value of type '@_lifetime(copy $0, copy $1) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
 
-  takeCopying1(f: copying0) // expected-error{{cannot convert value of type '@_lifetime(copy 0) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne1) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying1(f: copying0) // expected-error{{cannot convert value of type '@_lifetime(copy $0) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne1) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
   takeCopying1(f: copying1) // OK
-  takeCopying1(f: copying01) // expected-error{{cannot convert value of type '@_lifetime(copy 0, copy 1) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne1) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying1(f: copying01) // expected-error{{cannot convert value of type '@_lifetime(copy $0, copy $1) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne1) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
 
   takeCopying01(f: copying0) // OK
   takeCopying01(f: copying1) // OK
@@ -349,33 +349,33 @@ func callLifetimeFunctions() {
 
 
   takeBorrowing2(f: borrowing2) // OK
-  takeBorrowing2(f: borrowing3) // expected-error{{cannot convert value of type '@_lifetime(borrow 3) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeBorrowing2(f: borrowing23) // expected-error{{cannot convert value of type '@_lifetime(borrow 2, borrow 3) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeBorrowing2(f: borrowing3) // expected-error{{cannot convert value of type '@_lifetime(borrow $3) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeBorrowing2(f: borrowing23) // expected-error{{cannot convert value of type '@_lifetime(borrow $2, borrow $3) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
 
-  takeBorrowing3(f: borrowing2) // expected-error{{cannot convert value of type '@_lifetime(borrow 2) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(borrow ne3) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeBorrowing3(f: borrowing2) // expected-error{{cannot convert value of type '@_lifetime(borrow $2) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(borrow ne3) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
   takeBorrowing3(f: borrowing3) // OK
-  takeBorrowing3(f: borrowing23) // expected-error{{cannot convert value of type '@_lifetime(borrow 2, borrow 3) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(borrow ne3) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeBorrowing3(f: borrowing23) // expected-error{{cannot convert value of type '@_lifetime(borrow $2, borrow $3) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(borrow ne3) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
 
   takeBorrowing23(f: borrowing2) // OK
   takeBorrowing23(f: borrowing3) // OK
   takeBorrowing23(f: borrowing23) // OK
 
 
-  takeCopying0(f: copying0borrowing2) // expected-error{{cannot convert value of type '@_lifetime(copy 0, borrow 2) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeBorrowing2(f: copying0borrowing2) // expected-error{{cannot convert value of type '@_lifetime(copy 0, borrow 2) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying0(f: copying0borrowing2) // expected-error{{cannot convert value of type '@_lifetime(copy $0, borrow $2) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeBorrowing2(f: copying0borrowing2) // expected-error{{cannot convert value of type '@_lifetime(copy $0, borrow $2) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
 
   takeCopying0Borrowing2(f: copying0) // OK
   takeCopying0Borrowing2(f: borrowing2) // OK
   takeCopying0Borrowing2(f: copying0borrowing2) // OK
-  takeCopying0Borrowing2(f: copying0borrowing2borrowing3) // expected-error{{cannot convert value of type '@_lifetime(copy 0, borrow 2, borrow 3) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne0, borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeCopying0Borrowing2(f: copying0copying1borrowing2) // expected-error{{cannot convert value of type '@_lifetime(copy 0, copy 1, borrow 2) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne0, borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeCopying0Borrowing2(f: copying0copying1borrowing2borrowing3) // expected-error{{cannot convert value of type '@_lifetime(copy 0, copy 1, borrow 2, borrow 3) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne0, borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying0Borrowing2(f: copying0borrowing2borrowing3) // expected-error{{cannot convert value of type '@_lifetime(copy $0, borrow $2, borrow $3) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne0, borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying0Borrowing2(f: copying0copying1borrowing2) // expected-error{{cannot convert value of type '@_lifetime(copy $0, copy $1, borrow $2) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne0, borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying0Borrowing2(f: copying0copying1borrowing2borrowing3) // expected-error{{cannot convert value of type '@_lifetime(copy $0, copy $1, borrow $2, borrow $3) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne0, borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
 
 
   takeMutborrowing4(f: mutborrowing4) // OK
-  takeMutborrowing4(f: copying0) // expected-error{{cannot convert value of type '@_lifetime(copy 0) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(&ne4) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeCopying0(f: mutborrowing4) // expected-error{{cannot convert value of type '@_lifetime(&4) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeBorrowing2(f: mutborrowing4) // expected-error{{cannot convert value of type '@_lifetime(&4) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeMutborrowing4(f: copying0) // expected-error{{cannot convert value of type '@_lifetime(copy $0) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(&ne4) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying0(f: mutborrowing4) // expected-error{{cannot convert value of type '@_lifetime(&$4) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeBorrowing2(f: mutborrowing4) // expected-error{{cannot convert value of type '@_lifetime(&$4) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(borrow ne2) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
 
 
   takeCopying0(f: immortalFn) // OK
@@ -387,18 +387,18 @@ func callLifetimeFunctions() {
   takeCopying0Borrowing2(f: immortalFn) // OK
   takeMutborrowing4(f: immortalFn) // OK
 
-  takeImmortal(f: copying0) // expected-error{{cannot convert value of type '@_lifetime(copy 0) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeImmortal(f: copying1) // expected-error{{cannot convert value of type '@_lifetime(copy 1) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeImmortal(f: copying01) // expected-error{{cannot convert value of type '@_lifetime(copy 0, copy 1) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeImmortal(f: borrowing2) // expected-error{{cannot convert value of type '@_lifetime(borrow 2) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeImmortal(f: borrowing3) // expected-error{{cannot convert value of type '@_lifetime(borrow 3) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeImmortal(f: borrowing23) // expected-error{{cannot convert value of type '@_lifetime(borrow 2, borrow 3) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeImmortal(f: copying0borrowing2) // expected-error{{cannot convert value of type '@_lifetime(copy 0, borrow 2) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
-  takeImmortal(f: mutborrowing4) // expected-error{{cannot convert value of type '@_lifetime(&4) @_lifetime(4: copy 4) (NE, NE, borrowing NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeImmortal(f: copying0) // expected-error{{cannot convert value of type '@_lifetime(copy $0) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeImmortal(f: copying1) // expected-error{{cannot convert value of type '@_lifetime(copy $1) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeImmortal(f: copying01) // expected-error{{cannot convert value of type '@_lifetime(copy $0, copy $1) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeImmortal(f: borrowing2) // expected-error{{cannot convert value of type '@_lifetime(borrow $2) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeImmortal(f: borrowing3) // expected-error{{cannot convert value of type '@_lifetime(borrow $3) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeImmortal(f: borrowing23) // expected-error{{cannot convert value of type '@_lifetime(borrow $2, borrow $3) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeImmortal(f: copying0borrowing2) // expected-error{{cannot convert value of type '@_lifetime(copy $0, borrow $2) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeImmortal(f: mutborrowing4) // expected-error{{cannot convert value of type '@_lifetime(&$4) @_lifetime($4: copy $4) (_ $0: NE, _ $1: NE, _ $2: borrowing NE, _ $3: borrowing NE, _ $4: inout NE) -> NE' to expected argument type '@_lifetime(immortal) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
   takeImmortal(f: immortalFn) // OK
 
   takeInout0(f: inout0) // OK
-  takeInout0(f: inout01) // expected-error{{cannot convert value of type '@_lifetime(0: copy 0, copy 1) (inout NE, NE) -> ()' to expected argument type '@_lifetime(ne0: copy ne0) (_ ne0: inout NE, _ ne1: NE) -> ()'}}
+  takeInout0(f: inout01) // expected-error{{cannot convert value of type '@_lifetime($0: copy $0, copy $1) (_ $0: inout NE, _ $1: NE) -> ()' to expected argument type '@_lifetime(ne0: copy ne0) (_ ne0: inout NE, _ ne1: NE) -> ()'}}
   takeInout01(f: inout01) // OK
   takeInout01(f: inout0) // OK
 
@@ -412,4 +412,72 @@ func callLifetimeFunctions() {
   takeCopying0(f: copying0Captures) // expected-error{{cannot convert value of type '@_lifetime(captures, copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
   takeCopying0Captures(f: copying0) // OK
   takeCopying0Captures(f: copying0Captures) // OK
+}
+
+// ============================================================================
+// Tests for synthetic $N labels on unlabeled function type parameters
+// ============================================================================
+
+// Single unlabeled parameter
+@_lifetime(borrow x)
+func singleParam(x: borrowing NE) -> NE { x }
+
+func takeSingleCopy(f: @_lifetime(copy x) (_ x: borrowing NE) -> NE) {}
+
+do {
+  takeSingleCopy(f: singleParam) // expected-error{{cannot convert value of type '@_lifetime(borrow $0) (_ $0: borrowing NE) -> NE' to expected argument type '@_lifetime(copy x) (_ x: borrowing NE) -> NE'}}
+}
+
+// Mixed labeled and unlabeled parameters: labeled type on LHS, unlabeled function on RHS
+@_lifetime(copy a)
+func mixedUnlabeled(a: NE, b: borrowing NE) -> NE { a }
+
+func takeMixedLabeled(f: @_lifetime(borrow b) (_ a: NE, _ b: borrowing NE) -> NE) {}
+
+do {
+  takeMixedLabeled(f: mixedUnlabeled) // expected-error{{cannot convert value of type '@_lifetime(copy $0) (_ $0: NE, _ $1: borrowing NE) -> NE' to expected argument type '@_lifetime(borrow b) (_ a: NE, _ b: borrowing NE) -> NE'}}
+}
+
+// Instance method with self: self should print as 'self', not a synthetic label
+struct NEContainer: ~Escapable {
+  @_lifetime(copy self)
+  borrowing func getView() -> NE { NE() }
+}
+
+func takeFreeNE(f: @_lifetime(copy ne) (_ ne: borrowing NE) -> NE) {}
+
+// Inferred lifetime with inout target: synthetic labels for target and source
+@_lifetime(a: copy a, copy b)
+func inoutMixed(a: inout NE, b: NE) {}
+
+func takeInoutSingle(f: @_lifetime(a: copy a) (_ a: inout NE, _ b: NE) -> ()) {}
+
+do {
+  takeInoutSingle(f: inoutMixed) // expected-error{{cannot convert value of type '@_lifetime($0: copy $0, copy $1) (_ $0: inout NE, _ $1: NE) -> ()' to expected argument type '@_lifetime(a: copy a) (_ a: inout NE, _ b: NE) -> ()'}}
+}
+
+// Inout scope dep with synthetic label: &$N syntax
+@_lifetime(&a)
+func inoutScope(a: inout NE) -> NE { a }
+
+func takeInoutCopy(f: @_lifetime(copy a) (_ a: inout NE) -> NE) {}
+
+do {
+  takeInoutCopy(f: inoutScope) // expected-error{{cannot convert value of type '@_lifetime(&$0) @_lifetime($0: copy $0) (_ $0: inout NE) -> NE' to expected argument type '@_lifetime(copy a) @_lifetime(a: copy a) (_ a: inout NE) -> NE'}}
+}
+
+// Immortal function passed where specific source is expected: synthetic labels in param list
+@_lifetime(immortal)
+func immortalSingle(x: borrowing NE) -> NE { NE() }
+
+// immortal is a superset of any dependency, so this should be OK
+do {
+  takeSingleCopy(f: immortalSingle) // OK
+}
+
+// Captures-dependent closure passed where copy is expected
+do {
+  let captured = NE()
+  let closure: @_lifetime(captures) (_ x: borrowing NE) -> NE = { _ in captured }
+  takeSingleCopy(f: closure) // expected-error{{cannot convert value of type '@_lifetime(captures) (_ x: borrowing NE) -> NE' to expected argument type '@_lifetime(copy x) (_ x: borrowing NE) -> NE'}}
 }

@@ -299,7 +299,7 @@ class Holder {
 }
 
 func bar(_ span: Span<Int>) {
-  _ = foo(Holder.incorrect, span) // expected-error{{cannot convert value of type '@_lifetime(borrow 0) (Span<Int>) -> Span<Int>' to expected argument type '@_lifetime(copy span) (_ span: Span<Int>) -> Span<Int>'}}
+  _ = foo(Holder.incorrect, span) // expected-error{{cannot convert value of type '@_lifetime(borrow $0) (_ $0: Span<Int>) -> Span<Int>' to expected argument type '@_lifetime(copy span) (_ span: Span<Int>) -> Span<Int>'}}
   _ = foo(Holder.correct, span) // OK
 }
 
@@ -308,7 +308,7 @@ func baz1() -> @_lifetime(copy span) (_ span: Span<Int>) -> Span<Int> {
 }
 
 func baz2() -> @_lifetime(copy span) (_ span: Span<Int>) -> Span<Int> {
-  return Holder.incorrect  // expected-error{{cannot convert return expression of type '@_lifetime(borrow 0) (Span<Int>) -> Span<Int>' to return type '@_lifetime(copy span) (_ span: Span<Int>) -> Span<Int>'}}
+  return Holder.incorrect  // expected-error{{cannot convert return expression of type '@_lifetime(borrow $0) (_ $0: Span<Int>) -> Span<Int>' to return type '@_lifetime(copy span) (_ span: Span<Int>) -> Span<Int>'}}
 }
 
 struct StaticIOMethods {
@@ -324,5 +324,5 @@ do {
   typealias IOTransfer = @_lifetime(ne0: copy ne0, borrow ne1) (_ ne0: inout NE, _ ne1: borrowing NE) -> ()
   let _: IOTransfer = StaticIOMethods.staticInoutCopying0 // OK
   let _: IOTransfer = StaticIOMethods.staticInoutCopying0Borrowing1 // OK
-  let _: IOTransfer = StaticIOMethods.staticInoutCopying0Copying1 // expected-error {{cannot convert value of type '@_lifetime(0: copy 0, copy 1) (inout NE, borrowing NE) -> ()' to specified type 'IOTransfer' (aka '@_lifetime(ne0: copy ne0, borrow ne1) (_ ne0: inout NE, _ ne1: borrowing NE) -> ()')}}
+  let _: IOTransfer = StaticIOMethods.staticInoutCopying0Copying1 // expected-error {{cannot convert value of type '@_lifetime($0: copy $0, copy $1) (_ $0: inout NE, _ $1: borrowing NE) -> ()' to specified type 'IOTransfer' (aka '@_lifetime(ne0: copy ne0, borrow ne1) (_ ne0: inout NE, _ ne1: borrowing NE) -> ()')}}
 }
