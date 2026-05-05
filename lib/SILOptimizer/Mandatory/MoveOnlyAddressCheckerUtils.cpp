@@ -1821,13 +1821,6 @@ shouldEmitPartialMutationErrorForType(SILType ty, NominalTypeDecl *nominal,
   if (nominal->getModuleContext() == fn->getModule().getSwiftModule())
     return std::nullopt;
 
-  // It's defined in another module and used here; it has to be visible.
-  assert(nominal
-             ->getFormalAccessScope(
-                 /*useDC=*/fn->getDeclContext(),
-                 /*treatUsableFromInlineAsPublic=*/true)
-             .isPublicOrPackage());
-
   // Partial mutation is supported only for frozen/fixed-layout types from
   // other modules.
   if (hasExplicitFixedLayoutAnnotation(nominal))
