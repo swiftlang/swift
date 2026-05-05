@@ -83,3 +83,41 @@ func sendingTransferNonSendableError(_ x: NonSendableKlass) async {
   await transferToMain(x) // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
   // expected-note @-1 {{sending task-isolated value of non-Sendable type 'NonSendableKlass' to main actor-isolated global function 'transferToMain' risks causing races in between task-isolated and main actor-isolated uses}}
 }
+
+func useNonSendable<T, U>(_ x: T, _ y: U) {}
+
+@globalActor actor CustomActor {
+  static let shared = CustomActor()
+}
+
+// Assign merge: both sides use types (src=CustomActor-type, dst=MainActor-type)
+@MainActor
+struct MainActorWithCustomField {
+  var mainField: NonSendableKlass? = nil
+  @CustomActor var customField: NonSendableKlass? = nil
+
+  init(assign: Void = ()) {
+    mainField = customField // expected-error {{assigning global actor 'CustomActor'-isolated value of type '()' to main actor-isolated value of type '()' risks causing data races}}
+    // expected-note @-1 {{a value of type '()' could become accessible to main actor-isolated code despite remaining accessible to global actor 'CustomActor'-isolated code}}
+  }
+
+  // NonisolatedFunction merge: both sides use types
+  init(nonisolatedFunc: Void = ()) {
+    useNonSendable(mainField, customField) // expected-error {{passing global actor 'CustomActor'-isolated value of type 'NonSendableKlass?' and main actor-isolated value of type 'NonSendableKlass?' as arguments to global function 'useNonSendable' risks causing data races}}
+    // expected-note @-1 {{a value of type 'NonSendableKlass?' could begin referencing a value of type 'NonSendableKlass?' allowing concurrent access to a value of type 'NonSendableKlass?' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+  }
+}
+
+// FunctionIsolation: src uses type when name inference fails
+actor ActorWithIsolatedInit {
+  var localVar: NonSendableKlass
+  init(value val: NonSendableKlass) { self.localVar = val }
+  init(valueAsync val: NonSendableKlass) async { self.localVar = val }
+  nonisolated init(nonisoAsync val: NonSendableKlass, _ c: Int) async {
+    if c == 0 {
+      await self.init(valueAsync: val) // expected-error {{passing a value of type 'NonSendableKlass' to 'self'-isolated initializer 'init(valueAsync:)' risks causing data races}}
+    } else {
+      self.init(value: val)
+    }
+  }
+}
