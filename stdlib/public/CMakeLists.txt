@@ -253,6 +253,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
         "i686    i686-unknown-none-elf       i686-unknown-none-elf"
         "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
+        "x86_64  x86_64-unknown-uefi         x86_64-unknown-uefi"
+      )
+    endif()
+
+    if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "aarch64  aarch64-unknown-uefi       aarch64-unknown-uefi"
       )
     endif()
 
