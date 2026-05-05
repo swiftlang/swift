@@ -410,6 +410,7 @@ struct AliasAnalysis {
     // First try to figure out to which argument(s) the address "escapes" to.
     if let result = memLoc.addressWithPath.visit(using: visitor,
                                                  initialWalkingDirection: memLoc.walkingDirection,
+                                                 complexityBudget: getComplexityBudget(for: apply.parentFunction),
                                                  context)
     {
       // The resulting effects are the argument effects to which `address` escapes to.
