@@ -7,29 +7,34 @@ import SwiftShims
 var TemporaryAllocationTestSuite = TestSuite("TemporaryAllocation")
 
 func isStackAllocated(_ pointer: UnsafeRawPointer) -> Bool? {
-    var stackBegin: UInt = 0
-    var stackEnd: UInt = 0
-    if unsafe _swift_stdlib_getCurrentStackBounds(&stackBegin, &stackEnd) {
-        let pointerValue = UInt(bitPattern: pointer)
-        return pointerValue >= stackBegin && pointerValue < stackEnd
-    }
+  guard #available(SwiftStdlib 5.6, *)
+  else {
     return nil
+  }
+
+  var stackBegin: UInt = 0
+  var stackEnd: UInt = 0
+  if unsafe _swift_stdlib_getCurrentStackBounds(&stackBegin, &stackEnd) {
+    let pointerValue = UInt(bitPattern: pointer)
+    return pointerValue >= stackBegin && pointerValue < stackEnd
+  }
+  return nil
 }
 
 func expectStackAllocated(_ pointer: UnsafeRawPointer) {
-    if let stackAllocated = unsafe isStackAllocated(pointer) {
-        expectTrue(stackAllocated)
-    } else {
-        // Could not read stack bounds. Skip.
-    }
+  if let stackAllocated = unsafe isStackAllocated(pointer) {
+    expectTrue(stackAllocated)
+  } else {
+    // Could not read stack bounds. Skip.
+  }
 }
 
 func expectNotStackAllocated(_ pointer: UnsafeRawPointer) {
-    if let stackAllocated = unsafe isStackAllocated(pointer) {
-        expectFalse(stackAllocated)
-    } else {
-        // Could not read stack bounds. Skip.
-    }
+  if let stackAllocated = unsafe isStackAllocated(pointer) {
+    expectFalse(stackAllocated)
+  } else {
+    // Could not read stack bounds. Skip.
+  }
 }
 
 // MARK: Untyped buffers
