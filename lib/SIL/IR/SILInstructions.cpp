@@ -219,7 +219,7 @@ AllocStackInst::AllocStackInst(
     IsFromVarDecl_t isFromVarDecl,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
-      SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
+      SILDebugVariableSupplement(0,
                                  Var ? Var->Type.has_value() : false,
                                  Var ? Var->Loc.has_value() : false,
                                  Var ? Var->Scope != nullptr : false),
@@ -241,7 +241,7 @@ AllocStackInst::AllocStackInst(
       Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
       getTrailingObjects<SILLocation>(),
       getTrailingObjects<const SILDebugScope *>(),
-      getTrailingObjects<SILDIExprElement>());
+      nullptr);
 
   assert(sharedUInt32().AllocStackInst.numOperands ==
              TypeDependentOperands.size() &&
@@ -265,6 +265,13 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
       Var->Scope = nullptr;
     if (Var->Type == elementType)
       Var->Type = {};
+    if (Var->DIExpr) {
+      // alloc_stack cannot carry a DIExpression.
+      // Strip a single implied op_deref. Anything else is an error.
+      assert(Var->DIExpr.getNumElements() == 1 && Var->DIExpr.startsWithDeref()
+             && "alloc_stack cannot have a DIExpr; use debug_value instead");
+      Var->DIExpr = {};
+    }
   }
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,

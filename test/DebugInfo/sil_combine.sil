@@ -49,8 +49,9 @@ enum MP {
 // CHECK: } // end sil function 'expand_alloc_stack_of_enum_without_take'
 sil @expand_alloc_stack_of_enum_without_take : $@convention(method) (S) -> () {
 bb0(%0 : $S):
-  %1 = alloc_stack $MP, let, name "a", expr op_fragment:#C.x
-  debug_value %1 : $*MP, let, name "b", expr op_deref
+  %1 = alloc_stack $MP
+  debug_value %1 : $*MP, let, name "a", expr op_fragment:#C.x
+  debug_value %1 : $*MP, let, name "b"
   cond_br undef, bb1, bb2
 bb1:
   %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt

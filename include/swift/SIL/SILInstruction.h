@@ -2052,8 +2052,7 @@ class AllocStackInst final
                              AllocationInst>,
       private SILDebugVariableSupplement,
       private llvm::TrailingObjects<AllocStackInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    Operand, char> {
+                                    const SILDebugScope *, Operand, char> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -2203,11 +2202,8 @@ public:
     else if (complete)
       VarDeclScope = getDebugScope();
 
-    llvm::ArrayRef<SILDIExprElement> DIExprElements(
-        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
-
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
-                       VarDeclLoc, VarDeclScope, DIExprElements);
+                       VarDeclLoc, VarDeclScope, {});
   }
 
   /// True if this AllocStack has var info that a pass purposely invalidated.
