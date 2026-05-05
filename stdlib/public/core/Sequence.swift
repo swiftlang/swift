@@ -448,7 +448,7 @@ public protocol Sequence<Element> {
   @available(SwiftStdlib 6.4, *)
   @safe
   func withContiguousStorageIfAvailable<R, E: Error>(
-    _ body: (_ _buffer: UnsafeBufferPointer<Element>) throws(E) -> R
+    _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R?
 
   // Superseded by the typed-throws version of this function, but retained
