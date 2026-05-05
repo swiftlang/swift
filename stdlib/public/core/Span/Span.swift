@@ -88,6 +88,22 @@ public struct Span<Element: ~Copyable & ~Escapable>: ~Escapable, Copyable, Bitwi
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@usableFromInline
+@_silgen_name("$ss4SpanVsRi_zrlE6_countSivg")
+internal func _oldCountGetter<T: ~Copyable>(_ span: Span<T>) -> Int {
+  span._count
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@usableFromInline
+@_silgen_name("$ss4SpanVsRi_zrlE8_pointerSVSgvg")
+internal func _oldPointerGetter<T: ~Copyable>(_ span: Span<T>) -> UnsafeRawPointer? {
+  unsafe span._pointer
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span: @unchecked Sendable where Element: Sendable & ~Copyable & ~Escapable {}
 
 @available(SwiftCompatibilitySpan 5.0, *)
