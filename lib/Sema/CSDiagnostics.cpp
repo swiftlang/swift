@@ -6060,39 +6060,24 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
   // Build a mapping from arguments to parameters.
   SmallVector<unsigned, 4> argBindings(args->size());
   for (unsigned paramIdx = 0; paramIdx != Bindings.size(); ++paramIdx) {
-    for (auto argIdx : Bindings[paramIdx]) {
+    for (auto argIdx : Bindings[paramIdx])
       argBindings[argIdx] = paramIdx;
-    }
   }
 
   auto argRange = [&](unsigned argIdx, Identifier label) -> SourceRange {
-    auto *expr = args->getExpr(argIdx);
-    if (!expr)
-      return SourceRange();
-    
-    auto range = expr->getSourceRange();
+    auto range = args->getExpr(argIdx)->getSourceRange();
     if (!label.empty())
       range.Start = args->getLabelLoc(argIdx);
 
-    if (argIdx >= argBindings.size())
-      return range;
-    
     unsigned paramIdx = argBindings[argIdx];
-    if (paramIdx < Bindings.size() && Bindings[paramIdx].size() > 1) {
-      auto *endExpr = args->getExpr(Bindings[paramIdx].back());
-      if (endExpr)
-        range.End = endExpr->getEndLoc();
-    }
+    if (Bindings[paramIdx].size() > 1)
+      range.End = args->getExpr(Bindings[paramIdx].back())->getEndLoc();
 
     return range;
   };
 
   auto firstRange = argRange(ArgIdx, first);
   auto secondRange = argRange(PrevArgIdx, second);
-
-  // Check if ranges are valid (not default-constructed empty ranges)
-  if (!firstRange.Start.isValid() || !secondRange.Start.isValid())
-    return false;
 
   SourceLoc diagLoc = firstRange.Start;
 
@@ -6123,10 +6108,7 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
     } else {
       // For all other arguments, start is the next token past
       // the previous argument.
-      auto *prevExpr = args->getExpr(ArgIdx - 1);
-      if (!prevExpr)
-        return;
-      removalStartLoc = prevExpr->getEndLoc();
+      removalStartLoc = args->getExpr(ArgIdx - 1)->getEndLoc();
     }
 
     SourceRange removalRange{Lexer::getLocForEndOfToken(SM, removalStartLoc),
