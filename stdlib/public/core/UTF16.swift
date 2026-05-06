@@ -442,38 +442,38 @@ private enum ScalarFallbackResult: UInt8 {
 }
 
 #if arch(arm64_32)
-typealias Word = UInt64
+private typealias Word = UInt64
 #else
-typealias Word = UInt
+private typealias Word = UInt
 #endif
-@_transparent var mask:Word {
+@_transparent private var mask: Word {
   Word(truncatingIfNeeded: 0xFF80FF80_FF80FF80 as UInt64)
 }
 
-typealias Block = (Word, Word, Word, Word)
+private typealias Block = (Word, Word, Word, Word)
 
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
 #if _pointerBitWidth(_32) && !arch(arm64_32)
-@_transparent var blockSize:Int { 8 }
+@_transparent private var blockSize: Int { 8 }
 @_transparent
-func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD8<UInt8>? {
+private func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD8<UInt8>? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
   return unsafe ((block.0 | block.1 | block.2 | block.3) & mask == 0)
     ? unsafeBitCast(block, to: SIMD16<UInt8>.self).evenHalf : nil
 }
 #else
-@_transparent var blockSize:Int { 16 }
+@_transparent private var blockSize: Int { 16 }
 @_transparent
-func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD16<UInt8>? {
+private func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD16<UInt8>? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
   return unsafe ((block.0 | block.1 | block.2 | block.3) & mask == 0)
     ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
 }
 #endif
 #else
-@_transparent var blockSize:Int { 1 }
+@_transparent private var blockSize: Int { 1 }
 @_transparent
-func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>? {
+private func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>? {
   let value = unsafe pointer.pointee
   if value & 0xFF80 == 0 {
     return CollectionOfOne(UInt8(truncatingIfNeeded: value))
@@ -482,13 +482,13 @@ func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>?
 }
 #endif
 
-@_transparent var utf8TwoByteMax: UInt32 { 0x7FF }
-@_transparent var utf16LeadSurrogateMin: UInt32 { 0xD800 }
-@_transparent var utf16TrailSurrogateMin: UInt32 { 0xDC00 }
-@_transparent var utf16ReplacementCharacter: UInt32 { 0xFFFD }
-@_transparent var utf16ScalarMax: UInt32 { 0x10FFFF }
-@_transparent var utf16BasicMultilingualPlaneMax: UInt32 { 0xFFFF }
-@_transparent var utf16AstralPlaneMin: UInt32 { 0x10000 }
+@_transparent private var utf8TwoByteMax: UInt32 { 0x7FF }
+@_transparent private var utf16LeadSurrogateMin: UInt32 { 0xD800 }
+@_transparent private var utf16TrailSurrogateMin: UInt32 { 0xDC00 }
+@_transparent private var utf16ReplacementCharacter: UInt32 { 0xFFFD }
+@_transparent private var utf16ScalarMax: UInt32 { 0x10FFFF }
+@_transparent private var utf16BasicMultilingualPlaneMax: UInt32 { 0xFFFF }
+@_transparent private var utf16AstralPlaneMin: UInt32 { 0x10000 }
 
 /*
  This is expressible in a more concise way using the other transcoding
@@ -604,7 +604,7 @@ private func processScalarFallback(
   return (.singleByte, repairsMade: false)
 }
 
-func processNonASCIIChunk(
+private func processNonASCIIChunk(
   input: inout UnsafePointer<UInt16>,
   inputEnd: UnsafePointer<UInt16>,
   output: inout UnsafeMutablePointer<UInt8>,
