@@ -6694,6 +6694,11 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
       i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
+  // The alloc_stack's VarInfo is a single op_deref, but for IRGen the
+  // indirection is already expressed by using llvm.dbg.declare on the
+  // alloca address. Strip the op_deref to avoid a double-dereference.
+  VarInfo->DIExpr = {};
+
   VarDecl *Decl = i->getDecl();
   auto *DS = i->getDebugScope();
 
