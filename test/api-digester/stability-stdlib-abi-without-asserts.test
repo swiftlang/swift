@@ -91,21 +91,10 @@ Func AnyRandomAccessCollection.map(_:) has been removed
 Func AnySequence.map(_:) has been removed
 Func Collection.map(_:) has been removed
 Func RangeReplaceableCollection.filter(_:) has been removed
-Func Sequence.allSatisfy(_:) has been removed
-Func Sequence.compactMap(_:) has been removed
-Func Sequence.contains(where:) has been removed
-Func Sequence.elementsEqual(_:by:) has been removed
-Func Sequence.filter(_:) has been removed
-Func Sequence.flatMap(_:) has been removed
-Func Sequence.lexicographicallyPrecedes(_:by:) has been removed
-Func Sequence.max(by:) has been removed
-Func Sequence.map(_:) has been removed
-Func Sequence.min(by:) has been removed
-Func Sequence.reduce(_:_:) has been removed
-Func Sequence.reduce(into:_:) has been removed
-Func Sequence.starts(with:by:) has been removed
-Func Sequence._compactMap(_:) has been removed
 Func Sequence._filter(_:) has been removed
+Func Sequence.filter(_:) has been removed
+Func Sequence.map(_:) has been removed
+Func Sequence.reduce(_:_:) has been removed
 Func Dictionary.filter(_:) has been removed
 Func Set.filter(_:) has been removed
 Func String._slowWithCString(encodedAs:_:) has been removed
@@ -259,7 +248,6 @@ Protocol FixedWidthInteger has added inherited protocol Copyable
 Protocol FixedWidthInteger has added inherited protocol Escapable
 Protocol FloatingPoint has added inherited protocol Copyable
 Protocol FloatingPoint has added inherited protocol Escapable
-Protocol Hashable has added inherited protocol Escapable
 Protocol Identifiable has added inherited protocol Copyable
 Protocol Identifiable has added inherited protocol Escapable
 Protocol IteratorProtocol has added inherited protocol Copyable
@@ -500,8 +488,8 @@ Constructor OpaquePointer.init(_:) has generic signature change from <T> to <T w
 Constructor OpaquePointer.init(_:) has mangled name changing from 'Swift.OpaquePointer.init<A>(Swift.Optional<Swift.UnsafePointer<A>>) -> Swift.Optional<Swift.OpaquePointer>' to 'Swift.OpaquePointer.init<A where A: ~Swift.Copyable>(Swift.Optional<Swift.UnsafePointer<A>>) -> Swift.Optional<Swift.OpaquePointer>'
 Constructor OpaquePointer.init(_:) has mangled name changing from 'Swift.OpaquePointer.init<A>(Swift.UnsafePointer<A>) -> Swift.OpaquePointer' to 'Swift.OpaquePointer.init<A where A: ~Swift.Copyable>(Swift.UnsafePointer<A>) -> Swift.OpaquePointer'
 Constructor OpaquePointer.init(_:) is now with @_preInverseGenerics
-Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
-Constructor Optional.init(_:) has mangled name changing from 'Swift.Optional.init(A) -> Swift.Optional<A>' to '(extension in Swift):Swift.Optional< where A: ~Swift.Copyable>.init(A) -> Swift.Optional<A>'
+Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
+Constructor Optional.init(_:) has mangled name changing from 'Swift.Optional.init(A) -> Swift.Optional<A>' to '(extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.init(A) -> Swift.Optional<A>'
 Constructor Optional.init(_:) has parameter 0 changing from Default to Owned
 Constructor Optional.init(_:) is now with @_preInverseGenerics
 Constructor Optional.init(nilLiteral:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
@@ -692,6 +680,9 @@ Func UnsafeMutableRawPointer.assumingMemoryBound(to:) is now with @_preInverseGe
 Func UnsafeMutableRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeMutableRawPointer.bindMemory(to:capacity:) has mangled name changing from 'Swift.UnsafeMutableRawPointer.bindMemory<A>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafeMutablePointer<A>' to 'Swift.UnsafeMutableRawPointer.bindMemory<A where A: ~Swift.Copyable>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafeMutablePointer<A>'
 Func UnsafeMutableRawPointer.bindMemory(to:capacity:) is now with @_preInverseGenerics
+Func UnsafeMutableRawPointer.load(fromByteOffset:as:) has generic signature change from <T> to <T where T : ~Escapable>
+Func UnsafeMutableRawPointer.load(fromByteOffset:as:) has mangled name changing from 'Swift.UnsafeMutableRawPointer.load<A>(fromByteOffset: Swift.Int, as: A.Type) -> A' to 'Swift.UnsafeMutableRawPointer.load<A where A: ~Swift.Escapable>(fromByteOffset: Swift.Int, as: A.Type) -> A'
+Func UnsafeMutableRawPointer.load(fromByteOffset:as:) is now with @_preInverseGenerics
 Func UnsafeMutableRawPointer.moveInitializeMemory(as:from:count:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeMutableRawPointer.moveInitializeMemory(as:from:count:) has mangled name changing from 'Swift.UnsafeMutableRawPointer.moveInitializeMemory<A>(as: A.Type, from: Swift.UnsafeMutablePointer<A>, count: Swift.Int) -> Swift.UnsafeMutablePointer<A>' to 'Swift.UnsafeMutableRawPointer.moveInitializeMemory<A where A: ~Swift.Copyable>(as: A.Type, from: Swift.UnsafeMutablePointer<A>, count: Swift.Int) -> Swift.UnsafeMutablePointer<A>'
 Func UnsafeMutableRawPointer.moveInitializeMemory(as:from:count:) is now with @_preInverseGenerics
@@ -707,6 +698,9 @@ Func UnsafeRawPointer.assumingMemoryBound(to:) is now with @_preInverseGenerics
 Func UnsafeRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.bindMemory(to:capacity:) has mangled name changing from 'Swift.UnsafeRawPointer.bindMemory<A>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafePointer<A>' to 'Swift.UnsafeRawPointer.bindMemory<A where A: ~Swift.Copyable>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafePointer<A>'
 Func UnsafeRawPointer.bindMemory(to:capacity:) is now with @_preInverseGenerics
+Func UnsafeRawPointer.load(fromByteOffset:as:) has generic signature change from <T> to <T where T : ~Escapable>
+Func UnsafeRawPointer.load(fromByteOffset:as:) has mangled name changing from 'Swift.UnsafeRawPointer.load<A>(fromByteOffset: Swift.Int, as: A.Type) -> A' to 'Swift.UnsafeRawPointer.load<A where A: ~Swift.Escapable>(fromByteOffset: Swift.Int, as: A.Type) -> A'
+Func UnsafeRawPointer.load(fromByteOffset:as:) is now with @_preInverseGenerics
 Func _fixLifetime(_:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Func _fixLifetime(_:) has mangled name changing from 'Swift._fixLifetime<A>(A) -> ()' to 'Swift._fixLifetime<A where A: ~Swift.Copyable, A: ~Swift.Escapable>(A) -> ()'
 Func _fixLifetime(_:) has parameter 0 changing from Default to Shared
@@ -959,19 +953,19 @@ Func Comparable.>=(_:_:) has parameter 0 changing from Default to Shared
 Func Comparable.>=(_:_:) has parameter 1 changing from Default to Shared
 Func Comparable.>=(_:_:) is now with @_preInverseGenerics
 
-// Hashable: ~Copyable
-Protocol Hashable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable>
-Accessor Hashable.hashValue.Get() has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
-Func Hashable._rawHashValue(seed:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
-Func Hashable._rawHashValue(seed:) has mangled name changing from '(extension in Swift):Swift.Hashable._rawHashValue(seed: Swift.Int) -> Swift.Int' to '(extension in Swift):Swift.Hashable< where A: ~Swift.Copyable>._rawHashValue(seed: Swift.Int) -> Swift.Int'
+// Hashable: ~Copyable & ~Escapable
+Protocol Hashable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
+Accessor Hashable.hashValue.Get() has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
+Func Hashable._rawHashValue(seed:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
+Func Hashable._rawHashValue(seed:) has mangled name changing from '(extension in Swift):Swift.Hashable._rawHashValue(seed: Swift.Int) -> Swift.Int' to '(extension in Swift):Swift.Hashable< where A: ~Swift.Copyable, A: ~Swift.Escapable>._rawHashValue(seed: Swift.Int) -> Swift.Int'
 Func Hashable._rawHashValue(seed:) is now with @_preInverseGenerics
-Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
-Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable>
-Func Hasher.combine(_:) has mangled name changing from 'Swift.Hasher.combine<A where A: Swift.Hashable>(A) -> ()' to 'Swift.Hasher.combine<A where A: Swift.Hashable, A: ~Swift.Copyable>(A) -> ()'
+Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
+Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable, H : ~Escapable>
+Func Hasher.combine(_:) has mangled name changing from 'Swift.Hasher.combine<A where A: Swift.Hashable>(A) -> ()' to 'Swift.Hasher.combine<A where A: Swift.Hashable, A: ~Swift.Copyable, A: ~Swift.Escapable>(A) -> ()'
 Func Hasher.combine(_:) has parameter 0 changing from Default to Shared
 Func Hasher.combine(_:) is now with @_preInverseGenerics
-Func _hashValue(for:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable>
-Func _hashValue(for:) has mangled name changing from 'Swift._hashValue<A where A: Swift.Hashable>(for: A) -> Swift.Int' to 'Swift._hashValue<A where A: Swift.Hashable, A: ~Swift.Copyable>(for: A) -> Swift.Int'
+Func _hashValue(for:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable, H : ~Escapable>
+Func _hashValue(for:) has mangled name changing from 'Swift._hashValue<A where A: Swift.Hashable>(for: A) -> Swift.Int' to 'Swift._hashValue<A where A: Swift.Hashable, A: ~Swift.Copyable, A: ~Swift.Escapable>(for: A) -> Swift.Int'
 Func _hashValue(for:) has parameter 0 changing from Default to Shared
 Func _hashValue(for:) is now with @_preInverseGenerics
 

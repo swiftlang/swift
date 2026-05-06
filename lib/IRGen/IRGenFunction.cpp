@@ -527,22 +527,6 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
     }
   }
 
-  if (IGM.IRGen.Opts.shouldOptimize() && !IGM.IRGen.Opts.MergeableTraps) {
-    // Emit unique side-effecting inline asm calls in order to eliminate
-    // the possibility that an LLVM optimization or code generation pass
-    // will merge these blocks back together again. We emit an empty asm
-    // string with the side-effect flag set, and with a unique integer
-    // argument for each cond_fail we see in the function.
-    llvm::IntegerType *asmArgTy = IGM.Int32Ty;
-    llvm::Type *argTys = {asmArgTy};
-    llvm::FunctionType *asmFnTy =
-        llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
-    llvm::InlineAsm *inlineAsm =
-        llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
-    CreateAsmCall(inlineAsm,
-                  llvm::ConstantInt::get(asmArgTy, NumTrapBarriers++));
-  }
-
   // Emit the trap instruction.
   llvm::Function *trapIntrinsic = llvm::Intrinsic::getOrInsertDeclaration(
       &IGM.Module, llvm::Intrinsic::trap);
@@ -551,6 +535,10 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
   }
   auto Call = IRBuilderBase::CreateCall(trapIntrinsic, {});
   setCallingConvUsingCallee(Call);
+
+  if (IGM.IRGen.Opts.shouldOptimize() && !IGM.IRGen.Opts.MergeableTraps) {
+    Call->addFnAttr(llvm::Attribute::NoMerge);
+  }
 
   if (!IGM.IRGen.Opts.TrapFuncName.empty()) {
     auto A = llvm::Attribute::get(getContext(), "trap-func-name",

@@ -209,7 +209,7 @@ public:
     if (F->getExtFlags().hasSendingResult()) {
       printField("", "sending-result");
     }
-    if (F->getExtFlags().isNonIsolatedCaller()) {
+    if (F->getExtFlags().isNonisolatedNonsending()) {
       printField("execution", "caller");
     }
 
@@ -899,7 +899,7 @@ public:
     } else if (F->getExtFlags().isIsolatedAny()) {
       auto node = Dem.createNode(Node::Kind::IsolatedAnyFunctionType);
       funcNode->addChild(node, Dem);
-    } else if (F->getExtFlags().isNonIsolatedCaller()) {
+    } else if (F->getExtFlags().isNonisolatedNonsending()) {
       auto node = Dem.createNode(Node::Kind::NonIsolatedCallerFunctionType);
       funcNode->addChild(node, Dem);
     }

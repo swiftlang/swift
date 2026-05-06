@@ -1359,6 +1359,7 @@ namespace {
       case ActorIsolation::Unspecified:
         printFlag(true, "unspecified_isolation", CapturesColor);
         break;
+
       case ActorIsolation::NonisolatedUnsafe:
         printFlag(true, "nonisolated(unsafe)", CapturesColor);
         break;
@@ -1367,12 +1368,16 @@ namespace {
         printFlag(true, "nonisolated", CapturesColor);
         break;
 
+      case ActorIsolation::NonisolatedConcurrent:
+        printFlag(true, "@concurrent", CapturesColor);
+        break;
+
       case ActorIsolation::Erased:
         printFlag(true, "dynamically_isolated", CapturesColor);
         break;
 
-      case ActorIsolation::CallerIsolationInheriting:
-        printFlag(true, "isolated_to_caller_isolation", CapturesColor);
+      case ActorIsolation::NonisolatedNonsending:
+        printFlag(true, "nonisolated_nonsending", CapturesColor);
         break;
 
       case ActorIsolation::ActorInstance:
@@ -4882,7 +4887,7 @@ public:
     printFoot();
   }
 
-  void visitCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *T, Label label) {
+  void visitNonisolatedNonsendingTypeRepr(NonisolatedNonsendingTypeRepr *T, Label label) {
     printCommon("caller_isolated", label);
     printRec(T->getBase(), Label::optional("base"));
     printFoot();
@@ -5000,7 +5005,10 @@ public:
   void visitGenericArgumentExprTypeRepr(GenericArgumentExprTypeRepr *T,
                                         Label label) {
     printCommon("generic_argument_expr", label);
-    printRec(T->getArgExpr(), Label::optional("arg_expr"));
+    auto *argExpr = T->getArgExpr();
+    if (!argExpr)
+      argExpr = T->getOriginalArgExpr();
+    printRec(argExpr, Label::optional("arg_expr"));
     printFoot();
   }
 };
@@ -6193,6 +6201,7 @@ namespace {
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeLiteral(), "compileTimeLiteral");
       printFlag(paramFlags.isConstValue(), "constValue");
+      printFlag(paramFlags.isSending(), "sending");
       printFlag(getDumpString(paramFlags.getValueOwnership()));
     }
 
@@ -6263,6 +6272,8 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinImplicitActor, builtin_implicit_isolated_actor)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
     TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
+    TRIVIAL_TYPE_PRINTER(Join, join)
+    TRIVIAL_TYPE_PRINTER(Meet, meet)
 
     void visitBuiltinVectorType(BuiltinVectorType *T, Label label) {
       printCommon("builtin_vector_type", label);

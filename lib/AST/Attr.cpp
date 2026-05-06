@@ -1079,7 +1079,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         if (!BD->hasClangNode() &&
             !BD->getFormalAccessScope(VD->getDeclContext(),
                                       /*treatUsableFromInlineAsPublic*/ true)
-                 .isPublic()) {
+                 .isPublicOrPackage()) {
           return false;
         }
       }

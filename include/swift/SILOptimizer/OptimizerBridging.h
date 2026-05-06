@@ -177,6 +177,8 @@ struct BridgedPassContext {
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedDiagnosticEngine getDiagnosticEngine() const;
+  BRIDGED_INLINE bool isWholeModule() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getModuleDecl() const;
 
   // SIL modifications
 
@@ -229,6 +231,7 @@ struct BridgedPassContext {
   SwiftInt getStaticAlignment(BridgedType type) const;
   SwiftInt getStaticStride(BridgedType type) const;
   bool canMakeStaticObjectReadOnly(BridgedType type) const;
+  bool hasClassFixedMetadataLayout(BridgedDeclObj classDecl) const;
 
   // Stack nesting and other notifications
 

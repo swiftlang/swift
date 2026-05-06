@@ -79,6 +79,8 @@ PASS(ComputeEscapeEffects, "compute-escape-effects",
      "Computes function escape effects")
 PASS(ComputeSideEffects, "compute-side-effects",
      "Computes function side effects")
+PASS(CondFailOptimization, "cond-fail-optimization",
+     "Optimizes cond_fail instructions")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
      "Diagnose Infinitely-Recursive Code")
 PASS(InitializeStaticGlobals, "initialize-static-globals",
@@ -160,6 +162,8 @@ MODULE_PASS(StackProtection, "stack-protection",
      "Decides which functions need stack protectors")
 MODULE_PASS(DiagnoseUnknownConstValues, "diagnose-unknown-const-values",
      "Diagnose any '@const' entities which could not be simplified to a compile-time value")
+MODULE_PASS(ConformanceCheckOptimization, "conformance-check-optimization",
+     "Build conformance entries in vtables for fast class conformance checks")
 MODULE_PASS(EmbeddedSwiftDiagnostics, "embedded-swift-diagnostics",
      "Diagnose violations of Embedded Swift language restrictions")
 

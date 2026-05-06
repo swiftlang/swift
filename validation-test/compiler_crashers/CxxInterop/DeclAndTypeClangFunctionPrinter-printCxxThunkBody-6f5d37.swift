@@ -1,0 +1,6 @@
+// {"extraArgs":["-experimental-allow-module-with-compiler-errors","-cxx-interoperability-mode=default","-emit-clang-header-min-access","internal","-emit-clang-header-path","/dev/null"],"kind":"emit-sil","original":"034478b5","signature":"void llvm::function_ref<void (swift::LoweredFunctionSignature::GenericRequirementParameter const&)>::callback_fn<swift::DeclAndTypeClangFunctionPrinter::printCxxThunkBody(swift::AbstractFunctionDecl const*, swift::LoweredFunctionSignature const&, llvm::StringRef, swift::NominalTypeDecl const*, swift::ModuleDecl const*, swift::Type, swift::ParameterList const*, bool, swift::AnyFunctionType const*, bool, std::__1::optional<swift::IRABIDetailsProvider::MethodDispatchInfo>)::$_9::operator()(std::__1::optional<llvm::StringRef>) const::'lambda'(swift::LoweredFunctionSignature::GenericRequirementParameter const&)>(long, swift::LoweredFunctionSignature::GenericRequirementParameter const&)","signatureAssert":"Assertion failed: (genericRequirement.isAnyMetadata()), function operator()","signatureNext":"LoweredFunctionSignature::visitParameterList"}
+// RUN: not --crash %target-swift-frontend -emit-sil -experimental-allow-module-with-compiler-errors -cxx-interoperability-mode=default -emit-clang-header-min-access internal -emit-clang-header-path /dev/null %s
+struct a<b {
+  c: b  init
+  where
+  b: ExpressibleByIntegerLiteral

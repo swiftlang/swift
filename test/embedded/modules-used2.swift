@@ -29,10 +29,13 @@ func foo() {
 import MyModule
 
 // CHECK-SIL:      // main()
+// CHECK-SIL-NEXT: // Isolation: unspecified
 // CHECK-SIL-NEXT: sil [used] @$e8MyModule4mains5Int32VyF : $@convention(thin) () -> Int32 {
 // CHECK-SIL: 	   // @objc main
+// CHECK-SIL-NEXT: // Isolation: unspecified
 // CHECK-SIL-NEXT: sil [thunk] [used] [asmname "main"] @$e8MyModule4mains5Int32VyFTo : $@convention(c) () -> Int32
 // CHECK-SIL:      // foo()
+// CHECK-SIL-NEXT: // Isolation: unspecified
 // CHECK-SIL-NEXT: sil [used] @$e8MyModule3fooyyF : $@convention(thin) () -> () {
 
 // CHECK: main in a submodule

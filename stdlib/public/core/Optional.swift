@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -162,27 +162,12 @@ where Wrapped: ~Copyable & ~Escapable {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
-  /// Creates an instance that stores the given value.
-  @_transparent
-  @_preInverseGenerics
-  public init(_ value: consuming Wrapped) {
-    // FIXME: Merge this with the generalization below.
-    // This is the original initializer, preserved to avoid breaking source
-    // compatibility with clients that use the `Optional.init` syntax to create
-    // a function reference. The ~Escapable generalization is currently breaking
-    // that. (rdar://147533059)
-    self = .some(value)
-  }
-}
-
 extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Creates an instance that stores the given value.
   @_transparent
-  @_alwaysEmitIntoClient
+  @_preInverseGenerics
   @lifetime(copy value)
   public init(_ value: consuming Wrapped) {
-    // FIXME: Merge this into the original entry above.
     self = .some(value)
   }
 }
@@ -424,6 +409,22 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
       return x
     }
     _internalInvariantFailure("_uncheckedUnwrapped of nil optional")
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Optional where Wrapped: ~Copyable & Escapable {
+  @_alwaysEmitIntoClient
+  @_addressableSelf
+  @lifetime(borrow self)
+  public func _span() -> Span<Wrapped> {
+    if self == nil {
+      return Span()
+    }
+    let a = Builtin.unprotectedAddressOfBorrow(self)
+    let s = unsafe Span<Wrapped>(_unsafeStart: .init(a), count: 1)
+    return unsafe _overrideLifetime(s, borrowing: self)
   }
 }
 
@@ -1016,22 +1017,3 @@ extension Optional: _ObjectiveCBridgeable {
   }
 }
 #endif
-
-extension Optional where Wrapped: ~Copyable {
-  @available(SwiftStdlib 6.3, *)
-  @_transparent
-  public var _span: Span<Wrapped> {
-    @_addressableSelf
-    @lifetime(borrow self)
-    get {
-      guard self != nil else {
-        return Span()
-      }
-
-      let ptr = Builtin.unprotectedAddressOfBorrow(self)
-      return unsafe _overrideLifetime(
-        Span(_unsafeStart: UnsafePointer(ptr), count: 1),
-        borrowing: self)
-    }
-  }
-}

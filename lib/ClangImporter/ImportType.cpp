@@ -61,7 +61,7 @@ using namespace importer;
 namespace clang {
 class DynamicRangePointerType;
 class ValueTerminatedType;
-}
+} // namespace clang
 
 /// Given that a type is the result of a special typedef import, was
 /// it originally a CF pointer?
@@ -70,12 +70,13 @@ static bool isImportedCFPointer(clang::QualType clangType, Type type) {
           (type->is<ClassType>() || type->isClassExistentialType()));
 }
 
-bool ClangImporter::Implementation::isOverAligned(const clang::TypeDecl *decl) {
+bool ClangImporter::Implementation::isOverAligned(
+    const clang::TypeDecl *decl) const {
   auto type = getClangASTContext().getTypeDeclType(decl);
   return isOverAligned(type);
 }
 
-bool ClangImporter::Implementation::isOverAligned(clang::QualType type) {
+bool ClangImporter::Implementation::isOverAligned(clang::QualType type) const {
   auto align = getClangASTContext().getTypeAlignInChars(type);
   return align > clang::CharUnits::fromQuantity(MaximumAlignment);
 }
@@ -517,6 +518,20 @@ namespace {
 
       // All other C pointers to concrete types map to
       // UnsafeMutablePointer<T> or OpaquePointer.
+
+      // If the pointee record is annotated with swift_attr("import_opaque_pointer"),
+      // import as OpaquePointer regardless of whether the struct definition is
+      // complete. This allows SDK overlays (e.g. Android NDK) to normalize a type
+      // like FILE* that is complete on some API levels and opaque on others.
+      if (const auto *recordType = pointeeQualType->getAs<clang::RecordType>()) {
+        if (importer::hasImportAsOpaquePointerAttr(recordType->getDecl())) {
+          auto opaquePointerDecl = Impl.SwiftContext.getOpaquePointerDecl();
+          if (!opaquePointerDecl)
+            return Type();
+          return {opaquePointerDecl->getDeclaredInterfaceType(),
+                  ImportHint::OtherPointer};
+        }
+      }
 
       // With pointer conversions enabled, map to the normal pointer types
       // without special hints.
@@ -1997,9 +2012,9 @@ private:
   /// \param members The types to include in the composition.
   /// \return \c true if the composition should include \c AnyObject, \c false
   ///         otherwise.
-  bool getAsComposition(ProtocolCompositionType *ty,
-                        SmallVectorImpl<Type> &members,
-                        InvertibleProtocolSet &inverses) {
+  static bool getAsComposition(ProtocolCompositionType *ty,
+                               SmallVectorImpl<Type> &members,
+                               InvertibleProtocolSet &inverses) {
     llvm::append_range(members, ty->getMembers());
     inverses.insertAll(ty->getInverses());
     return ty->hasExplicitAnyObject();
@@ -2012,9 +2027,8 @@ private:
   /// \param members The types to include in the composition.
   /// \return \c true if the composition should include \c AnyObject, \c false
   ///         otherwise.
-  bool getAsComposition(TypeBase *ty,
-                        SmallVectorImpl<Type> &members,
-                        InvertibleProtocolSet &inverses) {
+  static bool getAsComposition(TypeBase *ty, SmallVectorImpl<Type> &members,
+                               InvertibleProtocolSet &inverses) {
     members.push_back(ty);
     return false;
   }
@@ -2063,9 +2077,7 @@ private:
 
   /// Visitor action: Ignore this type; do not modify it and do not recurse into
   /// it to find other types to modify.
-  Result pass(Type ty, bool found = false) {
-    return { ty, found };
-  }
+  static Result pass(Type ty, bool found = false) { return {ty, found}; }
 
   // Macros to define visitors based on these actions.
 #define VISIT(CLASS, ACT)  Result visit##CLASS(CLASS *ty) { return ACT(ty); }
@@ -2157,6 +2169,8 @@ private:
   NEVER_VISIT(PackElementType)
   NEVER_VISIT(TypeVariableType)
   NEVER_VISIT(ErrorUnionType)
+  NEVER_VISIT(JoinType)
+  NEVER_VISIT(MeetType)
 
   VISIT(SugarType, recurse)
 
@@ -2710,6 +2724,12 @@ bool ClangImporter::Implementation::isDefaultArgSafeToImport(
     // HACK: Clang will crash while trying to instantiate this default arg.
     return false;
 
+  if (param->hasUninstantiatedDefaultArg() &&
+      isa<clang::CXXConstructorDecl>(functionDecl))
+    // HACK: Constructors of std::set have default arguments that rely on the
+    // comparator type being copyable.
+    return false;
+
   clang::CXXDefaultArgExpr *defaultArgExpr = nullptr;
   // Try to instantiate the default expression.
   auto defaultArgExprResult = getClangSema().BuildCXXDefaultArgExpr(
@@ -2794,7 +2814,8 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
                              : (isBorrowing ? ParamSpecifier::Borrowing
                                             : ParamSpecifier::Default)));
   paramInfo->setInterfaceType(swiftParamTy);
-  impl->recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
+  ClangImporter::Implementation::recordImplicitUnwrapForDecl(
+      paramInfo, isParamTypeImplicitlyUnwrapped);
 
   // Import the default expression for this parameter if possible.
   // Swift doesn't support default values of inout parameters.
@@ -2802,7 +2823,6 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // (https://github.com/apple/swift/issues/70124)
   // TODO: support params with template parameters
   if (param->hasDefaultArg() && !isInOut &&
-      !isa<clang::CXXConstructorDecl>(param->getDeclContext()) &&
       impl->isDefaultArgSafeToImport(param) &&
       !param->isTemplated()) {
     SwiftDeclSynthesizer synthesizer(*impl);

@@ -15,10 +15,13 @@ The ultimate tool for building Swift.
 
 
 from argparse import Namespace
+import atexit
 import json
 import os
 import platform
 import re
+import signal
+import subprocess
 import sys
 import time
 
@@ -209,6 +212,29 @@ def validate_arguments(toolchain, args: Namespace):
         if toolchain.sccache is None:
             fatal_error(
                 "can't find sccache (please install sccache)")
+
+    if args.enable_caching:
+        cc_dir = os.path.dirname(toolchain.cc)
+        clang_cache_path = os.path.join(cc_dir, 'clang-cache')
+        if not os.path.isfile(clang_cache_path):
+            fatal_error(
+                "can't find clang-cache at '{}' "
+                "(expected next to clang at '{}')".format(
+                    clang_cache_path, toolchain.cc))
+
+    if args.enable_caching and args.sccache:
+        fatal_error(
+            '--enable-caching can not be used with --sccache')
+
+    if args.enable_caching and args.distcc:
+        fatal_error(
+            '--enable-caching can not be used with --distcc')
+
+    if args.enable_caching and (args.cmake_c_launcher or
+                                args.cmake_cxx_launcher):
+        fatal_error(
+            '--enable-caching can not be used with'
+            ' --cmake-c-launcher or --cmake-cxx-launcher')
 
     # Xcode project generation is no longer supported.
     if args.cmake_generator == "Xcode":
@@ -503,6 +529,41 @@ def parse_preset_args():
         nargs=argparse.Nargs.OPTIONAL,
         default=os.environ.get('SWIFT_USE_SCCACHE') == '1')
     parser.add_argument(
+        "--enable-caching",
+        help="enable compilation caching using clang-cache and swift "
+             "cache-compile-job (incompatible with --sccache)",
+        action=argparse.actions.StoreTrueAction,
+        nargs=argparse.Nargs.OPTIONAL,
+        default=os.environ.get('SWIFT_USE_CACHING') == '1')
+    parser.add_argument(
+        "--caching-cas-path",
+        help="the path to the CAS directory for caching builds",
+        metavar="PATH")
+    parser.add_argument(
+        "--caching-depscan-socket",
+        help="the socket path for the clang-cache depscan daemon",
+        metavar="PATH")
+    parser.add_argument(
+        "--caching-plugin-path",
+        help="the path to the CAS plugin for caching builds",
+        metavar="PATH")
+    parser.add_argument(
+        "--caching-plugin-option",
+        action="append",
+        default=[],
+        help="options to pass to the CAS plugin "
+             "(can be specified multiple times)")
+    parser.add_argument(
+        "--caching-prefix-map",
+        help="enable prefix mapping for cached builds",
+        action=argparse.actions.StoreTrueAction,
+        nargs=argparse.Nargs.OPTIONAL,
+        default=False)
+    parser.add_argument(
+        "--caching-remote-service-path",
+        help="the path to the remote caching service socket",
+        metavar="PATH")
+    parser.add_argument(
         "--cmake-c-launcher",
         help="the absolute path to set CMAKE_C_COMPILER_LAUNCHER",
         metavar="PATH")
@@ -612,6 +673,17 @@ def main_preset():
         fatal_error(
             '--sccache can not be used with' +
             ' --cmake-c-launcher or --cmake-cxx-launcher')
+    if args.enable_caching and (args.cmake_c_launcher or
+                                args.cmake_cxx_launcher):
+        fatal_error(
+            '--enable-caching can not be used with'
+            ' --cmake-c-launcher or --cmake-cxx-launcher')
+    if args.enable_caching and args.sccache:
+        fatal_error(
+            '--enable-caching can not be used with --sccache')
+    if args.enable_caching and args.distcc:
+        fatal_error(
+            '--enable-caching can not be used with --distcc')
 
     build_script_args = [sys.argv[0]]
     if args.dry_run:
@@ -624,6 +696,23 @@ def main_preset():
         build_script_args += ["--distcc"]
     if args.sccache:
         build_script_args += ["--sccache"]
+    if args.enable_caching:
+        build_script_args += ["--enable-caching"]
+    if args.caching_cas_path:
+        build_script_args += ["--caching-cas-path", args.caching_cas_path]
+    if args.caching_depscan_socket:
+        build_script_args += ["--caching-depscan-socket",
+                              args.caching_depscan_socket]
+    if args.caching_plugin_path:
+        build_script_args += ["--caching-plugin-path",
+                              args.caching_plugin_path]
+    for opt in (args.caching_plugin_option or []):
+        build_script_args += ["--caching-plugin-option", opt]
+    if args.caching_prefix_map:
+        build_script_args += ["--caching-prefix-map"]
+    if args.caching_remote_service_path:
+        build_script_args += ["--caching-remote-service-path",
+                              args.caching_remote_service_path]
     if args.build_jobs:
         build_script_args += ["--jobs", str(args.build_jobs)]
     if args.lit_jobs:
@@ -699,6 +788,84 @@ def main_normal():
     # Preprocess the arguments to apply defaults.
     apply_default_arguments(toolchain, args)
 
+    cached_ninja_real = None
+    cached_ninja_cache_session = None
+    cached_ninja_wrapper_path = None
+
+    # Set up caching build defaults and environment.
+    if args.enable_caching:
+        # Handle --caching-remote-service-path implications.
+        if args.caching_remote_service_path:
+            # Infer plugin path if not explicitly provided.
+            if not args.caching_plugin_path:
+                plugin_path = None
+                if platform.system() == 'Darwin':
+                    try:
+                        developer_dir = shell.capture(
+                            ['xcode-select', '-p'],
+                            dry_run=False, echo=False).rstrip()
+                        candidate = os.path.join(
+                            developer_dir, 'usr', 'lib',
+                            'libToolchainCASPlugin.dylib')
+                        if os.path.isfile(candidate):
+                            plugin_path = candidate
+                    except Exception:
+                        pass
+                if plugin_path is None:
+                    fatal_error(
+                        "--caching-remote-service-path requires a CAS "
+                        "plugin. Provide --caching-plugin-path or install "
+                        "Xcode.")
+                args.caching_plugin_path = plugin_path
+
+            # Add remote-service-path as a plugin option.
+            if args.caching_plugin_option is None:
+                args.caching_plugin_option = []
+            args.caching_plugin_option.append(
+                'remote-service-path=' + args.caching_remote_service_path)
+
+            # Imply prefix mapping.
+            args.caching_prefix_map = True
+
+        if args.caching_cas_path is None:
+            args.caching_cas_path = os.path.join(
+                SWIFT_BUILD_ROOT, 'cas')
+        os.environ['LLVM_CACHE_CAS_PATH'] = args.caching_cas_path
+        os.environ['LLVM_CACHE_BUILD_SESSION_ID'] = 'buildid'
+        if args.caching_plugin_path:
+            os.environ['LLVM_CACHE_PLUGIN_PATH'] = args.caching_plugin_path
+        if args.caching_plugin_option:
+            os.environ['LLVM_CACHE_PLUGIN_OPTIONS'] = \
+                ':'.join(args.caching_plugin_option)
+        if args.caching_prefix_map:
+            os.environ['LLVM_CACHE_PREFIX_MAPS'] = \
+                SWIFT_SOURCE_ROOT + '=/^src'
+        if args.caching_remote_service_path:
+            os.environ['LLVM_CACHE_REMOTE_SERVICE_SOCKET_PATH'] = \
+                args.caching_remote_service_path
+
+        # Enable MCCAS backend unless using remote service or explicitly
+        # disabled via environment.
+        args.caching_enable_mccas = (
+            not args.caching_remote_service_path and
+            os.environ.get('SWIFT_CACHE_DISABLE_MCCAS') is None)
+
+        # Compute a ninja wrapper that invokes cache-build-session for
+        # incremental builds outside the build-script daemon. The wrapper
+        # file itself is written after the clean step below so that --clean
+        # does not remove it.
+        if toolchain.ninja is not None:
+            cc_dir = os.path.dirname(toolchain.cc)
+            cache_session = os.path.join(cc_dir, 'cache-build-session')
+            if os.path.isfile(cache_session):
+                wrapper_path = os.path.join(
+                    SWIFT_BUILD_ROOT, args.build_subdir,
+                    'build-utils', 'ninja')
+                cached_ninja_real = toolchain.ninja
+                cached_ninja_cache_session = cache_session
+                cached_ninja_wrapper_path = wrapper_path
+                toolchain.ninja = wrapper_path
+
     cmake = CMake(args=args, toolchain=toolchain)
     toolchain.cmake = cmake.get_cmake_path(source_root=SWIFT_SOURCE_ROOT,
                                            build_root=SWIFT_BUILD_ROOT)
@@ -716,6 +883,56 @@ def main_normal():
         # --start-server will fail if the server is already running.
         # Capture the output because we don't want to see the stats.
         shell.capture([toolchain.sccache, "--show-stats"])
+
+    clang_cache_depscan_daemon = None
+    depscan_log_file = None
+    if args.enable_caching:
+        cc_dir = os.path.dirname(toolchain.cc)
+        clang_cache_path = os.path.join(cc_dir, 'clang-cache')
+        depscan_socket = args.caching_depscan_socket
+
+        os.environ['CLANG_CACHE_SCAN_DAEMON_SOCKET_PATH'] = depscan_socket
+
+        # Clean stale socket/pid files.
+        for suffix in ['', '.sock', '.pid']:
+            try:
+                os.remove(depscan_socket + suffix)
+            except FileNotFoundError:
+                pass
+
+        # Start the depscan daemon.
+        print("Starting clang-cache depscan daemon...")
+        depscan_log_path = os.path.join(
+            SWIFT_BUILD_ROOT, args.build_subdir, 'depscan-daemon.log')
+        shell.makedirs(os.path.dirname(depscan_log_path))
+        depscan_log_file = open(depscan_log_path, 'w')
+        clang_cache_depscan_daemon = subprocess.Popen(
+            [clang_cache_path, '-depscan-server', depscan_socket],
+            stdout=depscan_log_file, stderr=depscan_log_file)
+
+        def _cleanup_depscan_daemon():
+            if (clang_cache_depscan_daemon is not None and
+                    clang_cache_depscan_daemon.poll() is None):
+                print("Terminating clang-cache depscan daemon...")
+                clang_cache_depscan_daemon.terminate()
+                try:
+                    clang_cache_depscan_daemon.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    clang_cache_depscan_daemon.kill()
+            if depscan_log_file is not None:
+                depscan_log_file.close()
+
+        atexit.register(_cleanup_depscan_daemon)
+
+        original_sigterm = signal.getsignal(signal.SIGTERM)
+
+        def _sigterm_handler(signum, frame):
+            _cleanup_depscan_daemon()
+            if callable(original_sigterm):
+                original_sigterm(signum, frame)
+            else:
+                sys.exit(128 + signum)
+        signal.signal(signal.SIGTERM, _sigterm_handler)
 
     # Sanitize the runtime environment.
     initialize_runtime_environment()
@@ -735,6 +952,21 @@ def main_normal():
 
     # Create build directory.
     shell.makedirs(invocation.workspace.build_root)
+
+    # Write the cached-build ninja wrapper now so that --clean above does
+    # not remove it. cmake config steps that follow invoke this wrapper.
+    if cached_ninja_wrapper_path is not None:
+        shell.makedirs(os.path.dirname(cached_ninja_wrapper_path))
+        with open(cached_ninja_wrapper_path, 'w') as f:
+            f.write('#!/bin/sh\n')
+            f.write('# Auto-generated ninja wrapper for cached builds.\n')
+            f.write('if [ -n "$CLANG_CACHE_SCAN_DAEMON_SOCKET_PATH" ]; then\n')
+            f.write('  exec "{}" "$@"\n'.format(cached_ninja_real))
+            f.write('else\n')
+            f.write('  exec "{}" "{}" "$@"\n'.format(
+                cached_ninja_cache_session, cached_ninja_real))
+            f.write('fi\n')
+        os.chmod(cached_ninja_wrapper_path, 0o755)
 
     # Create .build_script_log
     if not args.dry_run:

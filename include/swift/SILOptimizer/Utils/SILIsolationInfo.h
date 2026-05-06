@@ -486,30 +486,38 @@ public:
 
   static SILIsolationInfo
   getActorInstanceIsolated(SILValue isolatedValue,
-                           const SILFunctionArgument *actorInstance) {
+                           const SILFunctionArgument *actorInstance,
+                           ProtocolDecl *isolatedConformance = nullptr) {
     assert(actorInstance);
     auto *varDecl =
         llvm::dyn_cast_if_present<VarDecl>(actorInstance->getDecl());
     if (!varDecl)
       return {};
-    return {isolatedValue, actorInstance,
+    return {isolatedValue,
+            actorInstance,
             actorInstance->isSelf()
                 ? ActorIsolation::forActorInstanceSelf(varDecl)
                 : ActorIsolation::forActorInstanceParameter(
-                      varDecl, actorInstance->getIndex())};
+                      varDecl, actorInstance->getIndex()),
+            {},
+            isolatedConformance};
   }
 
-  static SILIsolationInfo getActorInstanceIsolated(SILValue isolatedValue,
-                                                   ActorInstance actorInstance,
-                                                   NominalTypeDecl *typeDecl) {
+  static SILIsolationInfo
+  getActorInstanceIsolated(SILValue isolatedValue, ActorInstance actorInstance,
+                           NominalTypeDecl *typeDecl,
+                           ProtocolDecl *isolatedConformance = nullptr) {
     assert(actorInstance);
     if (!typeDecl->isAnyActor()) {
       assert(!swift::getActorIsolation(typeDecl).isGlobalActor() &&
              "Should have called getGlobalActorIsolated");
       return {};
     }
-    return {isolatedValue, actorInstance,
-            ActorIsolation::forActorInstanceSelf(typeDecl)};
+    return {isolatedValue,
+            actorInstance,
+            ActorIsolation::forActorInstanceSelf(typeDecl),
+            {},
+            isolatedConformance};
   }
 
   /// A special actor instance isolated for partial apply cases where we do not

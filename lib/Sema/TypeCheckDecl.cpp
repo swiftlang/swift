@@ -2214,7 +2214,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     nestedRepr = lifetime->getBase();
   }
 
-  if (auto callerIsolated = dyn_cast<CallerIsolatedTypeRepr>(nestedRepr)) {
+  if (auto callerIsolated = dyn_cast<NonisolatedNonsendingTypeRepr>(nestedRepr)) {
     nestedRepr = callerIsolated->getBase();
   }
 
@@ -2549,6 +2549,16 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       SmallVector<AnyFunctionType::Param, 4> argTy;
       AFD->getParameters()->getParams(argTy);
 
+      // If we don't have the concurrency library, reject the use of 'async'.
+      ASTContext &ctx = AFD->getASTContext();
+      if (AFD->hasAsync() &&
+          AFD->getLoc(/*SerializedOK=*/false).isValid() &&
+          !ctx.getLoadedModule(ctx.Id_Concurrency) &&
+          !ctx.SILOpts.ParseStdlib) {
+        ctx.Diags.diagnose(
+            AFD->getAsyncLoc(), diag::no_concurrency_module, "async");
+      }
+
       maybeAddParameterIsolation(infoBuilder, argTy);
       infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
       infoBuilder = infoBuilder.withSendable(AFD->isSendable());
@@ -2736,9 +2746,23 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
       // FIXME: The check for 'IsForSourceKit' is a hack to workaround cases
       // where we're doing cursor info in an invalid extension, we ought to
       // still be type-checking decls in invalid extensions.
+      auto inSecondaryScriptFile = [&]() -> bool {
+        // FIXME: We can hit this when lazily type-checking decls in a
+        // main.swift when it's a secondary file, avoid asserting since the
+        // DeclChecker won't be run on the file. We only need to handle the
+        // secondary case since main files are always type-checked first when
+        // primary.
+        //
+        // Once we fix script variables to either be consistently local or
+        // global we can remove this.
+        auto *SF = VD->getDeclContext()->getOutermostParentSourceFile();
+        return SF && SF->isScriptMode() && !SF->isPrimary() &&
+          !SF->getParentModule()->getPrimarySourceFiles().empty();
+      };
       ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
              Context.LangOpts.IsForSourceKit ||
-             Context.TypeCheckerOpts.EnableLazyTypecheck &&
+             Context.TypeCheckerOpts.EnableLazyTypecheck ||
+             inSecondaryScriptFile() &&
              "Querying VarDecl's type before type-checking parent stmt");
 
       // Try type checking parent control statement.

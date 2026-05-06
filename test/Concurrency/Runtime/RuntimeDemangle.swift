@@ -23,7 +23,7 @@ if #available(SwiftStdlib 6.4, *) {
     expectEqual(try? demangle("Swift is super cool!"), nil)
 
     // Test that correct symbols are demangled. (Test all documented prefixes)
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) // legacy mangling is not supported on Linux
+    #if os(anyAppleOS) // legacy mangling is not supported on Linux
     expectEqual(try? demangle("_TSb"), "Swift.Bool")
     expectEqual(try? demangle("_T0Si"), "Swift.Int")
     #endif
@@ -82,7 +82,7 @@ if #available(SwiftStdlib 6.4, *) {
     }
 
     // Test that correct symbols are demangled. (Test all documented prefixes)
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) // legacy mangling is not supported on Linux
+    #if os(anyAppleOS) // legacy mangling is not supported on Linux
     test { outputSpan in
       do {
         try demangle("_TSb".utf8Span, into: &outputSpan)
@@ -94,7 +94,7 @@ if #available(SwiftStdlib 6.4, *) {
     }
     #endif
 
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) // legacy mangling is not supported on Linux
+    #if os(anyAppleOS) // legacy mangling is not supported on Linux
     test { outputSpan in
       do {
         try demangle("_T0Si".utf8Span, into: &outputSpan)

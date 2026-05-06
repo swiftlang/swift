@@ -964,6 +964,27 @@ func testTaskAddPriorityEscalationHandlerWithDefer() async {
   defer { Builtin.taskRemovePriorityEscalationHandler(record: result) }
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins18testTaskLocalValueyyBp_xntYalF : $@convention(thin) @async <Value> (Builtin.RawPointer, @in Value) -> () {
+// CHECK: bb0([[PTR_ARG:%.*]] : $Builtin.RawPointer, [[VALUE:%.*]] : @noImplicitCopy @_eagerMove $*Value):
+// CHECK:   [[CONSUME_BOX:%.*]] = alloc_box $<τ_0_0> { var @moveOnly τ_0_0 } <Value>, var, name "value"
+// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [var_decl] [[CONSUME_BOX]]
+// CHECK:   [[PROJECT_BOX:%.*]] = project_box [[BORROW_BOX]]
+// CHECK:   [[WRAPPER:%.*]] = moveonlywrapper_to_copyable_addr [[PROJECT_BOX]]
+// CHECK:   copy_addr [take] [[VALUE]] to [init] [[WRAPPER]]
+// CHECK:   [[DEINIT_ADDR:%.*]] = begin_access [deinit] [unknown] [[PROJECT_BOX]]
+// CHECK:   [[MOVE_ONLY_ADDR:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[DEINIT_ADDR]]
+// CHECK:   [[STACK:%.*]] = alloc_stack $@moveOnly Value
+// CHECK:   copy_addr [[MOVE_ONLY_ADDR]] to [init] [[STACK]]
+// CHECK:   [[BINDING:%.*]] = builtin "addTaskLocalValue"<Value>([[PTR_ARG]] : $Builtin.RawPointer, [[STACK]] : $*@moveOnly Value) : $Builtin.RawPointer
+// CHECK:   [[MOVE_BINDING:%.*]] = move_value [var_decl] [[BINDING]]
+// CHECK:   builtin "removeTaskLocalValue"([[MOVE_BINDING]] : $Builtin.RawPointer) : $()
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK: } // end sil function '$s8builtins18testTaskLocalValueyyBp_xntYalF'
+func testTaskLocalValue<Value>(_ key: Builtin.RawPointer, _ value: consuming Value) async {
+  let binding = Builtin.addTaskLocalValue(key, value)
+  Builtin.removeTaskLocalValue(binding)
+}
+
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins22testTaskLocalValuePushyyBp_xntYalF : $@convention(thin) @async <Value> (Builtin.RawPointer, @in Value) -> () {
 // CHECK: bb0([[PTR_ARG:%.*]] : $Builtin.RawPointer, [[VALUE:%.*]] : @noImplicitCopy @_eagerMove $*Value):
 // CHECK:   [[CONSUME_BOX:%.*]] = alloc_box $<τ_0_0> { var @moveOnly τ_0_0 } <Value>, var, name "value"

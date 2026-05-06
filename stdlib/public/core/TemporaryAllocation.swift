@@ -36,7 +36,9 @@ internal func _byteCountForTemporaryAllocation<T: ~Copyable>(
   // emitting equivalent compile-time diagnostics because the call to
   // Builtin.stackAlloc() becomes unreachable.
   if _isComputed(capacity) {
-    _precondition(capacity >= 0, "Allocation capacity must be greater than or equal to zero")
+    _precondition(
+      capacity >= 0, "Allocation capacity must be greater than or equal to zero"
+    )
   }
   let stride = MemoryLayout<T>.stride
   let (byteCount, overflow) = capacity.multipliedReportingOverflow(by: stride)
@@ -58,12 +60,13 @@ internal func _byteCountForTemporaryAllocation<T: ~Copyable>(
 ///   `byteCount` bytes of memory.
 @_alwaysEmitIntoClient @_transparent
 internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
-#if compiler(>=5.5) && $BuiltinStackAlloc
   // PRECONDITIONS: Non-positive alignments are nonsensical, as are
   // non-power-of-two alignments.
   if _isComputed(alignment) {
     _precondition(alignment > 0, "Alignment value must be greater than zero")
-    _precondition(_isPowerOf2(alignment), "Alignment value must be a power of two")
+    _precondition(
+      _isPowerOf2(alignment), "Alignment value must be a power of two"
+    )
   }
 
   // If the alignment is larger than MaximumAlignment, the allocation is always
@@ -86,21 +89,10 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
     return true
   }
 
-#if !$Embedded
-  // Finally, take a slow path through the standard library to see if the
-  // current environment can accept a larger stack allocation.
-  guard #available(macOS 12.3, iOS 15.4, watchOS 8.5, tvOS 15.4, *) //SwiftStdlib 5.6
-  else {
-    return false
-  }
-  return swift_stdlib_isStackAllocationSafe(byteCount, alignment)
-#else
+  // NOTE: If swift_stdlib_isStackAllocationSafe() is ever updated to return
+  // something other than false, call it here instead of returning false
+  // unconditionally.
   return false
-#endif
-
-#else
-  fatalError("unsupported compiler")
-#endif
 }
 
 /// Provides scoped access to a raw buffer pointer with the specified type,
@@ -109,7 +101,8 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
 /// - Parameters:
 ///   - type: The type of the elements in the buffer being temporarily
 ///     allocated. For untyped buffers, use `Int8.self`.
-///   - capacity: The number of elements to allocate. `capacity` must not be negative.
+///   - capacity: The number of elements to allocate. `capacity` must not be
+///     negative.
 ///   - alignment: The alignment of the new, temporary region of allocated
 ///     memory, in bytes. `alignment` must be a whole power of 2.
 ///   - body: A closure to invoke and to which the allocated buffer pointer
@@ -121,76 +114,60 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
 /// `withUnsafeTemporaryAllocation()`.
 @_alwaysEmitIntoClient @_transparent
 internal func _withUnsafeTemporaryAllocation<
-  T: ~Copyable, R: ~Copyable
+  T: ~Copyable, R: ~Copyable, E: Error
 >(
   of type: T.Type,
   capacity: Int,
   alignment: Int,
-  _ body: (Builtin.RawPointer) -> R
-) -> R {
+  _ body: (Builtin.RawPointer) throws(E) -> R
+) throws(E) -> R {
   // How many bytes do we need to allocate?
   let byteCount = _byteCountForTemporaryAllocation(of: type, capacity: capacity)
 
   guard _isStackAllocationSafe(byteCount: byteCount, alignment: alignment) else {
-    return _fallBackToHeapAllocation(byteCount: byteCount, alignment: alignment, body)
+    return try _fallBackToHeapAllocation(
+      byteCount: byteCount, alignment: alignment, body
+    )
   }
 
-  // This declaration must come BEFORE Builtin.stackAlloc() or
-  // Builtin.stackDealloc() will end up blowing it away (and the verifier will
-  // notice and complain.)
-  let result: R
-  
-#if compiler(>=5.5) && $BuiltinStackAlloc
   let stackAddress = Builtin.stackAlloc(
     capacity._builtinWordValue,
     MemoryLayout<T>.stride._builtinWordValue,
     alignment._builtinWordValue
   )
-  
-  // The multiple calls to Builtin.stackDealloc() are because defer { } produces
-  // a child function at the SIL layer and that conflicts with the verifier's
-  // idea of a stack allocation's lifetime.
-  result = body(stackAddress)
-  Builtin.stackDealloc(stackAddress)
-  return result
-#else
-  fatalError("unsupported compiler")
-#endif
+  defer {
+    Builtin.stackDealloc(stackAddress)
+  }
+  return try body(stackAddress)
 }
 
 @_alwaysEmitIntoClient @_transparent
 internal func _withUnprotectedUnsafeTemporaryAllocation<
-  T: ~Copyable, R: ~Copyable
+  T: ~Copyable, R: ~Copyable, E: Error
 >(
   of type: T.Type,
   capacity: Int,
   alignment: Int,
-  _ body: (Builtin.RawPointer) -> R
-) -> R {
+  _ body: (Builtin.RawPointer) throws(E) -> R
+) throws(E) -> R {
   // How many bytes do we need to allocate?
   let byteCount = _byteCountForTemporaryAllocation(of: type, capacity: capacity)
 
   guard _isStackAllocationSafe(byteCount: byteCount, alignment: alignment) else {
-    return _fallBackToHeapAllocation(byteCount: byteCount, alignment: alignment, body)
+    return try _fallBackToHeapAllocation(
+      byteCount: byteCount, alignment: alignment, body
+    )
   }
-
-  // This declaration must come BEFORE Builtin.unprotectedStackAlloc() or
-  // Builtin.stackDealloc() will end up blowing it away (and the verifier will
-  // notice and complain.)
-  let result: R
 
   let stackAddress = Builtin.unprotectedStackAlloc(
     capacity._builtinWordValue,
     MemoryLayout<T>.stride._builtinWordValue,
     alignment._builtinWordValue
   )
-
-  // The multiple calls to Builtin.stackDealloc() are because defer { } produces
-  // a child function at the SIL layer and that conflicts with the verifier's
-  // idea of a stack allocation's lifetime.
-  result = body(stackAddress)
-  Builtin.stackDealloc(stackAddress)
-  return result
+  defer {
+    Builtin.stackDealloc(stackAddress)
+  }
+  return try body(stackAddress)
 }
 
 @_alwaysEmitIntoClient @_transparent
@@ -243,28 +220,61 @@ internal func _fallBackToHeapAllocation<R: ~Copyable, E: Error>(
 /// the buffer) must not escape. It will be deallocated when `body` returns and
 /// cannot be used afterward.
 @_alwaysEmitIntoClient @_transparent
+@safe
 public func withUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
   byteCount: Int,
   alignment: Int,
   _ body: (UnsafeMutableRawBufferPointer) throws(E) -> R
 ) throws(E) -> R {
-  let result: Result<R, E> = _withUnsafeTemporaryAllocation(
+  return try _withUnsafeTemporaryAllocation(
     of: Int8.self,
     capacity: byteCount,
     alignment: alignment
-  ) { pointer in
-    do throws(E) {
-      let buffer = unsafe UnsafeMutableRawBufferPointer(
-        start: .init(pointer),
-        count: byteCount
-      )
-      return .success(try unsafe body(buffer))
-    } catch {
-      return .failure(error)
-    }
+  ) { (pointer: Builtin.RawPointer) throws(E) -> R in
+    let buffer = unsafe UnsafeMutableRawBufferPointer(
+      start: .init(pointer),
+      count: byteCount
+    )
+    return try unsafe body(buffer)
   }
+}
 
-  return try result.get()
+@available(SwiftCompatibilitySpan 5.0, *)
+@_alwaysEmitIntoClient @_transparent
+public func withTemporaryAllocation<T: ~Copyable, R: ~Copyable, E: Error>(
+  of type: T.Type,
+  capacity: Int,
+  _ body: (inout OutputSpan<T>) throws(E) -> R
+) throws(E) -> R where T : ~Copyable, R : ~Copyable {
+  try withUnsafeTemporaryAllocation(of: type, capacity: capacity) {
+    (buffer) throws(E) in
+    var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+    defer {
+      let initializedCount = unsafe span.finalize(for: buffer)
+      span = OutputSpan()
+      unsafe buffer.extracting(..<initializedCount).deinitialize()
+    }
+
+    return try body(&span)
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_alwaysEmitIntoClient @_transparent
+public func withTemporaryAllocation<R: ~Copyable, E: Error>(
+  byteCount: Int,
+  alignment: Int,
+  _ body: (inout OutputRawSpan) throws(E) -> R
+) throws(E) -> R where R: ~Copyable {
+  try withUnsafeTemporaryAllocation(byteCount: byteCount, alignment: alignment) {
+    (buffer) throws(E) in
+    var span = unsafe OutputRawSpan(buffer: buffer, initializedCount: 0)
+    defer {
+      _ = unsafe span.finalize(for: buffer)
+      span = OutputRawSpan()
+    }
+    return try body(&span)
+  }
 }
 
 /// Provides scoped access to a raw buffer pointer with the specified byte count
@@ -278,23 +288,17 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
   alignment: Int,
   _ body: (UnsafeMutableRawBufferPointer) throws(E) -> R
 ) throws(E) -> R {
-  let result: Result<R, E> = _withUnprotectedUnsafeTemporaryAllocation(
+  return try _withUnprotectedUnsafeTemporaryAllocation(
     of: Int8.self,
     capacity: byteCount,
     alignment: alignment
-  ) { pointer in
-    do throws(E) {
-      let buffer = unsafe UnsafeMutableRawBufferPointer(
-        start: .init(pointer),
-        count: byteCount
-      )
-      return try unsafe .success(body(buffer))
-    } catch {
-      return .failure(error)
-    }
+  ) { (pointer: Builtin.RawPointer) throws(E) -> R in
+    let buffer = unsafe UnsafeMutableRawBufferPointer(
+      start: .init(pointer),
+      count: byteCount
+    )
+    return try unsafe body(buffer)
   }
-
-  return try result.get()
 }
 
 /// Provides scoped access to a buffer pointer to memory of the specified type
@@ -329,6 +333,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
 /// the buffer) must not escape. It will be deallocated when `body` returns and
 /// cannot be used afterward.
 @_alwaysEmitIntoClient @_transparent
+@safe
 public func withUnsafeTemporaryAllocation<
   T: ~Copyable, R: ~Copyable,
   E: Error
@@ -337,24 +342,18 @@ public func withUnsafeTemporaryAllocation<
   capacity: Int,
   _ body: (UnsafeMutableBufferPointer<T>) throws(E) -> R
 ) throws(E) -> R {
-  let result: Result<R, E> = _withUnsafeTemporaryAllocation(
+  return try _withUnsafeTemporaryAllocation(
     of: type,
     capacity: capacity,
     alignment: MemoryLayout<T>.alignment
-  ) { pointer in
-    do throws(E) {
-      Builtin.bindMemory(pointer, capacity._builtinWordValue, type)
-      let buffer = unsafe UnsafeMutableBufferPointer<T>(
-        start: .init(pointer),
-        count: capacity
-      )
-      return try unsafe .success(body(buffer))
-    } catch {
-      return .failure(error)
-    }
+  ) { (pointer: Builtin.RawPointer) throws(E) -> R in
+    Builtin.bindMemory(pointer, capacity._builtinWordValue, type)
+    let buffer = unsafe UnsafeMutableBufferPointer<T>(
+      start: .init(pointer),
+      count: capacity
+    )
+    return try unsafe body(buffer)
   }
-
-  return try result.get()
 }
 
 /// Provides scoped access to a buffer pointer to memory of the specified type
@@ -371,22 +370,16 @@ public func _withUnprotectedUnsafeTemporaryAllocation<
   capacity: Int,
   _ body: (UnsafeMutableBufferPointer<T>) throws(E) -> R
 ) throws(E) -> R {
-  let result: Result<R, E> = _withUnprotectedUnsafeTemporaryAllocation(
+  return try _withUnprotectedUnsafeTemporaryAllocation(
     of: type,
     capacity: capacity,
     alignment: MemoryLayout<T>.alignment
-  ) { pointer in
-    do throws(E) {
-      Builtin.bindMemory(pointer, capacity._builtinWordValue, type)
-      let buffer = unsafe UnsafeMutableBufferPointer<T>(
-        start: .init(pointer),
-        count: capacity
-      )
-      return try unsafe .success(body(buffer))
-    } catch {
-      return .failure(error)
-    }
+  ) { (pointer: Builtin.RawPointer) throws(E) -> R in
+    Builtin.bindMemory(pointer, capacity._builtinWordValue, type)
+    let buffer = unsafe UnsafeMutableBufferPointer<T>(
+      start: .init(pointer),
+      count: capacity
+    )
+    return try unsafe body(buffer)
   }
-
-  return try result.get()
 }

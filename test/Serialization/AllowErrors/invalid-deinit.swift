@@ -6,7 +6,7 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=errors -source-filename=x -I %t -allow-compiler-errors
 
 // Also check it wasn't serialized
-// RUN: llvm-bcanalyzer -dump %t/errors.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer -dump %t/errors.swiftmodule | %FileCheck %s
 // CHECK-NOT: DESTRUCTOR_DECL
 
 struct Foo {}

@@ -359,6 +359,37 @@ static bool dumpPrecompiledClangModule(const CompilerInstance &Instance) {
       opts.InputsAndOutputs.getSingleOutputFilename());
 }
 
+static bool printPolyglotAST(CompilerInstance &Instance) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &opts = Invocation.getFrontendOptions();
+  auto &Context = Instance.getASTContext();
+  auto *clangImporter = static_cast<ClangImporter *>(
+      Context.getClangModuleLoader());
+  for (auto unloadedImport :
+       Instance.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Context.getModule(unloadedImport.module.getModulePath());
+  }
+
+  // The first input file is the target header or implementation file.
+  StringRef headerPath = opts.InputsAndOutputs.getFilenameOfFirstInput();
+  clangImporter->importBridgingHeader(headerPath, Instance.getMainModule(),
+                                      /*diagLoc=*/{},
+                                      /*trackParsedSymbols=*/true);
+
+  std::string outputPath = opts.InputsAndOutputs.getSingleOutputFilename();
+  std::error_code EC;
+  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::OF_None);
+  if (out.has_error() || EC) {
+    Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
+                           EC.message());
+    out.clear_error();
+    return true;
+  }
+
+  clangImporter->printPolyglotAST(headerPath, out);
+  return Context.hadError();
+}
+
 static bool buildModuleFromInterface(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const FrontendOptions &FEOpts = Invocation.getFrontendOptions();
@@ -596,6 +627,41 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
   }
 }
 
+/// Write const values JSON to disk (and store into CAS when caching is
+/// enabled). When CAS is active, compact JSON is stored to CAS and
+/// prefix-remapped pretty-printed JSON is written to disk. Without CAS,
+/// pretty-printed JSON is written directly.
+/// Returns true on error.
+static bool writeConstValues(CompilerInstance &Instance,
+                             const std::vector<ConstValueTypeInfo> &ConstValues,
+                             StringRef ConstValuesFilePath) {
+  return withOutputPath(
+      Instance.getDiags(), Instance.getOutputBackend(), ConstValuesFilePath,
+      [&](llvm::raw_ostream &OS) {
+        if (!Instance.supportCaching()) {
+          // Caching not enabled, write output directly.
+          writeAsJSONToFile(ConstValues, OS);
+          return false;
+        }
+        // Using CAS, the path need to be remapped.
+        std::string Buffer;
+        llvm::raw_string_ostream BufferOS(Buffer);
+        writeAsJSONToFile(ConstValues, BufferOS, /*Compact=*/true);
+        if (auto err =
+                Instance.getCASOutputBackend().storeSupplementaryOutputFile(
+                    ConstValuesFilePath, Buffer)) {
+          Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
+                                       "storing const values file",
+                                       toString(std::move(err)));
+          return true;
+        }
+        remapConstValuesJSON(
+            Buffer, OS,
+            Instance.getInvocation().getFrontendOptions().CacheReplayPrefixMap);
+        return false;
+      });
+}
+
 static bool emitConstValuesForWholeModuleIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
@@ -620,14 +686,10 @@ static bool emitConstValuesForWholeModuleIfNeeded(
       Instance.getFileSystem(), Protocols);
   if (!inputParseSuccess)
     return true;
-  auto ConstValues = gatherConstValuesForModule(Protocols,
-                                                Instance.getMainModule());
 
-  return withOutputPath(Instance.getDiags(), Instance.getOutputBackend(),
-                        ConstValuesFilePath, [&](llvm::raw_ostream &OS) {
-                          writeAsJSONToFile(ConstValues, OS);
-                          return false;
-                        });
+  return writeConstValues(
+      Instance, gatherConstValuesForModule(Protocols, Instance.getMainModule()),
+      ConstValuesFilePath);
 }
 
 static void emitConstValuesForAllPrimaryInputsIfNeeded(
@@ -653,12 +715,8 @@ static void emitConstValuesForAllPrimaryInputsIfNeeded(
     if (ConstValuesFilePath.empty())
       continue;
 
-    auto ConstValues = gatherConstValuesForPrimary(Protocols, SF);
-    withOutputPath(Instance.getDiags(), Instance.getOutputBackend(),
-                   ConstValuesFilePath, [&](llvm::raw_ostream &OS) {
-                     writeAsJSONToFile(ConstValues, OS);
-                     return false;
-                   });
+    writeConstValues(Instance, gatherConstValuesForPrimary(Protocols, SF),
+                     ConstValuesFilePath);
   }
 }
 
@@ -708,12 +766,13 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
 }
 
 static bool writeAPIDescriptor(ModuleDecl *M, StringRef OutputPath,
-                               llvm::vfs::OutputBackend &Backend) {
-  return withOutputPath(M->getDiags(), Backend, OutputPath,
-                        [&](raw_ostream &OS) -> bool {
-                          writeAPIJSONFile(M, OS, /*PrettyPrinted=*/false);
-                          return false;
-                        });
+                               llvm::vfs::OutputBackend &Backend,
+                               const TBDGenOptions &TBDOpts) {
+  return withOutputPath(
+      M->getDiags(), Backend, OutputPath, [&](raw_ostream &OS) -> bool {
+        writeAPIJSONFile(M, OS, TBDOpts, /*PrettyPrinted=*/false);
+        return false;
+      });
 }
 
 static bool writeAPIDescriptorIfNeeded(CompilerInstance &Instance) {
@@ -731,8 +790,10 @@ static bool writeAPIDescriptorIfNeeded(CompilerInstance &Instance) {
   const std::string &APIDescriptorPath =
       Invocation.getAPIDescriptorPathForWholeModule();
 
+  const auto &TBDOpts = Invocation.getTBDGenOptions();
+
   return writeAPIDescriptor(Instance.getMainModule(), APIDescriptorPath,
-                            Instance.getOutputBackend());
+                            Instance.getOutputBackend(), TBDOpts);
 }
 
 static bool performCompileStepsPostSILGen(
@@ -1307,6 +1368,8 @@ static bool performAction(CompilerInstance &Instance, int &ReturnValue,
     return precompileClangModule(Instance);
   case FrontendOptions::ActionType::DumpPCM:
     return dumpPrecompiledClangModule(Instance);
+  case FrontendOptions::ActionType::EmitPolyglotAST:
+    return printPolyglotAST(Instance);
 
   // MARK: Module Interface Actions
   case FrontendOptions::ActionType::CompileModuleFromInterface:

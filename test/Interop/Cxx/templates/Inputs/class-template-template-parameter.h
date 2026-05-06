@@ -20,4 +20,20 @@ struct TemplatedMagicWrapper {
 
 typedef TemplatedMagicWrapper<MagicWrapper> TemplatedWrappedMagicInt;
 typedef MagicWrapper<IntWrapper> WrappedMagicInt;
+
+template<template <typename> typename>
+struct HasTemplateTemplateParam {};
+
+template <typename> struct Traits1 {};
+template <typename> struct Traits2 {};
+
+using HasTraits1 = HasTemplateTemplateParam<Traits1>;
+using HasTraits2 = HasTemplateTemplateParam<Traits2>;
+
+struct Outer {
+  template <typename> struct NestedTraits {};
+};
+
+using HasNestedTraits = HasTemplateTemplateParam<Outer::NestedTraits>;
+
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_TEMPLATE_PARAMETER_H

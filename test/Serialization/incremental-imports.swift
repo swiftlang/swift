@@ -6,7 +6,7 @@
 // RUN: %target-swift-frontend -emit-module -module-name IncrementalImports -o %t/IncrementalImports~A.swiftmodule -primary-file %t/A.swift
 // RUN: %target-swift-frontend -merge-modules -emit-module -module-name IncrementalImports -o %t/IncrementalImports.swiftmodule %t/IncrementalImports~A.swiftmodule
 
-// RUN: llvm-bcanalyzer -dump %t/IncrementalImports.swiftmodule | %FileCheck %s --check-prefix=INCREMENTAL-IMPORTS-BASELINE
+// RUN: %llvm-bcanalyzer -dump %t/IncrementalImports.swiftmodule | %FileCheck %s --check-prefix=INCREMENTAL-IMPORTS-BASELINE
 
 // INCREMENTAL-IMPORTS-BASELINE-LABEL: <INCREMENTAL_INFORMATION_BLOCK
 // Test for the fingerprint for the class
@@ -21,7 +21,7 @@
 // RUN: %target-swift-frontend -emit-module -module-name IncrementalImports -o %t/IncrementalImports~A.swiftmodule -primary-file %t/A.swift
 // RUN: %target-swift-frontend -merge-modules -emit-module -module-name IncrementalImports -o %t/IncrementalImports.swiftmodule %t/IncrementalImports~A.swiftmodule
 
-// RUN: llvm-bcanalyzer -dump %t/IncrementalImports.swiftmodule | %FileCheck %s --check-prefix=INCREMENTAL-IMPORTS-MUTATION
+// RUN: %llvm-bcanalyzer -dump %t/IncrementalImports.swiftmodule | %FileCheck %s --check-prefix=INCREMENTAL-IMPORTS-MUTATION
 
 // INCREMENTAL-IMPORTS-MUTATION-LABEL: <INCREMENTAL_INFORMATION_BLOCK
 // Make sure the fingerprint for the class doesn't change

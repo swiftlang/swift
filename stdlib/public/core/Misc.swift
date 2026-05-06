@@ -62,7 +62,7 @@ public // SPI (Distributed)
 func _getFunctionFullNameFromMangledName(mangledName: String) -> String? {
   let mangledNameUTF8 = Array(mangledName.utf8)
   let (stringPtr, count) =
-    unsafe mangledNameUTF8.withUnsafeBufferPointer { (mangledNameUTF8) in
+    mangledNameUTF8.withUnsafeBufferPointer { (mangledNameUTF8) in
     return unsafe _getFunctionFullNameFromMangledNameImpl(
       mangledNameUTF8.baseAddress!,
       UInt(mangledNameUTF8.endIndex))
@@ -126,7 +126,7 @@ func _mangledTypeName(_ type: any (~Copyable & ~Escapable).Type) -> String? {
 public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
-  return unsafe nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
+  return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
     return  unsafe _getTypeByMangledNameUntrusted(nameUTF8.baseAddress!,
                                   UInt(nameUTF8.endIndex))
   }

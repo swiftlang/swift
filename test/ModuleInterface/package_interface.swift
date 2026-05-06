@@ -13,8 +13,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Bar.package.swiftinterface) -I %t -module-name Bar
 // RUN: %target-swift-typecheck-module-from-interface(%t/Bar.private.swiftinterface) -I %t -module-name Bar
 
-// RUN: %FileCheck --check-prefixes=CHECK %s < %t/Bar.swiftinterface
-// RUN: %FileCheck --check-prefixes=CHECK,CHECK-PRIV %s < %t/Bar.private.swiftinterface
+// RUN: %FileCheck --check-prefixes=CHECK,CHECK-PUB %s < %t/Bar.swiftinterface
+// RUN: %FileCheck --check-prefixes=CHECK,CHECK-PRIV,CHECK-PRIV-ONLY %s < %t/Bar.private.swiftinterface
 // RUN: %FileCheck --check-prefixes=CHECK,CHECK-PRIV,CHECK-PKG %s < %t/Bar.package.swiftinterface
 
 
@@ -158,6 +158,8 @@ public class PubKlass {
     pubVarPrivSetInPub = 1
     pubVarPkgSetInPub = 1
   }
+
+  package func pkgMethodInPub() { }
 }
 
 // CHECK: public class PubKlass {
@@ -170,8 +172,18 @@ public class PubKlass {
 // CHECK:     get
 // CHECK:   }
 // CHECK:   public init()
+// CHECK-PKG:   package func pkgMethodInPub()
 // CHECK:   deinit
 // CHECK: }
+
+public class PubSubklass: PubKlass {
+  public override func pkgMethodInPub() { }
+}
+
+// CHECK: @_inheritsConvenienceInitializers public class PubSubklass : Bar::PubKlass {
+// CHECK-PUB:         public func pkgMethodInPub()
+// CHECK-PRIV-ONLY:   public func pkgMethodInPub()
+// CHECK-PKG:         override public func pkgMethodInPub()
 
 class IntrnKlass {
   var intrnVarInIntrn: String

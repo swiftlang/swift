@@ -3,8 +3,8 @@
 // RUN: echo '"%s": { bitstream-opt-record: "%t/foo.opt.bitstream" }' > %t/filemap.bitstream.yaml
 
 // RUN: %target-swift-frontend -c -O -num-threads 2 -save-optimization-record=bitstream %s %S/Inputs/opt-record-2.swift -module-name foo -o %t/foo.o  -o %t/opt-record-2.o -supplementary-output-file-map %t/filemap.bitstream.yaml
-// RUN: llvm-bcanalyzer -dump "%t/foo.opt.bitstream" | %FileCheck -check-prefix=BITSTREAM %s
-// RUN: llvm-bcanalyzer -dump "%t/opt-record-2.opt.bitstream" | %FileCheck -check-prefix=BITSTREAM2 %s
+// RUN: %llvm-bcanalyzer -dump "%t/foo.opt.bitstream" | %FileCheck -check-prefix=BITSTREAM %s
+// RUN: %llvm-bcanalyzer -dump "%t/opt-record-2.opt.bitstream" | %FileCheck -check-prefix=BITSTREAM2 %s
 
 // RUN: %empty-directory(%t)
 // RUN: echo '"%s": { yaml-opt-record: "%t/foo.opt.yaml" }' > %t/filemap.yaml.yaml

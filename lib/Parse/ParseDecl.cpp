@@ -1286,9 +1286,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   } else {
     diagnoseExpectLanguage();
     DiscardAttribute = true;
-    while (Tok.isNot(tok::r_paren)) {
-      consumeToken();
-    }
+    skipUntilDeclRBrace(tok::r_paren, tok::NUM_TOKENS);
   }
 
   rParenLoc = Tok.getLoc();
@@ -1301,7 +1299,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   auto AttrRange = SourceRange(Loc, rParenLoc);
 
   // Reject duplicate attributes with the same kind.
-  if (ExternAttr::find(Attributes, kind)) {
+  if (!DiscardAttribute && ExternAttr::find(Attributes, kind)) {
     diagnose(Loc, diag::duplicate_attribute, false);
     DiscardAttribute = true;
   }
@@ -5533,7 +5531,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
 
       auto kwLoc = P.consumeToken();
 
-      if (CallerIsolatedLoc.isValid()) {
+      if (NonisolatedNonsendingLoc.isValid()) {
         P.diagnose(kwLoc, diag::nonisolated_nonsending_repeated)
             .fixItRemove(SpecifierLoc);
       }
@@ -5560,7 +5558,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         continue;
       }
 
-      CallerIsolatedLoc = kwLoc;
+      NonisolatedNonsendingLoc = kwLoc;
       continue;
     }
 
@@ -8279,13 +8277,6 @@ bool Parser::parseAccessorAfterIntroducer(
                                           /*underscored*/ false));
   }
 
-  if (requiresFeatureBorrowAndMutateAccessors(Kind) &&
-      !Context.LangOpts.hasFeature(Feature::BorrowAndMutateAccessors)) {
-    diagnose(Tok, diag::accessor_requires_borrow_and_mutate_accessors,
-             getAccessorNameForDiagnostic(Kind, /*article*/ false,
-                                          /*underscored*/ false));
-  }
-
   if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
     if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InEnum) &&
         !Flags.contains(PD_InClass) && !Flags.contains(PD_InExtension) &&
@@ -8414,7 +8405,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
       // parsingLimitedSyntax mode cannot have a body.
       if (parsingLimitedSyntax) {
-        diagnose(Tok, diag::expected_getreadset_in_protocol);
+        diagnose(Tok, diag::expected_getreadborrowsetmutate_in_protocol);
         Status |= makeParserError();
         break;
       }
@@ -8448,10 +8439,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     // avoid having to deal with them everywhere.
     if (parsingLimitedSyntax && !isAllowedWhenParsingLimitedSyntax(
                                     Kind, SF.Kind == SourceFileKind::SIL)) {
-      auto diag = diag::expected_getreadset_in_protocol;
-      if (Context.LangOpts.hasFeature(Feature::BorrowAndMutateAccessors)) {
-        diag = diag::expected_getreadborrowsetmutate_in_protocol;
-      }
+      auto diag = diag::expected_getreadborrowsetmutate_in_protocol;
       diagnose(Loc, diag);
       continue;
     }

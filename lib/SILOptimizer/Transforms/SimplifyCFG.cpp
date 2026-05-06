@@ -34,6 +34,7 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
@@ -823,42 +824,8 @@ static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget,
 }
 
 void SimplifyCFG::findLoopHeaders() {
-  /// Find back edges in the CFG. This performs a dfs search and identifies
-  /// back edges as edges going to an ancestor in the dfs search. If a basic
-  /// block is the target of such a back edge we will identify it as a header.
   LoopHeaders.clear();
-
-  BasicBlockSet Visited(&Fn);
-  BasicBlockSet InDFSStack(&Fn);
-  SmallVector<std::pair<SILBasicBlock *, SILBasicBlock::succ_iterator>, 16>
-      DFSStack;
-
-  auto EntryBB = &Fn.front();
-  DFSStack.push_back(std::make_pair(EntryBB, EntryBB->succ_begin()));
-  Visited.insert(EntryBB);
-  InDFSStack.insert(EntryBB);
-
-  while (!DFSStack.empty()) {
-    auto &D = DFSStack.back();
-    // No successors.
-    if (D.second == D.first->succ_end()) {
-      // Retreat the dfs search.
-      DFSStack.pop_back();
-      InDFSStack.erase(D.first);
-    } else {
-      // Visit the next successor.
-      SILBasicBlock *NextSucc = *(D.second);
-      ++D.second;
-      if (Visited.insert(NextSucc)) {
-        InDFSStack.insert(NextSucc);
-        DFSStack.push_back(std::make_pair(NextSucc, NextSucc->succ_begin()));
-      } else if (InDFSStack.contains(NextSucc)) {
-        // We have already visited this node and it is in our dfs search. This
-        // is a back-edge.
-        LoopHeaders.insert(NextSucc);
-      }
-    }
-  }
+  swift::findLoopHeaders(Fn, LoopHeaders);
 }
 
 static bool couldRemoveRelease(SILBasicBlock *SrcBB, SILValue SrcV,
@@ -2611,7 +2578,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     std::tie(Arg, std::ignore) = castValueToABICompatibleType(
         &Builder, PM, TAI->getLoc(), Arg,
         origConv.getSILArgumentType(i, context),
-        targetConv.getSILArgumentType(calleeArgIdx, context), {TAI});
+        targetConv.getSILArgumentType(calleeArgIdx, context));
     Args.push_back(Arg);
     calleeArgIdx += 1;
   }
@@ -2644,7 +2611,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
   // Non-guaranteed values don't need use points when casting.
   SILValue CastedResult;
   std::tie(CastedResult, std::ignore) = castValueToABICompatibleType(
-      &Builder, PM, Loc, NewAI, ResultTy, OrigResultTy, /*usePoints*/ {});
+      &Builder, PM, Loc, NewAI, ResultTy, OrigResultTy);
 
   BranchInst *branch = Builder.createBranch(Loc, NormalBB, {CastedResult});
 

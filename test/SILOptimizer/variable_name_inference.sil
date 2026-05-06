@@ -446,14 +446,14 @@ sil [ossa] @function_argument_inference_through_uncheckedtakeenumdataaddr : $@co
 bb0(%0 : $*FakeOptional<Klass>):
   specify_test "variable_name_inference @trace[0]"
   debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
   %3 = load [take] %2 : $*Klass
   debug_value [trace] %3 : $Klass
   return %3 : $Klass
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on function_argument_inference_through_uncheckedtakeenumdataaddr_2: variable_name_inference with: @trace[0]
-// CHECK: Input Value:   %2 = unchecked_take_enum_data_addr %0
+// CHECK: Input Value:   %2 = unchecked_inplace_enum_data_addr %0
 // CHECK: Name: 'self.some'
 // CHECK: Root: %0 = argument of bb0 : $*FakeOptional<Klass>
 // CHECK: end running test 1 of 1 on function_argument_inference_through_uncheckedtakeenumdataaddr_2: variable_name_inference with: @trace[0]
@@ -461,7 +461,7 @@ sil [ossa] @function_argument_inference_through_uncheckedtakeenumdataaddr_2 : $@
 bb0(%0 : $*FakeOptional<Klass>):
   specify_test "variable_name_inference @trace[0]"
   debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
   debug_value [trace] %2 : $*Klass
   %3 = load [take] %2 : $*Klass
   return %3 : $Klass

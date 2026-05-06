@@ -3,7 +3,7 @@
 // REQUIRES: optimized_stdlib
 
 // CHECK-LABEL: define hidden swiftcc{{.*}} i8 @"$s16condfail_message6testitys4Int8VADF"(i8 %0)
-// CHECK: call void @llvm.trap(), !dbg [[LOC:![0-9]+]]
+// CHECK: call void @llvm.trap(){{.*}}, !dbg [[LOC:![0-9]+]]
 
 func testit(_ a: Int8) -> Int8 {
   return a + 1

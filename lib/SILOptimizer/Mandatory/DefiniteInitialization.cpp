@@ -44,6 +44,9 @@
 using namespace swift;
 using namespace ownership;
 
+STATISTIC(NumInstScansDuringLivenessQueries,
+          "# of instructions scanned while computing `getLivenessAtInst()`");
+
 llvm::cl::opt<bool> TriggerUnreachableOnFailure(
     "sil-di-assert-on-failure", llvm::cl::init(false),
     llvm::cl::desc("After emitting a DI error, assert instead of continuing. "
@@ -1063,7 +1066,8 @@ void LifetimeChecker::injectActorHops() {
 
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedConcurrent:
+  case ActorIsolation::NonisolatedNonsending:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::GlobalActor:
     return;
@@ -2008,7 +2012,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   // uninitialized at MarkFunctionEscapeInst, extract and report the reason
   // why the variable escapes in the error message.
   //
-  // (b) An UncheckedTakeEnumDataAddrInst takes the address of the data of
+  // (b) An Unchecked*EnumDataAddrInst takes the address of the data of
   // an optional and is introduced as an intermediate step in optional chaining.
   Diag<StringRef, bool> DiagMessage;
   if (isa<MarkFunctionEscapeInst>(Inst)) {
@@ -2019,7 +2023,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
     } else {
       DiagMessage = diag::variable_function_use_uninit;
     }
-  } else if (isa<UncheckedTakeEnumDataAddrInst>(Inst)) {
+  } else if (isa<UncheckedEnumDataAddrInstBase>(Inst)) {
     DiagMessage = diag::variable_used_before_initialized;
   } else {
     DiagMessage = diag::variable_closure_use_uninit;
@@ -3619,6 +3623,7 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
   // the elements we are looking for.
   if (getBlockInfo(InstBB).HasNonLoadUse) {
     for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
+      ++NumInstScansDuringLivenessQueries;
       --BBI;
       SILInstruction *TheInst = &*BBI;
 

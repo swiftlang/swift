@@ -28,6 +28,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/Test.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -267,53 +268,6 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
 }
 
 //===----------------------------------------------------------------------===//
-//                       Trivial Live Range Elimination
-//===----------------------------------------------------------------------===//
-
-/// If cvi only has destroy value users, then cvi is a dead live range. Lets
-/// eliminate all such dead live ranges.
-///
-/// FIXME: OSSACanonicalizeOwned replaces this.
-bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(
-    CopyValueInst *cvi) {
-  // This is a cheap optimization generally.
-
-  // See if we are lucky and have a simple case.
-  if (auto *op = cvi->getSingleUse()) {
-    if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
-      LLVM_DEBUG(llvm::dbgs() << "Erasing single-use copy: " << *cvi);
-      eraseInstruction(dvi);
-      eraseInstructionAndAddOperandsToWorklist(cvi);
-      return true;
-    }
-  }
-
-  // If all of our copy_value users are destroy_value, zap all of the
-  // instructions. We begin by performing that check and gathering up our
-  // destroy_value.
-  SmallVector<DestroyValueInst *, 16> destroys;
-  if (!all_of(cvi->getUses(), [&](Operand *op) {
-        auto *dvi = dyn_cast<DestroyValueInst>(op->getUser());
-        if (!dvi)
-          return false;
-
-        // Stash dvi in destroys so we can easily eliminate it later.
-        destroys.push_back(dvi);
-        return true;
-      })) {
-    return false;
-  }
-
-  // Now that we have a truly dead live range copy value, eliminate it!
-  LLVM_DEBUG(llvm::dbgs() << "Eliminate dead copy: " << *cvi);
-  while (!destroys.empty()) {
-    eraseInstruction(destroys.pop_back_val());
-  }
-  eraseInstructionAndAddOperandsToWorklist(cvi);
-  return true;
-}
-
-//===----------------------------------------------------------------------===//
 //                             Live Range Joining
 //===----------------------------------------------------------------------===//
 
@@ -414,8 +368,9 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
   // consuming use of the copy and the destroy.  If any of those instructions
   // is a deinit barrier, it would be illegal to shorten the original lexical
   // value's lifetime to end at that consuming use.  Bail if any are.
-  if (llvm::any_of(visitedInsts, [](auto *inst) {
-        return mayBeDeinitBarrierNotConsideringSideEffects(inst);
+  auto *bca = ctx.ctx.pm->getAnalysis<BasicCalleeAnalysis>();
+  if (llvm::any_of(visitedInsts, [bca](auto *inst) {
+        return isDeinitBarrier(inst, bca);
       }))
     return false;
 
@@ -845,13 +800,6 @@ static FunctionTest SemanticARCOptsCopyValueOptsGuaranteedValueOptTest(
 //===----------------------------------------------------------------------===//
 
 bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
-  // If our copy value inst has only destroy_value users, it is a dead live
-  // range. Try to eliminate them.
-  if (ctx.shouldPerform(ARCTransformKind::RedundantCopyValueElimPeephole) &&
-      eliminateDeadLiveRangeCopyValue(cvi)) {
-    return true;
-  }
-
   // Then see if copy_value operand's lifetime ends after our copy_value via a
   // destroy_value. If so, we can join their lifetimes.
   if (ctx.shouldPerform(ARCTransformKind::LifetimeJoiningPeephole) &&

@@ -1584,7 +1584,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto linkage = vjp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
   auto *pullback = fb.createFunction(
       linkage, context.getASTContext().getIdentifier(pbName).str(), pbType,
-      pbGenericEnv, original->getLocation(), original->isBare(),
+      original->getActorIsolation(), pbGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, vjp->getSerializedKind(),
       original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());

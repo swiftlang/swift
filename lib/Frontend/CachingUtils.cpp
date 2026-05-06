@@ -18,6 +18,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ConstExtract/ConstExtract.h"
 #include "swift/Frontend/CASOutputBackends.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/CompileJobCacheResult.h"
@@ -33,10 +34,10 @@
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/CAS/TreeEntry.h"
+#include "llvm/CASUtil/Utils.h"
 #include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
-#include "llvm/CASUtil/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -124,10 +125,11 @@ Error cas::CachedResultLoader::replay(CallbackTy Callback) {
 }
 
 static Expected<std::optional<ObjectRef>>
-lookupCacheKey(ObjectStore &CAS, ActionCache &Cache, ObjectRef CacheKey) {
+lookupCacheKey(ObjectStore &CAS, ActionCache &Cache, ObjectRef CacheKey,
+               bool CanBeDistributed) {
   // Lookup the cache key for the input file.
   auto OutID = CAS.getID(CacheKey);
-  auto Lookup = Cache.get(OutID);
+  auto Lookup = Cache.get(OutID, CanBeDistributed);
   if (!Lookup)
     return Lookup.takeError();
 
@@ -325,6 +327,13 @@ static bool replayCachedCompilerOutputsImpl(
                       "failed to emit dependency file");
         return failedReplay();
       }
+    } else if (Output.Kind == file_types::ID::TY_ConstValues) {
+      if (remapConstValuesJSON(Output.Proxy.getData(), *File,
+                               Opts.CacheReplayPrefixMap)) {
+        Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
+                      "failed to remap const values file");
+        return failedReplay();
+      }
     } else
       *File << Output.Proxy.getData();
 
@@ -369,7 +378,8 @@ bool replayCachedCompilerOutputs(
     }
 
     auto OutID = CAS.getID(*OutputKey);
-    auto OutputRef = lookupCacheKey(CAS, Cache, *OutputKey);
+    auto OutputRef =
+        lookupCacheKey(CAS, Cache, *OutputKey, /*CanBeDistributed=*/true);
     if (!OutputRef) {
       Diag.diagnose(SourceLoc(), diag::error_cas, "cache key lookup",
                     toString(OutputRef.takeError()));
@@ -443,7 +453,10 @@ loadCachedCompileResultFromCacheKey(ObjectStore &CAS, ActionCache &Cache,
   if (!Ref)
     return nullptr;
 
-  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref);
+  // This function is used to load compiler inputs like swift module or swift
+  // interface file produced by previous commands. Those should be available
+  // locally.
+  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref, /*CanBeDistributed=*/false);
   if (!OutputRef)
     return failure("lookup cache key", OutputRef.takeError());
 
@@ -482,7 +495,9 @@ loadCachedCompileResultProxy(llvm::cas::ObjectStore &CAS,
   if (!Ref)
     return std::nullopt;
 
-  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref);
+  // This function is used to load compiler inputs like pch files. The result
+  // should be available locally.
+  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref, /*CanBeDistributed=*/false);
   if (!OutputRef)
     return OutputRef.takeError();
 
@@ -513,7 +528,7 @@ static llvm::Error createCASObjectNotFoundError(const llvm::cas::CASID &ID) {
                            "CASID missing from Object Store " + ID.toString());
 }
 
-Expected<IntrusiveRefCntPtr<vfs::FileSystem>>
+Expected<IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
 createCASFileSystem(ObjectStore &CAS, const std::string &IncludeTree,
                     const std::string &IncludeTreeFileList) {
   assert(!IncludeTree.empty() ||

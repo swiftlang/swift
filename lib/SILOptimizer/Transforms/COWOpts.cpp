@@ -111,11 +111,17 @@ static SILValue skipStructAndExtract(SILValue value) {
       continue;
     }
     if (auto *sei = dyn_cast<StructExtractInst>(value)) {
+      if (sei->getStructDecl()->getStoredProperties().size() != 1) {
+        return value;
+      }
       value = sei->getOperand();
       continue;
     }
     if (auto *mv = dyn_cast<MultipleValueInstructionResult>(value)) {
       if (auto *dsi = dyn_cast<DestructureStructInst>(mv->getParent())) {
+        if (dsi->getStructDecl()->getStoredProperties().size() != 1) {
+          return value;
+        }
         value = dsi->getOperand();
         continue;
       }

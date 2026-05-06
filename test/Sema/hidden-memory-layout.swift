@@ -38,6 +38,7 @@
 // RUN: %target-swift-frontend -emit-module -verify -verify-ignore-unrelated %s -I %t \
 // RUN:   -swift-version 6 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
+// RUN:   -verify-additional-prefix embedded-not-opt-in- \
 // RUN:   -verify-additional-prefix embedded- \
 // RUN:   -verify-additional-prefix not-opt-in-
 
@@ -108,10 +109,11 @@ private class HiddenClass {
 
 @_implementationOnly
 private struct HiddenLayout {
-// expected-note @-1 2 {{struct 'HiddenLayout' is not '@usableFromInline' or public}}
-// expected-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
+// expected-note @-1 4 {{struct 'HiddenLayout' is not '@usableFromInline' or public}}
+// expected-note @-2 3 {{initializer 'init()' is not '@usableFromInline' or public}}
 // expected-note @-3 9 {{struct declared here}}
 // expected-note @-4 4 {{type declared here}}
+// expected-embedded-note @-5 2 {{struct declared here}}
 }
 
 public enum ExposedEnumPublic {
@@ -132,6 +134,7 @@ private enum HiddenEnum {
 // expected-note @-1 6 {{enum declared here}}
 // expected-note @-2 2 {{enum 'HiddenEnum' is not '@usableFromInline' or public}}
 // expected-note @-3 2 {{type declared here}}
+// expected-embedded-note @-4 2 {{enum declared here}}
   case A
 // expected-note @-1 {{enum case 'A' is not '@usableFromInline' or public}}
   case B
@@ -155,10 +158,15 @@ private protocol HiddenProtocol {
 // expected-note @-1 {{protocol 'HiddenProtocol' is not '@usableFromInline' or public}}
 // expected-note @-2 9 {{protocol declared here}}
 // expected-note @-3 4 {{type declared here}}
+// expected-embedded-note @-4 2 {{protocol declared here}}
 }
 
 @_spi(S) public struct SPIStruct {}
 // expected-note @-1 {{struct declared here}}
+
+public protocol PublicProto {}
+extension StructFromDirect : PublicProto {}
+extension HiddenLayout : PublicProto {}
 
 /// Function use sites
 
@@ -340,10 +348,17 @@ public struct ExposedLayoutFrozenUser: ProtocolFromDirect {
   // expected-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenProtocol' is marked '@_implementationOnly'}}
   // expected-error @-2 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
 
+  private var hiddenInit: PublicProto = HiddenLayout()
+  // expected-error @-1 {{struct 'HiddenLayout' is private and cannot be referenced from a property initializer in a '@frozen' type}}
+  // expected-error @-2 {{initializer 'init()' is private and cannot be referenced from a property initializer in a '@frozen' type}}
+
   private func privateFunc(h: HiddenLayout) {}
   // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
   private func privateFuncClass(h: HiddenClass) {}
   // expected-embedded-error @-1 {{class 'HiddenClass' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenClass' is marked '@_implementationOnly'}}
+
+  private func defaultArgFunc(arg: PublicProto = HiddenLayout()) {}
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 
   @_spi(S) public var s: SPIStruct
   // expected-error @-1 {{stored property 's' cannot be declared '@_spi' in a '@frozen' struct}}
@@ -395,6 +410,9 @@ public struct ExposedLayoutPublicUser: ProtocolFromDirect {
   // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
   private func privateFuncClass(h: HiddenClass) {}
   // expected-embedded-error @-1 {{class 'HiddenClass' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenClass' is marked '@_implementationOnly'}}
+
+  private func defaultArgFunc(arg: PublicProto = HiddenLayout()) {}
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 
   @_spi(S) public var s: SPIStruct
 }
@@ -648,23 +666,86 @@ public class PublicClassUser: ProtocolFromDirect {
   public var publicField: StructFromDirect
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
+  @_implementationOnly
   private var privateField: StructFromDirect
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
+  @_implementationOnly
   private var c: HiddenLayout
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
+  @_implementationOnly
   private var f: HiddenEnum
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
+  @_implementationOnly
   private var j: HiddenProtocol
+
+  @_implementationOnly
+  private var importedInit: PublicProto = StructFromDirect()
+  // expected-embedded-error @-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  // expected-embedded-error @-2 {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  @_implementationOnly
+  private var hiddenInit: PublicProto = HiddenLayout()
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 
   @export(interface)
   private func privateFunc(h: HiddenLayout) {}
+
+  @export(interface)
+  deinit {}
+}
+
+public class PublicClassUserWithoutDeinit: ProtocolFromDirect {
+// expected-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
+// expected-embedded-note @-2 4 {{add a '@export(interface)' deinit to the parent class}}
+
+  public init() { fatalError() }
+
+  @_implementationOnly
+  private var ta: TA
+  // expected-embedded-not-opt-in-warning @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a stored property of a class without meeting the Embedded mode requirements because 'directs' has been imported as implementation-only}}
+  // expected-embedded-opt-in-error @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a stored property of a class without meeting the Embedded mode requirements because 'directs' has been imported as implementation-only}}
+
+  public var publicField: StructFromDirect
+  // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
+
+  @_implementationOnly
+  private var privateField: StructFromDirect
+  // expected-embedded-not-opt-in-warning @-1 {{cannot use struct 'StructFromDirect' in a stored property of a class without meeting the Embedded mode requirements; 'directs' has been imported as implementation-only}}
+  // expected-embedded-opt-in-error @-2 {{cannot use struct 'StructFromDirect' in a stored property of a class without meeting the Embedded mode requirements; 'directs' has been imported as implementation-only}}
+  private var a: ExposedLayoutPublic
+  private var aa: ExposedLayoutInternal
+  private var b: ExposedLayoutPrivate
+  @_implementationOnly
+  private var c: HiddenLayout
+  // expected-embedded-error @-1 {{cannot use struct 'HiddenLayout' in a stored property of a class without meeting the Embedded mode requirements; 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  private var d: ExposedEnumPublic
+  private var e: ExposedEnumPrivate
+  @_implementationOnly
+  private var f: HiddenEnum
+  // expected-embedded-error @-1 {{cannot use enum 'HiddenEnum' in a stored property of a class without meeting the Embedded mode requirements; 'HiddenEnum' is marked '@_implementationOnly'}}
+
+  private var g: ExposedProtocolPublic
+  private var h: ExposedProtocolInternal
+  private var i: ExposedProtocolPrivate
+  @_implementationOnly
+  private var j: HiddenProtocol
+  // expected-embedded-error @-1 {{cannot use protocol 'HiddenProtocol' in a stored property of a class without meeting the Embedded mode requirements; 'HiddenProtocol' is marked '@_implementationOnly'}}
+
+  private var importedInit: PublicProto = StructFromDirect()
+  // expected-embedded-error @-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  // expected-embedded-error @-2 {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  private var hiddenInit: PublicProto = HiddenLayout()
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  private func defaultArgFunc(arg: PublicProto = HiddenLayout()) {}
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
 
 open class OpenClassUser: ProtocolFromDirect {
@@ -672,35 +753,52 @@ open class OpenClassUser: ProtocolFromDirect {
 
   public init() { fatalError() }
 
+  @_implementationOnly
   private var ta: TA
-  // expected-opt-in-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
-  // expected-not-opt-in-warning @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of an open class because 'directs' has been imported as implementation-only}}
+  // expected-not-opt-in-warning @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of an open class because 'directs' has been imported as implementation-only}}
 
   public var publicField: StructFromDirect
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
+  @_implementationOnly
   private var privateField: StructFromDirect
-  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
-  // expected-not-opt-in-warning @-2 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of an open class; 'directs' has been imported as implementation-only}}
+  // expected-not-opt-in-warning @-2 {{cannot use struct 'StructFromDirect' in a property declaration member of an open class; 'directs' has been imported as implementation-only}}
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
+  @_implementationOnly
   private var c: HiddenLayout
-  // expected-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of an open class; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
+  @_implementationOnly
   private var f: HiddenEnum
-  // expected-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of an open class; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
+  @_implementationOnly
   private var j: HiddenProtocol
-  // expected-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of an open class; 'HiddenProtocol' is marked '@_implementationOnly'}}
+
+  private var importedInit: PublicProto = StructFromDirect()
+  // expected-embedded-error @-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  // expected-embedded-error @-2 {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  private var hiddenInit: PublicProto = HiddenLayout()
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  private func defaultArgFunc(arg: PublicProto = HiddenLayout()) {}
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 
   @export(interface)
   private func privateFunc(h: HiddenLayout) {}
+
+  @export(interface)
+  deinit {}
 }
 
 @_fixed_layout
@@ -709,6 +807,7 @@ public class FixedClassUser: ProtocolFromDirect {
 
   public init() { fatalError() }
 
+  @_implementationOnly
   private var ta: TA
   // expected-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration marked public or in a '@frozen' or '@usableFromInline' context because 'directs' has been imported as implementation-only}}
   // expected-error @-2 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
@@ -716,6 +815,7 @@ public class FixedClassUser: ProtocolFromDirect {
   public var publicField: StructFromDirect
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
+  @_implementationOnly
   private var privateField: StructFromDirect
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
   private var a: ExposedLayoutPublic
@@ -723,6 +823,7 @@ public class FixedClassUser: ProtocolFromDirect {
   // expected-error @-1 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
   private var b: ExposedLayoutPrivate
   // expected-error @-1 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  @_implementationOnly
   private var c: HiddenLayout
   // expected-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
   // expected-error @-2 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
@@ -730,6 +831,7 @@ public class FixedClassUser: ProtocolFromDirect {
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   // expected-error @-1 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  @_implementationOnly
   private var f: HiddenEnum
   // expected-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
   // expected-error @-2 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
@@ -739,9 +841,17 @@ public class FixedClassUser: ProtocolFromDirect {
   // expected-error @-1 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
   private var i: ExposedProtocolPrivate
   // expected-error @-1 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  @_implementationOnly
   private var j: HiddenProtocol
   // expected-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenProtocol' is marked '@_implementationOnly'}}
   // expected-error @-2 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+
+  private var importedInit: PublicProto = StructFromDirect()
+  // expected-error @-1 {{struct 'StructFromDirect' cannot be used in a property initializer in a '@frozen' type because 'directs' was imported implementation-only}}
+  // expected-error @-2 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because 'directs' was imported implementation-only}}
+  private var hiddenInit: PublicProto = HiddenLayout()
+  // expected-error @-1 {{struct 'HiddenLayout' is private and cannot be referenced from a property initializer in a '@frozen' type}}
+  // expected-error @-2 {{initializer 'init()' is private and cannot be referenced from a property initializer in a '@frozen' type}}
 
   @export(interface)
   private func privateFunc(h: HiddenLayout) {}
@@ -753,26 +863,46 @@ internal class InternalClassUser: ProtocolFromDirect {
 
   public init() { fatalError() }
 
+  @_implementationOnly
   private var ta: TA
 
+  @_implementationOnly
   public var publicField: StructFromDirect
+  @_implementationOnly
   private var privateField: StructFromDirect
 
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
+  @_implementationOnly
   private var c: HiddenLayout
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
+  @_implementationOnly
   private var f: HiddenEnum
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
+  @_implementationOnly
   private var j: HiddenProtocol
 
+  @_implementationOnly
+  private var importedInit: PublicProto = StructFromDirect()
+  // expected-embedded-error @-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  // expected-embedded-error @-2 {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  @_implementationOnly
+  private var hiddenInit: PublicProto = HiddenLayout()
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
   private func privateFunc(h: HiddenLayout) {} // expected-embedded-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  private func defaultArgFunc(arg: PublicProto = HiddenLayout()) {}
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  @export(interface)
+  deinit {}
 }
 
 private class PrivateClassUser: ProtocolFromDirect {
@@ -781,26 +911,44 @@ private class PrivateClassUser: ProtocolFromDirect {
 
   public init() { fatalError() }
 
+  @_implementationOnly
   private var ta: TA
 
+  @_implementationOnly
   public var publicField: StructFromDirect
+  @_implementationOnly
   private var privateField: StructFromDirect
 
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
+  @_implementationOnly
   private var c: HiddenLayout
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
+  @_implementationOnly
   private var f: HiddenEnum
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
+  @_implementationOnly
   private var j: HiddenProtocol
 
+  private var importedInit: PublicProto = StructFromDirect()
+  // expected-embedded-error @-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  // expected-embedded-error @-2 {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  private var hiddenInit: PublicProto = HiddenLayout()
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
   private func privateFunc(h: HiddenLayout) {} // expected-embedded-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  private func defaultArgFunc(arg: PublicProto = HiddenLayout()) {}
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  @export(interface)
+  deinit {}
 }
 
 @_implementationOnly
@@ -830,6 +978,63 @@ internal class HiddenClassUser: ProtocolFromDirect {
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
+
+  private var importedInit: PublicProto = StructFromDirect()
+  private var hiddenInit: PublicProto = HiddenLayout()
+}
+
+internal class ClassWithoutAttributeOnProperties: ProtocolFromDirect {
+// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
+// expected-not-opt-in-warning @-2 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
+
+  public init() { fatalError() }
+
+  private var ta: TA
+  // expected-embedded-not-opt-in-warning @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a stored property of a class without meeting the Embedded mode requirements because 'directs' has been imported as implementation-only}}
+  // expected-embedded-opt-in-error @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a stored property of a class without meeting the Embedded mode requirements because 'directs' has been imported as implementation-only}}
+
+  public var publicField: StructFromDirect
+  // expected-embedded-not-opt-in-warning @-1 {{cannot use struct 'StructFromDirect' in a stored property of a class without meeting the Embedded mode requirements; 'directs' has been imported as implementation-only}}
+  // expected-embedded-opt-in-error @-2 {{cannot use struct 'StructFromDirect' in a stored property of a class without meeting the Embedded mode requirements; 'directs' has been imported as implementation-only}}
+  // expected-embedded-note @-3 {{mark the stored property '@_implementationOnly'}}
+  private var privateField: StructFromDirect
+  // expected-embedded-not-opt-in-warning @-1 {{cannot use struct 'StructFromDirect' in a stored property of a class without meeting the Embedded mode requirements; 'directs' has been imported as implementation-only}}
+  // expected-embedded-opt-in-error @-2 {{cannot use struct 'StructFromDirect' in a stored property of a class without meeting the Embedded mode requirements; 'directs' has been imported as implementation-only}}
+  // expected-embedded-note @-3 {{mark the stored property '@_implementationOnly'}}
+
+  private var a: ExposedLayoutPublic
+  private var aa: ExposedLayoutInternal
+  private var b: ExposedLayoutPrivate
+  private var c: HiddenLayout
+  // expected-embedded-error @-1 {{cannot use struct 'HiddenLayout' in a stored property of a class without meeting the Embedded mode requirements; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-embedded-note @-2 {{mark the stored property '@_implementationOnly'}}
+
+  private var d: ExposedEnumPublic
+  private var e: ExposedEnumPrivate
+  private var f: HiddenEnum
+  // expected-embedded-error @-1 {{cannot use enum 'HiddenEnum' in a stored property of a class without meeting the Embedded mode requirements; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-embedded-note @-2 {{mark the stored property '@_implementationOnly'}}
+
+  private var g: ExposedProtocolPublic
+  private var h: ExposedProtocolInternal
+  private var i: ExposedProtocolPrivate
+  private var j: HiddenProtocol
+  // expected-embedded-error @-1 {{cannot use protocol 'HiddenProtocol' in a stored property of a class without meeting the Embedded mode requirements; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-embedded-note @-2 {{mark the stored property '@_implementationOnly'}}
+
+  private var importedInit: PublicProto = StructFromDirect()
+  // expected-embedded-error @-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  // expected-embedded-error @-2 {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  private var hiddenInit: PublicProto = HiddenLayout()
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  private func privateFunc(h: HiddenLayout) {} // expected-embedded-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  private func defaultArgFunc(arg: PublicProto = HiddenLayout()) {}
+  // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+
+  @export(interface)
+  deinit {}
 }
 
 @_implementationOnly // expected-error {{'@_implementationOnly' may not be used on public declarations}}

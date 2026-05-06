@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-library-evolution -enable-upcoming-feature StrictAccessControl
+// RUN: %target-typecheck-verify-swift -enable-library-evolution -enable-experimental-feature StrictAccessControl
 
 // REQUIRES: swift_feature_StrictAccessControl
 

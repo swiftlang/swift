@@ -24,6 +24,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace importer;

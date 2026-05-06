@@ -109,7 +109,7 @@ extension AddressUseVisitor {
 
     case is StructElementAddrInst, is TupleElementAddrInst,
          is IndexAddrInst, is TailAddrInst, is TuplePackElementAddrInst, 
-         is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst,
+         is InitEnumDataAddrInst,
          is InitExistentialAddrInst, is OpenExistentialAddrInst,
          is ProjectBlockStorageInst, is UncheckedAddrCastInst,
          is MarkUninitializedInst, is DropDeinitInst,
@@ -119,6 +119,9 @@ extension AddressUseVisitor {
          is MarkUnresolvedNonCopyableValueInst:
       let svi = operand.instruction as! SingleValueInstruction
       return projectedAddressUse(of: operand, into: svi)
+
+    case let ueda as UncheckedEnumDataAddrInstBase where ueda.enum == operand.value:
+      return projectedAddressUse(of: operand, into: ueda)
 
     case let apply as FullApplySite:
       return appliedAddressUse(of: operand, by: apply)

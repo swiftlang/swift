@@ -761,6 +761,12 @@ public:
   /// promises to return non-null.
   bool hasArrayLiteralIntrinsics() const;
 
+  /// Retrieve the declaration of Swift.CGFloat.init(_: Double).
+  ConcreteDeclRef getCGFloatInitDecl() const;
+
+  /// Retrieve the declaration of Swift.Double.init(_: CGFloat).
+  ConcreteDeclRef getDoubleInitDecl() const;
+
   /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
   ConcreteDeclRef getBoolBuiltinInitDecl() const;
 

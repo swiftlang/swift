@@ -2237,7 +2237,7 @@ class AbstractGenericSignatureRequest :
                          GenericSignatureWithError (const GenericSignatureImpl *,
                                                     SmallVector<GenericTypeParamType *, 2>,
                                                     SmallVector<Requirement, 2>,
-                                                    bool),
+                                                    DefaultRequirementOptions),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2251,7 +2251,7 @@ private:
            const GenericSignatureImpl *baseSignature,
            SmallVector<GenericTypeParamType *, 2> addedParameters,
            SmallVector<Requirement, 2> addedRequirements,
-           bool allowInverses) const;
+           DefaultRequirementOptions options) const;
 
 public:
   // Separate caching.
@@ -2271,7 +2271,7 @@ class InferredGenericSignatureRequest :
                                                     SmallVector<Requirement, 2>,
                                                     SmallVector<TypeBase *, 2>,
                                                     SourceLoc, ExtensionDecl *,
-                                                    bool),
+                                                    DefaultRequirementOptions),
                          RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2288,7 +2288,7 @@ private:
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeBase *, 2> inferenceSources,
            SourceLoc loc, ExtensionDecl *forExtension,
-           bool allowInverses) const;
+           DefaultRequirementOptions options) const;
 
 public:
   /// Inferred generic signature requests don't have source-location info.

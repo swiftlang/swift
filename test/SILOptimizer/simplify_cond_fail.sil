@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=cond_fail | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=cond_fail | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ASSERT
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=cond_fail -remove-runtime-asserts | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERT
 
 // REQUIRES: swift_in_compiler
 
@@ -12,21 +13,6 @@ sil @not_failing : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0
   cond_fail %0 : $Builtin.Int1, "not failing"
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: sil @failing
-// CHECK:         cond_fail
-// CHECK-NEXT:    unreachable
-// CHECK:       } // end sil function 'failing'
-sil @failing : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Int1, -1
-  cond_fail %0 : $Builtin.Int1, "failing"
-  br bb1
-
-bb1:
   %r = tuple ()
   return %r : $()
 }
@@ -47,9 +33,10 @@ bb0(%0 : @owned $String):
   unreachable
 }
 
-// CHECK-LABEL: sil @unknown
-// CHECK:         cond_fail
-// CHECK:       } // end sil function 'unknown'
+// CHECK-LABEL:        sil @unknown
+// CHECK-ASSERT:         cond_fail
+// CHECK-NOASSERT-NOT:   cond_fail
+// CHECK:              } // end sil function 'unknown'
 sil @unknown : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_fail %0 : $Builtin.Int1, "unknown"

@@ -77,7 +77,7 @@ public typealias CFloat = Float
 public typealias CDouble = Double
 
 /// The C 'long double' type.
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+#if os(anyAppleOS)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 #if arch(x86_64) || arch(i386)
 public typealias CLongDouble = Float80
@@ -168,6 +168,8 @@ public struct OpaquePointer {
 
 @available(*, unavailable)
 extension OpaquePointer: Sendable {}
+
+extension OpaquePointer: ConvertibleToBytes {}
 
 extension OpaquePointer {
   /// Creates a new `OpaquePointer` from the given address, specified as a bit
@@ -296,7 +298,7 @@ extension UInt {
 }
 
 /// A wrapper around a C `va_list` pointer.
-#if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) ||  os(Windows))
+#if arch(arm64) && !(os(anyAppleOS) || os(Windows))
 @frozen
 @unsafe
 public struct CVaListPointer {

@@ -265,6 +265,9 @@ bool isIndirectArgumentMutated(SILFunctionArgument *arg, bool ignoreDestroys = f
 ///       concurrently.
 class InstructionIndices {
   NodeBitfield indices;
+  bool indicesOverflowed = false;
+
+  void indexBlock(SILBasicBlock &block);
 
 public:
   // Leave a few bits for other purposes (e.g. InstructionSet).
@@ -274,6 +277,12 @@ public:
                 "should at least be able to index 65536 instructions in a block");
 
   InstructionIndices(SILFunction *f);
+
+  InstructionIndices(SILBasicBlock *block);
+
+  /// Returns true if any block had more instructions than can be uniquely
+  /// indexed, causing some instructions to share the same maximum index.
+  bool hasOverflowedIndices() const { return indicesOverflowed; }
 
   unsigned get(SILInstruction *inst) {
     return indices.get(inst->asSILNode());

@@ -24,7 +24,7 @@
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func simple(_ len: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.count)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -39,7 +39,7 @@ int * __counted_by(len) simple(int len, int len2, int * p __counted_by(len2) __l
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func shared(_ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {|}}
 //   expected-experimental-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -54,7 +54,7 @@ int * __counted_by(len) shared(int len, int * p __counted_by(len) __lifetimeboun
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.count)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -69,7 +69,7 @@ int * __counted_by(len - offset) complexExpr(int len, int offset, int len2, int 
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func nullUnspecified(_ len: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.count)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -84,7 +84,7 @@ int * __counted_by(len) _Null_unspecified nullUnspecified(int len, int len2, int
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func nonnull(_ len: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.count)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -99,7 +99,7 @@ int * __counted_by(len) _Nonnull nonnull(int len, int len2, int * _Nonnull p __c
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func nullable(_ len: Int32, _ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p?.count ?? 0)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p?.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p?.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -135,7 +135,7 @@ int * __counted_by(len) noncountedLifetime(int len, int * p __lifetimebound);
 //   expected-experimental-remark@4{{macro content: |    if _pCount != 13 {|}}
 //   expected-experimental-remark@5{{macro content: |      fatalError("bounds check failure in constant: expected \\(13) but got \\(_pCount)")|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
-//   expected-experimental-remark@7{{macro content: |    let _pPtr = unsafe p?.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@7{{macro content: |    let _pPtr = p?.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@8{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
 //   expected-experimental-remark@10{{macro content: |    defer {|}}
@@ -169,7 +169,7 @@ struct __attribute__((swift_attr("~Escapable"))) NonescapableStruct {};
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func lifetimeboundNonescapableReturn(_ p: inout MutableSpan<Int32>) -> NonescapableStruct {|}}
 //   expected-experimental-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -184,7 +184,7 @@ struct NonescapableStruct lifetimeboundNonescapableReturn(int len, int * __count
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p, copy s) @_lifetime(p: copy p) @_disfavoredOverload public func lifetimeboundNonescapableReturnDoubleBounds(_ p: inout MutableSpan<Int32>, _ s: NonescapableStruct) -> NonescapableStruct {|}}
 //   expected-experimental-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
@@ -200,7 +200,7 @@ struct NonescapableStruct lifetimeboundNonescapableReturnDoubleBounds(int len, i
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func oneLifetimeboundOneEscapable(_ len: Int32, _ p: inout MutableSpan<Int32>, _ p2: UnsafeMutableBufferPointer<Int32>) -> MutableSpan<Int32> {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.count)!|}}
 //   expected-experimental-remark@4{{macro content: |    let len3 = Int32(exactly: p2.count)!|}}
-//   expected-experimental-remark@5{{macro content: |    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@5{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@6{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@7{{macro content: |    }|}}
 //   expected-experimental-remark@8{{macro content: |    defer {|}}

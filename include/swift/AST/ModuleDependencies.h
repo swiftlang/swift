@@ -1093,6 +1093,13 @@ public:
   /// Allocate string inside ScanningService.
   StringRef save(StringRef str);
 
+  /// Get clang scanning service.
+  const clang::tooling::dependencies::DependencyScanningService &
+  getClangScanningService() const {
+    assert(ClangScanningService);
+    return *ClangScanningService;
+  }
+
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be
   /// wrapped in an instance of `ModuleDependenciesCache`.

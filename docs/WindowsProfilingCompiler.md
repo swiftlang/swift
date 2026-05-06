@@ -100,6 +100,6 @@ This section describes Windows profiling tools that can be used with the Swift c
 
 To build the Swift compiler with PDB format debug symbols that are used by profile analysis tools like WPA or Visual Studio, follow the https://github.com/compnerd/swift-build/blob/main/docs/WindowsQuickStart.md instructions, using the following `build.cmd` command line (or a variant on it based on your exact needs):
 
-`S:\SourceCache\swift\utils\build.cmd -Windows -DebugInfo -SkipPackaging -WindowsSDKArchitectures x64 -CDebugFormat codeview -SwiftDebugFormat codeview`
+`S:\SourceCache\swift\utils\build.cmd -Windows -DebugInfo -SkipPackaging -WindowsSDKArchitectures x64 -DebugFormat codeview`
 
 If you need to build a package that you can install on a separate Windows host, either remove `-SkipPackaging` in the above command, or if you've already run the above build, substitute `-SkipBuild` in place of `-SkipPackaging`.

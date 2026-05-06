@@ -518,11 +518,12 @@ extension Substring: StringProtocol {
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient // (Primarily @inlinable) specialization
+  @safe
   public func withCString<Result, E: Error>(
     _ body: (UnsafePointer<CChar>) throws(E) -> Result) throws(E) -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
-    return try unsafe String(self).withCString(body)
+    return try String(self).withCString(body)
   }
 
 #if !hasFeature(Embedded)
@@ -536,7 +537,7 @@ extension Substring: StringProtocol {
   internal func __rethrows_withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result
   ) throws -> Result {
-    return try unsafe withCString(body)
+    return try withCString(body)
   }
 #endif // !hasFeature(Embedded)
 
@@ -557,13 +558,14 @@ extension Substring: StringProtocol {
   ///     interpreted.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient // (Primarily @inlinable) specialization
+  @safe
   public func withCString<Result, TargetEncoding: _UnicodeEncoding, E: Error>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
   ) throws(E) -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
-    return try unsafe String(self).withCString(encodedAs: targetEncoding, body)
+    return try String(self).withCString(encodedAs: targetEncoding, body)
   }
 
 #if !hasFeature(Embedded)
@@ -579,7 +581,7 @@ extension Substring: StringProtocol {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) throws -> Result {
-    return try unsafe withCString(encodedAs: targetEncoding, body)
+    return try withCString(encodedAs: targetEncoding, body)
   }
 #endif // !hasFeature(Embedded)
 }
@@ -742,7 +744,7 @@ extension Substring.UTF8View: BidirectionalCollection {
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return try unsafe _slice.withContiguousStorageIfAvailable(body)
+    return try _slice.withContiguousStorageIfAvailable(body)
   }
 
   @inlinable

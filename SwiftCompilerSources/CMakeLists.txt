@@ -109,6 +109,10 @@ function(add_swift_compiler_modules_library name)
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
 
+  if(SWIFT_CACHING_BUILD AND BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    swift_append_caching_compile_flags(swift_compile_options)
+  endif()
+
   # Pass the declared C++ stdlib for swift's internal clang.
   set(swift_compile_cxx_flags ${CMAKE_CXX_FLAGS})
   separate_arguments(swift_compile_cxx_flags)
@@ -193,10 +197,6 @@ function(add_swift_compiler_modules_library name)
     list(APPEND sdk_option "-sdk" "${SWIFT_PATH_TO_SWIFT_SDK}")
     # For "swift/shims/*.h".
     list(APPEND sdk_option "-I" "${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib")
-
-    # Workaround a crash in the LoadableByAddress pass
-    # https://github.com/apple/swift/issues/73254
-    list(APPEND swift_compile_options "-Xllvm" "-sil-disable-pass=loadable-address")
 
     # MSVC 14.40 (VS 17.10, MSVC_VERSION 1940) added a requirement for Clang 17 or higher.
     # Swift 6.0 is the first version to include Clang 17.

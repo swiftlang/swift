@@ -435,7 +435,7 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
       diagnose(diag::interface_file_lock_timed_out, interfacePath);
     }
     // Clear the lock file so that future invocations can make progress.
-    Lock.unsafeMaybeUnlock();
+    Lock.unsafeUnlock();
     continue;
   }
   }

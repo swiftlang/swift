@@ -446,12 +446,11 @@ class ForeignReferenceTypeInfoRequest
     : public SimpleRequest<ForeignReferenceTypeInfoRequest,
                            ForeignReferenceTypeInfo(
                                ForeignReferenceTypeInfoDescriptor),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
   SourceLoc getNearestLoc() const { return SourceLoc(); };
-  bool isCached() const { return true; }
 
 private:
   friend SimpleRequest;
@@ -614,6 +613,7 @@ struct CustomRefCountingOperationResult {
     immortal,
     notFound,
     tooManyFound,
+    unreachable,
     foundOperation
   };
 
@@ -626,12 +626,9 @@ class CustomRefCountingOperation
     : public SimpleRequest<CustomRefCountingOperation,
                            CustomRefCountingOperationResult(
                                CustomRefCountingOperationDescriptor),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
-
-  // Caching
-  bool isCached() const { return true; }
 
   // Source location
   SourceLoc getNearestLoc() const { return SourceLoc(); };
@@ -762,13 +759,12 @@ SourceLoc extractNearestSourceLoc(ClangDeclExplicitSafetyDescriptor desc);
 class ClangDeclExplicitSafety
     : public SimpleRequest<ClangDeclExplicitSafety,
                            ExplicitSafety(ClangDeclExplicitSafetyDescriptor),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
   // Source location
   SourceLoc getNearestLoc() const { return SourceLoc(); };
-  bool isCached() const;
 
 private:
   friend SimpleRequest;
@@ -809,13 +805,12 @@ class ClangRefCountedSmartPointer
     : public SimpleRequest<ClangRefCountedSmartPointer,
                            importer::RefCountedPtrRequestResult(
                                ClangRefCountedSmartPointerDescriptor),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
   // Source location
   SourceLoc getNearestLoc() const { return SourceLoc(); };
-  bool isCached() const { return true; }
 
 private:
   friend SimpleRequest;
@@ -862,10 +857,9 @@ class CxxIteratorInfoRequest
     : public SimpleRequest<CxxIteratorInfoRequest,
                            std::optional<importer::CxxIteratorCategory>(
                                CxxRecordDeclDescriptor),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
-  bool isCached() const { return true; }
 
 private:
   friend SimpleRequest;

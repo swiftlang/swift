@@ -552,3 +552,6 @@ extension Int128 {
     return rhs < lhs
   }
 }
+
+@available(SwiftStdlib 6.0, *)
+extension Int128: ConvertibleToBytes, ConvertibleFromBytes {}

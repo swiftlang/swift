@@ -390,6 +390,12 @@ llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
     if (std::error_code EC = Invocation.getError())
       return EC;
 
+    // Setup the CAS instance from scanning service if applicable.
+    if (Invocation->requiresCAS())
+      Instance->setSharedCASInstances(
+          ScanningService->getClangScanningService().getCAS(),
+          ScanningService->getClangScanningService().getActionCache());
+
     // Setup the instance
     std::string InstanceSetupError;
     if (Instance->setup(*Invocation, InstanceSetupError))

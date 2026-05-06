@@ -61,6 +61,27 @@ SILDebugLocation SILGenBuilder::getSILDebugLocation(SILLocation Loc,
 }
 
 //===----------------------------------------------------------------------===//
+//                             SILValue APIs
+//===----------------------------------------------------------------------===//
+
+PartialApplyInst *SILGenBuilder::createPartialApply(
+    SILLocation Loc, SILValue Fn, SubstitutionMap Subs, ArrayRef<SILValue> Args,
+    ParameterConvention CalleeConvention,
+    SILFunctionTypeIsolation ResultIsolation,
+    PartialApplyInst::OnStackKind OnStack, StackAllocationIsNested_t IsNested,
+    const GenericSpecializationInformation *SpecializationInfo) {
+
+  // We completely drop the generic signature if all generic parameters were
+  // concrete. Similar to emitRawApply.
+  if (Subs && Subs.getGenericSignature()->areAllParamsConcrete())
+    Subs = SubstitutionMap();
+
+  return SILBuilder::createPartialApply(Loc, Fn, Subs, Args, CalleeConvention,
+                                        ResultIsolation, OnStack, IsNested,
+                                        SpecializationInfo);
+}
+
+//===----------------------------------------------------------------------===//
 //                             Managed Value APIs
 //===----------------------------------------------------------------------===//
 
@@ -455,6 +476,27 @@ ManagedValue SILGenBuilder::createUncheckedTakeEnumDataAddr(
   SILValue result =
       createUncheckedTakeEnumDataAddr(loc, operand.forward(SGF), element);
   return cloner.clone(result);
+}
+
+ManagedValue SILGenBuilder::createUncheckedInPlaceEnumDataAddr(
+    SILLocation loc, ManagedValue operand, EnumElementDecl *element,
+    SILType ty) {
+  CleanupCloner cloner(*this, operand);
+  SILValue result =
+      createUncheckedInPlaceEnumDataAddr(loc, operand.forward(SGF), element);
+  return cloner.clone(result);
+}
+
+/// Project an in-memory enum in such a way that we can take the payload,
+/// using the least side-effecting instruction possible.
+ManagedValue SILGenBuilder::createUncheckedEnumDataAddrForTake(
+    SILLocation loc, ManagedValue operand, EnumElementDecl *element,
+    SILType ty) {
+  if (UncheckedEnumDataAddrInstBase::isDestructive(element->getParentEnum(),
+                                                   &getFunction())) {
+    return createUncheckedTakeEnumDataAddr(loc, operand, element, ty);
+  }
+  return createUncheckedInPlaceEnumDataAddr(loc, operand, element, ty);
 }
 
 ManagedValue

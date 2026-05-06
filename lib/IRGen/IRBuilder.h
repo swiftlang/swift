@@ -42,7 +42,6 @@ private:
   /// point was last cleared.  Used only for preserving block
   /// ordering.
   llvm::BasicBlock *ClearedIP;
-  unsigned NumTrapBarriers = 0;
 
 #ifndef NDEBUG
   /// Whether debug information is requested. Only used in assertions.
@@ -422,9 +421,9 @@ public:
                                    llvm::Value *value,
                                    bool expectedValue, const Twine &name = "");
 
-  /// Call the trap intrinsic. If optimizations are enabled, an inline asm
-  /// gadget is emitted before the trap. The gadget inhibits transforms which
-  /// merge trap calls together, which makes debugging crashes easier.
+  /// Call the trap intrinsic. If optimizations are enabled, the nomerge
+  /// attribute is set on the trap call to inhibit transforms which merge
+  /// trap calls together, which makes debugging crashes easier.
   llvm::CallInst *CreateNonMergeableTrap(IRGenModule &IGM, StringRef failureMsg);
 
   /// Split a first-class aggregate value into its component pieces.

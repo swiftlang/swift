@@ -2,7 +2,8 @@ import time
 import functools
 from typing import Callable, TypeVar, Any
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 def exponential_retry(
     max_retries: int = 3,
@@ -11,39 +12,52 @@ def exponential_retry(
 ):
     """
     Retries with exponential backoff if the method returns a value > 0.
-    
+
     Args:
         max_retries (int): Maximum number of retry attempts. 0 is for no
                            retries, -1 is for an unlimited amount.
         base_delay (float): Initial delay in seconds.
         max_delay (float): Maximum delay between retries in seconds.
     """
+
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> T:
             retries = 0
-            
+
             while max_retries == -1 or retries <= max_retries:
-                fail_count = func(*args, **kwargs)
-                
-                if fail_count <= 0:
+                caught_exception = None
+                try:
+                    fail_count = func(*args, **kwargs)
+                except Exception as e:
+                    caught_exception = e
+                    fail_count = 1
+
+                if caught_exception is None and fail_count <= 0:
                     return fail_count
-                
+
                 if retries == max_retries:
+                    if caught_exception is not None:
+                        raise caught_exception
                     return fail_count
-                
-                delay = min(base_delay * (4 ** retries), max_delay)
-                
-                print(f"Retry {retries + 1}/{max_retries}: There were {fail_count} failure", end="")
-                if fail_count > 1:
-                    print("s", end="")
-                print(".")
+
+                delay = min(base_delay * (4**retries), max_delay)
+
+                if caught_exception is not None:
+                    print(
+                        f"Retry {retries + 1}/{max_retries}: Caught exception: {caught_exception}"
+                    )
+                else:
+                    print(
+                        f"Retry {retries + 1}/{max_retries}: There were {fail_count} failure{'s' if fail_count > 1 else ''}."
+                    )
                 print(f"Waiting {delay:.2f}s before retrying...")
-                
+
                 time.sleep(delay)
                 retries += 1
-            
+
             return fail_count
-        
+
         return wrapper
+
     return decorator

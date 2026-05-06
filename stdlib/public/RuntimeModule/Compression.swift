@@ -27,7 +27,7 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(anyAppleOS)
 internal import Darwin
 #elseif os(Windows)
 internal import ucrt
@@ -64,7 +64,7 @@ protocol CompressedStream {
 
 // .. Compression library bindings .............................................
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(anyAppleOS)
 private var lzmaHandle = dlopen("liblzma.dylib", RTLD_LAZY)
 private var zlibHandle = dlopen("libz.dylib", RTLD_LAZY)
 private var zstdHandle = dlopen("libzstd.dylib", RTLD_LAZY)

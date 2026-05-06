@@ -1135,3 +1135,23 @@ extension Range where Bound == String.Index {
       _uncheckedBounds: (lowerBound._encodedOffset, upperBound._encodedOffset))
   }
 }
+
+extension Range: ConvertibleToBytes
+  where Bound: ConvertibleToBytes {}
+
+extension PartialRangeFrom: ConvertibleToBytes
+  where Bound: ConvertibleToBytes {}
+extension PartialRangeFrom: ConvertibleFromBytes
+  where Bound: ConvertibleFromBytes {}
+extension PartialRangeFrom.Iterator: ConvertibleToBytes
+  where Bound: ConvertibleToBytes {}
+extension PartialRangeFrom.Iterator: ConvertibleFromBytes
+  where Bound: ConvertibleFromBytes {}
+extension PartialRangeThrough: ConvertibleToBytes
+  where Bound: ConvertibleToBytes {}
+extension PartialRangeThrough: ConvertibleFromBytes
+  where Bound: ConvertibleFromBytes {}
+extension PartialRangeUpTo: ConvertibleToBytes
+  where Bound: ConvertibleToBytes {}
+extension PartialRangeUpTo: ConvertibleFromBytes
+  where Bound: ConvertibleFromBytes {}

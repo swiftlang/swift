@@ -107,5 +107,6 @@ TYPE("api-descriptor-json", SwiftAPIDescriptor,        "",                "")
 TYPE("fixit",               SwiftFixIt,                "",                "")
 TYPE("module-semantic-info", ModuleSemanticInfo,       "",                "")
 TYPE("cached-diagnostics",  CachedDiagnostics,         "",                "")
+TYPE("json-polyglot-ast",   JSONPolyglotAST,          "ast.json",         "")
 
 #undef TYPE

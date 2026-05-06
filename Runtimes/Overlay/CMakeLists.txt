@@ -23,6 +23,14 @@ project(SwiftOverlay
   LANGUAGES C CXX Swift
   VERSION ${SWIFT_RUNTIME_VERSION})
 
+# FIXME(compnerd) add a compatibility shim for WASI on older CMake releases.
+if(CMAKE_VERSION VERSION_LESS 3.31)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Generic" AND CMAKE_SYSTEM_PROCESSOR MATCHES "wasm32")
+    set(CMAKE_SYSTEM_NAME WASI)
+    set(WASI 1)
+  endif()
+endif()
+
 set(CMAKE_Swift_LANGUAGE_VERSION 5)
 
 find_package(SwiftCore)
@@ -63,6 +71,17 @@ option(SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backd
 add_compile_definitions(
   $<$<BOOL:${SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT}>:SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT>)
 
+if(WASI)
+  add_compile_definitions(
+    $<$<COMPILE_LANGUAGE:C,CXX>:_WASI_EMULATED_MMAN>
+    $<$<COMPILE_LANGUAGE:C,CXX>:_WASI_EMULATED_PROCESS_CLOCKS>
+    $<$<COMPILE_LANGUAGE:C,CXX>:_WASI_EMULATED_SIGNAL>)
+  add_compile_options(
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -D_WASI_EMULATED_MMAN>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -D_WASI_EMULATED_PROCESS_CLOCKS>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -D_WASI_EMULATED_SIGNAL>")
+endif()
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
@@ -102,6 +121,8 @@ if(ANDROID)
   add_subdirectory(Android)
 elseif(WIN32)
   add_subdirectory(Windows)
+elseif(WASI)
+  add_subdirectory(WASI)
 elseif(LINUX)
   defaulted_set(SwiftOverlay_LINUX_LIBC STRING "Select Linux libc flavor. Options are: glibc")
   add_subdirectory("Linux/${SwiftOverlay_LINUX_LIBC}")

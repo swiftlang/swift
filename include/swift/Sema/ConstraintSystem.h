@@ -227,24 +227,37 @@ public:
 };
 
 
-class ExpressionTimer {
+class ComplexityTracker {
   ConstraintSystem &CS;
   llvm::TimeRecord StartTime;
 
   /// The number of seconds from creation until
-  /// this timer is considered expired.
+  /// this tracker is considered expired.
   unsigned ThresholdInSecs;
+
+  /// Threshold (in milliseconds) for emitting a wall-clock-based warning.
+  /// 0 disables the warning.
+  unsigned WarnTimeLimitInMillis;
+
+  /// Threshold for emitting a solver-scope-based warning.
+  /// 0 disables the warning.
+  unsigned WarnScopeLimit;
+
+  /// Threshold for emitting a solver-trail-step-based warning.
+  /// 0 disables the warning.
+  unsigned WarnTrailLimit;
 
   bool PrintWarning;
 
 public:
   const static unsigned NoLimit = (unsigned) -1;
 
-  ExpressionTimer(ConstraintSystem &CS, unsigned thresholdInSecs);
+  ComplexityTracker(ConstraintSystem &CS, unsigned thresholdInSecs,
+                    unsigned warnTimeLimitInMillis, unsigned warnScopeLimit,
+                    unsigned warnTrailLimit);
 
-  ~ExpressionTimer();
+  ~ComplexityTracker();
 
-  unsigned getWarnLimit() const;
   llvm::TimeRecord startedAt() const { return StartTime; }
 
   /// Return the elapsed process time (including fractional seconds)
@@ -782,7 +795,7 @@ public:
   DeclContext *DC;
   ConstraintSystemOptions Options;
   DiagnosticTransaction *diagnosticTransaction;
-  std::optional<ExpressionTimer> Timer;
+  std::optional<ComplexityTracker> Timer;
 
   friend class Solution;
   friend class ConstraintFix;
@@ -1086,11 +1099,11 @@ public:
   llvm::DenseMap<NominalTypeDecl *, DynamicCallableMethods>
       DynamicCallableCache;
 
-  /// A cache of implicitly generated dot-member expressions used as roots
+  /// A cache of implicitly generated dot-member expressions and argument lists
   /// for some `.callAsFunction` calls. The key here is "base" locator for
   /// the `.callAsFunction` member reference.
-  llvm::SmallDenseMap<ConstraintLocator *, UnresolvedDotExpr *, 2>
-      ImplicitCallAsFunctionRoots;
+  llvm::SmallDenseMap<ConstraintLocator *, ImplicitCallAsFunctionInfo, 2>
+      ImplicitCallAsFunctions;
 
   /// The set of conformances synthesized during solving (i.e. for
   /// ad-hoc distributed `SerializationRequirement` conformances).
@@ -2069,8 +2082,15 @@ public:
   void recordMatchCallArgumentResult(ConstraintLocator *locator,
                                      MatchCallArgumentResult result);
 
-  void recordImplicitCallAsFunctionRoot(
-      ConstraintLocator *locator, UnresolvedDotExpr *root);
+  /// Record a new implicit `callAsFunction` call for a split argument list
+  /// e.g `T(...) {}` -> `T(...).callAsFunction {}`
+  ///
+  /// \param root The member access to \c callAsFunction
+  /// \param baseArgs The new arguments for the base \c T(...) call. The
+  /// arguments for the \c callAsFunction call are recorded on the \c root
+  void recordImplicitCallAsFunction(ConstraintLocator *locator,
+                                    UnresolvedDotExpr *root,
+                                    ArgumentList *baseArgs);
 
   /// Record root, value, and declContext of keypath expression for use across
   /// constraint system, and add a change to the trail.
@@ -3202,6 +3222,11 @@ public:
                                ConstraintKind kind, TypeMatchOptions flags,
                                ConstraintLocatorBuilder locator);
 
+  /// Subroutine of \c matchTypes()
+  bool matchFunctionLifetimes(const LifetimeDependentInterface &func1,
+                              const LifetimeDependentInterface &func2,
+                              ConstraintLocatorBuilder locator);
+
   /// Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
   TypeMatchResult matchSuperclassTypes(Type type1, Type type2,
@@ -4061,6 +4086,12 @@ public:
     return CurrentRange;
   }
 
+  /// Return the number of solver scopes created so far.
+  unsigned getNumSolverScopes() const { return NumSolverScopes; }
+
+  /// Return the number of solver trail steps taken so far.
+  unsigned getNumTrailSteps() const { return NumTrailSteps; }
+
   /// Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   std::pair<bool, SourceRange> isAlreadyTooComplex = {false, SourceRange()};
@@ -4541,6 +4572,11 @@ unsigned getNumApplications(bool hasAppliedSelf,
 /// Determine whether the debug output is enabled for the given target.
 bool debugConstraintSolverForTarget(ASTContext &C,
                                     SyntacticElementTarget target);
+
+/// Determine whether the given declaration is only generic because it
+/// adopted typed throws.
+bool isGenericOnlyOverThrownType(AbstractFunctionDecl *func);
+
 } // end namespace constraints
 
 /// If the expression has the effect of a forced downcast, find the

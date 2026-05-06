@@ -58,7 +58,7 @@ public:
     auto sig = buildGenericSignature(ctx, GenericSignature(),
                                      addedParameters,
                                      addedRequirements,
-                                     /*allowInverses=*/false);
+                                     DefaultRequirementOptions());
 
     // TODO: minimize the signature by removing redundant generic
     // parameters.
@@ -182,6 +182,8 @@ private:
   INVALID_TO_GENERALIZE(SILPack)
   INVALID_TO_GENERALIZE(SILToken)
   INVALID_TO_GENERALIZE(SILMoveOnlyWrapped)
+  INVALID_TO_GENERALIZE(Join)
+  INVALID_TO_GENERALIZE(Meet)
 #undef INVALID_TO_GENERALIZE
 
   /// Generalize the generic arguments of the given generic type.s

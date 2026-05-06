@@ -1516,6 +1516,10 @@ def print_ast_decl : Flag<["-"], "print-ast-decl">,
   HelpText<"Parse and type-check input file(s) and pretty print declarations from AST(s)">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_polyglot_ast : Flag<["-"], "emit-polyglot-ast">,
+  HelpText<"Parse the Objective-C input file and emit polyglot AST as JSON">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_pcm : Flag<["-"], "dump-pcm">,
   HelpText<"Dump debugging information about a precompiled Clang module">,
   ModeOpt,
@@ -2044,7 +2048,7 @@ def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement
 
 def const_gather_protocols_list
   : Separate<["-"], "const-gather-protocols-list">, MetaVarName<"<path>">,
-    Flags<[NewDriverOnlyOption, ArgumentIsPath]>,
+    Flags<[NewDriverOnlyOption, ArgumentIsPath, FrontendOption]>,
     HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
 
 def input_paths: Separate<["-", "--"], "input-paths">,

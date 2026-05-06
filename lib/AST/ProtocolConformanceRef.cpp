@@ -413,6 +413,15 @@ ProtocolConformanceRef::getAvailabilityConstraint(DeclContext *dc,
     return std::nullopt;
 
   auto availability = AvailabilityContext::forLocation(loc, dc);
+  // Conformance declarations can be more available than the protocols they
+  // involve due to source compatibility exceptions. Thus, it is important to 
+  // verify that neither pose a constraint in the given context when checking 
+  // for availability of a conformance.
+  if (auto constraint =
+          getAvailabilityConstraintsForDecl(getProtocol(), availability)
+              .getPrimaryConstraint())
+    return constraint;
+
   auto *conformanceDC = getConcrete()->getRootConformance()->getDeclContext();
   if (auto constraint = getAvailabilityConstraintsForDecl(
                             conformanceDC->getAsDecl(), availability)

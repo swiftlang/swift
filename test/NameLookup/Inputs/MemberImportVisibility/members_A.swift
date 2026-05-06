@@ -68,17 +68,42 @@ public enum EnumInA {
 open class BaseClassInA {
   open func methodInA() {}
   open func overriddenMethod() {}
+  open func overriddenInBMethod() {}
 }
 
-public protocol ProtocolInA {
+public protocol ProtocolInA1 {
+  func defaultedRequirementInA()
+}
+
+extension ProtocolInA1 {
+  public func defaultedRequirementInA() { }
+}
+
+public protocol ProtocolInA2 {
   func defaultedRequirementInA()
   func defaultedRequirementInB()
   func defaultedRequirementInC()
 }
 
-extension ProtocolInA {
+extension ProtocolInA2 {
   public func defaultedRequirementInA() { }
 }
+
+public protocol ProtocolInA3 {
+  func defaultedRequirementInBAndC()
+}
+
+public protocol ProtocolWithAssociatedTypesInA {
+  associatedtype WitnessedInA
+  associatedtype WitnessedInB
+  associatedtype WitnessedInC
+}
+
+public struct StructInA1 {
+  public struct WitnessedInA { }
+}
+
+public struct StructInA2: Equatable { }
 
 public struct EquatableInA: Equatable {
   public static func ==(_: Self, _: Self) -> Bool {

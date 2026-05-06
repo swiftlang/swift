@@ -23,8 +23,13 @@ module Nullable {
   requires cplusplus
 }
 
-module Inheritance {
-  header "inheritance.h"
+module InheritanceLayout {
+  header "inheritance-layout.h"
+  requires cplusplus
+}
+
+module InheritFRT {
+  header "inherit-frt.hpp"
   requires cplusplus
 }
 
@@ -43,8 +48,8 @@ module ReferenceCountedObjCProperty {
   export *
 }
 
-module LifetimeOperationMethods {
-  header "lifetime-operation-methods.h"
+module RefCountingMethods {
+  header "refcounting-methods.h"
   requires cplusplus
 }
 
@@ -100,5 +105,10 @@ module FRTReferenceReturns {
 
 module RefCountedSmartPtrs {
   header "refcounted-smartptrs.h"
+  requires cplusplus
+}
+
+module RefKit {
+  header "refkit.hpp"
   requires cplusplus
 }

@@ -257,6 +257,18 @@ typedef struct {
   uint32_t Padding2[2];
 } WIN32_ARM_CONTEXT;
 
+// Swift has trouble with the original versions of these, so bring in our
+// own, simpler, definitions.
+typedef struct {
+  uint32_t BeginAddress;
+  uint32_t UnwindData;
+} WIN32_IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY;
+
+typedef struct {
+  uint32_t HeaderData;
+  uint32_t PackedFields;
+} WIN32_IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY_XDATA;
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

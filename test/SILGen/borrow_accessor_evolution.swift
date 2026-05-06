@@ -1,7 +1,6 @@
-// RUN:%target-swift-frontend -emit-silgen %s -verify  -enable-experimental-feature BorrowAndMutateAccessors -enable-library-evolution | %FileCheck %s
-// RUN:%target-swift-frontend -c -Xllvm -sil-print-after=SILGenCleanup  %s -verify  -enable-experimental-feature BorrowAndMutateAccessors -enable-library-evolution 2>&1 | %FileCheck --check-prefixes=CHECK-SILGEN-CLEANUP %s
+// RUN:%target-swift-frontend -emit-silgen %s -verify  -enable-library-evolution | %FileCheck %s
+// RUN:%target-swift-frontend -c -Xllvm -sil-print-after=SILGenCleanup  %s -verify  -enable-library-evolution 2>&1 | %FileCheck --check-prefixes=CHECK-SILGEN-CLEANUP %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 public class Klass {}
 

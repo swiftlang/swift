@@ -431,6 +431,7 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
       "", "", std::move(newBuf), nullptr, nullptr,
       /*isFramework=*/isFramework,
       Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
+      Ctx.LangOpts.hasFeature(Feature::Embedded),
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
   Name = loadedModuleFile->Name.str();
   return std::move(moduleBuf.get());

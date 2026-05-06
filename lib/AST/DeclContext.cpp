@@ -17,6 +17,7 @@
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
@@ -534,17 +535,27 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         return {FragileFunctionKind::DefaultArgument};
       }
 
+      if (VD->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+          !VD->isNeverEmittedIntoClient())
+        return {FragileFunctionKind::EmbeddedAlwaysEmitIntoClient};
       return {FragileFunctionKind::None};
     }
 
     // Stored property initializer contexts use minimal resilience expansion
     // if the type is formally fixed layout.
     if (auto *init = dyn_cast <PatternBindingInitializer>(dc)) {
-      auto bindingIndex = init->getBindingIndex();
-      if (auto *varDecl = init->getBinding()->getAnchoringVarDecl(bindingIndex)) {
-        if (varDecl->isInitExposedToClients()) {
+      auto index = init->getBindingIndex();
+      if (auto *varDecl = init->getBinding()->getAnchoringVarDecl(index)) {
+        switch (varDecl->getInitExposedLevel()) {
+        case ExportedLevel::Exported:
           return {FragileFunctionKind::PropertyInitializer};
-        }
+        case ExportedLevel::ImplicitlyExported:
+          if (init->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+            return {FragileFunctionKind::EmbeddedAlwaysEmitIntoClient};
+          break;
+        case ExportedLevel::None:
+          break;
+        };
       }
 
       return {FragileFunctionKind::None};
@@ -569,7 +580,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         // Accessors are implicitly EmbeddedAlwaysEmitIntoClient if neither the
         // accessor or starage is marked @_neverEmitIntoClient.
         if (!funcIsNEIC && !storageIsNEIC)
-            return FragileFunctionKind::EmbeddedAlwaysEmitIntoClient;
+          return FragileFunctionKind::EmbeddedAlwaysEmitIntoClient;
         return FragileFunctionKind::None;
       };
 

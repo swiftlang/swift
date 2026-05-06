@@ -3210,7 +3210,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     attributes.push_back("conflicting");
   if (!attributes.empty()) {
     out << "[attributes: ";
-    interleave(attributes, out, ", ");
+    interleaveComma(attributes, out);
   }
   
   auto literalKind = getLiteralForScore();
@@ -3234,7 +3234,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
         collectionLiterals.push_back(
             getCollectionLiteralAsString(protocolKind));
       });
-      interleave(collectionLiterals, out, ", ");
+      interleaveComma(collectionLiterals, out);
       break;
     }
     case LiteralBindingKind::Float:

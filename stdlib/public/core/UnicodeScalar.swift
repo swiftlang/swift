@@ -512,7 +512,7 @@ extension Unicode.Scalar {
       _internalInvariant(utf16Count == 2)
       codeUnits.1 = self.utf16[1]
     }
-    return try unsafe Swift.withUnsafePointer(to: &codeUnits) {
+    return try Swift.withUnsafePointer(to: &codeUnits) {
       return try unsafe $0.withMemoryRebound(to: UInt16.self, capacity: 2) {
         return try unsafe body(UnsafeBufferPointer(start: $0, count: utf16Count))
       }

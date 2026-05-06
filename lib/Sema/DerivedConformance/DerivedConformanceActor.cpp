@@ -154,14 +154,6 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   if (property->getFormalAccess() == AccessLevel::Open)
     property->overwriteAccess(AccessLevel::Public);
 
-  // Infer availability.
-  SmallVector<const Decl *, 2> asAvailableAs;
-  asAvailableAs.push_back(executorDecl);
-  if (auto enclosingDecl = property->getInnermostDeclWithAvailability())
-    asAvailableAs.push_back(enclosingDecl);
-
-  AvailabilityInference::applyInferredAvailableAttrs(property, asAvailableAs);
-
   auto getter = derived.addGetterToReadOnlyDerivedProperty(property);
   getter->setBodySynthesizer(deriveBodyActor_unownedExecutor);
 

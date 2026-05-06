@@ -1,0 +1,5 @@
+---
+Name: _stdio
+Tags:
+- Name: __sFILE
+  SwiftImportAs: opaque_pointer

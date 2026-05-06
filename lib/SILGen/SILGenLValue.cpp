@@ -568,12 +568,12 @@ static ManagedValue getPayloadOfOptionalValue(SILGenFunction &SGF,
     isOwned = false;
   }
 
-  // UncheckedTakeEnumDataAddr is safe to apply to Optional, because it is
-  // a single-payload enum. There will (currently) never be spare bits
-  // embedded in the payload.
+  // UncheckedInPlaceEnumDataAddr is safe to apply to Optional, because it
+  // is a single-payload enum. There will never be spare bits embedded in the
+  // payload.
   SILValue payload;
   if (optBase.getType().isAddress()) {
-    payload = SGF.B.createUncheckedTakeEnumDataAddr(loc, value, someDecl,
+    payload = SGF.B.createUncheckedInPlaceEnumDataAddr(loc, value, someDecl,
                                           SILType::getPrimitiveAddressType(
                                               valueTypeData.TypeOfRValue));
   } else {
@@ -986,6 +986,32 @@ namespace {
     }
   };
 
+  /// A physical path component which force-projects the address of
+  /// the value of an optional address l-value. Always pure.
+  class ForceOptionalAddressComponent : public PhysicalPathComponent {
+    bool isImplicitUnwrap;
+
+  public:
+    ForceOptionalAddressComponent(LValueTypeData typeData,
+                                  bool isImplicitUnwrap)
+        : PhysicalPathComponent(typeData, OptionalAddressKind,
+                                /*actorIsolation=*/std::nullopt),
+          isImplicitUnwrap(isImplicitUnwrap) {}
+
+    virtual bool isLoadingPure() const override { return true; }
+
+    ManagedValue project(SILGenFunction &SGF, SILLocation loc,
+                         ManagedValue base) &&
+        override {
+      return SGF.emitPreconditionOptionalHasValue(loc, base, isImplicitUnwrap);
+    }
+
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "ForceOptionalAddressComponent(" << isImplicitUnwrap
+                        << ")\n";
+    }
+  };
+
   /// A physical path component which projects out an opened archetype
   /// from an existential.
   class OpenOpaqueExistentialComponent : public PhysicalPathComponent {
@@ -1277,6 +1303,18 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+void LValue::addForceValueComponent(bool isObject, bool isImplicitOptional) {
+  auto substFormalType = getSubstFormalType();
+  LValueTypeData typeData = {
+      getAccessKind(), AbstractionPattern(substFormalType), substFormalType,
+      substFormalType.getOptionalObjectType()};
+
+  if (isObject)
+    add<ForceOptionalObjectComponent>(typeData, isImplicitOptional);
+  else
+    add<ForceOptionalAddressComponent>(typeData, isImplicitOptional);
+}
 
 static bool isReadNoneFunction(const Expr *e) {
   // If this is a curried call to an integer literal conversion operations, then
@@ -2965,6 +3003,7 @@ LValue SILGenFunction::emitLValue(Expr *e, SGFAccessKind accessKind,
     assert(r.isLastComponentPhysical());
     r.addOrigToSubstComponent(loweredSubstType);
   }
+
   return r;
 }
 
@@ -3440,6 +3479,34 @@ LValue SILGenLValue::visitApplyExpr(ApplyExpr *e, SGFAccessKind accessKind,
                                      deref.getValue());
     LValue lv;
     lv.add<ValueComponent>(deref, std::nullopt, typeData, /*isRValue*/ true);
+    return lv;
+  }
+  case BuiltinValueKind::BorrowAt: {
+    ManagedValue borrowedValue = SGF.emitRValueAsSingleValue(e);
+    // Emitting the call to Builtin.borrowAt requires the usual emitRValue
+    // pathways. So the result follows RValue rules: an address for address-only
+    // types, a load_borrow value for loadable types. If the borrowedValue is
+    // addressable-for-dependencies, then strip off the load_borrow to get back
+    // to the original address required for an LValue.
+    if (!borrowedValue.getType().isAddress()) {
+      if (borrowedValue.getType().isAddressableForDeps(SGF.F)) {
+        // RValue construction is expected to emit load_borrow.
+        auto *load = cast<SingleValueInstruction>(borrowedValue.getValue());
+        ASSERT(isa<LoadInst>(load) || isa<LoadBorrowInst>(load));
+        SILValue addr = load->getOperand(0);
+        // Replace the borrowed value with an address. Borrowed values have no
+        // cleanups. The dead borrow will be removed by Onone simplification.
+        borrowedValue = ManagedValue::forRValueWithoutOwnership(addr);
+      } else {
+        // Allow this LValue to be used in a return expression, which violates
+        // end_borrow ownership.
+        borrowedValue = SGF.B.createUncheckedOwnership(e, borrowedValue);
+      }
+    }
+    auto typeData = getValueTypeData(SGF, accessKind, e);
+    LValue lv;
+    lv.add<ValueComponent>(borrowedValue, std::nullopt, typeData,
+                           /*isRValue*/ true);
     return lv;
   }
 
@@ -4252,13 +4319,24 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   CanType substFormalRValueType = getSubstFormalRValueType(e);
   CanType baseTy = getBaseFormalType(e->getBase());
   AbstractionPattern orig = AbstractionPattern::getInvalid();
+
+  AccessorDecl *calleeAccessor = strategy.hasAccessor()
+    ? var->getAccessor(strategy.getAccessor())
+    : nullptr;
+  ParamDecl *calleeAccessorSelfParam = calleeAccessor
+    ? calleeAccessor->getImplicitSelfDecl()
+    : nullptr;
+  
   bool addressable = false;
-  // If the access produces a dependent value, and the base is addressable-for-
-  // dependencies, then request an addressable base.
-  if (!substFormalRValueType->isEscapable()
-      && SGF.getTypeProperties(baseTy).isAddressableForDependencies()) {
-    addressable = true;
-    orig = AbstractionPattern::getOpaque();
+  // If the access produces a dependent value, and the base is addressable,
+  // then request an addressable base.
+  if (!substFormalRValueType->isEscapable()) {
+    addressable = SGF.getTypeProperties(baseTy).isAddressableForDependencies()
+      || (calleeAccessorSelfParam && calleeAccessorSelfParam->isAddressable());
+      
+    if (addressable) {
+      orig = AbstractionPattern::getOpaque();
+    }
   }
   
   LValue lv = visitRec(e->getBase(),
@@ -5616,28 +5694,65 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
         projection =
             emitLoad(loc, projection.getValue(), origFormalType,
                      substFormalType, rvalueTL, C, IsNotTake, isBaseGuaranteed);
-      } else if (isReadAccessResultOwned(src.getAccessKind()) &&
-          !projection.isPlusOneOrTrivial(*this)) {
+      } else {
+        bool isPlusZeroOk = isBaseGuaranteed ? C.isGuaranteedPlusZeroOk()
+                                             : C.isImmediatePlusZeroOk();
+        if (!projection.isPlusOneOrTrivial(*this) &&
+            (isReadAccessResultOwned(src.getAccessKind()) ||
+             (src.getAccessKind() == SGFAccessKind::BorrowedAddressRead &&
+              !isPlusZeroOk))) {
+          // Before we copy, if we have a move only wrapped value, unwrap the
+          // value using a guaranteed moveonlywrapper_to_copyable.
+          if (projection.getType().isMoveOnlyWrapped()) {
+            // We are assuming we always get a guaranteed value here.
+            assert(projection.getValue()->getOwnershipKind() ==
+                   OwnershipKind::Guaranteed);
+            // We use SILValues here to ensure we get a tight scope around our
+            // copy.
+            projection = B.createGuaranteedMoveOnlyWrapperToCopyableValue(
+                loc, projection);
+          }
 
-        // Before we copy, if we have a move only wrapped value, unwrap the
-        // value using a guaranteed moveonlywrapper_to_copyable.
-        if (projection.getType().isMoveOnlyWrapped()) {
-          // We are assuming we always get a guaranteed value here.
-          assert(projection.getValue()->getOwnershipKind() ==
-                 OwnershipKind::Guaranteed);
-          // We use SILValues here to ensure we get a tight scope around our
-          // copy.
-          projection =
-              B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, projection);
+          projection = projection.copy(*this, loc);
         }
-
-        projection = projection.copy(*this, loc);
       }
 
       result = RValue(*this, loc, substFormalType, projection);
     } else {
       // If the last component is logical, emit a get.
       result = std::move(component.asLogical()).get(*this, loc, addr, C);
+    }
+
+    // Check if we have an ignored read. If we do, insert the relevant uses to
+    // end the lifetime (if noncopyable) and or ignored_use to provide a use for
+    // diagnostic passes and set result to be an empty RValue. We do not want to
+    // allow for our caller to use the RValue since the RValue could contain
+    // things whose lifetimes are scoped to within the formal evaluation scope.
+    if (src.getAccessKind() == SGFAccessKind::IgnoredRead && !result.isNull()) {
+      SmallVector<ManagedValue, 16> values;
+      std::move(result).getAll(values);
+
+      for (auto mv : values) {
+        // If we have a move only type, we need to perform a move on each
+        // element to ensure we consume our arguments as part of the
+        // assignment.
+        if (mv.getType().isMoveOnly()) {
+          mv = mv.ensurePlusOne(*this, loc);
+          // If we have an address, then ensure plus one will create a temporary
+          // copy which will act as a consume of the address value. If we have
+          // an object, we need to insert our own move though.
+          if (mv.getType().isObject())
+            mv = B.createMoveValue(loc, mv);
+        }
+
+        // Then regardless if we are noncopyable or copyable, then we insert
+        // an ignored_use for diagnostics.
+        B.createIgnoredUse(loc, mv.getValue());
+      }
+
+      // Then set result to be an empty RValue so that our caller cannot use the
+      // RValue.
+      result = RValue();
     }
   } // End the evaluation scope before any hop back to the current executor.
 

@@ -1,7 +1,7 @@
 // Make sure this can be compiled without any errors
 
-// RUN: %target-swift-frontend %s -emit-ir -o /dev/null -enable-experimental-feature Embedded -enable-testing
-// RUN: %target-swift-frontend %s -emit-ir -o /dev/null -enable-experimental-feature Embedded -enable-testing -no-allocations
+// RUN: %target-swift-frontend %s -emit-ir -o /dev/null -enable-experimental-feature Embedded -enable-testing -disable-implicit-concurrency-module-import
+// RUN: %target-swift-frontend %s -emit-ir -o /dev/null -enable-experimental-feature Embedded -enable-testing -no-allocations -disable-implicit-concurrency-module-import
 
 
 // REQUIRES: OS=macosx || OS=wasip1

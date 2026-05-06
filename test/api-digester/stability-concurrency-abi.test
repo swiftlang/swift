@@ -129,6 +129,10 @@ Func withCheckedContinuation(function:_:) has mangled name changing from '_Concu
 
 Func pthread_main_np() is a new API without '@available'
 
+// TaskLocal.get() made @_alwaysEmitIntoClient; __abi_get() preserves the ABI symbol via @abi
+Func TaskLocal.get() has been renamed to Func __abi_get()
+Func TaskLocal.get() has mangled name changing from '_Concurrency.TaskLocal.get() -> A' to '_Concurrency.TaskLocal.__abi_get() -> A'
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
 

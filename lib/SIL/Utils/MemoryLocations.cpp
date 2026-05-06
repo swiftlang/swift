@@ -68,7 +68,7 @@ MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx)
   assert(((parentIdx >= 0) ==
           (isa<StructElementAddrInst>(val) || isa<TupleElementAddrInst>(val) ||
            isa<InitEnumDataAddrInst>(val) ||
-           isa<UncheckedTakeEnumDataAddrInst>(val) ||
+           isa<UncheckedEnumDataAddrInstBase>(val) ||
            isa<InitExistentialAddrInst>(val) ||
            isa<OpenExistentialAddrInst>(val) || isa<ApplyInst>(val) ||
            isa<StoreBorrowInst>(val))) &&
@@ -319,10 +319,18 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
                                             collectedVals, subLocationMap))
           return false;
         break;
+      case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+        // borrow acts as a projection of its enum operand, but not of its
+        // scratch space.
+        if (use->getOperandNumber() != 0) {
+          break;
+        }
+        LLVM_FALLTHROUGH;
       case SILInstructionKind::InitExistentialAddrInst:
       case SILInstructionKind::OpenExistentialAddrInst:
       case SILInstructionKind::InitEnumDataAddrInst:
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+      case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
         if (!handleNonTrivialProjections)
           return false;
         // The payload is represented as a single sub-location of the enum.
@@ -444,7 +452,7 @@ bool MemoryLocations::analyzeAddrProjection(
     Location *loc = &locations[subLocIdx];
     if (loc->representativeValue->getType() != projection->getType()) {
       assert(isa<InitEnumDataAddrInst>(projection) ||
-             isa<UncheckedTakeEnumDataAddrInst>(projection) ||
+             isa<UncheckedEnumDataAddrInstBase>(projection) ||
              isa<InitExistentialAddrInst>(projection));
              
       // We can only handle a single enum payload type for a location or or a

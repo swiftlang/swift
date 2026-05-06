@@ -58,32 +58,8 @@ Func RangeReplaceableCollection.filter(_:) is now without rethrows
 Func Dictionary.filter(_:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
 Func Dictionary.filter(_:) has self access kind changing from __Consuming to Consuming
 Func Dictionary.filter(_:) is now without rethrows
-Func Sequence.allSatisfy(_:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
-Func Sequence.allSatisfy(_:) is now without rethrows
-Func Sequence.compactMap(_:) has generic signature change from <Self, ElementOfResult where Self : Swift.Sequence> to <Self, ElementOfResult, E where Self : Swift.Sequence, E : Swift.Error>
-Func Sequence.compactMap(_:) is now without rethrows
-Func Sequence.contains(where:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
-Func Sequence.contains(where:) is now without rethrows
-Func Sequence.elementsEqual(_:by:) has generic signature change from <Self, OtherSequence where Self : Swift.Sequence, OtherSequence : Swift.Sequence> to <Self, OtherSequence, E where Self : Swift.Sequence, OtherSequence : Swift.Sequence, E : Swift.Error>
-Func Sequence.elementsEqual(_:by:) is now without rethrows
 Func Sequence.filter(_:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
 Func Sequence.filter(_:) is now without rethrows
-Func Sequence.flatMap(_:) has generic signature change from <Self, ElementOfResult where Self : Swift.Sequence> to <Self, ElementOfResult, E where Self : Swift.Sequence, E : Swift.Error>
-Func Sequence.flatMap(_:) has generic signature change from <Self, SegmentOfResult where Self : Swift.Sequence, SegmentOfResult : Swift.Sequence> to <Self, SegmentOfResult, E where Self : Swift.Sequence, SegmentOfResult : Swift.Sequence, E : Swift.Error>
-Func Sequence.flatMap(_:) is now without rethrows
-Func Sequence.lexicographicallyPrecedes(_:by:) has generic signature change from <Self, OtherSequence where Self : Swift.Sequence, OtherSequence : Swift.Sequence, Self.Element == OtherSequence.Element> to <Self, OtherSequence, E where Self : Swift.Sequence, OtherSequence : Swift.Sequence, E : Swift.Error, Self.Element == OtherSequence.Element>
-Func Sequence.lexicographicallyPrecedes(_:by:) is now without rethrows
-Func Sequence.max(by:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
-Func Sequence.max(by:) is now without rethrows
-Func Sequence.min(by:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
-Func Sequence.min(by:) is now without rethrows
-Func Sequence.reduce(into:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result, E where Self : Swift.Sequence, E : Swift.Error>
-Func Sequence.reduce(into:_:) has parameter 1 type change from (inout Result, Self.Element) throws -> () to (inout Result, Self.Element) throws(E) -> ()
-Func Sequence.reduce(into:_:) is now without rethrows
-Func Sequence.reduce(_:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result, E where Self : Swift.Sequence, E : Swift.Error>
-Func Sequence.reduce(_:_:) is now without rethrows
-Func Sequence.starts(with:by:) has generic signature change from <Self, PossiblePrefix where Self : Swift.Sequence, PossiblePrefix : Swift.Sequence> to <Self, PossiblePrefix, E where Self : Swift.Sequence, PossiblePrefix : Swift.Sequence, E : Swift.Error>
-Func Sequence.starts(with:by:) is now without rethrows
 Func Set.filter(_:) has generic signature change from <Element where Element : Swift.Hashable> to <Element, E where Element : Swift.Hashable, E : Swift.Error>
 Func Set.filter(_:) has self access kind changing from __Consuming to Consuming
 Func Set.filter(_:) is now without rethrows
@@ -162,7 +138,6 @@ Protocol FixedWidthInteger has added inherited protocol Copyable
 Protocol FixedWidthInteger has added inherited protocol Escapable
 Protocol FloatingPoint has added inherited protocol Copyable
 Protocol FloatingPoint has added inherited protocol Escapable
-Protocol Hashable has added inherited protocol Escapable
 Protocol Identifiable has added inherited protocol Copyable
 Protocol Identifiable has added inherited protocol Escapable
 Protocol IteratorProtocol has added inherited protocol Copyable
@@ -266,7 +241,7 @@ Constructor ExpressibleByNilLiteral.init(nilLiteral:) has generic signature chan
 Constructor ManagedBufferPointer.init(bufferClass:minimumCapacity:makingHeaderWith:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Constructor ManagedBufferPointer.init(unsafeBufferObject:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Constructor OpaquePointer.init(_:) has generic signature change from <T> to <T where T : ~Copyable>
-Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
+Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
 Constructor Optional.init(_:) has parameter 0 changing from Default to Owned
 Constructor Optional.init(nilLiteral:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
 Constructor Result.init(catching:) has generic signature change from <Success, Failure where Failure == any Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable>
@@ -332,16 +307,19 @@ Func UnsafeMutablePointer.moveInitialize(from:count:) has generic signature chan
 Func UnsafeMutableRawBufferPointer.bindMemory(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeMutableRawPointer.assumingMemoryBound(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeMutableRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
+Func UnsafeMutableRawPointer.load(fromByteOffset:as:) has generic signature change from <T> to <T where T : ~Escapable>
 Func UnsafeMutableRawPointer.moveInitializeMemory(as:from:count:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafePointer.deallocate() has generic signature change from <Pointee> to <Pointee where Pointee : ~Copyable>
 Func UnsafeRawBufferPointer.bindMemory(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.assumingMemoryBound(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
+Func UnsafeRawPointer.load(fromByteOffset:as:) has generic signature change from <T> to <T where T : ~Escapable>
 Func swap(_:_:) has generic signature change from <T> to <T where T : ~Copyable>
 Func withExtendedLifetime(_:_:) has parameter 0 changing from Default to Shared
 Func withUnsafeBytes(of:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
+Func withUnsafeBytes(of:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, T : ~Escapable, Result : ~Copyable>
 Func withUnsafeBytes(of:_:) has parameter 0 changing from Default to Shared
-Func withUnsafeMutableBytes(of:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
+Func withUnsafeMutableBytes(of:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, T : ~Escapable, Result : ~Copyable>
 Func withUnsafeMutablePointer(to:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
 Func withUnsafePointer(to:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
 Func withUnsafePointer(to:_:) has parameter 0 changing from Default to Shared
@@ -459,9 +437,13 @@ Func Comparable.>=(_:_:) has generic signature change from <Self where Self : Sw
 Func Comparable.>=(_:_:) has parameter 0 changing from Default to Shared
 Func Comparable.>=(_:_:) has parameter 1 changing from Default to Shared
 
-// Hashable: ~Copyable
-Protocol Hashable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable>
-Accessor Hashable.hashValue.Get() has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
-Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
-Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable>
+// Hashable: ~Copyable & Escapable
+Protocol Hashable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
+Accessor Hashable.hashValue.Get() has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
+Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
+Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable, H : ~Escapable>
 Func Hasher.combine(_:) has parameter 0 changing from Default to Shared
+
+Func Sequence.reduce(_:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result where Self : Swift.Sequence, Result : ~Copyable>
+Func Sequence.reduce(_:_:) has parameter 0 changing from Default to Owned
+

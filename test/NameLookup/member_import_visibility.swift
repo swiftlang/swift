@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_MemberImportVisibility
 
 import members_C
-// expected-member-visibility-note 28{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
+// expected-member-visibility-note 27{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -137,8 +137,32 @@ class DerivedFromClassInC: DerivedClassInC {
   override func methodInC() {}
 }
 
-// FIXME: Visibility of defaultedRequirementInB() should be diagnosed (rdar://154237873)
-struct ConformsToProtocolInA: ProtocolInA {} // expected-member-visibility-error{{type 'ConformsToProtocolInA' does not conform to protocol 'ProtocolInA'}} expected-member-visibility-note {{add stubs for conformance}}{{44-44=\n    func defaultedRequirementInB() {\n        <#code#>\n    \}\n}}
+struct ConformsToProtocolInA1: ProtocolInA1 {}
+
+// FIXME: Should diagnose import needed for defaultedRequirementInB().
+struct ConformsToProtocolInA2: ProtocolInA2 {}
+// expected-member-visibility-error@-1{{type 'ConformsToProtocolInA2' does not conform to protocol 'ProtocolInA2'}}
+// expected-member-visibility-note@-2{{add stubs for conformance}}
+
+struct ConformsToProtocolInA3: ProtocolInA3 {}
+
+// FIXME: Should diagnose import needed for defaultedRequirementInB().
+struct ConformsToProtocolInC1: ProtocolInC1 {}
+// expected-member-visibility-error@-1{{type 'ConformsToProtocolInC1' does not conform to protocol 'ProtocolInB1'}}
+// expected-member-visibility-note@-2{{add stubs for conformance}}
+
+struct ConformsToProtocolInC2: ProtocolInC2 {}
+
+// FIXME: The missing import for WitnessedInB should be diagnosed (rdar://154237873)
+extension StructInA1: ProtocolWithAssociatedTypesInA {}
+// expected-warning@-1{{extension declares a conformance of imported type 'StructInA1' to imported protocol 'ProtocolWithAssociatedTypesInA'; this will not behave correctly if the owners of 'members_A' introduce this conformance in the future}}
+// expected-note@-2{{add '@retroactive' to silence this warning}}
+// expected-member-visibility-error@-3{{type 'StructInA1' does not conform to protocol 'ProtocolWithAssociatedTypesInA'}}
+// expected-member-visibility-note@-4{{add stubs for conformance}}{{55-55=\n    public typealias WitnessedInB = <#type#>\n}}
+
+extension StructInA2: @retroactive Hashable {
+  public func hash(into: inout Hasher) { }
+}
 
 func testInheritedMethods(
   a: BaseClassInA,
@@ -156,8 +180,12 @@ func testInheritedMethods(
   c.methodInC()
 
   a.overriddenMethod()
-  b.overriddenMethod() // expected-member-visibility-error{{instance method 'overriddenMethod()' is not available due to missing import of defining module 'members_B'}}
+  b.overriddenMethod()
   c.overriddenMethod()
+
+  a.overriddenInBMethod()
+  b.overriddenInBMethod()
+  c.overriddenInBMethod()
 }
 
 func testLeadingDotSyntax() {

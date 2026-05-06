@@ -17,13 +17,14 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(anyAppleOS)
 internal import Darwin
 internal import BacktracingImpl.OS.Darwin
 #endif
 
 #if os(Windows)
 internal import WinSDK
+internal import BacktracingImpl.OS.Windows
 #endif
 
 /// Holds a map of the process's address space.
@@ -51,7 +52,7 @@ public struct ImageMap: Collection, Sendable, Hashable {
 
   #if os(Windows)
   enum ExceptionTable {
-    case arm64(ExceptionTableWrapper<IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY>)
+    case arm64(ExceptionTableWrapper<WIN32_IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY>)
     case amd64(ExceptionTableWrapper<_IMAGE_RUNTIME_FUNCTION_ENTRY>)
     case i386(ExceptionTableWrapper<FPO_DATA>)
   }
@@ -146,7 +147,7 @@ public struct ImageMap: Collection, Sendable, Hashable {
 
   /// Capture the image map for the current process.
   public static func capture() -> ImageMap {
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if os(anyAppleOS)
     return capture(for: mach_task_self())
     #elseif os(Windows)
     return capture(for: UInt(bitPattern: GetCurrentProcess()))

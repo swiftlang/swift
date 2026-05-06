@@ -267,10 +267,8 @@ ERROR(enum_case_dot_prefix,none,
 ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(expected_getreadset_in_protocol,none,
-      "expected 'get', 'yielding borrow', or 'set' in a protocol property", ())
 ERROR(expected_getreadborrowsetmutate_in_protocol,none,
-      "expected get, 'yielding borrow', borrow, set or mutate in a protocol property", ())
+      "expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property", ())
 
 ERROR(unexpected_getset_implementation_in_protocol,none,
       "protocol property %0 cannot have a default implementation specified "
@@ -1980,7 +1978,7 @@ ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
 ERROR(compiler_version_too_many_components,none,
       "compiler version must not have more than five components", ())
-WARNING(unused_compiler_version_component,NoUsage,
+GROUPED_WARNING(unused_compiler_version_component,NoUsage,NoUsage,
       "the second version component is not used for comparison in legacy "
       "compiler versions%select{|; are you trying to encode a new Swift "
       "compiler version for compatibility with legacy compilers?}0",

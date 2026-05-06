@@ -32,6 +32,8 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/LanguageMode.h"
+#include "llvm/ADT/SmallVector.h"
 using namespace swift;
 
 static void adjustFunctionTypeForOverride(Type &type) {
@@ -2480,24 +2482,31 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     return noResults;
   }
 
-  auto matches = matcher.match(OverrideCheckingAttempt::PerfectMatch);
-  if (matches.empty()) {
-    return noResults;
+  // Mismatches on @Sendable and global-actor attributes are treated as
+  // warnings depending on the language mode and declaration attributes.
+  // `checkOverrides` would produce mismatching override results and so
+  // should this method.
+  for (auto attempt : {OverrideCheckingAttempt::PerfectMatch,
+                       OverrideCheckingAttempt::MismatchedConcurrency}) {
+    auto matches = matcher.match(attempt);
+    if (matches.empty())
+      continue;
+
+    // If we have more than one potential match from a class, diagnose the
+    // ambiguity and fail.
+    if (matches.size() > 1 && decl->getDeclContext()->getSelfClassDecl()) {
+      diagnoseGeneralOverrideFailure(decl, matches, attempt);
+      invalidateOverrideAttribute(decl);
+      return noResults;
+    }
+
+    // Check the matches. If any are ill-formed, invalidate the override
+    // attribute
+    // so we don't try again.
+    return matcher.checkPotentialOverrides(matches, attempt);
   }
 
-  // If we have more than one potential match from a class, diagnose the
-  // ambiguity and fail.
-  if (matches.size() > 1 && decl->getDeclContext()->getSelfClassDecl()) {
-    diagnoseGeneralOverrideFailure(decl, matches,
-                                   OverrideCheckingAttempt::PerfectMatch);
-    invalidateOverrideAttribute(decl);
-    return noResults;
-  }
-
-  // Check the matches. If any are ill-formed, invalidate the override attribute
-  // so we don't try again.
-  return matcher.checkPotentialOverrides(matches,
-                                         OverrideCheckingAttempt::PerfectMatch);
+  return noResults;
 }
 
 llvm::TinyPtrVector<ValueDecl *>

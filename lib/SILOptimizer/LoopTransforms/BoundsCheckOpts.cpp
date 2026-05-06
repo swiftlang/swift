@@ -17,6 +17,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -38,6 +39,7 @@
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 
 #include "llvm/ADT/DepthFirstIterator.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
@@ -1022,6 +1024,11 @@ private:
   /// state after an instruction that may modify any array allowing removal of
   /// redundant checks up to that point and after that point.
   bool removeRedundantArrayChecksInBlock(SILBasicBlock &BB);
+
+  /// Hoists fixed storage bounds checks of the same self value to the earliest
+  /// check's position.
+  bool hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block);
+
   /// Hoist or remove redundant bound checks in \p Loop
   bool optimizeArrayBoundsCheckInLoop(SILLoop *Loop);
   /// Walk down the dominator tree inside the loop, removing redundant checks.
@@ -1045,6 +1052,18 @@ private:
       SILLoop *loop, DominanceInfoNode *currentNode,
       llvm::DenseSet<std::pair<SILValue, SILValue>> &dominatingSafeChecks,
       int recursionDepth);
+
+  /// Clone an index value and its operands, inserting them in correct order
+  /// at the given insertion position.
+  ///
+  /// \param indexValue The index value to clone
+  /// \param insertPos The position where cloned instructions should be inserted
+  /// \param instIndices Pre-computed instruction indices
+  /// \returns The cloned index value or std::nullopt if cloning was not
+  /// possible
+  std::optional<SILValue>
+  cloneFixedStorageIndex(SILValue indexValue, SILInstruction *insertPos,
+                         InstructionIndices &instIndices);
 
 public:
   void run() override {
@@ -1108,6 +1127,7 @@ bool BoundsCheckOpts::optimizeBoundsChecksInBlocks() {
   bool changed = false;
   for (auto &block : *getFunction()) {
     changed |= removeRedundantArrayChecksInBlock(block);
+    changed |= hoistFixedStorageBoundsChecksInBlock(block);
   }
   return changed;
 }
@@ -1192,6 +1212,79 @@ bool BoundsCheckOpts::removeRedundantArrayChecksInBlock(SILBasicBlock &BB) {
     Changed = true;
   }
   return Changed;
+}
+
+bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block) {
+  bool changed = false;
+
+  // Map to track fixed storage checks grouped by self value.
+  llvm::MapVector<SILValue, SmallVector<FixedStorageSemanticsCall, 4>>
+      checksToMerge;
+
+  LLVM_DEBUG(llvm::dbgs() << "Merging fixed storage checks in BB"
+                          << block.getDebugID() << "\n");
+
+  // First pass: collect all fixed storage checks grouped by self value
+  for (auto &inst : block) {
+    FixedStorageSemanticsCall fixedStorageCall(&inst);
+    if (!fixedStorageCall ||
+        fixedStorageCall.getKind() !=
+            FixedStorageSemanticsCallKind::CheckIndex ||
+        fixedStorageCall->getNumArguments() < 2) {
+      continue;
+    }
+
+    auto selfValue = fixedStorageCall.getSelf();
+    auto indexValue = fixedStorageCall.getIndex();
+
+    // Add this check to the list for the self value
+    checksToMerge[selfValue].push_back(fixedStorageCall);
+
+    LLVM_DEBUG(llvm::dbgs() << "  Found fixed storage check: " << inst
+                            << " with self: " << *selfValue
+                            << " and index: " << *indexValue);
+  }
+
+  InstructionIndices instIndices(&block);
+
+  // If instruction indices have overflowed, the ordering comparisons are
+  // unreliable and can cause unnecessary cloning below in an already large
+  // block, bail out.
+  if (instIndices.hasOverflowedIndices()) {
+    return changed;
+  }
+
+  // Second pass: process each self group to place checks with same self next to
+  // each other, preserving their original relative order.
+  for (auto &entry : checksToMerge) {
+    auto &checks = entry.second;
+    if (checks.size() <= 1) {
+      continue;
+    }
+
+    SILInstruction *insertAfter = *checks[0];
+
+    for (unsigned i = 1, e = checks.size(); i < e; ++i) {
+      auto check = checks[i];
+
+      auto indexValue = check.getIndex();
+      auto clonedValue =
+          cloneFixedStorageIndex(indexValue, *checks[0], instIndices);
+      if (!clonedValue) {
+        continue;
+      }
+      check.getIndexOperand().set(*clonedValue);
+      check->getCalleeOperand()->set(checks[0]->getCallee());
+      check->moveAfter(insertAfter);
+      insertAfter = *check;
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "      Moved check to be adjacent: " << *check.apply);
+      changed = true;
+    }
+  }
+
+  return changed;
 }
 
 bool BoundsCheckOpts::removeRedundantArrayBoundsChecksInLoop(
@@ -1746,6 +1839,97 @@ bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
                 });
 
   return changed;
+}
+
+static void mapOperands(SILInstruction *inst,
+                        const llvm::DenseMap<ValueBase *, SILValue> &valueMap) {
+  for (auto &operand : inst->getAllOperands()) {
+    SILValue origVal = operand.get();
+    ValueBase *origDef = origVal;
+    auto found = valueMap.find(origDef);
+    if (found != valueMap.end()) {
+      SILValue mappedVal = found->second;
+      operand.set(mappedVal);
+    }
+  }
+}
+
+static void mapValue(SILValue cloned, SILValue original,
+                     llvm::DenseMap<ValueBase *, SILValue> &valueMap) {
+  valueMap[original] = cloned;
+}
+
+static void mapResults(SILInstruction *cloned, SILInstruction *original,
+                       llvm::DenseMap<ValueBase *, SILValue> &valueMap) {
+  auto instResults = original->getResults();
+  auto clonedResults = cloned->getResults();
+  assert(instResults.size() == clonedResults.size());
+  for (auto i : indices(instResults)) {
+    mapValue(clonedResults[i], instResults[i], valueMap);
+  }
+}
+
+std::optional<SILValue>
+BoundsCheckOpts::cloneFixedStorageIndex(SILValue indexValue,
+                                        SILInstruction *insertPos,
+                                        InstructionIndices &instIndices) {
+  SmallVector<SILInstruction *, 8> worklist;
+  llvm::DenseMap<ValueBase *, SILValue> valueMap;
+  ValueSet visited(getFunction());
+
+
+  std::function<bool(SILValue)> collectOperands = [&](SILValue value) -> bool {
+    if (!visited.insert(value)) {
+      return true;
+    }
+    auto *inst = value->getDefiningInstruction();
+
+    // In ossa, bailout when we have an instruction with lifetime ending
+    // operands to avoid creating a possible over-consume.
+    if (inst && getFunction()->hasOwnership()) {
+      for (auto &operand : inst->getAllOperands()) {
+        if (operand.isLifetimeEnding()) {
+          return false;
+        }
+      }
+    }
+
+    // If the value appears to be before the insertion point, cloning is not
+    // necessary, because we can just reuse the value. Note that if the value is
+    // in a different block it must come before the insertion point because the
+    // value dominates insertion point.
+    if (isa<SILArgument>(value) ||
+        inst->getParent() != insertPos->getParent() ||
+        instIndices.get(inst) < instIndices.get(insertPos)) {
+      mapValue(value, value, valueMap);
+      return true;
+    }
+
+    if (!inst->isTriviallyDuplicatable() || inst->mayHaveSideEffects()) {
+      return false;
+    }
+
+    for (auto operand : inst->getOperandValues()) {
+      if (!collectOperands(operand)) {
+        return false;
+      }
+    }
+
+    worklist.push_back(inst);
+    return true;
+  };
+
+  if (!collectOperands(indexValue)) {
+    return std::nullopt;
+  }
+
+  for (auto *inst : worklist) {
+    auto *cloned = inst->clone(insertPos);
+    mapOperands(cloned, valueMap);
+    mapResults(cloned, inst, valueMap);
+  }
+
+  return valueMap[indexValue];
 }
 
 } // end anonymous namespace

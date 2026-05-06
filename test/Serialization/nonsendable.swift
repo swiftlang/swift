@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -module-name def_nonsendable -o %t %S/Inputs/def_nonsendable.swift
-// RUN: llvm-bcanalyzer %t/def_nonsendable.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer %t/def_nonsendable.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -typecheck -I %t %s -o /dev/null
 // RUN: %target-swift-frontend -emit-sil -I %t %s -o /dev/null
 

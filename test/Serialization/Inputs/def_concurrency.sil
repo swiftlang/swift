@@ -2,6 +2,7 @@ sil_stage raw // CHECK: sil_stage canonical
 
 import Builtin
 import Swift
+import _Concurrency
 
 actor Act { }
 

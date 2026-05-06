@@ -257,10 +257,23 @@ const {
     case DisallowedOriginKind::SPILocal:
       return DiagnosticBehavior::Ignore;
     case DisallowedOriginKind::MissingImport:
-    case DisallowedOriginKind::InternalBridgingHeaderImport:
     case DisallowedOriginKind::ImplementationOnly:
     case DisallowedOriginKind::FragileCxxAPI:
     case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
+      break;
+    case DisallowedOriginKind::InternalBridgingHeaderImport:
+      if (getDeclContext()->getASTContext().LangOpts.hasFeature(
+              Feature::AbstractStoredPropertyLayout)) {
+        if (auto reason = getExportabilityReason()) {
+          switch (*reason) {
+          case ExportabilityReason::ImplicitlyPublicVarDecl:
+          case ExportabilityReason::ImplicitlyPublicVarDeclOpenClass:
+            return DiagnosticBehavior::Ignore;
+          default:
+            break;
+          }
+        }
+      }
       break;
     }
   }

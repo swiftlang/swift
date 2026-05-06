@@ -122,7 +122,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         /*inferenceSources=*/{},
         repr->getLoc(),
         /*forExtension=*/nullptr,
-        /*allowInverses=*/true};
+        ExpandDefaults};
 
     interfaceSignature = evaluateOrDefault(
         ctx.evaluator, request, GenericSignatureWithError())
@@ -205,10 +205,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       requirements.emplace_back(kind, paramType, constraintType);
     }
 
-    interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
-                                               genericParamTypes,
-                                               std::move(requirements),
-                                               /*allowInverses=*/true);
+    interfaceSignature = buildGenericSignature(
+        ctx, outerGenericSignature, genericParamTypes, std::move(requirements),
+        {ExpandDefaults, InferOutOfScopeImpliedInverses});
     genericParams = originatingGenericContext
         ? originatingGenericContext->getGenericParams()
         : nullptr;
@@ -467,8 +466,9 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
       }
     }
 
-    auto weightedSig = buildGenericSignature(
-        ctx, GenericSignature(), params, reqs, /*allowInverses=*/false);
+    auto weightedSig =
+        buildGenericSignature(ctx, GenericSignature(), params, reqs,
+                              DefaultRequirementOptions());
 
     // Repeat the check with the new signature.
     checkProtocolSelfRequirementsImpl(ctx, proto, decl, sig, weightedSig,
@@ -988,7 +988,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       genericParams, WhereClauseOwner(GC),
       extraReqs, inferenceSources, loc,
       /*forExtension=*/dyn_cast<ExtensionDecl>(GC),
-      /*allowInverses=*/true};
+      ExpandDefaults};
   return evaluateOrDefault(ctx.evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }

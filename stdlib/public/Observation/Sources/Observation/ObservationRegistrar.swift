@@ -36,13 +36,6 @@ public struct ObservationRegistrar: Sendable {
     }
   }
 
-  enum Dirty {
-    case clean
-    case willSet(AnyKeyPath)
-    case didSet(AnyKeyPath)
-    case `deinit`
-  }
-
   private struct State: @unchecked Sendable {
     private enum ObservationKind {
       case willSetTracking(@Sendable (AnyKeyPath) -> Void)
@@ -92,7 +85,6 @@ public struct ObservationRegistrar: Sendable {
     private var observations = [Int : Observation]()
     private var lookups = [AnyKeyPath : Set<Int>]()
 
-    var dirty: Dirty = .clean
     var trackingLists = Set<UnsafeRawPointer>()
     
     internal mutating func generateId() -> Int {
@@ -207,15 +199,6 @@ public struct ObservationRegistrar: Sendable {
 
     internal func deinitialize() {
       let tracking = state.withCriticalRegion { 
-        let flagDirty: Bool
-        if let ptr = _ThreadLocal.value {
-          flagDirty = !$0.trackingLists.contains(ptr)
-        } else {
-          flagDirty = true
-        }
-        if flagDirty, case .clean = $0.dirty {
-          $0.dirty = .deinit
-        }
         return $0.deinitialize() 
       }
       for action in tracking {
@@ -229,11 +212,9 @@ public struct ObservationRegistrar: Sendable {
       }
     }
 
-    func clearDirty(_ tracking: UnsafeRawPointer) -> Dirty? {
+    func clearTracking(_ tracking: UnsafeRawPointer) {
       state.withCriticalRegion { state in
-        defer { state.dirty = .clean }
         state.trackingLists.remove(tracking)
-        return state.dirty
       }
     }
     
@@ -242,15 +223,6 @@ public struct ObservationRegistrar: Sendable {
        keyPath: KeyPath<Subject, Member>
     ) {
       let tracking = state.withCriticalRegion {
-        let flagDirty: Bool
-        if let ptr = _ThreadLocal.value {
-          flagDirty = !$0.trackingLists.contains(ptr)
-        } else {
-          flagDirty = true
-        }
-        if flagDirty, case .clean = $0.dirty {
-          $0.dirty = .willSet(keyPath) 
-        }
         return $0.willSet(keyPath: keyPath) 
       }
       for action in tracking {
@@ -263,15 +235,6 @@ public struct ObservationRegistrar: Sendable {
       keyPath: KeyPath<Subject, Member>
     ) {
       let tracking = state.withCriticalRegion {
-        let flagDirty: Bool
-        if let ptr = _ThreadLocal.value {
-          flagDirty = !$0.trackingLists.contains(ptr)
-        } else {
-          flagDirty = true
-        }
-        if flagDirty, case .clean = $0.dirty {
-          $0.dirty = .didSet(keyPath)
-        }
         return $0.didSet(keyPath: keyPath) 
       }
       for action in tracking {

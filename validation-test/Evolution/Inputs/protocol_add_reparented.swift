@@ -120,3 +120,72 @@ public func willChirp(_ e: some SeedEater) -> Bool {
   return e.containsChirps()
 }
 #endif
+
+
+// Ensure you can reparent a protocol that previously inherited from
+// other reparentable protocols.
+
+@reparentable
+public protocol A {
+  func helloA() -> Int
+}
+
+#if !BEFORE
+@reparentable
+public protocol B {
+  func helloB(extra: Int) -> Int
+}
+#endif
+
+public protocol C {
+  func helloC() -> Int
+}
+
+@reparentable
+public protocol D {
+  func helloD(extra: Int) -> Int
+}
+
+@reparentable
+public protocol E {
+  func helloE() -> Int
+}
+
+#if BEFORE
+public protocol MultiParent: A, C, D, E {}
+#else
+public protocol MultiParent: A, B, C, D, E {}
+
+extension MultiParent: @reparented B {
+  public func helloB(extra: Int) -> Int {
+    return libraryVersion() + (extra - 19)
+  }
+}
+#endif
+
+// Tests a pre-existing reparenting by D, ensuring we can reparent something that's been reparented.
+extension MultiParent: @reparented D {
+  public func helloD(extra: Int) -> Int { return 10 + (extra - 42) }
+}
+
+// The "extra:" parameters test to ensure we call the _right_ witness function, by
+// passing in the correct extra value to cancel-out the subtraction in the expected implementation.
+
+public func library_testMultiParent_someType(_ t: some MultiParent) -> Int {
+  let baseline = t.helloA() + t.helloC() + t.helloD(extra: 42) + t.helloE()
+  #if BEFORE
+    return baseline
+  #else
+    return baseline + t.helloB(extra: 19)
+  #endif
+}
+
+public func library_testMultiParent_anyType(_ t: any MultiParent) -> Int {
+  let baseline = t.helloA() + t.helloC() + t.helloD(extra: 42) + t.helloE()
+  #if BEFORE
+    return baseline
+  #else
+    return baseline + t.helloB(extra: 19)
+  #endif
+}
+

@@ -25,9 +25,10 @@ public:
 
   SILFunction *createFunctionForForwardReference(StringRef name,
                                                  CanSILFunctionType ty,
+                                                 ActorIsolation isolation,
                                                  SILLocation loc) {
     auto *result = builder.createFunction(
-        SILLinkage::Private, name, ty, nullptr, loc, IsNotBare,
+        SILLinkage::Private, name, ty, isolation, nullptr, loc, IsNotBare,
         IsNotTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
         IsNotRuntimeAccessible);
     result->setDebugScope(new (builder.mod) SILDebugScope(loc, result));

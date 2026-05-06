@@ -101,7 +101,8 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 
   case ActorIsolation::GlobalActor:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedConcurrent:
+  case ActorIsolation::NonisolatedNonsending:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     break;

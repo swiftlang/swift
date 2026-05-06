@@ -1,6 +1,5 @@
-// RUN:%target-swift-frontend -emit-silgen %s -enable-experimental-feature BorrowAndMutateAccessors -enable-sil-opaque-values | %FileCheck %s
+// RUN:%target-swift-frontend -emit-silgen %s -enable-sil-opaque-values | %FileCheck %s
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 public final class Klass {}
 

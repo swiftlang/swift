@@ -315,8 +315,6 @@ private:
                           const SILOptions &SILOptions,
                           ASTContext &ScanASTContext,
                           DependencyTracker &DependencyTracker,
-                          std::shared_ptr<llvm::cas::ObjectStore> CAS,
-                          std::shared_ptr<llvm::cas::ActionCache> ActionCache,
                           DiagnosticEngine &Diagnostics, bool ParallelScan,
                           bool EmitScanRemarks);
   llvm::Error initializeWorkerClangScanningTool();
@@ -465,6 +463,7 @@ private:
   std::shared_ptr<llvm::cas::ActionCache> ActionCache;
   /// File prefix mapper.
   std::unique_ptr<llvm::PrefixMapper> PrefixMapper;
+  std::unique_ptr<llvm::PrefixMapper> ReversePrefixMapping;
   /// CAS file system for loading file content.
   llvm::IntrusiveRefCntPtr<llvm::cas::CASBackedFileSystem> CacheFS;
   /// Protect worker access.

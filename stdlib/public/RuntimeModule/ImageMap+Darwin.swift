@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(anyAppleOS)
 
 import Swift
 
@@ -129,4 +129,4 @@ extension ImageMap {
 
 }
 
-#endif // os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#endif // os(anyAppleOS)

@@ -1,10 +1,9 @@
-// RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature CoroutineAccessors
-// RUN: %target-swift-frontend-typecheck -enable-testing -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature CoroutineAccessors
+// RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature CoroutineAccessors
+// RUN: %target-swift-frontend-typecheck -enable-testing -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature CoroutineAccessors
 
 // Swift.AdditiveArithmetic:3:17: note: cannot yet register derivative default implementation for protocol requirements
 
 // REQUIRES: swift_feature_CoroutineAccessors
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 import _Differentiation
 

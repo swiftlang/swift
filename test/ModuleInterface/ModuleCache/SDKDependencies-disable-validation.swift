@@ -8,8 +8,8 @@
 // RUN: %target-swift-frontend -compile-module-from-interface -serialize-parseable-module-interface-dependency-hashes -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -I %t/my-sdk -module-cache-path %t/MCP -o %t/prebuilt-cache/SdkLib.swiftmodule -track-system-dependencies -module-name SdkLib %t/my-sdk/SdkLib.swiftinterface
 //
 // Check the prebuilt modules don't contain dependencies in the module cache, prebuilt cache, or resource dir
-// RUN: llvm-bcanalyzer -dump %t/prebuilt-cache/ExportedLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
-// RUN: llvm-bcanalyzer -dump %t/prebuilt-cache/SdkLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+// RUN: %llvm-bcanalyzer -dump %t/prebuilt-cache/ExportedLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+// RUN: %llvm-bcanalyzer -dump %t/prebuilt-cache/SdkLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 //
 // PREBUILT: MODULE_BLOCK
 // PREBUILT-NOT: FILE_DEPENDENCY {{.*[/\\]MCP[/\\]}}
@@ -23,8 +23,8 @@
 // RUN: %target-swift-frontend -compile-module-from-interface -serialize-parseable-module-interface-dependency-hashes -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -I %t/my-sdk -module-cache-path %t/MCP -o %t/prebuilt-cache/ExportedLib.swiftmodule -track-system-dependencies -module-name ExportedLib %t/my-sdk/ExportedLib.swiftinterface
 //
 // Check they still don't contain dependencies in the module cache or prebuilt cache
-// RUN: llvm-bcanalyzer -dump %t/prebuilt-cache/ExportedLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
-// RUN: llvm-bcanalyzer -dump %t/prebuilt-cache/SdkLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+// RUN: %llvm-bcanalyzer -dump %t/prebuilt-cache/ExportedLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+// RUN: %llvm-bcanalyzer -dump %t/prebuilt-cache/SdkLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 //
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '1: PASSED'
@@ -43,8 +43,8 @@
 // RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they don't contain dependencies in the module cache (..or prebuilt cache)
-// RUN: llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
-// RUN: llvm-bcanalyzer -dump %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+// RUN: %llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+// RUN: %llvm-bcanalyzer -dump %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 //
 // Check we didn't emit anything from the cache in the .d file either
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE-NEGATIVE
@@ -142,7 +142,7 @@
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NOCACHE -DLIB_NAME=ExportedLib
 //
 // Check SdkLib doesn't contain dependencies in the module cache or prebuilt cache
-// RUN: llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+// RUN: %llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 //
 // RUN: echo '5: PASSED'
 

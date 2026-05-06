@@ -123,7 +123,7 @@ public func myFunc6(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: C
     if _ptrCount != count * size {
       fatalError("bounds check failure in myFunc6: expected \(count * size) but got \(_ptrCount)")
     }
-    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+    let _ptrPtr = ptr.withUnsafeBytes {
         unsafe $0
     }
     defer {
@@ -141,7 +141,7 @@ public func myFunc7(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: C
     if _ptrCount != count * size {
       fatalError("bounds check failure in myFunc7: expected \(count * size) but got \(_ptrCount)")
     }
-    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+    let _ptrPtr = ptr.withUnsafeBytes {
         unsafe $0
     }
     defer {
@@ -159,7 +159,7 @@ public func myFunc8(_ ptr: RawSpan, _ span: Span<CInt>, _ count: CInt, _ size: C
     if _ptrCount != count * size {
       fatalError("bounds check failure in myFunc8: expected \(count * size) but got \(_ptrCount)")
     }
-    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+    let _ptrPtr = ptr.withUnsafeBytes {
         unsafe $0
     }
     defer {
@@ -173,7 +173,7 @@ public func myFunc8(_ ptr: RawSpan, _ span: Span<CInt>, _ count: CInt, _ size: C
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(copy span) @_lifetime(span: copy span) @_disfavoredOverload
 public func myFunc9(_ span: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
-    return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: unsafe span.withUnsafeMutableBufferPointer { _spanPtr in
+    return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: span.withUnsafeMutableBufferPointer { _spanPtr in
       return unsafe myFunc9(MutableSpanOfInt(_spanPtr))
             }), copying: ())
 }
@@ -183,7 +183,7 @@ public func myFunc9(_ span: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(copy `self`) @_lifetime(`self`: copy `self`) @_disfavoredOverload
 public func myFunc10(_ `self`: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
-    return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: unsafe `self`.withUnsafeMutableBufferPointer { _selfPtr in
+    return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: `self`.withUnsafeMutableBufferPointer { _selfPtr in
       return unsafe myFunc10(MutableSpanOfInt(_selfPtr))
             }), copying: ())
 }

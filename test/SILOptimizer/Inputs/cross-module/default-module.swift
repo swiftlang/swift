@@ -70,3 +70,29 @@ public func callPrivateCFunc() -> Int {
 public func usePrivateCVar() -> Int {
   return Int(privateCVar);
 }
+
+public struct S {
+  @usableFromInline
+  final class C {
+    @usableFromInline var p: UnsafeMutableRawPointer
+
+    init(p: UnsafeMutableRawPointer) { self.p = p }
+  }
+
+  @usableFromInline var c: C
+
+  public let b: Bool
+
+  public init(p: UnsafeMutableRawPointer, b: Bool) {
+    self.c = C(p: p)
+    self.b = b
+  }
+
+  public func load<T>(t: T.Type, i: Int) -> T {
+    if b {
+      return c.p.advanced(by: i).loadUnaligned(as: T.self)
+    }
+    return c.p.advanced(by: i).load(as: T.self)
+  }
+}
+

@@ -515,11 +515,9 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
 
   return TypeResolution::forInterface(
              DC, GenericSig, options,
-             [](auto unboundTy) {
-               // FIXME: Don't let unbound generic types escape type resolution.
-               // For now, just return the unbound generic type.
-               return unboundTy;
-             },
+             // FIXME: Don't let unbound generic types escape type resolution.
+             // For now, just return the unbound generic type.
+             TypeResolution::defaultUnboundTypeOpener,
              // FIXME: Don't let placeholder types escape type resolution.
              // For now, just return the placeholder type.
              PlaceholderType::get,
@@ -558,8 +556,8 @@ namespace {
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericSignature
-swift::handleSILGenericParams(GenericParamList *genericParams,
-                              DeclContext *DC, bool allowInverses) {
+swift::handleSILGenericParams(GenericParamList *genericParams, DeclContext *DC,
+                              DefaultRequirementOptions options) {
   if (genericParams == nullptr)
     return nullptr;
 
@@ -586,7 +584,7 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
       nestedList.back(), WhereClauseOwner(),
       {}, {}, genericParams->getLAngleLoc(),
       /*forExtension=*/nullptr,
-      allowInverses};
+      options};
   return evaluateOrDefault(DC->getASTContext().evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }

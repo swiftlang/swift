@@ -952,8 +952,8 @@ enum MaybeAddressOnlyPair {
   case Left(Q)
 }
 
-// CHECK-LABEL: sil @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
-sil @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> () {
+// CHECK-LABEL: sil @test_switch_enum_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
+sil @test_switch_enum_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> () {
 bb0(%0 : $*MaybeAddressOnlyPair):
   // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt: bb
   switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt: bb2
@@ -964,6 +964,47 @@ bb1:
 bb2:
   // CHECK: unchecked_take_enum_data_addr [[ENUM]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
   %q = unchecked_take_enum_data_addr %0 : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @test_switch_enum_addr_inplace : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
+sil @test_switch_enum_addr_inplace : $@convention(thin) (@in MaybeAddressOnlyPair) -> () {
+bb0(%0 : $*MaybeAddressOnlyPair):
+  // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt: bb
+  switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  // CHECK: unchecked_inplace_enum_data_addr [[ENUM]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
+  %q = unchecked_inplace_enum_data_addr %0 : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @test_switch_enum_addr_borrow : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
+sil @test_switch_enum_addr_borrow : $@convention(thin) (@in MaybeAddressOnlyPair) -> () {
+bb0(%0 : $*MaybeAddressOnlyPair):
+  // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt: bb
+  switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  // CHECK: [[SCRATCH:%.*]] = alloc_stack $MaybeAddressOnlyPair
+  %s = alloc_stack $MaybeAddressOnlyPair
+  // CHECK: unchecked_borrow_enum_data_addr [[ENUM]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt in [[SCRATCH]]
+  %q = unchecked_borrow_enum_data_addr %0 : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt in %s
+  dealloc_stack %s
   br bb3
 
 bb3:
@@ -1847,22 +1888,28 @@ entry(%addr : $*T):
   return %r : $()
 }
 
-class Foo2: Foo {}
+class Foo2: Foo, Q {}
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter: {{.*}} : @Foo_subscript_getter [nonoverridden]
-// CHECK: #Foo.subscript!setter: {{.*}} : @Foo_subscript_setter
-// CHECK: }
+// CHECK-NEXT:    #Foo.subscript!getter: {{.*}} : @Foo_subscript_getter [nonoverridden]
+// CHECK-NEXT:    #Foo.subscript!setter: {{.*}} : @Foo_subscript_setter
+// CHECK-NEXT:  }
 sil_vtable Foo {
   #Foo.subscript!getter: @Foo_subscript_getter [nonoverridden]
   #Foo.subscript!setter: @Foo_subscript_setter 
 }
 
 // CHECK-LABEL: sil_vtable Foo2 {
-// CHECK: #Foo.subscript!getter: {{.*}} : @Foo_subscript_getter [inherited] [nonoverridden]
-// CHECK: #Foo.subscript!setter: {{.*}} : @Foo_subscript_setter [override]
-// CHECK: }
+// CHECK-NEXT:    no_conformance P
+// CHECK-NEXT:    conformance Foo2: Q module main
+// CHECK-NEXT:    no_conformance P2
+// CHECK-NEXT:    #Foo.subscript!getter: {{.*}} : @Foo_subscript_getter [inherited] [nonoverridden]
+// CHECK-NEXT:    #Foo.subscript!setter: {{.*}} : @Foo_subscript_setter [override]
+// CHECK-NEXT:  }
 sil_vtable Foo2 {
+  no_conformance P
+  conformance Foo2: Q module main
+  no_conformance P2
   #Foo.subscript!getter: @Foo_subscript_getter [inherited] [nonoverridden]
   #Foo.subscript!setter: @Foo_subscript_setter [override]
 }

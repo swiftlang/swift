@@ -30,6 +30,17 @@ enum E: String {
   case a, b, c, d, e
 }
 
+struct NonUnqiueRawValue: Equatable, ExpressibleByStringLiteral {
+  init() {}
+  init(stringLiteral _: String) {}
+}
+
+enum NU: NonUnqiueRawValue {
+  case a = "a"
+  case b = "b"
+}
+
+
 protocol P2 {
   associatedtype A: Q
 }
@@ -231,6 +242,17 @@ sil [ossa] @string_enum_is_equal_wrong_convention : $@convention(thin) (E, E) ->
 bb0(%0 : $E, %1 : $E):
   %2 = function_ref @rawrepresentable_is_equal_wrong_convention : $@convention(thin) (E, E) -> Bool
   %3 = apply %2(%0, %1) : $@convention(thin) (E, E) -> Bool
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @custom_rawvalue_enum_is_equal :
+// CHECK:         function_ref
+// CHECK:         apply
+// CHECK:       } // end sil function 'custom_rawvalue_enum_is_equal'
+sil [ossa] @custom_rawvalue_enum_is_equal : $@convention(thin) (@in_guaranteed NU, @in_guaranteed NU) -> Bool {
+bb0(%0 : $*NU, %1 : $*NU):
+  %2 = function_ref @rawrepresentable_is_equal : $@convention(thin) <T where T : RawRepresentable, T.RawValue : Equatable> (@in_guaranteed T, @in_guaranteed T) -> Bool
+  %3 = apply %2<NU>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
   return %3
 }
 

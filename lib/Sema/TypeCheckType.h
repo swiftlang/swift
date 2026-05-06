@@ -55,7 +55,7 @@ enum class TypeResolutionFlags : uint16_t {
   Direct = 1 << 5,
 
   /// Whether we should not produce diagnostics if the type is invalid.
-  SilenceErrors = 1 << 6,
+  SilenceDiagnostics = 1 << 6,
 
   /// Whether to allow module declaration types.
   AllowModule = 1 << 7,
@@ -711,12 +711,6 @@ public:
   /// \returns A well-formed type that is never null, or an \c ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR,
                    SILTypeResolutionContext *silContext = nullptr) const;
-
-  /// Resolve a reference to a member type of the given (dependent) base and
-  /// name.
-  Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
-                                  SourceRange baseRange,
-                                  QualifiedIdentTypeRepr *repr) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.

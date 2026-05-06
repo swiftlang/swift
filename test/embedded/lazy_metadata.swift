@@ -1,23 +1,22 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -wmo -module-name A -emit-irgen -o %t/A1.ll %t/A.swift -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedExistentials -parse-as-library
+// RUN: %target-swift-frontend -wmo -module-name A -emit-irgen -o %t/A1.ll %t/A.swift -enable-experimental-feature Embedded -parse-as-library -disable-implicit-concurrency-module-import
 // RUN: %FileCheck --check-prefix=A1 %s < %t/A1.ll
 
-// RUN: %target-swift-frontend -wmo -module-name A -num-threads 1 -emit-ir -o %t/A2.ll -o %t/B2.ll %t/A.swift %t/B.swift -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedExistentials -parse-as-library
+// RUN: %target-swift-frontend -wmo -module-name A -num-threads 1 -emit-ir -o %t/A2.ll -o %t/B2.ll %t/A.swift %t/B.swift -enable-experimental-feature Embedded -parse-as-library -disable-implicit-concurrency-module-import
 // RUN: %FileCheck --check-prefix=A2 %s < %t/A2.ll
 // RUN: %FileCheck --check-prefix=B2 %s < %t/B2.ll
 
-// RUN: %target-swift-frontend  -emit-module -emit-module-path %t/A.swiftmodule -wmo -module-name A -emit-ir -o %t/A3.ll  %t/A.swift %t/B.swift -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedExistentials -parse-as-library
+// RUN: %target-swift-frontend  -emit-module -emit-module-path %t/A.swiftmodule -wmo -module-name A -emit-ir -o %t/A3.ll  %t/A.swift %t/B.swift -enable-experimental-feature Embedded -parse-as-library -disable-implicit-concurrency-module-import
 // RUN: %FileCheck --check-prefix=A3 %s < %t/A3.ll
 
-// RUN: %target-swift-frontend -wmo -I %t -module-name C -emit-irgen -o %t/C4.ll  %t/C.swift -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedExistentials -parse-as-library
+// RUN: %target-swift-frontend -wmo -I %t -module-name C -emit-irgen -o %t/C4.ll  %t/C.swift -enable-experimental-feature Embedded -parse-as-library -disable-implicit-concurrency-module-import
 // RUN: %FileCheck --check-prefix=C4 %s < %t/C4.ll
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedExistentials
 
 
 //--- A.swift

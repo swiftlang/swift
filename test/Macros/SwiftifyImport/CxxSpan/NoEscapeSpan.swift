@@ -43,7 +43,7 @@ public func myFunc(_ span: Span<CInt>, _ secondSpan: SpanOfInt) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(span: copy span) @_disfavoredOverload
 public func myFunc2(_ span: inout MutableSpan<CInt>, _ secondSpan: MutableSpanOfInt) {
-    return unsafe span.withUnsafeMutableBufferPointer { _spanPtr in
+    return span.withUnsafeMutableBufferPointer { _spanPtr in
       return unsafe myFunc2(MutableSpanOfInt(_spanPtr), secondSpan)
     }
 }
@@ -53,7 +53,7 @@ public func myFunc2(_ span: inout MutableSpan<CInt>, _ secondSpan: MutableSpanOf
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(span: copy span) @_disfavoredOverload
 public func myFunc3(_ span: inout MutableSpan<CInt>, _ secondSpan: Span<CInt>) {
-    return unsafe span.withUnsafeMutableBufferPointer { _spanPtr in
+    return span.withUnsafeMutableBufferPointer { _spanPtr in
       return unsafe myFunc3(MutableSpanOfInt(_spanPtr), SpanOfInt(secondSpan))
     }
 }
@@ -63,8 +63,8 @@ public func myFunc3(_ span: inout MutableSpan<CInt>, _ secondSpan: Span<CInt>) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(span: copy span) @_lifetime(secondSpan: copy secondSpan) @_disfavoredOverload
 public func myFunc4(_ span: inout MutableSpan<CInt>, _ secondSpan: inout MutableSpan<CInt>) {
-    return unsafe secondSpan.withUnsafeMutableBufferPointer { _secondSpanPtr in
-      return unsafe span.withUnsafeMutableBufferPointer { _spanPtr in
+    return secondSpan.withUnsafeMutableBufferPointer { _secondSpanPtr in
+      return span.withUnsafeMutableBufferPointer { _spanPtr in
       return unsafe myFunc4(MutableSpanOfInt(_spanPtr), MutableSpanOfInt(_secondSpanPtr))
       }
     }

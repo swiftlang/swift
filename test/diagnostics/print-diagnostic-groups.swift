@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -typecheck %s -diagnostic-documentation-path https://docs.swift.org/compiler/documentation/diagnostics/ 2>&1 | %FileCheck %s --check-prefix=CHECK-HTTPS -check-prefix CHECK
 // REQUIRES: swift_swift_parser
 
-// CHECK: warning: file 'print-diagnostic-groups.swift' is part of module 'main'; ignoring import{{$}}
+// CHECK: warning: file 'print-diagnostic-groups.swift' is part of module 'main'; ignoring import [#ModuleSelfImport]{{$}}
 import main
 
 // This test checks that we get diagnostic groups as part of the printed output.

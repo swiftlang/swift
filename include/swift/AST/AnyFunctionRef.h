@@ -195,6 +195,15 @@ public:
     return false;
   }
 
+  /// Whether this function is `async`.
+  bool isAsync() const {
+    auto type = getType();
+    if (!type)
+      return false;
+    auto *fnType = type->getAs<AnyFunctionType>();
+    return fnType && fnType->isAsync();
+  }
+
   bool isObjC() const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->isObjC();

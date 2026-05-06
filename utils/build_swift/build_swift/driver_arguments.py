@@ -484,6 +484,31 @@ def create_argument_parser():
     option('--sccache', toggle_true,
            default=os.environ.get('SWIFT_USE_SCCACHE') == '1',
            help='use sccache')
+    option('--enable-caching', toggle_true,
+           default=os.environ.get('SWIFT_USE_CACHING') == '1',
+           help='enable compilation caching using clang-cache and swift '
+                'cache-compile-job (incompatible with --sccache)')
+    option('--caching-cas-path', store_path,
+           default=None,
+           help='the path to the CAS directory for caching builds. '
+                'Defaults to $BUILD_ROOT/cas')
+    option('--caching-depscan-socket', store,
+           default='/tmp/clang-scand',
+           help='the socket path for the clang-cache depscan daemon')
+    option('--caching-plugin-path', store_path,
+           default=None,
+           help='the path to the CAS plugin for caching builds')
+    option('--caching-plugin-option', append,
+           help='options to pass to the CAS plugin. Can be specified '
+                'multiple times.')
+    option('--caching-prefix-map', toggle_true,
+           help='enable prefix mapping for cached builds. Maps source, '
+                'SDK, and toolchain paths to canonical prefixes.')
+    option('--caching-remote-service-path', store_path,
+           default=None,
+           help='the path to the remote caching service socket. Implies '
+                '--caching-prefix-map. Uses libToolchainCASPlugin.dylib '
+                'from Xcode if --caching-plugin-path is not provided.')
     option('--enable-asan', toggle_true,
            help='enable Address Sanitizer')
     option('--enable-ubsan', toggle_true,
@@ -856,8 +881,8 @@ def create_argument_parser():
 
     # Wasm options
 
-    option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
-           help='build the stdlib for WebAssembly target into a'
+    option(['--build-wasi-stdlib'], toggle_true('build_wasistdlib'),
+           help='build the stdlib for WASI target into a'
                 'separate build directory ')
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
@@ -1193,6 +1218,11 @@ def create_argument_parser():
                 'Then re-builds the TSan runtime (compiler-rt) using this '
                 'freshly-built Clang and runs the TSan libdispatch tests.')
 
+    option('--continue-on-test-failure', toggle_true,
+           help='Continue building and testing remaining products even if '
+                'tests fail for a product. A non-zero exit code is still '
+                'returned at the end if any test failures occurred.')
+
     option('--skip-test-osx', toggle_false('test_osx'),
            help='skip testing Swift stdlibs for Mac OS X')
     option('--skip-test-linux', toggle_false('test_linux'),
@@ -1442,8 +1472,8 @@ def create_argument_parser():
            help='skip testing swift_inspect')
     option('--skip-test-swiftdocc', toggle_false('test_swiftdocc'),
            help='skip testing swift-docc')
-    option('--skip-test-wasm-stdlib', toggle_false('test_wasmstdlib'),
-           help='skip testing stdlib for WebAssembly')
+    option('--skip-test-wasi-stdlib', toggle_false('test_wasistdlib'),
+           help='skip testing stdlib for WASI')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
@@ -1704,8 +1734,6 @@ Preparing to run this script
 ----------------------------
 
   See README.md for instructions on cloning Swift subprojects.
-
-If you intend to use the -l, -L, --lldb, or --debug-lldb options.
 
 That's it; you're ready to go!
 

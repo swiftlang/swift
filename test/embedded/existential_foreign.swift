@@ -1,11 +1,10 @@
-// RUN: %target-run-simple-swift(-import-objc-header %S/Inputs/existential_foreign.h -enable-experimental-feature EmbeddedExistentials -enable-experimental-feature Embedded -parse-as-library -wmo %target-embedded-posix-shim) | %FileCheck %s --check-prefix=OUTPUT
-// RUN: %target-run-simple-swift(-import-objc-header %S/Inputs/existential_foreign.h -enable-experimental-feature EmbeddedExistentials -enable-experimental-feature Embedded -parse-as-library -wmo -O %target-embedded-posix-shim) | %FileCheck %s --check-prefix=OUTPUT
+// RUN: %target-run-simple-swift(-import-objc-header %S/Inputs/existential_foreign.h -enable-experimental-feature Embedded -parse-as-library -wmo %target-embedded-posix-shim) | %FileCheck %s --check-prefix=OUTPUT
+// RUN: %target-run-simple-swift(-import-objc-header %S/Inputs/existential_foreign.h -enable-experimental-feature Embedded -parse-as-library -wmo -O %target-embedded-posix-shim) | %FileCheck %s --check-prefix=OUTPUT
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedExistentials
 
 protocol P {
   func printme()

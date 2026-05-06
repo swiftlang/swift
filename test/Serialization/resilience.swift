@@ -4,18 +4,18 @@
 // flag.
 
 // RUN: %target-swift-frontend -emit-module -o %t %s
-// RUN: llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience.dump.txt
+// RUN: %llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=DEFAULT %s < %t/resilience.dump.txt
 
 // RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %s
-// RUN: llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience2.dump.txt
+// RUN: %llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience2.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=RESILIENCE %s < %t/resilience2.dump.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/resilience2.dump.txt
 
 // FIXME: The alternate -enable-resilience flag is going away soon.
 
 // RUN: %target-swift-frontend -emit-module -o %t -enable-resilience %s
-// RUN: llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience2.dump.txt
+// RUN: %llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience2.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=RESILIENCE %s < %t/resilience2.dump.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/resilience2.dump.txt
 

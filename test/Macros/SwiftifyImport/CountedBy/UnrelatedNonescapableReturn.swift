@@ -31,7 +31,7 @@ public func myFunc2(_ ptr: UnsafeMutablePointer<CInt>, _ len: CInt, _ extraNE: i
 @_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
 public func myFunc(_ ptr: Span<CInt>) -> NonescapableEnum {
     let len = CInt(exactly: ptr.count)!
-    let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
+    let _ptrPtr = ptr.withUnsafeBufferPointer {
         unsafe $0
     }
     defer {
@@ -46,7 +46,7 @@ public func myFunc(_ ptr: Span<CInt>) -> NonescapableEnum {
 @_alwaysEmitIntoClient @_lifetime(copy ptr, copy extraNE) @_lifetime(ptr: copy ptr) @_lifetime(extraNE: copy extraNE) @_disfavoredOverload
 public func myFunc2(_ ptr: inout MutableSpan<CInt>, _ extraNE: inout NonescapableEnum) -> NonescapableEnum {
     let len = CInt(exactly: ptr.count)!
-    let _ptrPtr = unsafe ptr.withUnsafeMutableBufferPointer {
+    let _ptrPtr = ptr.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {

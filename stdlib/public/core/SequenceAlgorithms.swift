@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -106,11 +106,11 @@ extension Sequence {
   ///   `nil`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @_alwaysEmitIntoClient
+  @inlinable // protocol-only
   @warn_unqualified_access
-  public func min<E: Error>(
-    by areInIncreasingOrder: (Element, Element) throws(E) -> Bool
-  ) throws(E) -> Element? {
+  public func min(
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows -> Element? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
     while let e = it.next() {
@@ -118,21 +118,6 @@ extension Sequence {
     }
     return result
   }
-
-#if !hasFeature(Embedded)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func min(
-      by areInIncreasingOrder: (Element, Element) throws -> Bool
-    ) throws -> Element?
-  )
-  @usableFromInline
-  internal func __rethrows_min(
-    by areInIncreasingOrder: (Element, Element) throws -> Bool
-  ) throws -> Element? {
-    return try self.min(by: areInIncreasingOrder)
-  }
-#endif // !hasFeature(Embedded)
 
   /// Returns the maximum element in the sequence, using the given predicate
   /// as the comparison between elements.
@@ -165,11 +150,11 @@ extension Sequence {
   ///   otherwise, `nil`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @_alwaysEmitIntoClient
+  @inlinable // protocol-only
   @warn_unqualified_access
-  public func max<E: Error>(
-    by areInIncreasingOrder: (Element, Element) throws(E) -> Bool
-  ) throws(E) -> Element? {
+  public func max(
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows -> Element? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
     while let e = it.next() {
@@ -177,21 +162,6 @@ extension Sequence {
     }
     return result
   }
-
-#if !hasFeature(Embedded)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func max(
-      by areInIncreasingOrder: (Element, Element) throws -> Bool
-    ) throws -> Element?
-  )
-  @usableFromInline
-  internal func __rethrows_max(
-    by areInIncreasingOrder: (Element, Element) throws -> Bool
-  ) throws -> Element? {
-    return try self.max(by: areInIncreasingOrder)
-  }
-#endif // !hasFeature(Embedded)
 }
 
 extension Sequence where Element: Comparable {
@@ -262,11 +232,11 @@ extension Sequence  {
   ///
   /// - Complexity: O(*m*), where *m* is the lesser of the length of the
   ///   sequence and the length of `possiblePrefix`.
-  @_alwaysEmitIntoClient
-  public func starts<PossiblePrefix: Sequence, E: Error>(
+  @inlinable
+  public func starts<PossiblePrefix: Sequence>(
     with possiblePrefix: PossiblePrefix,
-    by areEquivalent: (Element, PossiblePrefix.Element) throws(E) -> Bool
-  ) throws(E) -> Bool {
+    by areEquivalent: (Element, PossiblePrefix.Element) throws -> Bool
+  ) rethrows -> Bool {
     var possiblePrefixIterator = possiblePrefix.makeIterator()
     for e0 in self {
       if let e1 = possiblePrefixIterator.next() {
@@ -280,23 +250,6 @@ extension Sequence  {
     }
     return possiblePrefixIterator.next() == nil
   }
-
-#if !hasFeature(Embedded)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func starts<PossiblePrefix: Sequence>(
-      with possiblePrefix: PossiblePrefix,
-      by areEquivalent: (Element, PossiblePrefix.Element) throws -> Bool
-    ) throws -> Bool
-  )
-  @usableFromInline
-  internal func __rethrows_starts<PossiblePrefix: Sequence>(
-    with possiblePrefix: PossiblePrefix,
-    by areEquivalent: (Element, PossiblePrefix.Element) throws -> Bool
-  ) throws -> Bool {
-    return try self.starts(with: possiblePrefix, by: areEquivalent)
-  }
-#endif // !hasFeature(Embedded)
 }
 
 extension Sequence where Element: Equatable {
@@ -362,11 +315,11 @@ extension Sequence {
   ///
   /// - Complexity: O(*m*), where *m* is the lesser of the length of the
   ///   sequence and the length of `other`.
-  @_alwaysEmitIntoClient
-  public func elementsEqual<OtherSequence: Sequence, E: Error>(
+  @inlinable
+  public func elementsEqual<OtherSequence: Sequence>(
     _ other: OtherSequence,
-    by areEquivalent: (Element, OtherSequence.Element) throws(E) -> Bool
-  ) throws(E) -> Bool {
+    by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
+  ) rethrows -> Bool {
     var iter1 = self.makeIterator()
     var iter2 = other.makeIterator()
     while true {
@@ -381,23 +334,6 @@ extension Sequence {
     }
     fatalError()
   }
-
-#if !hasFeature(Embedded)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func elementsEqual<OtherSequence: Sequence>(
-      _ other: OtherSequence,
-      by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
-    ) throws -> Bool
-  )
-  @usableFromInline
-  internal func __rethrows_elementsEqual<OtherSequence: Sequence>(
-    _ other: OtherSequence,
-    by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
-  ) throws -> Bool {
-    return try self.elementsEqual(other, by: areEquivalent)
-  }
-#endif // !hasFeature(Embedded)
 }
 
 extension Sequence where Element: Equatable {
@@ -468,11 +404,11 @@ extension Sequence {
   ///
   /// - Complexity: O(*m*), where *m* is the lesser of the length of the
   ///   sequence and the length of `other`.
-  @_alwaysEmitIntoClient
-  public func lexicographicallyPrecedes<OtherSequence: Sequence, E: Error>(
+  @inlinable
+  public func lexicographicallyPrecedes<OtherSequence: Sequence>(
     _ other: OtherSequence,
-    by areInIncreasingOrder: (Element, Element) throws(E) -> Bool
-  ) throws(E) -> Bool
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows -> Bool
   where OtherSequence.Element == Element {
     var iter1 = self.makeIterator()
     var iter2 = other.makeIterator()
@@ -492,25 +428,6 @@ extension Sequence {
     }
     fatalError()
   }
-
-#if !hasFeature(Embedded)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func lexicographicallyPrecedes<OtherSequence: Sequence>(
-      _ other: OtherSequence,
-      by areInIncreasingOrder: (Element, Element) throws -> Bool
-    ) throws -> Bool
-    where OtherSequence.Element == Element
-  )
-  @usableFromInline
-  internal func __rethrows_lexicographicallyPrecedes<OtherSequence: Sequence>(
-    _ other: OtherSequence,
-    by areInIncreasingOrder: (Element, Element) throws -> Bool
-  ) throws -> Bool
-  where OtherSequence.Element == Element {
-    return try self.lexicographicallyPrecedes(other, by: areInIncreasingOrder)
-  }
-#endif // !hasFeature(Embedded)
 }
 
 extension Sequence where Element: Comparable {
@@ -590,10 +507,10 @@ extension Sequence {
   ///   `predicate`; otherwise, `false`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @_alwaysEmitIntoClient
-  public func contains<E: Error>(
-    where predicate: (Element) throws(E) -> Bool
-  ) throws(E) -> Bool {
+  @inlinable
+  public func contains(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Bool {
     for e in self {
       if try predicate(e) {
         return true
@@ -601,21 +518,6 @@ extension Sequence {
     }
     return false
   }
-
-#if !hasFeature(Embedded)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func contains(
-      where predicate: (Element) throws -> Bool
-    ) throws -> Bool
-  )
-  @usableFromInline
-  internal func __rethrows_contains(
-    where predicate: (Element) throws -> Bool
-  ) throws -> Bool {
-    return try self.contains(where: predicate)
-  }
-#endif // !hasFeature(Embedded)
 
   /// Returns a Boolean value indicating whether every element of a sequence
   /// satisfies a given predicate.
@@ -636,27 +538,12 @@ extension Sequence {
   ///   `predicate`; otherwise, `false`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @_alwaysEmitIntoClient
-  public func allSatisfy<E: Error>(
-    _ predicate: (Element) throws(E) -> Bool
-  ) throws(E) -> Bool {
-    return try !contains { element throws(E) in try !predicate(element) }
-  }
-
-#if !hasFeature(Embedded)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func allSatisfy(
-      _ predicate: (Element) throws -> Bool
-    ) throws -> Bool
-  )
-  @usableFromInline
-  internal func __rethrows_allSatisfy(
+  @inlinable
+  public func allSatisfy(
     _ predicate: (Element) throws -> Bool
-  ) throws -> Bool {
-    return try self.allSatisfy(predicate)
+  ) rethrows -> Bool {
+    return try !contains { try !predicate($0) }
   }
-#endif // !hasFeature(Embedded)
 }
 
 extension Sequence where Element: Equatable {
@@ -778,11 +665,11 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_alwaysEmitIntoClient
-  public func reduce<Result, E: Error>(
-    _ initialResult: Result,
+  public func reduce<Result: ~Copyable>(
+    _ initialResult: consuming Result,
     _ nextPartialResult:
-      (_ partialResult: Result, Element) throws(E) -> Result
-  ) throws(E) -> Result {
+      (_ partialResult: consuming Result, Element) throws -> Result
+  ) rethrows -> Result {
     var accumulator = initialResult
     for element in self {
       accumulator = try nextPartialResult(accumulator, element)
@@ -853,37 +740,18 @@ extension Sequence {
   ///   the result is `initialResult`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @_alwaysEmitIntoClient
-  public func reduce<Result, E: Error>(
+  @inlinable
+  public func reduce<Result>(
     into initialResult: __owned Result,
     _ updateAccumulatingResult:
-      (_ partialResult: inout Result, Element) throws(E) -> ()
-  ) throws(E) -> Result {
+      (_ partialResult: inout Result, Element) throws -> ()
+  ) rethrows -> Result {
     var accumulator = initialResult
     for element in self {
       try updateAccumulatingResult(&accumulator, element)
     }
     return accumulator
   }
-
-#if !hasFeature(Embedded)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func reduce<Result>(
-      into initialResult: __owned Result,
-      _ updateAccumulatingResult:
-        (_ partialResult: inout Result, Element) throws -> ()
-    ) throws -> Result
-  )
-  @usableFromInline
-  internal func __rethrows_reduce<Result>(
-    into initialResult: __owned Result,
-    _ updateAccumulatingResult:
-      (_ partialResult: inout Result, Element) throws -> ()
-  ) throws -> Result {
-    return try self.reduce(into: initialResult, updateAccumulatingResult)
-  }
-#endif // !hasFeature(Embedded)
 }
 
 //===----------------------------------------------------------------------===//
@@ -945,31 +813,16 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *n* is the length of this sequence
   ///   and *m* is the length of the result.
-  @_alwaysEmitIntoClient
-  public func flatMap<SegmentOfResult: Sequence, E: Error>(
-    _ transform: (Element) throws(E) -> SegmentOfResult
-  ) throws(E) -> [SegmentOfResult.Element] {
+  @inlinable
+  public func flatMap<SegmentOfResult: Sequence>(
+    _ transform: (Element) throws -> SegmentOfResult
+  ) rethrows -> [SegmentOfResult.Element] {
     var result: [SegmentOfResult.Element] = []
     for element in self {
       result.append(contentsOf: try transform(element))
     }
     return result
   }
-
-#if !hasFeature(Embedded)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func flatMap<SegmentOfResult: Sequence>(
-      _ transform: (Element) throws -> SegmentOfResult
-    ) throws -> [SegmentOfResult.Element]
-  )
-  @usableFromInline
-  internal func __rethrows_flatMap<SegmentOfResult: Sequence>(
-    _ transform: (Element) throws -> SegmentOfResult
-  ) throws -> [SegmentOfResult.Element] {
-    return try self.flatMap(transform)
-  }
-#endif // !hasFeature(Embedded)
 }
 
 extension Sequence {
@@ -996,36 +849,21 @@ extension Sequence {
   ///   with each element of the sequence.
   ///
   /// - Complexity: O(*n*), where *n* is the length of this sequence.
-  @_alwaysEmitIntoClient
-  public func compactMap<ElementOfResult, E: Error>(
-    _ transform: (Element) throws(E) -> ElementOfResult?
-  ) throws(E) -> [ElementOfResult] {
+  @inlinable // protocol-only
+  public func compactMap<ElementOfResult>(
+    _ transform: (Element) throws -> ElementOfResult?
+  ) rethrows -> [ElementOfResult] {
     return try _compactMap(transform)
   }
-
-#if !hasFeature(Embedded)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func compactMap<ElementOfResult>(
-      _ transform: (Element) throws -> ElementOfResult?
-    ) throws -> [ElementOfResult]
-  )
-  @usableFromInline
-  internal func __rethrows_compactMap<ElementOfResult>(
-    _ transform: (Element) throws -> ElementOfResult?
-  ) throws -> [ElementOfResult] {
-    return try self.compactMap(transform)
-  }
-#endif // !hasFeature(Embedded)
 
   // The implementation of compactMap accepting a closure with an optional result.
   // Factored out into a separate function in order to be used in multiple
   // overloads.
-  @_alwaysEmitIntoClient
+  @inlinable // protocol-only
   @inline(__always)
-  public func _compactMap<ElementOfResult, E: Error>(
-    _ transform: (Element) throws(E) -> ElementOfResult?
-  ) throws(E) -> [ElementOfResult] {
+  public func _compactMap<ElementOfResult>(
+    _ transform: (Element) throws -> ElementOfResult?
+  ) rethrows -> [ElementOfResult] {
     var result: [ElementOfResult] = []
     for element in self {
       if let newElement = try transform(element) {
@@ -1034,19 +872,4 @@ extension Sequence {
     }
     return result
   }
-
-#if !hasFeature(Embedded)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @abi(
-    func _compactMap<ElementOfResult>(
-      _ transform: (Element) throws -> ElementOfResult?
-    ) throws -> [ElementOfResult]
-  )
-  @usableFromInline
-  internal func __rethrows_underscore_compactMap<ElementOfResult>(
-    _ transform: (Element) throws -> ElementOfResult?
-  ) throws -> [ElementOfResult] {
-    return try self._compactMap(transform)
-  }
-#endif // !hasFeature(Embedded)
 }

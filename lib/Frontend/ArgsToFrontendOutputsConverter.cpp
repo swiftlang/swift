@@ -566,6 +566,7 @@ static bool shouldEmitFineModuleTrace(FrontendOptions::ActionType action) {
   case swift::FrontendOptions::ActionType::ScanDependencies:
   case swift::FrontendOptions::ActionType::PrintVersion:
   case swift::FrontendOptions::ActionType::PrintArguments:
+  case swift::FrontendOptions::ActionType::EmitPolyglotAST:
     return false;
   }
 }

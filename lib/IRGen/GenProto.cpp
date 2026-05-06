@@ -58,6 +58,7 @@
 #include "CallEmission.h"
 #include "ConformanceDescription.h"
 #include "ConstantBuilder.h"
+#include "ComputedWitnessIndex.h"
 #include "EntryPointArgumentEmission.h"
 #include "EnumPayload.h"
 #include "Explosion.h"
@@ -961,24 +962,10 @@ namespace {
     }
 
     void addAssociatedType(AssociatedTypeDecl *assocType) {
-      // In Embedded Swift witness tables don't have associated-types entries.
-      auto &langOpts = assocType->getASTContext().LangOpts;
-      if (langOpts.hasFeature(Feature::Embedded) &&
-          !langOpts.hasFeature(Feature::EmbeddedExistentials))
-        return;
       Entries.push_back(WitnessTableEntry::forAssociatedType(assocType));
     }
 
     void addAssociatedConformance(const AssociatedConformance &req) {
-      auto &langOpts = req.getAssociation()->getASTContext().LangOpts;
-      if (langOpts.hasFeature(Feature::Embedded) &&
-          !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
-          !req.getAssociatedRequirement()->requiresClass()) {
-        // If it's not a class protocol, the associated type can never be used to create
-        // an existential. Therefore this witness entry is never used at runtime
-        // in embedded swift.
-        return;
-      }
       Entries.push_back(WitnessTableEntry::forAssociatedConformance(req));
     }
 
@@ -1749,12 +1736,6 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
       auto &entry = SILEntries.front();
       SILEntries = SILEntries.slice(1);
 
-      // In Embedded Swift witness tables don't have associated-types entries.
-      auto &langOpts = IGM.Context.LangOpts;
-      if (langOpts.hasFeature(Feature::Embedded) &&
-          !langOpts.hasFeature(Feature::EmbeddedExistentials))
-        return;
-
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::AssociatedType
              && "sil witness table does not match protocol");
@@ -1812,15 +1793,6 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
       auto &entry = SILEntries.front();
       (void)entry;
       SILEntries = SILEntries.slice(1);
-      auto &langOpts = IGM.Context.LangOpts;
-      if (langOpts.hasFeature(Feature::Embedded) &&
-          !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
-          !requirement.getAssociatedRequirement()->requiresClass()) {
-        // If it's not a class protocol, the associated type can never be used to create
-        // an existential. Therefore this witness entry is never used at runtime
-        // in embedded swift.
-        return;
-      }
 
       ProtocolConformanceRef associatedConformance =
         ConformanceInContext.getAssociatedConformance(
@@ -2219,6 +2191,7 @@ static TypeEntityReference getConformingEntityReference(
       cast<NormalProtocolConformance>(conformance)->isConformanceOfProtocol()) {
     auto ext = cast<ExtensionDecl>(conformance->getDeclContext());
     auto linkEntity = LinkEntity::forExtensionDescriptor(ext);
+    IGM.IRGen.AllConformanceOfProtocolExtensionDescriptors.insert(ext);
     IGM.IRGen.noteUseOfExtensionDescriptor(ext);
     return IGM.getContextDescriptorEntityReference(linkEntity);
   }
@@ -2795,13 +2768,6 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 }
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
-  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-    // In Embedded Swift, only class-bound wtables are allowed.
-    if (!wt->getConformance()->getProtocol()->requiresClass() &&
-        !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))
-      return;
-  }
-
   // Don't emit a witness table if it is a declaration.
   if (wt->isDeclaration())
     return;
@@ -3118,29 +3084,11 @@ llvm::Value *IRGenFunction::optionallyLoadFromConditionalProtocolWitnessTable(
   return phi;
 }
 
-llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
-                                            llvm::Value *wtable,
-                                            WitnessIndex index) {
+static void createRelativeWitnessTableAccessorFuncBody(
+    IRGenFunction &IGF, llvm::Value *wtable, ComputedWitnessIndex index) {
   auto &IGM = IGF.IGM;
-  if (!IGM.IRGen.Opts.UseRelativeProtocolWitnessTables) {
-    auto baseWTable =
-      emitInvariantLoadOfOpaqueWitness(IGF,/*isProtocolWitness*/true, wtable,
-                                       index);
-    return baseWTable;
-  }
 
-  llvm::SmallString<40> fnName;
-  llvm::raw_svector_ostream(fnName)
-    << "__swift_relative_protocol_witness_table_parent_"
-    << index.getValue();
-
-  auto helperFn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
-    fnName, IGM.WitnessTablePtrTy, {IGM.WitnessTablePtrTy},
-    [&](IRGenFunction &subIGF) {
-
-  auto it = subIGF.CurFn->arg_begin();
-  llvm::Value *wtable =  &*it;
-  auto &Builder = subIGF.Builder;
+  auto &Builder = IGF.Builder;
   auto *ptrVal = Builder.CreatePtrToInt(wtable, IGM.IntPtrTy);
   auto *one = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
   auto *isCond = Builder.CreateAnd(ptrVal, one);
@@ -3154,29 +3102,29 @@ llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
   auto *mask = Builder.CreateNot(one);
   auto *wtableAddr = Builder.CreateAnd(ptrVal, mask);
   wtableAddr = Builder.CreateIntToPtr(wtableAddr, IGM.WitnessTablePtrTy);
-  auto addr = slotForLoadOfOpaqueWitness(subIGF, wtableAddr, index,
+  auto addr = slotForLoadOfOpaqueWitness(IGF, wtableAddr, index,
                                          false /*isRelative*/);
   llvm::Value *baseWTable = Builder.CreateLoad(addr);
-  baseWTable = subIGF.Builder.CreateBitCast(baseWTable, IGM.WitnessTablePtrTy);
+  baseWTable = IGF.Builder.CreateBitCast(baseWTable, IGM.WitnessTablePtrTy);
   Builder.CreateBr(endBB);
 
   Builder.emitBlock(isNotCondBB);
-  if (auto &schema = subIGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
-    auto info = PointerAuthInfo::emit(subIGF, schema, nullptr,
+  if (auto &schema = IGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
+    auto info = PointerAuthInfo::emit(IGF, schema, nullptr,
                                       PointerAuthEntity());
-    wtable = emitPointerAuthAuth(subIGF, wtable, info);
+    wtable = emitPointerAuthAuth(IGF, wtable, info);
   }
   auto baseWTable2 =
-      emitInvariantLoadOfOpaqueWitness(subIGF,/*isProtocolWitness*/true, wtable,
+      emitInvariantLoadOfOpaqueWitness(IGF,/*isProtocolWitness*/true, wtable,
                                        index);
-  baseWTable2 = subIGF.Builder.CreateBitCast(baseWTable2,
-                                          subIGF.IGM.WitnessTablePtrTy);
-  if (auto &schema = subIGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
-    auto info = PointerAuthInfo::emit(subIGF, schema, nullptr,
+  baseWTable2 = IGF.Builder.CreateBitCast(baseWTable2,
+                                          IGF.IGM.WitnessTablePtrTy);
+  if (auto &schema = IGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
+    auto info = PointerAuthInfo::emit(IGF, schema, nullptr,
                                       PointerAuthEntity());
-    baseWTable2 = emitPointerAuthSign(subIGF, baseWTable2, info);
+    baseWTable2 = emitPointerAuthSign(IGF, baseWTable2, info);
 
-    baseWTable2 = subIGF.Builder.CreateBitCast(baseWTable2,
+    baseWTable2 = IGF.Builder.CreateBitCast(baseWTable2,
                                             IGM.WitnessTablePtrTy);
   }
 
@@ -3187,11 +3135,63 @@ llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
   phi->addIncoming(baseWTable, isCondBB);
   phi->addIncoming(baseWTable2, isNotCondBB);
   Builder.CreateRet(phi);
+}
 
-  }, true /*noinline*/));
+static void
+createDynamicIndexRelativeWitnessTableAccessorFunc(IRGenFunction &IGF) {
+  auto it = IGF.CurFn->arg_begin();
+  llvm::Value *wtable = &*it++;
+  llvm::Value *indexValue = &*it++;
+  createRelativeWitnessTableAccessorFuncBody(IGF, wtable,
+                                             ComputedWitnessIndex(indexValue));
+}
 
-  auto *call = IGF.Builder.CreateCallWithoutDbgLoc(
-    helperFn->getFunctionType(), helperFn, {wtable});
+llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
+                                                   llvm::Value *wtable,
+                                                   ComputedWitnessIndex index) {
+  auto &IGM = IGF.IGM;
+  if (!IGM.IRGen.Opts.UseRelativeProtocolWitnessTables) {
+    auto baseWTable = emitInvariantLoadOfOpaqueWitness(
+        IGF, /*isProtocolWitness*/ true, wtable, index);
+    return baseWTable;
+  }
+
+  if (!index.isStatic()) {
+    llvm::Value *dynamicIdx = index.getDynamicIndex();
+    llvm::Type *indexType = dynamicIdx->getType();
+
+    llvm::SmallString<70> fnName;
+    llvm::raw_svector_ostream(fnName)
+        << "__swift_relative_protocol_witness_table_parent_dynamic_index_i"
+        << indexType->getIntegerBitWidth();
+
+    auto helperFn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
+        fnName, IGM.WitnessTablePtrTy, {IGM.WitnessTablePtrTy, indexType},
+        createDynamicIndexRelativeWitnessTableAccessorFunc, true /*noinline*/));
+    auto *call = IGF.Builder.CreateCallWithoutDbgLoc(
+        helperFn->getFunctionType(), helperFn, {wtable, dynamicIdx});
+    call->setCallingConv(IGF.IGM.DefaultCC);
+    call->setDoesNotThrow();
+    return call;
+  }
+
+  assert(index.isStatic());
+  llvm::SmallString<50> fnName;
+  llvm::raw_svector_ostream(fnName)
+      << "__swift_relative_protocol_witness_table_parent_"
+      << index.getStaticIndex()->getValue();
+
+  auto helperFn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
+      fnName, IGM.WitnessTablePtrTy, {IGM.WitnessTablePtrTy},
+      [&](IRGenFunction &subIGF) {
+        auto it = subIGF.CurFn->arg_begin();
+        llvm::Value *wtableArg = &*it;
+        createRelativeWitnessTableAccessorFuncBody(subIGF, wtableArg, index);
+      },
+      true /*noinline*/));
+
+  auto *call = IGF.Builder.CreateCallWithoutDbgLoc(helperFn->getFunctionType(),
+                                                   helperFn, {wtable});
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
   return call;
@@ -3244,6 +3244,31 @@ emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
   call->setDoesNotThrow();
   call->setDoesNotAccessMemory();
   return call;
+}
+
+/// Witness tables for inherited protocols that are reparentable must be
+/// accessed using resilient witness table indexing, rather than a compile-time
+/// known index. This ensures that future newly-added (reparentable) parents
+/// of a protocol in a resilient module do not visibly change the order
+/// of its base protocol witness table entries.
+static llvm::Value *computeReparentableBaseWitnessTableIndex(
+    IRGenFunction &IGF, ProtocolDecl *Proto, ProtocolDecl *Base) {
+  // Non-reparentable bases are expected to use constant offsets, though this
+  // indexing scheme could work for them, too.
+  assert(Base->getAttrs().hasAttribute<ReparentableAttr>());
+
+  BaseConformance baseConf(Proto, Base);
+  auto baseConfDescriptor =
+      IGF.IGM.getAddrOfBaseConformanceDescriptor(baseConf);
+
+  // The offset into the witness table;
+  // corresponds to this in swift_getAssociatedConformanceWitness:
+  //     unsigned witnessIndex = assocConformance - reqBase;
+  // where the assocConformance is our base conformance descriptor.
+  auto witnessIndex =
+      computeResilientWitnessTableIndex(IGF, Proto, baseConfDescriptor);
+  witnessIndex->setName("witnessIndex");
+  return witnessIndex;
 }
 
 /// Drill down on a single stage of component.
@@ -3463,9 +3488,18 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     if (!source) return MetadataResponse();
 
     auto wtable = source.getMetadata();
-    WitnessIndex index(component.getPrimaryIndex(), /*prefix*/ false);
-    auto baseWTable = loadParentProtocolWitnessTable(IGF, wtable,
-                                       index.forProtocolWitnessTable());
+    WitnessIndex primaryIndex(component.getPrimaryIndex(), /*prefix*/ false);
+
+    // For ordinary inherited protocols, the entry can be accessed using
+    // a static offset into the table. But for reparentable protocols, we need
+    // a dynamic offset that is computed at runtime.
+    ComputedWitnessIndex index =
+        inheritedProtocol->getAttrs().hasAttribute<ReparentableAttr>()
+            ? ComputedWitnessIndex(computeReparentableBaseWitnessTableIndex(
+                  IGF, protocol, inheritedProtocol))
+            : primaryIndex.forProtocolWitnessTable();
+
+    auto baseWTable = loadParentProtocolWitnessTable(IGF, wtable, index);
     baseWTable =
       IGF.Builder.CreateBitCast(baseWTable, IGF.IGM.WitnessTablePtrTy);
     setProtocolWitnessTableName(IGF.IGM, baseWTable, sourceKey.Type,
@@ -3817,13 +3851,6 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         llvm::Value **srcMetadataCache,
                                         ProtocolConformanceRef conformance) {
   auto proto = conformance.getProtocol();
-
-  // In Embedded Swift, only class-bound wtables are allowed.
-  auto &langOpts = srcType->getASTContext().LangOpts;
-  if (langOpts.hasFeature(Feature::Embedded) &&
-      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
-    assert(proto->requiresClass());
-  }
 
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
          && "protocol does not have witness tables?!");

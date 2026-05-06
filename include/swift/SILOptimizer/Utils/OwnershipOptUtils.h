@@ -101,16 +101,19 @@ class GuaranteedOwnershipExtension {
   DeadEndBlocks &deBlocks;
 
   // --- analysis state
+  SmallVector<SILBasicBlock *> guaranteedLivenessBlocks;
   MultiDefPrunedLiveness guaranteedLiveness;
+  SmallVector<SILBasicBlock *> ownedLifetimeBlocks;
   SSAPrunedLiveness ownedLifetime;
-  SmallVector<SILBasicBlock *, 4> ownedConsumeBlocks;
   BeginBorrowInst *beginBorrow = nullptr;
 
 public:
   GuaranteedOwnershipExtension(InstructionDeleter &deleter,
                                DeadEndBlocks &deBlocks, SILFunction *function)
     : deleter(deleter), deBlocks(deBlocks),
-      guaranteedLiveness(function), ownedLifetime(function) {}
+      guaranteedLiveness(function, &guaranteedLivenessBlocks),
+      ownedLifetime(function, &ownedLifetimeBlocks)
+  {}
 
   /// Invalid indicates that the current guaranteed scope is insufficient, and
   /// it does not meet the precondition for scope extension.

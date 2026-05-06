@@ -138,7 +138,7 @@ void PartitionOpError::IncompatibleRegionMergeError::print(
   case Reason::Assign:
     os << "assign\n";
     return;
-  case Reason::IsolatedFunction:
+  case Reason::ActorIntroducingInst:
     os << "isolated_function\n";
     return;
   case Reason::NonisolatedClosure:
@@ -149,6 +149,9 @@ void PartitionOpError::IncompatibleRegionMergeError::print(
     return;
   case Reason::NonisolatedFunction:
     os << "nonisolated_function\n";
+    return;
+  case Reason::Cast:
+    os << "cast\n";
     return;
   }
   llvm_unreachable("Unhandled case");
@@ -705,7 +708,7 @@ void Partition::printHistory(llvm::raw_ostream &os) const {
       auto extraArgs = head->getAdditionalElementArgs();
       if (extraArgs.empty())
         break;
-      llvm::interleave(extraArgs, os, ", ");
+      llvm::interleaveComma(extraArgs, os);
       break;
     }
     case IsolationHistory::Node::MergeElementRegions: {
@@ -714,7 +717,7 @@ void Partition::printHistory(llvm::raw_ostream &os) const {
       if (extraArgs.empty())
         break;
       os << ", ";
-      llvm::interleave(extraArgs, os, ", ");
+      llvm::interleaveComma(extraArgs, os);
       break;
     }
     case IsolationHistory::Node::CFGHistoryJoin:

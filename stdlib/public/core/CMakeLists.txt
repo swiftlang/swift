@@ -45,13 +45,13 @@ split_embedded_sources(
   EMBEDDED BidirectionalCollection.swift
   EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
-  EMBEDDED Borrow.swift
   EMBEDDED BorrowingSequence.swift
     NORMAL BridgeObjectiveC.swift
   EMBEDDED BridgeStorage.swift
     NORMAL BridgingBuffer.swift
   EMBEDDED Builtin.swift
   EMBEDDED BuiltinMath.swift
+  EMBEDDED ByteOrder.swift
   EMBEDDED CString.swift
   EMBEDDED CTypes.swift
   EMBEDDED Character.swift
@@ -92,9 +92,8 @@ split_embedded_sources(
   EMBEDDED FlatMap.swift
   EMBEDDED Flatten.swift
   EMBEDDED FloatingPoint.swift
-  EMBEDDED FloatingPointFromString.swift
   EMBEDDED FloatingPointRandom.swift
-  EMBEDDED FloatingPointToString.swift
+  EMBEDDED FullyInhabited.swift
   EMBEDDED HashTable.swift
   EMBEDDED Hashable.swift
   EMBEDDED Hasher.swift
@@ -102,7 +101,6 @@ split_embedded_sources(
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
   EMBEDDED InlineArray.swift
-  EMBEDDED Inout.swift
   EMBEDDED InputStream.swift
   EMBEDDED Instant.swift
   EMBEDDED Int128.swift
@@ -123,6 +121,7 @@ split_embedded_sources(
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
+  EMBEDDED MutableRef.swift
   EMBEDDED NFC.swift
   EMBEDDED NFD.swift
   EMBEDDED NativeDictionary.swift
@@ -146,6 +145,7 @@ split_embedded_sources(
   EMBEDDED RangeReplaceableCollection.swift
   EMBEDDED RangeSet.swift
   EMBEDDED RangeSetRanges.swift
+  EMBEDDED Ref.swift
     NORMAL ReflectionMirror.swift
   EMBEDDED Repeat.swift
   EMBEDDED Result.swift
@@ -239,6 +239,7 @@ split_embedded_sources(
   EMBEDDED UnicodeSPI.swift
   EMBEDDED UnicodeScalar.swift
   EMBEDDED UnicodeScalarProperties.swift
+  EMBEDDED UniqueBox.swift
   EMBEDDED Unmanaged.swift
   EMBEDDED UnmanagedOpaqueString.swift
   EMBEDDED UnmanagedString.swift
@@ -259,7 +260,9 @@ split_embedded_sources(
   OUT_LIST_NORMAL SWIFTLIB_GYB_SOURCES
 
     NORMAL AtomicInt.swift.gyb
+  EMBEDDED FloatingPointFromString.swift
   EMBEDDED FloatingPointParsing.swift.gyb
+  EMBEDDED FloatingPointToString.swift
   EMBEDDED FloatingPointTypes.swift.gyb
   EMBEDDED IntegerTypes.swift.gyb
   EMBEDDED LegacyInt128.swift.gyb
@@ -292,6 +295,7 @@ if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF" AND NOT SWIFT_FREESTANDING_FLAVOR AND N
 endif()
 
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
+  EmbeddedCasting.swift
   EmbeddedRuntime.swift
   EmbeddedStubs.swift
   EmbeddedPrint.swift

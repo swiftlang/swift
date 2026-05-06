@@ -1065,7 +1065,7 @@ bb3(%12 : $List):
 
 // CHECK-LABEL: sil [ossa] @testStructPhiCommon
 // CHECK-NEXT:  [%0: write s0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @testStructPhiCommon : $@convention(thin) (@inout Ptr) -> () {
 bb0(%0 : $*Ptr):
@@ -1169,6 +1169,27 @@ bb0(%0 : $*X):
   %1 = is_unique %0 : $*X
   %3 = tuple()
   return %3 : $()
+}
+
+// CHECK-LABEL: sil @tsan_inout_access_test
+// CHECK-NEXT:  [global: deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil @tsan_inout_access_test : $@convention(thin) (@inout Int32) -> () {
+bb0(%0 : $*Int32):
+  %1 = builtin "tsanInoutAccess"(%0 : $*Int32) : $()
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @tsan_inout_access_does_not_escape
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [global: deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil @tsan_inout_access_does_not_escape : $@convention(thin) (@in_guaranteed Int32) -> Int32 {
+bb0(%0 : $*Int32):
+  %1 = builtin "tsanInoutAccess"(%0 : $*Int32) : $()
+  %2 = load %0 : $*Int32
+  return %2 : $Int32
 }
 
 // CHECK-LABEL: sil @destroy_not_escaped_closure_test

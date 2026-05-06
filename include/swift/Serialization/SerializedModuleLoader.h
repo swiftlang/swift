@@ -197,6 +197,7 @@ protected:
                                         bool isFramework,
                                         StringRef SDKName,
                                         const llvm::Triple &target,
+                                        bool isEmbedded,
                                         StringRef packageName,
                                         llvm::vfs::FileSystem *fileSystem,
                                         PathObfuscator &recoverer);

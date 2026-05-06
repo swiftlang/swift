@@ -45,6 +45,17 @@ extension Context {
   func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
     bridgedPassContext.canMakeStaticObjectReadOnly(objectType.bridged)
   }
+
+  /// True if the current compilation is in whole-module mode, i.e. the SIL of all source files
+  /// of the module is available.
+  var isWholeModule: Bool {
+    bridgedPassContext.isWholeModule()
+  }
+
+  /// The ModuleDecl of the currently compiled module.
+  var moduleDecl: ModuleDecl {
+    bridgedPassContext.getModuleDecl().getAs(ModuleDecl.self)
+  }
 }
 
 extension MutatingContext {
@@ -89,7 +100,12 @@ extension MutatingContext {
   }
   
   func tryOptimizeKeypath(apply: FullApplySite) -> Bool {
-    return bridgedPassContext.tryOptimizeKeypath(apply.bridged)
+    if bridgedPassContext.tryOptimizeKeypath(apply.bridged) {
+      notifyBranchesChanged()
+      notifyInstructionsChanged()
+      return true
+    }
+    return false
   }
 
   func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) {

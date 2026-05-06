@@ -1,0 +1,3 @@
+// {"extraArgs":["-experimental-allow-module-with-compiler-errors","-emit-module-path","/dev/null"],"kind":"emit-sil","original":"e53a752e","signature":"printDifferentiableAttrArguments(swift::DifferentiableAttr const*, swift::ASTPrinter&, swift::PrintOptions const&, swift::Decl const*, bool)","signatureAssert":"Assertion failed: (original && \"Must resolve original declaration\"), function printDifferentiableAttrArguments","signatureNext":"DeclAttribute::printImpl"}
+// RUN: not --crash %target-swift-frontend -emit-sil -experimental-allow-module-with-compiler-errors -emit-module-path /dev/null %s
+@differentiable() var a

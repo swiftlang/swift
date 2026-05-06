@@ -105,9 +105,8 @@ struct SerializedSwiftName {
     if (Kind == DeclBaseName::Kind::Normal) {
       assert(RHS.Kind == DeclBaseName::Kind::Normal);
       return Name == RHS.Name;
-    } else {
-      return true;
     }
+    return true;
   }
 };
 

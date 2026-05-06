@@ -2045,7 +2045,7 @@ public:
   }
 
   MetatypeRepresentation visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
-    return MetatypeRepresentation::Unknown;
+    return MetatypeRepresentation::Thick;
   }
 
   MetatypeRepresentation visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OP) {
@@ -2702,6 +2702,13 @@ public:
             Borrowability,
             RecordTI->isAddressableForDependencies(),
             SubKind, Fields);
+      }
+
+      // `Unmanaged` is layout-identical to its referent. A valid referent
+      // always lowers to a single pointer word.
+      if (Kind == ReferenceKind::Unmanaged && SubKind == RecordKind::Struct &&
+          RecordTI->getSize() == TC.targetPointerSize()) {
+        return RecordTI;
       }
     }
 

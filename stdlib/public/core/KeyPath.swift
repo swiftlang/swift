@@ -163,7 +163,7 @@ public class AnyKeyPath: _AppendKeyPath {
     // Subtract the buffer header and any padding it may have from the number of
     // bytes we need to allocate. The alloc below has a 0 sized 16 byte aligned
     // tail element that will force the compiler to insert buffer header + any
-    // padding necessary to accomodate.
+    // padding necessary to accommodate.
     let bytesWithoutHeader = bytes &- MemoryLayout<Int>.size
 
     let result = Builtin.allocWithTailElems_2(
@@ -639,7 +639,7 @@ public class ReferenceWritableKeyPath<
       func formalMutation<MutationRoot>(_ base: MutationRoot)
           -> UnsafeMutablePointer<Value> {
         var base2 = base
-        return unsafe withUnsafeBytes(of: &base2) { baseBytes in
+        return withUnsafeBytes(of: &base2) { baseBytes in
           var p = unsafe baseBytes.baseAddress.unsafelyUnwrapped
           var curType: Any.Type = MutationRoot.self
           while true {
@@ -1048,11 +1048,11 @@ internal final class ClassHolder<ProjectionType> {
     // withUnsafeMutablePointer(to:) because the instance was just allocated with
     // allocWithTailElems_1 and so we need to make sure to use an initialization
     // rather than an assignment.
-    unsafe withUnsafeMutablePointer(to: &holder.previous) {
+    withUnsafeMutablePointer(to: &holder.previous) {
       unsafe $0.initialize(to: previous)
     }
 
-    unsafe withUnsafeMutablePointer(to: &holder.instance) {
+    withUnsafeMutablePointer(to: &holder.instance) {
       unsafe $0.initialize(to: instance)
     }
 
@@ -1198,7 +1198,7 @@ internal struct ComputedArgumentSize {
 #if _pointerBitWidth(_64)
     0x8000_0000_0000_0000
 #elseif _pointerBitWidth(_32)
-    0x6000_0000
+    0xC000_0000
 #else
 #warning("Unsupported platform")
     fatalError()

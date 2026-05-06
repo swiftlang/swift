@@ -2088,6 +2088,31 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       callee = dyn_cast<AbstractFunctionDecl>(
                  dynMemberRef->getMember().getDecl());
     
+    // If the callee is an unstructured Task factory, warn if the operation
+    // closure can throw a non-Never error warn about discarding the error.
+    if (callee && !call->isImplicit() && callee->isUnstructuredTaskFactory()) {
+      for (auto arg : *call->getArgs()) {
+        auto argTy = arg.getExpr()->getType();
+        if (!argTy)
+          continue;
+        auto *fnTy = argTy->getAs<AnyFunctionType>();
+        if (!fnTy || !fnTy->isThrowing())
+          continue;
+
+        // throws(Never) is fine to discard, don't warn. Bare `throws` has
+        // a null thrown-error type and always warns.
+        auto thrownError = fnTy->getThrownError();
+        if (thrownError && thrownError->isUninhabited())
+          continue;
+
+        DE.diagnose(fn->getLoc(),
+                    diag::expression_unused_throwing_unstructured_task, callee);
+        DE.diagnose(fn->getLoc(),
+                    diag::expression_unused_throwing_unstructured_task_silence);
+        return;
+      }
+    }
+
     // If the callee explicitly allows its result to be ignored, then don't
     // complain.
     if (callee && callee->getAttrs().getAttribute<DiscardableResultAttr>())
@@ -3107,17 +3132,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   return hadError ? errorBody() : body;
 }
 
-bool TypeChecker::typeCheckTapBody(TapExpr *expr, DeclContext *DC) {
-  // We intentionally use typeCheckStmt instead of typeCheckBody here
-  // because we want to contextualize TapExprs with the body they're in.
-  BraceStmt *body = expr->getBody();
-  bool HadError = StmtChecker(DC).typeCheckStmt(body);
-  if (body) {
-    expr->setBody(body);
-  }
-  return HadError;
-}
-
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   BraceStmt *Body = TLCD->getBody();
   StmtChecker(TLCD).typeCheckBody(Body);
@@ -3441,7 +3455,7 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 
 bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
                                        bool isAsync, SourceLoc loc,
-                                       const DeclContext *dc) {
+                                       DeclContext *dc) {
   if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
     return false;
   }

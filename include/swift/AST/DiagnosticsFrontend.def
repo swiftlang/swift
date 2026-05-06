@@ -201,7 +201,7 @@ WARNING(ignoring_option_requires_option,none,
         "ignoring %0 (requires %1)", (StringRef, StringRef))
 WARNING(warn_ignore_option_overridden_by,none,
         "ignoring %0 (overridden by %1)", (StringRef, StringRef))
-WARNING(ignoring_option_obsolete_module_selectors,none,
+GROUPED_WARNING(ignoring_option_obsolete_module_selectors,OptionObsoletedByModuleSelectors,none,
         "ignoring '%0'; this option has been obsoleted by module selectors "
         "(add '-disable-module-selectors-in-module-interface' to restore "
         "original behavior)",
@@ -410,7 +410,7 @@ ERROR(error_opt_invalid_mapping, none,
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))
 
-WARNING(module_interface_scoped_import_unsupported,none,
+GROUPED_WARNING(module_interface_scoped_import_unsupported,UnsupportedScopedImport,none,
         "scoped imports are not yet supported in module interfaces",
         ())
 WARNING(warn_unsupported_module_interface_swift_version,none,
@@ -586,8 +586,6 @@ ERROR(layout_string_instantiation_without_layout_strings,none,
 
 ERROR(evolution_with_embedded,none,
       "Library evolution cannot be enabled with embedded Swift.", ())
-ERROR(embedded_existentials_without_embedded,none,
-      "EmbeddedExistentials requires enabling embedded Swift.", ())
 ERROR(wmo_with_embedded,none,
       "Whole module optimization (wmo) must be enabled with embedded Swift.", ())
 ERROR(objc_with_embedded,none,

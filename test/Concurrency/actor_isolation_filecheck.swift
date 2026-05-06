@@ -39,13 +39,13 @@ class NonSendableKlass {}
   let erased: () -> Void = t.foo
 
   await useValueAsync(erased) // expected-error {{sending 'erased' risks causing data races}}
-  // expected-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-note @-1 {{sending main actor-isolated 'erased' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
 }
 
 @MainActor
 struct MainActorStruct {
   // CHECK: variable initialization expression of MainActorStruct.mainActorField
-  // CHECK-NEXT: Isolation: global_actor. type: MainActor
+  // CHECK-NEXT: Isolation: unspecified
   // CHECK: MainActorStruct.mainActorField.getter
   // CHECK-NEXT: Isolation: global_actor. type: MainActor
   // CHECK: MainActorStruct.mainActorField.setter
@@ -53,7 +53,7 @@ struct MainActorStruct {
   var mainActorField = NonSendableKlass()
 
   // CHECK: variable initialization expression of MainActorStruct.customActorField
-  // CHECK-NEXT: Isolation: global_actor. type: CustomActor
+  // CHECK-NEXT: Isolation: unspecified
   // CHECK: MainActorStruct.customActorField.getter
   // CHECK-NEXT: Isolation: global_actor. type: CustomActor
   // CHECK: MainActorStruct.customActorField.setter
@@ -73,7 +73,7 @@ struct NonisolatedStruct {
   var nonisolatedField = NonSendableKlass()
 
   // CHECK: variable initialization expression of NonisolatedStruct.mainActorField
-  // CHECK-NEXT: Isolation: global_actor. type: MainActor
+  // CHECK-NEXT: Isolation: unspecified
   // CHECK: NonisolatedStruct.mainActorField.getter
   // CHECK-NEXT: Isolation: global_actor. type: MainActor
   // CHECK: NonisolatedStruct.mainActorField.setter
@@ -81,12 +81,12 @@ struct NonisolatedStruct {
   @MainActor var mainActorField = NonSendableKlass()
 
   // CHECK: variable initialization expression of NonisolatedStruct.customActorField
-  // CHECK-NEXT: Isolation: global_actor. type: CustomActor
+  // CHECK-NEXT: Isolation: unspecified
   // CHECK: NonisolatedStruct.customActorField.getter
   // CHECK-NEXT: Isolation: global_actor. type: CustomActor
   // CHECK: NonisolatedStruct.customActorField.setter
   // CHECK-NEXT: Isolation: global_actor. type: CustomActor
-  @CustomActor var customActorField = NonSendableKlass() // expected-error {{pattern that the region-based isolation checker does not understand how to check}}
+  @CustomActor var customActorField = NonSendableKlass()
 
   nonisolated init() {}
 }
@@ -94,7 +94,7 @@ struct NonisolatedStruct {
 @MainActor
 struct MainActorKlass {
   // CHECK: variable initialization expression of MainActorKlass.mainActorField
-  // CHECK-NEXT: Isolation: global_actor. type: MainActor
+  // CHECK-NEXT: Isolation: unspecified
   // CHECK: MainActorKlass.mainActorField.getter
   // CHECK-NEXT: Isolation: global_actor. type: MainActor
   // CHECK: MainActorKlass.mainActorField.setter
@@ -102,7 +102,7 @@ struct MainActorKlass {
   var mainActorField = NonSendableKlass()
 
   // CHECK: variable initialization expression of MainActorKlass.customActorField
-  // CHECK-NEXT: Isolation: global_actor. type: CustomActor
+  // CHECK-NEXT: Isolation: unspecified
   // CHECK: MainActorKlass.customActorField.getter
   // CHECK-NEXT: Isolation: global_actor. type: CustomActor
   // CHECK: MainActorKlass.customActorField.setter
@@ -122,7 +122,7 @@ struct NonisolatedKlass {
   var nonisolatedField = NonSendableKlass()
 
   // CHECK: variable initialization expression of NonisolatedKlass.mainActorField
-  // CHECK-NEXT: Isolation: global_actor. type: MainActor
+  // CHECK-NEXT: Isolation: unspecified
   // CHECK: NonisolatedKlass.mainActorField.getter
   // CHECK-NEXT: Isolation: global_actor. type: MainActor
   // CHECK: NonisolatedKlass.mainActorField.setter
@@ -130,12 +130,12 @@ struct NonisolatedKlass {
   @MainActor var mainActorField = NonSendableKlass()
 
   // CHECK: variable initialization expression of NonisolatedKlass.customActorField
-  // CHECK-NEXT: Isolation: global_actor. type: CustomActor
+  // CHECK-NEXT: Isolation: unspecified
   // CHECK: NonisolatedKlass.customActorField.getter
   // CHECK-NEXT: Isolation: global_actor. type: CustomActor
   // CHECK: NonisolatedKlass.customActorField.setter
   // CHECK-NEXT: Isolation: global_actor. type: CustomActor
-  @CustomActor var customActorField = NonSendableKlass() // expected-error {{pattern that the region-based isolation checker does not understand how to check}}
+  @CustomActor var customActorField = NonSendableKlass()
 
   nonisolated init() {}
 }

@@ -17,7 +17,7 @@ func testSendableInference(s: S) {
 }
 
 // The declaration is @MainActor @preconcurrency because language mode is less than 6
-// CHECK-LABEL: sil hidden [ossa] @$s24approachable_concurrency25testNonisolatedNonSendingyyyyYaXEYaF : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s24approachable_concurrency25testNonisolatedNonSendingyyyyYaXEYaF : $@convention(thin) @async (@guaranteed @caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
 func testNonisolatedNonSending(_: () async -> Void) async {
 }
 

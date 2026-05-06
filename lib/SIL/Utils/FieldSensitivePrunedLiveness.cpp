@@ -216,9 +216,9 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       continue;
     }
 
-    if (auto *enumData = dyn_cast<UncheckedTakeEnumDataAddrInst>(
+    if (auto *enumData = dyn_cast<UncheckedEnumDataAddrInstBase>(
             projectionDerivedFromRoot)) {
-      auto ty = enumData->getOperand()->getType();
+      auto ty = enumData->getEnum()->getType();
       auto *enumDecl = enumData->getEnumDecl();
       for (auto *element : enumDecl->getAllElements()) {
         if (!element->hasAssociatedValues())
@@ -230,7 +230,7 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
         finalSubElementOffset +=
             unsigned(TypeSubElementCount(elementTy, mod, context));
       }
-      projectionDerivedFromRoot = enumData->getOperand();
+      projectionDerivedFromRoot = enumData->getEnum();
       continue;
     }
 
@@ -543,7 +543,7 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
             if (auto *seai = dyn_cast<SwitchEnumAddrInst>(user)) {
               seais.push_back(seai);
             }
-            auto *utedai = dyn_cast<UncheckedTakeEnumDataAddrInst>(user);
+            auto *utedai = dyn_cast<UncheckedEnumDataAddrInstBase>(user);
             if (!utedai) {
               continue;
             }
@@ -625,7 +625,7 @@ void TypeTreeLeafTypeRange::get(
     return;
   }
 
-  if (auto *utedai = dyn_cast<UncheckedTakeEnumDataAddrInst>(op->getUser())) {
+  if (auto *utedai = dyn_cast<UncheckedEnumDataAddrInstBase>(op->getUser())) {
     auto *selected = utedai->getElement();
     auto *enumDecl = utedai->getEnumDecl();
     unsigned numAtoms = 0;

@@ -20,6 +20,7 @@ import Swift
 
 internal import WinSDK
 internal import BacktracingImpl.ImageFormats.CodeView
+internal import BacktracingImpl.OS.Windows
 
 typealias CV_PDB70_INFO = swift.runtime.CV_PDB70_INFO
 typealias RTL_GET_VERSION_FN = @convention(c) (UnsafeMutablePointer<RTL_OSVERSIONINFOW>) -> NTSTATUS
@@ -459,7 +460,7 @@ extension ImageMap {
         if let table = fetchExceptionTable(hProcess: hProcess,
                               from: Address(tableAddress),
                               size: UInt64(exceptionEntry.Size),
-                              as: IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY.self) {
+                              as: WIN32_IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY.self) {
           exceptionTable = .arm64(table)
         } else {
           exceptionTable = nil

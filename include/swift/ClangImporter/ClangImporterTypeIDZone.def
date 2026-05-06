@@ -31,19 +31,19 @@ SWIFT_REQUEST(ClangImporter, ObjCInterfaceAndImplementationRequest,
               ObjCInterfaceAndImplementation(Decl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ForeignReferenceTypeInfoRequest,
-              ForeignReferenceTypeInfo(ForeignReferenceTypeInfoDescriptor), Cached,
+              ForeignReferenceTypeInfo(ForeignReferenceTypeInfoDescriptor), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CxxRecordSemantics,
-              CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor), Cached,
+              CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CxxRecordAsSwiftType,
-              ValueDecl *(CxxRecordSemanticsDescriptor), Cached,
+              ValueDecl *(CxxRecordSemanticsDescriptor), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, IsSafeUseOfCxxDecl,
-              bool(SafeUseOfCxxRecordDescriptor), Cached,
+              bool(SafeUseOfCxxRecordDescriptor), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CustomRefCountingOperation,
-              CustomRefCountingOperationResult(CustomRefCountingOperationDescriptor), Cached,
+              CustomRefCountingOperationResult(CustomRefCountingOperationDescriptor), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangTypeEscapability,
               CxxEscapability(EscapabilityLookupDescriptor), Cached,
@@ -52,11 +52,11 @@ SWIFT_REQUEST(ClangImporter, CxxValueSemantics,
               CxxValueSemanticsKind(CxxValueSemanticsDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangDeclExplicitSafety,
-              ExplicitSafety(ClangDeclExplicitSafetyDescriptor), Cached,
+              ExplicitSafety(ClangDeclExplicitSafetyDescriptor), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangRefCountedSmartPointer,
               RefCountedPtrRequestResult(ClangRefCountedSmartPointerDescriptor),
-              Cached, NoLocationInfo)
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CxxIteratorInfoRequest,
               std::optional<CxxIteratorCategory>(CxxRecordDeclDescriptor),
-              Cached, NoLocationInfo)
+              Uncached, NoLocationInfo)

@@ -934,7 +934,7 @@ ValueOwnership OwnershipTypeRepr::getValueOwnership() const {
   return ParamDecl::getValueOwnershipForSpecifier(getSpecifier());
 }
 
-void CallerIsolatedTypeRepr::printImpl(ASTPrinter &Printer,
+void NonisolatedNonsendingTypeRepr::printImpl(ASTPrinter &Printer,
                                 const PrintOptions &Opts,
                                 NonRecursivePrintOptions nrOpts) const {
   Printer.printKeyword("nonisolated(nonsending)", Opts);

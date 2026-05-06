@@ -210,6 +210,8 @@ TYPE(PackExpansion, Type)
 TYPE(PackElement, Type)
 UNCHECKED_TYPE(TypeVariable, Type)
 UNCHECKED_TYPE(ErrorUnion, Type)
+UNCHECKED_TYPE(Join, Type)
+UNCHECKED_TYPE(Meet, Type)
 TYPE(Integer, Type)
 ABSTRACT_SUGARED_TYPE(Sugar, Type)
   SUGARED_TYPE(TypeAlias, SugarType)
@@ -242,6 +244,8 @@ SINGLETON_TYPE(UnsafeValueBuffer, BuiltinUnsafeValueBuffer)
 SINGLETON_TYPE(DefaultActorStorage, BuiltinDefaultActorStorage)
 SINGLETON_TYPE(NonDefaultDistributedActorStorage, BuiltinNonDefaultDistributedActorStorage)
 SINGLETON_TYPE(SILToken, SILToken)
+SINGLETON_TYPE(Join, Join)
+SINGLETON_TYPE(Meet, Meet)
 #undef SINGLETON_TYPE
 #endif
 

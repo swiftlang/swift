@@ -127,9 +127,8 @@ targets.append(
     dependencies: swiftBenchDeps,
     path: "utils",
     sources: ["main.swift"],
-    swiftSettings: [.interoperabilityMode(.Cxx),
-                    .unsafeFlags(["-I",
-                                  "utils/CxxTests"])]))
+    cxxSettings: [.headerSearchPath("../utils/CxxTests")],
+    swiftSettings: [.interoperabilityMode(.Cxx)]))
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 targets.append(
@@ -165,10 +164,9 @@ targets += cxxSingleSourceLibraries.map { name in
     dependencies: singleSourceDeps,
     path: "cxx-source",
     sources: ["\(name).swift"],
+    cxxSettings: [.headerSearchPath("../utils/CxxTests")],
     swiftSettings: [.interoperabilityMode(.Cxx),
-                    .unsafeFlags(["-I",
-                                  "utils/CxxTests",
-                                  // FIXME: https://github.com/apple/swift/issues/61453
+                    .unsafeFlags([// FIXME: https://github.com/apple/swift/issues/61453
                                   "-Xfrontend", "-validate-tbd-against-ir=none"])])
 }
 

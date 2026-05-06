@@ -155,7 +155,8 @@ SwiftCASOutputBackend::~SwiftCASOutputBackend() { delete &Impl; }
 
 bool SwiftCASOutputBackend::isStoredDirectly(file_types::ID Kind) {
   return !file_types::isProducedFromDiagnostics(Kind) &&
-         Kind != file_types::TY_Dependencies;
+         Kind != file_types::TY_Dependencies &&
+         Kind != file_types::TY_ConstValues;
 }
 
 IntrusiveRefCntPtr<OutputBackend> SwiftCASOutputBackend::cloneImpl() const {
@@ -186,16 +187,14 @@ Error SwiftCASOutputBackend::storeCachedDiagnostics(unsigned InputIndex,
                    file_types::ID::TY_CachedDiagnostics);
 }
 
-Error SwiftCASOutputBackend::storeMakeDependenciesFile(StringRef OutputFilename,
-                                                       llvm::StringRef Bytes) {
+Error SwiftCASOutputBackend::storeSupplementaryOutputFile(
+    StringRef OutputFilename, llvm::StringRef Bytes) {
   auto Input = Impl.OutputToInputMap.find(OutputFilename);
   if (Input == Impl.OutputToInputMap.end())
     return llvm::createStringError("InputIndex for output file not found!");
   auto InputIndex = Input->second.first;
-  assert(Input->second.second == file_types::TY_Dependencies &&
-         "wrong output type");
-  return storeImpl(OutputFilename, Bytes, InputIndex,
-                   file_types::TY_Dependencies);
+  auto OutputKind = Input->second.second;
+  return storeImpl(OutputFilename, Bytes, InputIndex, OutputKind);
 }
 
 Error SwiftCASOutputBackend::storeMCCASObjectID(StringRef OutputFilename,
@@ -358,7 +357,8 @@ Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
                           << CAS.getID(*CacheKey).toString() << "\' => \'"
                           << CAS.getID(*Result).toString() << "\'\n";);
 
-  if (auto E = Cache.put(CAS.getID(*CacheKey), CAS.getID(*Result))) {
+  if (auto E = Cache.put(CAS.getID(*CacheKey), CAS.getID(*Result),
+                         /*CanBeDistributed=*/true)) {
     // If `SWIFT_STRICT_CAS_ERRORS` environment is set, do not attempt to
     // recover from error.
     if (::getenv("SWIFT_STRICT_CAS_ERRORS"))

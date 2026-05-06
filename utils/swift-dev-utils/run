@@ -1,0 +1,6 @@
+#!/bin/zsh
+extra_args=()
+if [ -n "$LLVM_CACHE_CAS_PATH" ]; then
+  extra_args+=(-Xswiftc -explicit-module-build -Xswiftc -cache-compile-job -Xswiftc -cas-path -Xswiftc "$LLVM_CACHE_CAS_PATH" -Xswiftc -Xfrontend -Xswiftc -cas-backend)
+fi
+exec swift run -c release --package-path "$0:A:h" "$extra_args[@]" "$@"

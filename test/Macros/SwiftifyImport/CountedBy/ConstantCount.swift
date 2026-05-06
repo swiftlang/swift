@@ -117,7 +117,7 @@ public func noescape(_ ptr: Span<CInt>) {
     if _ptrCount != 37 {
       fatalError("bounds check failure in noescape: expected \(37) but got \(_ptrCount)")
     }
-    let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
+    let _ptrPtr = ptr.withUnsafeBufferPointer {
         unsafe $0
     }
     defer {
@@ -135,7 +135,7 @@ public func noescapeOpt(_ ptr: Span<CInt>?) {
     if _ptrCount != 37 {
       fatalError("bounds check failure in noescapeOpt: expected \(37) but got \(_ptrCount)")
     }
-    let _ptrPtr = unsafe ptr?.withUnsafeBufferPointer {
+    let _ptrPtr = ptr?.withUnsafeBufferPointer {
         unsafe $0
     }
     defer {
@@ -153,7 +153,7 @@ public func noescapeMut(_ ptr: inout MutableSpan<CInt>) {
     if _ptrCount != 37 {
       fatalError("bounds check failure in noescapeMut: expected \(37) but got \(_ptrCount)")
     }
-    let _ptrPtr = unsafe ptr.withUnsafeMutableBufferPointer {
+    let _ptrPtr = ptr.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -171,7 +171,7 @@ public func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>?) {
     if _ptrCount != 37 {
       fatalError("bounds check failure in noescapeMutOpt: expected \(37) but got \(_ptrCount)")
     }
-    let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
+    let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {

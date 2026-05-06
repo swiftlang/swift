@@ -287,11 +287,13 @@ static const char * const GenericParamNames[] = {
   "Z"
 };
 
-static GenericTypeParamDecl*
-createGenericParam(ASTContext &ctx, const char *name, unsigned index,
-                   bool isParameterPack = false) {
+static GenericTypeParamDecl *createGenericParam(ASTContext &ctx,
+                                                const Twine &name,
+                                                unsigned index,
+                                                bool isParameterPack = false) {
+  SmallString<2> StrBuf;
   ModuleDecl *M = ctx.TheBuiltinModule;
-  Identifier ident = ctx.getIdentifier(name);
+  Identifier ident = ctx.getIdentifier(name.toStringRef(StrBuf));
 
   auto paramKind = GenericTypeParamKind::Type;
 
@@ -308,12 +310,12 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index,
 static GenericParamList *getGenericParams(ASTContext &ctx,
                                           unsigned numParameters,
                                           bool areParameterPacks = false) {
-  assert(numParameters <= std::size(GenericParamNames));
-
+  const unsigned numNamedParams = std::size(GenericParamNames);
   SmallVector<GenericTypeParamDecl *, 2> genericParams;
   for (unsigned i = 0; i != numParameters; ++i)
-    genericParams.push_back(createGenericParam(ctx, GenericParamNames[i], i,
-                                               areParameterPacks));
+    genericParams.push_back(createGenericParam(
+        ctx, i < numNamedParams ? GenericParamNames[i] : "T" + Twine(i), i,
+        areParameterPacks));
 
   auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
@@ -376,7 +378,7 @@ synthesizeGenericSignature(SynthesisContext &SC,
                                GenericSignature(),
                                std::move(collector.GenericParamTypes),
                                std::move(collector.AddedRequirements),
-                               /*allowInverses=*/false);
+                               DefaultRequirementOptions());
 }
 
 /// Build a builtin function declaration.
@@ -817,7 +819,7 @@ namespace {
           Context, GenericSignature(),
           std::move(genericParamTypes),
           std::move(addedRequirements),
-          /*allowInverses=*/false);
+          DefaultRequirementOptions());
       return getBuiltinGenericFunction(name, InterfaceParams, InterfaceResult,
                                        TheGenericParamList, GenericSig, Async,
                                        Throws, ThrownError, SendingResult);
@@ -2304,6 +2306,8 @@ static ValueDecl *getDistributedActorAsAnyActor(ASTContext &ctx, Identifier id) 
   BuiltinFunctionBuilder builder(ctx);
   auto *distributedActorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor);
   auto *actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+  if (!distributedActorProto || !actorProto)
+    return nullptr;
 
   // Create type parameters and add conformance constraints.
   auto actorParam = makeGenericParam();
@@ -2430,6 +2434,16 @@ static ValueDecl *getTaskLocalValuePop(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
 }
 
+static ValueDecl *getAddTaskLocalValue(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
+                            _parameters(_rawPointer, _consuming(_typeparam(0))),
+                            _rawPointer);
+}
+
+static ValueDecl *getRemoveTaskLocalValue(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer), _void);
+}
+
 static ValueDecl *getMakeBorrow(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
 
@@ -2437,6 +2451,17 @@ static ValueDecl *getMakeBorrow(ASTContext &ctx, Identifier id) {
 
   builder.addParameter(T, ParamSpecifier::Borrowing);
   builder.setResult(makeBuiltinBorrowType(T));
+
+  return builder.build(id);
+}
+
+static ValueDecl *getBorrowAt(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+
+  auto T = makeGenericParam(0);
+
+  builder.addParameter(makeConcrete(ctx.TheRawPointerType));
+  builder.setResult(T);
 
   return builder.build(id);
 }
@@ -3565,8 +3590,17 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::TaskLocalValuePop:
     return getTaskLocalValuePop(Context, Id);
 
+  case BuiltinValueKind::AddTaskLocalValue:
+    return getAddTaskLocalValue(Context, Id);
+
+  case BuiltinValueKind::RemoveTaskLocalValue:
+    return getRemoveTaskLocalValue(Context, Id);
+
   case BuiltinValueKind::MakeBorrow:
     return getMakeBorrow(Context, Id);
+
+  case BuiltinValueKind::BorrowAt:
+    return getBorrowAt(Context, Id);
 
   case BuiltinValueKind::DereferenceBorrow:
     return getDereferenceBorrow(Context, Id);

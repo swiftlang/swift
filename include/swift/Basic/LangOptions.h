@@ -931,6 +931,20 @@ namespace swift {
     /// Intended for debugging purposes only.
     unsigned WarnLongExpressionTypeChecking = 0;
 
+    /// If non-zero, warn when type-checking an expression uses more than
+    /// this many solver scopes.
+    ///
+    /// Intended for debugging purposes only. Unlike WarnLongExpressionTypeChecking,
+    /// this threshold is deterministic across machines.
+    unsigned WarnLongExpressionTypeCheckingScopes = 0;
+
+    /// If non-zero, warn when type-checking an expression uses more than
+    /// this many solver trail steps.
+    ///
+    /// Intended for debugging purposes only. Unlike WarnLongExpressionTypeChecking,
+    /// this threshold is deterministic across machines.
+    unsigned WarnLongExpressionTypeCheckingTrail = 0;
+
     /// If non-zero, abort the expression type checker if it takes more
     /// than this many seconds.
     unsigned ExpressionTimeoutThreshold = 0;
