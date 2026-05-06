@@ -1125,6 +1125,11 @@ protected:
 
     switch (parsedLifetimeKind) {
     case ParsedLifetimeDependenceKind::Default: {
+      // Infer copy dependence on @noescape function types by default.
+      if (type->isNoEscape()) {
+        return LifetimeDependenceKind::Inherit;
+      }
+
       if (type->isEscapable()) {
         if (loweredOwnership == ValueOwnership::Shared ||
             loweredOwnership == ValueOwnership::InOut) {
@@ -1823,13 +1828,19 @@ protected:
       // The usual diagnostic check is sufficient.
       return;
     }
-    // Do not infer non-escapable dependence kind -- it is ambiguous.
+    // Do not infer non-escapable dependence kind -- it is ambiguous, except for
+    // noescape function types, for which we should always infer a copy dependence.
     auto const &paramInfo = parameterInfos[0];
     Type paramTypeInContext = paramInfo.typeInContext;
     if (paramTypeInContext->hasError()) {
       return;
     }
     if (!paramTypeInContext->isEscapable()) {
+      if (paramTypeInContext->isNoEscape()) {
+        resultDeps->addIfNew(/*paramIndex*/ 0, LifetimeDependenceKind::Inherit);
+        return;
+      }
+      
       diagnose(returnLoc, diag::lifetime_dependence_cannot_infer_kind,
                diagnosticQualifier(), paramInfo.name());
       return;

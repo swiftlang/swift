@@ -429,9 +429,24 @@ func callLifetimeFunctions() {
 }
 
 // ~Escapable function types
-@_lifetime(body) // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow body)' or '@_lifetime(copy body)'}}
+@_lifetime(body) // OK: Infer copy
+func implicitDependKindClosureNE(body: () -> NE) -> NE {
+  body()
+}
+
+func callImplicitDependKindClosureNE(ne: NE) -> NE {
+  let neo = implicitDependClosureNE { ne }
+  return neo
+}
+
 func implicitDependClosureNE(body: () -> NE) -> NE {
   body()
+}
+
+func callImplicitDependClosureNE(ne: NE) -> NE {
+  // OK: Infer copy
+  let neo = implicitDependClosureNE { ne }
+  return neo
 }
 
 @_lifetime(copy body)
