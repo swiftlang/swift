@@ -21,6 +21,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "clang/AST/ASTContext.h"
@@ -28,8 +29,11 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/ExprCXX.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/Specifiers.h"
+#include "clang/Basic/TypeTraits.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Overload.h"
@@ -1296,6 +1300,72 @@ bool swift::isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl) {
   return false;
 }
 
+static bool canDefaultConstructType(ClangImporter::Implementation &impl,
+                                    clang::QualType type,
+                                    clang::SourceLocation loc) {
+  auto &clangCtx = impl.getClangASTContext();
+  auto &clangSema = impl.getClangSema();
+
+  auto typeInfo = clangCtx.getTrivialTypeSourceInfo(type);
+  SmallVector<clang::TypeSourceInfo *, 1> traitArgs{typeInfo};
+
+  auto &diags = clangSema.getDiagnostics();
+  bool oldSuppressAllDiagnostics = diags.getSuppressAllDiagnostics();
+  diags.setSuppressAllDiagnostics(true);
+  SWIFT_DEFER { diags.setSuppressAllDiagnostics(oldSuppressAllDiagnostics); };
+
+  clang::DiagnosticErrorTrap diagnosticTrap(diags);
+  clang::Sema::SFINAETrap trap(clangSema, /*ForValidityCheck=*/true);
+  auto traitExprResult =
+      clangSema.BuildTypeTrait(clang::TT_IsConstructible, loc, traitArgs, loc);
+  if (traitExprResult.isInvalid() || trap.hasErrorOccurred() ||
+      diagnosticTrap.hasErrorOccurred())
+    return false;
+
+  auto *traitExpr = dyn_cast<clang::TypeTraitExpr>(traitExprResult.get());
+  return traitExpr && !traitExpr->isValueDependent() &&
+         traitExpr->getBoolValue();
+}
+
+static bool canDefaultConstructTemplateArgument(
+    ClangImporter::Implementation &impl, const clang::TemplateArgument &arg,
+    clang::SourceLocation loc) {
+  if (arg.getKind() == clang::TemplateArgument::Type)
+    return canDefaultConstructType(impl, arg.getAsType(), loc);
+
+  if (arg.getKind() == clang::TemplateArgument::Pack) {
+    for (auto packArg : arg.pack_elements()) {
+      if (!canDefaultConstructTemplateArgument(impl, packArg, loc))
+        return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+static bool canDefaultConstructRecord(ClangImporter::Implementation &impl,
+                                      const clang::CXXRecordDecl *clangDecl) {
+  auto *templateSpecialization =
+      dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl);
+  if (!templateSpecialization)
+    return false;
+
+  auto templateArgs = templateSpecialization->getTemplateArgs().asArray();
+  if (templateArgs.empty())
+    return false;
+
+  // The first template argument is the element type. Default construction of
+  // standard set containers depends on the remaining policy arguments, such as
+  // comparators, hashers, equality predicates, and allocators.
+  for (auto arg : templateArgs.drop_front()) {
+    if (!canDefaultConstructTemplateArgument(impl, arg,
+                                             clangDecl->getLocation()))
+      return false;
+  }
+  return true;
+}
+
 static void conformToCxxSet(ClangImporter::Implementation &impl,
                             NominalTypeDecl *decl,
                             const clang::CXXRecordDecl *clangDecl,
@@ -1409,8 +1479,6 @@ static void conformToCxxSet(ClangImporter::Implementation &impl,
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
                                Value->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
-                               Value->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
                                Size->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
@@ -1423,6 +1491,14 @@ static void conformToCxxSet(ClangImporter::Implementation &impl,
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSet});
   if (isUniqueSet)
     impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxUniqueSet});
+
+  // Array literal construction relies on default construction of the set.
+  if (canDefaultConstructRecord(impl, clangDecl)) {
+    impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
+                                 Value->getUnderlyingType());
+    impl.addSynthesizedProtocolAttrs(
+        decl, {KnownProtocolKind::CxxDefaultConstructibleSet});
+  }
 }
 
 static void conformToCxxPair(ClangImporter::Implementation &impl,
