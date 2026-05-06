@@ -330,7 +330,6 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
     StringRef printedValueCopy(context.AllocateCopy(printedValue));
     if (value.getKind() == clang::APValue::Int) {
       // Check if "type" is Bool or a C++ enum with an underlying type of Bool.
-      // NOTE: This must match the condition in `importNumericLiteral`.
       if (isBoolOrBoolEnumType(type)) {
         auto *boolExpr = new (context)
             BooleanLiteralExpr(value.getInt().getBoolValue(), SourceLoc(),
@@ -346,7 +345,17 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
                                              /*Implicit=*/true);
 
         auto *intDecl = literalType->getAnyNominal();
-        intExpr->setBuiltinInitializer(context.getIntBuiltinInitDecl(intDecl));
+        auto initRef = context.getIntBuiltinInitDecl(intDecl);
+        // The resolved literal type may not be a primitive integer — for
+        // example, when a `swift_wrapper(struct)` is layered on a typedef
+        // whose underlying type is itself imported as a wrapper struct
+        // (rather than a primitive integer). In that case there is no
+        // `ExpressibleByBuiltinIntegerLiteral` conformance to look up.
+        // Bail out and let the caller import the constant as an external
+        // declaration instead of asserting.
+        if (!initRef)
+          return nullptr;
+        intExpr->setBuiltinInitializer(initRef);
         intExpr->setType(literalType);
 
         expr = intExpr;
@@ -360,8 +369,12 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
       floatExpr->setBuiltinType(maxFloatTypeDecl->getUnderlyingType());
 
       auto *floatDecl = literalType->getAnyNominal();
-      floatExpr->setBuiltinInitializer(
-          context.getFloatBuiltinInitDecl(floatDecl));
+      auto initRef = context.getFloatBuiltinInitDecl(floatDecl);
+      // See the integer case above: the resolved literal type may not have
+      // an `ExpressibleByBuiltinFloatLiteral` conformance.
+      if (!initRef)
+        return nullptr;
+      floatExpr->setBuiltinInitializer(initRef);
       floatExpr->setType(literalType);
 
       expr = floatExpr;
