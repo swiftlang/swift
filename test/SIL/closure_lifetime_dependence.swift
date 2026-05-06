@@ -101,3 +101,15 @@ func callContextAndArgDependentPicker() {
 // The captures dependence here is technically unnecessary, but causes no harm, since the closure is only called in one place.
 // CHECK-LABEL: sil private @$s27closure_lifetime_dependence32callContextAndArgDependentPickeryyFAA2NEVADXEfU0_ : $@convention(thin) (@guaranteed NE) -> @lifetime(captures, copy 0) @owned NE {
 // CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence32callContextAndArgDependentPickeryyFAA2NEVADXEfU0_'
+
+
+// Closures as Lifetime Dependence Sources
+// CHECK-LABEL: sil hidden @$s27closure_lifetime_dependence13copyClosureNE4bodyAA0F0VAEyXE_tF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @lifetime(captures) @owned NE) -> @lifetime(copy 0) @owned NE {
+// CHECK: bb0(%0 : $@noescape @callee_guaranteed () -> @lifetime(captures) @owned NE):
+// CHECK: [[RESULT:%[0-9]+]] = apply %0() : $@noescape @callee_guaranteed () -> @lifetime(captures) @owned NE
+// CHECK-NEXT: return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence13copyClosureNE4bodyAA0F0VAEyXE_tF'
+@_lifetime(copy body)
+func copyClosureNE(body: () -> NE) -> NE {
+  body()
+}

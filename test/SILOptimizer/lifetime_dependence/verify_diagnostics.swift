@@ -461,10 +461,9 @@ func testBasicClosureDependency(value: AnyObject, body: () -> NE) -> NE {
 
 // Implicit dependence on a nonescaping closure context. The result is escaping in the current generic context, so
 // should not be diagnosed as an escape.
-//
-// TODO: remove the _overrideLifetime when context dependencies are tracked.
+@_lifetime(copy f)
 func testIndirectClosureResult<T>(f: () -> CNE<T>) -> CNE<T> {
-  return _overrideLifetime(f(), copying: ())
+  return f()
 }
 
 // =============================================================================
