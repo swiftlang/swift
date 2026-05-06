@@ -2490,16 +2490,24 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     // signature. Even if we recover, print as a warning the errors we skip.
     if (getContext().LangOpts.EnableWorkaroundBrokenModules &&
         errorKind == ModularizationError::Kind::DeclMoved &&
-        baseModule->findUnderlyingClangModule() &&
+        (baseModule->findUnderlyingClangModule() ||
+         baseModule->isClangHeaderImportModule()) &&
         foundIn->findUnderlyingClangModule() &&
         !values.empty()) {
-      // Print the error as a warning and notify of the recovery attempt.
-      llvm::handleAllErrors(std::move(error),
-        [&](const ModularizationError &modularError) {
-          modularError.diagnose(this, DiagnosticBehavior::Warning);
-        });
-      getContext().Diags.diagnose(SourceLoc(),
-                                  diag::modularization_issue_worked_around);
+      if (baseModule->isClangHeaderImportModule()) {
+        // C++ namespaces are placed in the '__ObjC' header import module
+        // but are found in their actual Clang module during deserialization.
+        // This is expected, so recover silently.
+        llvm::consumeError(std::move(error));
+      } else {
+        // Print the error as a warning and notify of the recovery attempt.
+        llvm::handleAllErrors(std::move(error),
+          [&](const ModularizationError &modularError) {
+            modularError.diagnose(this, DiagnosticBehavior::Warning);
+          });
+        getContext().Diags.diagnose(SourceLoc(),
+                                    diag::modularization_issue_worked_around);
+      }
     } else {
       return std::move(error);
     }

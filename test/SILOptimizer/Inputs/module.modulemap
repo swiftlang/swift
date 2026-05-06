@@ -1,3 +1,8 @@
 module CXXTypesWithUserProvidedDestructor {
   header "CXXTypesWithUserProvidedDestructor.h"
 }
+
+module TsanCxxWitnessCopy {
+  header "tsan_cxx_witness_copy.h"
+  requires cplusplus
+}
