@@ -5059,7 +5059,18 @@ if ($Android) {
 
   # Android swift-inspect only supports 64-bit platforms.
   $AndroidSDKBuilds | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
-    Invoke-BuildStep Build-Inspect $_
+    # Build-Inspect's `-CCompiler/-CXXCompiler $Compilers.C/.CXX` would feed
+    # MSVC-style flags to the NDK clang; swap in a target-aware view of the
+    # compiler hashtable that exposes GNU drivers under .C/.CXX.
+    $InspectCompilers = @{
+      C     = $Compilers.Stage1.GNUC
+      CXX   = $Compilers.Stage1.GNUCXX
+      Swift = $Compilers.Stage1.Swift
+    }
+    Invoke-BuildStep Build-Inspect $_ @{
+      Compilers = $InspectCompilers;
+      SwiftSDK  = Get-SwiftSDK -OS Android;
+    }
   }
 
   # Copy static dependencies
