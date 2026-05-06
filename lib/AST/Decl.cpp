@@ -2637,9 +2637,32 @@ VarDecl *PatternBindingInitializer::getInitializedLazyVar() const {
     if (auto var = binding->getSingleVar()) {
       if (var->getAttrs().hasAttribute<LazyAttr>())
         return var;
+      
+      // Check macro if we can still pretend the var is lazy
+      if (maybeLazilySubsumed(var))
+        return var;
     }
   }
   return nullptr;
+}
+
+bool PatternBindingInitializer::maybeLazilySubsumed(VarDecl *var) const {
+  assert(var && "Cannot check macros of a null VarDecl");
+  bool introducesNonObservingAccessors = false;
+  bool introducesInitAccessor = false;
+  
+  namelookup::forEachPotentialAttachedMacro(var, MacroRole::Accessor,
+    [&](MacroDecl *macro, const MacroRoleAttr *attr) {
+      if (!swift::accessorMacroOnlyIntroducesObservers(macro, attr))
+        introducesNonObservingAccessors = true;
+      
+      if (swift::accessorMacroIntroducesInitAccessor(macro, attr))
+        introducesInitAccessor = true;
+  });
+  
+  // We assume the initializer will be used in the body of an
+  // init accessor if introduced by the macro.
+  return introducesNonObservingAccessors && !introducesInitAccessor;
 }
 
 unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) const {
@@ -13557,6 +13580,50 @@ MacroDiscriminatorContext
 MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
   return getParentOf(
       expansion->getPoundLoc(), expansion->getDeclContext());
+}
+
+bool swift::accessorMacroOnlyIntroducesObservers(
+    MacroDecl *macro,
+    const MacroRoleAttr *attr
+) {
+  // Will this macro introduce observers?
+  bool foundObserver = false;
+  for (auto name : attr->getNames()) {
+    if (name.getKind() == MacroIntroducedDeclNameKind::Named &&
+        (name.getName().getBaseName().userFacingName() == "willSet" ||
+         name.getName().getBaseName().userFacingName() == "didSet" ||
+         name.getName().getBaseName().isConstructor())) {
+      foundObserver = true;
+    } else {
+      // Introduces something other than an observer.
+      return false;
+    }
+  }
+
+  if (foundObserver)
+    return true;
+
+  // WORKAROUND: Older versions of the Observation library make
+  // `ObservationIgnored` an accessor macro that implies that it makes a
+  // stored property computed. Override that, because we know it produces
+  // nothing.
+  if (macro->getName().getBaseName().userFacingName() == "ObservationIgnored") {
+    return true;
+  }
+
+  return false;
+}
+
+bool swift::accessorMacroIntroducesInitAccessor(
+    MacroDecl *macro, const MacroRoleAttr *attr
+) {
+  for (auto name : attr->getNames()) {
+    if (name.getKind() == MacroIntroducedDeclNameKind::Named &&
+        (name.getName().getBaseName().isConstructor()))
+      return true;
+  }
+
+  return false;
 }
 
 void swift::printMemberwiseInit(NominalTypeDecl *nominal,

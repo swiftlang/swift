@@ -9992,6 +9992,16 @@ public:
   using Decl::getASTContext;
 };
 
+/// Determine whether an accessor macro with the given attribute only
+/// introduces observers like willSet and didSet.
+bool accessorMacroOnlyIntroducesObservers(
+    MacroDecl *macro, const MacroRoleAttr *attr);
+
+/// Determine whether an accessor macro (defined with the given role attribute)
+/// introduces an init accessor.
+bool accessorMacroIntroducesInitAccessor(
+    MacroDecl *macro, const MacroRoleAttr *attr);
+
 class MacroExpansionDecl : public Decl, public FreestandingMacroExpansion {
 
 public:
