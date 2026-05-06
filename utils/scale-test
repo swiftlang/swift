@@ -224,7 +224,10 @@ def run_many(args):
     else:
         with io.open(args.file, 'r', encoding='utf-8') as f:
             ast = gyb.parse_template(args.file, f.read())
-    rng = range(args.begin, args.end, args.step)
+    if args.superlinear_threshold:
+        rng = [0, args.begin, args.end]
+    else:
+        rng = range(args.begin, args.end, args.step)
     if args.step > (args.end - args.begin):
         print("Step value", args.step,
               "is too large for the range", str((args.begin, args.end)) + ".",
@@ -638,10 +641,19 @@ def report(args, rng, runs):
     rows = []
     for k in keys:
         vals = [r[k] for r in runs]
+        if args.trace:
+            print("values: " + repr(vals))
+
         if all(v == 0 for v in vals):
             print("Missing data")
             return True
         bounded = [max(v, 1) for v in vals]
+
+        if args.superlinear_threshold:
+            if check_superlinear_threshold(args, rng, bounded):
+              bad = True
+            continue
+
         one_fit = False
         perfect_fit = False
         fit_r2_thresh = 0.99
@@ -704,6 +716,27 @@ def report(args, rng, runs):
     return bad
 
 
+def check_superlinear_threshold(args, rng, values):
+    assert len(rng) == 3
+    assert len(values) == 3
+
+    c = values[0]
+    y1 = values[1] - c
+    y2 = values[2] - c
+    x1 = rng[1]
+    x2 = rng[2]
+    f = y2 / y1
+    normalized = f / (x2 / x1)
+
+    if args.trace:
+        print("factor: " + str(normalized))
+    if normalized > args.superlinear_threshold:
+        print("superlinear threshold exceeded: " +
+              str(normalized) + " > " + str(args.superlinear_threshold))
+        return True
+    return False
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -727,6 +760,10 @@ def main():
         '--exponential-threshold', type=float,
         default=1.2,
         help='minimum base for exponential fit to consider "bad scaling"')
+    parser.add_argument(
+        '--superlinear-threshold', type=float,
+        default=None,
+        help='maximum superlinear factor with 3 data points at [0, begin, end]')
     parser.add_argument(
         '-parse', '--parse', action='store_true',
         default=False, help='only run compiler with -parse')
