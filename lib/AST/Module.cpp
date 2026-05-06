@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Module.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
@@ -3912,16 +3913,20 @@ std::optional<DefaultIsolation> SourceFile::getDefaultIsolation() const {
 namespace {
 class LocalTypeDeclCollector : public ASTWalker {
   SmallVectorImpl<TypeDecl *> &results;
+  SmallVectorImpl<Decl *> &visitedDecls;
 
 public:
-  LocalTypeDeclCollector(SmallVectorImpl<TypeDecl *> &results)
-      : results(results) {}
+  LocalTypeDeclCollector(SmallVectorImpl<TypeDecl *> &results,
+                         SmallVectorImpl<Decl *> &visitedDecls)
+      : results(results), visitedDecls(visitedDecls) {}
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Expansion;
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
+    visitedDecls.push_back(D);
+    
     switch (D->getKind()) {
     case DeclKind::Enum:
     case DeclKind::Struct:
@@ -3937,13 +3942,79 @@ public:
     return Action::Continue();
   }
 };
+
+/// Append the local type decls reachable through attached-macro 
+/// expansion buffers anchored at \p anchor to \p results, recursing 
+/// into each expansion SourceFile via LocalTypeDeclsRequest. 
+/// \p visitedSFs deduplicates expansion buffers across the recursion.
+static void collectLocalTypeDeclsFromAttachedMacroExpansions(
+    Decl *anchor, SmallPtrSetImpl<SourceFile *> &visitedSFs,
+    SmallVectorImpl<TypeDecl *> &results) {
+  ASTContext &ctx = anchor->getASTContext();
+  ModuleDecl *module = anchor->getModuleContext();
+  SourceManager &sourceMgr = ctx.SourceMgr;
+
+  auto appendFromBuffer = [&](unsigned bufferID) {
+    auto startLoc = sourceMgr.getLocForBufferStart(bufferID);
+    auto *expansionSF = module->getSourceFileContainingLocation(startLoc);
+    if (!expansionSF || !visitedSFs.insert(expansionSF).second)
+      return;
+    auto locals = expansionSF->getLocalTypeDecls();
+    results.append(locals.begin(), locals.end());
+  };
+
+  // Peer macros: Produce sibling decls whose bodies may contain local types.
+  for (unsigned bufferID : evaluateOrDefault(
+           ctx.evaluator, ExpandPeerMacroRequest{anchor}, {})) {
+    appendFromBuffer(bufferID);
+  }
+
+  // Member macros: Produce members of a nominal/extension whose bodies 
+  // may contain local types.
+  for (unsigned bufferID : evaluateOrDefault(
+           ctx.evaluator, ExpandSynthesizedMemberMacroRequest{anchor}, {})) {
+    appendFromBuffer(bufferID);
+  }
+
+  // Preamble and body macros are anchored at functions and replace or 
+  // prepend body content, which may declare local types.
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(anchor)) {
+    for (unsigned bufferID : evaluateOrDefault(
+             ctx.evaluator, ExpandPreambleMacroRequest{afd}, {})) {
+      appendFromBuffer(bufferID);
+    }
+    if (auto bufferID = evaluateOrDefault(
+            ctx.evaluator, ExpandBodyMacroRequest{AnyFunctionRef(afd)},
+            std::optional<unsigned>{})) {
+      appendFromBuffer(*bufferID);
+    }
+  }
+}
 } // namespace
 
 ArrayRef<TypeDecl *> LocalTypeDeclsRequest::evaluate(Evaluator &evaluator,
                                                      SourceFile *sf) const {
   SmallVector<TypeDecl *> results;
-  LocalTypeDeclCollector collector(results);
+  SmallVector<Decl *> visitedDecls;
+  LocalTypeDeclCollector collector(results, visitedDecls);
   sf->walk(collector);
+
+  // The walker descends into freestanding macro expansions (using
+  // MacroWalking::Expansion) but cannot reach attached-macro expansion
+  // buffers, since those live in separate SourceFiles not connected to 
+  // the walker's tree. Surface local types from those buffers explicitly 
+  // so consumers (SILGen, IRGen, debug-info type reconstruction) see a
+  // complete view.
+  //
+  // Note: visitAuxiliaryDecls only covers peer/freestanding expansions, 
+  // so we cannot reuse it here. Member, preamble, and body roles 
+  // require their own request invocations.
+  SmallPtrSet<SourceFile *, 4> visitedSFs;
+  visitedSFs.insert(sf);
+  for (auto *D : visitedDecls) {
+    collectLocalTypeDeclsFromAttachedMacroExpansions(D, visitedSFs, results);
+  }
+  
   return sf->getASTContext().AllocateCopy(results);
 }
 
