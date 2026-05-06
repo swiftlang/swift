@@ -280,9 +280,8 @@ function(setup_lit_args ARGS_VAR_OUT tested_sdk test_results_dir resource_dir_ov
     list(APPEND swift_lit_args_result "--param" "backtrace_on_crash")
   endif()
 
-  get_target_property(_python3_exe Python3::Interpreter IMPORTED_LOCATION)
   execute_process(COMMAND
-      "${_python3_exe}" "-c" "import psutil"
+      "${Python3_EXECUTABLE}" "-c" "import psutil"
       RESULT_VARIABLE python_psutil_status
       TIMEOUT 1 # second
       ERROR_QUIET)
