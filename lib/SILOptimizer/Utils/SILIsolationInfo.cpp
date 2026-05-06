@@ -1284,7 +1284,7 @@ void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
          "Please update MaxNumBits so that we can avoid heap allocations in "
          "this SmallVector");
 
-  llvm::interleave(data, os, ", ");
+  llvm::interleaveComma(data, os);
 }
 
 StringRef SILIsolationInfo::printActorIsolationForDiagnostics(

@@ -708,7 +708,7 @@ void Partition::printHistory(llvm::raw_ostream &os) const {
       auto extraArgs = head->getAdditionalElementArgs();
       if (extraArgs.empty())
         break;
-      llvm::interleave(extraArgs, os, ", ");
+      llvm::interleaveComma(extraArgs, os);
       break;
     }
     case IsolationHistory::Node::MergeElementRegions: {
@@ -717,7 +717,7 @@ void Partition::printHistory(llvm::raw_ostream &os) const {
       if (extraArgs.empty())
         break;
       os << ", ";
-      llvm::interleave(extraArgs, os, ", ");
+      llvm::interleaveComma(extraArgs, os);
       break;
     }
     case IsolationHistory::Node::CFGHistoryJoin:
