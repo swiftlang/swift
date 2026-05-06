@@ -2909,14 +2909,20 @@ function Build-CompilerRuntime([Hashtable] $Platform,
 
   $InstallRoot = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
 
+  # Pick GNU-style (clang) drivers for non-MSVC targets so the MSVC-style
+  # `$Compilers.C.Flags` (e.g. `/GS-`, `/Gw`) aren't passed through to the
+  # NDK clang when cross-compiling compiler-rt for Android.
+  $C   = if ($Platform.OS -eq [OS]::Windows) { $Compilers.C   } else { $Compilers.GNUC   }
+  $CXX = if ($Platform.OS -eq [OS]::Windows) { $Compilers.CXX } else { $Compilers.GNUCXX }
+
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt\lib\builtins `
     -Bin "$(Get-ProjectBinaryCache $Platform ClangBuiltins)" `
     -InstallTo $InstallRoot `
     -Platform $Platform `
     -Assembler $Assembler `
-    -CCompiler $Compilers.C `
-    -CXXCompiler $Compilers.CXX `
+    -CCompiler $C `
+    -CXXCompiler $CXX `
     -BuildTargets "install-compiler-rt" `
     -Defines @{
       LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
@@ -2930,8 +2936,8 @@ function Build-CompilerRuntime([Hashtable] $Platform,
     -InstallTo $InstallRoot `
     -Platform $Platform `
     -Assembler $Assembler `
-    -CCompiler $Compilers.C `
-    -CXXCompiler $Compilers.CXX `
+    -CCompiler $C `
+    -CXXCompiler $CXX `
     -BuildTargets "install-compiler-rt" `
     -Defines @{
       LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
@@ -3439,11 +3445,16 @@ function Build-SDKDependencies([Hashtable[]] $ArchitectureSlices,
                                [Hashtable]   $Compilers,
                                [string]      $Phase) {
   foreach ($Slice in $ArchitectureSlices) {
+    # `$Compilers.C/.CXX` are clang-cl drivers configured with MSVC-style
+    # flags (`/GS-`, `/Gw`, ...).  For non-Windows targets the NDK clang
+    # rejects those — pick the GNU drivers (`-fno-stack-protector`, ...).
+    $C   = if ($Slice.OS -eq [OS]::Windows) { $Compilers.C   } else { $Compilers.GNUC   }
+    $CXX = if ($Slice.OS -eq [OS]::Windows) { $Compilers.CXX } else { $Compilers.GNUCXX }
     if ($IncludeDS2) { Invoke-BuildStep Build-DS2 $Slice }
-    Invoke-BuildStep Build-ZLib $Slice -CCompiler $Compilers.C -Phase $Phase
-    Invoke-BuildStep Build-Brotli $Slice -CCompiler $Compilers.C -Phase $Phase
-    Invoke-BuildStep Build-XML2 $Slice -CCompiler $Compilers.C -CXXCompiler $Compilers.CXX -Phase $Phase
-    Invoke-BuildStep Build-CURL $Slice -CCompiler $Compilers.C -Phase $Phase
+    Invoke-BuildStep Build-ZLib $Slice -CCompiler $C -Phase $Phase
+    Invoke-BuildStep Build-Brotli $Slice -CCompiler $C -Phase $Phase
+    Invoke-BuildStep Build-XML2 $Slice -CCompiler $C -CXXCompiler $CXX -Phase $Phase
+    Invoke-BuildStep Build-CURL $Slice -CCompiler $C -Phase $Phase
   }
 }
 
