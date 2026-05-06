@@ -1100,7 +1100,7 @@ void Serializer::writeHeader() {
     Channel.emit(ScratchRecord, version::getCurrentCompilerChannel());
 
     {
-      llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
+      llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 6);
 
       options_block::IsSIBLayout IsSIB(Out);
       IsSIB.emit(ScratchRecord, Options.IsSIB);
