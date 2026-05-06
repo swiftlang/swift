@@ -2182,14 +2182,17 @@ function Load-LitTestOverrides($Filename) {
   }
 }
 
-function Build-CDispatch([Hashtable] $Platform, [switch] $Static = $false) {
+function Build-CDispatch([Hashtable] $Platform,
+                         [Hashtable] $CCompiler   = $script:Compilers.Pinned.C,
+                         [Hashtable] $CXXCompiler = $script:Compilers.Pinned.CXX,
+                         [switch]    $Static      = $false) {
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-libdispatch `
     -Bin (Get-ProjectBinaryCache $Platform CDispatch) `
     -BuildTargets default `
     -Platform $Platform `
-    -CCompiler $Compilers.Pinned.C `
-    -CXXCompiler $Compilers.Pinned.CXX `
+    -CCompiler $CCompiler `
+    -CXXCompiler $CXXCompiler `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       BUILD_TESTING = "NO";
@@ -2558,12 +2561,13 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
     }
 }
 
-function Build-Brotli([Hashtable] $Platform) {
+function Build-Brotli([Hashtable] $Platform,
+                      [Hashtable] $CCompiler = $script:Compilers.Host.C) {
   Build-CMakeProject `
     -Src $SourceCache\brotli `
     -Bin "$(Get-ProjectBinaryCache $Platform brotli)" `
     -Platform $Platform `
-    -CCompiler $Compilers.Host.C `
+    -CCompiler $CCompiler `
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
@@ -2573,27 +2577,30 @@ function Build-Brotli([Hashtable] $Platform) {
 }
 
 
-function Build-ZLib([Hashtable] $Platform) {
+function Build-ZLib([Hashtable] $Platform,
+                    [Hashtable] $CCompiler = $script:Compilers.Host.C) {
   Build-CMakeProject `
     -Src $SourceCache\zlib `
     -Bin "$BinaryCache\$($Platform.Triple)\zlib" `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
-    -CCompiler $Compilers.Host.C `
+    -CCompiler $CCompiler `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
     }
 }
 
-function Build-XML2([Hashtable] $Platform) {
+function Build-XML2([Hashtable] $Platform,
+                    [Hashtable] $CCompiler   = $script:Compilers.Host.C,
+                    [Hashtable] $CXXCompiler = $script:Compilers.Host.CXX) {
   Build-CMakeProject `
     -Src $SourceCache\libxml2 `
     -Bin "$BinaryCache\$($Platform.Triple)\libxml2-2.11.5" `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
-    -CCompiler $Compilers.Host.C `
-    -CXXCompiler $Compilers.Host.CXX `
+    -CCompiler $CCompiler `
+    -CXXCompiler $CXXCompiler `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
@@ -2665,7 +2672,8 @@ function Build-DS2([Hashtable] $Platform) {
     }
 }
 
-function Build-CURL([Hashtable] $Platform) {
+function Build-CURL([Hashtable] $Platform,
+                    [Hashtable] $CCompiler = $script:Compilers.Host.C) {
   $PlatformDefines = @{}
   if ($Platform.OS -eq [OS]::Android) {
     $PlatformDefines += @{
@@ -2678,7 +2686,7 @@ function Build-CURL([Hashtable] $Platform) {
     -Bin "$BinaryCache\$($Platform.Triple)\curl" `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
-    -CCompiler $Compilers.Host.C `
+    -CCompiler $CCompiler `
     -Defines ($PlatformDefines + @{
       BUILD_SHARED_LIBS = "NO";
       BUILD_TESTING = "NO";
