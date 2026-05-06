@@ -53,5 +53,7 @@ public struct MyView: View {
 // CHECK-NOT: alloc_pack
 // CHECK-NOT: pack_element_set
 // CHECK-NOT: pack_element_get
+// CHECK-NOT: open_pack_element
+// CHECK-NOT: unchecked_addr_cast
 // CHECK-NOT: dealloc_pack
 // CHECK: } // end sil function '$s28pack_element_forwarding_test19bodyParameterPacks2QryF'

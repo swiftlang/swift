@@ -1752,13 +1752,21 @@ SILCombiner::visitOpenPackElementInst(OpenPackElementInst *OPEI) {
     return nullptr;
   }
 
-  // Verify all users of the token are PackElementGetInst (type-dep users).
+  // Verify all users of the token are instructions we can handle.
   SmallVector<PackElementGetInst *, 4> packElementGets;
+  SmallVector<TuplePackElementAddrInst *, 4> tuplePackElementAddrs;
+  SmallVector<UncheckedAddrCastInst *, 4> uncheckedAddrCasts;
   for (auto *use : OPEI->getUses()) {
-    auto *PEGI = dyn_cast<PackElementGetInst>(use->getUser());
-    if (!PEGI)
+    if (auto *PEGI = dyn_cast<PackElementGetInst>(use->getUser())) {
+      packElementGets.push_back(PEGI);
+    } else if (auto *TPEAI =
+                   dyn_cast<TuplePackElementAddrInst>(use->getUser())) {
+      tuplePackElementAddrs.push_back(TPEAI);
+    } else if (auto *UACI = dyn_cast<UncheckedAddrCastInst>(use->getUser())) {
+      uncheckedAddrCasts.push_back(UACI);
+    } else {
       return nullptr;
-    packElementGets.push_back(PEGI);
+    }
   }
 
   // Create a scalar pack index for the concrete-typed replacements.
@@ -1780,6 +1788,52 @@ SILCombiner::visitOpenPackElementInst(OpenPackElementInst *OPEI) {
 
     replaceInstUsesWith(*PEGI, newPEGI);
     eraseInstFromFunction(*PEGI);
+  }
+
+  // Replace each TuplePackElementAddrInst with tuple_element_addr.
+  for (auto *TPEAI : tuplePackElementAddrs) {
+    Builder.setInsertionPoint(TPEAI);
+    auto *TEAI = Builder.createTupleElementAddr(
+        TPEAI->getLoc(), TPEAI->getTuple(), componentIndex);
+
+    replaceInstUsesWith(*TPEAI, TEAI);
+    eraseInstFromFunction(*TPEAI);
+  }
+
+  // Replace each UncheckedAddrCastInst by substituting element archetypes
+  // with concrete types.
+  if (!uncheckedAddrCasts.empty()) {
+    auto *env = OPEI->getOpenedGenericEnvironment();
+    auto substFn = [&](SubstitutableType *type) -> Type {
+      auto *archetype = dyn_cast<ElementArchetypeType>(type);
+      if (!archetype)
+        return Type();
+      PackType *pack = nullptr;
+      env->forEachPackElementBinding(
+          [&](ElementArchetypeType *elementType, PackType *packSubst) {
+            if (elementType == archetype)
+              pack = packSubst;
+          });
+      if (!pack)
+        return Type();
+      return pack->getElementType(componentIndex);
+    };
+    auto conformanceFn = LookUpConformanceInModule();
+
+    for (auto *UACI : uncheckedAddrCasts) {
+      auto substTy = UACI->getType().subst(
+          Builder.getModule(), substFn, conformanceFn, CanGenericSignature(),
+          SubstFlags::SubstituteLocalArchetypes);
+      Builder.setInsertionPoint(UACI);
+      if (substTy == UACI->getOperand()->getType()) {
+        replaceInstUsesWith(*UACI, UACI->getOperand());
+      } else {
+        auto *newCast = Builder.createUncheckedAddrCast(
+            UACI->getLoc(), UACI->getOperand(), substTy);
+        replaceInstUsesWith(*UACI, newCast);
+      }
+      eraseInstFromFunction(*UACI);
+    }
   }
 
   return eraseInstFromFunction(*OPEI);
@@ -1909,49 +1963,10 @@ SILCombiner::visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI) {
     return nullptr;
   }
 
-  auto *TEAI =
-      Builder.createTupleElementAddr(TPEAI->getLoc(), TPEAI->getTuple(), Index);
-  if (TEAI->getType() == TPEAI->getType())
-    return TEAI;
-
-  return Builder.createUncheckedAddrCast(TPEAI->getLoc(), TEAI,
-                                         TPEAI->getElementType());
-}
-
-// This is a hack. When optimizing a simple pack expansion expression which
-// forms a tuple from a pack, like `(repeat each t)`, after the above
-// peepholes we end up with:
-//
-// %src = unchecked_addr_cast %real_src, @element("...")
-// %dst = unchecked_addr_cast %real_dst, @element("...")
-// copy_addr %src, %dst
-//
-// Simplify this to
-//
-// copy_addr %real_src, %real_dst
-//
-// Assuming that %real_src and %real_dst have the same type.
-//
-// In this simple case, this eliminates the opened element archetype entirely.
-// However, a more principled peephole would be to transform an
-// open_pack_element with a scalar index by replacing all usages of the
-// element archetype with a concrete type.
-SILInstruction *
-SILCombiner::visitCopyAddrInst(CopyAddrInst *CAI) {
-  auto *Src = dyn_cast<UncheckedAddrCastInst>(CAI->getSrc());
-  auto *Dst = dyn_cast<UncheckedAddrCastInst>(CAI->getDest());
-
-  if (Src == nullptr || Dst == nullptr)
+  auto tupleElementTy = TPEAI->getTuple()->getType().getTupleElementType(Index);
+  if (tupleElementTy != TPEAI->getType())
     return nullptr;
 
-  if (Src->getType() != Dst->getType() ||
-      !Src->getType().is<ElementArchetypeType>())
-    return nullptr;
-
-  if (Src->getOperand()->getType() != Dst->getOperand()->getType())
-    return nullptr;
-
-  return Builder.createCopyAddr(
-      CAI->getLoc(), Src->getOperand(), Dst->getOperand(),
-      CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
+  return Builder.createTupleElementAddr(TPEAI->getLoc(), TPEAI->getTuple(),
+                                        Index);
 }
