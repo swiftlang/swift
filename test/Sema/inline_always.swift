@@ -57,7 +57,7 @@ func internalUsingInternal() {
 @inline(always) // okay
 package func packageFunc() {}
 
-@inline(always) // expected-error{{cannot use '@inline(always)' together with '@usableFromInline'}}
+@inline(always) // expected-error{{'@inline(always)' implies '@usableFromInline'; do not use both}}
 @usableFromInline
 func internalUFI() {}
 

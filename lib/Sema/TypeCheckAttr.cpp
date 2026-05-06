@@ -3691,7 +3691,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
       /*inferenceSources=*/{},
       attr->getLocation(),
       /*forExtension=*/nullptr,
-      /*allowInverses=*/true};
+      ExpandDefaults};
 
   auto specializedSig = evaluateOrDefault(Ctx.evaluator, request,
                                           GenericSignatureWithError())
@@ -6903,7 +6903,7 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
         /*inferenceSources=*/{},
         attr->getLocation(),
         /*forExtension=*/nullptr,
-        /*allowInverses=*/true};
+        ExpandDefaults};
 
     // Compute generic signature for derivative functions.
     derivativeGenSig = evaluateOrDefault(ctx.evaluator, request,

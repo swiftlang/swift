@@ -451,6 +451,11 @@ struct AliasAnalysis {
         return .init(write: true)
       }
       return .noEffects
+    case .TSanInoutAccess:
+      if memLoc.mayAlias(with: builtin.arguments[0], self) {
+        return .init(read: true)
+      }
+      return .noEffects
     default:
       if builtin.memoryEffects == .noEffects {
         return .noEffects

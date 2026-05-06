@@ -330,6 +330,12 @@ func inout01(ne0: inout NE, ne1: NE) {}
 func takeInout0(f: @_lifetime(ne0: copy ne0) (_ ne0: inout NE, _ ne1: NE) -> ()) {}
 func takeInout01(f: @_lifetime(ne0: copy ne0, copy ne1) (_ ne0: inout NE, _ ne1: NE) -> ()) {}
 
+
+func takeCaptures(
+  f: @_lifetime(captures)
+    (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE) {}
+
+
 func takeCopying0Captures(
   f: @_lifetime(copy ne0, captures)
     (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE) {}
@@ -406,10 +412,39 @@ func callLifetimeFunctions() {
   let copying0Captures: @_lifetime(copy ne0, captures)
     (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE = {
       ne0, ne1, ne2, ne3, ne4 in
+      true ? ne5 : ne0
+    }
+
+  let capturesOnly: @_lifetime(captures)
+    (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE = {
+      ne0, ne1, ne2, ne3, ne4 in
       ne5
     }
 
   takeCopying0(f: copying0Captures) // expected-error{{cannot convert value of type '@_lifetime(captures, copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying0(f: capturesOnly) // expected-error{{cannot convert value of type '@_lifetime(captures) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) @_lifetime(ne4: copy ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying0Captures(f: capturesOnly) // OK
   takeCopying0Captures(f: copying0) // OK
   takeCopying0Captures(f: copying0Captures) // OK
+}
+
+// ~Escapable function types
+@_lifetime(body) // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow body)' or '@_lifetime(copy body)'}}
+func implicitDependClosureNE(body: () -> NE) -> NE {
+  body()
+}
+
+@_lifetime(copy body)
+func explicitCopyClosureNE(body: () -> NE) -> NE {
+  body()
+}
+
+@_lifetime(borrow body)
+func explicitBorrowClosureNE(body: () -> NE) -> NE {
+  body()
+}
+
+func callCopyClosureNE(ne: NE) -> NE {
+  let neo = explicitCopyClosureNE { ne }
+  return neo
 }

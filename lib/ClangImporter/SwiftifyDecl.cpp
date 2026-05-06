@@ -495,14 +495,9 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                          const T *ClangDecl) {
   DLOG_SCOPE("Checking '" << *ClangDecl << "' for bounds and lifetime info\n");
 
-  if (ClangDecl->hasAttrs()) {
-    for (auto *attr : ClangDecl->getAttrs()) {
-      if (auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
-          swiftAttr && swiftAttr->getAttribute() == "no_safe_wrapper") {
-        DLOG("skipping function with no_safe_wrapper\n");
-        return false;
-      }
-    }
+  if (hasSwiftAttribute(ClangDecl, {"no_safe_wrapper"})) {
+    DLOG("skipping function with no_safe_wrapper\n");
+    return false;
   }
 
   if (shouldSkipModule(MappedDecl->getParentModule()))

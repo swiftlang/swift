@@ -1942,7 +1942,10 @@ static void swift_task_startOnMainActorImpl(AsyncTask* task) {
 // Defined in Swift, redeclared here so we can register it with the runtime.
 extern "C" SWIFT_CC(swift)
 bool _swift_task_isCurrentGlobalActor(
-    const swift::Metadata *, const swift::WitnessTable *);
+  const swift::Metadata *,
+  const swift::WitnessTable *,
+  SWIFT_CONTEXT const swift::Metadata *
+);
 
 // Register our type descriptors with standard manglings when the concurrency
 // runtime is loaded. This allows the runtime to quickly resolve those standard

@@ -484,6 +484,31 @@ def create_argument_parser():
     option('--sccache', toggle_true,
            default=os.environ.get('SWIFT_USE_SCCACHE') == '1',
            help='use sccache')
+    option('--enable-caching', toggle_true,
+           default=os.environ.get('SWIFT_USE_CACHING') == '1',
+           help='enable compilation caching using clang-cache and swift '
+                'cache-compile-job (incompatible with --sccache)')
+    option('--caching-cas-path', store_path,
+           default=None,
+           help='the path to the CAS directory for caching builds. '
+                'Defaults to $BUILD_ROOT/cas')
+    option('--caching-depscan-socket', store,
+           default='/tmp/clang-scand',
+           help='the socket path for the clang-cache depscan daemon')
+    option('--caching-plugin-path', store_path,
+           default=None,
+           help='the path to the CAS plugin for caching builds')
+    option('--caching-plugin-option', append,
+           help='options to pass to the CAS plugin. Can be specified '
+                'multiple times.')
+    option('--caching-prefix-map', toggle_true,
+           help='enable prefix mapping for cached builds. Maps source, '
+                'SDK, and toolchain paths to canonical prefixes.')
+    option('--caching-remote-service-path', store_path,
+           default=None,
+           help='the path to the remote caching service socket. Implies '
+                '--caching-prefix-map. Uses libToolchainCASPlugin.dylib '
+                'from Xcode if --caching-plugin-path is not provided.')
     option('--enable-asan', toggle_true,
            help='enable Address Sanitizer')
     option('--enable-ubsan', toggle_true,

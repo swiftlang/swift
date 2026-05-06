@@ -132,7 +132,8 @@ function(handle_swift_sources
     # FIXME: We shouldn't /have/ to build things in a single process.
     # <rdar://problem/15972329>
     list(APPEND swift_compile_flags "-whole-module-optimization")
-    if(sdk IN_LIST SWIFT_DARWIN_PLATFORMS OR sdk STREQUAL "MACCATALYST")
+    if((sdk IN_LIST SWIFT_DARWIN_PLATFORMS OR sdk STREQUAL "MACCATALYST") AND
+       NOT (SWIFT_CACHING_BUILD AND SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER))
       list(APPEND swift_compile_flags "-save-optimization-record=bitstream")
     endif()
     if (SWIFTSOURCES_ENABLE_LTO)
@@ -683,6 +684,10 @@ function(_compile_swift_files
   endif()
 
   list(APPEND swift_flags ${SWIFTFILE_FLAGS})
+
+  if(SWIFT_CACHING_BUILD AND SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    swift_append_caching_compile_flags(swift_flags)
+  endif()
 
   set(dirs_to_create)
   foreach(output ${SWIFTFILE_OUTPUT})

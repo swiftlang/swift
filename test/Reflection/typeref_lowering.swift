@@ -1418,3 +1418,15 @@ $1_12TypeLowering10SimpleEnumOBVBW
 // CHECK-32:         (builtin_borrow
 // CHECK-32-NEXT:      (struct TypeLowering.Big))
 // CHECK-32-NEXT:    (borrow size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)
+
+// `unmanaged_storage` applied to a single-field pointer-sized struct.
+SpySiGXu
+// CHECK:      (unmanaged_storage
+// CHECK-NEXT:   (bound_generic_struct Swift.UnsafeMutablePointer
+// CHECK-NEXT:     (struct Swift.Int)))
+// CHECK-64-NEXT: (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1
+// CHECK-64-NEXT:   (field name=_rawValue offset=0
+// CHECK-64-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)))
+// CHECK-32-NEXT: (struct size=4 alignment=4 stride=4 num_extra_inhabitants={{[0-9]+}} bitwise_takable=1
+// CHECK-32-NEXT:   (field name=_rawValue offset=0
+// CHECK-32-NEXT:     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants={{[0-9]+}} bitwise_takable=1)))

@@ -579,6 +579,34 @@ void validateGenericSignature(ASTContext &context,
 /// Verify all of the generic signatures in the given module.
 void validateGenericSignaturesInModule(ModuleDecl *module);
 
+/// Controls how default requirements for invertible protocols such as Copyable
+/// or Escapable are expanded when building a generic signature.
+enum DefaultRequirementFlags : uint8_t {
+  /// If set, default requirements to Copyable/Escapable are
+  /// expanded for generic parameters.
+  ExpandDefaults = 1 << 0,
+
+  /// If set, generic parameters defined in an outer generic signature that
+  /// are same-type constrained to some generic type X within the current
+  /// generic signature will skip performing expansion of defaults on type X.
+  ///
+  /// At a high-level, it "carries inverses across same-type requirements".
+  InferOutOfScopeImpliedInverses = 1 << 1,
+};
+
+using DefaultRequirementOptions = OptionSet<DefaultRequirementFlags>;
+
+inline bool operator==(DefaultRequirementOptions lhs,
+                       DefaultRequirementOptions rhs) {
+  return lhs.containsOnly(rhs);
+}
+
+inline llvm::hash_code hash_value(DefaultRequirementOptions options) {
+  return llvm::hash_value(options.toRaw());
+}
+
+void simple_display(llvm::raw_ostream &out, DefaultRequirementOptions options);
+
 /// Build a generic signature from the given requirements, which are not
 /// required to be minimal or canonical, and may contain unresolved
 /// DependentMemberTypes.
@@ -586,14 +614,14 @@ void validateGenericSignaturesInModule(ModuleDecl *module);
 /// \param baseSignature if non-null, the new parameters and requirements
 ///// are added on; existing requirements of the base signature might become
 ///// redundant. Otherwise if null, build a new signature from scratch.
-/// \param allowInverses if true, default requirements to Copyable/Escapable are
-/// expanded for generic parameters.
+/// \param options provides control over expansion of default requirements for
+/// conforming to Copyable/Escapable for generic parameters.
 GenericSignature buildGenericSignature(
     ASTContext &ctx,
     GenericSignature baseSignature,
     SmallVector<GenericTypeParamType *, 2> addedParameters,
     SmallVector<Requirement, 2> addedRequirements,
-    bool allowInverses);
+    DefaultRequirementOptions options);
 
 /// Summary of error conditions detected by the Requirement Machine.
 enum class GenericSignatureErrorFlags {
@@ -640,7 +668,7 @@ GenericSignatureWithError buildGenericSignatureWithError(
     GenericSignature baseSignature,
     SmallVector<GenericTypeParamType *, 2> addedParameters,
     SmallVector<Requirement, 2> addedRequirements,
-    bool allowInverses);
+    DefaultRequirementOptions options);
 
 } // end namespace swift
 

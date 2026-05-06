@@ -32,33 +32,29 @@ static inline __swift_uint32_t _swift_stdlib_gettid() {
   return tid;
 }
 
-static inline __swift_uint32_t _swift_stdlib_futex_lock(__swift_uint32_t *lock) {
-  int ret = syscall(SYS_futex, lock, FUTEX_LOCK_PI_PRIVATE,
-                    /* val */ 0, // this value is ignored by this futex op
-                    /* timeout */ NULL); // block indefinitely
+// Plain-futex wait: sleeps if *addr == expected. Returns 0 on success
+// (woken by FUTEX_WAKE) or the errno value (EAGAIN=11, EINTR=4 are the
+// expected retryable cases).
+static inline __swift_uint32_t _swift_stdlib_futex_wait(
+    __swift_uint32_t *addr, __swift_uint32_t expected) {
+  int ret = syscall(SYS_futex, addr, FUTEX_WAIT_PRIVATE, expected,
+                    /* timeout */ NULL);
 
   if (ret == 0) {
-    return ret;
+    return 0;
   }
 
   return errno;
 }
 
-static inline __swift_uint32_t _swift_stdlib_futex_trylock(__swift_uint32_t *lock) {
-  int ret = syscall(SYS_futex, lock, FUTEX_TRYLOCK_PI);
+// Plain-futex wake: wakes up to `count` waiters parked on `addr`.
+// Returns the number woken on success, or the errno value on failure.
+static inline __swift_uint32_t _swift_stdlib_futex_wake(
+    __swift_uint32_t *addr, __swift_uint32_t count) {
+  int ret = syscall(SYS_futex, addr, FUTEX_WAKE_PRIVATE, count);
 
-  if (ret == 0) {
-    return ret;
-  }
-
-  return errno;
-}
-
-static inline __swift_uint32_t _swift_stdlib_futex_unlock(__swift_uint32_t *lock) {
-  int ret = syscall(SYS_futex, lock, FUTEX_UNLOCK_PI_PRIVATE);
-
-  if (ret == 0) {
-    return ret;
+  if (ret >= 0) {
+    return (__swift_uint32_t)ret;
   }
 
   return errno;

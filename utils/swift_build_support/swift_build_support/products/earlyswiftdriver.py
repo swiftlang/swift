@@ -138,4 +138,17 @@ def run_build_script_helper(action, host_target, product, args):
     if args.verbose_build:
         helper_cmd.append('--verbose')
 
+    if args.enable_caching and args.caching_cas_path:
+        helper_cmd += ['--enable-caching',
+                       '--caching-cas-path', args.caching_cas_path]
+        if args.caching_plugin_path:
+            helper_cmd += ['--caching-plugin-path',
+                           args.caching_plugin_path]
+        for opt in (args.caching_plugin_option or []):
+            helper_cmd += ['--caching-plugin-option', opt]
+        if args.caching_prefix_map:
+            helper_cmd.append('--caching-prefix-map')
+        if getattr(args, 'caching_enable_mccas', False):
+            helper_cmd.append('--caching-enable-mccas')
+
     shell.call(helper_cmd)

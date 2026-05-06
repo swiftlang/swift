@@ -5592,7 +5592,7 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         return CxxEscapability::NonEscapable;
       if (hasEscapableAttr(recordDecl))
         continue;
-      if (hasSwiftAttribute(recordDecl, "unsafe"))
+      if (hasSwiftAttribute(recordDecl, {"unsafe"}))
         return CxxEscapability::Unknown;
       SmallVector<int> STLParams;
       if (recordDecl->isInStdNamespace()) {
@@ -7851,13 +7851,7 @@ bool ClangImporter::isUnsafeCXXMethod(const FuncDecl *func) {
 
 bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,
                                     StringRef attr) {
-  return method->hasAttrs() &&
-         llvm::any_of(method->getAttrs(), [attr](clang::Attr *a) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(a)) {
-             return swiftAttr->getAttribute() == attr;
-           }
-           return false;
-         });
+  return hasSwiftAttribute(method, {attr});
 }
 
 FuncDecl *
@@ -8156,20 +8150,21 @@ static bool clangTypeIsForeignReference(const clang::QualType type,
   return info.isReference();
 }
 
-bool importer::hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
+bool importer::hasSwiftAttribute(const clang::Decl *decl,
+                                 ArrayRef<StringRef> attrs) {
   if (decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [&](auto *A) {
         if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(A))
-          return swiftAttr->getAttribute() == attr;
+          return llvm::is_contained(attrs, swiftAttr->getAttribute());
         return false;
       }))
     return true;
 
   if (auto *P = dyn_cast<clang::ParmVarDecl>(decl)) {
     bool found = false;
-    findSwiftAttributes(P->getOriginalType(),
-                        [&](const clang::SwiftAttrAttr *swiftAttr) {
-                          found |= swiftAttr->getAttribute() == attr;
-                        });
+    findSwiftAttributes(
+        P->getOriginalType(), [&](const clang::SwiftAttrAttr *swiftAttr) {
+          found |= llvm::is_contained(attrs, swiftAttr->getAttribute());
+        });
     return found;
   }
 
@@ -8177,27 +8172,27 @@ bool importer::hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
 }
 
 bool importer::hasOwnedValueAttr(const clang::RecordDecl *decl) {
-  return hasSwiftAttribute(decl, "import_owned");
+  return hasSwiftAttribute(decl, {"import_owned"});
 }
 
 bool importer::hasUnsafeAPIAttr(const clang::Decl *decl) {
-  return hasSwiftAttribute(decl, "import_unsafe");
+  return hasSwiftAttribute(decl, {"import_unsafe"});
 }
 
 bool importer::hasIteratorAPIAttr(const clang::Decl *decl) {
-  return hasSwiftAttribute(decl, "import_iterator");
+  return hasSwiftAttribute(decl, {"import_iterator"});
 }
 
 bool importer::hasNonCopyableAttr(const clang::RecordDecl *decl) {
-  return hasSwiftAttribute(decl, "~Copyable");
+  return hasSwiftAttribute(decl, {"~Copyable"});
 }
 
 bool importer::hasNonEscapableAttr(const clang::RecordDecl *decl) {
-  return hasSwiftAttribute(decl, "~Escapable");
+  return hasSwiftAttribute(decl, {"~Escapable"});
 }
 
 bool importer::hasEscapableAttr(const clang::RecordDecl *decl) {
-  return hasSwiftAttribute(decl, "Escapable");
+  return hasSwiftAttribute(decl, {"Escapable"});
 }
 
 CxxValueSemanticsKind
@@ -8759,8 +8754,8 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
   if (desc.isClass)
     // Safety for class types is handled a bit differently than other types.
     // If it is not explicitly marked unsafe, it is always explicitly safe.
-    return hasSwiftAttribute(desc.decl, "unsafe") ? ExplicitSafety::Unsafe
-                                                  : ExplicitSafety::Safe;
+    return hasSwiftAttribute(desc.decl, {"unsafe"}) ? ExplicitSafety::Unsafe
+                                                    : ExplicitSafety::Safe;
 
   // Clang record types are considered explicitly unsafe if any of their fields,
   // base classes, and template type parameters are unsafe. We use a stack for
@@ -8800,10 +8795,10 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
 
     // Found unsafe; whether decl == desc.decl or not, desc.decl is unsafe
     // (see invariant, above)
-    if (hasSwiftAttribute(decl, "unsafe"))
+    if (hasSwiftAttribute(decl, {"unsafe"}))
       return ExplicitSafety::Unsafe;
 
-    if (hasSwiftAttribute(decl, "safe"))
+    if (hasSwiftAttribute(decl, {"safe"}))
       continue;
 
     // Enums are always safe

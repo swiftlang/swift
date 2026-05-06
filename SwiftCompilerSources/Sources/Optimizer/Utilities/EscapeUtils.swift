@@ -572,6 +572,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case is DeallocStackInst, is InjectEnumAddrInst, is FixLifetimeInst, is EndBorrowInst, is EndAccessInst,
          is IsUniqueInst, is DebugValueInst:
       return .continueWalk
+    case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
+      return .continueWalk
     case let uac as UncheckedAddrCastInst:
       if uac.type != uac.fromAddress.type {
         // It's dangerous to continue walking over an `unchecked_addr_cast` which casts between two different types.

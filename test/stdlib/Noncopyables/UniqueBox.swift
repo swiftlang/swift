@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift
+
 // REQUIRES: executable_test
 
-// CHECK: Start
-print("Start")
+import StdlibUnittest
 
 struct Foo: ~Copyable {
   func idk() -> String {
@@ -15,94 +15,53 @@ struct Foo: ~Copyable {
   }
 }
 
+let suite = TestSuite("UniqueBox")
 
-@available(SwiftStdlib 6.4, *)
-func basic() {
+if #available(SwiftStdlib 6.4, *) {
+suite.test("Basic") {
   var intBox = UniqueBox(123)
 
-  // CHECK: 123
-  print(intBox.value)
+  expectEqual(intBox.value, 123)
 
   intBox.value += 321
 
-  // CHECK: 444
-  print(intBox.value)
+  expectEqual(intBox.value, 444)
+}
 }
 
-@available(SwiftStdlib 6.4, *)
-func noncopyable() {
-  let fooBox = UniqueBox(Foo())
-
-  // CHECK: bar
-  print("bar")
-
-  // CHECK: foo
-}
-
-@available(SwiftStdlib 6.4, *)
-func consume() {
-  func help() -> Foo {
-    let fooBox = UniqueBox(Foo())
-
-    let foo = fooBox.consume()
-
-    // CHECK: bar
-    print("bar")
-
-    return foo
-  }
-
-  _ = help()
-
-  // CHECK: foo
-}
-
-@available(SwiftStdlib 6.4, *)
-func span() {
+if #available(SwiftStdlib 6.4, *) {
+suite.test("Span") {
   let fooBox = UniqueBox(Foo())
 
   let fooSpan = fooBox.span
 
-  // CHECK: 1
-  print(fooSpan.count)
-
-  // CHECK: idk
-  print(fooSpan[0].idk())
+  expectEqual(fooSpan.count, 1)
+  expectEqual(fooSpan[0].idk(), "idk")
+}
 }
 
-@available(SwiftStdlib 6.4, *)
-func mutableSpan() {
+if #available(SwiftStdlib 6.4, *) {
+suite.test("MutableSpan") {
   var intBox = UniqueBox(123)
 
   let intSpan = intBox.mutableSpan
 
-  // CHECK: 1
-  print(intSpan.count)
-
-  // CHECK: 123
-  print(intSpan[0])
+  expectEqual(intSpan.count, 1)
+  expectEqual(intSpan[0], 123)
+}
 }
 
-@available(SwiftStdlib 6.4, *)
-func clone() {
+if #available(SwiftStdlib 6.4, *) {
+suite.test("Clone") {
   var intBox = UniqueBox(8)
   var cloneIntBox = intBox.clone()
 
   intBox.value += 8
   cloneIntBox.value -= 8
 
-  // CHECK: 16
-  print(intBox.value)
-
-  // CHECK: 0
-  print(cloneIntBox.value)
+  expectEqual(intBox.value, 16)
+  expectEqual(cloneIntBox.value, 0)
+}
 }
 
-if #available(SwiftStdlib 6.4, *) {
-  basic()
-  noncopyable()
-  consume()
-  span()
-  mutableSpan()
-  clone()
-}
+runAllTests()

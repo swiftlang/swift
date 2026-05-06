@@ -122,6 +122,18 @@ CLANG_MACRO_CONDITIONAL("SWIFT_WARN_UNUSED_RESULT", , \
                         "__has_attribute(warn_unused_result)", \
                         "__attribute__((warn_unused_result))")
 
+CLANG_MACRO_CONDITIONAL("NS_RETURNS_RETAINED", , \
+                        "__has_attribute(ns_returns_retained)", \
+                        "__attribute__((ns_returns_retained))")
+
+CLANG_MACRO_CONDITIONAL("CF_RETURNS_RETAINED", , \
+                        "__has_attribute(cf_returns_retained)", \
+                        "__attribute__((cf_returns_retained))")
+
+CLANG_MACRO_CONDITIONAL("SWIFT_RETURNS_RETAINED", , \
+                        "__has_attribute(swift_attr)", \
+                        "__attribute__((swift_attr(\"returns_retained\")))")
+
 CLANG_MACRO_CONDITIONAL("SWIFT_NORETURN", , \
                         "__has_attribute(noreturn)", \
                         "__attribute__((noreturn))")
