@@ -621,6 +621,11 @@ extension __StringStorage {
 
 #if _pointerBitWidth(_64)
     if let utf16Len, hasBreadcrumbs, utf16Len <= Int32.max {
+      // `_oneCrumb`'s setter uses a raw `storeBytes`, so an ARC reference in
+      // the slot would be leaked. Current callers only pass `utf16Len` on
+      // freshly-created storage where the slot holds a small integer or nil
+      // pointer; this invariant catches future misuse.
+      _internalInvariant(!hasAllocatedBreadcrumbs)
       self._oneCrumb = utf16Len
     } else if hasAllocatedBreadcrumbs {
       unsafe self._breadcrumbsAddress.pointee = nil
