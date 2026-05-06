@@ -2166,12 +2166,22 @@ function Build-CMakeProject {
     if ($EnableCaching) {
       $env:LLVM_CACHE_CAS_PATH = "$Cache"
 
-      if ($UseC -and $CCompiler.DriverStyle -ne [DriverStyle]::CL) {
+      # Skip the clang-cache launcher when targeting Android: cmake auto-detects
+      # the NDK's clang (e.g. 19.x) as the actual compiler, but the launcher
+      # we'd point at lives under Stage1Compilers (a newer LLVM, e.g. 21.x).
+      # The version skew makes the in-process dep scanner look for builtin
+      # headers (`stddef.h`, `float.h`, ...) under the wrong resource-dir
+      # layout and fail with "CAS-based dependency scan failed: failed to get
+      # include-tree".  Compiler-rt builds for Android are fast enough without
+      # the launcher.
+      $LauncherSafe = ($Platform.OS -ne [OS]::Android)
+
+      if ($LauncherSafe -and $UseC -and $CCompiler.DriverStyle -ne [DriverStyle]::CL) {
         Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_LAUNCHER `
             (Join-Path -Path (Split-Path $CCompiler.Executable) -ChildPath "clang-cache.exe")
       }
 
-      if ($UseCXX -and $CXXCompiler.DriverStyle -ne [DriverStyle]::CL) {
+      if ($LauncherSafe -and $UseCXX -and $CXXCompiler.DriverStyle -ne [DriverStyle]::CL) {
         Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_LAUNCHER `
             (Join-Path -Path (Split-Path $CXXCompiler.Executable) -ChildPath "clang-cache.exe")
       }
