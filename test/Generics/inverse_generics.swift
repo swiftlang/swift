@@ -413,11 +413,15 @@ public func checkAnyObject<Result>(_ t: Result) where Result: AnyObject {
     checkCopyable(t)
 }
 
+protocol AnyObjectRefining: AnyObject {}
+
 func checkExistentialAndClasses(
     _ a: any AnyObject & ~Copyable, // expected-error {{composition involving 'AnyObject' cannot contain '~Copyable'}}
     _ b: any Soup & Copyable & ~Escapable & ~Copyable,
     // expected-error@-1 {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
-    _ c: some (~Escapable & Removed) & Soup // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
+    _ c: some (~Escapable & Removed) & Soup, // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
+    _ d: borrowing any AnyObjectRefining & ~Copyable
+    // expected-error@-1 {{composition involving 'AnyObject' cannot contain '~Copyable'}}
     ) {}
 
 protocol HasNCBuddy: ~Copyable {
