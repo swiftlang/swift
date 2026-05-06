@@ -236,6 +236,12 @@ private func _NSStringCopyBytes(
   )
   if success {
     if let remainingRange = unsafe remainingRange {
+      // Defensive: if getBytes claimed success but made no progress against a
+      // non-empty input range, treat as failure so chunked callers can't loop
+      // forever on a pathological NSString subclass.
+      if usedLen == 0 && tmpRemainingRange.length == range.length && range.length != 0 {
+        return nil
+      }
       unsafe remainingRange.pointee = tmpRemainingRange
       return usedLen
     } else if tmpRemainingRange.length == 0 {
