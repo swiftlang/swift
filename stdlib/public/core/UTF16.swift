@@ -649,7 +649,7 @@ internal func transcodeUTF16ToUTF8(
   let outputStart = unsafe output
   var repairsMade = false
   
-  while unsafe input <= (inputEnd - blockSize) {
+  while unsafe (inputEnd - input) >= blockSize {
     if let asciiBlock = unsafe allASCIIBlock(at: input) {
       _onFastPath()
       // All ASCII: transcode directly
@@ -756,7 +756,7 @@ internal func utf8Length(
   //   U+DC00..U+DFFF  → low surrogate  (consumed by high surrogate)
   //   U+E000..U+FFFF  → 3 UTF-8 bytes  (BMP, non-surrogate)
 
-  while unsafe input < (inputEnd - blockSize) {
+  while unsafe (inputEnd - input) > blockSize {
     if let _ = unsafe allASCIIBlock(at: input) {
       _onFastPath()
       unsafe input += blockSize
