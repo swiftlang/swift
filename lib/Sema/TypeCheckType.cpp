@@ -6559,12 +6559,12 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       auto kp = getKnownProtocolKind(ip);
 
       if (layout.requiresClass()) {
-        bool hasExplicitAnyObject = layout.hasExplicitAnyObject;
+        auto superclass = layout.getSuperclass();
         diagnose(repr->getStartLoc(),
                  diag::inverse_with_class_constraint,
-                 hasExplicitAnyObject,
+                 !superclass,
                  getProtocolName(kp),
-                 layout.getSuperclass());
+                 superclass);
         IsInvalid = true;
         break;
       }
