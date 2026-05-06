@@ -824,23 +824,18 @@ fileprivate func isEqual(
   
   var remainingOtherByteCount = otherByteCount
   var offset = 0
-  
-  enum ChunkResult {
-    case equal
-    case nonequal
-    case `continue`
-  }
-  
-  let tryCopyingChunk = { () -> ChunkResult in
+
+  while true {
     /*
      Larger chunk sizes mean we read more out of `self` even if the difference
      is early, which can be a bit expensive if it has to transcode or doesn't
      do bulk access (the latter is unusual but appears in our benchmark suite).
-     
+
      Smaller chunk sizes mean more call overhead.
      */
     let chunkSize = Swift.min(64, remainingOtherByteCount)
-    return unsafe withUnsafeTemporaryAllocation(
+    // nil = keep looping; .some(equal) = terminate with that equality result
+    let chunkResult: Bool? = unsafe withUnsafeTemporaryAllocation(
       of: UInt8.self,
       capacity: chunkSize
     ) { tmpBuffer in
@@ -858,46 +853,37 @@ fileprivate func isEqual(
         UTF16Range: offset ..< selfCount, //the remaining tail of self
         remainingRange: &remainingRange
       ) else {
-        return .nonequal
+        return false
       }
       /*
-       selfChunkByteCount is now the number of bytes occupied by the next
-       N UTF16 code units from self, when transcoded into `otherEncoding`
+       selfChunkByteCount is now the number of bytes occupied by the next N
+       UTF16 code units from self, when transcoded into `otherEncoding`
        */
       if selfChunkByteCount > remainingOtherByteCount {
-        return .nonequal
+        return false
       }
       if remainingRange.isEmpty && selfChunkByteCount != remainingOtherByteCount {
         //We've processed all of self. If we don't have enough bytes now we never will
-        return .nonequal
+        return false
       }
-      
-      let result = unsafe _swift_stdlib_memcmp(
+
+      let cmpResult = unsafe _swift_stdlib_memcmp(
         otherPtr + (otherByteCount &- remainingOtherByteCount),
         buffer.baseAddress.unsafelyUnwrapped,
         selfChunkByteCount
       )
-      if result != 0 {
-        return .nonequal
+      if cmpResult != 0 {
+        return false
       }
       remainingOtherByteCount &-= selfChunkByteCount
       offset = remainingRange.lowerBound
       if remainingOtherByteCount == 0 {
-          return remainingRange.isEmpty ? .equal : .nonequal
-      } else {
-          return .continue
+        return remainingRange.isEmpty
       }
+      return nil
     }
-  }
-  
-  while true {
-    switch tryCopyingChunk() {
-    case .equal:
-      return 1
-    case .nonequal:
-      return 0
-    default:
-      continue
+    if let chunkResult {
+      return chunkResult ? 1 : 0
     }
   }
 }
