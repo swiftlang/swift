@@ -175,13 +175,8 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
   }
 }
 
-bool importer::hasImmortalAttrs(const clang::RecordDecl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "retain:immortal" ||
-                    swiftAttr->getAttribute() == "release:immortal";
-           return false;
-         });
+bool importer::hasAnyImmortalAttr(const clang::RecordDecl *decl) {
+  return hasSwiftAttribute(decl, {"retain:immortal", "release:immortal"});
 }
 
 importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
@@ -923,11 +918,7 @@ static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
 }
 
 static bool hasComputedPropertyAttr(const clang::Decl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "import_computed_property";
-           return false;
-         });
+  return hasSwiftAttribute(decl, {"import_computed_property"});
 }
 
 /// Whether to import a member decl when importing its parent record.
@@ -3822,7 +3813,7 @@ namespace {
       HeaderLoc loc(decl->getLocation());
 
       if (recordDecl && recordHasReferenceSemantics(recordDecl) &&
-          !hasImmortalAttrs(recordDecl)) {
+          !hasAnyImmortalAttr(recordDecl)) {
         if (attrInfo.hasConflictingAttr()) {
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);
@@ -9800,16 +9791,10 @@ void ClangImporter::Implementation::importAttributes(
     }
 
     // Map Clang's swift_objc_members attribute to @objcMembers.
-    if (ID->hasAttr<clang::SwiftObjCMembersAttr>() &&
-        isa<ClassDecl>(MappedDecl)) {
-      if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
-        auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
-        MappedDecl->addAttribute(attr);
-      }
-    }
-
-    // Infer @objcMembers on XCTestCase.
-    if (ID->getName() == "XCTestCase") {
+    // Also infer @objcMembers on XCTestCase.
+    if ((ID->hasAttr<clang::SwiftObjCMembersAttr>() &&
+         isa<ClassDecl>(MappedDecl)) ||
+        ID->getName() == "XCTestCase") {
       if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
         auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
         MappedDecl->addAttribute(attr);
