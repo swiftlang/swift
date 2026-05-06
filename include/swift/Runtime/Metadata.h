@@ -1076,7 +1076,7 @@ struct ConcurrencyStandardTypeDescriptors {
 /// Function that determines whether we are executing on the given global
 /// actor. The metadata is for the global actor type, and the witness table
 /// is the conformance of that type to the GlobalActor protocol.
-typedef bool (* SWIFT_CC(swift) IsCurrentGlobalActor)(const Metadata *, const WitnessTable *);
+typedef SWIFT_CC(swift) bool (*IsCurrentGlobalActor)(const Metadata *, const WitnessTable *, SWIFT_CONTEXT const Metadata *);
 
 /// Register various concurrency-related data and hooks needed in the Swift
 /// standard library / runtime. This includes type descriptors with standard
