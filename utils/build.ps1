@@ -814,10 +814,22 @@ function Invoke-BuildStep {
 enum Project {
   BuildTools
   RegsGen2
-  BootstrapFoundationMacros
-  BootstrapTestingMacros
+
   EarlySwiftDriver
   Stage0Compilers
+  BootstrapRuntime
+  BootstrapOverlay
+  BootstrapRuntimeModule
+  BootstrapStringProcessing
+  BootstrapSynchronization
+  BootstrapDistributed
+  BootstrapObservation
+  BootstrapDifferentiation
+  BootstrapVolatile
+  BootstrapFoundationMacros
+  BootstrapTestingMacros
+  BootstrapDispatch
+  BootstrapFoundation
 
   CDispatch
   Compilers
@@ -3591,19 +3603,27 @@ function Get-SelectedSDKBuilds() {
   }
 }
 
+# Promotes C module header directories that libdispatch and Foundation install
+# under usr/lib/swift[_static]/<Module>/ into usr/include/ so that SDK-based
+# consumers can locate the corresponding module maps via the standard include
+# search path. CMake consumers receive a -vfsoverlay from the target's PUBLIC
+# interface; SDK consumers do not and therefore need the physical headers.
+function Repair-SDKHeaders([string] $SDKRoot) {
+  foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims")) {
+    foreach ($ResourceType in ("swift", "swift_static")) {
+      $ModuleDirectory = "$SDKRoot\usr\lib\$ResourceType\$Module"
+      if (Test-Path $ModuleDirectory) {
+        Move-Directory $ModuleDirectory "$SDKRoot\usr\include\"
+      }
+    }
+  }
+}
+
 # Copies files installed by CMake from the arch-specific platform root,
 # where they follow the layout expected by the installer,
 # to the final platform root, following the installer layout.
 function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [string] $Identifier = $OS.ToString()) {
-  # Copy SDK header files
-  foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims")) {
-    foreach ($ResourceType in ("swift", "swift_static")) {
-      $ModuleDirectory = "$(Get-SwiftSDK -OS $OS -Identifier $Identifier)\usr\lib\$ResourceType\$Module"
-      if (Test-Path $ModuleDirectory) {
-        Move-Directory $ModuleDirectory "$(Get-SwiftSDK -OS $OS -Identifier $Identifier)\usr\include\"
-      }
-    }
-  }
+  Repair-SDKHeaders (Get-SwiftSDK -OS $OS -Identifier $Identifier)
 
   # Copy files from the arch subdirectory, including "*.swiftmodule" which need restructuring
   foreach ($Platform in $Platforms) {
@@ -3794,6 +3814,399 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
         }
       }
     }
+}
+
+$SDKSupplementalRuntimes = @(
+  "StringProcessing",
+  "Synchronization",
+  "Distributed",
+  "Observation",
+  "Differentiation",
+  "Volatile",
+  "Runtime"
+)
+
+function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
+  $SDKIdentifier        = $Context.SDKIdentifier
+  $Variant              = $Context.Variant
+  $Compilers            = $Context.Compilers
+  $Static               = [bool]$Context.Static
+  $BuildFoundation      = [bool]$Context.BuildFoundation
+  $SupplementalRuntimes = @($Context.SupplementalRuntimes)
+  $SDKRoot              = Get-SwiftSDK -OS $Platform.OS -Identifier $SDKIdentifier
+  $BUILD_SHARED_LIBS    = if ($Static) { "NO" } else { "YES" }
+  $RuntimeBinaryCache   = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime")
+  $OverlayBinaryCache   = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay")
+
+  # TODO: remove this once the migration is completed.
+  Invoke-IsolatingEnvVars {
+    Invoke-VsDevShell $BuildPlatform
+
+    Push-Location "${SourceCache}\swift\Runtimes"
+    Start-Process -Wait -WindowStyle Hidden -FilePath $cmake -ArgumentList @("-P", "Resync.cmake")
+    Pop-Location
+  }
+
+  Invoke-IsolatingEnvVars {
+    # TODO(compnerd) build statically for static builds
+    # Match Build-SDKDependencies: pick GNU drivers for non-Windows targets.
+    $CDispatchC   = if ($Platform.OS -eq [OS]::Windows) { $Compilers.C   } else { $Compilers.GNUC   }
+    $CDispatchCXX = if ($Platform.OS -eq [OS]::Windows) { $Compilers.CXX } else { $Compilers.GNUCXX }
+    Build-CDispatch $Platform -CCompiler $CDispatchC -CXXCompiler $CDispatchCXX -Phase $Variant
+    if ($BuildFoundation) {
+      Build-SDKDependencies @($Platform) -Compilers $Compilers -Phase $Variant
+    }
+
+    # ── Core ──────────────────────────────────────────────────────────────────
+    Record-OperationTime $Platform "Build-${Variant}Runtime" {
+      Build-CMakeProject `
+        -Src $SourceCache\swift\Runtimes\Core `
+        -Bin $RuntimeBinaryCache `
+        -InstallTo "$SDKRoot\usr" `
+        -Platform $Platform `
+        -CCompiler $Compilers.GNUC `
+        -CXXCompiler $Compilers.GNUCXX `
+        -SwiftCompiler $Compilers.Swift `
+        -SwiftSDK $null `
+        -Defines @{
+          BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+          dispatch_DIR = (Get-ProjectCMakeModules $Platform CDispatch);
+
+          # FIXME(hjyamauchi) Should dynamic to libdispatch https://github.com/swiftlang/swift/issues/87548
+          CMAKE_CXX_FLAGS   = if ($Static) { @("-Ddispatch_STATIC") } else { @() };
+          CMAKE_Swift_FLAGS = $(if ($Static) { @("-Xcc", "-static-libclosure") } else { @() });
+
+          # FIXME(compnerd) remove this once the default option is flipped to `ON`.
+          SwiftCore_ENABLE_BACKTRACING       = "YES";
+          # FIXME(compnerd) remove this once the default option is flipped to `ON`.
+          SwiftCore_ENABLE_CONCURRENCY       = "YES";
+          # FIXME(compnerd) remove this once the default option is flipped to `ON`.
+          SwiftCore_ENABLE_REMOTE_MIRROR     = "YES";
+          # FIXME(compnerd) this currently causes a build failure on Windows, but
+          # this should be enabled when building the dynamic runtime.
+          SwiftCore_ENABLE_LIBRARY_EVOLUTION = "NO";
+        }
+    }
+
+    # ── Overlay ────────────────────────────────────────────────────────────────
+    Record-OperationTime $Platform "Build-${Variant}Overlay" {
+      Build-CMakeProject `
+        -Src $SourceCache\swift\Runtimes\Overlay `
+        -Bin $OverlayBinaryCache `
+        -InstallTo "$SDKRoot\usr" `
+        -Platform $Platform `
+        -CCompiler $Compilers.GNUC `
+        -CXXCompiler $Compilers.GNUCXX `
+        -SwiftCompiler $Compilers.Swift `
+        -SwiftSDK $null `
+        -Defines @{
+          BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+          SwiftCore_DIR = "$RuntimeBinaryCache\cmake\SwiftCore";
+
+          SwiftOverlay_ENABLE_CXX_INTEROP = "YES";
+          # FIXME(compnerd) this currently causes a build failure on Windows, but
+          # this should be enabled when building the dynamic runtime.
+          SwiftOverlay_ENABLE_LIBRARY_EVOLUTION = "NO";
+        }
+    }
+
+
+    if ($SupplementalRuntimes -contains "StringProcessing") {
+      Record-OperationTime $Platform "Build-${Variant}StringProcessing" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\StringProcessing `
+          -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}StringProcessing")) `
+          -InstallTo "$SDKRoot\usr" `
+          -Platform $Platform `
+          -CCompiler $Compilers.GNUC `
+          -CXXCompiler $Compilers.GNUCXX `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $null `
+          -Defines @{
+            BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+            SwiftCore_DIR = "$RuntimeBinaryCache\cmake\SwiftCore";
+
+            # FIXME(compnerd) this currently causes a build failure on Windows, but
+            # this should be enabled when building the dynamic runtime.
+            SwiftStringProcessing_ENABLE_LIBRARY_EVOLUTION = "NO";
+          }
+      }
+    }
+
+    # ── Supplementals ─────────────────────────────────────────────────────────
+    if ($SupplementalRuntimes -contains "Synchronization") {
+      Record-OperationTime $Platform "Build-${Variant}Synchronization" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\Synchronization `
+          -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}Synchronization")) `
+          -InstallTo "$SDKRoot\usr" `
+          -Platform $Platform `
+          -CCompiler $Compilers.GNUC `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $null `
+          -Defines @{
+            BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+            SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
+            SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
+
+            # FIXME(compnerd) this currently causes a build failure on Windows, but
+            # this should be enabled when building the dynamic runtime.
+            SwiftSynchronization_ENABLE_LIBRARY_EVOLUTION = "NO";
+          }
+      }
+    }
+
+    if ($SupplementalRuntimes -contains "Distributed") {
+      Record-OperationTime $Platform "Build-${Variant}Distributed" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\Distributed `
+          -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}Distributed")) `
+          -InstallTo "$SDKRoot\usr" `
+          -Platform $Platform `
+          -CCompiler $Compilers.GNUC `
+          -CXXCompiler $Compilers.GNUCXX `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $null `
+          -Defines @{
+            BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+            # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
+            CMAKE_CXX_FLAGS = @("-I$RuntimeBinaryCache\include");
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+            SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
+            SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
+
+            # FIXME(compnerd) this currently causes a build failure on Windows, but
+            # this should be enabled when building the dynamic runtime.
+            SwiftDistributed_ENABLE_LIBRARY_EVOLUTION = "NO";
+          }
+      }
+    }
+
+    if ($SupplementalRuntimes -contains "Observation") {
+      Record-OperationTime $Platform "Build-${Variant}Observation" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\Observation `
+          -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}Observation")) `
+          -InstallTo "$SDKRoot\usr" `
+          -Platform $Platform `
+          -CXXCompiler $Compilers.GNUCXX `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $null `
+          -Defines @{
+            BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+            # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
+            CMAKE_CXX_FLAGS = @("-I$RuntimeBinaryCache\include");
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+            SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
+            SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
+
+            # FIXME(compnerd) this currently causes a build failure on Windows, but
+            # this should be enabled when building the dynamic runtime.
+            SwiftObservation_ENABLE_LIBRARY_EVOLUTION = "NO";
+          }
+      }
+    }
+
+    if ($SupplementalRuntimes -contains "Differentiation") {
+      Record-OperationTime $Platform "Build-${Variant}Differentiation" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\Differentiation `
+          -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}Differentiation")) `
+          -InstallTo "$SDKRoot\usr" `
+          -Platform $Platform `
+          -CCompiler $Compilers.GNUC `
+          -CXXCompiler $Compilers.GNUCXX `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $null `
+          -Defines @{
+            BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+            SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
+            SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
+
+            # FIXME(compnerd) this currently causes a build failure on Windows, but
+            # this should be enabled when building the dynamic runtime.
+            SwiftDifferentiation_ENABLE_LIBRARY_EVOLUTION = "NO";
+          }
+      }
+    }
+
+    if ($SupplementalRuntimes -contains "Volatile") {
+      Record-OperationTime $Platform "Build-${Variant}Volatile" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\Volatile `
+          -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}Volatile")) `
+          -InstallTo "$SDKRoot\usr" `
+          -Platform $Platform `
+          -CCompiler $Compilers.GNUC `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $null `
+          -Defines @{
+            BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+            CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+            SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
+            SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
+
+            # FIXME(compnerd) this currently causes a build failure on Windows, but
+            # this should be enabled when building the dynamic runtime.
+            SwiftVolatile_ENABLE_LIBRARY_EVOLUTION = "NO";
+          }
+      }
+    }
+
+    if ($SupplementalRuntimes -contains "Runtime" -and $Platform.OS -eq [OS]::Windows) {
+      Record-OperationTime $Platform "Build-${Variant}RuntimeModule" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\Runtime `
+          -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}RuntimeModule")) `
+          -InstallTo "$SDKRoot\usr" `
+          -Platform $Platform `
+          -CCompiler $Compilers.GNUC `
+          -CXXCompiler $Compilers.GNUCXX `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $null `
+          -Defines @{
+            BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+            CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+            SwiftCore_DIR       = "$RuntimeBinaryCache\cmake\SwiftCore";
+            SwiftOverlay_DIR    = "$OverlayBinaryCache\cmake\SwiftOverlay";
+            SwiftCxxOverlay_DIR = "$OverlayBinaryCache\Cxx\cmake\SwiftCxxOverlay";
+
+            # FIXME(compnerd) this currently causes a build failure on Windows, but
+            # this should be enabled when building the dynamic runtime.
+            SwiftRuntime_ENABLE_LIBRARY_EVOLUTION = "NO";
+
+            SwiftRuntime_ENABLE_BACKTRACING = "YES";
+          }
+      }
+    }
+
+    # ── Dispatch ──────────────────────────────────────────────────────────────
+    Record-OperationTime $Platform "Build-${Variant}Dispatch" {
+      $DispatchDefines = @{
+        BUILD_TESTING                     = "NO";
+        BUILD_SHARED_LIBS                 = $BUILD_SHARED_LIBS;
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG  = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_Swift_FLAGS                 = if ($Static) {
+                                              @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir")
+                                            } else {
+                                              @()
+                                            };
+        ENABLE_SWIFT                      = "YES";
+        dispatch_INSTALL_ARCH_SUBDIR      = "YES";
+      }
+
+      Build-CMakeProject `
+        -Src $SourceCache\swift-corelibs-libdispatch `
+        -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}Dispatch")) `
+        -InstallTo "$SDKRoot\usr" `
+        -Platform $Platform `
+        -CCompiler $Compilers.GNUC `
+        -CXXCompiler $Compilers.GNUCXX `
+        -SwiftCompiler $Compilers.Swift `
+        -SwiftSDK $SDKRoot `
+        -Defines $DispatchDefines
+    }
+
+    if ($BuildFoundation) {
+      # ── Foundation ────────────────────────────────────────────────────────────
+      Record-OperationTime $Platform "Build-${Variant}Foundation" {
+        $FoundationMacrosProject = if ($Variant -eq "Toolchain") {
+          [Project]::BootstrapFoundationMacros
+        } else {
+          [Project]::FoundationMacros
+        }
+
+        $FoundationDefines = @{
+          BUILD_SHARED_LIBS                 = $BUILD_SHARED_LIBS;
+          CMAKE_FIND_PACKAGE_PREFER_CONFIG  = "YES";
+          CMAKE_NINJA_FORCE_RESPONSE_FILE   = "YES";
+          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+          CMAKE_Swift_FLAGS                 = if ($Static) {
+                                                @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir")
+                                              } else {
+                                                @()
+                                              };
+          ENABLE_TESTING                    = "NO";
+          BROTLI_INCLUDE_DIR                = "$SourceCache\brotli\c\include";
+          BROTLICOMMON_LIBRARY              = "$(Get-ProjectBinaryCache $Platform brotli)\brotlicommon.lib";
+          BROTLIDEC_LIBRARY                 = "$(Get-ProjectBinaryCache $Platform brotli)\brotlidec.lib";
+          FOUNDATION_BUILD_TOOLS            = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
+          CURL_DIR                          = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
+          LibXml2_DIR                       = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
+          ZLIB_LIBRARY                      = if ($Platform.OS -eq [OS]::Windows) {
+                                                "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
+                                              } else {
+                                                "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
+                                              };
+          ZLIB_INCLUDE_DIR                  = "$BinaryCache\$($Platform.Triple)\usr\include";
+          dispatch_DIR                      = Get-ProjectCMakeModules $Platform ([Project]"${Variant}Dispatch");
+          _SwiftFoundation_SourceDIR        = "$SourceCache\swift-foundation";
+          _SwiftFoundationICU_SourceDIR     = "$SourceCache\swift-foundation-icu";
+          _SwiftCollections_SourceDIR       = "$SourceCache\swift-collections";
+          SwiftFoundation_MACRO             = "$(Get-ProjectBinaryCache $HostPlatform $FoundationMacrosProject)\bin";
+        }
+
+        Build-CMakeProject `
+          -Src $SourceCache\swift-corelibs-foundation `
+          -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}Foundation")) `
+          -InstallTo "$SDKRoot\usr" `
+          -Platform $Platform `
+          -CCompiler $Compilers.GNUC `
+          -CXXCompiler $Compilers.GNUCXX `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $SDKRoot `
+          -Defines $FoundationDefines
+      }
+    }
+
+    # ── Backtrace (static Windows 64-bit only) ────────────────────────────────
+    if ($Static -and $Platform.OS -eq [OS]::Windows -and $Platform.Architecture.ShortName -ne "x86") {
+      Record-OperationTime $Platform "Build-Backtrace" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\StackWalker `
+          -Bin (Get-ProjectBinaryCache $Platform Backtrace) `
+          -InstallTo "${SDKRoot}\usr" `
+          -Platform $Platform `
+          -CXXCompiler $Compilers.GNUCXX `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $null `
+          -Defines @{
+            CMAKE_Swift_FLAGS   = @("-static-stdlib");
+            SwiftCore_DIR       = "$(Get-ProjectBinaryCache $Platform StaticRuntime)\cmake\SwiftCore";
+            SwiftCxxOverlay_DIR = "$(Get-ProjectBinaryCache $Platform StaticOverlay)\Cxx\cmake\SwiftCxxOverlay";
+            SwiftOverlay_DIR    = "$(Get-ProjectBinaryCache $Platform StaticOverlay)\cmake\SwiftOverlay";
+            SwiftRuntime_DIR    = "$(Get-ProjectBinaryCache $Platform StaticRuntimeModule)\cmake\SwiftRuntime";
+          }
+      }
+    }
+
+    # ── SDK metadata ──────────────────────────────────────────────────────────
+    Repair-SDKHeaders $SDKRoot
+    Write-SDKSettings $Platform.OS -Identifier $SDKIdentifier
+
+    # ── Testing frameworks ────────────────────────────────────────────────────
+    if (-not $Static -and $BuildFoundation -and $SDKIdentifier -eq $Platform.DefaultSDK) {
+      Invoke-BuildStep Build-Testing $Platform
+      Invoke-BuildStep Build-XCTest $Platform
+    }
+  }
 }
 
 function Build-SQLite([Hashtable] $Platform) {
@@ -4595,6 +5008,14 @@ if (-not $SkipBuild) {
     SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
     ToolchainRoot   = Get-ProjectToolchainRoot $BuildPlatform Stage0Compilers;
     RuntimeLocation = Get-PinnedToolchainRuntime;
+  }
+  Invoke-BuildStep Build-SDK $BuildPlatform -Context @{
+    SDKIdentifier        = "Bootstrap";
+    Variant              = "Bootstrap";
+    Compilers            = $Compilers.Stage0;
+    Static               = $false;
+    BuildFoundation      = $false;
+    SupplementalRuntimes = @("StringProcessing");
   }
 
   if ($IsCrossCompiling) {
