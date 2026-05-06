@@ -1,5 +1,5 @@
 // https://github.com/swiftlang/swift/issues/84884
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 
 protocol Proto<Assoc> {
   associatedtype Assoc
