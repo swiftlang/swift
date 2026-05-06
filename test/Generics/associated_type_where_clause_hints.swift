@@ -40,14 +40,14 @@ protocol P2d : P1 {
 }
 
 protocol P2e : P1 {
-  // expected-warning@+1 {{redeclaration of associated type 'A4' from protocol 'P1' is better expressed as a 'where' clause on the protocol}}{{-2:18-18= where A4: P0, A4 : Collection, A4.Element == A4.Index, A4.SubSequence == A4}}{{3-+2:51=}}
+  // expected-warning@+1 {{redeclaration of associated type 'A4' from protocol 'P1' is better expressed as a 'where' clause on the protocol}}{{42:18-18= where A4: P0, A4 : Collection, A4.Element == A4.Index, A4.SubSequence == A4}}{{1-47:1=}}
   associatedtype A4: P0 where A4: Collection,
                               A4.Element == A4.Index,
                               A4.SubSequence == A4
 }
 
 protocol P2f : P1 {
-  // expected-warning@+1 {{redeclaration of associated type 'A5' from protocol 'P1' is better expressed as a 'where' clause on the protocol}}{{-2:18-18= where A5: P0b & Class, A5 : Collection, A5.Element : Collection}}{{3-+1:62=}}
+  // expected-warning@+1 {{redeclaration of associated type 'A5' from protocol 'P1' is better expressed as a 'where' clause on the protocol}}{{-2:18-18= where A5: P0b & Class, A5 : Collection, A5.Element : Collection}}{{1-+2:1=}}
   associatedtype A5: P0b & Class where A5: Collection,
                                        A5.Element: Collection
 }
