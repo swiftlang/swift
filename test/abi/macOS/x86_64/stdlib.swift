@@ -1216,7 +1216,7 @@ Added: _$ss25BorrowingIteratorProtocolP4skip2byS2i_tFTq
 Added: _$ss25BorrowingIteratorProtocolP8nextSpan12maximumCounts0E0Vy7ElementQzGSi_tFTj
 Added: _$ss25BorrowingIteratorProtocolP8nextSpan12maximumCounts0E0Vy7ElementQzGSi_tFTq
 Added: _$ss25BorrowingIteratorProtocolTL
-Added: _$ss4SpanVyxGs17BorrowingSequencesRi_zrlMc
+Added: _$ss4SpanVyxGs17BorrowingSequencesRi_zRi0_zrlMc
 Added: _$ss7RawSpanV5_spans0B0Vys5UInt8VGvg
 Added: _$ss7RawSpanVs17BorrowingSequencesMc
 Added: _$ss7RawSpanVs17BorrowingSequencesWP
@@ -1224,26 +1224,26 @@ Added: _$ss11InlineArrayVsRi__rlE21makeBorrowingIterators04SpanE0Vyq_GyF
 Added: _$ss11MutableSpanVsRi_zrlE21makeBorrowingIterators0bE0VyxGyF
 Added: _$ss12SpanIteratorVMa
 Added: _$ss12SpanIteratorVMn
-Added: _$ss12SpanIteratorVsRi_zrlE5_spans0A0VyxGvM
-Added: _$ss12SpanIteratorVsRi_zrlE5_spans0A0VyxGvg
-Added: _$ss12SpanIteratorVsRi_zrlE5_spans0A0VyxGvs
-Added: _$ss12SpanIteratorVsRi_zrlE6_countSivM
-Added: _$ss12SpanIteratorVsRi_zrlE6_countSivg
-Added: _$ss12SpanIteratorVsRi_zrlE6_countSivs
-Added: _$ss12SpanIteratorVsRi_zrlE6_startSivM
-Added: _$ss12SpanIteratorVsRi_zrlE6_startSivg
-Added: _$ss12SpanIteratorVsRi_zrlE6_startSivs
-Added: _$ss12SpanIteratorVsRi_zrlEyAByxGs0A0VyxGcfC
-Added: _$ss12SpanIteratorVyxGs09BorrowingB8ProtocolsRi_zrlMc
+Added: _$ss12SpanIteratorVsRi_zRi0_zrlE5_spans0A0VyxGvM
+Added: _$ss12SpanIteratorVsRi_zRi0_zrlE5_spans0A0VyxGvg
+Added: _$ss12SpanIteratorVsRi_zRi0_zrlE5_spans0A0VyxGvs
+Added: _$ss12SpanIteratorVsRi_zRi0_zrlE6_countSivM
+Added: _$ss12SpanIteratorVsRi_zRi0_zrlE6_countSivg
+Added: _$ss12SpanIteratorVsRi_zRi0_zrlE6_countSivs
+Added: _$ss12SpanIteratorVsRi_zRi0_zrlE6_startSivM
+Added: _$ss12SpanIteratorVsRi_zRi0_zrlE6_startSivg
+Added: _$ss12SpanIteratorVsRi_zRi0_zrlE6_startSivs
+Added: _$ss12SpanIteratorVsRi_zRi0_zrlEyAByxGs0A0VyxGcfC
+Added: _$ss12SpanIteratorVyxGs09BorrowingB8ProtocolsRi_zRi0_zrlMc
 Added: _$ss14MutableRawSpanV21makeBorrowingIterators0cF0Vys5UInt8VGyF
 Added: _$ss17BorrowingSequenceP19underestimatedCountSivgTj
 Added: _$ss17BorrowingSequenceP19underestimatedCountSivgTq
 Added: _$ss17BorrowingSequenceP31_customContainsEquatableElementySbSg0F0QzFTj
 Added: _$ss17BorrowingSequenceP31_customContainsEquatableElementySbSg0F0QzFTq
-Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zrlE024_customContainsEquatableC0ySbSgADF
-Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zrlE19underestimatedCountSivg
-Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zrlE19underestimatedCountSivpMV
-Added: _$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF
+Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zADRI0_rlE024_customContainsEquatableC0ySbSgADF
+Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zADRI0_rlE19underestimatedCountSivg
+Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zADRI0_rlE19underestimatedCountSivpMV
+Added: _$ss4SpanVsRi_zRi0_zrlE21makeBorrowingIterators0aD0VyxGyF
 Added: _$ss7RawSpanV21makeBorrowingIterators0bE0Vys5UInt8VGyF
 Added: _$sSTss17BorrowingSequenceRzrlE19underestimatedCountSivg
 Added: _$sSTss17BorrowingSequenceRzrlE19underestimatedCountSivpMV
@@ -1304,3 +1304,9 @@ Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
 
 // Cross-encoding strcmp for Foundation
 Added: __swift_unicodeBuffersEqual_nonNormalizing
+
+// New manglings of Span._count and _pointer for ~Escapable elements
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss4SpanVsRi_zRi0_zrlE6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvg$
+Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivg
+Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvg
