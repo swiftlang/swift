@@ -692,8 +692,14 @@ internal func transcodeUTF16ToUTF8(
 private func utf8Length(
   input: inout UnsafePointer<Unicode.UTF16.CodeUnit>,
   end: UnsafePointer<Unicode.UTF16.CodeUnit>,
+  inputEnd: UnsafePointer<Unicode.UTF16.CodeUnit>,
   repairing: Bool
 ) -> Int? {
+  // `end` is the stopping point for this call; `inputEnd` is the real end of
+  // the buffer. They differ when the caller is processing one block at a time
+  // from a larger buffer. A lead surrogate at `end - 1` may pair with a trail
+  // at `end` (which is past the block but still within the buffer); in that
+  // case we consume the pair, advancing `input` one position past `end`.
   var count = 0
   while unsafe input < end {
     let cu = unsafe input.pointee
@@ -704,9 +710,10 @@ private func utf8Length(
       count &+= 2
       unsafe input += 1
     } else if UTF16.isLeadSurrogate(cu) {
-      // Check for a valid surrogate pair
+      // Check for a valid surrogate pair, allowing the trail to sit just past
+      // `end` as long as it's still within the buffer.
       let next = unsafe input + 1
-      if unsafe next < end && UTF16.isTrailSurrogate(next.pointee) {
+      if unsafe next < inputEnd && UTF16.isTrailSurrogate(next.pointee) {
         count &+= 4
         unsafe input += 2
       } else if repairing {
@@ -759,6 +766,7 @@ internal func utf8Length(
       guard let addedCount = unsafe utf8Length(
         input: &input,
         end: blockEnd,
+        inputEnd: inputEnd,
         repairing: repairing
       ) else {
         return nil
@@ -770,6 +778,7 @@ internal func utf8Length(
   guard let addedByteCount = unsafe utf8Length(
     input: &input,
     end: inputEnd,
+    inputEnd: inputEnd,
     repairing: repairing
   ) else {
     return nil
