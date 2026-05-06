@@ -192,10 +192,12 @@ void IRGenThunk::prepareArguments() {
 
   // Prepare indirect results, if any.
   SILType directResultType = conv.getSILResultType(expansionContext);
-  auto &directResultTL = IGF.IGM.getTypeInfo(directResultType);
-  auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);
-  if (schema.requiresIndirect()) {
-    indirectReturnSlot = original.claimNext();
+  if (!conv.hasAddressResult()) {
+    auto &directResultTL = IGF.IGM.getTypeInfo(directResultType);
+    auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);
+    if (schema.requiresIndirect()) {
+      indirectReturnSlot = original.claimNext();
+    }
   }
 
   original.transferInto(params, conv.getNumIndirectSILResults());
@@ -344,7 +346,7 @@ void IRGenThunk::emit() {
   SILType directResultType = conv.getSILResultType(expansionContext);
   auto &directResultTL = IGF.IGM.getTypeInfo(directResultType);
   auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);
-  if (schema.requiresIndirect()) {
+  if (!conv.hasAddressResult() && schema.requiresIndirect()) {
     Address indirectReturnAddr(indirectReturnSlot,
                                IGF.IGM.getStorageType(directResultType),
                                directResultTL.getBestKnownAlignment());
@@ -553,6 +555,13 @@ void IRGenThunk::emit() {
   }
 
   // Return the result.
+  if (conv.hasAddressResult()) {
+    // Address results return a pointer directly.
+    assert(!result.empty() && "address result should produce a value");
+    IGF.Builder.CreateRet(result.claimNext());
+    return;
+  }
+
   if (result.empty()) {
     if (emission->getTypedErrorExplosion() &&
         !IGF.CurFn->getReturnType()->isVoidTy()) {
