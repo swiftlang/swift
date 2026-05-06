@@ -234,9 +234,17 @@ where SubSequence: MutableCollection
   /// - Returns: The value returned from `body`, unless the collection doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
+  @available(SwiftStdlib 6.4, *)
+  @safe
+  mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
+    _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R?
+
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
   @safe
   mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: (_ _buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
 }
 
@@ -248,6 +256,27 @@ extension MutableCollection {
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return nil
+  }
+
+  @_alwaysEmitIntoClient
+  @safe
+  public mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
+    // This default typed throws implementation is preferred to the concrete
+    // typed throws implementations when the typed-throwing protocol requirement
+    // is unavailable (i.e., below SwiftStdlib 6.4).
+    // Hence, this method forwards to the `rethrows` variant (by passing an
+    // untyped-throwing closure) in order to dispatch a concrete implementation
+    // if available.
+
+    do {
+      return try self.withContiguousMutableStorageIfAvailable { buffer throws -> R in
+        return try unsafe body(&buffer)
+      }
+    } catch {
+      throw error as! E
+    }
   }
 
   @inlinable

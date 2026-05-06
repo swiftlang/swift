@@ -223,15 +223,28 @@ extension Slice: Collection {
 
   @_alwaysEmitIntoClient @inlinable
   @safe
-  public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    try _base.withContiguousStorageIfAvailable { buffer in
+  public func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
+  #if hasFeature(Embedded)
+    return try _base.withContiguousStorageIfAvailable { buffer throws(E) in
       let start = _base.distance(from: _base.startIndex, to: _startIndex)
       let count = _base.distance(from: _startIndex, to: _endIndex)
       let slice = unsafe UnsafeBufferPointer(rebasing: buffer[start ..< start + count])
       return try unsafe body(slice)
     }
+  #else // hasFeature(Embedded)
+    do {
+      return try _base.withContiguousStorageIfAvailable { buffer in
+        let start = _base.distance(from: _base.startIndex, to: _startIndex)
+        let count = _base.distance(from: _startIndex, to: _endIndex)
+        let slice = unsafe UnsafeBufferPointer(rebasing: buffer[start ..< start + count])
+        return try unsafe body(slice)
+      }
+    } catch {
+      throw error as! E
+    }
+  #endif // hasFeature(Embedded)
   }
 }
 
@@ -295,9 +308,9 @@ extension Slice: MutableCollection where Base: MutableCollection {
 
   @_alwaysEmitIntoClient @inlinable
   @safe
-  public mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     // We're calling `withContiguousMutableStorageIfAvailable` twice here so
     // that we don't calculate index distances unless we know we'll use them.
     // The expectation here is that the base collection will make itself
@@ -308,7 +321,8 @@ extension Slice: MutableCollection where Base: MutableCollection {
     }
     let start = _base.distance(from: _base.startIndex, to: _startIndex)
     let count = _base.distance(from: _startIndex, to: _endIndex)
-    return try _base.withContiguousMutableStorageIfAvailable { buffer in
+  #if hasFeature(Embedded)
+    return try _base.withContiguousMutableStorageIfAvailable { buffer throws(E) in
       var slice = unsafe UnsafeMutableBufferPointer(
         rebasing: buffer[start ..< start + count])
       let copy = unsafe slice
@@ -320,6 +334,24 @@ extension Slice: MutableCollection where Base: MutableCollection {
       }
       return try unsafe body(&slice)
     }
+  #else // hasFeature(Embedded)
+    do {
+      return try _base.withContiguousMutableStorageIfAvailable { buffer in
+        var slice = unsafe UnsafeMutableBufferPointer(
+          rebasing: buffer[start ..< start + count])
+        let copy = unsafe slice
+        defer {
+          unsafe _precondition(
+            slice.baseAddress == copy.baseAddress &&
+            slice.count == copy.count,
+            "Slice.withContiguousMutableStorageIfAvailable: replacing the buffer is not allowed")
+        }
+        return try unsafe body(&slice)
+      }
+    } catch {
+      throw error as! E
+    }
+  #endif // hasFeature(Embedded)
   }
 }
 

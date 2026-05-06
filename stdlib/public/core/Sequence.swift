@@ -445,9 +445,17 @@ public protocol Sequence<Element> {
   /// - Returns: The value returned from `body`, unless the sequence doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
+  @available(SwiftStdlib 6.4, *)
+  @safe
+  func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R?
+
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
   @safe
   func withContiguousStorageIfAvailable<R>(
-    _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
+    _ body: (_ _buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
 }
 
@@ -1281,14 +1289,35 @@ extension Sequence {
     }
     return (it, buffer.endIndex)
   }
-    
+
+  @_alwaysEmitIntoClient
+  @safe
+  public func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
+    // This default typed throws implementation is preferred to the concrete
+    // typed throws implementations when the typed-throwing protocol requirement
+    // is unavailable (i.e., below SwiftStdlib 6.4).
+    // Hence, this method forwards to the `rethrows` variant (by passing an
+    // untyped-throwing closure) in order to dispatch a concrete implementation
+    // if available.
+
+    do {
+      return try self.withContiguousStorageIfAvailable { buffer throws -> R in
+        return try unsafe body(buffer)
+      }
+    } catch {
+      throw error as! E
+    }
+  }
+
   @inlinable
   @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return nil
-  }  
+  }
 }
 
 // FIXME(ABI)#182

@@ -741,9 +741,9 @@ extension Substring.UTF8View: BidirectionalCollection {
 
   @_alwaysEmitIntoClient
   @inlinable
-  public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     return try _slice.withContiguousStorageIfAvailable(body)
   }
 

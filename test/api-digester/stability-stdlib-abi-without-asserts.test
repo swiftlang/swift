@@ -97,6 +97,7 @@ Func Sequence.map(_:) has been removed
 Func Sequence.reduce(_:_:) has been removed
 Func Dictionary.filter(_:) has been removed
 Func Set.filter(_:) has been removed
+Func String.UTF8View.withContiguousStorageIfAvailable(_:) has been removed
 Func String._slowWithCString(encodedAs:_:) has been removed
 Func String._withNFCCodeUnits(_:) has been renamed to Func __rethrows_underscore_withNFCCodeUnits(_:)
 Func String._withNFCCodeUnits(_:) has mangled name changing from 'Swift.String._withNFCCodeUnits((Swift.UInt8) throws -> ()) throws -> ()' to 'Swift.String.__rethrows_underscore_withNFCCodeUnits((Swift.UInt8) throws -> ()) throws -> ()'
@@ -135,7 +136,10 @@ Protocol StringProtocol has generic signature change from <Self : Swift.Bidirect
 // source-level name. This causes a false positive with the ABI checker.
 // The symbols are still present at the ABI level. The symbols are also still present
 // at the source level. The association between them is simply no longer straightforward.
+Func UnsafeBufferPointer.withContiguousStorageIfAvailable(_:) has been removed
 Func UnsafeBufferPointer.withMemoryRebound(to:_:) has been removed
+Func UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable(_:) has been removed
+Func UnsafeMutableBufferPointer.withContiguousStorageIfAvailable(_:) has been removed
 Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has been removed
 Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
@@ -844,8 +848,14 @@ Constructor Array.init(_unsafeUninitializedCapacity:initializingWith:) has been 
 Constructor Dictionary.init(_:uniquingKeysWith:) has been removed
 Constructor Dictionary.init(grouping:by:) has been removed
 Constructor _NativeDictionary.init(grouping:by:) has been removed
+Func Array.withContiguousMutableStorageIfAvailable(_:) has been removed
+Func Array.withContiguousStorageIfAvailable(_:) has been removed
 Func Array.withUnsafeBufferPointer(_:) has been removed
+Func ArraySlice.withContiguousMutableStorageIfAvailable(_:) has been removed
+Func ArraySlice.withContiguousStorageIfAvailable(_:) has been removed
 Func ArraySlice.withUnsafeBufferPointer(_:) has been removed
+Func ContiguousArray.withContiguousMutableStorageIfAvailable(_:) has been removed
+Func ContiguousArray.withContiguousStorageIfAvailable(_:) has been removed
 Func ContiguousArray.withUnsafeBufferPointer(_:) has been removed
 Func Dictionary._Variant.mapValues(_:) has been removed
 Func Dictionary._Variant.merge(_:uniquingKeysWith:) has been removed

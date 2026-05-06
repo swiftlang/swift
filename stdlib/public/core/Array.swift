@@ -1421,28 +1421,58 @@ extension Array: RangeReplaceableCollection {
     }
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   @safe
-  public mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public mutating func withContiguousMutableStorageIfAvailable<R, E: Error>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     return try withUnsafeMutableBufferPointer {
-      (bufferPointer) -> R in
+      (bufferPointer) throws(E) -> R in
       return try unsafe body(&bufferPointer)
     }
   }
 
-  @inlinable
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func withContiguousMutableStorageIfAvailable<R>(
+      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    ) throws -> R?
+  )
+  @usableFromInline
+  internal mutating func __rethrows_withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) throws -> R? {
+    return try self.withContiguousMutableStorageIfAvailable(body)
+  }
+#endif // !hasFeature(Embedded)
+
+  @_alwaysEmitIntoClient
   @safe
-  public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     return try withUnsafeBufferPointer {
-      (bufferPointer) -> R in
+      (bufferPointer) throws(E) -> R in
       return try unsafe body(bufferPointer)
     }
   }
-  
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withContiguousStorageIfAvailable<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) throws -> R?
+  )
+  @usableFromInline
+  internal func __rethrows_withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) throws -> R? {
+    return try self.withContiguousStorageIfAvailable(body)
+  }
+#endif // !hasFeature(Embedded)
+
   @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {

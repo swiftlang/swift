@@ -1166,10 +1166,10 @@ extension Unsafe${Mutable}RawBufferPointer {
 %  if Mutable:
   @_alwaysEmitIntoClient
   @_transparent
-  public func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    try unsafe withMemoryRebound(to: Element.self) { b in
+  public func withContiguousMutableStorageIfAvailable<R, E: Error>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
+    return try unsafe withMemoryRebound(to: Element.self) { b throws(E) in
       var buffer = unsafe b
       defer {
         _debugPrecondition(
@@ -1184,11 +1184,11 @@ extension Unsafe${Mutable}RawBufferPointer {
 %  end
   @_alwaysEmitIntoClient
   @_transparent
-  public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    try unsafe withMemoryRebound(to: Element.self) {
-      try unsafe body(${ 'UnsafeBufferPointer<Element>($0)' if Mutable else '$0' })
+  public func withContiguousStorageIfAvailable<R, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
+    return try unsafe withMemoryRebound(to: Element.self) { buffer throws(E) in
+      return try unsafe body(${ 'UnsafeBufferPointer<Element>(buffer)' if Mutable else 'buffer' })
     }
   }
 }

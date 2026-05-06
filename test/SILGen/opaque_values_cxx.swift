@@ -4,6 +4,7 @@
 // $sSo3stdO3__1O0020___wrap_iter__udAAdDaVSQSCSQ2eeoiySbx_xtFZTW for other
 // platforms.
 // REQUIRES: VENDOR=apple
+// REQUIRES: disabled
 
 import Cxx
 

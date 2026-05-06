@@ -1160,10 +1160,10 @@ extension Slice {
 
   @inlinable
   @_alwaysEmitIntoClient
-  public func withContiguousMutableStorageIfAvailable<R, Element>(
-    _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? where Base == UnsafeMutableBufferPointer<Element> {
-    try unsafe base.withContiguousStorageIfAvailable { buffer in
+  public func withContiguousMutableStorageIfAvailable<R, E: Error, Element>(
+    _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? where Base == UnsafeMutableBufferPointer<Element> {
+    return try unsafe base.withContiguousStorageIfAvailable { buffer throws(E) in
       let start = unsafe base.baseAddress?.advanced(by: startIndex)
       var slice = unsafe UnsafeMutableBufferPointer(start: start, count: count)
       let (b,c) = (slice.baseAddress, slice.count)
