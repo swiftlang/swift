@@ -756,7 +756,7 @@ internal func utf8Length(
   //   U+DC00..U+DFFF  → low surrogate  (consumed by high surrogate)
   //   U+E000..U+FFFF  → 3 UTF-8 bytes  (BMP, non-surrogate)
 
-  while unsafe (inputEnd - input) > blockSize {
+  while unsafe (inputEnd - input) >= blockSize {
     if let _ = unsafe allASCIIBlock(at: input) {
       _onFastPath()
       unsafe input += blockSize
