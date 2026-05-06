@@ -214,38 +214,49 @@ shouldIgnoreConstraintInContext(const Decl *decl,
 static std::optional<AvailabilityConstraint>
 getAvailabilityConstraintForAttr(const Decl *decl,
                                  const SemanticAvailableAttr &attr,
-                                 const AvailabilityContext &context) {
-  // Is the decl unconditionally unavailable?
-  if (attr.isUnconditionallyUnavailable())
-    return AvailabilityConstraint::unavailableUnconditionally(attr);
+                                 const AvailabilityContext &context,
+                                 const AvailabilityConstraintFlags flags) {
+  auto getConstraint = [&]() -> std::optional<AvailabilityConstraint> {
+    // Is the decl unconditionally unavailable?
+    if (attr.isUnconditionallyUnavailable())
+      return AvailabilityConstraint::unavailableUnconditionally(attr);
 
-  auto &ctx = decl->getASTContext();
-  auto domain = attr.getDomain();
-  bool domainSupportsRefinement = domain.supportsContextRefinement();
+    auto &ctx = decl->getASTContext();
+    auto domain = attr.getDomain();
+    bool domainSupportsRefinement = domain.supportsContextRefinement();
 
-  // Compute the available range in the given context. If there is no explicit
-  // range defined by the context, use the deployment range as fallback.
-  std::optional<AvailabilityRange> availableRange;
-  if (domainSupportsRefinement)
-    availableRange = context.getAvailabilityRange(domain, ctx);
-  if (!availableRange)
-    availableRange = domain.getDeploymentRange(ctx);
+    // Compute the available range in the given context. If there is no
+    // explicit range defined by the context, use the deployment range as
+    // fallback.
+    std::optional<AvailabilityRange> availableRange;
+    if (domainSupportsRefinement)
+      availableRange = context.getAvailabilityRange(domain, ctx);
+    if (!availableRange)
+      availableRange = domain.getDeploymentRange(ctx);
 
-  // Is the decl obsoleted in this context?
-  if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
-    if (availableRange && availableRange->isContainedIn(*obsoletedRange))
-      return AvailabilityConstraint::unavailableObsolete(attr);
-  }
+    // Is the decl obsoleted in this context?
+    if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
+      if (availableRange && availableRange->isContainedIn(*obsoletedRange))
+        return AvailabilityConstraint::unavailableObsolete(attr);
+    }
 
-  // Is the decl not yet introduced in this context?
-  if (auto introducedRange = attr.getIntroducedRange(ctx)) {
-    if (!availableRange || !availableRange->isContainedIn(*introducedRange))
-      return domainSupportsRefinement
-                 ? AvailabilityConstraint::unintroduced(attr)
-                 : AvailabilityConstraint::unavailableUnintroduced(attr);
-  }
+    // Is the decl not yet introduced in this context?
+    if (auto introducedRange = attr.getIntroducedRange(ctx)) {
+      if (!availableRange || !availableRange->isContainedIn(*introducedRange))
+        return domainSupportsRefinement
+                   ? AvailabilityConstraint::unintroduced(attr)
+                   : AvailabilityConstraint::unavailableUnintroduced(attr);
+    }
 
-  return std::nullopt;
+    return std::nullopt;
+  };
+
+  auto constraint = getConstraint();
+  if (constraint &&
+      shouldIgnoreConstraintInContext(decl, *constraint, context, flags))
+    return std::nullopt;
+
+  return constraint;
 }
 
 /// Returns the most specific platform domain from the availability attributes
@@ -285,16 +296,10 @@ static void getAvailabilityConstraintsForDecl(
         !activePlatformDomain->contains(domain))
       continue;
 
-    if (auto constraint = getAvailabilityConstraintForAttr(decl, attr, context))
+    if (auto constraint =
+            getAvailabilityConstraintForAttr(decl, attr, context, flags))
       addConstraint(constraints, *constraint, ctx);
   }
-
-  // After resolving constraints, remove any constraints that indicate the
-  // declaration is unconditionally unavailable in a domain for which
-  // the context is already unavailable.
-  llvm::erase_if(constraints, [&](const AvailabilityConstraint &constraint) {
-    return shouldIgnoreConstraintInContext(decl, constraint, context, flags);
-  });
 }
 
 DeclAvailabilityConstraints

@@ -440,11 +440,11 @@ class ExtendMe { }
 extension ExtendMe {
   @available(swift 6.0)
   @available(*, deprecated, message: "yes 6.0")
-  public func bar() -> Int16 {} // expected-swift6-note {{found this candidate}}
+  public func bar() -> Int16 {}
 
   @available(swift, obsoleted: 6.0)
   @available(*, deprecated, message: "not 6.0")
-  public func bar() -> Int8 {} // expected-swift6-note {{found this candidate}}
+  public func bar() -> Int8 {}
 
   func test() {
     _ = bar() // expected-swift5-warning {{not 6.0}} expected-swift6-warning {{yes 6.0}}
@@ -452,8 +452,6 @@ extension ExtendMe {
 
   @available(swift, obsoleted: 6.0)
   func testObsoleted() {
-    _ = bar() // expected-swift5-warning {{not 6.0}}
-    // FIXME: This should not be ambiguous
-    // expected-swift6-error@-2 {{ambiguous use of 'bar()'}}
+    _ = bar() // expected-swift5-warning {{not 6.0}} expected-swift6-warning {{yes 6.0}}
   }
 }

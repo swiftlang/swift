@@ -114,8 +114,9 @@ public func testLocalObsoleted(_ b: BeforeAndAfter) throws {
   // CHECK-SWIFT-5:  class_method {{.*}}, #BeforeAndAfter.computed!setter : (BeforeAndAfter) -> (Int8) -> ()
   // CHECK-SWIFT-6:  class_method {{.*}}, #BeforeAndAfter.computed!setter : (BeforeAndAfter) -> (Int16) -> ()
   try BeforeAndAfter().computed = 10
-  // FIXME: Should not be diagnosed as ambiguous
-//  try b.bar()
+  // CHECK-SWIFT-5:  function_ref @$s22availability_overloads14BeforeAndAfterC3baryyF
+  // CHECK-SWIFT-6:  function_ref @$s22availability_overloads14BeforeAndAfterC3baryyKF
+  try b.bar()
 }
 // CHECK: } // end sil function '$s22availability_overloads18testLocalObsoletedyyAA14BeforeAndAfterCKF'
 
