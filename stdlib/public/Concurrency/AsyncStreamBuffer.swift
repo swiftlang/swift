@@ -88,8 +88,8 @@ fileprivate struct Disconnected<Value: ~Copyable>: ~Copyable, @unchecked Sendabl
 /// ```text
 /// Current State   Possible Next State
 /// -------------   -------------------
-/// idle          ->  idle, waiting, terminated
-/// waiting       ->  idle, waiting, draining
+/// idle          ->  idle, waiting, draining, terminated
+/// waiting       ->  idle, waiting, terminated
 /// draining      ->  draining, terminated
 /// terminated    ->  terminated
 /// ```
