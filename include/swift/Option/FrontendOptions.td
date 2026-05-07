@@ -196,6 +196,17 @@ def expansion_remarks:  Flag<["-"], "Rmacro-expansions">,
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
 
+def swift_diagnostics_assert_on_error : Flag<["-"], "swift-diagnostics-assert-on-error">,
+  HelpText<"Trap when an error diagnostic is emitted. For compiler developers only.">;
+
+def swift_diagnostics_assert_on_warning : Flag<["-"], "swift-diagnostics-assert-on-warning">,
+  HelpText<"Trap when a warning diagnostic is emitted. For compiler developers only.">;
+
+def swift_diagnostics_assert_on_group : Separate<["-"], "swift-diagnostics-assert-on-group">,
+  MetaVarName<"<diagnostic_group>">,
+  HelpText<"Trap when any diagnostic in the given group is emitted. "
+           "For compiler developers only.">;
+
 def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
   HelpText<"Automatically import declared cross-import overlays.">;
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
@@ -1084,6 +1095,11 @@ def sil_verify_none : Flag<["-"], "sil-verify-none">,
 
 def sil_ownership_verify_all : Flag<["-"], "sil-ownership-verify-all">,
   HelpText<"Verify ownership after each transform">;
+
+def sil_region_isolation_assert_on_unknown_pattern :
+  Flag<["-"], "sil-region-isolation-assert-on-unknown-pattern">,
+  HelpText<"Abort if SIL region isolation detects an unknown pattern. "
+           "For compiler developers only.">;
 
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;

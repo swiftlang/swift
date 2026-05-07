@@ -28,14 +28,6 @@ class RegionAnalysisValueMap;
 
 namespace regionanalysisimpl {
 
-/// Global bool set only when asserts are enabled to ease debugging by causing
-/// unknown pattern errors to cause an assert so we drop into the debugger.
-extern bool AbortOnUnknownPatternMatchError;
-
-static inline bool shouldAbortOnUnknownPatternMatchError() {
-  return AbortOnUnknownPatternMatchError;
-}
-
 using SendingOperandSetFactory = Partition::SendingOperandSetFactory;
 using Element = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
