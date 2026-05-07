@@ -163,6 +163,11 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension CollectionOfOne {
 
+  /// A span over the single element of this collection.
+  ///
+  /// - Returns: A `Span` over the element of this collection.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
@@ -173,6 +178,11 @@ extension CollectionOfOne {
     }
   }
 
+  /// A mutable span over the single element of this collection.
+  ///
+  /// - Returns: A `MutableSpan` over the element of this collection.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)

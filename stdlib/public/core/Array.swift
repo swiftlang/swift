@@ -1745,6 +1745,16 @@ extension Array {
     return try _buffer.withUnsafeBufferPointer(body)
   }
 
+  /// A span over the elements of this array.
+  ///
+  /// - Note: On Apple platforms, bridged `NSArray` instances are copied into
+  ///   contiguous storage the first time this property is called.
+  ///   The contiguous copy is cached, and subsequent calls
+  ///   to `span` can reuse this copy.
+  ///
+  /// - Returns: A `Span` over the elements of this array.
+  ///
+  /// - Complexity: O(1) for native arrays, amortized O(1) for bridged arrays.
   @available(SwiftStdlib 6.2, *)
   public var span: Span<Element> {
     @lifetime(borrow self)
@@ -1865,6 +1875,12 @@ extension Array {
     return try unsafe body(&inoutBufferPointer)
   }
 
+  /// A mutable span over the elements of this array.
+  ///
+  /// - Returns: A `MutableSpan` over the elements of this array.
+  ///
+  /// - Complexity: O(1) when the array's storage is uniquely referenced,
+  ///   O(*n*) otherwise.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
