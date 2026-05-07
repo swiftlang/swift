@@ -132,7 +132,21 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   }
   Invocation.setImportSearchPaths(ImportSearchPaths);
 
+  for (const auto *A : ParsedArgs.filtered(OPT_plugin_path)) {
+    Invocation.getSearchPathOptions().PluginSearchOpts.emplace_back(
+        PluginSearchOption::PluginPath{A->getValue()});
+  }
+  for (const auto *A : ParsedArgs.filtered(OPT_external_plugin_path)) {
+    StringRef dylibPath;
+    StringRef serverPath;
+    std::tie(dylibPath, serverPath) = StringRef(A->getValue()).split('#');
+    Invocation.getSearchPathOptions().PluginSearchOpts.emplace_back(
+        PluginSearchOption::ExternalPluginPath{std::string(dylibPath),
+                                              std::string(serverPath)});
+  }
+
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
+  Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
                                                     Invocation.getFrontendOptions());
   Invocation.computeCXXStdlibOptions();
@@ -148,6 +162,7 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
   Invocation.setDefaultPrebuiltCacheIfNecessary();
+  Invocation.setDefaultInProcessPluginServerPathIfNecessary();
 
   if (auto *A = ParsedArgs.getLastArg(OPT_language_mode)) {
     using version::Version;
@@ -173,6 +188,7 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
     return EXIT_FAILURE;
   }
 
+  (void)CI.getMainModule(); // clang modules inherit default imports from main module
   auto M = CI.getASTContext().getModuleByName(ModuleName);
   if (!M) {
     llvm::errs() << "Couldn't load module '" << ModuleName << '\''
