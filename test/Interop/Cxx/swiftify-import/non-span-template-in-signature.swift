@@ -14,7 +14,7 @@
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -Rmacro-expansions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}api.h \
-// RUN:   -suppress-notes \
+// RUN:   -suppress-notes -eager-macro-checking \
 // RUN:   %t/test.swift
 
 //--- Inputs/module.modulemap
