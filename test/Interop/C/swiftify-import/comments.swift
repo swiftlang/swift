@@ -1,5 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CommentsClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x | %FileCheck %s --strict-whitespace --match-full-lines --check-prefixes=BOTH,IDE
-// RUN: %target-swift-synthesize-interface -module-name CommentsClang -plugin-path %swift-plugin-dir -I %S/Inputs -o - | %FileCheck %s --strict-whitespace --match-full-lines --check-prefixes=BOTH,SYNTH
+// RUN: %target-swift-synthesize-interface -module-name CommentsClang -I %S/Inputs -o - | %FileCheck %s --strict-whitespace --match-full-lines --check-prefixes=BOTH,SYNTH
 
 // Check that doc comments are carried over from clang to the safe macro expansion.
 

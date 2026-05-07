@@ -2403,13 +2403,11 @@ def register_module_dependency : Separate<["-"], "register-module-dependency">,
 def plugin_search_Group : OptionGroup<"<plugin search options>">;
 
 def plugin_path : Separate<["-"], "plugin-path">, Group<plugin_search_Group>,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
-         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Add directory to the plugin search path">;
 
 def external_plugin_path : Separate<["-"], "external-plugin-path">, Group<plugin_search_Group>,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
-         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Add directory to the plugin search path with a plugin server executable">,
   MetaVarName<"<path>#<plugin-server-path>">;
 
