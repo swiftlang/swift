@@ -1338,14 +1338,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
     break;
       
-  case DeclAttrKind::Warn: {
-    auto warnAttr = cast<WarnAttr>(this);
-    Printer.printAttrName("@warn(");
-    
-    auto &diagGroupInfo = getDiagGroupInfoByID(warnAttr->DiagnosticGroupID);
+  case DeclAttrKind::Diagnose: {
+    auto diagnoseAttr = cast<DiagnoseAttr>(this);
+    Printer.printAttrName("@diagnose(");
+
+    auto &diagGroupInfo = getDiagGroupInfoByID(diagnoseAttr->DiagnosticGroupID);
     Printer.printText(diagGroupInfo.name);
     Printer << ", ";
-    switch (cast<WarnAttr>(this)->DiagnosticBehavior) {
+    switch (cast<DiagnoseAttr>(this)->DiagnosticBehavior) {
       case WarningGroupBehavior::None:
       case WarningGroupBehavior::AsWarning:
         Printer << "as: warning";
@@ -1357,8 +1357,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         Printer << "as: ignored";
         break;
     }
-    if (cast<WarnAttr>(this)->Reason) {
-      Printer << ", \"" << *(cast<WarnAttr>(this)->Reason) << "\"";
+    if (cast<DiagnoseAttr>(this)->Reason) {
+      Printer << ", \"" << *(cast<DiagnoseAttr>(this)->Reason) << "\"";
     }
     Printer <<")";
   }
@@ -2054,8 +2054,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_rawLayout";
   case DeclAttrKind::Extern:
     return "_extern";
-  case DeclAttrKind::Warn:
-    return "warn";
+  case DeclAttrKind::Diagnose:
+    return "diagnose";
   case DeclAttrKind::AllowFeatureSuppression:
     if (cast<AllowFeatureSuppressionAttr>(this)->getInverted()) {
       return "_disallowFeatureSuppression";

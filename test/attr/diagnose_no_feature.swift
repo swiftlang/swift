@@ -5,12 +5,12 @@ func bar() -> [Int] { return [1,2,3] }
 
 // Ensure feature SourceWarningControl has no effect until enabled
 
-@warn(DeprecatedDeclaration, as: error)
+@diagnose(DeprecatedDeclaration, as: error)
 func foo() -> [Int] { 
     return bar() // expected-warning {{'bar()' is deprecated}}
 }
 
-@warn(DeprecatedDeclaration, as: ignored)
+@diagnose(DeprecatedDeclaration, as: ignored)
 func baz() -> [Int] { 
     return bar() // expected-warning {{'bar()' is deprecated}}
 }

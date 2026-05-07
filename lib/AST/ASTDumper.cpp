@@ -5648,8 +5648,8 @@ public:
     printFoot();
   }
                          
-  void visitWarnAttr(WarnAttr *Attr, Label label) {
-    printCommon(Attr, "warn", label);
+  void visitDiagnoseAttr(DiagnoseAttr *Attr, Label label) {
+    printCommon(Attr, "diagnose", label);
     auto &diagGroupInfo = getDiagGroupInfoByID(Attr->DiagnosticGroupID);
     printFieldRaw([&](raw_ostream &out) { out << diagGroupInfo.name; },
                   Label::always("diagGroupID:"));
