@@ -1550,16 +1550,6 @@ enum EnqueueFlags : uint32_t {
 static inline void
 swift_task_enqueueSelfOrStealer(AsyncTask *task, SerialExecutorRef newExecutor,
                                 EnqueueFlags flags) {
-  // Feature flag to disable stealers
-#if HAS_OS_FEATURE
-  if ((flags & EnqueueFlagsForEscalation) &&
-      os_feature_enabled_simple(Swift, enableTaskStealers, false)) {
-    SWIFT_TASK_DEBUG_LOG("Task %p, skipping stealer enqueue from escalate due "
-                         "to disabled feature flag",
-                         task);
-    return;
-  }
-#endif
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   // Assertions / Logging, these intitial values need not have
   // strong syncronization with other callers as it is for
