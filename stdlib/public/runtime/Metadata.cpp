@@ -1888,8 +1888,21 @@ FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
   assert(count > 0);
   Data.ValueWitnesses = &Witnesses;
   auto eltWitnesses = element->getValueWitnesses();
-  auto arraySize
-    = Witnesses.size = Witnesses.stride = eltWitnesses->stride * count;
+  // `size`/`stride` in the value-witness table are `size_t`, so on 32-bit
+  // targets `eltStride * count` can wrap silently and leave the allocation
+  // sized for a small fraction of the requested element count — subsequent
+  // stores indexed by element would then run past the allocation. Trap
+  // here when the multiplication overflows `size_t`.
+  size_t arraySize;
+  if (__builtin_mul_overflow(eltWitnesses->stride,
+                             static_cast<size_t>(count),
+                             &arraySize)) {
+    swift::fatalError(0,
+        "fatal error: Builtin.FixedArray size overflow: "
+        "element stride %zu * count %zd overflows size_t\n",
+        eltWitnesses->stride, count);
+  }
+  Witnesses.size = Witnesses.stride = arraySize;
   // We take on most of the properties of the element type, except that an array
   // of elements might end up larger than an inline buffer, and the array is
   // always addressable for dependencies.
