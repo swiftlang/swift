@@ -1757,8 +1757,18 @@ uint16_t SILGenFunction::emitBasicProlog(
                        std::move(scopedDependencyParams))
       .emitParams(origClosureType, paramList, selfParam);
 
-  // Record the ArgNo of the artificial $error inout argument. 
-  if (errorType && !(*errorType)->isNever() && IndirectErrorResult == nullptr) {
+  // Record the ArgNo of the artificial $error inout argument.
+  //
+  // The abstraction pattern's `errorType` can describe a throwing closure
+  // while the emitted SIL function is non-throwing — this happens when a
+  // non-throwing literal is stored into a `throws(E)` position and the
+  // outer conversion adds the error result externally. The indirect error
+  // parameter emission above already guards on the lowered SIL function's
+  // conventions; do the same for the `$error` debug placeholder, which
+  // must only appear in a function whose SIL type has an error result
+  // (SIL verifier enforces this invariant).
+  if (errorType && !(*errorType)->isNever() && IndirectErrorResult == nullptr &&
+      F.getLoweredFunctionType()->hasErrorResult()) {
     CanType errorTypeInContext =
       DC->mapTypeIntoEnvironment(*errorType)->getCanonicalType();
     auto loweredErrorTy = getLoweredType(*origErrorType, errorTypeInContext);

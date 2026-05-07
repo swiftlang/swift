@@ -1817,6 +1817,27 @@ public:
     if (!varInfo)
       return;
 
+    // The `$error` debug variable is a placeholder for the function's
+    // error-result slot so the debugger can display the in-flight error.
+    // It only makes sense in a function whose SIL type actually has an
+    // error result; see `SILGenFunction::emitBasicProlog`. Downstream
+    // consumers (IRGen's `visitDebugValueInst`) call `getErrorResult()`
+    // on it, which asserts when no such result exists.
+    //
+    // For an inlined occurrence the variable belongs to the function it
+    // was originally declared in (which must itself have an error
+    // result), not the function it was inlined into. Look through the
+    // debug scope to that function rather than checking the containing
+    // function.
+    if (isa<DebugValueInst>(inst) && varInfo->Name == "$error") {
+      auto *scope = varInfo->Scope ? varInfo->Scope : inst->getDebugScope();
+      auto *owningFn = scope ? scope->getInlinedFunction()
+                             : inst->getFunction();
+      require(owningFn->getLoweredFunctionType()->hasErrorResult(),
+              "'$error' debug_value may only appear in a function whose "
+              "SIL type has an error result");
+    }
+
     SILType DebugVarTy = *varInfo->Type;
 
     auto *debugScope = inst->getDebugScope();
