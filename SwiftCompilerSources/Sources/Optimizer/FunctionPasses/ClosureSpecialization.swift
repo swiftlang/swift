@@ -172,15 +172,20 @@ let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-special
 
   repeat {
     var changed = false
-    for inst in function.instructions {
-      if let partialApply = inst as? PartialApplyInst,
-         partialApply.isPullbackInResultOfAutodiffVJP
-      {
-        if trySpecialize(apply: partialApply, context) {
-          changed = true
-        }
-      }
+
+    guard let returnInst = function.returnInstruction,
+      let tupleInst = returnInst.returnedValue.definingInstruction as? TupleInst,
+      let lastTupleOp = tupleInst.operands.last,
+      let partialApplyInst = lastTupleOp.value.definingInstruction as? PartialApplyInst,
+      partialApplyInst.uses.singleUse?.instruction == tupleInst
+    else {
+      break
     }
+
+    if trySpecialize(apply: partialApplyInst, context) {
+      changed = true
+    }
+
     if context.needFixStackNesting {
       context.fixStackNesting(in: function)
     }
@@ -764,21 +769,6 @@ private func numberOfIsolatedParameters(_ params: [ParameterInfo]) -> Int {
 }
 
 private extension PartialApplyInst {
-  /// True, if the closure obtained from this partial_apply is the
-  /// pullback returned from an autodiff VJP
-  var isPullbackInResultOfAutodiffVJP: Bool {
-    if self.parentFunction.isAutodiffVJP,
-      let use = self.uses.singleUse,
-      let tupleInst = use.instruction as? TupleInst,
-      let returnInst = self.parentFunction.returnInstruction,
-      tupleInst == returnInst.returnedValue
-    {
-      return true
-    }
-
-    return false
-  }
-
   var isPartialApplyOfThunk: Bool {
     if self.numArguments == 1,
       let fun = self.referencedFunction,
