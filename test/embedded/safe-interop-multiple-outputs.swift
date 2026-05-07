@@ -1,11 +1,9 @@
-// Regression test: compiler crashes in IRGenerator::getGenModule
-// when calling a safe wrapper from an Embedded module compiled
-// with multiple source files and multiple threads, without WMO.
-// https://github.com/swiftlang/swift/issues/88864
+// Regression test: this used to trigger a compiler crash in IRGenerator::getGenModule
+// since the SourceFile for the _SwiftifyImport macro expansion had no corresponding
+// IRGenModule. This would only trigger with multiple outputs and multiple threads
+// since there's only a single IRGenModule to return otherwise.
 
 // REQUIRES: swift_feature_Embedded
-
-// XFAIL: *
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t

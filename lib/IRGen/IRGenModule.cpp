@@ -2277,7 +2277,12 @@ IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
     return getPrimaryIGM();
 
  IRGenModule *IGM = GenModules[SF];
- assert(IGM);
+
+ if (!IGM) {
+   ASSERT(SF->getParentModule()->findUnderlyingClangModule());
+   return getPrimaryIGM();
+ }
+
  return IGM;
 }
 
@@ -2290,9 +2295,7 @@ IRGenModule *IRGenerator::getGenModule(DeclContext *ctxt) {
     return getPrimaryIGM();
   }
 
-  IRGenModule *IGM = GenModules[SF];
-  assert(IGM);
-  return IGM;
+  return getGenModule(SF);
 }
 
 IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
