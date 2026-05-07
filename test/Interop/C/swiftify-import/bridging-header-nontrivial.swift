@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swiftc_driver -typecheck -disable-bridging-pch -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -Xcc -I -Xcc %t -import-objc-header %t/bridging.h -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast %t/test.swift -Xfrontend -verify
+// RUN: %target-swiftc_driver -typecheck -disable-bridging-pch -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -Xcc -I -Xcc %t -import-objc-header %t/bridging.h -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast %t/test.swift -Xfrontend -verify -Xfrontend -eager-macro-checking
 // RUN: %target-swiftc_driver -typecheck -disable-bridging-pch -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-objc-header %t/bridging.h -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast %t/test.swift -Xfrontend -dump-macro-expansions 2>&1 | %FileCheck --dry-run > %t/macro-expansions.out
 // RUN: %diff %t/macro-expansions.out %t/macro-expansions.expected
 // RUN: %target-swiftc_driver -typecheck -disable-bridging-pch -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-objc-header %t/bridging.h -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast %t/test.swift -Xfrontend -dump-source-file-imports 2>&1 | %FileCheck --sanitize TEST_SWIFT=%t/test.swift --dry-run > %t/imports.out

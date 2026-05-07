@@ -9,9 +9,7 @@
 // REQUIRES: swift_feature_BorrowingForLoop
 
 import StdlibUnittest
-#if !BRIDGING_HEADER
 import StdSpan
-#endif
 import CxxStdlib
 
 var StdSpanTestSuite = TestSuite("StdSpan")

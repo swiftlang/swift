@@ -5,11 +5,11 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
-// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-prefix experimental- -Rmacro-expansions -suppress-notes
+// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-prefix experimental- -Rmacro-expansions -suppress-notes -eager-macro-checking
 
 // lifetimebound support is not stabilized yet. Don't generate _any_ overloads on functions with lifetimebound to prevent future sourcebreak.
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
-// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-prefix stable- -Rmacro-expansions -suppress-notes
+// RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-prefix stable- -Rmacro-expansions -suppress-notes -eager-macro-checking
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by __lifetimebound parameters and return values.
 
