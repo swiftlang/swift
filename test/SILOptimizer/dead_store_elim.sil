@@ -389,7 +389,7 @@ bb0:
   %1 = integer_literal $Builtin.Int64, 1
   %2 = struct $Int (%1 : $Builtin.Int64)
   store %2 to %0 : $*Int
-  debug_value %0 : $*Int
+  debug_value %0 : $*Int, expr op_deref
   %4 = tuple ()
   dealloc_stack %0 : $*Int
   return %4 : $()

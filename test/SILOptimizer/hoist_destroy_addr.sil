@@ -252,7 +252,7 @@ bb1:
   br bb3
 
 bb2:
-  debug_value %4 : $*T, let, name "t"
+  debug_value %4 : $*T, let, name "t", expr op_deref
   br bb3
 
 bb3:
@@ -299,7 +299,7 @@ bb1:
   br bb3
 
 bb2:
-  debug_value %4 : $*T, let, name "t"
+  debug_value %4 : $*T, let, name "t", expr op_deref
   br bb3
 
 bb3:
@@ -338,7 +338,7 @@ bb2:
   br bb1
 
 bb3:
-  debug_value %a : $*T, let, name "t"
+  debug_value %a : $*T, let, name "t", expr op_deref
   destroy_addr %a : $*T
   dealloc_stack %a : $*T
   %16 = tuple ()
@@ -375,7 +375,7 @@ bb2:
   br bb1
 
 bb3:
-  debug_value %a : $*T, let, name "t"
+  debug_value %a : $*T, let, name "t", expr op_deref
   destroy_addr %a : $*T
   dealloc_stack %a : $*T
   %16 = tuple ()

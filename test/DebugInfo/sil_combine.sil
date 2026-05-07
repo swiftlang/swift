@@ -38,7 +38,7 @@ enum MP {
 // CHECK-LABEL: sil @expand_alloc_stack_of_enum_without_take
 // CHECK:        [[A:%[0-9]+]] = alloc_stack $S
 // CHECK-NOT:      name "a"
-// CHECK-NEXT:   debug_value undef : $*MP, let, name "a", expr op_fragment:#C.x
+// CHECK-NEXT:   debug_value undef : $*MP, let, name "a", expr op_deref:op_fragment:#C.x
 // CHECK-NEXT:   debug_value undef : $*MP, let, name "b"
 // CHECK:      bb1:
 // CHECK-NEXT:   store %0 to [[A]]
@@ -50,8 +50,8 @@ enum MP {
 sil @expand_alloc_stack_of_enum_without_take : $@convention(method) (S) -> () {
 bb0(%0 : $S):
   %1 = alloc_stack $MP
-  debug_value %1 : $*MP, let, name "a", expr op_fragment:#C.x
-  debug_value %1 : $*MP, let, name "b"
+  debug_value %1 : $*MP, let, name "a", expr op_deref:op_fragment:#C.x
+  debug_value %1 : $*MP, let, name "b", expr op_deref
   cond_br undef, bb1, bb2
 bb1:
   %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
