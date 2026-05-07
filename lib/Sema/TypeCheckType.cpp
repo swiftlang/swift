@@ -1706,6 +1706,28 @@ Type TypeResolution::applyUnboundGenericArguments(
   auto &ctx = getASTContext();
   TypeSubstitutionMap subs;
 
+  // If this is `InlineArray` with a concrete integer literal count, reject
+  // counts that exceed `UINT32_MAX` before layout reasoning begins. IRGen's
+  // `FixedTypeInfo` stores the byte size in a 32-bit bitfield, so any count
+  // above that cannot fit regardless of the element type's stride (minimum
+  // stride is 1). Diagnosing here gives us a source location and covers
+  // cases the IRGen check misses — e.g. a generic element type where the
+  // IRGen path falls back to `NonFixedArrayTypeInfo` and silently skips
+  // the overflow guard.
+  if (decl == ctx.getInlineArrayDecl() && genericArgs.size() == 2) {
+    if (auto *intTy = genericArgs[0]->getAs<IntegerType>()) {
+      if (!intTy->isNegative()) {
+        auto value = intTy->getValue();
+        if (value.getActiveBits() > 32) {
+          ctx.Diags.diagnose(loc, diag::inline_array_count_exceeds_max,
+                             genericArgs[0],
+                             std::numeric_limits<uint32_t>::max());
+          return ErrorType::get(ctx);
+        }
+      }
+    }
+  }
+
   // Get the interface type for the declaration. We will be substituting
   // type parameters that appear inside this type with the provided
   // generic arguments.

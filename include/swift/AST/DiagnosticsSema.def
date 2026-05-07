@@ -8889,6 +8889,11 @@ ERROR(inlinearray_literal_incorrect_count,none,
 ERROR(inline_array_type_backwards,none,
       "element count must precede inline array element type", ())
 
+ERROR(inline_array_count_exceeds_max,none,
+      "'InlineArray' element count %0 exceeds the maximum supported "
+      "value of %1 (the resulting type's byte size could not be "
+      "represented)", (Type, unsigned))
+
 //===----------------------------------------------------------------------===//
 // MARK: Embedded Swift
 //===----------------------------------------------------------------------===//
