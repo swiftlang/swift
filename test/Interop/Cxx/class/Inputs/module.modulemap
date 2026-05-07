@@ -184,3 +184,8 @@ module FriendFunction {
   requires cplusplus
   export *
 }
+
+module NoncopyableNonmovableGlobal {
+  header "noncopyable-nonmovable-global.h"
+  requires cplusplus
+}
