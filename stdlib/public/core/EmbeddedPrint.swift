@@ -170,3 +170,21 @@ public func print(_ boolean: Bool, terminator: StaticString = "\n") {
     print("false", terminator: terminator)
   }
 }
+
+/// Hook used to print a fatal error from C code, e.g., parts of the Swift
+/// Concurrency runtime.
+@c @used
+public func _swift_fatalError(_ message: UnsafePointer<UInt8>) -> Never {
+  if _isDebugAssertConfiguration() {
+    print("fatal error", terminator: ": ")
+
+    var pointer = unsafe message
+    while unsafe pointer.pointee != 0 {
+      unsafe writeSingleChar(CInt(pointer.pointee))
+      unsafe pointer += 1
+    }
+  } else {
+    Builtin.condfail_message(true._value, message._rawValue)
+  }
+  Builtin.unreachable()
+}
