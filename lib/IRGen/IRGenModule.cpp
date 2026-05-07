@@ -2276,7 +2276,7 @@ IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
   if (GenModules.size() == 1)
     return getPrimaryIGM();
 
- IRGenModule *IGM = GenModules[SF];
+ IRGenModule *IGM = GenModules.lookup(SF);
 
  if (!IGM) {
    ASSERT(SF->getParentModule()->findUnderlyingClangModule());
