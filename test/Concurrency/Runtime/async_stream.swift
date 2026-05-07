@@ -525,17 +525,26 @@ class NotSendable {}
         _ = await consumer2.value
       }
 
-      tests.test("finish throwing behavior with multiple consumers throwing") {
+      tests.test("finish by throwing behavior with multiple consumers") {
         let thrownError = SomeError()
         var errorCount = 0
+        var nilCount = 0
 
         let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
         var iterator = stream.makeAsyncIterator()
 
-        func makeConsumingTask() -> Task<Void, Never> {
-          return Task { @MainActor in
+        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
+        var controlIterator = controlStream.makeAsyncIterator()
+
+        func makeConsumingTaskWithIndex(_ index: Int) -> Task<Void, Never> {
+          Task { @MainActor in
+            controlContinuation.yield(index)
             do {
-              expectEqual(try await iterator.next(isolation: #isolation), nil)
+              if let element = try await iterator.next(isolation: #isolation) {
+                controlContinuation.yield(element)
+              } else {
+                nilCount += 1
+              }
             } catch {
               errorCount += 1
               if let failure = error as? SomeError {
@@ -548,9 +557,11 @@ class NotSendable {}
         }
 
         // Set up multiple consumers
-        let consumer1 = makeConsumingTask()
-        let consumer2 = makeConsumingTask()
-        let consumer3 = makeConsumingTask()
+        let consumer1 = makeConsumingTaskWithIndex(1)
+        expectEqual(await controlIterator.next(isolation: #isolation), 1)
+
+        let consumer2 = makeConsumingTaskWithIndex(2)
+        expectEqual(await controlIterator.next(isolation: #isolation), 2)
 
         // Ensure the iterators are suspended
         await MainActor.run {}
@@ -561,7 +572,9 @@ class NotSendable {}
         // Ensure the consuming Tasks both complete
         _ = await consumer1.value
         _ = await consumer2.value
-        _ = await consumer3.value
+
+        // Ensure that all, but the first consumer return nil
+        expectEqual(nilCount, 1)
 
         // Ensure error was only thrown once
         expectEqual(errorCount, 1)
