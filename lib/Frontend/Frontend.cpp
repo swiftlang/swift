@@ -1834,6 +1834,8 @@ void CompilerInstance::freeASTContext() {
 /// Perform "stable" optimizations that are invariant across compiler versions.
 static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM) {
+  FrontendStatsTracer tracer(SM->getASTContext().Stats,
+                             "SIL-mandatory-passes");
   // Don't run diagnostic passes at all when merging modules.
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::MergeModules) {
@@ -1888,6 +1890,9 @@ static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
 }
 
 bool CompilerInstance::performSILProcessing(SILModule *silModule) {
+  FrontendStatsTracer tracer(silModule->getASTContext().Stats,
+                             "SIL-processing");
+
   if (performMandatorySILPasses(Invocation, silModule) &&
       !Invocation.getFrontendOptions().AllowModuleWithCompilerErrors)
     return true;
