@@ -8218,8 +8218,16 @@ static Expr *buildCallAsFunctionMethodRef(
     rewriter.ExprStack.pop_back();
   };
 
+  // Anchor the implicit `.callAsFunction` name. Usually `args->getStartLoc()`
+  // is fine — for `foo(x)` that's the `(`, a sensible anchor. But for a bare
+  // trailing closure (`foo { ... }`) it's the `{`, which bleeds into the
+  // member ref's end loc and breaks downstream fix-its
+  // (see fixItEncloseTrailingClosure). Fall back to the end of the base in
+  // that case.
+  auto nameLoc = args->getLParenLoc().isValid() ? args->getStartLoc()
+                                                : fn->getEndLoc();
   auto *declRef = rewriter.buildMemberRef(
-      fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(args->getStartLoc()),
+      fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(nameLoc),
       calleeLoc, calleeLoc, /*implicit*/ true, AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;

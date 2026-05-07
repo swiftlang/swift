@@ -1866,12 +1866,11 @@ shouldEmitPartialMutationErrorForType(SILType ty, NominalTypeDecl *nominal,
   if (nominal->getModuleContext() == fn->getModule().getSwiftModule())
     return std::nullopt;
 
-  // It's defined in another module and used here; it has to be visible.
-  assert(nominal
-             ->getFormalAccessScope(
-                 /*useDC=*/fn->getDeclContext(),
-                 /*treatUsableFromInlineAsPublic=*/true)
-             .isPublicOrPackage());
+  // It's defined in another module and used here, so we've established the
+  // type is visible. Historically the access scope was expected to be public
+  // or package; with `InternalImportsByDefault` a public type reached via an
+  // internal import has `Internal` scope in the importing module, which is
+  // also valid.
 
   // Partial mutation is supported only for frozen/fixed-layout types from
   // other modules.
