@@ -631,12 +631,12 @@ extension String {
       return _guts.asSmall.withUTF8 { bufPtr in
         // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
         if _guts.isSmallASCII,
-           _guts.count <= 11, //tagged pointers can't fit >11 characters
+           bufPtr.count <= 11, //tagged pointers can't fit >11 characters
            let result = unsafe _createCFString(
-          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          bufPtr.count,
-          kCFStringEncodingUTF8
-        ) {
+            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+            bufPtr.count,
+            kCFStringEncodingUTF8
+           ) {
           return result
         }
         // We can't form a tagged pointer String, so make a non-small String,
