@@ -49,6 +49,8 @@ struct CompilerDebuggingOptions {
   /// Indicates whether or not the Clang importer should dump lookup tables
   /// upon termination.
   bool DumpClangLookupTables = false;
+
+  bool DumpAbstractLayout = false;
 };
 
 /// Options for controlling the behavior of the frontend.

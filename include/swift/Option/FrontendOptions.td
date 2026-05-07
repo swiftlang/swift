@@ -722,6 +722,9 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
 
+def dump_abstract_layout : Flag<["-"], "dump-abstract-layout">,
+  HelpText<"Dump abstract layout information for Clang-backed types">;
+
 def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
                                HelpText<"Dump availability scopes to stderr">;
 

@@ -13,6 +13,20 @@
 // RUN:   -o %t/Library.swiftmodule \
 // RUN:   %t/Library.swift
 
+// RUN: %target-swift-frontend \
+// RUN:   -internal-import-bridging-header %t/Utility.h \
+// RUN:   -enable-experimental-feature AbstractStoredPropertyLayout \
+// RUN:   -typecheck -module-name Library \
+// RUN:   -dump-abstract-layout \
+// RUN:   %t/Library.swift | %FileCheck %s
+
+// CHECK: Wrapper:
+// CHECK:   size: 4
+// CHECK:   alignment: 4
+// CHECK:   stride: 4
+// CHECK:   bitwiseCopyable: true
+// CHECK:   isOpaque: false
+
 //--- Utility.h
 
 typedef struct { int value; } Wrapper;

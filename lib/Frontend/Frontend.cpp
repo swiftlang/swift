@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/Frontend.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityScope.h"
@@ -1927,6 +1928,30 @@ void CompilerInstance::emitEndOfPipelineDebuggingOutput() {
 
   if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
     ctx.getClangModuleLoader()->dumpSwiftLookupTables();
+
+  if (opts.DumpAbstractLayout) {
+    auto &sf = getPrimaryOrMainSourceFile();
+    for (auto *decl : sf.getTopLevelDecls()) {
+      auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+      if (!nominal)
+        continue;
+      for (auto *field : nominal->getStoredProperties()) {
+        auto fieldType = field->getInterfaceType();
+        if (auto *fieldNominal = fieldType->getAnyNominal()) {
+          if (auto layout = computeAbstractLayout(fieldNominal)) {
+            llvm::outs() << fieldNominal->getName() << ":\n";
+            llvm::outs() << "  size: " << layout->size << "\n";
+            llvm::outs() << "  alignment: " << layout->alignment << "\n";
+            llvm::outs() << "  stride: " << layout->stride << "\n";
+            llvm::outs() << "  bitwiseCopyable: "
+                         << (layout->bitwiseCopyable ? "true" : "false") << "\n";
+            llvm::outs() << "  isOpaque: "
+                         << (layout->isOpaque ? "true" : "false") << "\n";
+          }
+        }
+      }
+    }
+  }
 }
 
 bool CompilerInstance::isCancellationRequested() const {
