@@ -106,9 +106,9 @@ public:
     if (asDerived().shouldVisitRequirementSignatureOnly())
       return;
 
-    // Visit the witnesses for the members of a protocol, including those
+    // Visit the witnesses for the ABI members of a protocol, including those
     // introduced by freestanding declaration macro expansions.
-    for (Decl *member : protocol->getAllMembers()) {
+    for (Decl *member : protocol->getABIMembers()) {
       ASTVisitor<T>::visit(member);
     }
   }
@@ -183,7 +183,7 @@ public:
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *) {
-    // The expanded declarations are visited through getAllMembers().
+    // The expanded declarations are visited through getABIMembers().
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {
