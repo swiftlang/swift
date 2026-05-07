@@ -54,6 +54,9 @@ public let benchmarks = [
   BenchmarkInfo(name: "ObjectiveCBridgeStringIsEqual2",
     runFunction: run_ObjectiveCBridgeStringIsEqual2, tags: ts,
     setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringIsEqual2NoCustom",
+    runFunction: run_ObjectiveCBridgeStringIsEqual2NoCustom, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
   BenchmarkInfo(name: "ObjectiveCBridgeStringIsEqualAllSwift",
     runFunction: run_ObjectiveCBridgeStringIsEqualAllSwift, tags: ts,
     setUpFunction: setup_StringBridgeBenchmark),
@@ -353,6 +356,17 @@ public func run_ObjectiveCBridgeStringIsEqual2(n: Int) {
   for _ in 0 ..< n {
     autoreleasepool {
       b.testIsEqualToString2()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringIsEqual2NoCustom(n: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< n {
+    autoreleasepool {
+      b.testIsEqualToString2NoCustom()
     }
   }
   #endif

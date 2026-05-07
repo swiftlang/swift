@@ -21,6 +21,7 @@ internal protocol _AbstractStringStorage: _NSCopying {
   var isASCII: Bool { get }
   var start: UnsafePointer<UInt8> { get }
   var UTF16Length: Int { get }
+  var hasBreadcrumbs: Bool { get }
 }
 
 #else
@@ -31,6 +32,7 @@ internal protocol _AbstractStringStorage {
   var count: Int { get }
   var isASCII: Bool { get }
   var start: UnsafePointer<UInt8> { get }
+  var hasBreadcrumbs: Bool { get }
 }
 
 #endif
@@ -808,6 +810,11 @@ final internal class __SharedStringStorage
   @inline(__always)
   final internal var utf16: String.UTF16View {
     String.UTF16View(_StringGuts(self))
+  }
+  
+  @inline(always)
+  final internal var hasBreadcrumbs: Bool {
+    _breadcrumbs != nil
   }
 
   internal init(
