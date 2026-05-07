@@ -272,7 +272,7 @@ StringCreateTests.test("UTF16.surrogatePairAtBlockBoundary")
       String(validating: $0, as: UTF16.self)
     }
     expectNotNil(validated, "leadPos=\(leadPos)")
-    expectEqual(Array(validated?.utf16 ?? []), units, "leadPos=\(leadPos)")
+    expectEqual(Array(validated?.utf16) ?? [], units, "leadPos=\(leadPos)")
 
     let decoded = String(decoding: units, as: UTF16.self)
     expectEqual(Array(decoded.utf16), units, "leadPos=\(leadPos)")
