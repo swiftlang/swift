@@ -3,11 +3,11 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module -emit-module-interface-path %t/test.swiftinterface -plugin-path %swift-plugin-dir -o %t/test.swiftmodule %t/test.swift -I %t -strict-memory-safety \
-// RUN:   -verify -verify-additional-file %t%{fs-sep}test.h
+// RUN:   -verify -verify-additional-file %t%{fs-sep}test.h -eager-macro-checking
 
 // Verify that including the binary module works as expected
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/depender.swiftmodule %t/depender.swift -I %t -strict-memory-safety \
-// RUN:   -verify -verify-additional-file %t%{fs-sep}test.h
+// RUN:   -verify -verify-additional-file %t%{fs-sep}test.h -eager-macro-checking
 
 // Make sure we trigger compilation from text interface
 // RUN: rm %t/test.swiftmodule %t/depender.swiftmodule
@@ -21,7 +21,7 @@
 
 // Verify that absence of the macro plugin doesn't break compilation by itself - only if one of the inlinable functions calls the safe wrapper
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/depender.swiftmodule %t/depender.swift -I %t -strict-memory-safety \
-// RUN:   -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-file %t%{fs-sep}test.swiftinterface -verify-additional-prefix textinterface- -suppress-notes
+// RUN:   -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-file %t%{fs-sep}test.swiftinterface -verify-additional-prefix textinterface- -suppress-notes -eager-macro-checking
 
 
 //--- test.h

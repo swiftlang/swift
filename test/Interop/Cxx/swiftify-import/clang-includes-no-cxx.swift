@@ -6,19 +6,19 @@
 
 // Case 1: a.swift calls A1.B1.foo with C++ interop
 // RUN: not %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs %t/a.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefixes CHECK-A,CHECK-A-CXX %s
-// RUN:     %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs %t/a.swift -verify -verify-additional-prefix cxx- -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B1.h -verify-ignore-macro-note
+// RUN:     %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs %t/a.swift -verify -verify-additional-prefix cxx- -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B1.h -verify-ignore-macro-note -eager-macro-checking
 
 // Case 2: a.swift calls A1.B1.foo without C++ interop
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/a.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefixes CHECK-A,CHECK-A-C %s
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/a.swift -verify
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/a.swift -verify -eager-macro-checking
 
 // Case 3: b.swift calls A2.B2.foo with C++ interop
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs %t/b.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefixes CHECK-B,CHECK-B-CXX %s
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs %t/b.swift -verify
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs %t/b.swift -verify -eager-macro-checking
 
 // Case 4: b.swift calls A2.B2.foo without C++ interop
 // RUN: not %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/b.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefix CHECK-B %s
-// RUN:     %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/b.swift -verify -verify-additional-prefix c- -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B2.h -verify-ignore-macro-note
+// RUN:     %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/b.swift -verify -verify-additional-prefix c- -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B2.h -verify-ignore-macro-note -eager-macro-checking
 
 // CHECK-A:      imports for {{.*}}a.swift:
 // CHECK-A-NEXT: 	Swift

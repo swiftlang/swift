@@ -1665,7 +1665,9 @@ processExpansions(SourceManager &SM, llvm::DenseMap<SourceLoc, unsigned> &Expans
     if (ExpansionStart.isInvalid())
       continue;
     if (Expansions.count(ExpansionStart)) {
-      ASSERT(Expansions[ExpansionStart] == diag.SourceBufferID.value());
+      ASSERT(Expansions[ExpansionStart] == diag.SourceBufferID.value() &&
+             "diagnostics in multiple expansions for the same decl not "
+             "supported by -verify");
       continue;
     }
     Expansions.insert(std::make_pair(ExpansionStart, diag.SourceBufferID.value()));
