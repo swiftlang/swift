@@ -1742,6 +1742,28 @@ public:
     return SILValue();
   }
 
+  /// If \p region is contains a sending indirect out parameter, return that.
+  std::optional<Element> findSendingOutParameterInRegion(Region region) const {
+    for (const auto &pair : p.range()) {
+      if (pair.second != region)
+        continue;
+      // See if we have an indirect out parameter...
+      if (asImpl().getSendingIndirectOutParameter(pair.first)) {
+        return pair.first;
+      }
+
+      // If this was not an out parameter, return {}.
+      return {};
+    }
+
+    // After going over our loop, if result is not SILValue(), then we found
+    // that our region is not disconnected due only to a single 'indirect out'
+    // parameter. If SILValue() then we had all disconnected values. If we found
+    // multiple non-disconnected things, we would have bailed earlier in the
+    // loop itself.
+    return {};
+  }
+  
   /// Given the region \p regionOfInOutSendingParam containing the 'inout
   /// sending' parameter \p firstInOutSendingParam, see if that region contains
   /// any other 'inout sending' parameters with greater element numbers than \p
@@ -2117,9 +2139,8 @@ public:
              "Require PartitionOp's argument should already be tracked");
 
       // First check if the region of our 'inout sending' element has been
-      // sent. In that case, we emit a special use after free error so that the
-      // user knows that they need to reinitialize the 'inout sending'
-      // parameter.
+      // sent. In that case, we emit a special error so that the user knows that
+      // they need to reinitialize the 'inout sending' parameter.
       if (auto *sentOperandSet = p.getSentOperandSet(op.getOpArg1())) {
         for (auto sentOperand : sentOperandSet->data()) {
           handleError(InOutSendingNotInitializedAtExitError(op, op.getOpArg1(),
@@ -2179,6 +2200,8 @@ public:
         // exit error... check if our dynamic region isolation is not
         // disconnected since it is in the same region an out parameter. In that
         // case we want to emit a special 'cannot return value' error.
+        //
+        // This handles task-isolated captures.
         if (auto outParam =
                 findNonDisconnectedOutParameterInRegion(inoutSendingRegion)) {
           handleError(InOutSendingReturnedError(op, op.getOpArg1(),
@@ -2209,7 +2232,7 @@ public:
         return;
       }
 
-      // Finally We could still be returning a disconnected value in the same
+      // Finally we could still be returning a disconnected value in the same
       // region as an 'inout sending' parameter. We cannot allow that since the
       // caller considers 'inout sending' values to be in their own region on
       // function return. So it would assume that it could potentially send the
@@ -2224,6 +2247,21 @@ public:
         dynamicRegionIsolation = {isolation};
       }
 
+      // Then check if we have a sending out parameter. This will actually be
+      // disconnected unlike most other out parameters that are
+      // task-isolated. So it will look like we have a disconnected value, but
+      // we do not want to allow for an 'inout sending' parameter to also be
+      // returned as a 'sending' result since it would potentially allow for
+      // them to be send separately.
+      if (auto outParam =
+          findSendingOutParameterInRegion(inoutSendingRegion)) {
+        handleError(InOutSendingReturnedError(op, op.getOpArg1(),
+                                              outParam.value(),
+                                              dynamicRegionIsolation));
+        return;
+      }
+
+      // If we did not, then handle the direct return case.
       handleDirectReturn();
       return;
     }
@@ -2422,6 +2460,10 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// return that value.
   SILValue getIndirectOutParameter(Element elt) const { return {}; }
 
+  /// If \p elt maps to a representative that is a sending indirect out parameter,
+  /// return that value.
+  SILValue getSendingIndirectOutParameter(Element elt) const { return {}; }
+  
   /// If \p elt maps to a representative that is an 'inout sending' parameter
   /// that returns that value.
   SILValue getInOutSendingParameter(Element elt) const { return {}; }
