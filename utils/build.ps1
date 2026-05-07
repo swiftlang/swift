@@ -103,8 +103,7 @@ An array of architectures for which the Windows Swift SDK should be built.
 Default: @("X64","X86","ARM64")
 
 .PARAMETER Clean
-Clean non-compiler builds while building. Use this for a fresh build when
-experiencing issues.
+Remove selected build outputs before building.
 
 .PARAMETER SkipBuild
 Skip the build phase entirely. Useful for testing packaging or other post-build
@@ -4301,21 +4300,31 @@ try {
 Get-Dependencies
 
 if ($Clean) {
-  Remove-Item -Force -Recurse -Path "$BinaryCache\$($BuildPlatform.Triple)\" -ErrorAction Ignore
-  Remove-Item -Force -Recurse -Path "$BinaryCache\$($HostPlatform.Triple)\" -ErrorAction Ignore
+  # Fail instead of leaving a partially-cleaned tree behind.
+  function Clean-Path([string] $Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    try {
+      [System.IO.Directory]::Delete("\\?\$Path", $true)
+    } catch {
+      throw "Failed to clean '$Path': $_"
+    }
+  }
+
+  Clean-Path "$BinaryCache\$($BuildPlatform.Triple)"
+  Clean-Path "$BinaryCache\$($HostPlatform.Triple)"
   foreach ($Build in $WindowsSDKBuilds) {
-    Remove-Item -Force -Recurse -Path "$BinaryCache\$($Build.Triple)\" -ErrorAction Ignore
+    Clean-Path "$BinaryCache\$($Build.Triple)"
   }
   foreach ($Build in $AndroidSDKBuilds) {
-    Remove-Item -Force -Recurse -Path "$BinaryCache\$($Build.Triple)\" -ErrorAction Ignore
+    Clean-Path "$BinaryCache\$($Build.Triple)"
   }
-  Remove-Item -Force -Recurse -Path "$BinaryCache\1" -ErrorAction Ignore
-  Remove-Item -Force -Recurse -Path "$BinaryCache\5" -ErrorAction Ignore
-  Remove-Item -Force -Recurse -Path (Get-InstallDir $HostPlatform) -ErrorAction Ignore
+  Clean-Path "$BinaryCache\1"
+  Clean-Path "$BinaryCache\5"
+  Clean-Path (Get-InstallDir $HostPlatform)
 
   Get-SelectedSDKBuilds | ForEach-Object {
-    Remove-Item -Force -Recurse -Path (Get-ProjectBinaryCache $_ ClangBuiltins) -ErrorAction Ignore
-    Remove-Item -Force -Recurse -Path (Get-ProjectBinaryCache $_ ClangRuntime) -ErrorAction Ignore
+    Clean-Path (Get-ProjectBinaryCache $_ ClangBuiltins)
+    Clean-Path (Get-ProjectBinaryCache $_ ClangRuntime)
   }
 }
 
