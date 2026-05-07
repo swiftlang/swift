@@ -567,12 +567,6 @@ _swift_objcClassUsesNativeSwiftReferenceCounting(const Metadata *theClass) {
 #endif
 }
 
-// The non-pointer bits, excluding the tag bits.
-static auto const unTaggedNonNativeBridgeObjectBits
-  = heap_object_abi::SwiftSpareBitsMask
-  & ~heap_object_abi::ObjCReservedBitsMask
-  & ~heap_object_abi::BridgeObjectTagBitsMask;
-
 #if SWIFT_OBJC_INTEROP
 
 #if defined(__x86_64__)
@@ -674,7 +668,7 @@ static bool isBridgeObjectTaggedPointer(void *object) {
 ///
 /// Precondition: object does not encode a tagged pointer
 static void* toPlainObject_unTagged_bridgeObject(void *object) {
-  return (void*)(uintptr_t(object) & ~unTaggedNonNativeBridgeObjectBits);
+  return (void*)(uintptr_t(object) & ~heap_object_abi::UntaggedNonNativeBridgeObjectBits);
 }
 
 #if SWIFT_OBJC_INTEROP
