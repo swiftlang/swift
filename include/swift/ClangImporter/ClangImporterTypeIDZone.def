@@ -34,16 +34,16 @@ SWIFT_REQUEST(ClangImporter, ForeignReferenceTypeInfoRequest,
               ForeignReferenceTypeInfo(ForeignReferenceTypeInfoDescriptor), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CxxRecordSemantics,
-              CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor), Uncached,
+              CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CxxRecordAsSwiftType,
-              ValueDecl *(CxxRecordSemanticsDescriptor), Uncached,
+              ValueDecl *(CxxRecordSemanticsDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, IsSafeUseOfCxxDecl,
-              bool(SafeUseOfCxxRecordDescriptor), Uncached,
+              bool(SafeUseOfCxxRecordDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CustomRefCountingOperation,
-              CustomRefCountingOperationResult(CustomRefCountingOperationDescriptor), Uncached,
+              CustomRefCountingOperationResult(CustomRefCountingOperationDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangTypeEscapability,
               CxxEscapability(EscapabilityLookupDescriptor), Cached,
@@ -52,11 +52,11 @@ SWIFT_REQUEST(ClangImporter, CxxValueSemantics,
               CxxValueSemanticsKind(CxxValueSemanticsDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangDeclExplicitSafety,
-              ExplicitSafety(ClangDeclExplicitSafetyDescriptor), Uncached,
+              ExplicitSafety(ClangDeclExplicitSafetyDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangRefCountedSmartPointer,
               RefCountedPtrRequestResult(ClangRefCountedSmartPointerDescriptor),
-              Uncached, NoLocationInfo)
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, CxxIteratorInfoRequest,
               std::optional<CxxIteratorCategory>(CxxRecordDeclDescriptor),
-              Uncached, NoLocationInfo)
+              Cached, NoLocationInfo)

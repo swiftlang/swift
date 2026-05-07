@@ -8880,6 +8880,10 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
   return ExplicitSafety::Safe;
 }
 
+bool ClangDeclExplicitSafety::isCached() const {
+  return isa<clang::RecordDecl>(std::get<0>(getStorage()).decl);
+}
+
 void swift::simple_display(llvm::raw_ostream &out,
                            ClangRefCountedSmartPointerDescriptor desc) {
   out << "Validating SWIFT_REFCOUNTED_PTR for '";
