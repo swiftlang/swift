@@ -318,9 +318,10 @@ private func getHash(
   calleeAnalysis: CalleeAnalysis? = nil
 ) -> Int? {
   // In OSSA, skip instructions that produce an owned result: replacing them
-  // would require inserting copies to maintain ownership correctness, which
-  // defeats the purpose of CSE. Trivial (none) and guaranteed results are
-  // safe to replace without any fixup. Same goes for no-result instructions.
+  // would require inserting copies (via OwnershipRAUW or similar) to maintain
+  // ownership correctness. While this is possible, the inserted copies often
+  // cannot be optimized away, making the CSE counterproductive. Trivial (none)
+  // and guaranteed results are safe to replace without any fixup.
   if inst.parentFunction.hasOwnership && inst.results.contains(where: { $0.ownership == .owned }) {
     return nil
   }
@@ -365,10 +366,7 @@ private func getHash(
     hasher.combine(ObjectIdentifier(ExistentialMetatypeInst.self))
     hasher.combine(emi.type)
 
-  // FIXME: The C++ HashVisitor omits the result type for several of these
-  // (ClassifyBridgeObjectInst, ValueToBridgeObjectInst, RefTailAddrInst,
-  // ProjectBoxInst, RefToRawPointerInst, and the LOADABLE_REF_STORAGE
-  // family — RefToUnowned/UnownedToRef/RefToUnmanaged/UnmanagedToRef).
+  // These instructions all use the same hash pattern: kind + result type + operands.
   case let x as UpcastInst: hashTypeOps(x)
   case let x as UncheckedRefCastInst: hashTypeOps(x)
   case let x as UncheckedAddrCastInst: hashTypeOps(x)
@@ -448,22 +446,19 @@ private func getHash(
     hasher.combine(x.fieldIndex)
     hasher.combine(x.operands[0].value.hashable)
 
-  // FIXME: Same divergence from C++ as StructExtractInst above.
   case let x as StructElementAddrInst:
     hasher.combine(ObjectIdentifier(StructElementAddrInst.self))
     hasher.combine(x.type)
     hasher.combine(x.fieldIndex)
     hasher.combine(x.operands[0].value.hashable)
 
-  // FIXME: C++ also hashes getTupleType(); we omit it since fieldIndex +
-  // operand already uniquely identifies the projection within the tuple,
-  // and the operand's SSA type encodes the tuple type.
+  // fieldIndex + operand already uniquely identifies the projection within
+  // the tuple, and the operand's SSA type encodes the tuple type.
   case let x as TupleExtractInst:
     hasher.combine(ObjectIdentifier(TupleExtractInst.self))
     hasher.combine(x.fieldIndex)
     hasher.combine(x.operands[0].value.hashable)
 
-  // FIXME: Same divergence from C++ as TupleExtractInst above.
   case let x as TupleElementAddrInst:
     hasher.combine(ObjectIdentifier(TupleElementAddrInst.self))
     hasher.combine(x.fieldIndex)
@@ -474,9 +469,8 @@ private func getHash(
     hasher.combine(x.fieldIndex)
     hasher.combine(x.operands[0].value.hashable)
 
-  // FIXME: C++ hashes getElement() (a VarDecl*) as the case discriminator.
-  // We use caseIndex (an Int) which encodes the same information within
-  // a given enum type.
+  // We use caseIndex (an Int) as the case discriminator, which encodes the
+  // same information as VarDecl* within a given enum type.
   case let x as EnumInst:
     hasher.combine(ObjectIdentifier(EnumInst.self))
     hasher.combine(x.caseIndex)
@@ -484,9 +478,8 @@ private func getHash(
       hasher.combine(payload.hashable)
     }
 
-  // FIXME: C++ hashes getElement() (a VarDecl*) as the case discriminator.
-  // We use the result type as a proxy — each case has a unique payload type,
-  // so the type already encodes the case.
+  // We use the result type as a proxy for the case — each case has a unique
+  // payload type, so the type already encodes the case.
   case let x as UncheckedEnumDataInst:
     hasher.combine(ObjectIdentifier(UncheckedEnumDataInst.self))
     hasher.combine(x.type)

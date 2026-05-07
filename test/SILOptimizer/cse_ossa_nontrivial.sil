@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -cse | %FileCheck %s
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -common-subexpression-elimination | %FileCheck --check-prefix=SWIFT-CSE %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -common-subexpression-elimination | %FileCheck %s
 // REQUIRES: PTRSIZE=64
 
 sil_stage canonical
@@ -50,10 +49,6 @@ sil @use_superklass1 : $@convention(thin) (@owned SuperKlass) -> ()
 // CHECK: struct $NonTrivialStruct
 // CHECK-NOT: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'structliteral1'
-// SWIFT-CSE-LABEL: sil [ossa] @structliteral1 :
-// SWIFT-CSE: struct $NonTrivialStruct
-// SWIFT-CSE-NOT: struct $NonTrivialStruct
-// SWIFT-CSE-LABEL: } // end sil function 'structliteral1'
 sil [ossa] @structliteral1 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %2 = struct $NonTrivialStruct (%0 : $Klass)
@@ -67,12 +62,8 @@ bb0(%0 : @guaranteed $Klass):
 
 // CHECK-LABEL: sil [ossa] @structliteral2 :
 // CHECK: struct $NonTrivialStruct
-// CHECK-NOT: struct $NonTrivialStruct
+// CHECK: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'structliteral2'
-// SWIFT-CSE-LABEL: sil [ossa] @structliteral2 :
-// SWIFT-CSE: struct $NonTrivialStruct
-// SWIFT-CSE: struct $NonTrivialStruct
-// SWIFT-CSE-LABEL: } // end sil function 'structliteral2'
 sil [ossa] @structliteral2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   %copy0 = copy_value %0 : $Klass
@@ -91,10 +82,6 @@ sil [ossa] @sadd_with_address : $@convention(thin) (@inout Klass, @inout Klass) 
 // CHECK: project_box %0 : $<τ_0_0> { var τ_0_0 } <Klass>
 // CHECK-NOT: project_box
 // CHECK-LABEL: } // end sil function 'project_box_test1'
-// SWIFT-CSE-LABEL: sil [ossa] @project_box_test1 :
-// SWIFT-CSE: project_box %0 : $<τ_0_0> { var τ_0_0 } <Klass>
-// SWIFT-CSE-NOT: project_box
-// SWIFT-CSE-LABEL: } // end sil function 'project_box_test1'
 sil [ossa] @project_box_test1 : $(@owned <τ_0_0> { var τ_0_0 } <Klass>) -> Klass {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Klass>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Klass>, 0
@@ -109,10 +96,6 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Klass>):
 // CHECK: project_box %0 : $<τ_0_0> { var τ_0_0 } <Klass>
 // CHECK: project_box
 // CHECK-LABEL: } // end sil function 'project_box_test2'
-// SWIFT-CSE-LABEL: sil [ossa] @project_box_test2 :
-// SWIFT-CSE: project_box %0 : $<τ_0_0> { var τ_0_0 } <Klass>
-// SWIFT-CSE: project_box
-// SWIFT-CSE-LABEL: } // end sil function 'project_box_test2'
 sil [ossa] @project_box_test2 : $(@owned <τ_0_0> { var τ_0_0 } <Klass>) -> Klass {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Klass>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Klass>, 0
@@ -129,10 +112,6 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Klass>):
 // CHECK: project_box
 // CHECK: project_box
 // CHECK-LABEL: } // end sil function 'project_box_test3'
-// SWIFT-CSE-LABEL: sil [ossa] @project_box_test3 :
-// SWIFT-CSE: project_box
-// SWIFT-CSE: project_box
-// SWIFT-CSE-LABEL: } // end sil function 'project_box_test3'
 sil [ossa] @project_box_test3 : $(@owned <τ_0_0> { var τ_0_0 } <Klass>) -> Klass {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Klass>):
   %copy0 = copy_value %0 : $<τ_0_0> { var τ_0_0 } <Klass>
@@ -150,12 +129,8 @@ sil [ossa] @tuple_function2 : $@convention(thin) (@guaranteed (Klass, Klass), @g
 
 // CHECK-LABEL: sil [ossa] @tuple_test1 :
 // CHECK: tuple ({{%[0-9]+}} : $Klass, {{%[0-9]+}} : $Klass)
-// CHECK-NOT: tuple ({{%[0-9]+}} : $Klass, {{%[0-9]+}} : $Klass)
+// CHECK: tuple ({{%[0-9]+}} : $Klass, {{%[0-9]+}} : $Klass)
 // CHECK-LABEL: } // end sil function 'tuple_test1'
-// SWIFT-CSE-LABEL: sil [ossa] @tuple_test1 :
-// SWIFT-CSE: tuple ({{%[0-9]+}} : $Klass, {{%[0-9]+}} : $Klass)
-// SWIFT-CSE: tuple ({{%[0-9]+}} : $Klass, {{%[0-9]+}} : $Klass)
-// SWIFT-CSE-LABEL: } // end sil function 'tuple_test1'
 sil [ossa] @tuple_test1 : $@convention(thin) (@owned Klass, @owned Klass) -> @owned (Klass) {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   %copy0 = copy_value %0 : $Klass
@@ -167,16 +142,10 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   return %5 : $(Klass)
 }
 
-// mayIntroduceUnoptimizableCopies returns true because swift::areUsesWithinValueLifetime returns false
-// since findOwnershipReferenceAggregate only looks through single operand forwarding instructions
 // CHECK-LABEL: sil [ossa] @tuple_test2 :
 // CHECK: tuple ({{%[0-9]+}} : $Klass, {{%[0-9]+}} : $Klass)
-// TODO-CHECK-NOT: tuple ({{%[0-9]+}} : $Klass, {{%[0-9]+}} : $Klass)
+// CHECK-NOT: tuple ({{%[0-9]+}} : $Klass, {{%[0-9]+}} : $Klass)
 // CHECK-LABEL: } // end sil function 'tuple_test2'
-// SWIFT-CSE-LABEL: sil [ossa] @tuple_test2 :
-// SWIFT-CSE: tuple ({{%[0-9]+}} : $Klass, {{%[0-9]+}} : $Klass)
-// SWIFT-CSE-NOT: tuple ({{%[0-9]+}} : $Klass, {{%[0-9]+}} : $Klass)
-// SWIFT-CSE-LABEL: } // end sil function 'tuple_test2'
 sil [ossa] @tuple_test2 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> @owned (Klass) {
 bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
   %2 = tuple(%0 : $Klass, %1 : $Klass)
@@ -192,10 +161,6 @@ sil [ossa] @generate_tuple : $@convention(thin) () -> @owned ((Klass, Klass))
 // CHECK: tuple_extract {{%[0-9]}} : $(Klass, Klass), 0
 // CHECK-NOT: tuple_extract {{%[0-9]}} : $(Klass, Klass), 0
 // CHECK-LABEL: } // end sil function 'tupleextract_test'
-// SWIFT-CSE-LABEL: sil [ossa] @tupleextract_test :
-// SWIFT-CSE: tuple_extract {{%[0-9]}} : $(Klass, Klass), 0
-// SWIFT-CSE-NOT: tuple_extract {{%[0-9]}} : $(Klass, Klass), 0
-// SWIFT-CSE-LABEL: } // end sil function 'tupleextract_test'
 sil [ossa] @tupleextract_test : $@convention(thin) () -> @owned (Klass) {
   %0 = function_ref @generate_tuple : $@convention(thin) () -> @owned ((Klass, Klass))
   %1 = apply %0() : $@convention(thin) () -> @owned ((Klass, Klass))
@@ -219,12 +184,6 @@ sil [ossa] @helper2 : $@convention(thin) (UInt8, UInt8) -> Builtin.Word
 // CHECK: enum $FakeOptional, #FakeOptional.some!enumelt
 // CHECK-NOT: enum $FakeOptional, #FakeOptional.some!enumelt
 // CHECK-LABEL: } // end sil function 'enum_cse'
-// SWIFT-CSE-LABEL: sil [ossa] @enum_cse :
-// SWIFT-CSE: enum $FakeOptional, #FakeOptional.none!enumelt
-// SWIFT-CSE-NOT: enum $FakeOptional, #FakeOptional.none!enumelt
-// SWIFT-CSE: enum $FakeOptional, #FakeOptional.some!enumelt
-// SWIFT-CSE-NOT: enum $FakeOptional, #FakeOptional.some!enumelt
-// SWIFT-CSE-LABEL: } // end sil function 'enum_cse'
 sil [ossa] @unknown_fake_optional_user : $@convention(thin) (FakeOptional) -> ()
 sil [ossa] @enum_cse : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -247,10 +206,6 @@ sil [ossa] @klass_user : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK: unchecked_enum_data
 // CHECK-NOT: unchecked_enum_data
 // CHECK-LABEL: } // end sil function 'unchecked_enum_data_cse'
-// SWIFT-CSE-LABEL: sil [ossa] @unchecked_enum_data_cse :
-// SWIFT-CSE: unchecked_enum_data
-// SWIFT-CSE-NOT: unchecked_enum_data
-// SWIFT-CSE-LABEL: } // end sil function 'unchecked_enum_data_cse'
 sil [ossa] @unchecked_enum_data_cse : $@convention(thin) (@guaranteed FakeOptional) -> () {
 bb0(%0 : @guaranteed $FakeOptional):
   %1 = function_ref @klass_user : $@convention(thin) (@guaranteed Klass) -> ()
@@ -268,12 +223,6 @@ bb0(%0 : @guaranteed $FakeOptional):
 // CHECK: function_ref
 // CHECK: apply
 // CHECK-LABEL: } // end sil function 'test2cse1'
-// SWIFT-CSE-LABEL: sil [ossa] @test2cse1 :
-// SWIFT-CSE: ref_to_raw_pointer
-// SWIFT-CSE-NOT: ref_to_raw_pointer
-// SWIFT-CSE: function_ref
-// SWIFT-CSE: apply
-// SWIFT-CSE-LABEL: } // end sil function 'test2cse1'
 sil [ossa] @test2cse1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   %1 = ref_to_raw_pointer %0 : $Klass to $Builtin.RawPointer
@@ -291,12 +240,6 @@ bb0(%0 : @owned $Klass):
 // CHECK: function_ref
 // CHECK: apply
 // CHECK-LABEL: } // end sil function 'test2cse2'
-// SWIFT-CSE-LABEL: sil [ossa] @test2cse2 :
-// SWIFT-CSE: ref_to_raw_pointer
-// SWIFT-CSE: ref_to_raw_pointer
-// SWIFT-CSE: function_ref
-// SWIFT-CSE: apply
-// SWIFT-CSE-LABEL: } // end sil function 'test2cse2'
 sil [ossa] @test2cse2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   %copy0 = copy_value %0 : $Klass
@@ -320,11 +263,6 @@ enum Enum1 {
 // CHECK-NOT: select_enum
 // CHECK: tuple
 // CHECK-LABEL: } // end sil function 'cse_select_enum'
-// SWIFT-CSE-LABEL: sil [ossa] @cse_select_enum :
-// SWIFT-CSE: select_enum
-// SWIFT-CSE-NOT: select_enum
-// SWIFT-CSE: tuple
-// SWIFT-CSE-LABEL: } // end sil function 'cse_select_enum'
 sil [ossa] @cse_select_enum : $@convention(thin) (@guaranteed Enum1) -> (Builtin.Int1, Builtin.Int1) {
 bb0(%0 : $Enum1):
   %t = integer_literal $Builtin.Int1, 1
@@ -335,15 +273,11 @@ bb0(%0 : $Enum1):
   return %3: $(Builtin.Int1, Builtin.Int1)
 }
 
-// CHECK-LABEL:   sil [ossa] @cse_bridge_object_to_word1 :
-// CHECK:           [[REF:%[0-9]+]] = bridge_object_to_word
-// CHECK-NOT:       bridge_object_to_word
-// CHECK:           tuple ([[REF]] : $Builtin.Word, [[REF]] : $Builtin.Word)
+// CHECK-LABEL: sil [ossa] @cse_bridge_object_to_word1 :
+// CHECK: [[REF:%[0-9]+]] = bridge_object_to_word
+// CHECK-NOT: bridge_object_to_word
+// CHECK: tuple ([[REF]] : $Builtin.Word, [[REF]] : $Builtin.Word)
 // CHECK-LABEL: } // end sil function 'cse_bridge_object_to_word1'
-// SWIFT-CSE-LABEL: sil [ossa] @cse_bridge_object_to_word1 :
-// SWIFT-CSE: bridge_object_to_word
-// SWIFT-CSE-NOT: bridge_object_to_word
-// SWIFT-CSE-LABEL: } // end sil function 'cse_bridge_object_to_word1'
 sil [ossa] @cse_bridge_object_to_word1 : $@convention(thin) (@owned Builtin.BridgeObject) -> (Builtin.Word, Builtin.Word) {
 bb0(%0 : @owned $Builtin.BridgeObject):
   %1 = bridge_object_to_word %0 : $Builtin.BridgeObject to $Builtin.Word
@@ -353,14 +287,10 @@ bb0(%0 : @owned $Builtin.BridgeObject):
   return %3 : $(Builtin.Word, Builtin.Word)
 }
 
-// CHECK-LABEL:   sil [ossa] @cse_bridge_object_to_word2 :
-// CHECK:           [[REF:%[0-9]+]] = bridge_object_to_word
-// CHECK:           bridge_object_to_word
+// CHECK-LABEL: sil [ossa] @cse_bridge_object_to_word2 :
+// CHECK: bridge_object_to_word
+// CHECK: bridge_object_to_word
 // CHECK-LABEL: } // end sil function 'cse_bridge_object_to_word2'
-// SWIFT-CSE-LABEL: sil [ossa] @cse_bridge_object_to_word2 :
-// SWIFT-CSE: bridge_object_to_word
-// SWIFT-CSE: bridge_object_to_word
-// SWIFT-CSE-LABEL: } // end sil function 'cse_bridge_object_to_word2'
 sil [ossa] @cse_bridge_object_to_word2 : $@convention(thin) (@owned Builtin.BridgeObject) -> (Builtin.Word, Builtin.Word) {
 bb0(%0 : @owned $Builtin.BridgeObject):
   %copy = copy_value %0 : $Builtin.BridgeObject
@@ -372,14 +302,10 @@ bb0(%0 : @owned $Builtin.BridgeObject):
   return %3 : $(Builtin.Word, Builtin.Word)
 }
 
-// CHECK-LABEL:   sil [ossa] @cse_bridge_object_to_word3 :
-// CHECK:           [[REF:%[0-9]+]] = bridge_object_to_word
-// CHECK:           bridge_object_to_word
+// CHECK-LABEL: sil [ossa] @cse_bridge_object_to_word3 :
+// CHECK: bridge_object_to_word
+// CHECK: bridge_object_to_word
 // CHECK-LABEL: } // end sil function 'cse_bridge_object_to_word3'
-// SWIFT-CSE-LABEL: sil [ossa] @cse_bridge_object_to_word3 :
-// SWIFT-CSE: bridge_object_to_word
-// SWIFT-CSE: bridge_object_to_word
-// SWIFT-CSE-LABEL: } // end sil function 'cse_bridge_object_to_word3'
 sil [ossa] @cse_bridge_object_to_word3 : $@convention(thin) (@owned Builtin.BridgeObject) -> (Builtin.Word, Builtin.Word) {
 bb0(%0 : @owned $Builtin.BridgeObject):
   %copy = copy_value %0 : $Builtin.BridgeObject
@@ -398,15 +324,11 @@ sil [ossa]  @_TFC4main4Ping4pingfS0_FT_S0_ : $@convention(method) (@guaranteed P
 sil [ossa]  @_TFC4main4PingD : $@convention(method) (@owned Ping) -> ()
 sil [ossa]  @_TFC4main4PingcfMS0_FT_S0_ : $@convention(method) (@owned Ping) -> @owned Ping
 
-// TODO: In order to cse this, we have to handle class_method with copy_value in InstructionIdentityComparer
+// TODO: In order to CSE this, we would need to look through copy_value when comparing operands
 // CHECK-LABEL: sil [ossa] @_TF4main4ringFCS_4PingT_ :
-// CHECK:      class_method
-// CHECK:      class_method
+// CHECK: class_method
+// CHECK: class_method
 // CHECK-LABEL: } // end sil function '_TF4main4ringFCS_4PingT_'
-// SWIFT-CSE-LABEL: sil [ossa] @_TF4main4ringFCS_4PingT_ :
-// SWIFT-CSE: class_method
-// SWIFT-CSE: class_method
-// SWIFT-CSE-LABEL: } // end sil function '_TF4main4ringFCS_4PingT_'
 sil [ossa] @_TF4main4ringFCS_4PingT_ : $@convention(thin) (@owned Ping) -> () {
 bb0(%0 : @owned $Ping):
   %copy0 = copy_value %0 : $Ping
@@ -433,15 +355,11 @@ struct KlassPair {
  var second: Klass
 }
 
-// Support destructure_struct in CSE after introducing support for MultipleValueInstruction is OSSA's rauw utility
+// TODO: Support destructure_struct in CSE after adding MultipleValueInstruction support to replaceAll
 // CHECK-LABEL: sil [ossa] @destructure_struct_test1 :
-// CHECK:       destructure_struct
-// TODOCHECK-NOT:   destructure_struct
+// CHECK: destructure_struct
+// CHECK: destructure_struct
 // CHECK-LABEL: } // end sil function 'destructure_struct_test1'
-// SWIFT-CSE-LABEL: sil [ossa] @destructure_struct_test1 :
-// SWIFT-CSE: destructure_struct
-// SWIFT-CSE: destructure_struct
-// SWIFT-CSE-LABEL: } // end sil function 'destructure_struct_test1'
 sil [ossa] @destructure_struct_test1 : $@convention(thin) (@owned KlassPair) -> () {
 bb0(%0 : @owned $KlassPair):
   %copy0 = copy_value %0: $KlassPair
@@ -455,14 +373,10 @@ bb0(%0 : @owned $KlassPair):
   return %res : $()
 }
 
-// Support destructure_struct in CSE after introducing support for MultipleValueInstruction is OSSA's rauw utility
+// TODO: Support destructure_struct in CSE after adding MultipleValueInstruction support to replaceAll
 // CHECK-LABEL: sil [ossa] @destructure_struct_test2 :
-// CHECK:       destructure_struct
-// TODOCHECK-NOT:   destructure_struct
+// CHECK: destructure_struct
 // CHECK-LABEL: } // end sil function 'destructure_struct_test2'
-// SWIFT-CSE-LABEL: sil [ossa] @destructure_struct_test2 :
-// SWIFT-CSE: destructure_struct
-// SWIFT-CSE-LABEL: } // end sil function 'destructure_struct_test2'
 sil [ossa] @destructure_struct_test2 : $@convention(thin) (@guaranteed KlassPair) -> () {
 bb0(%0 : @guaranteed $KlassPair):
   (%1, %2) = destructure_struct %0 : $KlassPair
@@ -474,15 +388,11 @@ bb0(%0 : @guaranteed $KlassPair):
   return %res : $()
 }
 
-// Support destructure_tuple in CSE after introducing support for MultipleValueInstruction is OSSA's rauw utility
+// TODO: Support destructure_tuple in CSE after adding MultipleValueInstruction support to replaceAll
 // CHECK-LABEL: sil [ossa] @destructure_tuple_test1 :
-// CHECK:       destructure_tuple
-// TODOCHECK-NOT:   destructure_tuple
+// CHECK: destructure_tuple
+// CHECK: destructure_tuple
 // CHECK-LABEL: } // end sil function 'destructure_tuple_test1'
-// SWIFT-CSE-LABEL: sil [ossa] @destructure_tuple_test1 :
-// SWIFT-CSE: destructure_tuple
-// SWIFT-CSE: destructure_tuple
-// SWIFT-CSE-LABEL: } // end sil function 'destructure_tuple_test1'
 sil [ossa] @destructure_tuple_test1 : $@convention(thin) (@owned (Klass, Klass)) -> () {
 bb0(%0 : @owned $(Klass, Klass)):
   %copy0 = copy_value %0: $(Klass, Klass)
@@ -496,14 +406,10 @@ bb0(%0 : @owned $(Klass, Klass)):
   return %res : $()
 }
 
-// Support destructure_tuple in CSE after introducing support for MultipleValueInstruction is OSSA's rauw utility
+// TODO: Support destructure_tuple in CSE after adding MultipleValueInstruction support to replaceAll
 // CHECK-LABEL: sil [ossa] @destructure_tuple_test2 :
-// CHECK:       destructure_tuple
-// TODOCHECK-NOT:   destructure_tuple
+// CHECK: destructure_tuple
 // CHECK-LABEL: } // end sil function 'destructure_tuple_test2'
-// SWIFT-CSE-LABEL: sil [ossa] @destructure_tuple_test2 :
-// SWIFT-CSE: destructure_tuple
-// SWIFT-CSE-LABEL: } // end sil function 'destructure_tuple_test2'
 sil [ossa] @destructure_tuple_test2 : $@convention(thin) (@guaranteed (Klass, Klass)) -> () {
 bb0(%0 : @guaranteed $(Klass, Klass)):
   (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
@@ -518,12 +424,8 @@ bb0(%0 : @guaranteed $(Klass, Klass)):
 
 // CHECK-LABEL: sil [ossa] @struct_test2 :
 // CHECK: struct $NonTrivialStruct
-// TODO-CHECK-NOT: struct $NonTrivialStruct
+// CHECK: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'struct_test2'
-// SWIFT-CSE-LABEL: sil [ossa] @struct_test2 :
-// SWIFT-CSE: struct $NonTrivialStruct
-// SWIFT-CSE: struct $NonTrivialStruct
-// SWIFT-CSE-LABEL: } // end sil function 'struct_test2'
 sil [ossa] @struct_test2 : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
 bb0(%0 : @guaranteed $Klass):
   %copy0 = copy_value %0 : $Klass
@@ -537,12 +439,8 @@ bb0(%0 : @guaranteed $Klass):
 
 // CHECK-LABEL: sil [ossa] @struct_test3 :
 // CHECK: struct $NonTrivialStruct
-// TODO-CHECK-NOT: struct $NonTrivialStruct
+// CHECK: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'struct_test3'
-// SWIFT-CSE-LABEL: sil [ossa] @struct_test3 :
-// SWIFT-CSE: struct $NonTrivialStruct
-// SWIFT-CSE: struct $NonTrivialStruct
-// SWIFT-CSE-LABEL: } // end sil function 'struct_test3'
 sil [ossa] @struct_test3 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %copy0 = copy_value %0 : $Klass
@@ -560,10 +458,6 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK: struct $NonTrivialStruct
 // CHECK-NOT: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'struct_test4'
-// SWIFT-CSE-LABEL: sil [ossa] @struct_test4 :
-// SWIFT-CSE: struct $NonTrivialStruct
-// SWIFT-CSE-NOT: struct $NonTrivialStruct
-// SWIFT-CSE-LABEL: } // end sil function 'struct_test4'
 sil [ossa] @struct_test4 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1 = struct $NonTrivialStruct (%0 : $Klass)
@@ -580,12 +474,8 @@ bb0(%0 : @guaranteed $Klass):
 
 // CHECK-LABEL: sil [ossa] @struct_test5 :
 // CHECK: struct $NonTrivialStruct
-// CHECK-NOT: struct $NonTrivialStruct
+// CHECK: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'struct_test5'
-// SWIFT-CSE-LABEL: sil [ossa] @struct_test5 :
-// SWIFT-CSE: struct $NonTrivialStruct
-// SWIFT-CSE: struct $NonTrivialStruct
-// SWIFT-CSE-LABEL: } // end sil function 'struct_test5'
 sil [ossa] @struct_test5 : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
 bb0(%0 : @guaranteed $Klass):
   %copy0 = copy_value %0 : $Klass
@@ -598,13 +488,9 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @struct_extract_test1 :
-// CHECK:       struct_extract
-// TODO-CHECK-NOT:   struct_extract
+// CHECK: struct_extract
+// CHECK: struct_extract
 // CHECK-LABEL: } // end sil function 'struct_extract_test1'
-// SWIFT-CSE-LABEL: sil [ossa] @struct_extract_test1 :
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE-LABEL: } // end sil function 'struct_extract_test1'
 sil [ossa] @struct_extract_test1 : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
 bb0(%0 : @owned $NonTrivialStruct):
   %borrow0 = begin_borrow %0 : $NonTrivialStruct
@@ -624,10 +510,6 @@ bb0(%0 : @owned $NonTrivialStruct):
 // CHECK: struct_extract
 // CHECK-NOT: struct_extract
 // CHECK-LABEL: } // end sil function 'struct_extract_test2'
-// SWIFT-CSE-LABEL: sil [ossa] @struct_extract_test2 :
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE-NOT: struct_extract
-// SWIFT-CSE-LABEL: } // end sil function 'struct_extract_test2'
 sil [ossa] @struct_extract_test2 : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 bb0(%0 : @guaranteed $NonTrivialStruct):
   %1 = struct_extract %0 : $NonTrivialStruct, #NonTrivialStruct.val
@@ -644,10 +526,6 @@ bb0(%0 : @guaranteed $NonTrivialStruct):
 // CHECK: struct_extract
 // CHECK-NOT: struct_extract
 // CHECK-LABEL: } // end sil function 'struct_extract_test3'
-// SWIFT-CSE-LABEL: sil [ossa] @struct_extract_test3 :
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE-NOT: struct_extract
-// SWIFT-CSE-LABEL: } // end sil function 'struct_extract_test3'
 sil [ossa] @struct_extract_test3 : $@convention(thin) (@guaranteed StructWithEnum) -> () {
 bb0(%0 : @guaranteed $StructWithEnum):
   %1 = struct_extract %0 : $StructWithEnum, #StructWithEnum.val
@@ -678,15 +556,10 @@ bb6:
   return %res : $()
 }
 
-// This CSE test will need the OSSA rauw utility to split edges
 // CHECK-LABEL: sil [ossa] @struct_extract_test4 :
 // CHECK: struct_extract
 // CHECK-NOT: struct_extract
 // CHECK-LABEL: } // end sil function 'struct_extract_test4'
-// SWIFT-CSE-LABEL: sil [ossa] @struct_extract_test4 :
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE-NOT: struct_extract
-// SWIFT-CSE-LABEL: } // end sil function 'struct_extract_test4'
 sil [ossa] @struct_extract_test4 : $@convention(thin) (@guaranteed StructWithEnum2) -> () {
 bb0(%0 : @guaranteed $StructWithEnum2):
   %1 = struct_extract %0 : $StructWithEnum2, #StructWithEnum2.val
@@ -719,21 +592,12 @@ struct RecurStruct {
   var val:NonTrivialStruct
 }
 
-// Test to make sure we do not crash on a use after free when the branch instructions in bb1 and bb2 are deleted
-//
-// FIXME: Fix OwnershipRAUW to handle guaranteed uses of the old CSE'd
-// value that are reborrows. The reborrowed uses are not dominated by
-// the old value, but they are still within the new values borrow scope.
-//
 // CHECK-LABEL: sil [ossa] @test_useafterfreeinrauw :
 // CHECK: bb0
 // CHECK: struct_extract
-// FIXME-CHECK-NOT: struct_extract
+// CHECK-NOT: struct_extract
 // CHECK: cond_br
 // CHECK-LABEL: } // end sil function 'test_useafterfreeinrauw'
-// SWIFT-CSE-LABEL: sil [ossa] @test_useafterfreeinrauw :
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE-LABEL: } // end sil function 'test_useafterfreeinrauw'
 sil [ossa] @test_useafterfreeinrauw : $@convention(thin) (@guaranteed RecurStruct) -> @owned NonTrivialStruct {
 bb0(%0 : @guaranteed $RecurStruct):
   %1 = struct_extract %0, #RecurStruct.val
@@ -755,18 +619,13 @@ bb3(%9 : @guaranteed $Klass):
   return %11
 }
 
-// Test to make sure we clear the context if we fail while checking if ownership rauw is possible
 // CHECK-LABEL: sil [ossa] @test_rauwfailsandthensucceeds :
 // CHECK: bb0
 // CHECK: struct_extract
-// TODO-CHECK: struct_extract
+// CHECK-NOT: struct_extract
 // CHECK: struct $_SliceBuffer
 // TODO-CHECK-NOT: struct $_SliceBuffer
 // CHECK-LABEL: } // end sil function 'test_rauwfailsandthensucceeds'
-// SWIFT-CSE-LABEL: sil [ossa] @test_rauwfailsandthensucceeds :
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE: struct $_SliceBuffer
-// SWIFT-CSE-LABEL: } // end sil function 'test_rauwfailsandthensucceeds'
 sil [ossa] @test_rauwfailsandthensucceeds : $@convention(method) <Element> (UnsafeMutablePointer<Element>, @guaranteed _ContiguousArrayBuffer<Element>, Int, UInt) -> @owned _SliceBuffer<Element> {
 bb0(%0 : $UnsafeMutablePointer<Element>, %1 : @guaranteed $_ContiguousArrayBuffer<Element>, %2 : $Int, %3 : $UInt):
   %4 = struct_extract %1 : $_ContiguousArrayBuffer<Element>, #_ContiguousArrayBuffer._storage
@@ -792,16 +651,11 @@ bb0(%0 : $UnsafeMutablePointer<Element>, %1 : @guaranteed $_ContiguousArrayBuffe
 
 sil [ossa] @use_word1 : $@convention(thin) (@inout _UnsafeBitset.Word) -> ()
 
-// TODO: Disable the TODO check when rauw address users correctly replaces all uses of the old ref_tail_addr with the new ref_tail_addr.
+// TODO: Enable when rauw address users correctly replaces all uses of the old ref_tail_addr with the new ref_tail_addr.
 // CHECK-LABEL: sil [ossa] @test_reftailaddr :
-// CHECK: bb0
 // CHECK: ref_tail_addr
 // TODO-CHECK-NOT: ref_tail_addr
 // CHECK-LABEL: } // end sil function 'test_reftailaddr'
-// SWIFT-CSE-LABEL: sil [ossa] @test_reftailaddr :
-// SWIFT-CSE: ref_tail_addr
-// SWIFT-CSE: ref_tail_addr
-// SWIFT-CSE-LABEL: } // end sil function 'test_reftailaddr'
 sil [ossa] @test_reftailaddr : $@convention(thin) (@owned __RawSetStorage) -> () {
 bb0(%0 : @owned $__RawSetStorage):
   %func  = function_ref @use_word1 : $@convention(thin) (@inout _UnsafeBitset.Word) -> ()
@@ -829,14 +683,9 @@ class WrapperKlass {
 sil [ossa] @use_object : $@convention(thin) (@inout Builtin.NativeObject) -> ()
 
 // CHECK-LABEL: sil [ossa] @test_refelementaddr :
-// CHECK: bb0
 // CHECK: ref_element_addr
-// CHECK-NOT: ref_element_addr
+// CHECK: ref_element_addr
 // CHECK-LABEL: } // end sil function 'test_refelementaddr'
-// SWIFT-CSE-LABEL: sil [ossa] @test_refelementaddr :
-// SWIFT-CSE: ref_element_addr
-// SWIFT-CSE: ref_element_addr
-// SWIFT-CSE-LABEL: } // end sil function 'test_refelementaddr'
 sil [ossa] @test_refelementaddr : $@convention(thin) (@guaranteed WrapperKlass) -> () {
 bb0(%0 : @guaranteed $WrapperKlass):
   %func  = function_ref @use_object : $@convention(thin) (@inout Builtin.NativeObject) -> ()
@@ -852,19 +701,15 @@ bb0(%0 : @guaranteed $WrapperKlass):
   return %res : $()
 }
 
-// CHECK-LABEL: sil [ossa] @test_refelementaddr_loop : {{.*}} {
-// CHECK:         ref_element_addr
-// CHECK:         ref_element_addr
+// CHECK-LABEL: sil [ossa] @test_refelementaddr_loop :
+// CHECK: ref_element_addr
+// CHECK: ref_element_addr
 // CHECK-LABEL: } // end sil function 'test_refelementaddr_loop'
-// SWIFT-CSE-LABEL: sil [ossa] @test_refelementaddr_loop :
-// SWIFT-CSE: ref_element_addr
-// SWIFT-CSE: ref_element_addr
-// SWIFT-CSE-LABEL: } // end sil function 'test_refelementaddr_loop'
 sil [ossa] @test_refelementaddr_loop : $@convention(thin) () -> () {
 bb0:
   %2 = apply undef() : $@convention(thin) () -> @owned WrapperKlass
   %3 = move_value [lexical] [var_decl] %2 : $WrapperKlass
-  br bb1 
+  br bb1
 
 bb1:
   %func  = function_ref @use_object : $@convention(thin) (@inout Builtin.NativeObject) -> ()
@@ -890,11 +735,11 @@ sil [ossa] @use_word2 : $@convention(thin) (@inout Builtin.Word) -> ()
 
 /*
 // TODO: Enable this test after the verifier correctly handles the case a ref_tail_addr's result is used in an unchecked_addr_cast
-// TODOCHECK-LABEL: sil [ossa] @test_uncheckedaddrcast :
-// TODOCHECK: bb0
-// TODOCHECK: unchecked_addr_cast
+// TODO-CHECK-LABEL: sil [ossa] @test_uncheckedaddrcast :
+// TODO-CHECK: bb0
+// TODO-CHECK: unchecked_addr_cast
 // TODO-CHECK-NOT: unchecked_addr_cast
-// TODOCHECK-LABEL: } // end sil function 'test_uncheckedaddrcast'
+// TODO-CHECK-LABEL: } // end sil function 'test_uncheckedaddrcast'
 sil [ossa] @test_reftailaddr : $@convention(thin) (@owned __RawSetStorage) -> () {
 bb0(%0 : @owned $__RawSetStorage):
   %func = function_ref @use_word2 : $@convention(thin) (@inout Builtin.Word) -> ()
@@ -921,14 +766,9 @@ bb0(%0 : @owned $__RawSetStorage):
 sil [ossa] @use_bridgeobject : $@convention(thin) (Builtin.BridgeObject) -> ()
 
 // CHECK-LABEL: sil [ossa] @test_valuetobridgeobject :
-// CHECK: bb0
 // CHECK: value_to_bridge_object
 // CHECK: value_to_bridge_object
 // CHECK-LABEL: } // end sil function 'test_valuetobridgeobject'
-// SWIFT-CSE-LABEL: sil [ossa] @test_valuetobridgeobject :
-// SWIFT-CSE: value_to_bridge_object
-// SWIFT-CSE: value_to_bridge_object
-// SWIFT-CSE-LABEL: } // end sil function 'test_valuetobridgeobject'
 sil [ossa] @test_valuetobridgeobject : $@convention(thin) (@guaranteed WrapperKlass) -> () {
 bb0(%0 : @guaranteed $WrapperKlass):
   %func  = function_ref @use_bridgeobject : $@convention(thin) (Builtin.BridgeObject) -> ()
@@ -944,12 +784,8 @@ bb0(%0 : @guaranteed $WrapperKlass):
 
 // CHECK-LABEL: sil [ossa] @cse_upcast_loop :
 // CHECK: upcast
-// CHECK-NOT: upcast
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'cse_upcast_loop'
-// SWIFT-CSE-LABEL: sil [ossa] @cse_upcast_loop :
-// SWIFT-CSE: upcast
-// SWIFT-CSE: upcast
-// SWIFT-CSE-LABEL: } // end sil function 'cse_upcast_loop'
 sil [ossa] @cse_upcast_loop : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   %func  = function_ref @use_superklass1 : $@convention(thin) (@owned SuperKlass) -> ()
@@ -975,14 +811,9 @@ bb3:
 
 // CHECK-LABEL: sil [ossa] @cse_select_enum2 :
 // CHECK: select_enum
-// CHECK-NOT: select_enum
+// CHECK: select_enum
 // CHECK: tuple
 // CHECK-LABEL: } // end sil function 'cse_select_enum2'
-// SWIFT-CSE-LABEL: sil [ossa] @cse_select_enum2 :
-// SWIFT-CSE: select_enum
-// SWIFT-CSE: select_enum
-// SWIFT-CSE: tuple
-// SWIFT-CSE-LABEL: } // end sil function 'cse_select_enum2'
 sil [ossa] @cse_select_enum2 : $@convention(thin) (@guaranteed FakeOptional) -> (Builtin.Int1, Builtin.Int1) {
 bb0(%0 : @guaranteed $FakeOptional):
   %t = integer_literal $Builtin.Int1, 1
@@ -997,12 +828,8 @@ bb0(%0 : @guaranteed $FakeOptional):
 
 // CHECK-LABEL: sil [ossa] @enum_cse2 :
 // CHECK: enum $FakeOptional, #FakeOptional.some!enumelt
-// CHECK-NOT: enum $FakeOptional, #FakeOptional.some!enumelt
+// CHECK: enum $FakeOptional, #FakeOptional.some!enumelt
 // CHECK-LABEL: } // end sil function 'enum_cse2'
-// SWIFT-CSE-LABEL: sil [ossa] @enum_cse2 :
-// SWIFT-CSE: enum $FakeOptional, #FakeOptional.some!enumelt
-// SWIFT-CSE: enum $FakeOptional, #FakeOptional.some!enumelt
-// SWIFT-CSE-LABEL: } // end sil function 'enum_cse2'
 sil [ossa] @enum_cse2 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %func = function_ref @unknown_fake_optional_user : $@convention(thin) (FakeOptional) -> ()
@@ -1022,18 +849,10 @@ class TestKlass {
 
 sil [ossa] @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 
-// An interior pointer, struct_element_addr, can be reused during an
-// OSSA/RAUW because its new uses are within the borrowed value
-// (function argument %0).
-//
 // CHECK-LABEL: sil [ossa] @cse_ossa_interioruseswithinarg :
 // CHECK: struct_element_addr
 // CHECK-NOT: struct_element_addr
 // CHECK-LABEL: } // end sil function 'cse_ossa_interioruseswithinarg'
-// SWIFT-CSE-LABEL: sil [ossa] @cse_ossa_interioruseswithinarg :
-// SWIFT-CSE: struct_element_addr
-// SWIFT-CSE-NOT: struct_element_addr
-// SWIFT-CSE-LABEL: } // end sil function 'cse_ossa_interioruseswithinarg'
 sil [ossa] @cse_ossa_interioruseswithinarg : $@convention(thin) (@guaranteed TestKlass) -> () {
 bb0(%0 : @guaranteed $TestKlass):
   %1 = ref_element_addr %0 : $TestKlass, #TestKlass.testStruct
@@ -1052,18 +871,10 @@ bb0(%0 : @guaranteed $TestKlass):
   return %139 : $()
 }
 
-// An interior pointer, struct_element_addr, cannot be reused without
-// cloning the access scope, which we don't do. The two
-// struct_element_addr's are not currently considered equivalent.
-//
 // CHECK-LABEL: sil [ossa] @cse_ossa_outsideaccessscope :
 // CHECK: struct_element_addr
 // CHECK: struct_element_addr
 // CHECK-LABEL: } // end sil function 'cse_ossa_outsideaccessscope'
-// SWIFT-CSE-LABEL: sil [ossa] @cse_ossa_outsideaccessscope :
-// SWIFT-CSE: struct_element_addr
-// SWIFT-CSE: struct_element_addr
-// SWIFT-CSE-LABEL: } // end sil function 'cse_ossa_outsideaccessscope'
 sil [ossa] @cse_ossa_outsideaccessscope : $@convention(thin) (@guaranteed TestKlass) -> () {
 bb0(%0 : @guaranteed $TestKlass):
   %1 = ref_element_addr %0 : $TestKlass, #TestKlass.testStruct
@@ -1096,10 +907,6 @@ sil [ossa] @use_address : $@convention(thin) (@in_guaranteed X) -> ()
 // CHECK: global_addr
 // CHECK-NOT: global_addr
 // CHECK-LABEL: } // end sil function 'cse_ossa_validrauwfollowinvalidrauw'
-// SWIFT-CSE-LABEL: sil [ossa] @cse_ossa_validrauwfollowinvalidrauw :
-// SWIFT-CSE: global_addr
-// SWIFT-CSE-NOT: global_addr
-// SWIFT-CSE-LABEL: } // end sil function 'cse_ossa_validrauwfollowinvalidrauw'
 sil [ossa] @cse_ossa_validrauwfollowinvalidrauw : $@convention(thin) (@guaranteed TestKlass) -> () {
 bb0(%0 : @guaranteed $TestKlass):
   %1 = function_ref @use_address : $@convention(thin) (@in_guaranteed X) -> ()
@@ -1130,11 +937,8 @@ struct WrapperStruct {
 
 // CHECK-LABEL: sil [ossa] @cse_ossa_utilstest :
 // CHECK: ref_element_addr
-// CHECK: ref_element_addr
+// CHECK-NOT: ref_element_addr
 // CHECK-LABEL: } // end sil function 'cse_ossa_utilstest'
-// SWIFT-CSE-LABEL: sil [ossa] @cse_ossa_utilstest :
-// SWIFT-CSE: ref_element_addr
-// SWIFT-CSE-LABEL: } // end sil function 'cse_ossa_utilstest'
 sil [ossa] @cse_ossa_utilstest : $@convention(thin) (@guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct):
 %f = function_ref @use_nontrivialstruct3 : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
@@ -1160,16 +964,10 @@ return %res : $()
 sil [ossa] @use : $@convention(thin) (@sil_unmanaged Klass) -> ()
 sil [ossa] @getKlass : $@convention(thin) () -> (@owned Klass)
 
-// Tests to make sure cse does not eliminate non-owned, non-guaranteed redundant values
-// by looking through ownership instructions.
 // CHECK-LABEL: sil [ossa] @test_ref_to_unmanaged :
 // CHECK: ref_to_unmanaged
 // CHECK: ref_to_unmanaged
 // CHECK-LABEL: } // end sil function 'test_ref_to_unmanaged'
-// SWIFT-CSE-LABEL: sil [ossa] @test_ref_to_unmanaged :
-// SWIFT-CSE: ref_to_unmanaged
-// SWIFT-CSE: ref_to_unmanaged
-// SWIFT-CSE-LABEL: } // end sil function 'test_ref_to_unmanaged'
 sil [ossa] @test_ref_to_unmanaged : $@convention(thin) () -> () {
 bb0:
  %f1 = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
@@ -1190,13 +988,9 @@ bb0:
 // CHECK: ref_tail_addr
 // CHECK: ref_tail_addr
 // CHECK-LABEL: } // end sil function 'test_aggreate_tail_addr'
-// SWIFT-CSE-LABEL: sil [ossa] @test_aggreate_tail_addr :
-// SWIFT-CSE: ref_tail_addr
-// SWIFT-CSE: ref_tail_addr
-// SWIFT-CSE-LABEL: } // end sil function 'test_aggreate_tail_addr'
 sil [ossa] @test_aggreate_tail_addr : $@convention(thin) (@owned _NativeDictionary<Int, Klass>) -> () {
 bb0(%0 : @owned $_NativeDictionary<Int, Klass>):
-  %49 = move_value [lexical] %0 : $_NativeDictionary<Int, Klass> 
+  %49 = move_value [lexical] %0 : $_NativeDictionary<Int, Klass>
   %50 = begin_borrow %49
   %51 = struct_extract %50, #_NativeDictionary._storage
   %52 = copy_value %51
@@ -1220,19 +1014,15 @@ struct Pointer<Element> {
 
 struct Wrapper {
   let k: Klass
-  var ptr: Pointer<Klass> 
+  var ptr: Pointer<Klass>
 }
 
 sil @use_wrapper : $@convention(thin) (@in_guaranteed Wrapper) -> ()
 
-// CHECK-LABEL: sil [ossa] @testMarkDepNonEscAddressValue : $@convention(thin) (@in Wrapper) -> () {
+// CHECK-LABEL: sil [ossa] @testMarkDepNonEscAddressValue :
 // CHECK: mark_dependence
 // CHECK: mark_dependence
 // CHECK-LABEL: } // end sil function 'testMarkDepNonEscAddressValue'
-// SWIFT-CSE-LABEL: sil [ossa] @testMarkDepNonEscAddressValue :
-// SWIFT-CSE: mark_dependence
-// SWIFT-CSE: mark_dependence
-// SWIFT-CSE-LABEL: } // end sil function 'testMarkDepNonEscAddressValue'
 sil [ossa] @testMarkDepNonEscAddressValue : $@convention(thin) (@in Wrapper) -> () {
 bb0(%0 : $*Wrapper):
   %f = function_ref @use_wrapper : $@convention(thin) (@in_guaranteed Wrapper) -> ()
@@ -1261,16 +1051,10 @@ bb0(%0 : $*Wrapper):
 
 sil @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
 
-// Both CopyPropagation and CopyToBorrow cannot eliminate the copy generated by
-// OSSA RAUW if we look through ownership instructions while CSE'ing
 // CHECK-LABEL: sil [ossa] @struct_copy_test1 :
 // CHECK: struct_extract
 // CHECK: struct_extract
 // CHECK-LABEL: } // end sil function 'struct_copy_test1'
-// SWIFT-CSE-LABEL: sil [ossa] @struct_copy_test1 :
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE-LABEL: } // end sil function 'struct_copy_test1'
 sil [ossa] @struct_copy_test1 : $@convention(thin) (@owned NonTrivialStruct) -> () {
 bb0(%0 : @owned $NonTrivialStruct):
   %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
@@ -1287,16 +1071,10 @@ bb0(%0 : @owned $NonTrivialStruct):
   return %res : $()
 }
 
-// Both CopyPropagation and CopyToBorrow cannot eliminate the copy generated by
-// OSSA RAUW if we look through ownership instructions while CSE'ing
 // CHECK-LABEL: sil [ossa] @struct_copy_test2 :
 // CHECK: struct_extract
 // CHECK: struct_extract
 // CHECK-LABEL: } // end sil function 'struct_copy_test2'
-// SWIFT-CSE-LABEL: sil [ossa] @struct_copy_test2 :
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE-LABEL: } // end sil function 'struct_copy_test2'
 sil [ossa] @struct_copy_test2 : $@convention(thin) () -> () {
 bb0:
   %f1 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
@@ -1315,8 +1093,6 @@ bb0:
   return %res : $()
 }
 
-// testMoveEnumChangesOwnership requires HasOptC and HasOptC to declare
-// their properties with @_hasStorage.
 public struct HasOptKlass {
   @_hasStorage let c: Klass? { get }
 }
@@ -1325,17 +1101,13 @@ public struct HasOptKlassHolder {
   @_hasStorage public var hasOptKlass: HasOptKlass { get set }
 }
 
-// CHECK-LABEL: sil [ossa] @testMoveEnumChangesOwnership : $@convention(thin) () -> () {
-// CHECK:   [[E1:%[0-9]+]] = enum $Optional<Klass>, #Optional.none!enumelt
-// CHECK:   [[MV1:%[0-9]+]] = move_value [lexical] [[E1]] : $Optional<Klass>
-// CHECK:   [[S:%[0-9]+]] = struct $HasOptKlass (%0 : $Optional<Klass>)
-// CHECK:   store [[S]] to [init]
-// CHECK:   destroy_value [[MV1]] : $Optional<Klass>
-// CHECK:   [[MV2:%[0-9]+]] = move_value [lexical] [[S]] : $HasOptKlass
-// CHECK:   store [[MV2]] to [assign]
-// CHECK: } // end sil function 'testMoveEnumChangesOwnership'
-// SWIFT-CSE-LABEL: sil [ossa] @testMoveEnumChangesOwnership :
-// SWIFT-CSE-LABEL: } // end sil function 'testMoveEnumChangesOwnership'
+// CHECK-LABEL: sil [ossa] @testMoveEnumChangesOwnership :
+// CHECK: enum $Optional<Klass>, #Optional.none!enumelt
+// CHECK: struct $HasOptKlass
+// CHECK: store {{%[0-9]+}} to [init]
+// CHECK: struct $HasOptKlass
+// CHECK: store {{%[0-9]+}} to [assign]
+// CHECK-LABEL: } // end sil function 'testMoveEnumChangesOwnership'
 sil [ossa] @testMoveEnumChangesOwnership : $@convention(thin) () -> () {
 bb0:
   %0 = enum $Optional<Klass>, #Optional.none!enumelt
@@ -1355,19 +1127,12 @@ bb0:
   return %13
 }
 
-/// A scenario where a borrow of a copy is introduced but the cfg is such that
-/// no end_borrows are inserted for the borrow.  The copy must still be
-/// destroyed.
+// The Swift CSE pass handles this cleanly: it replaces the second
+// struct_extract with the first without needing copy_value/destroy_value.
 // CHECK-LABEL: sil [ossa] @no_boundary_for_end_borrows : {{.*}} {
-// TODO: There shouldn't actually be a copy_value here, but lifetime transfer
-//       APIs are written and OSSARAUWHelper is in use, there will be.
-//       Even then, this test case shouldn't crash.
-// CHECK:         copy_value
-// CHECK:         destroy_value
+// CHECK: struct_extract
+// CHECK-NOT: struct_extract
 // CHECK-LABEL: } // end sil function 'no_boundary_for_end_borrows'
-// SWIFT-CSE-LABEL: sil [ossa] @no_boundary_for_end_borrows :
-// SWIFT-CSE: struct_extract
-// SWIFT-CSE-LABEL: } // end sil function 'no_boundary_for_end_borrows'
 sil [ossa] @no_boundary_for_end_borrows : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 entry(%s : @guaranteed $NonTrivialStruct):
   %c1 = struct_extract %s : $NonTrivialStruct, #NonTrivialStruct.val
