@@ -2063,6 +2063,10 @@ SolutionResult ConstraintSystem::salvage() {
     // Solve the system.
     solveImpl(viable);
 
+    // We have to keep solverState around for diagnoseAmbiguityWithFixes(),
+    // but we should not record any more changes from this point on.
+    state.Trail.close();
+
     // If we hit a threshold, we're done.
     if (isTooComplex(viable))
       return SolutionResult::forTooComplex(getTooComplexRange());

@@ -329,7 +329,7 @@ struct PotentialBindings {
     return Protocols;
   }
 
-  void inferFromLiteral(Constraint *literal);
+  void inferFromLiteral(Constraint *literal, bool recordChange=true);
 
   /// Attempt to infer a new binding and other useful information
   /// (i.e. whether bindings should be delayed) from the given

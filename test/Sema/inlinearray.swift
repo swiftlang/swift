@@ -159,3 +159,12 @@ func testPointerConversion() {
 }
 
 func acceptPointer(_ pointer: UnsafeMutablePointer<Int>) {}
+
+// rdar://152143989
+struct Test3<let count1: Int> {
+  init(value1: InlineArray<count1, Int>) {}
+}
+struct Test1<T> { init(test2: T) {} }
+
+let _ = Test1<Test3>(test2: Test3(value1: ["x"]))
+// expected-error@-1 {{cannot convert value of type 'String' to expected element type 'Int'}}
