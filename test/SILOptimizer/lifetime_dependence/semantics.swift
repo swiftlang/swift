@@ -268,6 +268,18 @@ func f(x: NotEscapable) -> NotEscapable {
   return local // expected-note {{this use causes the lifetime-dependent value to escape}}
 }
 
+// Test Optional<~E> 'var' properties.
+// The initializer expressions (which return 'nil') should be considered immortal.
+struct OptionalVarInit<Element: ~Escapable>: ~Escapable {
+  var e1: Element? = nil
+  var e2: Element? = nil
+
+  @_lifetime(copy e)
+  init(e: Element) {
+    e1 = e
+  }
+}
+
 // =============================================================================
 // Scoped dependence on values
 // =============================================================================
