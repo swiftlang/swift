@@ -340,12 +340,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
 
         expr = boolExpr;
       } else {
-        auto *intExpr =
-            new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
-                                             /*Implicit=*/true);
-
         auto *intDecl = literalType->getAnyNominal();
-        auto initRef = context.getIntBuiltinInitDecl(intDecl);
         // The resolved literal type may not be a primitive integer — for
         // example, when a `swift_wrapper(struct)` is layered on a typedef
         // whose underlying type is itself imported as a wrapper struct
@@ -353,14 +348,27 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
         // `ExpressibleByBuiltinIntegerLiteral` conformance to look up.
         // Bail out and let the caller import the constant as an external
         // declaration instead of asserting.
+        auto initRef = context.getIntBuiltinInitDecl(intDecl);
         if (!initRef)
           return nullptr;
+
+        auto *intExpr =
+            new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
+                                             /*Implicit=*/true);
+
         intExpr->setBuiltinInitializer(initRef);
         intExpr->setType(literalType);
 
         expr = intExpr;
       }
     } else {
+      auto *floatDecl = literalType->getAnyNominal();
+      // See the integer case above: the resolved literal type may not have
+      // an `ExpressibleByBuiltinFloatLiteral` conformance.
+      auto initRef = context.getFloatBuiltinInitDecl(floatDecl);
+      if (!initRef)
+        return nullptr;
+
       auto *floatExpr =
           new (context) FloatLiteralExpr(printedValueCopy, SourceLoc(),
                                          /*Implicit=*/true);
@@ -368,12 +376,6 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
       auto maxFloatTypeDecl = context.get_MaxBuiltinFloatTypeDecl();
       floatExpr->setBuiltinType(maxFloatTypeDecl->getUnderlyingType());
 
-      auto *floatDecl = literalType->getAnyNominal();
-      auto initRef = context.getFloatBuiltinInitDecl(floatDecl);
-      // See the integer case above: the resolved literal type may not have
-      // an `ExpressibleByBuiltinFloatLiteral` conformance.
-      if (!initRef)
-        return nullptr;
       floatExpr->setBuiltinInitializer(initRef);
       floatExpr->setType(literalType);
 
