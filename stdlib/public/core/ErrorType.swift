@@ -111,10 +111,10 @@ import SwiftShims
 ///     }
 ///     // Prints "Parsing error: mismatchedTag [19:5]"
 public protocol Error: Sendable {
-#if !$Embedded
   var _domain: String { get }
   var _code: Int { get }
 
+#if !$Embedded
   // Note: _userInfo is always an NSDictionary, but we cannot use that type here
   // because the standard library cannot depend on Foundation. However, the
   // underscore implies that we control all implementations of this requirement.
@@ -272,12 +272,12 @@ public func _errorInMainTyped<Failure: Error>(_ error: Failure) -> Never {
 @_silgen_name("_swift_stdlib_getDefaultErrorCode")
 public func _getDefaultErrorCode<T: Error>(_ error: T) -> Int
 
-#if !$Embedded
 extension Error {
   public var _code: Int {
     return _getDefaultErrorCode(self)
   }
 
+#if !$Embedded
   public var _domain: String {
     return _typeName(type(of: self), qualified: true)
   }
@@ -289,8 +289,12 @@ extension Error {
     return nil
 #endif
   }
-}
+#else
+  public var _domain: String {
+    return ""
+  }
 #endif
+}
 
 extension Error where Self: RawRepresentable, Self.RawValue: FixedWidthInteger {
   // The error code of Error with integral raw values is the raw value.
