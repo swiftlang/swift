@@ -14,6 +14,7 @@ list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
 
 include(SwiftProjectVersion)
+include(SwiftAddWindowsVersionResource)
 project(SwiftDifferentiation
   LANGUAGES Swift C
   VERSION ${SWIFT_RUNTIME_VERSION})
@@ -115,6 +116,7 @@ add_library(swift_Differentiation
   TgmathDerivatives.swift
   FloatingPointDifferentiation.swift
   linker-support/magic-symbols-for-install-name.c)
+swift_add_windows_version_resource(swift_Differentiation)
 
 if(APPLE AND BUILD_SHARED_LIBS)
   target_link_options(swift_Differentiation PRIVATE

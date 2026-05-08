@@ -1,6 +1,7 @@
 
 add_library(swiftWinSDK
   WinSDK.swift)
+swift_add_windows_version_resource(swiftWinSDK)
 set_target_properties(swiftWinSDK PROPERTIES
   Swift_MODULE_NAME WinSDK)
 target_compile_definitions(swiftWinSDK PRIVATE

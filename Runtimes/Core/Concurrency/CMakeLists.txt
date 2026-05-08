@@ -97,6 +97,7 @@ add_library(swift_Concurrency
   "${CMAKE_CURRENT_BINARY_DIR}/Task+init.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")
+swift_add_windows_version_resource(swift_Concurrency)
 
 if(SwiftCore_ENABLE_STDLIB_TRACING)
   target_compile_definitions(swift_Concurrency

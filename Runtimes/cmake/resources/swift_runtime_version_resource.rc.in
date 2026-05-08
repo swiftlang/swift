@@ -1,0 +1,46 @@
+//===--- swift_runtime_version_resource.rc.in ---------------------------===//
+//
+// This source file is part of the Swift open source project
+//
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===---------------------------------------------------------------------===//
+//
+// Microsoft VC resource script template embedding `VS_VERSIONINFO` into
+// the PE binaries built by `swift_add_windows_version_resource()`.
+// Configured (via `configure_file(... @ONLY)`) into a per-target staged
+// .rc by `cmake/modules/SwiftAddWindowsVersionResource.cmake`.
+//
+// VS_VERSIONINFO format reference:
+//   https://learn.microsoft.com/windows/win32/menurc/vs-versioninfo
+
+1 VERSIONINFO
+FILEVERSION    @SWIFT_RC_VERSION_MAJOR@,@SWIFT_RC_VERSION_MINOR@,@SWIFT_RC_VERSION_PATCH@,@SWIFT_RC_VERSION_TWEAK@
+PRODUCTVERSION @SWIFT_RC_VERSION_MAJOR@,@SWIFT_RC_VERSION_MINOR@,@SWIFT_RC_VERSION_PATCH@,@SWIFT_RC_VERSION_TWEAK@
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    // U.S. English (langID 0x0409), UTF-8 (codepage 0xFDE9 == 65001)
+    BLOCK "0409FDE9"
+    BEGIN
+      VALUE "CompanyName",      "Swift Open Source Project"
+      VALUE "FileDescription",  "@SWIFT_RC_FILE_DESCRIPTION@"
+      VALUE "FileVersion",      "@SWIFT_RC_VERSION_STRING@"
+      VALUE "InternalName",     "@SWIFT_RC_INTERNAL_NAME@"
+      VALUE "LegalCopyright",   "Copyright (c) Apple Inc. and the Swift project authors. Licensed under Apache License v2.0 with Runtime Library Exception."
+      VALUE "OriginalFilename", "@SWIFT_RC_ORIGINAL_FILENAME@"
+      VALUE "ProductName",      "@SWIFT_RC_PRODUCT_NAME@"
+      VALUE "ProductVersion",   "@SWIFT_RC_VERSION_STRING@"
+    END
+  END
+
+  BLOCK "VarFileInfo"
+  BEGIN
+    // Translation must match the StringFileInfo BLOCK key above.
+    VALUE "Translation", 0x0409, 0xFDE9
+  END
+END

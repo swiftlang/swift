@@ -5,6 +5,7 @@ add_library(swiftRegexBuilder
   Algorithms.swift
   Variadics.swift
   DSL.swift)
+swift_add_windows_version_resource(swiftRegexBuilder)
 
 set_target_properties(swiftRegexBuilder PROPERTIES
   Swift_MODULE_NAME RegexBuilder)

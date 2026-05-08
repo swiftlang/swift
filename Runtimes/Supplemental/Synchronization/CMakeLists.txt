@@ -15,6 +15,7 @@ list(APPEND CMAKE_MODULE_PATH
 
 include(LanguageVersions)
 include(SwiftProjectVersion)
+include(SwiftAddWindowsVersionResource)
 project(SwiftSynchronization
   LANGUAGES Swift
   VERSION ${SWIFT_RUNTIME_VERSION})
@@ -131,6 +132,7 @@ add_library(swiftSynchronization
   Atomics/AtomicStorage.swift
   Atomics/AtomicIntegers.swift
   Cell.swift)
+swift_add_windows_version_resource(swiftSynchronization)
 
 # Determine Mutex definition
 if(${PROJECT_NAME}_SINGLE_THREADED_MODE)

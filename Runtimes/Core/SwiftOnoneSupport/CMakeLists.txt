@@ -1,6 +1,7 @@
 add_library(swiftSwiftOnoneSupport
   SwiftOnoneSupport.swift
   "${PROJECT_SOURCE_DIR}/linker-support/magic-symbols-for-install-name.c")
+swift_add_windows_version_resource(swiftSwiftOnoneSupport)
 
 set_target_properties(swiftSwiftOnoneSupport PROPERTIES
  Swift_MODULE_NAME SwiftOnoneSupport)

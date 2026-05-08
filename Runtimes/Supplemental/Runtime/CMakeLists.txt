@@ -14,6 +14,7 @@ list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
 
 include(SwiftProjectVersion)
+include(SwiftAddWindowsVersionResource)
 project(SwiftRuntime
   LANGUAGES Swift CXX
   VERSION ${SWIFT_RUNTIME_VERSION})
@@ -129,6 +130,7 @@ add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
 
 add_library(swiftRuntime
   Mangling.swift)
+swift_add_windows_version_resource(swiftRuntime)
 
 # Optionally add backtracing sources
 if(${PROJECT_NAME}_ENABLE_BACKTRACING)

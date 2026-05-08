@@ -264,6 +264,7 @@ add_library(swiftCore
   "${CMAKE_CURRENT_BINARY_DIR}/UnsafeBufferPointer.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/UnsafeRawBufferPointer.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Tuple.swift")
+swift_add_windows_version_resource(swiftCore)
 
 # https://github.com/swiftlang/swift/issues/77705 - Freestanding and Linux/Android builds both have failures to resolve.
 if(NOT LINUX AND NOT ANDROID)

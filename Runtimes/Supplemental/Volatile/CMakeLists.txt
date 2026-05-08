@@ -15,6 +15,7 @@ list(APPEND CMAKE_MODULE_PATH
 
 include(LanguageVersions)
 include(SwiftProjectVersion)
+include(SwiftAddWindowsVersionResource)
 project(SwiftVolatile
   LANGUAGES Swift
   VERSION ${SWIFT_RUNTIME_VERSION})
@@ -86,6 +87,7 @@ add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 add_library(swift_Volatile
   Volatile.swift)
+swift_add_windows_version_resource(swift_Volatile)
 set_target_properties(swift_Volatile PROPERTIES
   Swift_MODULE_NAME _Volatile)
 target_compile_options(swift_Volatile PRIVATE

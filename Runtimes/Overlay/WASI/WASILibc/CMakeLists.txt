@@ -8,6 +8,7 @@ add_library(swiftWASILibc
   tgmath.swift
   TiocConstants.swift
   WASILibc.swift)
+swift_add_windows_version_resource(swiftWASILibc)
 set_target_properties(swiftWASILibc PROPERTIES
   Swift_MODULE_NAME WASILibc)
 target_compile_definitions(swiftWASILibc PRIVATE

@@ -16,6 +16,7 @@ list(APPEND CMAKE_MODULE_PATH
 
 include(LanguageVersions)
 include(SwiftProjectVersion)
+include(SwiftAddWindowsVersionResource)
 project(SwiftStringProcessing
   LANGUAGES Swift C
   VERSION ${SWIFT_RUNTIME_VERSION})

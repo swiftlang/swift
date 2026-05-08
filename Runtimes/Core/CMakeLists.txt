@@ -46,6 +46,7 @@ list(APPEND CMAKE_MODULE_PATH
 include(CMakeWorkarounds)
 
 include(SwiftProjectVersion)
+include(SwiftAddWindowsVersionResource)
 project(SwiftCore
   LANGUAGES C CXX Swift
   VERSION ${SWIFT_RUNTIME_VERSION})

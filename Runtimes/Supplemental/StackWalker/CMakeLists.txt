@@ -8,6 +8,7 @@ list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
 
 include(SwiftProjectVersion)
+include(SwiftAddWindowsVersionResource)
 project(SwiftBacktrace
   LANGUAGES CXX Swift
   VERSION ${SWIFT_RUNTIME_VERSION})
@@ -75,6 +76,7 @@ add_executable(swift-backtrace
   Themes.swift
   Timing.swift
   Utils.swift)
+swift_add_windows_version_resource(swift-backtrace)
 set_target_properties(swift-backtrace PROPERTIES
   Swift_MODULE_NAME swift_backtrace)
 target_compile_options(swift-backtrace PRIVATE

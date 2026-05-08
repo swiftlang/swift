@@ -1,6 +1,7 @@
 
 add_library(swift_math
   Math.swift)
+swift_add_windows_version_resource(swift_math)
 set_target_properties(swift_math PROPERTIES
   Swift_MODULE_NAME _math)
 target_link_libraries(swift_math PRIVATE

@@ -5,6 +5,7 @@ gyb_expand(float.swift.gyb float.swift)
 add_library(swift_Builtin_float
   float.swift
   "${PROJECT_SOURCE_DIR}/linker-support/magic-symbols-for-install-name.c")
+swift_add_windows_version_resource(swift_Builtin_float)
 set_target_properties(swift_Builtin_float PROPERTIES
   Swift_MODULE_NAME _Builtin_float)
 target_compile_options(swift_Builtin_float PRIVATE

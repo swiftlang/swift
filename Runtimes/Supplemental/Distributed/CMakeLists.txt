@@ -15,6 +15,7 @@ list(APPEND CMAKE_MODULE_PATH
 
 include(LanguageVersions)
 include(SwiftProjectVersion)
+include(SwiftAddWindowsVersionResource)
 project(SwiftDistributed
   LANGUAGES C CXX Swift
   VERSION ${SWIFT_RUNTIME_VERSION})
@@ -106,6 +107,7 @@ add_library(swiftDistributed
   DistributedMacros.swift
   DistributedMetadata.swift
   LocalTestingDistributedActorSystem.swift)
+swift_add_windows_version_resource(swiftDistributed)
 
 set_target_properties(swiftDistributed PROPERTIES
   Swift_MODULE_NAME Distributed)

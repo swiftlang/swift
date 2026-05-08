@@ -7,6 +7,7 @@ add_library(swiftAndroid
   Platform.swift
   POSIXError.swift
   TiocConstants.swift)
+swift_add_windows_version_resource(swiftAndroid)
 set_target_properties(swiftAndroid PROPERTIES
   Swift_MODULE_NAME Android)
 target_compile_definitions(swiftAndroid PRIVATE

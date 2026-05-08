@@ -15,6 +15,7 @@ list(APPEND CMAKE_MODULE_PATH
 
 include(LanguageVersions)
 include(SwiftProjectVersion)
+include(SwiftAddWindowsVersionResource)
 project(SwiftObservation
   LANGUAGES Swift CXX
   VERSION ${SWIFT_RUNTIME_VERSION})
@@ -103,6 +104,7 @@ add_library(swiftObservation
   Sources/Observation/Observations.swift
   Sources/Observation/ThreadLocal.swift
   Sources/Observation/ThreadLocal.cpp)
+swift_add_windows_version_resource(swiftObservation)
 set_target_properties(swiftObservation PROPERTIES
   Swift_MODULE_NAME Observation)
 # FIXME: We should split out the parts that are needed by the runtime to avoid

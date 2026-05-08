@@ -19,6 +19,7 @@ if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
 endif()
 
 include(SwiftProjectVersion)
+include(SwiftAddWindowsVersionResource)
 project(SwiftOverlay
   LANGUAGES C CXX Swift
   VERSION ${SWIFT_RUNTIME_VERSION})

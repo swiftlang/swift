@@ -9,6 +9,7 @@ add_library(swiftGlibc
   Platform.swift
   TiocConstants.swift
   tgmath.swift)
+swift_add_windows_version_resource(swiftGlibc)
 
 target_link_libraries(swiftGlibc
   PRIVATE

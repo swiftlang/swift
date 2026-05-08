@@ -7,6 +7,7 @@ add_library(swiftCRT
   Platform.swift
   POSIXError.swift
   TiocConstants.swift)
+swift_add_windows_version_resource(swiftCRT)
 set_target_properties(swiftCRT PROPERTIES
   Swift_MODULE_NAME CRT)
 target_compile_definitions(swiftCRT PRIVATE

@@ -1,6 +1,7 @@
 
 add_library(swiftRemoteMirror
   SwiftRemoteMirror.cpp)
+swift_add_windows_version_resource(swiftRemoteMirror)
 target_compile_definitions(swiftRemoteMirror PUBLIC
   $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:swiftRemoteMirror_STATIC>)
 target_link_libraries(swiftRemoteMirror PRIVATE

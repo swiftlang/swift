@@ -74,6 +74,7 @@ add_library(swift_StringProcessing
   Utility/TypeVerification.swift
   Utility/RegexFactory.swift
   Utility/ASTBuilder.swift)
+swift_add_windows_version_resource(swift_StringProcessing)
 
 set_target_properties(swift_StringProcessing PROPERTIES
   Swift_MODULE_NAME _StringProcessing)

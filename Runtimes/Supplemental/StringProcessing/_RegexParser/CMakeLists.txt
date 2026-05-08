@@ -30,6 +30,7 @@ add_library(swift_RegexParser
   Utility/AllScalars.swift
   Utility/Errors.swift
   Utility/MissingUnicode.swift)
+swift_add_windows_version_resource(swift_RegexParser)
 
 target_link_libraries(swift_RegexParser PRIVATE
   swiftCore
