@@ -1302,6 +1302,11 @@ bool UseAfterSendDiagnosticInferrer::initForSendingPartialApply(
     auto trackableValue = valueMap.getTrackableValue(sendingPAIOp.get());
     if (trackableValue.value.isSendable())
       continue;
+    // Skip nonisolated(unsafe) captures -- the user has opted out of isolation
+    // checking for these values, so they should not be diagnosed as
+    // non-Sendable captures of a sending closure.
+    if (trackableValue.value.getIsolationRegionInfo().isUnsafeNonIsolated())
+      continue;
     nonSendableOps.push_back(&sendingPAIOp);
   }
 
@@ -2195,6 +2200,8 @@ bool SentNeverSendableDiagnosticEmitter::initForSendingPartialApply(
     // value... then we are done. This is a 'correct' error value to emit.
     auto trackableValue = valueMap.getTrackableValue(sendingPAIOp.get());
     if (trackableValue.value.isSendable())
+      continue;
+    if (trackableValue.value.getIsolationRegionInfo().isUnsafeNonIsolated())
       continue;
 
     auto rep = trackableValue.value.getRepresentative().maybeGetValue();
