@@ -559,7 +559,7 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   100)
 
 DECL_ATTR(export, Export,
-    OnVar | OnSubscript | OnAbstractFunction | OnStruct | OnEnum | OnClass,
+    OnVar | OnSubscript | OnAbstractFunction | OnStruct | OnEnum | OnClass | OnExtension,
     ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
     101)
 

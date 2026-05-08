@@ -1826,11 +1826,22 @@ bool LinkEntity::hasNonUniqueDefinition() const {
     return true;
   }
 
-  // Always treat witness tables as having non-unique definitions.
+  // In embedded Swift, witness tables are treated as having non-unique
+  // definitions (so they get linkonce_odr linkage) unless the underlying
+  // conformance was explicitly marked @export(interface).
   if (getKind() == Kind::ProtocolWitnessTable) {
-    if (auto context = getDeclContextForEmission())
-      if (context->getParentModule()->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    if (auto context = getDeclContextForEmission()) {
+      if (context->getParentModule()->getASTContext().LangOpts.hasFeature(
+              Feature::Embedded)) {
+        if (auto *normal = dyn_cast<NormalProtocolConformance>(
+                getProtocolConformance()->getRootConformance())) {
+          if (auto model = normal->getExplicitCodeGenerationModel())
+            if (*model == CodeGenerationModel::Interface)
+              return false;
+        }
         return true;
+      }
+    }
   }
 
   return false;
