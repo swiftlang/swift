@@ -22,7 +22,7 @@
 @available(SwiftStdlib 6.4, *)
 public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~Escapable {
   override associatedtype Element: ~Copyable
-  override associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = CxxBorrowingIterator<Self>
+  override associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element, Never> & ~Copyable & ~Escapable = CxxBorrowingIterator<Self>
   associatedtype RawIterator: UnsafeCxxInputIterator
     where RawIterator.Pointee == Element,
           RawIterator.DereferenceResult: _Pointer,
@@ -37,7 +37,7 @@ public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~E
 
 @frozen
 @available(SwiftStdlib 6.4, *)
-public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol<T.Element>, ~Escapable, ~Copyable where T: CxxBorrowingSequence & ~Copyable & ~Escapable, T.Element: ~Copyable {
+public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol<T.Element, Never>, ~Escapable, ~Copyable where T: CxxBorrowingSequence & ~Copyable & ~Escapable, T.Element: ~Copyable {
 
   @usableFromInline
   internal var current: T.RawIterator

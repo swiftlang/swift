@@ -21,19 +21,24 @@ import StdlibUnittest
 var suite = TestSuite("BorrowingSequence Tests")
 defer { runAllTests() }
 
+enum EE<A: Error, B: Error>: Error {
+  case a(A)
+  case b(B)
+}
+
 @available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable {
+extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable & ~Escapable {
   func reduce<T: ~Copyable>(
     _ initial: consuming T,
-    _ nextPartialResult: @escaping (consuming T, borrowing Element) -> T
-  ) -> T {
+    _ nextPartialResult: @escaping (consuming T, borrowing Element) throws(Failure) -> T
+  ) throws(Failure) -> T {
     var borrowIterator = makeBorrowingIterator()
     var result = initial
     while true {
-      let span = borrowIterator.nextSpan(maximumCount: .max)
+      let span = try borrowIterator.nextSpan(maximumCount: .max)
       if span.isEmpty { break }
       for i in span.indices {
-        result = nextPartialResult(result, span[i])
+        result = try nextPartialResult(result, span[i])
       }
     }
     return result
@@ -41,15 +46,15 @@ extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyab
   
   func reduce<T: ~Copyable>(
     into initial: consuming T,
-    _ nextPartialResult: (inout T, borrowing Element) -> Void
-  ) -> T {
+    _ nextPartialResult: (inout T, borrowing Element) throws(Failure) -> Void
+  ) throws(Failure) -> T {
     var borrowIterator = makeBorrowingIterator()
     var result = initial
     while true {
-      let span = borrowIterator.nextSpan(maximumCount: .max)
+      let span = try borrowIterator.nextSpan(maximumCount: .max)
       if span.isEmpty { break }
       for i in span.indices {
-        nextPartialResult(&result, span[i])
+        try nextPartialResult(&result, span[i])
       }
     }
     return result
@@ -58,11 +63,11 @@ extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyab
 
 @available(SwiftStdlib 6.4, *)
 extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: Copyable {
-  func collectViaBorrowing() -> [Element] {
+  func collectViaBorrowing() throws(Failure) -> [Element] {
     var borrowIterator = makeBorrowingIterator()
     var result: [Element] = []
     while true {
-      let span = borrowIterator.nextSpan(maximumCount: .max)
+      let span = try borrowIterator.nextSpan(maximumCount: .max)
       if span.isEmpty { break }
       for i in span.indices {
         result.append(span[i])
@@ -81,25 +86,25 @@ struct NoncopyableInt: ~Copyable, Equatable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: ~Escapable & ~Copyable, Element: Equatable & ~Copyable {
-  func elementsEqual<S: BorrowingSequence<Element>>(
+extension BorrowingSequence where Self: ~Escapable & ~Copyable, Element: Equatable & ~Copyable & ~Escapable {
+  func elementsEqual<S: BorrowingSequence<Element, Failure>>(
     _ rhs: borrowing S
-  ) -> Bool
-    where S: ~Escapable & ~Copyable, S.Element: ~Copyable
+  ) throws(Failure) -> Bool
+    where S: ~Copyable & ~Escapable, S.Element: ~Copyable & ~Escapable
   {
     var iter1 = makeBorrowingIterator()
     var iter2 = rhs.makeBorrowingIterator()
     while true {
-      var el1 = iter1.nextSpan(maximumCount: .max)
-
+      var el1 = try iter1.nextSpan(maximumCount: .max)
+      
       if el1.isEmpty {
         // LHS is empty - sequences are equal iff RHS is also empty
-        let el2 = iter2.nextSpan(maximumCount: 1)
+        let el2 = try iter2.nextSpan(maximumCount: 1)
         return el2.isEmpty
       }
-
+      
       while el1.count > 0 {
-        let el2 = iter2.nextSpan(maximumCount: el1.count)
+        let el2 = try iter2.nextSpan(maximumCount: el1.count)
         if el2.isEmpty { return false }
         for i in 0..<el2.count {
           if el1[i] != el2[i] { return false }

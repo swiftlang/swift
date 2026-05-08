@@ -12,9 +12,12 @@
 
 /// A type that provides borrowed access to the values of a borrowing sequence.
 @available(SwiftStdlib 6.4, *)
-public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
+public protocol BorrowingIteratorProtocol<Element, Failure>: ~Copyable, ~Escapable {
   associatedtype Element: ~Copyable & ~Escapable
 
+  /// A type representing an error that can occur during iteration.
+  associatedtype Failure: Error = Never
+  
   /// Returns a span over the next group of elements that are ready to by visited,
   /// up to the specifed maximum.
   ///
@@ -55,7 +58,7 @@ public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
   /// example to repeat their contents.
   @_lifetime(&self)
   @_lifetime(self: copy self)
-  mutating func nextSpan(maximumCount: Int) -> Span<Element>
+  mutating func nextSpan(maximumCount: Int) throws(Failure) -> Span<Element>
 
   /// Advances the position of this iterator by the specified offset, or until
   /// the end of the underlying type's elements.
@@ -68,7 +71,7 @@ public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
   ///   enough elements left to skip the requested number of items.
   ///   In that case, the iterator's position is set to the end of the underlying type.
   @_lifetime(self: copy self)
-  mutating func skip(by maximumOffset: Int) -> Int
+  mutating func skip(by maximumOffset: Int) throws(Failure) -> Int
 }
 
 @available(SwiftStdlib 6.4, *)
@@ -79,16 +82,16 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
   @_lifetime(&self)
   @_lifetime(self: copy self)
   @_transparent
-  public mutating func nextSpan() -> Span<Element> {
-    nextSpan(maximumCount: Int.max)
+  public mutating func nextSpan() throws(Failure) -> Span<Element> {
+    try nextSpan(maximumCount: Int.max)
   }
   
   @_alwaysEmitIntoClient
   @_lifetime(self: copy self)
-  public mutating func skip(by offset: Int) -> Int {
+  public mutating func skip(by offset: Int) throws(Failure) -> Int {
     var remainder = offset
     while remainder > 0 {
-      let span = nextSpan(maximumCount: remainder)
+      let span = try nextSpan(maximumCount: remainder)
       if span.isEmpty { break }
       remainder &-= span.count
     }
@@ -100,6 +103,8 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
 public struct SpanIterator<Element>: BorrowingIteratorProtocol, ~Copyable, ~Escapable
   where Element: ~Copyable & ~Escapable
 {
+  public typealias Failure = Never
+  
   @usableFromInline
   internal var _span: Span<Element>
   @usableFromInline
@@ -142,13 +147,16 @@ public struct SpanIterator<Element>: BorrowingIteratorProtocol, ~Copyable, ~Esca
 /// A type that provides sequential, borrowing access to its elements.
 @available(SwiftStdlib 6.4, *)
 @reparentable
-public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
+public protocol BorrowingSequence<Element, Failure>: ~Copyable, ~Escapable {
   /// A type representing the sequence's elements.
   associatedtype Element: ~Copyable & ~Escapable
 
+  /// A type representing an error that can occur during iteration.
+  associatedtype Failure: Error = Never
+  
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
-  associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable
+  associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element, Failure> & ~Copyable & ~Escapable
 
   /// Returns a borrowing iterator over the elements of this sequence.
   @lifetime(borrow self)
