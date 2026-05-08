@@ -2078,5 +2078,31 @@ ActorIsolation SILDeclRef::getActorIsolation() const {
     return cast<VarDecl>(getDecl())->getInitializerIsolation();
   }
 
-  return getActorIsolationOfContext(getInnermostDeclContext());
+  auto isolation = getActorIsolationOfContext(getInnermostDeclContext());
+  if (!isolation.isUnspecified())
+    return isolation;
+
+  // Local computed variable accessors get their isolation from the context.
+  //
+  // TODO: This is a narrow fix for region-based isolation, a proper fix here
+  // would be to set isolation correctly on the variable itself during
+  // type-checking, but that requires significant changes to support closures
+  // because their local declarations are currently type-checked during CSApply.
+  if (auto *accessor = getAccessorDecl()) {
+    auto *dc = accessor->getDeclContext();
+    if (dc->isLocalContext()) {
+      auto contextIsolation =
+          getActorIsolationOfContext(accessor->getDeclContext());
+
+      if (contextIsolation.isNonisolatedOrConcurrent() ||
+          contextIsolation.isNonisolatedNonsending())
+        return accessor->isAsync()
+                   ? ActorIsolation::forNonisolatedConcurrent()
+                   : ActorIsolation::forNonisolated(/*unsafe=*/false);
+
+      return contextIsolation;
+    }
+  }
+
+  return isolation;
 }
