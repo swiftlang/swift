@@ -44,6 +44,16 @@
 // CHECK-LABEL: (pattern_named type="Int" "intBinaryBitwiseOp5")
 // CHECK: (processed_constant_folded_init=integer_literal_expr implicit type="Int" location={{.*}}LiteralOperands.swift:{{[0-9]+}}:{{[0-9]+}} range=[{{.*}}] value="2"
 
+// Signed right shift is arithmetic, preserving the sign bit.
+@section("mysection") let intBinaryShiftRightSigned: Int8 = -8 >> 1
+// CHECK-LABEL: (pattern_named type="Int8" "intBinaryShiftRightSigned")
+// CHECK: (processed_constant_folded_init=integer_literal_expr implicit type="Int8" location={{.*}}LiteralOperands.swift:{{[0-9]+}}:{{[0-9]+}} range=[{{.*}}] negative value="4"
+
+// Unsigned right shift remains logical.
+@section("mysection") let intBinaryShiftRightUnsigned: UInt8 = 128 >> 1
+// CHECK-LABEL: (pattern_named type="UInt8" "intBinaryShiftRightUnsigned")
+// CHECK: (processed_constant_folded_init=integer_literal_expr implicit type="UInt8" location={{.*}}LiteralOperands.swift:{{[0-9]+}}:{{[0-9]+}} range=[{{.*}}] value="64"
+
 // Overflow arithmetic operators on integers
 @section("mysection") let intOverflowAddUnsigned: UInt8 = 250 &+ 10  // wraps: 260 mod 256
 // CHECK-LABEL: (pattern_named type="UInt8" "intOverflowAddUnsigned")

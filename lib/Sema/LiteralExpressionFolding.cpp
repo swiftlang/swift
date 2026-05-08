@@ -393,8 +393,7 @@ private:
     FoldingErrorOr<ConstantValuePtr> tryFoldIntegerBinaryArithmeticOperator(
         Identifier operatorIdentifier, SourceLoc sourceLocation,
         const IntegerValue *lhsVal, const IntegerValue *rhsVal) {
-      assert((lhsVal->getIsSigned() && rhsVal->getIsSigned()) ||
-             (!lhsVal->getIsSigned() && !rhsVal->getIsSigned()));
+      assert(lhsVal->getIsSigned() == rhsVal->getIsSigned());
       bool isSigned = lhsVal->getIsSigned();
       auto lhsInt = lhsVal->getValue();
       auto rhsInt = rhsVal->getValue();
@@ -434,8 +433,7 @@ private:
     tryFoldIntegerBinaryOverflowArithmeticOperator(
         Identifier operatorIdentifier, SourceLoc sourceLocation,
         const IntegerValue *lhsVal, const IntegerValue *rhsVal) {
-      assert((lhsVal->getIsSigned() && rhsVal->getIsSigned()) ||
-             (!lhsVal->getIsSigned() && !rhsVal->getIsSigned()));
+      assert(lhsVal->getIsSigned() == rhsVal->getIsSigned());
       bool isSigned = lhsVal->getIsSigned();
       auto lhsInt = lhsVal->getValue();
       auto rhsInt = rhsVal->getValue();
@@ -458,11 +456,17 @@ private:
     FoldingErrorOr<ConstantValuePtr> tryFoldIntegerBinaryBitwiseOperator(
         Identifier operatorIdentifier, SourceLoc sourceLocation,
         const IntegerValue *lhsVal, const IntegerValue *rhsVal) {
-      assert((lhsVal->getIsSigned() && rhsVal->getIsSigned()) ||
-             (!lhsVal->getIsSigned() && !rhsVal->getIsSigned()));
       bool isSigned = lhsVal->getIsSigned();
       auto lhsInt = lhsVal->getValue();
       auto rhsInt = rhsVal->getValue();
+      // The stdlib shift operators take `where RHS : BinaryInteger`, so the
+      // RHS does not share signedness or bit width with the LHS. The true
+      // bitwise operators `& | ^` do operate on two `Self` values.
+      bool isShift =
+          operatorIdentifier.is("<<") || operatorIdentifier.is(">>");
+      assert(isShift ||
+             lhsVal->getIsSigned() == rhsVal->getIsSigned());
+
       APInt result;
       if (operatorIdentifier.is("&"))
         result = lhsInt & rhsInt;
@@ -470,11 +474,30 @@ private:
         result = lhsInt | rhsInt;
       else if (operatorIdentifier.is("^"))
         result = lhsInt ^ rhsInt;
-      else if (operatorIdentifier.is("<<"))
-        result = lhsInt << rhsInt;
-      else if (operatorIdentifier.is(">>"))
-        result = lhsInt.lshr(rhsInt);
-      else
+      else if (isShift) {
+        // Non-masking shifts trap at runtime when the amount is negative or
+        // greater-or-equal to the LHS bit width. Reject both as folding
+        // errors so the result matches Swift's runtime semantics. The
+        // dedicated diagnostics are emitted inline so they can carry the
+        // amount and bit width; return `UpstreamError` to suppress the
+        // generic "not a literal expression" follow-up.
+        if (rhsVal->getIsSigned() && rhsInt.isNegative()) {
+          Ctx.Diags.diagnose(sourceLocation, diag::const_shift_negative);
+          return FoldingError(IllegalConstError::UpstreamError, sourceLocation);
+        }
+        unsigned width = lhsInt.getBitWidth();
+        uint64_t amountValue = rhsInt.getLimitedValue();
+        if (amountValue >= width) {
+          Ctx.Diags.diagnose(sourceLocation, diag::const_shift_out_of_range,
+                             static_cast<unsigned>(amountValue), width);
+          return FoldingError(IllegalConstError::UpstreamError, sourceLocation);
+        }
+        unsigned amount = static_cast<unsigned>(amountValue);
+        if (operatorIdentifier.is("<<"))
+          result = lhsInt.shl(amount);
+        else
+          result = isSigned ? lhsInt.ashr(amount) : lhsInt.lshr(amount);
+      } else
         return FoldingError(IllegalConstError::UnsupportedBinaryOperator,
                             sourceLocation);
 
@@ -484,8 +507,8 @@ private:
     FoldingErrorOr<ConstantValuePtr> tryFoldIntegerBinaryMaskingShiftOperator(
         Identifier operatorIdentifier, SourceLoc sourceLocation,
         const IntegerValue *lhsVal, const IntegerValue *rhsVal) {
-      assert((lhsVal->getIsSigned() && rhsVal->getIsSigned()) ||
-             (!lhsVal->getIsSigned() && !rhsVal->getIsSigned()));
+      // The stdlib masking-shift operators take `where RHS : BinaryInteger`,
+      // so the RHS does not share signedness or bit width with the LHS.
       bool isSigned = lhsVal->getIsSigned();
       auto lhsInt = lhsVal->getValue();
       auto rhsInt = rhsVal->getValue();
