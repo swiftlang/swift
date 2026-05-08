@@ -94,6 +94,13 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
     return SILLinkage::Shared;
 
   auto typeDecl = C->getDeclContext()->getSelfNominalTypeDecl();
+
+  // In embedded Swift, witness tables are always emitted lazily with shared
+  // linkage, so that each importing module emits its own local copy.
+  auto &ctx = typeDecl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::Embedded))
+    return SILLinkage::Shared;
+
   AccessLevel access = std::min(C->getProtocol()->getEffectiveAccess(),
                                 typeDecl->getEffectiveAccess());
 

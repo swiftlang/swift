@@ -18,38 +18,50 @@
 
 //--- Library.swift
 
-@export(interface)
-public struct ExportedStruct {
-  public var x: Int
-  public init(x: Int) { self.x = x }
-  public func describe() { print("ExportedStruct(x: \(x))") }
+public protocol Greeter {
+  func greet()
 }
 
 @export(interface)
-public class ExportedClass {
-  public var y: Int
-  public init(y: Int) { self.y = y }
-  public func describe() { print("ExportedClass(y: \(y))") }
+public struct ExportedStruct: Greeter {
+  public var name: StaticString
+  public init(name: StaticString) { self.name = name }
+  public func greet() { print("struct greeting from \(name)") }
+}
+
+@export(interface)
+public class ExportedClass: Greeter {
+  public var name: StaticString
+  public init(name: StaticString) { self.name = name }
+  public func greet() { print("class greeting from \(name)") }
 }
 
 //--- Application.swift
 import Library
 
+func callThroughExistential(_ g: any Greeter) {
+  g.greet()
+}
+
 @main
 struct Main {
   static func main() {
-    // Wrap imported @export(interface) values in Any existentials, which
-    // requires the type metadata for ExportedStruct / ExportedClass to be
-    // visible across the module boundary.
-    let values: [Any] = [
-      ExportedStruct(x: 42),
-      ExportedClass(y: 99),
-    ]
+    // Wrap imported @export(interface) values in `any Greeter` existentials.
+    // This requires both the type metadata AND the protocol witness table
+    // for ExportedStruct/ExportedClass to be available in this module.
 
-    // CHECK: ExportedStruct(x: 42)
-    (values[0] as! ExportedStruct).describe()
-    // CHECK-NEXT: ExportedClass(y: 99)
-    (values[1] as! ExportedClass).describe()
+    // CHECK: struct greeting from S
+    callThroughExistential(ExportedStruct(name: "S"))
+    // CHECK-NEXT: class greeting from C
+    callThroughExistential(ExportedClass(name: "C"))
+
+    // Also check casting out of Any still works end-to-end.
+    let anys: [Any] = [ExportedStruct(name: "S2"), ExportedClass(name: "C2")]
+    // CHECK-NEXT: struct greeting from S2
+    (anys[0] as! ExportedStruct).greet()
+    // CHECK-NEXT: class greeting from C2
+    (anys[1] as! ExportedClass).greet()
+
     // CHECK-NEXT: DONE
     print("DONE")
   }
