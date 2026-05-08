@@ -15,8 +15,8 @@ public enum FakeOptional<T> {
 }
 
 // CHECK-LABEL: sil [ossa] @test_redundantownedphiarg1 :
-// CHECK: bb3([[ARG1:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK: [[COPY:%.*]] = copy_value [[ARG1]]
+// CHECK: bb3([[ARG1:%.*]] : @owned $FakeOptional<Klass>, [[ARG2:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NOT: copy_value
 // CHECK-LABEL: } // end sil function 'test_redundantownedphiarg1'
 sil [ossa] @test_redundantownedphiarg1 : $@convention(thin) () -> () {
 bb0:
@@ -112,10 +112,10 @@ bb3(%1 : $FakeOptional<Klass>, %2 : @owned $FakeOptional<Klass>):
 }
 
 // CHECK-LABEL: sil [ossa] @test_redundantownedphiarg5 :
-// CHECK: bb1([[ARG1:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK: [[COPY1:%.*]] = copy_value [[ARG1]]
-// CHECK: bb3([[ARG2:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK: [[COPY2:%.*]] = copy_value [[ARG2]]
+// CHECK: bb1([[ARG1:%.*]] : @owned $FakeOptional<Klass>, [[ARG2:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NOT: copy_value
+// CHECK: bb3([[ARG3:%.*]] : @owned $FakeOptional<Klass>, [[ARG4:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NOT: copy_value
 // CHECK-LABEL: } // end sil function 'test_redundantownedphiarg5'
 sil [ossa] @test_redundantownedphiarg5 : $@convention(thin) () -> () {
 bb0:
@@ -139,13 +139,12 @@ bb4:
 }
 
 
-// Redundant phi args in bb4 don't get optimized away, because a compensating copy_value is added
-// while optimizing the redundant phi args in bb3.
+// Both-owned phis are no longer collapsed, so both bb3 and bb4 keep both args.
 // CHECK-LABEL: sil [ossa] @test_redundantownedphiarg6 :
-// CHECK: bb3([[ARG1:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK: [[COPY1:%.*]] = copy_value [[ARG1]]
-// CHECK: bb4([[ARG2:%.*]] : @owned $FakeOptional<Klass>, [[ARG3:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK-NOT: [[COPY2:%.*]] = copy_value [[ARG1]]
+// CHECK: bb3([[ARG1:%.*]] : @owned $FakeOptional<Klass>, [[ARG2:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NOT: copy_value
+// CHECK: bb4([[ARG3:%.*]] : @owned $FakeOptional<Klass>, [[ARG4:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NOT: copy_value
 // CHECK-LABEL: } // end sil function 'test_redundantownedphiarg6'
 sil [ossa] @test_redundantownedphiarg6 : $@convention(thin) () -> () {
 bb0:
