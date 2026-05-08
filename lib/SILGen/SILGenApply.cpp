@@ -1947,6 +1947,21 @@ static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation 
   return args;
 }
 
+static bool isImportedPointerType(SILType ty) {
+  auto astTy = ty.getASTType();
+  if (astTy->getAnyPointerElementType()) // Unsafe[Mutable][Raw]Pointer
+    return true;
+  if (astTy->isOpaquePointer())
+    return true;
+  if (astTy->getClassOrBoundGenericClass()) // CF/FRT class references
+    return true;
+  if (auto silFnTy = astTy->getAs<SILFunctionType>())
+    return silFnTy->getLanguage() == SILFunctionLanguage::C;
+  if (astTy->is<FunctionType>())
+    return true;
+  return false;
+}
+
 /// Emit a raw apply operation, performing no additional lowering of
 /// either the arguments or the result.
 static void emitRawApply(SILGenFunction &SGF,
@@ -2044,6 +2059,36 @@ static void emitRawApply(SILGenFunction &SGF,
       }
 
       argValue = arg.getValue();
+    }
+
+    // Handle optionality mismatch between the emitted argument and the
+    // expected parameter type, which occurs with C++ template instantiations
+    // where the type checker's generic substitution and the imported
+    // instantiation's SIL type disagree on optionality.
+    if (argValue->getType() != inputTy &&
+        getSILFunctionLanguage(substFnType->getRepresentation()) ==
+            SILFunctionLanguage::C) {
+      auto argType = argValue->getType();
+      if (auto objTy = inputTy.getOptionalObjectType();
+          objTy && objTy == argType &&
+          isImportedPointerType(argValue->getType())) {
+        // T argument, Optional<T> parameter: inject into Optional
+        auto optBuf = SGF.emitTemporaryAllocation(loc, inputTy);
+        auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
+        auto payloadAddr = SGF.B.createInitEnumDataAddr(loc, optBuf, someDecl,
+                                                        argValue->getType());
+        SGF.B.createCopyAddr(loc, argValue, payloadAddr, IsNotTake,
+                             IsInitialization);
+        SGF.B.createInjectEnumAddr(loc, optBuf, someDecl);
+        SGF.enterDestroyCleanup(optBuf);
+        argValue = optBuf;
+      } else if (auto objTy = argValue->getType().getOptionalObjectType();
+                 objTy && objTy == inputTy && isImportedPointerType(inputTy)) {
+        // Optional<T> argument, T parameter: extract from Optional
+        auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
+        argValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, argValue,
+                                                         someDecl, inputTy);
+      }
     }
 
 #ifndef NDEBUG
@@ -3898,6 +3943,48 @@ private:
       emitInOut(std::move(arg), loweredSubstArgType, loweredSubstParamType,
                 origParamType, substArgType);
       return;
+    }
+
+    // Handle optionality mismatch between the lowered argument type and the
+    // parameter's interface type, which happens when the type checker's
+    // substitution disagrees with the imported instantiation on optionality
+    // for C++ template pointer parameters.
+    if (getSILFunctionLanguage(Rep) == SILFunctionLanguage::C) {
+      if (auto argCanTy = loweredSubstArgType.getASTType(),
+          paramCanTy = loweredSubstParamType.getASTType();
+          argCanTy != paramCanTy) {
+
+        // T argument, Optional<T> parameter: emit then inject.
+        if (auto paramObjCanTy = paramCanTy.getOptionalObjectType();
+            paramObjCanTy && paramObjCanTy == argCanTy &&
+            isImportedPointerType(loweredSubstArgType)) {
+          auto result = std::move(arg).getAsSingleValue(SGF, SGFContext());
+          auto optTy = SGF.getLoweredType(paramCanTy);
+          auto &optTL = SGF.getTypeLowering(optTy);
+          auto inj = SGF.emitInjectOptional(ApplyLoc, optTL, SGFContext(),
+                                            [&](SGFContext) { return result; });
+          if (SGF.silConv.isSILIndirect(param) &&
+              !inj.getType().isAddress())
+            inj = inj.materialize(SGF, ApplyLoc);
+          Args.push_back(inj);
+          return;
+        }
+
+        // Optional<T> argument, T parameter: emit then force unwrap.
+        if (auto argObjCanTy = argCanTy.getOptionalObjectType();
+            argObjCanTy && argObjCanTy == paramCanTy &&
+            isImportedPointerType(loweredSubstParamType)) {
+          auto result = std::move(arg).getAsSingleValue(SGF, SGFContext());
+          auto &paramTL = SGF.getTypeLowering(loweredSubstParamType);
+          auto unwrapped =
+              SGF.emitUncheckedGetOptionalValueFrom(ApplyLoc, result, paramTL);
+          if (SGF.silConv.isSILIndirect(param) &&
+              !unwrapped.getType().isAddress())
+            unwrapped = unwrapped.materialize(SGF, ApplyLoc);
+          Args.push_back(unwrapped);
+          return;
+        }
+      }
     }
 
     // If we have a guaranteed +0 parameter...
