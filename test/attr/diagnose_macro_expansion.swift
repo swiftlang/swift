@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser, executable_test
-// REQUIRES: swift_feature_SourceWarningControl
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -8,7 +7,7 @@
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/macro.swift
 
 // Type check and verify the test itself which applies @diagnose to a macro expansion expression
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-feature SourceWarningControl -load-plugin-library %t/%target-library-name(MacroDefinition) %t/test.swift
+// RUN: %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroDefinition) %t/test.swift
 
 // This test verifies that @diagnose effect applies to everything within a macro expansion, and that @warn attributes within the expanded
 // code can override the expansion-statement control
