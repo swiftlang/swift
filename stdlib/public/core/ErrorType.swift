@@ -273,11 +273,11 @@ public func _errorInMainTyped<Failure: Error>(_ error: Failure) -> Never {
 public func _getDefaultErrorCode<T: Error>(_ error: T) -> Int
 
 extension Error {
+#if !$Embedded
   public var _code: Int {
     return _getDefaultErrorCode(self)
   }
 
-#if !$Embedded
   public var _domain: String {
     return _typeName(type(of: self), qualified: true)
   }
@@ -290,6 +290,10 @@ extension Error {
 #endif
   }
 #else
+  public var _code: Int {
+    return 1
+  }
+
   public var _domain: String {
     return ""
   }
