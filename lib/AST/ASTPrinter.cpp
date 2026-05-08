@@ -507,133 +507,124 @@ bool TypeTransformContext::isPrintingSynthesizedExtension() const {
   return !Decl.isNull();
 }
 
-/// Get a string representation of the parameter at params[index]. This will be
-/// the label or internal label of a normal parameter, or the string form of
-/// index. We cannot currently print lifetimes with indices in swiftinterface
-/// files because SwiftSyntax cannot parse lifetime entries that use them.
-static std::string
-getLifetimeDependenceIdentifier(unsigned index,
-                                ArrayRef<AnyFunctionType::Param> params) {
-  // NOTE: Does not handle the implicit self parameter, since this is only used
-  // for function types.
-  if (index < params.size() && params[index].hasInternalLabel()) {
-    return params[index].getInternalLabel().get();
-  }
-
-  return std::to_string(index);
-}
-
-static std::string_view
-getLifetimeDependenceSpecifier(unsigned index,
-                               ArrayRef<AnyFunctionType::Param> params,
-                               LifetimeDependenceKind kind) {
-  // NOTE: Does not handle the implicit self parameter, since this is only used
-  // for function types.
-  switch (kind) {
-  case LifetimeDependenceKind::Inherit:
-    return "copy ";
-  case LifetimeDependenceKind::Scope:
-    if (params[index].isInOut()) {
-      return "&";
-    }
-    return "borrow ";
-  }
-}
-
-/// Get a string representation for the list of sources of the given
-/// LifetimeDependenceInfo, if they can be printed.
+/// Format a lifetime dependence annotation as a string.
 ///
-/// See getLifetimeDependenceIdentifier.
-static std::string getLifetimeDependenceInfoSourceListString(
-    LifetimeDependenceInfo const &info,
-    ArrayRef<AnyFunctionType::Param> params) {
+/// When \p params is provided, Swift-style formatting is used: parameter
+/// labels are printed when available, the target is included when it is not
+/// the result, and scope dependencies on inout parameters use '&'. When
+/// \p params is \c std::nullopt, SIL-style formatting is used: sources and
+/// targets are always identified by numeric index.
+static std::string
+formatLifetimeDependence(LifetimeDependenceInfo const &info,
+                         std::optional<ArrayRef<AnyFunctionType::Param>> params,
+                         const PrintOptions &options) {
+  bool isSIL = !params;
+  bool isDump = options.PrintTypesForDebugging;
 
-  std::string lifetimeDependenceString = "";
+  std::string result;
+  if (!isDump) {
+    result = isSIL ? "@lifetime(" : "@_lifetime(";
+  }
+
+  // Determine whether implicit self is present by comparing the param indices
+  // length (which includes self) against the params array size (which doesn't).
+  std::optional<unsigned> selfIndex;
+  if (params && info.hasDependencySource()) {
+    unsigned indicesLen = info.getParamIndicesLength();
+    if (indicesLen > params->size()) {
+      selfIndex = params->size();
+    }
+  }
+
+  // Get a string identifier for a parameter at the given index.
+  auto getIdentifier = [&](unsigned index) -> std::string {
+    if (params) {
+      if (index < params->size() && (*params)[index].hasInternalLabel()) {
+        return (*params)[index].getInternalLabel().get();
+      }
+      if (index == selfIndex) {
+        return "self";
+      }
+    }
+    return std::to_string(index);
+  };
+
+  // In Swift mode, print the target if it is not the result.
+  if (!isSIL && params) {
+    const auto resultIndex = selfIndex ? params->size() + 1 : params->size();
+    if (info.getTargetIndex() != resultIndex) {
+      result += getIdentifier(info.getTargetIndex());
+      result += ": ";
+    }
+  }
+
   auto addressable = info.getAddressableIndices();
   auto condAddressable = info.getConditionallyAddressableIndices();
 
-  bool isFirstSpecifier = true;
-  auto getSourceString = [&](IndexSubset *bitvector,
-                             LifetimeDependenceKind kind) -> std::string {
-    std::string result;
+  bool isFirst = true;
+  auto appendSources = [&](IndexSubset *bitvector,
+                           LifetimeDependenceKind kind) {
     for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
-      if (bitvector->contains(i)) {
-        if (!isFirstSpecifier) {
-          result += ", ";
+      if (!bitvector->contains(i))
+        continue;
+      if (!isFirst)
+        result += ", ";
+
+      switch (kind) {
+      case LifetimeDependenceKind::Inherit:
+        result += "copy ";
+        break;
+      case LifetimeDependenceKind::Scope:
+        // In Swift mode, scope+inout uses "&".
+        if (!isSIL && params && i < params->size() && (*params)[i].isInOut()) {
+          result += "&";
+        } else {
+          result += "borrow ";
         }
-        result += getLifetimeDependenceSpecifier(i, params, kind);
-        if (addressable && addressable->contains(i)) {
-          result += "address ";
-        } else if (condAddressable && condAddressable->contains(i)) {
-          result += "address_for_deps ";
-        }
-        // Print source labels for explicit lifetime annotations. Otherwise,
-        // print the index. Indices should ideally never be used in Swift
-        // lifetime annotations, especially in module interfaces.
-        result += getLifetimeDependenceIdentifier(i, params);
-        isFirstSpecifier = false;
+        break;
       }
+
+      if (addressable && addressable->contains(i))
+        result += "address ";
+      else if (condAddressable && condAddressable->contains(i))
+        result += "address_for_deps ";
+
+      result += isSIL ? std::to_string(i) : getIdentifier(i);
+      isFirst = false;
     }
-    return result;
   };
+
   if (info.hasCaptures()) {
-    if (!isFirstSpecifier) {
-      lifetimeDependenceString += ", ";
-    }
-    lifetimeDependenceString += LifetimeDescriptor::CapturesContextSpecifier;
-    isFirstSpecifier = false;
+    if (!isFirst)
+      result += ", ";
+    result += LifetimeDescriptor::CapturesContextSpecifier;
+    isFirst = false;
   }
   if (info.hasImmortalSpecifier()) {
-    if (!isFirstSpecifier) {
-      lifetimeDependenceString += ", ";
-    }
-    lifetimeDependenceString += "immortal";
-    isFirstSpecifier = false;
+    if (!isFirst)
+      result += ", ";
+    result += "immortal";
+    isFirst = false;
   }
-  auto inheritLifetimeParamIndices = info.getInheritIndices();
-  if (inheritLifetimeParamIndices) {
-    assert(!inheritLifetimeParamIndices->isEmpty());
-    lifetimeDependenceString += getSourceString(
-        inheritLifetimeParamIndices, LifetimeDependenceKind::Inherit);
+  if (auto *inherit = info.getInheritIndices()) {
+    assert(!inherit->isEmpty());
+    appendSources(inherit, LifetimeDependenceKind::Inherit);
   }
-  if (auto scopeLifetimeParamIndices = info.getScopeIndices()) {
-    assert(!scopeLifetimeParamIndices->isEmpty());
-    lifetimeDependenceString += getSourceString(scopeLifetimeParamIndices,
-                                                LifetimeDependenceKind::Scope);
+  if (auto *scope = info.getScopeIndices()) {
+    assert(!scope->isEmpty());
+    appendSources(scope, LifetimeDependenceKind::Scope);
   }
-  return lifetimeDependenceString;
+
+  if (!isDump)
+    result += ") ";
+  return result;
 }
 
-/// Get a string representation for this dependence info as a Swift lifetime
-/// attribute (for a type or decl). The target and sources are referred to by
-/// their labels if possible (see getLifetimeDependenceIdentifier).
-///
-/// TODO: Factor this with LifetimeDependenceInfo::getString.
-static std::string
-getLifetimeDependenceInfoSwiftString(LifetimeDependenceInfo const &info,
-                                     ArrayRef<AnyFunctionType::Param> params) {
-  std::string lifetimeDependenceString = "@_lifetime(";
-
-  // Only print the target if it is a parameter or self.
-  const auto resultIndex = params.size();
-  const auto targetIndex = info.getTargetIndex();
-  if (targetIndex != resultIndex) {
-    lifetimeDependenceString +=
-        getLifetimeDependenceIdentifier(targetIndex, params);
-    lifetimeDependenceString += ": ";
-  }
-
-  lifetimeDependenceString +=
-      getLifetimeDependenceInfoSourceListString(info, params);
-  lifetimeDependenceString += ") ";
-  return lifetimeDependenceString;
-}
-
-void ASTPrinter::printSwiftLifetimeDependence(
-    LifetimeDependenceInfo const &lifetimeDependence,
-    ArrayRef<AnyFunctionType::Param> params) {
-
-  *this << getLifetimeDependenceInfoSwiftString(lifetimeDependence, params);
+void ASTPrinter::printLifetimeDependence(
+    LifetimeDependenceInfo const &info,
+    std::optional<ArrayRef<AnyFunctionType::Param>> params,
+    const PrintOptions &options) {
+  *this << formatLifetimeDependence(info, params, options);
 }
 
 void ASTPrinter::anchor() {}
@@ -7143,7 +7134,7 @@ public:
         // originated from explicit @lifetime annotations.
         if (!Options.IsForSwiftInterface ||
             lifetimeDependence.isFromAnnotation()) {
-          Printer.printSwiftLifetimeDependence(lifetimeDependence, params);
+          Printer.printLifetimeDependence(lifetimeDependence, params, Options);
         }
       }
     }
@@ -7389,7 +7380,8 @@ public:
       }
 
       if (Options.PrintInSILBody) {
-        Printer.printLifetimeDependenceAt(lifetimeDependencies, i);
+        Printer.printLifetimeDependenceAt(lifetimeDependencies, i, std::nullopt,
+                                          Options);
       }
 
       auto type = Param.getPlainType();
@@ -7453,7 +7445,8 @@ public:
 
     if (Options.PrintInSILBody) {
       Printer.printLifetimeDependenceAt(T->getLifetimeDependencies(),
-                                        T->getParams().size());
+                                        T->getParams().size(), std::nullopt,
+                                        Options);
     }
 
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
@@ -7515,7 +7508,8 @@ public:
 
     if (Options.PrintInSILBody) {
       Printer.printLifetimeDependenceAt(T->getLifetimeDependencies(),
-                                        T->getParams().size());
+                                        T->getParams().size(), std::nullopt,
+                                        Options);
     }
 
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
@@ -7621,7 +7615,8 @@ public:
       }
       Printer << ") -> ";
 
-      Printer.printSILLifetimeDependence(T->getLifetimeDependenceForResult());
+      if (auto dep = T->getLifetimeDependenceForResult())
+        Printer.printLifetimeDependence(*dep, std::nullopt, Options);
 
       bool parenthesizeResults = mustParenthesizeResults(T);
       if (parenthesizeResults)
@@ -8470,7 +8465,7 @@ void SILParameterInfo::print(
   }
 
   if (lifetimeDependence) {
-    Printer.printSILLifetimeDependence(*lifetimeDependence);
+    Printer.printLifetimeDependence(*lifetimeDependence, std::nullopt, Opts);
   }
 
   if (options.contains(SILParameterInfo::ImplicitLeading)) {

@@ -788,10 +788,6 @@ def main_normal():
     # Preprocess the arguments to apply defaults.
     apply_default_arguments(toolchain, args)
 
-    cached_ninja_real = None
-    cached_ninja_cache_session = None
-    cached_ninja_wrapper_path = None
-
     # Set up caching build defaults and environment.
     if args.enable_caching:
         # Handle --caching-remote-service-path implications.
@@ -849,22 +845,6 @@ def main_normal():
         args.caching_enable_mccas = (
             not args.caching_remote_service_path and
             os.environ.get('SWIFT_CACHE_DISABLE_MCCAS') is None)
-
-        # Compute a ninja wrapper that invokes cache-build-session for
-        # incremental builds outside the build-script daemon. The wrapper
-        # file itself is written after the clean step below so that --clean
-        # does not remove it.
-        if toolchain.ninja is not None:
-            cc_dir = os.path.dirname(toolchain.cc)
-            cache_session = os.path.join(cc_dir, 'cache-build-session')
-            if os.path.isfile(cache_session):
-                wrapper_path = os.path.join(
-                    SWIFT_BUILD_ROOT, args.build_subdir,
-                    'build-utils', 'ninja')
-                cached_ninja_real = toolchain.ninja
-                cached_ninja_cache_session = cache_session
-                cached_ninja_wrapper_path = wrapper_path
-                toolchain.ninja = wrapper_path
 
     cmake = CMake(args=args, toolchain=toolchain)
     toolchain.cmake = cmake.get_cmake_path(source_root=SWIFT_SOURCE_ROOT,
@@ -953,20 +933,26 @@ def main_normal():
     # Create build directory.
     shell.makedirs(invocation.workspace.build_root)
 
-    # Write the cached-build ninja wrapper now so that --clean above does
-    # not remove it. cmake config steps that follow invoke this wrapper.
-    if cached_ninja_wrapper_path is not None:
-        shell.makedirs(os.path.dirname(cached_ninja_wrapper_path))
-        with open(cached_ninja_wrapper_path, 'w') as f:
-            f.write('#!/bin/sh\n')
-            f.write('# Auto-generated ninja wrapper for cached builds.\n')
-            f.write('if [ -n "$CLANG_CACHE_SCAN_DAEMON_SOCKET_PATH" ]; then\n')
-            f.write('  exec "{}" "$@"\n'.format(cached_ninja_real))
-            f.write('else\n')
-            f.write('  exec "{}" "{}" "$@"\n'.format(
-                cached_ninja_cache_session, cached_ninja_real))
-            f.write('fi\n')
-        os.chmod(cached_ninja_wrapper_path, 0o755)
+    # Compute a ninja wrapper that invokes cache-build-session for
+    # incremental builds outside the build-script daemon.  
+    if args.enable_caching and toolchain.ninja is not None:
+        cc_dir = os.path.dirname(toolchain.cc)
+        cache_session = os.path.join(cc_dir, 'cache-build-session')
+        if os.path.isfile(cache_session):
+            wrapper_path = os.path.join(
+                SWIFT_BUILD_ROOT, args.build_subdir,
+                'build-utils', 'ninja')
+            shell.makedirs(os.path.dirname(wrapper_path))
+            with open(wrapper_path, 'w') as f:
+                f.write('#!/bin/sh\n')
+                f.write('# Auto-generated ninja wrapper for cached builds.\n')
+                f.write('if [ -n "$CLANG_CACHE_SCAN_DAEMON_SOCKET_PATH" ]; then\n')
+                f.write('  exec "{}" "$@"\n'.format(toolchain.ninja))
+                f.write('else\n')
+                f.write('  exec "{}" "{}" "$@"\n'.format(cache_session, toolchain.ninja))
+                f.write('fi\n')
+            os.chmod(wrapper_path, 0o755)
+            toolchain.ninja = wrapper_path
 
     # Create .build_script_log
     if not args.dry_run:

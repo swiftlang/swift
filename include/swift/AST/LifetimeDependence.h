@@ -241,11 +241,11 @@ class LifetimeDependenceInfo {
     return paramIndices ? paramIndices->getCapacity() : 0;
   }
 
+public:
   bool hasDependencySource() const {
     return inheritLifetimeParamIndices || scopeLifetimeParamIndices;
   };
 
-public:
   /// Fully-initialized dependence info.
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
@@ -384,13 +384,6 @@ public:
       && scopeLifetimeParamIndices->contains(index);
   }
 
-  /// Get a string representation of this LifetimeDependenceInfo suitable for
-  /// printing in SIL. The target is not included, since this is determined by
-  /// the position of the attribute in SIL.
-  ///
-  /// For printing function type lifetimes in Swift, see
-  /// ASTPrinter::printSwiftLifetimeDependence.
-  std::string getString() const;
   void Profile(llvm::FoldingSetNodeID &ID) const;
   void getConcatenatedData(SmallVectorImpl<bool> &concatenatedData) const;
 
