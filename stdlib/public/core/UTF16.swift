@@ -611,7 +611,11 @@ private func processNonASCIIChunk(
   repairing: Bool
 ) -> (Bool, repairsMade: Bool) {
   var repaired = false
-  for _ in 0 ..< blockSize {
+  // Bound by position, not iteration count: a single call can consume a
+  // surrogate pair (2 code units), so a fixed `blockSize` iteration count
+  // would overrun into the next block. Matches utf8Length's scalar loop.
+  let chunkEnd = unsafe input + blockSize
+  while unsafe input < chunkEnd {
     switch unsafe processScalarFallback(
       input: &input,
       inputEnd: inputEnd,
