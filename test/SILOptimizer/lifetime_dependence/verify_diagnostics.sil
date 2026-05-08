@@ -44,6 +44,13 @@ struct NCWrapper : ~Copyable, ~Escapable {
   deinit
 }
 
+struct BorrowWrapper<T: ~Copyable & ~Escapable>: ~Escapable {
+  private let ref: Builtin.Borrow<T>
+
+  @_lifetime(borrow target)
+  init(_ target: borrowing T)
+}
+
 sil @getNEPointer : $@convention(thin) (@guaranteed NE) -> Builtin.RawPointer
 sil @useA : $@convention(thin) (A) -> ()
 sil @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
@@ -421,4 +428,25 @@ bb4(%error : @owned $any Error):
 
 bb5:
   unreachable
+}
+
+// rdar://176564359 ([nonescapable] support Builtin.makeBorrow in lifetime diagnostics)
+//
+// Test that lifetime def-use walkers can follow the initialization of a local using init_borrow_addr.
+sil hidden [ossa] @testInitBorrowAddr : $@convention(method) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T, @thin BorrowWrapper<T>.Type) -> @lifetime(borrow address_for_deps 0) @out BorrowWrapper<T> {
+bb0(%0 : $*BorrowWrapper<T>, %1 : $*T, %2 : $@thin BorrowWrapper<T>.Type):
+  %3 = alloc_stack [lexical] [var_decl] $BorrowWrapper<T>, var, name "self", type $BorrowWrapper<T>
+  debug_value %1, let, name "target", argno 1, expr op_deref
+  %5 = alloc_stack $Builtin.Borrow<T>
+  init_borrow_addr %5 with %1
+  %7 = begin_access [modify] [static] %3
+  %8 = struct_element_addr %7, #BorrowWrapper.ref
+  copy_addr %5 to [init] %8
+  end_access %7
+  dealloc_stack %5
+  copy_addr %3 to [init] %0
+  destroy_addr %3
+  dealloc_stack %3
+  %15 = tuple ()
+  return %15
 }
