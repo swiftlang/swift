@@ -657,7 +657,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         if !indirectResultEscapes(of: beginApply, path: path) {
           return .continueWalk
         }
-      } else if !apply.isAddressable(operand: argOp) {
+      } else if !apply.isAddressable(operand: argOp) &&
+                !hasAddressResult(apply) {
         // The result does not depend on the argument's address.
         return .continueWalk
       }
@@ -699,6 +700,12 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       }
     }
     return .continueWalk
+  }
+
+  private func hasAddressResult(_ apply: ApplySite) -> Bool {
+    guard let fas = apply as? FullApplySite else { return false }
+    let convention = fas.functionConvention
+    return convention.hasAddressResult
   }
 
   private mutating func indirectResultEscapes(of beginApply: BeginApplyInst, path: Path) -> Bool {
