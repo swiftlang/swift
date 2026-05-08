@@ -663,7 +663,7 @@ case let (jeb):
   // expected-error@+2{{expected an identifier to name generic parameter}}
   // expected-error@+1{{expected '{' in class}}
   class Ceac<}> {}
-// expected-error@+1{{extraneous '}' at top level}} {{1-2=}}
+// expected-error@+1{{extraneous '}' at top level}} {{1-+1:1=}}
 }
 
 

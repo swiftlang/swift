@@ -110,7 +110,7 @@ class DerivedAvailable: Base {
   // expected-note@-1 {{remove 'override' modifier to declare a new 'overrideLessUnavailable'}}
 
   @_unavailableInEmbedded
-  override func overrideMoreUnavailable() { } // expected-error {{cannot override 'overrideMoreUnavailable' with a declaration that is marked unavailable}}{{112:3-26=}}
+  override func overrideMoreUnavailable() { } // expected-error {{cannot override 'overrideMoreUnavailable' with a declaration that is marked unavailable}}{{-1:1-+0:1=}}
 }
 
 @_unavailableInEmbedded

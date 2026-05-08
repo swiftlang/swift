@@ -1744,7 +1744,8 @@ void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
   }
 }
 
-void PotentialBindings::inferFromLiteral(Constraint *constraint) {
+void PotentialBindings::inferFromLiteral(Constraint *constraint,
+                                         bool recordChange) {
   ASSERT(TypeVar);
   ASSERT(isDirectRequirement(CS, TypeVar, constraint));
 
@@ -1762,10 +1763,9 @@ void PotentialBindings::inferFromLiteral(Constraint *constraint) {
     defaultType = TypeChecker::getDefaultType(protocol, CS.DC);
   }
 
-  // "undo" check is necessary here because this method is called
-  // from `Change::undo`, that's necessary because we only record
-  // a constraint.
-  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
+  // "recordChange" flag is necessary here because this method is also called
+  // from Change::undo().
+  if (CS.solverState && recordChange)
     CS.recordChange(SolverTrail::Change::AddedLiteral(TypeVar, constraint));
 
   Literals.emplace_back(protocol, constraint, defaultType, /*isDirect=*/true);
