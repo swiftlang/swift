@@ -5,3 +5,8 @@
 @section("mysection") let overflow: UInt8 = 100 * 3 // expected-error {{operation results in integer overflow}}
 @section("mysection") let divideZero1 = 4 / 0 // expected-error {{division by zero}}
 @section("mysection") let divideZero2 = 4 % 0 // expected-error {{division by zero}}
+
+// Overflow arithmetic operators wrap silently, without triggering overflow diagnostics.
+@section("mysection") let overflowAddWraps: UInt8 = 255 &+ 1
+@section("mysection") let overflowSubWraps: UInt8 = 0 &- 1
+@section("mysection") let overflowMulWraps: UInt8 = 128 &* 2

@@ -44,6 +44,32 @@
 // CHECK-LABEL: (pattern_named type="Int" "intBinaryBitwiseOp5")
 // CHECK: (processed_constant_folded_init=integer_literal_expr implicit type="Int" location={{.*}}LiteralOperands.swift:{{[0-9]+}}:{{[0-9]+}} range=[{{.*}}] value="2"
 
+// Overflow arithmetic operators on integers
+@section("mysection") let intOverflowAddUnsigned: UInt8 = 250 &+ 10  // wraps: 260 mod 256
+// CHECK-LABEL: (pattern_named type="UInt8" "intOverflowAddUnsigned")
+// CHECK: (processed_constant_folded_init=integer_literal_expr implicit type="UInt8" location={{.*}}LiteralOperands.swift:{{[0-9]+}}:{{[0-9]+}} range=[{{.*}}] value="4"
+
+@section("mysection") let intOverflowSubSigned: Int8 = -128 &- 1  // wraps: -129 -> 127
+// CHECK-LABEL: (pattern_named type="Int8" "intOverflowSubSigned")
+// CHECK: (processed_constant_folded_init=integer_literal_expr implicit type="Int8" location={{.*}}LiteralOperands.swift:{{[0-9]+}}:{{[0-9]+}} range=[{{.*}}] value="127"
+
+@section("mysection") let intOverflowMulSigned: Int8 = 100 &* 2  // wraps: 200 -> -56
+// CHECK-LABEL: (pattern_named type="Int8" "intOverflowMulSigned")
+// CHECK: (processed_constant_folded_init=integer_literal_expr implicit type="Int8" location={{.*}}LiteralOperands.swift:{{[0-9]+}}:{{[0-9]+}} range=[{{.*}}] negative value="56"
+
+// Masking shift operators on integers
+@section("mysection") let intMaskingShiftLeftOverflow: UInt8 = 1 &<< 9  // amount masks to 1
+// CHECK-LABEL: (pattern_named type="UInt8" "intMaskingShiftLeftOverflow")
+// CHECK: (processed_constant_folded_init=integer_literal_expr implicit type="UInt8" location={{.*}}LiteralOperands.swift:{{[0-9]+}}:{{[0-9]+}} range=[{{.*}}] value="2"
+
+@section("mysection") let intMaskingShiftRightUnsigned: UInt8 = 1 &>> 9  // amount masks to 1
+// CHECK-LABEL: (pattern_named type="UInt8" "intMaskingShiftRightUnsigned")
+// CHECK: (processed_constant_folded_init=integer_literal_expr implicit type="UInt8" location={{.*}}LiteralOperands.swift:{{[0-9]+}}:{{[0-9]+}} range=[{{.*}}] value="0"
+
+@section("mysection") let intMaskingShiftRightSigned: Int8 = -8 &>> 1  // arithmetic shift
+// CHECK-LABEL: (pattern_named type="Int8" "intMaskingShiftRightSigned")
+// CHECK: (processed_constant_folded_init=integer_literal_expr implicit type="Int8" location={{.*}}LiteralOperands.swift:{{[0-9]+}}:{{[0-9]+}} range=[{{.*}}] negative value="4"
+
 // Unary prefix operators on integers
 @section("mysection") let intUnaryOp1: Int = -(1)
 // CHECK-LABEL: (pattern_named type="Int" "intUnaryOp1")

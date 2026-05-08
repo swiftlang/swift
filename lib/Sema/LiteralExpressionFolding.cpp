@@ -16,7 +16,6 @@
 
 #include "LiteralExpressionFolding.h"
 #include "MiscDiagnostics.h"
-#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -50,9 +49,9 @@ static unsigned getTargetPointerBitWidth(ASTContext &ctx) {
   // `#if _pointerBitWidth` value.
   if (ctx.LangOpts.Target.isArch16Bit())
     return 16;
-  else if (ctx.LangOpts.Target.isArch32Bit())
+  if (ctx.LangOpts.Target.isArch32Bit())
     return 32;
-  else if (ctx.LangOpts.Target.isArch64Bit())
+  if (ctx.LangOpts.Target.isArch64Bit())
     return 64;
   swift_unreachable("Unsupported platform kind.");
 }
@@ -254,24 +253,24 @@ private:
     FoldingErrorOr<ConstantValuePtr> tryFoldExpression(const Expr *expr) {
       if (auto *literalExpr = dyn_cast<LiteralExpr>(expr))
         return tryFoldLiteralExpression(literalExpr);
-      else if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr))
+      if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr))
         return tryFoldBinaryExpr(binaryExpr);
-      else if (auto *unaryExpr = dyn_cast<PrefixUnaryExpr>(expr))
+      if (auto *unaryExpr = dyn_cast<PrefixUnaryExpr>(expr))
         return tryFoldUnaryExpr(unaryExpr);
-      else if (auto *parenExpr = dyn_cast<ParenExpr>(expr))
+      if (auto *parenExpr = dyn_cast<ParenExpr>(expr))
         return tryFoldParenExpr(parenExpr);
-      else if (auto *declRefExpr = dyn_cast<DeclRefExpr>(expr))
+      if (auto *declRefExpr = dyn_cast<DeclRefExpr>(expr))
         return foldDeclRefExpr(declRefExpr);
-      else
-        return FoldingError(IllegalConstError::Default, expr->getLoc());
+      
+      return FoldingError(IllegalConstError::Default, expr->getLoc());
     }
 
     FoldingErrorOr<ConstantValuePtr>
     tryFoldLiteralExpression(const LiteralExpr *expr) {
       if (auto *intLiteralExpr = dyn_cast<IntegerLiteralExpr>(expr))
         return foldIntegerLiteralExpr(intLiteralExpr);
-      else
-        return FoldingError(IllegalConstError::Default, expr->getLoc());
+      
+      return FoldingError(IllegalConstError::Default, expr->getLoc());
     }
 
     ConstantValuePtr foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
@@ -281,9 +280,8 @@ private:
       if (isSignedIntegerType(exprType))
         return std::make_unique<IntegerValue>(value.sextOrTrunc(resultBitWidth),
                                               true);
-      else
-        return std::make_unique<IntegerValue>(value.zextOrTrunc(resultBitWidth),
-                                              false);
+      return std::make_unique<IntegerValue>(value.zextOrTrunc(resultBitWidth),
+                                            false);
     }
 
     FoldingErrorOr<ConstantValuePtr> tryFoldBinaryExpr(const BinaryExpr *expr) {
@@ -303,12 +301,17 @@ private:
           if (operatorIdentifier.isArithmeticOperator())
             return tryFoldIntegerBinaryArithmeticOperator(
                 operatorIdentifier, expr->getLoc(), lhsIntPtr, rhsIntPtr);
-          else if (operatorIdentifier.isBitwiseOperator() ||
-                   operatorIdentifier.isShiftOperator())
+          if (operatorIdentifier.isOverflowArithmeticOperator())
+            return tryFoldIntegerBinaryOverflowArithmeticOperator(
+                operatorIdentifier, expr->getLoc(), lhsIntPtr, rhsIntPtr);
+          if (operatorIdentifier.isBitwiseOperator() ||
+              operatorIdentifier.isShiftOperator())
             return tryFoldIntegerBinaryBitwiseOperator(
                 operatorIdentifier, expr->getLoc(), lhsIntPtr, rhsIntPtr);
-          else
-            llvm_unreachable("Unsupported operator");
+          if (operatorIdentifier.isMaskingShiftOperator())
+            return tryFoldIntegerBinaryMaskingShiftOperator(
+                operatorIdentifier, expr->getLoc(), lhsIntPtr, rhsIntPtr);
+          llvm_unreachable("Unsupported operator");
         } else
           return rhsOrErr.getError();
       } else
@@ -331,8 +334,8 @@ private:
         return tryFoldIntegerUnaryArithmeticOperator(
             operatorIdentifier, expr->getLoc(),
             cast<IntegerValue>(operandOrErr->get()));
-      } else
-        return operandOrErr.getError();
+      }
+      return operandOrErr.getError();
     }
 
     FoldingErrorOr<ConstantValuePtr> tryFoldParenExpr(const ParenExpr *expr) {
@@ -341,8 +344,8 @@ private:
         auto *intValue = cast<IntegerValue>(operandOrErr->get());
         return ConstantValuePtr(std::make_unique<IntegerValue>(
             intValue->getValue(), intValue->getIsSigned()));
-      } else
-        return operandOrErr.getError();
+      }
+      return operandOrErr.getError();
     }
 
     FoldingErrorOr<ConstantValuePtr> foldDeclRefExpr(const DeclRefExpr *expr) {
@@ -382,7 +385,7 @@ private:
       // If this is the first time we have requested to constant-fold this
       // declaration's initializer and have failed to do so, emit a note
       // with a location of the declRef from which we initiated this query.
-      else if (!previouslyFolded)
+      if (!previouslyFolded)
         return FoldingError(IllegalConstError::NonConstDeclRef, referenceLoc);
       return FoldingError(IllegalConstError::OpaqueDeclRef, referenceLoc);
     }
@@ -427,6 +430,31 @@ private:
       return ConstantValuePtr(std::make_unique<IntegerValue>(result, isSigned));
     }
 
+    FoldingErrorOr<ConstantValuePtr>
+    tryFoldIntegerBinaryOverflowArithmeticOperator(
+        Identifier operatorIdentifier, SourceLoc sourceLocation,
+        const IntegerValue *lhsVal, const IntegerValue *rhsVal) {
+      assert((lhsVal->getIsSigned() && rhsVal->getIsSigned()) ||
+             (!lhsVal->getIsSigned() && !rhsVal->getIsSigned()));
+      bool isSigned = lhsVal->getIsSigned();
+      auto lhsInt = lhsVal->getValue();
+      auto rhsInt = rhsVal->getValue();
+      // APInt's plain +/-/* wrap at the declared bit width, which matches
+      // Swift's overflow arithmetic semantics for &+, &-, &*.
+      APInt result;
+      if (operatorIdentifier.is("&+"))
+        result = lhsInt + rhsInt;
+      else if (operatorIdentifier.is("&-"))
+        result = lhsInt - rhsInt;
+      else if (operatorIdentifier.is("&*"))
+        result = lhsInt * rhsInt;
+      else
+        return FoldingError(IllegalConstError::UnsupportedBinaryOperator,
+                            sourceLocation);
+
+      return ConstantValuePtr(std::make_unique<IntegerValue>(result, isSigned));
+    }
+
     FoldingErrorOr<ConstantValuePtr> tryFoldIntegerBinaryBitwiseOperator(
         Identifier operatorIdentifier, SourceLoc sourceLocation,
         const IntegerValue *lhsVal, const IntegerValue *rhsVal) {
@@ -446,6 +474,31 @@ private:
         result = lhsInt << rhsInt;
       else if (operatorIdentifier.is(">>"))
         result = lhsInt.lshr(rhsInt);
+      else
+        return FoldingError(IllegalConstError::UnsupportedBinaryOperator,
+                            sourceLocation);
+
+      return ConstantValuePtr(std::make_unique<IntegerValue>(result, isSigned));
+    }
+
+    FoldingErrorOr<ConstantValuePtr> tryFoldIntegerBinaryMaskingShiftOperator(
+        Identifier operatorIdentifier, SourceLoc sourceLocation,
+        const IntegerValue *lhsVal, const IntegerValue *rhsVal) {
+      assert((lhsVal->getIsSigned() && rhsVal->getIsSigned()) ||
+             (!lhsVal->getIsSigned() && !rhsVal->getIsSigned()));
+      bool isSigned = lhsVal->getIsSigned();
+      auto lhsInt = lhsVal->getValue();
+      auto rhsInt = rhsVal->getValue();
+      // Per FixedWidthInteger.&<< / &>>, the shift amount is reduced modulo
+      // the result type's bit width. All Swift integer widths are powers of
+      // two, so urem(width) is equivalent to & (width - 1).
+      unsigned width = lhsInt.getBitWidth();
+      APInt amount = rhsInt.urem(APInt(rhsInt.getBitWidth(), width));
+      APInt result;
+      if (operatorIdentifier.is("&<<"))
+        result = lhsInt.shl(amount);
+      else if (operatorIdentifier.is("&>>"))
+        result = isSigned ? lhsInt.ashr(amount) : lhsInt.lshr(amount);
       else
         return FoldingError(IllegalConstError::UnsupportedBinaryOperator,
                             sourceLocation);
