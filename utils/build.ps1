@@ -739,6 +739,18 @@ function Get-InstallDir([Hashtable] $Platform) {
   throw "Unknown Platform"
 }
 
+function Get-WindowsRuntimeInstallRoot([Hashtable] $Platform) {
+  return [IO.Path]::Combine((Get-InstallDir $Platform), "Runtimes", $ProductVersion)
+}
+
+function Get-WindowsRuntimeBin([Hashtable] $Platform) {
+  return [IO.Path]::Combine((Get-WindowsRuntimeInstallRoot $Platform), "usr", "bin")
+}
+
+function Get-WindowsRuntimeLibexec([Hashtable] $Platform) {
+  return [IO.Path]::Combine((Get-WindowsRuntimeInstallRoot $Platform), "usr", "libexec")
+}
+
 # For dev productivity, install the host toolchain directly using CMake.
 # This allows iterating on the toolchain using ninja builds.
 $HostPlatform.ToolchainInstallRoot = "$(Get-InstallDir $HostPlatform)\Toolchains\$ProductVersion+Asserts"
@@ -1107,9 +1119,19 @@ function Ensure-WindowsAssemblyManifest([string] $ImagePath,
   }
 }
 
-function Set-WindowsManifestDependencies([string] $ToolPath,
-                                         [object[]] $Dependencies,
-                                         [string] $LogPrefix) {
+function New-WindowsManifestDependency([string] $Name,
+                                       [string] $AssemblyVersion,
+                                       [string] $ProcessorArchitecture) {
+  return [pscustomobject]@{
+    Name                  = $Name
+    Version               = $AssemblyVersion
+    ProcessorArchitecture = $ProcessorArchitecture
+  }
+}
+
+function Set-WindowsExecutableManifestDependencies([string] $ToolPath,
+                                                   [object[]] $Dependencies,
+                                                   [string] $LogPrefix) {
   if (-not $Dependencies -or $Dependencies.Count -eq 0) {
     throw "${LogPrefix}: no manifest dependencies provided for '$ToolPath'"
   }
@@ -1181,6 +1203,118 @@ function Set-WindowsManifestDependencies([string] $ToolPath,
     Remove-Item -Path $ExistingManifestPath -Force -ErrorAction SilentlyContinue
     if (-not $KeepMergedManifest) {
       Remove-Item -Path $MergedManifestPath -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
+function Get-WindowsManifestResourceIDs([string] $ImagePath,
+                                        [string] $LogPrefix) {
+  $ReadObj = Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "llvm-readobj.exe"
+  if (-not (Test-Path $ReadObj)) {
+    throw "${LogPrefix}: pinned 'llvm-readobj.exe' not found at '$ReadObj'"
+  }
+
+  $Output = & $ReadObj --coff-resources $ImagePath 2>&1
+  $ExitCode = $LASTEXITCODE
+  if ($ExitCode -ne 0) {
+    throw "${LogPrefix}: llvm-readobj failed to inspect resources in '$ImagePath' (exit $ExitCode): $($Output -join "`n")"
+  }
+
+  $CandidateIDs = [System.Collections.Generic.HashSet[int]]::new()
+  $InManifestType = $false
+  foreach ($Line in $Output) {
+    if ($Line -match '^\s*Type:\s*(?:RT_MANIFEST\b.*|.*\(ID\s+24\)|24\b)') {
+      $InManifestType = $true
+      continue
+    }
+    if ($Line -match '^\s*Type:') {
+      $InManifestType = $false
+    }
+
+    if ($InManifestType -and
+        ($Line -match '^\s*Name:\s*(?:\(ID\s*)?#?([0-9]+)\)?' -or
+         $Line -match '^\s*Name:.*\(ID\s+([0-9]+)\)')) {
+      [void]$CandidateIDs.Add([int]$Matches[1])
+    }
+  }
+
+  # llvm-readobj reports the resource tree, but resource names such as #2 can
+  # occur under other resource types, e.g. RT_VERSION.  Confirm candidates with
+  # mt.exe, where `;#N` is explicitly an RT_MANIFEST resource name.
+  foreach ($ResourceID in 1..16) {
+    [void]$CandidateIDs.Add($ResourceID)
+  }
+
+  $ManifestIDs = [System.Collections.Generic.HashSet[int]]::new()
+  foreach ($ResourceID in ($CandidateIDs | Sort-Object)) {
+    $ManifestPath = Join-Path ([IO.Path]::GetTempPath()) `
+      "swift-sxs-probe-$([IO.Path]::GetFileName($ImagePath))-#$ResourceID-$([guid]::NewGuid().Guid).manifest"
+
+    try {
+      & "mt.exe" -nologo "-inputresource:$ImagePath;#$ResourceID" -out:$ManifestPath 2>&1 | Out-Null
+      if ($LASTEXITCODE -eq 0 -and (Test-Path $ManifestPath)) {
+        [void]$ManifestIDs.Add([int]$ResourceID)
+      }
+    } finally {
+      Remove-Item -Path $ManifestPath -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  return @($ManifestIDs | Sort-Object)
+}
+
+function Export-WindowsManifestResource([string] $ImagePath,
+                                        [int] $ResourceID,
+                                        [string] $LogPrefix) {
+  $ManifestPath = Join-Path ([IO.Path]::GetTempPath()) `
+    "swift-sxs-$([IO.Path]::GetFileName($ImagePath))-#$ResourceID-$([guid]::NewGuid().Guid).manifest"
+
+  & "mt.exe" -nologo "-inputresource:$ImagePath;#$ResourceID" -out:$ManifestPath 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ManifestPath)) {
+    throw "${LogPrefix}: failed to extract RT_MANIFEST resource #$ResourceID from '$ImagePath'"
+  }
+  return $ManifestPath
+}
+
+function Test-WindowsManifestHasExecutionLevel([string] $ManifestPath) {
+  $Doc = New-Object System.Xml.XmlDocument
+  $Doc.Load($ManifestPath)
+  return ($Doc.SelectSingleNode("//*[local-name()='trustInfo' or local-name()='requestedPrivileges' or local-name()='requestedExecutionLevel']") -ne $null)
+}
+
+function Assert-WindowsManifestResourcesAreSxSSafe([string] $ImagePath,
+                                                   [string] $LogPrefix) {
+  $ResourceIDs = @(Get-WindowsManifestResourceIDs $ImagePath $LogPrefix)
+  $ReservedResourceIDs = @($ResourceIDs | Where-Object { $_ -ge 1 -and $_ -le 16 })
+  $UnexpectedReservedResourceIDs = @($ReservedResourceIDs | Where-Object { $_ -ne 1 })
+  if ($UnexpectedReservedResourceIDs.Count -gt 0) {
+    $UnexpectedList = "#$($UnexpectedReservedResourceIDs -join ', #')"
+    $Message = "{0}: '{1}' has unexpected reserved RT_MANIFEST resources " +
+               "({2}); Windows reserves IDs 1..16, and this layout uses " +
+               "RT_MANIFEST #1 for SxS manifests"
+    throw ($Message -f $LogPrefix, $ImagePath, $UnexpectedList)
+  }
+
+  foreach ($ResourceID in $ResourceIDs) {
+    $ManifestPath = Export-WindowsManifestResource $ImagePath $ResourceID $LogPrefix
+    $KeepManifest = $false
+
+    try {
+      try {
+        $HasExecutionLevel = Test-WindowsManifestHasExecutionLevel $ManifestPath
+      } catch {
+        $KeepManifest = $true
+        throw "${LogPrefix}: '$ImagePath' has an unparsable RT_MANIFEST resource #$ResourceID (extracted to '$ManifestPath')"
+      }
+
+      if ($HasExecutionLevel) {
+        $KeepManifest = $true
+        throw "${LogPrefix}: '$ImagePath' has RT_MANIFEST resource #$ResourceID with UAC execution-level metadata (extracted to '$ManifestPath')"
+      }
+    } finally {
+      if (-not $KeepManifest) {
+        Remove-Item -Path $ManifestPath -Force -ErrorAction SilentlyContinue
+      }
     }
   }
 }
@@ -1583,6 +1717,32 @@ function Get-SwiftSDK([OS] $OS, [string] $Identifier = $OS.ToString()) {
   return ([IO.Path]::Combine((Get-PlatformRoot $OS), "Developer", "SDKs", "$Identifier.sdk"))
 }
 
+function Get-SDKRuntimeBin([Hashtable] $Platform, [string] $SDKRoot, [bool] $InstallRuntimeToStage = $true) {
+  # The Windows runtime is installed beside the architecture-specific toolchain
+  # image for staged SDK builds. Bootstrap and non-Windows SDKs keep their
+  # runtime payloads in the SDK root.
+  if ($Platform.OS -eq [OS]::Windows -and $InstallRuntimeToStage) {
+    return Get-WindowsRuntimeBin $Platform
+  }
+  return [IO.Path]::Combine($SDKRoot, "usr", "bin")
+}
+
+function Get-SDKLibexecDir([Hashtable] $Platform, [string] $SDKRoot, [bool] $InstallRuntimeToStage = $true) {
+  # See Get-SDKRuntimeBin for the Windows-only install layout split.
+  if ($Platform.OS -eq [OS]::Windows -and $InstallRuntimeToStage) {
+    return Get-WindowsRuntimeLibexec $Platform
+  }
+  return [IO.Path]::Combine($SDKRoot, "usr", "libexec")
+}
+
+function Resolve-SDKRuntimeBin([Hashtable] $Platform, [string] $SDKRoot, [bool] $InstallRuntimeToStage = $true) {
+  $RuntimeBin = Get-SDKRuntimeBin $Platform $SDKRoot $InstallRuntimeToStage
+  if (Test-Path $RuntimeBin -PathType Container) {
+    return $RuntimeBin
+  }
+  return [IO.Path]::Combine($SDKRoot, "usr", "bin")
+}
+
 enum DriverStyle {
   CL
   ClangCL
@@ -1930,7 +2090,6 @@ function Build-CMakeProject {
     $UsesDirectMSVCLinker =
       ($UseC   -and $CCompiler.DriverStyle   -in @([DriverStyle]::CL, [DriverStyle]::ClangCL)) -or
       ($UseCXX -and $CXXCompiler.DriverStyle -in @([DriverStyle]::CL, [DriverStyle]::ClangCL))
-
     $FlagHandling = if ($CMakeSupportsCMP0181) {
       # With CMP0181, the `LINKER:` generator expression can always be used.
       [LinkerFlagHandling]::CMP0181
@@ -1947,8 +2106,8 @@ function Build-CMakeProject {
 
     # Helper cmdlet to add linker flags with the appropriate handling based on
     # the linker driver and CMake version.
-    function Add-LinkerFlagsDefine([hashtable]$Defines, [string[]]$Value) {
-      $Value = switch ($FlagHandling) {
+    function Convert-LinkerFlags([string[]]$Value) {
+      switch ($FlagHandling) {
         CMP0181 {
           $Value | ForEach-Object { "LINKER:$_" }
         }
@@ -1964,9 +2123,18 @@ function Build-CMakeProject {
           $Value
         }
       }
+    }
 
+    function Add-LinkerFlagsDefine([hashtable]$Defines, [string[]]$Value) {
+      $Value = Convert-LinkerFlags $Value
       Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS $Value
       Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS $Value
+    }
+
+    function Add-SharedLinkerFlagsDefine([hashtable]$Defines, [string[]]$Value) {
+      $Value = Convert-LinkerFlags $Value
+      Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS $Value
+      Add-FlagsDefine $Defines CMAKE_MODULE_LINKER_FLAGS $Value
     }
 
     # Add additional defines (unless already present)
@@ -2095,6 +2263,9 @@ function Build-CMakeProject {
         }
 
         Add-LinkerFlagsDefine $Defines @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF")
+        Add-SharedLinkerFlagsDefine $Defines @("/MANIFEST:NO")
+        Add-KeyValueIfNew $Defines CMAKE_USER_MAKE_RULES_OVERRIDE `
+          "$SourceCache\swift\utils\windows-clang-overrides.cmake"
 
         if ($DebugInfo) {
           if ($UseASM -or $UseC -or $UseCXX) {
@@ -2371,8 +2542,10 @@ function Build-SPMProject {
 
   Invoke-IsolatingEnvVars {
 
-    $env:Path = "$(Get-SwiftSDK -OS $HostPlatform.OS)\usr\bin;$($HostPlatform.ToolchainInstallRoot)\usr\bin;${env:Path}"
-    $env:SDKROOT = (Get-SwiftSDK -OS $HostPlatform.OS)
+    $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
+    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    $env:Path = "$HostRuntimeBin;$($HostPlatform.ToolchainInstallRoot)\usr\bin;${env:Path}"
+    $env:SDKROOT = $HostSDKRoot
     $env:SWIFTCI_USE_LOCAL_DEPS = "1"
 
     $Arguments = @(
@@ -2799,6 +2972,205 @@ function Write-ToolchainInfo([Hashtable] $Platform,
     Version = "${ProductVersion}"
   }
   Write-PList -Settings $Settings -Path "$ToolchainRoot\ToolchainInfo.plist"
+}
+
+function Get-WindowsSxSRuntimeDLLs([string] $RuntimeSourceDir) {
+  $DeveloperDLLs = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  foreach ($DLL in @(
+    "Testing",
+    "_Testing_Foundation",
+    "_Testing_WinSDK",
+    "_TestingInterop",
+    "XCTest"
+  )) {
+    [void]$DeveloperDLLs.Add($DLL)
+  }
+
+  Get-ChildItem -Path $RuntimeSourceDir -Filter "*.dll" -File |
+    Where-Object {
+      -not $DeveloperDLLs.Contains([IO.Path]::GetFileNameWithoutExtension($_.Name))
+    } |
+    Sort-Object Name
+}
+
+# Return the imported DLL names from a PE file.  Use the pinned host toolchain
+# so this also works while cross-compiling a non-host Windows toolchain.
+function Get-DLLImports([string] $Path) {
+  if (-not (Test-Path $Path)) {
+    throw "Get-DLLImports: '$Path' does not exist"
+  }
+  $ReadObj = Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "llvm-readobj.exe"
+  if (-not (Test-Path $ReadObj)) {
+    throw "Get-DLLImports: pinned 'llvm-readobj.exe' not found at '$ReadObj'"
+  }
+  # `llvm-readobj --coff-imports` prints a `Name: <dll>` line per import.
+  $Output = & $ReadObj --coff-imports $Path 2>$null
+  $Imports = New-Object System.Collections.Generic.List[string]
+  foreach ($Line in $Output) {
+    if ($Line -match '^\s*Name:\s*(\S+)\s*$') {
+      [void]$Imports.Add($Matches[1])
+    }
+  }
+  $Imports | Sort-Object -Unique
+}
+
+function Get-DirectRuntimeImports([string] $Path, $RuntimeSet) {
+  $Imports = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  foreach ($Raw in (Get-DLLImports -Path $Path)) {
+    $Base = [IO.Path]::GetFileNameWithoutExtension($Raw)
+    if ($RuntimeSet.Contains($Base)) {
+      [void]$Imports.Add($Base)
+    }
+  }
+  $Imports | Sort-Object
+}
+
+function Get-StaticRuntimeImports([string] $Path,
+                                  [string] $BinaryDir,
+                                  [object] $RuntimeSet) {
+  $Imports = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  $Visited = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  $Queue = [System.Collections.Generic.Queue[string]]::new()
+  $Queue.Enqueue($Path)
+
+  while ($Queue.Count -gt 0) {
+    $Current = [IO.Path]::GetFullPath($Queue.Dequeue())
+    if (-not $Visited.Add($Current)) { continue }
+
+    foreach ($Raw in (Get-DLLImports -Path $Current)) {
+      $DLLName = [IO.Path]::GetFileName($Raw)
+      $Base = [IO.Path]::GetFileNameWithoutExtension($DLLName)
+      if ($RuntimeSet.Contains($Base)) {
+        [void]$Imports.Add($Base)
+        continue
+      }
+
+      $LocalDLL = Join-Path $BinaryDir $DLLName
+      if (Test-Path $LocalDLL -PathType Leaf) {
+        $Queue.Enqueue($LocalDLL)
+      }
+    }
+  }
+
+  $Imports | Sort-Object
+}
+
+function Get-RuntimeImportClosure([string[]] $Roots, [Hashtable] $RuntimeGraph) {
+  $Seen = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  $Queue = New-Object System.Collections.Generic.Queue[string]
+  foreach ($Root in $Roots) {
+    if ($RuntimeGraph.ContainsKey($Root)) {
+      $Queue.Enqueue($Root)
+    }
+  }
+
+  while ($Queue.Count -gt 0) {
+    $Current = $Queue.Dequeue()
+    if (-not $Seen.Add($Current)) { continue }
+    if ($RuntimeGraph.ContainsKey($Current)) {
+      foreach ($Next in $RuntimeGraph[$Current]) {
+        $Queue.Enqueue($Next)
+      }
+    }
+  }
+  $Seen | Sort-Object
+}
+
+# Stage one private SxS assembly per runtime DLL.  Each EXE manifest names the
+# runtime closure needed by its static import graph.
+function Set-WindowsSxSToolchainRuntimePerDLL {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)] [string]    $BinaryDir,
+    [Parameter(Mandatory)] [string]    $RuntimeSourceDir,
+    [Parameter(Mandatory)] [Hashtable] $EXEDependencies,
+    [Parameter(Mandatory)] [string[]]  $DLLsToInject,
+    [Parameter(Mandatory)] [string]    $AssemblyVersion,
+    [Parameter(Mandatory)] [string]    $ProcessorArchitecture
+  )
+
+  if (-not (Test-Path $BinaryDir)) {
+    throw "Set-WindowsSxSToolchainRuntimePerDLL: BinaryDir '$BinaryDir' does not exist"
+  }
+  if (-not (Test-Path $RuntimeSourceDir)) {
+    Write-Warning "Set-WindowsSxSToolchainRuntimePerDLL: RuntimeSourceDir '$RuntimeSourceDir' does not exist; skipping SxS bind"
+    return
+  }
+  if ($AssemblyVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+    throw "Set-WindowsSxSToolchainRuntimePerDLL: AssemblyVersion '$AssemblyVersion' is not in the required 4-part 'a.b.c.d' form (Windows SxS rejects any other shape)."
+  }
+
+  Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: source            = '$RuntimeSourceDir'"
+  Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: destination       = '$BinaryDir'"
+  Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: assembly version  = $AssemblyVersion"
+  Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: architecture      = $ProcessorArchitecture"
+
+  Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: staging $($DLLsToInject.Count) per-DLL assemblies:"
+  $InjectedDLLs = New-Object System.Collections.Generic.HashSet[string]
+  foreach ($DLLName in ($DLLsToInject | Sort-Object)) {
+    $SourceDLL = Join-Path $RuntimeSourceDir "$DLLName.dll"
+    if (-not (Test-Path $SourceDLL)) {
+      throw "Set-WindowsSxSToolchainRuntimePerDLL: '$SourceDLL' not found in source; refusing to bind EXEs to a missing SxS assembly"
+    }
+    $AssemblyDir = Join-Path $BinaryDir $DLLName
+    New-Item -ItemType Directory -Path $AssemblyDir -Force -ErrorAction Stop | Out-Null
+    $StagedDLL = Join-Path $AssemblyDir "$DLLName.dll"
+    Copy-Item -Path $SourceDLL -Destination $StagedDLL -Force -ErrorAction Stop
+    Ensure-WindowsAssemblyManifest `
+      -ImagePath              $StagedDLL `
+      -AssemblyVersion        $AssemblyVersion `
+      -ProcessorArchitecture  $ProcessorArchitecture `
+      -LogPrefix              "Set-WindowsSxSToolchainRuntimePerDLL"
+    Assert-WindowsManifestResourcesAreSxSSafe $StagedDLL "Set-WindowsSxSToolchainRuntimePerDLL"
+    $Length = (Get-Item $StagedDLL).Length
+    Write-Host ("  [{0,-32}]  {1,12:N0}b  ->  {2}" -f "$DLLName.dll", $Length, $AssemblyDir)
+    [void]$InjectedDLLs.Add($DLLName)
+  }
+
+  # Do not inspect arbitrary DLLs in `usr\bin` here.  Windows DLLs commonly
+  # carry RT_MANIFEST #2, and this pass only owns the staged runtime DLL
+  # assemblies plus the EXE manifests it rewrites below.
+  $BoundEXECount = 0
+  $SkippedCount = 0
+  foreach ($ToolPath in ($EXEDependencies.Keys | Sort-Object)) {
+    $DirectRuntimeDeps = @($EXEDependencies[$ToolPath])
+    if ($DirectRuntimeDeps.Count -eq 0) {
+      Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: skipped '$ToolPath' -- no Swift runtime imports"
+      $SkippedCount++
+      continue
+    }
+    if (-not (Test-Path $ToolPath)) {
+      Write-Warning "Set-WindowsSxSToolchainRuntimePerDLL: tool '$ToolPath' does not exist; skipping"
+      continue
+    }
+
+    Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: binding EXE '$ToolPath' -> [$($DirectRuntimeDeps -join ', ')]"
+
+    $MissingDLLs = @($DirectRuntimeDeps | Where-Object { -not $InjectedDLLs.Contains($_) })
+    if ($MissingDLLs.Count -gt 0) {
+      throw "Set-WindowsSxSToolchainRuntimePerDLL: refusing to bind '$ToolPath'; missing injected SxS DLL(s): $($MissingDLLs -join ', ')"
+    }
+
+    $Dependencies = @(
+      foreach ($DLLName in ($DirectRuntimeDeps | Sort-Object)) {
+        New-WindowsManifestDependency $DLLName $AssemblyVersion $ProcessorArchitecture
+      }
+    )
+    Set-WindowsExecutableManifestDependencies $ToolPath $Dependencies "Set-WindowsSxSToolchainRuntimePerDLL"
+    $BoundEXECount++
+  }
+
+  Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: bound $BoundEXECount EXE(s); skipped $SkippedCount EXE(s) with no runtime imports"
 }
 
 function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift) {
@@ -3538,10 +3910,9 @@ function Build-SDKDependencies([Hashtable[]] $ArchitectureSlices,
 
 # TODO(compnerd): remove this Build-SDK repair once libdispatch and
 # Foundation embed their Windows assembly manifests in their own builds.
-function Repair-WindowsSDKAssemblyManifests([Hashtable] $Platform, [string] $SDKRoot) {
+function Repair-WindowsSDKAssemblyManifests([Hashtable] $Platform, [string] $RuntimeBin) {
   $Targets = New-Object System.Collections.Generic.List[string]
 
-  $RuntimeBin = [IO.Path]::Combine($SDKRoot, "usr", "bin")
   foreach ($DLL in @(
     "dispatch",
     "swiftDispatch",
@@ -3568,6 +3939,7 @@ function Repair-WindowsSDKAssemblyManifests([Hashtable] $Platform, [string] $SDK
         -AssemblyVersion        (ConvertTo-FourPartVersion $ProductVersion) `
         -ProcessorArchitecture  $Platform.Architecture.VSName `
         -LogPrefix              "Repair-WindowsSDKAssemblyManifests"
+      Assert-WindowsManifestResourcesAreSxSSafe $Path "Repair-WindowsSDKAssemblyManifests"
     }
   }
 }
@@ -3583,16 +3955,29 @@ $SDKSupplementalRuntimes = @(
 )
 
 function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
-  $SDKIdentifier        = $Context.SDKIdentifier
-  $Variant              = $Context.Variant
-  $Compilers            = $Context.Compilers
-  $Static               = [bool]$Context.Static
-  $BuildFoundation      = [bool]$Context.BuildFoundation
-  $SupplementalRuntimes = @($Context.SupplementalRuntimes)
-  $SDKRoot              = Get-SwiftSDK -OS $Platform.OS -Identifier $SDKIdentifier
-  $BUILD_SHARED_LIBS    = if ($Static) { "NO" } else { "YES" }
-  $RuntimeBinaryCache   = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime")
-  $OverlayBinaryCache   = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay")
+  $SDKIdentifier         = $Context.SDKIdentifier
+  $Variant               = $Context.Variant
+  $Compilers             = $Context.Compilers
+  $Static                = [bool]$Context.Static
+  $BuildFoundation       = [bool]$Context.BuildFoundation
+  $SupplementalRuntimes  = @($Context.SupplementalRuntimes)
+  $InstallRuntimeToStage = $Platform.OS -eq [OS]::Windows
+  if ($Context.ContainsKey("InstallRuntimeToStage")) {
+    $InstallRuntimeToStage = [bool]$Context.InstallRuntimeToStage
+  }
+  $SDKRoot               = Get-SwiftSDK -OS $Platform.OS -Identifier $SDKIdentifier
+  $SDKRuntimeBin         = Get-SDKRuntimeBin $Platform $SDKRoot $InstallRuntimeToStage
+  $SDKLibexecDir         = Get-SDKLibexecDir $Platform $SDKRoot $InstallRuntimeToStage
+  # Windows SDK builds can redirect runtime install destinations out of the SDK
+  # root. Bootstrap disables that through InstallRuntimeToStage.
+  $SDKInstallDefines     = @{}
+  if ($Platform.OS -eq [OS]::Windows) {
+    $SDKInstallDefines.CMAKE_INSTALL_BINDIR = $SDKRuntimeBin
+    $SDKInstallDefines.CMAKE_INSTALL_LIBEXECDIR = $SDKLibexecDir
+  }
+  $BUILD_SHARED_LIBS     = if ($Static) { "NO" } else { "YES" }
+  $RuntimeBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime")
+  $OverlayBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay")
 
   # TODO: remove this once the migration is completed.
   Invoke-IsolatingEnvVars {
@@ -3624,7 +4009,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
         -CXXCompiler $Compilers.GNUCXX `
         -SwiftCompiler $Compilers.Swift `
         -SwiftSDK $null `
-        -Defines @{
+        -Defines ($SDKInstallDefines + @{
           BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
@@ -3643,7 +4028,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           # FIXME(compnerd) this currently causes a build failure on Windows, but
           # this should be enabled when building the dynamic runtime.
           SwiftCore_ENABLE_LIBRARY_EVOLUTION = "NO";
-        }
+        })
     }
 
     # ── Overlay ────────────────────────────────────────────────────────────────
@@ -3657,7 +4042,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
         -CXXCompiler $Compilers.GNUCXX `
         -SwiftCompiler $Compilers.Swift `
         -SwiftSDK $null `
-        -Defines @{
+        -Defines ($SDKInstallDefines + @{
           BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
@@ -3667,7 +4052,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           # FIXME(compnerd) this currently causes a build failure on Windows, but
           # this should be enabled when building the dynamic runtime.
           SwiftOverlay_ENABLE_LIBRARY_EVOLUTION = "NO";
-        }
+        })
     }
 
 
@@ -3682,7 +4067,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -CXXCompiler $Compilers.GNUCXX `
           -SwiftCompiler $Compilers.Swift `
           -SwiftSDK $null `
-          -Defines @{
+          -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
@@ -3691,7 +4076,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(compnerd) this currently causes a build failure on Windows, but
             # this should be enabled when building the dynamic runtime.
             SwiftStringProcessing_ENABLE_LIBRARY_EVOLUTION = "NO";
-          }
+          })
       }
     }
 
@@ -3706,7 +4091,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -CCompiler $Compilers.GNUC `
           -SwiftCompiler $Compilers.Swift `
           -SwiftSDK $null `
-          -Defines @{
+          -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
@@ -3716,7 +4101,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(compnerd) this currently causes a build failure on Windows, but
             # this should be enabled when building the dynamic runtime.
             SwiftSynchronization_ENABLE_LIBRARY_EVOLUTION = "NO";
-          }
+          })
       }
     }
 
@@ -3731,7 +4116,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -CXXCompiler $Compilers.GNUCXX `
           -SwiftCompiler $Compilers.Swift `
           -SwiftSDK $null `
-          -Defines @{
+          -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
             CMAKE_CXX_FLAGS = @("-I$RuntimeBinaryCache\include");
@@ -3743,7 +4128,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(compnerd) this currently causes a build failure on Windows, but
             # this should be enabled when building the dynamic runtime.
             SwiftDistributed_ENABLE_LIBRARY_EVOLUTION = "NO";
-          }
+          })
       }
     }
 
@@ -3757,7 +4142,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -CXXCompiler $Compilers.GNUCXX `
           -SwiftCompiler $Compilers.Swift `
           -SwiftSDK $null `
-          -Defines @{
+          -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
             CMAKE_CXX_FLAGS = @("-I$RuntimeBinaryCache\include");
@@ -3769,7 +4154,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(compnerd) this currently causes a build failure on Windows, but
             # this should be enabled when building the dynamic runtime.
             SwiftObservation_ENABLE_LIBRARY_EVOLUTION = "NO";
-          }
+          })
       }
     }
 
@@ -3784,7 +4169,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -CXXCompiler $Compilers.GNUCXX `
           -SwiftCompiler $Compilers.Swift `
           -SwiftSDK $null `
-          -Defines @{
+          -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
@@ -3794,7 +4179,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(compnerd) this currently causes a build failure on Windows, but
             # this should be enabled when building the dynamic runtime.
             SwiftDifferentiation_ENABLE_LIBRARY_EVOLUTION = "NO";
-          }
+          })
       }
     }
 
@@ -3808,7 +4193,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -CCompiler $Compilers.GNUC `
           -SwiftCompiler $Compilers.Swift `
           -SwiftSDK $null `
-          -Defines @{
+          -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -3819,7 +4204,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(compnerd) this currently causes a build failure on Windows, but
             # this should be enabled when building the dynamic runtime.
             SwiftVolatile_ENABLE_LIBRARY_EVOLUTION = "NO";
-          }
+          })
       }
     }
 
@@ -3834,7 +4219,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -CXXCompiler $Compilers.GNUCXX `
           -SwiftCompiler $Compilers.Swift `
           -SwiftSDK $null `
-          -Defines @{
+          -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -3848,7 +4233,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             SwiftRuntime_ENABLE_LIBRARY_EVOLUTION = "NO";
 
             SwiftRuntime_ENABLE_BACKTRACING = "YES";
-          }
+          })
       }
     }
 
@@ -3867,6 +4252,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
         ENABLE_SWIFT                      = "YES";
         dispatch_INSTALL_ARCH_SUBDIR      = "YES";
       }
+      $DispatchDefines = $SDKInstallDefines + $DispatchDefines
 
       Build-CMakeProject `
         -Src $SourceCache\swift-corelibs-libdispatch `
@@ -3940,6 +4326,7 @@ roots:
           _SwiftCollections_SourceDIR       = "$SourceCache\swift-collections";
           SwiftFoundation_MACRO             = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin";
         }
+        $FoundationDefines = $SDKInstallDefines + $FoundationDefines
 
         Build-CMakeProject `
           -Src $SourceCache\swift-corelibs-foundation `
@@ -3965,13 +4352,13 @@ roots:
           -CXXCompiler $Compilers.GNUCXX `
           -SwiftCompiler $Compilers.Swift `
           -SwiftSDK $null `
-          -Defines @{
+          -Defines ($SDKInstallDefines + @{
             CMAKE_Swift_FLAGS   = @("-static-stdlib");
             SwiftCore_DIR       = "$(Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime"))\cmake\SwiftCore";
             SwiftCxxOverlay_DIR = "$(Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay"))\Cxx\cmake\SwiftCxxOverlay";
             SwiftOverlay_DIR    = "$(Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay"))\cmake\SwiftOverlay";
             SwiftRuntime_DIR    = "$(Get-ProjectBinaryCache $Platform ([Project]"${Variant}RuntimeModule"))\cmake\SwiftRuntime";
-          }
+          })
       }
     }
 
@@ -3991,8 +4378,9 @@ roots:
     if ($Platform.OS -eq [OS]::Windows -and -not $Static) {
       # TODO(compnerd): remove once these runtime projects embed their Windows
       # assembly manifests in their own builds.
-      Repair-WindowsSDKAssemblyManifests $Platform $SDKRoot
+      Repair-WindowsSDKAssemblyManifests $Platform $SDKRuntimeBin
     }
+
   }
 }
 
@@ -4727,6 +5115,226 @@ function Test-PackageManager() {
     -Xlinker "-L$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+Asserts\usr\lib"
 }
 
+# Once the staged toolchain image is laid out, bind each toolchain EXE to
+# private SxS assemblies for the Swift runtime DLLs in its static import
+# closure.
+# The caller provides the exact runtime image the toolchain was linked against.
+# The WiX package authoring remains canonical; this pass only warns when the
+# live import graph and the checked-in package layout drift.
+function Stage-WindowsToolchainSxS([Hashtable] $Platform,
+                                   [string]    $ToolchainRoot,
+                                   [string]    $RuntimeLocation) {
+  # Ordered by package dependency.  `bld` is the common base package for the
+  # tool packages, and `dbg` is not useful without the base toolchain.
+  $PackageWxiFiles = [ordered] @{
+    "bld" = "$SourceCache\swift-installer-scripts\platforms\Windows\bld\bld.wxi"
+    "cli" = "$SourceCache\swift-installer-scripts\platforms\Windows\cli\cli.wxi"
+    "dbg" = "$SourceCache\swift-installer-scripts\platforms\Windows\dbg\dbg.wxi"
+    "ide" = "$SourceCache\swift-installer-scripts\platforms\Windows\ide\ide.wxi"
+  }
+
+  # Parse each `*.wxi` once: EXE name -> package, and package -> declared SxS DLLs.
+  $EXEToPackage   = @{}
+  $PackageToSxS   = @{}
+  foreach ($Package in $PackageWxiFiles.Keys) {
+    $WxiPath = $PackageWxiFiles[$Package]
+    if (-not (Test-Path $WxiPath)) {
+      Write-Warning "Stage-WindowsToolchainSxS: '$WxiPath' not found; package '$Package' will be omitted from cross-reference"
+      continue
+    }
+    $WxiText = Get-Content -Raw -LiteralPath $WxiPath
+    # Match `$(ToolchainRoot)\usr\bin\<basename>.exe` references (any
+    # quoting style, forward or back slashes).
+    $EXEMatches = [regex]::Matches(
+      $WxiText,
+      '\$\(ToolchainRoot\)[\\/]+usr[\\/]+bin[\\/]+([A-Za-z0-9_+\-\.]+)\.exe'
+    )
+    foreach ($M in $EXEMatches) {
+      $EXEName = $M.Groups[1].Value + ".exe"
+      if (-not $EXEToPackage.ContainsKey($EXEName)) {
+        $EXEToPackage[$EXEName] = $Package
+      }
+    }
+    # Match the per-DLL SxS layout: `usr\bin\<basename>\<basename>.dll`.
+    $SxSMatches = [regex]::Matches(
+      $WxiText,
+      '\$\(ToolchainRoot\)[\\/]+usr[\\/]+bin[\\/]+([A-Za-z0-9_+\-\.]+)[\\/]+\1\.dll'
+    )
+    $Names = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($M in $SxSMatches) {
+      [void]$Names.Add($M.Groups[1].Value)
+    }
+    $PackageToSxS[$Package] = @($Names | Sort-Object)
+  }
+
+  if (-not (Test-Path $RuntimeLocation)) {
+    throw "Stage-WindowsToolchainSxS: RuntimeLocation '$RuntimeLocation' not found"
+  }
+
+  if (-not (Test-Path $ToolchainRoot)) {
+    throw "Stage-WindowsToolchainSxS: ToolchainRoot '$ToolchainRoot' not found"
+  }
+
+  $RuntimeDLLs = @(Get-WindowsSxSRuntimeDLLs $RuntimeLocation)
+  if (-not $RuntimeDLLs) {
+    throw "Stage-WindowsToolchainSxS: no *.dll found under '$RuntimeLocation'"
+  }
+
+  $BinDir = [IO.Path]::Combine($ToolchainRoot, "usr", "bin")
+  if (-not (Test-Path $BinDir)) {
+    throw "Stage-WindowsToolchainSxS: BinDir '$BinDir' not found"
+  }
+
+  Write-Host "Stage-WindowsToolchainSxS: toolchain root     = '$ToolchainRoot'"
+  Write-Host "Stage-WindowsToolchainSxS: runtime source     = '$RuntimeLocation'"
+
+  # Build basename -> direct Swift runtime imports.  Keep only edges within
+  # the runtime DLL set; system and CRT DLLs are not part of the SxS graph.
+  #
+  # BlocksRuntime stays flat; the Swift runtime DLLs use private SxS.
+  $NonSxSRuntimeDLLs = New-Object System.Collections.Generic.HashSet[string]
+  [void]$NonSxSRuntimeDLLs.Add("BlocksRuntime")
+
+  $RuntimeBaseNames = @(
+    $RuntimeDLLs |
+      ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_.Name) } |
+      Where-Object { -not $NonSxSRuntimeDLLs.Contains($_) }
+  )
+  $RuntimeSet = New-Object System.Collections.Generic.HashSet[string]
+  foreach ($D in $RuntimeBaseNames) { [void]$RuntimeSet.Add($D) }
+
+  $RuntimeDependencies = @{}
+  foreach ($DLL in $RuntimeBaseNames) {
+    $DLLPath = Join-Path $RuntimeLocation "$DLL.dll"
+    $RuntimeDependencies[$DLL] = @(Get-DirectRuntimeImports -Path $DLLPath -RuntimeSet $RuntimeSet)
+  }
+  Write-Host "Stage-WindowsToolchainSxS: built runtime graph with $($RuntimeDependencies.Count) DLL(s)"
+
+  $EXEDependencies = @{}
+  $EXEPackageClosures = @{}
+  $DLLDependencies = @{}
+  $DLLsNeeded = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  $TotalEXEs = 0
+
+  Get-ChildItem -Path $BinDir -Filter "*.exe" -File | ForEach-Object {
+    $TotalEXEs++
+    $StaticRuntimeDeps = @(
+      Get-StaticRuntimeImports `
+        -Path       $_.FullName `
+        -BinaryDir  $BinDir `
+        -RuntimeSet $RuntimeSet
+    )
+    $EXEDependencies[$_.FullName] = @(
+      Get-RuntimeImportClosure `
+        -Roots        $StaticRuntimeDeps `
+        -RuntimeGraph $RuntimeDependencies
+    )
+    $EXEPackageClosures[$_.FullName] = $EXEDependencies[$_.FullName]
+    foreach ($D in $EXEDependencies[$_.FullName]) { [void]$DLLsNeeded.Add($D) }
+  }
+
+  Get-ChildItem -Path $BinDir -Filter "*.dll" -File -ErrorAction SilentlyContinue | ForEach-Object {
+    $ImageName = [IO.Path]::GetFileNameWithoutExtension($_.Name)
+    if (-not $RuntimeSet.Contains($ImageName)) {
+      $DirectRuntimeDeps = @(Get-DirectRuntimeImports -Path $_.FullName -RuntimeSet $RuntimeSet)
+      if ($DirectRuntimeDeps.Count -gt 0) {
+        $DLLDependencies[$_.FullName] = $DirectRuntimeDeps
+        foreach ($D in $DirectRuntimeDeps) { [void]$DLLsNeeded.Add($D) }
+      }
+    }
+  }
+
+  # Remove flat copies that would shadow the private SxS assemblies.  The
+  # excluded flat DLL and all link-time import libraries are left in place.
+  $RuntimeBaseNameSet = New-Object System.Collections.Generic.HashSet[string]
+  foreach ($D in $RuntimeBaseNames) { [void]$RuntimeBaseNameSet.Add($D) }
+  $RemovedFlat = New-Object System.Collections.Generic.List[string]
+  Get-ChildItem -Path $BinDir -Filter "*.dll" -File -ErrorAction SilentlyContinue | ForEach-Object {
+    $Base = [IO.Path]::GetFileNameWithoutExtension($_.Name)
+    if ($RuntimeBaseNameSet.Contains($Base)) {
+      Remove-Item -LiteralPath $_.FullName -Force
+      [void]$RemovedFlat.Add($_.Name)
+    }
+  }
+  if ($RemovedFlat.Count -gt 0) {
+    Write-Host "Stage-WindowsToolchainSxS: removed flat runtime DLL(s) from '$BinDir' to make room for per-assembly SxS layout: $(@($RemovedFlat) -join ', ')"
+  }
+
+  $DLLRootImports = @($DLLsNeeded | Sort-Object)
+  $DLLsToInject = @(Get-RuntimeImportClosure -Roots $DLLRootImports -RuntimeGraph $RuntimeDependencies)
+  $EXEsToBind = ($EXEDependencies.Keys | Where-Object { @($EXEDependencies[$_]).Count -gt 0 } | Measure-Object).Count
+  Write-Host "Stage-WindowsToolchainSxS: discovered $TotalEXEs exe(s); $EXEsToBind need EXE binding; $($DLLDependencies.Count) DLL(s) import Swift runtime DLLs; $($DLLsToInject.Count) DLL(s) in bind set"
+
+  # Prefer an MSI that already ships a dependent tool.  If a DLL is needed by
+  # a tool in `bld`, keep it in `bld` so the dependent `cli`/`ide` packages
+  # do not need to duplicate it.
+  $PackageOrder = @("bld", "cli", "dbg", "ide")
+  $ExpectedPackage = @{}
+  foreach ($DLL in $DLLsToInject) {
+    # Avoid `$Home`, which is a read-only PowerShell automatic variable.
+    $OwningPackage = $null
+    foreach ($Package in $PackageOrder) {
+      $PackageEXEs = @($EXEToPackage.GetEnumerator() | Where-Object { $_.Value -eq $Package } | ForEach-Object { $_.Key })
+      $Found = $false
+      foreach ($EXE in $PackageEXEs) {
+        $FullPath = Join-Path $BinDir $EXE
+        if ($EXEPackageClosures.ContainsKey($FullPath) -and ($EXEPackageClosures[$FullPath] -contains $DLL)) {
+          $Found = $true
+          break
+        }
+      }
+      if ($Found) { $OwningPackage = $Package; break }
+    }
+    if ($OwningPackage) { $ExpectedPackage[$DLL] = $OwningPackage }
+    else                { $ExpectedPackage[$DLL] = "(unattributed)" }
+  }
+
+  # Warn about WiX drift, but keep the checked-in package layout canonical.
+  foreach ($DLL in $DLLsToInject) {
+    $Want = $ExpectedPackage[$DLL]
+    $WiXPackage = $null
+    foreach ($Package in $PackageToSxS.Keys) {
+      if ($PackageToSxS[$Package] -contains $DLL) {
+        if ($WiXPackage) {
+          Write-Host -BackgroundColor DarkRed -ForegroundColor White "Stage-WindowsToolchainSxS: '$DLL' is declared in multiple package .wxi files ($WiXPackage, $Package)"
+        } else {
+          $WiXPackage = $Package
+        }
+      }
+    }
+    if (-not $WiXPackage) {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "Stage-WindowsToolchainSxS: '$DLL' is needed by staged PE files (expected package: $Want) but not declared in any package .wxi"
+    } elseif ($Want -ne "(unattributed)" -and $WiXPackage -ne $Want) {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "Stage-WindowsToolchainSxS: '$DLL' is declared in $WiXPackage.wxi but expected package is $Want.wxi"
+    }
+  }
+  foreach ($Package in $PackageToSxS.Keys) {
+    foreach ($DLL in $PackageToSxS[$Package]) {
+      if (-not $ExpectedPackage.ContainsKey($DLL)) {
+        Write-Host -BackgroundColor DarkRed -ForegroundColor White "Stage-WindowsToolchainSxS: '$DLL' is declared in $Package.wxi but no toolchain EXE imports it"
+      }
+    }
+  }
+
+  # Nothing to bind if no PE imports the Swift runtime graph.
+  if ($DLLsToInject.Count -eq 0) {
+    Write-Host "Stage-WindowsToolchainSxS: no PE in '$BinDir' has Swift runtime imports; skipping per-DLL bind"
+    return
+  }
+  Invoke-IsolatingEnvVars {
+    Invoke-VsDevShell $Platform
+    Set-WindowsSxSToolchainRuntimePerDLL `
+      -BinaryDir              $BinDir `
+      -RuntimeSourceDir       $RuntimeLocation `
+      -EXEDependencies        $EXEDependencies `
+      -DLLsToInject           $DLLsToInject `
+      -AssemblyVersion        (ConvertTo-FourPartVersion $ProductVersion) `
+      -ProcessorArchitecture  $Platform.Architecture.VSName
+  }
+}
+
 function Build-Installer([Hashtable] $Platform) {
   # TODO(hjyamauchi) Re-enable the swift-inspect and swift-docc builds
   # when cross-compiling https://github.com/apple/swift/issues/71655
@@ -4760,7 +5368,7 @@ function Build-Installer([Hashtable] $Platform) {
   $Properties["WindowsArchitectures"] = "`"$(($WindowsSDKBuilds | ForEach-Object { $_.Architecture.LLVMName }) -Join ";")`""
   $Properties["ToolchainVariants"] = "`"asserts$(if ($IncludeNoAsserts) { ";noasserts" })`"";
   foreach ($Build in $WindowsSDKBuilds) {
-    $Properties["WindowsRuntime$($Build.Architecture.ShortName.ToUpperInvariant())"] = [IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", "$ProductVersion");
+    $Properties["WindowsRuntime$($Build.Architecture.ShortName.ToUpperInvariant())"] = Get-WindowsRuntimeInstallRoot $Build
   }
 
   Build-WiXProject bundle\installer.wixproj -Platform $Platform -Bundle -Properties $Properties
@@ -4817,6 +5425,11 @@ if ($Clean) {
 
 if (-not $SkipBuild) {
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
+  if ($HostPlatform.OS -eq [OS]::Windows) {
+    (@($HostPlatform) + @($WindowsSDKBuilds)) | ForEach-Object {
+      Remove-Item -Force -Recurse (Get-WindowsRuntimeInstallRoot $_) -ErrorAction Ignore
+    }
+  }
 
   # ── Build Tools ───────────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $BuildPlatform
@@ -4841,12 +5454,13 @@ if (-not $SkipBuild) {
 
   # ── Bootstrap SDK ─────────────────────────────────────────────────────────
   Invoke-BuildStep Build-SDK $BuildPlatform -Context @{
-    SDKIdentifier        = "Bootstrap";
-    Variant              = "Bootstrap";
-    Compilers            = $Compilers.Stage0;
-    Static               = $false;
-    BuildFoundation      = $false;
-    SupplementalRuntimes = @("StringProcessing");
+    SDKIdentifier         = "Bootstrap";
+    Variant               = "Bootstrap";
+    Compilers             = $Compilers.Stage0;
+    Static                = $false;
+    BuildFoundation       = $false;
+    InstallRuntimeToStage = $false;
+    SupplementalRuntimes  = @("StringProcessing");
   }
 
   # ── Stage1 Compiler ───────────────────────────────────────────────────────
@@ -4857,7 +5471,7 @@ if (-not $SkipBuild) {
     SwiftCompiler   = $Compilers.Stage0.Swift;
     SwiftSDK        = Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap;
     ToolchainRoot   = Get-ProjectToolchainRoot $BuildPlatform Stage1Compilers;
-    RuntimeLocation = [IO.Path]::Combine((Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap), "usr", "bin");
+    RuntimeLocation = Get-SDKRuntimeBin $BuildPlatform (Get-SwiftSDK -OS $BuildPlatform.OS -Identifier Bootstrap) $false;
   }
 
   # ── Host Platform SDK ─────────────────────────────────────────────────────
@@ -5029,9 +5643,20 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "NoAsserts"
   }
 
-  # ── Stage2 Compiler Memory Allocator Swap ─────────────────────────────────
-  Invoke-BuildStep Build-mimalloc $HostPlatform
-  Invoke-BuildStep Patch-mimalloc $HostPlatform
+  if ($HostPlatform.OS -eq [OS]::Windows) {
+    $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
+    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+      ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
+      RuntimeLocation = $HostRuntimeBin;
+    }
+    if ($IncludeNoAsserts) {
+      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+        ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
+        RuntimeLocation = $HostRuntimeBin;
+      }
+    }
+  }
 }
 
 if ($IncludeDS2) {
@@ -5068,12 +5693,6 @@ if ($Windows) {
     ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift\windows"        -Filter @("*.lib")
     ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift_static\windows" -Filter @("*.lib")
 
-    Copy-Directory "${SDKROOT}\usr\bin"     "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", $ProductVersion, "usr"))"
-    # `usr\libexec` only exists when StackWalker (swift-backtrace) was built,
-    # which `Build-SDK` gates on the static link mode + 64-bit Windows.
-    if ($Build.LinkModes.Contains("static") -and $Build.Architecture.ShortName -ne "x86") {
-      Copy-Directory "${SDKROOT}\usr\libexec" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", $ProductVersion, "usr"))"
-    }
   }
 
   Install-SDK $WindowsSDKBuilds
@@ -5096,6 +5715,28 @@ if ($Windows) {
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build CURL)\lib\libcurl.lib" -Destination "${SwiftResourceDir}\libcurl.lib" | Out-Null
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build XML2)\libxml2s.lib" -Destination "${SwiftResourceDir}\libxml2s.lib" | Out-Null
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build ZLib)\zlibstatic.lib" -Destination "${SwiftResourceDir}\zlibstatic.lib" | Out-Null
+  }
+
+  $RebuiltHostDynamicRuntime = @(
+    $WindowsSDKBuilds | Where-Object {
+      $_ -eq $HostPlatform -and $_.LinkModes.Contains("dynamic")
+    }
+  ).Count -gt 0
+  # If -Windows rebuilds the host dynamic runtime, refresh the private SxS
+  # copies after the final runtime image is in place.
+  if (-not $SkipBuild -and $RebuiltHostDynamicRuntime) {
+    $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
+    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+      ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
+      RuntimeLocation = $HostRuntimeBin;
+    }
+    if ($IncludeNoAsserts) {
+      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+        ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
+        RuntimeLocation = $HostRuntimeBin;
+      }
+    }
   }
 }
 
@@ -5165,6 +5806,8 @@ if ($Android) {
 }
 
 if (-not $SkipPackaging) {
+  Invoke-BuildStep Build-mimalloc $HostPlatform
+  Invoke-BuildStep Patch-mimalloc $HostPlatform
   Invoke-BuildStep Build-Installer $HostPlatform
 }
 
@@ -5173,6 +5816,15 @@ if ($Stage) {
 }
 
 if (-not $IsCrossCompiling) {
+  if ($SkipBuild -and $HostPlatform.OS -eq [OS]::Windows -and $Test.Count -gt 0) {
+    $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
+    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+      ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
+      RuntimeLocation = $HostRuntimeBin;
+    }
+  }
+
   $CompilersTests = @("clang", "lld", "lldb", "lldb-swift", "llvm", "swift")
   if ($Test | Where-Object { $CompilersTests -contains $_ }) {
     $Tests = @{
