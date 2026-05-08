@@ -376,7 +376,7 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   // here.
 
   SWIFT_TASK_DEBUG_LOG("Destroyed task %p", task);
-  free(task);
+  swift_slowDealloc(task, 0, alignof(AsyncTask) - 1);
 }
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
@@ -963,7 +963,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     allocation = runInlineOption->getAllocation();
     initialSlabSize = runInlineBufferBytes - amountToAllocate;
   } else {
-    allocation = malloc(amountToAllocate);
+    allocation = swift_slowAlloc(amountToAllocate, alignof(AsyncTask) - 1);
   }
   SWIFT_TASK_DEBUG_LOG("allocate task %p, parent = %p, slab %u", allocation,
                        parent, initialSlabSize);
@@ -1884,10 +1884,12 @@ swift_task_createNullaryContinuationJobImpl(
   return job;
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 SWIFT_CC(swift)
 void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);
 }
+#endif
 
 // This has moved; the implementation is now in the executor; the declaration
 // needs to be here because unlike other things implemented by the executor,
@@ -1986,7 +1988,7 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
       swift_##name##_hook(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)          \
                               swift_##name##Impl,                              \
                           Override);                                           \
-      abort();                                                                 \
+      swift_unreachable("returned from noreturn hook");                        \
     }                                                                          \
     if (Override != nullptr)                                                   \
       Override(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)                     \
@@ -2002,7 +2004,7 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
   attrs ccAttrs void namespace swift_##name COMPATIBILITY_PAREN(typedArgs) {   \
     if (swift_##name##_hook) {                                                 \
       swift_##name##_hook(swift_##name##Impl, nullptr);                        \
-      abort();                                                                 \
+      swift_unreachable("returned from noreturn hook");                        \
     }                                                                          \
     swift_##name##Impl COMPATIBILITY_PAREN(namedArgs);                         \
   }

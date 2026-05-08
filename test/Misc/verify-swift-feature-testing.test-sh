@@ -33,6 +33,9 @@ EXCEPTIONAL_FILES = [
     pathlib.Path("validation-test/Evolution/test_coroutine_accessors.swift"),
     # Uses a special -experimental-features flag for the rth utility
     pathlib.Path("validation-test/Evolution/test_protocol_add_reparented_seq.swift"),
+    # Needs Embedded but without any command lines that enable it for the compiler.
+    pathlib.Path("test/embedded/concurrency-non-symbols.swift"),
+    pathlib.Path("test/embedded/concurrency-non-symbols-nonassert.swift"),
 ]
 
 ENABLE_FEATURE_RE = re.compile(

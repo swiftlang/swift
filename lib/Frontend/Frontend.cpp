@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/Frontend.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityScope.h"
@@ -1833,6 +1834,8 @@ void CompilerInstance::freeASTContext() {
 /// Perform "stable" optimizations that are invariant across compiler versions.
 static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM) {
+  FrontendStatsTracer tracer(SM->getASTContext().Stats,
+                             "SIL-mandatory-passes");
   // Don't run diagnostic passes at all when merging modules.
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::MergeModules) {
@@ -1887,6 +1890,9 @@ static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
 }
 
 bool CompilerInstance::performSILProcessing(SILModule *silModule) {
+  FrontendStatsTracer tracer(silModule->getASTContext().Stats,
+                             "SIL-processing");
+
   if (performMandatorySILPasses(Invocation, silModule) &&
       !Invocation.getFrontendOptions().AllowModuleWithCompilerErrors)
     return true;
@@ -1927,6 +1933,30 @@ void CompilerInstance::emitEndOfPipelineDebuggingOutput() {
 
   if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
     ctx.getClangModuleLoader()->dumpSwiftLookupTables();
+
+  if (opts.DumpAbstractLayout) {
+    auto &sf = getPrimaryOrMainSourceFile();
+    for (auto *decl : sf.getTopLevelDecls()) {
+      auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+      if (!nominal)
+        continue;
+      for (auto *field : nominal->getStoredProperties()) {
+        auto fieldType = field->getInterfaceType();
+        if (auto *fieldNominal = fieldType->getAnyNominal()) {
+          if (auto layout = computeAbstractLayout(fieldNominal)) {
+            llvm::outs() << fieldNominal->getName() << ":\n";
+            llvm::outs() << "  size: " << layout->size << "\n";
+            llvm::outs() << "  alignment: " << layout->alignment << "\n";
+            llvm::outs() << "  stride: " << layout->stride << "\n";
+            llvm::outs() << "  bitwiseCopyable: "
+                         << (layout->bitwiseCopyable ? "true" : "false") << "\n";
+            llvm::outs() << "  isOpaque: "
+                         << (layout->isOpaque ? "true" : "false") << "\n";
+          }
+        }
+      }
+    }
+  }
 }
 
 bool CompilerInstance::isCancellationRequested() const {

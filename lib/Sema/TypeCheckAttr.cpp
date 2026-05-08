@@ -222,7 +222,7 @@ public:
   IGNORED_ATTR(AllowFeatureSuppression)
   IGNORED_ATTR(PreInverseGenerics)
   IGNORED_ATTR(Safe)
-  IGNORED_ATTR(Warn)
+  IGNORED_ATTR(Diagnose)
 #undef IGNORED_ATTR
 
   void visitABIAttr(ABIAttr *attr) {

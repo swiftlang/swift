@@ -1100,7 +1100,22 @@ void Serializer::writeHeader() {
     Channel.emit(ScratchRecord, version::getCurrentCompilerChannel());
 
     {
-      llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
+      // OPTIONS_BLOCK needs an abbrev-code width wide enough to encode
+      // every BCRecordLayout it allocates: 4 reserved IDs plus one per
+      // record kind. If this fires, widen the code size below.
+      constexpr unsigned OptionsBlockCodeSize = 6;
+      constexpr unsigned ReservedAbbrevs =
+        llvm::bitc::FIRST_APPLICATION_ABBREV;
+      constexpr unsigned MaxUserAbbrevsInOptionsBlock =
+        options_block::LAST_RECORD_KIND_MARKER - 1;
+      static_assert(
+        ReservedAbbrevs + MaxUserAbbrevsInOptionsBlock <=
+            (1u << OptionsBlockCodeSize),
+        "OPTIONS_BLOCK abbrev-code size is too small to hold an "
+        "abbreviation for every record kind; widen "
+        "kOptionsBlockCodeSize.");
+      llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID,
+                                    OptionsBlockCodeSize);
 
       options_block::IsSIBLayout IsSIB(Out);
       IsSIB.emit(ScratchRecord, Options.IsSIB);
@@ -3047,7 +3062,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::ClangImporterSynthesizedType:
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
-    case DeclAttrKind::Warn:
+    case DeclAttrKind::Diagnose:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \

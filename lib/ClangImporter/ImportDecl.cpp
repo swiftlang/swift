@@ -19,6 +19,7 @@
 #include "ClangDerivedConformances.h"
 #include "ImporterImpl.h"
 #include "SwiftDeclSynthesizer.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityInference.h"
@@ -42,6 +43,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -91,6 +93,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
@@ -175,13 +178,8 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
   }
 }
 
-bool importer::hasImmortalAttrs(const clang::RecordDecl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "retain:immortal" ||
-                    swiftAttr->getAttribute() == "release:immortal";
-           return false;
-         });
+bool importer::hasAnyImmortalAttr(const clang::RecordDecl *decl) {
+  return hasSwiftAttribute(decl, {"retain:immortal", "release:immortal"});
 }
 
 importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
@@ -923,11 +921,7 @@ static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
 }
 
 static bool hasComputedPropertyAttr(const clang::Decl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "import_computed_property";
-           return false;
-         });
+  return hasSwiftAttribute(decl, {"import_computed_property"});
 }
 
 /// Whether to import a member decl when importing its parent record.
@@ -3822,7 +3816,7 @@ namespace {
       HeaderLoc loc(decl->getLocation());
 
       if (recordDecl && recordHasReferenceSemantics(recordDecl) &&
-          !hasImmortalAttrs(recordDecl)) {
+          !hasAnyImmortalAttr(recordDecl)) {
         if (attrInfo.hasConflictingAttr()) {
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);
@@ -9800,16 +9794,10 @@ void ClangImporter::Implementation::importAttributes(
     }
 
     // Map Clang's swift_objc_members attribute to @objcMembers.
-    if (ID->hasAttr<clang::SwiftObjCMembersAttr>() &&
-        isa<ClassDecl>(MappedDecl)) {
-      if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
-        auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
-        MappedDecl->addAttribute(attr);
-      }
-    }
-
-    // Infer @objcMembers on XCTestCase.
-    if (ID->getName() == "XCTestCase") {
+    // Also infer @objcMembers on XCTestCase.
+    if ((ID->hasAttr<clang::SwiftObjCMembersAttr>() &&
+         isa<ClassDecl>(MappedDecl)) ||
+        ID->getName() == "XCTestCase") {
       if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
         auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
         MappedDecl->addAttribute(attr);
@@ -11214,6 +11202,43 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 };
 
 static ClangDeclTraceFormatter TF;
+
+// MARK: - Abstract Layout Computation
+
+std::optional<AbstractTypeLayout>
+swift::computeAbstractLayout(const NominalTypeDecl *decl) {
+  auto *clangDecl =
+      dyn_cast_or_null<clang::RecordDecl>(decl->getClangDecl());
+  if (!clangDecl)
+    return std::nullopt;
+
+  clangDecl = clangDecl->getDefinition();
+  if (!clangDecl)
+    return std::nullopt;
+
+  auto &ctx = decl->getASTContext();
+  auto *clangLoader = ctx.getClangModuleLoader();
+  if (!clangLoader)
+    return std::nullopt;
+
+  auto &clangCtx = clangLoader->getClangASTContext();
+  const auto &recordLayout = clangCtx.getASTRecordLayout(clangDecl);
+
+  AbstractTypeLayout result;
+  result.size = recordLayout.getSize().getQuantity();
+  result.alignment = recordLayout.getAlignment().getQuantity();
+  result.stride = llvm::alignTo(result.size, result.alignment);
+
+  Type swiftType = decl->getDeclaredInterfaceType();
+  result.bitwiseCopyable = swiftType->isBitwiseCopyable();
+
+  if (auto *structDecl = dyn_cast<StructDecl>(decl))
+    result.isOpaque = structDecl->isCxxNonTrivial();
+  else
+    result.isOpaque = false;
+
+  return result;
+}
 
 template<>
 const UnifiedStatsReporter::TraceFormatter*

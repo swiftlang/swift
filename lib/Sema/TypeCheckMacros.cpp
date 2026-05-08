@@ -609,6 +609,9 @@ bool swift::isInvalidAttachedMacro(MacroRole role,
 static void diagnoseInvalidDecl(Decl *decl,
                                 MacroDecl *macro,
                                 llvm::function_ref<bool(DeclName)> coversName) {
+  if (decl->getASTContext().TypeCheckerOpts.TypeCheckMacrosEagerly)
+    TypeChecker::typeCheckDecl(decl);
+
   auto &ctx = decl->getASTContext();
 
   // Diagnose invalid declaration kinds.

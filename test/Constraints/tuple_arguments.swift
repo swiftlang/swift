@@ -1756,6 +1756,7 @@ func rdar48443263() {
 
 func autoclosureSplat() {
   func takeFn<T>(_: (T) -> ()) {}
+  // expected-note@-1 {{required by local function 'takeFn' where 'T' = '() -> Int'}}
 
   takeFn { (fn: @autoclosure () -> Int) in }
   // This type checks because we find a solution T:= @escaping () -> Int and
@@ -1764,6 +1765,8 @@ func autoclosureSplat() {
   takeFn { (fn: @autoclosure () -> Int, x: Int) in }
   // expected-error@-1 {{contextual closure type '(() -> Int) -> ()' expects 1 argument, but 2 were used in closure body}}
   // expected-error@-2 {{converting non-escaping value to 'T' may allow it to escape}}
+  // expected-error@-3 {{type '() -> Int' cannot conform to 'Escapable'}}
+  // expected-note@-4 {{a function type can be marked '@escaping' to conform to 'Escapable'}}
 
   takeFn { (fn: @autoclosure @escaping () -> Int) in }
   // FIXME: It looks like matchFunctionTypes() does not check @autoclosure at all.
@@ -1788,6 +1791,9 @@ func noescapeSplat() {
   do {
     let t = takesFn { (fn: () -> Int, x: Int) in }
     // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+    // expected-error@-2 {{type '() -> Int' cannot conform to 'Escapable'}}
+    // expected-note@-3 {{a function type can be marked '@escaping' to conform to 'Escapable'}}
+    // expected-note@-4 {{requirement from conditional conformance of '(() -> Int, Int)' to 'Escapable'}}
     takesEscaping(t.0)
   }
 }

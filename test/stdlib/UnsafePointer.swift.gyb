@@ -305,9 +305,9 @@ func checkPtr(
   }
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-UnsafeMutablePointerTestSuite.test("moveAssign:from:") {
+UnsafeMutablePointerTestSuite.test("moveAssign:from:")
+.require(.crashTesting)
+.code {
   let check = checkPtr(UnsafeMutablePointer.moveAssign, true)
   check(Check.Disjoint)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
@@ -317,7 +317,9 @@ UnsafeMutablePointerTestSuite.test("moveAssign:from:") {
   }
 }
 
-UnsafeMutablePointerTestSuite.test("moveAssign:from:.Right") {
+UnsafeMutablePointerTestSuite.test("moveAssign:from:.Right")
+.require(.crashTesting)
+.code {
   let check = checkPtr(UnsafeMutablePointer.moveAssign, true)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
@@ -325,7 +327,6 @@ UnsafeMutablePointerTestSuite.test("moveAssign:from:.Right") {
     check(Check.RightOverlap)
   }
 }
-#endif
 
 UnsafeMutablePointerTestSuite.test("assign:from:") {
   let check = checkPtr(UnsafeMutablePointer.assign, true)
@@ -341,9 +342,9 @@ UnsafeMutablePointerTestSuite.test("moveInitialize:from:") {
   check(Check.RightOverlap)
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-UnsafeMutablePointerTestSuite.test("initialize:from:") {
+UnsafeMutablePointerTestSuite.test("initialize:from:")
+.require(.crashTesting)
+.code {
   let check = checkPtr(UnsafeMutablePointer.initialize(from:count:), false)
   check(Check.Disjoint)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
@@ -353,7 +354,9 @@ UnsafeMutablePointerTestSuite.test("initialize:from:") {
   }
 }
 
-UnsafeMutablePointerTestSuite.test("initialize:from:.Right") {
+UnsafeMutablePointerTestSuite.test("initialize:from:.Right")
+.require(.crashTesting)
+.code {
   let check = checkPtr(UnsafeMutablePointer.initialize(from:count:), false)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
@@ -361,7 +364,6 @@ UnsafeMutablePointerTestSuite.test("initialize:from:.Right") {
     check(Check.RightOverlap)
   }
 }
-#endif
 
 UnsafeMutablePointerTestSuite.test("initialize:from:/immutable") {
   let ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 3)
@@ -537,8 +539,9 @@ ${SelfName}TestSuite.test("pointer(to:)") {
 % end
 }
 
-#if !os(WASI)
-${SelfName}TestSuite.test("pointer(to:).overflow") {
+${SelfName}TestSuite.test("pointer(to:).overflow")
+.require(.crashTesting)
+.code {
   struct Example {
     var a = false
     var b = 0
@@ -559,7 +562,6 @@ ${SelfName}TestSuite.test("pointer(to:).overflow") {
   let doublePointer = p.pointer(to: \.d)
   expectNotNil(doublePointer)
 }
-#endif
 
 % end
 

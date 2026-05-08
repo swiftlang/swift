@@ -732,12 +732,18 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
 
   bool emittedSpecializedNote = false;
   if (auto protoType = protocolType->getAs<ProtocolType>()) {
-    if (protoType->getDecl()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    auto *protoDecl = protoType->getDecl();
+    if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable)) {
       if (nonConformingType->is<FunctionType>()) {
         emitDiagnostic(diag::nonsendable_function_type);
         emittedSpecializedNote = true;
       } else if (nonConformingType->is<TupleType>()) {
         emitDiagnostic(diag::nonsendable_tuple_type);
+        emittedSpecializedNote = true;
+      }
+    } else if (protoDecl->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+      if (nonConformingType->is<AnyFunctionType>()) {
+        emitDiagnostic(diag::nonescapable_function_type);
         emittedSpecializedNote = true;
       }
     }

@@ -635,3 +635,30 @@ bb0(%0 : @guaranteed $NonTrivialStruct):
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil hidden [ossa] @nontrivialstruct_borrow : $@convention(method) (@in_guaranteed NonTrivialStructPair) -> @guaranteed_address NonTrivialStruct {
+bb0(%0 : $*NonTrivialStructPair):
+  %1 = mark_unresolved_non_copyable_value [no_consume_or_assign] %0 : $*NonTrivialStructPair
+  %2 = struct_element_addr %1 : $*NonTrivialStructPair, #NonTrivialStructPair.lhs
+  return %2 : $*NonTrivialStruct
+}
+
+// CHECK-LABEL: sil [ossa] @testGetCallsBorrowAccessor :
+// CHECK:         struct_element_addr
+// CHECK:         apply
+// CHECK:         explicit_copy_addr
+// CHECK: } // end sil function 'testGetCallsBorrowAccessor'
+sil [ossa] @testGetCallsBorrowAccessor : $@convention(method) (@in_guaranteed NonTrivialStructPair) -> @out NonTrivialStruct {
+bb0(%0 : $*NonTrivialStruct, %1 : $*NonTrivialStructPair):
+  debug_value %1 : $*NonTrivialStructPair, let, name "self", argno 1, expr op_deref
+  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*NonTrivialStructPair
+  %4 = struct_element_addr %3 : $*NonTrivialStructPair, #NonTrivialStructPair.lhs
+  %5 = function_ref @nontrivialstruct_borrow : $@convention(method) (@in_guaranteed NonTrivialStructPair) -> @guaranteed_address NonTrivialStruct
+  %6 = apply %5(%3) : $@convention(method) (@in_guaranteed NonTrivialStructPair) -> @guaranteed_address NonTrivialStruct
+  %7 = mark_unresolved_non_copyable_value [no_consume_or_assign] %6 : $*NonTrivialStruct
+  // expected-error @-1 {{'unknown' is borrowed and cannot be consumed}}
+  copy_addr %7 to [init] %0 : $*NonTrivialStruct
+  // expected-note @-1 {{consumed here}}
+  %9 = tuple ()
+  return %9 : $()
+}

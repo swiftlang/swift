@@ -270,7 +270,6 @@ extension CooperativeExecutor: SchedulingExecutor {
       suspendingWaitQueue.enqueue(job, after: duration)
     } else {
       fatalError("Sorry, cannot schedule on an unknown clock")
-      return
     }
   }
 

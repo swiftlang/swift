@@ -303,6 +303,11 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
     }
 
     if (auto fas = FullApplySite::isa(user)) {
+      // Visit transitive uses for borrow and mutate accessors
+      if (fas.hasAddressResult()) {
+        transitiveResultUses(op);
+        continue;
+      }
       callVisitUse(op);
       continue;
     }

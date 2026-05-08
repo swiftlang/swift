@@ -1301,3 +1301,5 @@ Added: _$ss9UniqueBoxVMn
 // UniqueBox.pointer getter
 Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
 
+// Cross-encoding strcmp for Foundation
+Added: __swift_unicodeBuffersEqual_nonNormalizing

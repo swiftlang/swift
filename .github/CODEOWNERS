@@ -79,7 +79,7 @@
 /include/swift/AST/*Requirement*                   @hborla @slavapestov
 /include/swift/AST/*Substitution*                  @slavapestov
 /include/swift/AST/DiagnosticGroup*                @DougGregor
-/include/swift/AST/DiagnosticsClangImporter.def    @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @susmonteiro
+/include/swift/AST/DiagnosticsClangImporter.def    @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @susmonteiro @patrykstefanski
 /include/swift/AST/DiagnosticsDriver.def           @artemcm
 /include/swift/AST/DiagnosticsFrontend.def         @artemcm @tshortli
 /include/swift/AST/DiagnosticsIDE.def              @hamishknight @rintaro
@@ -91,7 +91,7 @@
 /include/swift/AST/Evaluator*                      @CodaFi @slavapestov
 /include/swift/Basic/                              @DougGregor
 /include/swift/Basic/Features.def                  @DougGregor @hborla
-/include/swift/ClangImporter                       @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @susmonteiro @hnrklssn
+/include/swift/ClangImporter                       @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @susmonteiro @hnrklssn @patrykstefanski
 /include/swift/DependencyScan                      @artemcm @cachemeifyoucan
 /include/swift/Driver*/                            @artemcm
 /include/swift/Frontend*/                          @artemcm @tshortli
@@ -102,7 +102,7 @@
 /include/swift/Migrator/                           @nkcsgexi
 /include/swift/Option/*Options*                    @tshortli
 /include/swift/Parse/                              @CodaFi @DougGregor @hamishknight @rintaro
-/include/swift/PrintAsClang                        @egorzhdan @Xazax-hun @j-hui @susmonteiro
+/include/swift/PrintAsClang                        @egorzhdan @Xazax-hun @j-hui @susmonteiro @patrykstefanski
 /include/swift/Refactoring                         @hamishknight @rintaro
 /include/swift/Runtime/                            @rjmccall @compnerd
 /include/swift/SIL/                                @jckarter
@@ -136,7 +136,7 @@
 /lib/ASTGen/                                        @CodaFi @hamishknight @rintaro
 /lib/Basic/                                         @DougGregor
 /lib/Basic/Windows                                  @compnerd
-/lib/ClangImporter                                  @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @susmonteiro @hnrklssn
+/lib/ClangImporter                                  @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @susmonteiro @hnrklssn @patrykstefanski
 /lib/ClangImporter/DWARFImporter*                   @adrian-prantl
 /lib/DependencyScan                                 @artemcm @cachemeifyoucan
 /lib/Driver*/                                       @artemcm
@@ -156,7 +156,7 @@
 /lib/Markup/                                        @nkcsgexi
 /lib/Migrator/                                      @nkcsgexi
 /lib/Parse/                                         @CodaFi @DougGregor @hamishknight @rintaro
-/lib/PrintAsClang                                   @egorzhdan @Xazax-hun @j-hui @susmonteiro
+/lib/PrintAsClang                                   @egorzhdan @Xazax-hun @j-hui @susmonteiro @patrykstefanski
 /lib/Refactoring/                                   @hamishknight @rintaro
 /lib/SIL/                                           @jckarter
 /lib/SIL/**/*DebugInfo*                             @adrian-prantl
@@ -202,7 +202,7 @@
 /stdlib/public/core/Swiftify*             @hnrklssn @Xazax-hun
 /stdlib/public/*Demangl*/                 @rjmccall
 /stdlib/public/Concurrency/               @ktoso
-/stdlib/public/Cxx/                       @egorzhdan @Xazax-hun @j-hui @susmonteiro
+/stdlib/public/Cxx/                       @egorzhdan @Xazax-hun @j-hui @susmonteiro @patrykstefanski
 /stdlib/public/Differentiation/           @asl
 /stdlib/public/Distributed/               @ktoso
 /stdlib/public/Observation/               @phausler
@@ -231,7 +231,7 @@
 /test/IDE/                                          @hamishknight @rintaro
 /test/IRGen/                                        @rjmccall
 /test/Index/                                        @hamishknight @rintaro
-/test/Interop/                                      @egorzhdan @Xazax-hun @j-hui @susmonteiro @hnrklssn
+/test/Interop/                                      @egorzhdan @Xazax-hun @j-hui @susmonteiro @hnrklssn @patrykstefanski
 /test/Macros/SwiftifyImport                         @hnrklssn @Xazax-hun
 /test/Migrator/                                     @nkcsgexi
 /test/Parse/                                        @CodaFi @DougGregor @hamishknight @rintaro

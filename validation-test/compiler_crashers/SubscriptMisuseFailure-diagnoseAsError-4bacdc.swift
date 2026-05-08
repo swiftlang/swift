@@ -1,3 +1,3 @@
-// {"kind":"typecheck","original":"cb606608","signature":"swift::constraints::SubscriptMisuseFailure::diagnoseAsError()","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast"}
+// {"kind":"typecheck","original":"cb606608","signature":"swift::constraints::SubscriptMisuseFailure::diagnoseAsError()","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast","signatureNext":"UseSubscriptOperator::diagnose"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 a(.subscript < b)

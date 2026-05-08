@@ -47,8 +47,7 @@ static TaskAllocator &allocator(AsyncTask *task) {
   static GlobalAllocator global;
   return global.allocator;
 #else
-  puts("global allocator fallback not available\n");
-  abort();
+  swift_Concurrency_fatalError(0, "global allocator fallback not available");
 #endif
 }
 

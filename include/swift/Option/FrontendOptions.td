@@ -468,6 +468,9 @@ def dump_requirement_machine : Flag<["-"], "dump-requirement-machine">,
 def debug_requirement_machine : Joined<["-"], "debug-requirement-machine=">,
   HelpText<"Fine-grained debug output from the generics implementation">;
 
+def eager_macro_checking : Flag<["-"], "eager-macro-checking">,
+  HelpText<"Enable eager type-checking of declarations in macro expansions">;
+
 def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
   HelpText<"Dumps the results of each macro expansion">;
 def emit_macro_expansion_files : Separate<["-"], "emit-macro-expansion-files">,
@@ -721,6 +724,9 @@ def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
 def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
+
+def dump_abstract_layout : Flag<["-"], "dump-abstract-layout">,
+  HelpText<"Dump abstract layout information for Clang-backed types">;
 
 def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
                                HelpText<"Dump availability scopes to stderr">;
