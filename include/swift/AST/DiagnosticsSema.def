@@ -822,6 +822,10 @@ ERROR(const_unsupported_keypath,none,
       "keypaths not supported in a literal expression", ())
 ERROR(const_opaque_decl_ref,none,
       "unable to resolve variable reference in a literal expression", ())
+ERROR(const_public_let_ref,none,
+      "reference to a %select{%error|%error|%error|package|public|open}0 "
+      "'let' binding is not permitted in a literal expression",
+      (AccessLevel))
 ERROR(const_opaque_func_decl_ref,none,
       "unable to resolve function reference in a literal expression", ())
 ERROR(const_non_convention_c_conversion,none,

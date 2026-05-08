@@ -18,6 +18,7 @@
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Unreachable.h"
 
@@ -350,6 +351,23 @@ private:
 
     FoldingErrorOr<ConstantValuePtr> foldDeclRefExpr(const DeclRefExpr *expr) {
       if (const VarDecl *varDecl = dyn_cast<VarDecl>(expr->getDecl())) {
+        // Swift source `let` bindings whose access level is broader than
+        // internal participate in the ABI surface of their module and may
+        // not appear in a literal expression. Emit the diagnostic inline so
+        // we can carry the access level, and return `UpstreamError` so no
+        // further generic "not a literal expression" message is added.
+        // A `var` that reaches here falls through to the existing
+        // opaque-decl-ref path, which is the correct diagnostic for it.
+        if (!varDecl->hasClangNode() && varDecl->isLet()) {
+          auto access = varDecl->getFormalAccess();
+          if (access >= AccessLevel::Package) {
+            Ctx.Diags.diagnose(expr->getLoc(), diag::const_public_let_ref,
+                               access);
+            return FoldingError(IllegalConstError::UpstreamError,
+                                expr->getLoc());
+          }
+        }
+
         // For other `@const` or `@section` values, we expect
         // their initializer to be foldable. For other values which
         // have a default value, we attempt to fold the
