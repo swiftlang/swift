@@ -436,6 +436,10 @@ public class PDBFile {
               let address = sections[Int(info.seg) - 1].virtualAddress + info.off
 
               rawNames[address] = rawName
+
+              functions.append(FunctionInfo(rawName: rawName,
+                                            name: rawName,
+                                            address: address))
             }
           }
 
@@ -502,7 +506,23 @@ public class PDBFile {
       return nil
     }
 
-    functions.sort { $0.address < $1.address }
+    functions.sort { $0.address < $1.address
+                       || ($0.address == $1.address
+                             && (($0.scope != nil && $1.scope == nil)
+                                   || $0.name < $1.name)) }
+
+    // Remove any duplicates
+    var read = 0, write = 0
+    while read < functions.count {
+      let address = functions[read].address
+      functions[write] = functions[read]
+      read += 1
+      write += 1
+      while read < functions.count && functions[read].address == address {
+        read += 1
+      }
+    }
+    functions.removeLast(functions.count - write)
   }
 
   enum StreamId {
@@ -888,13 +908,19 @@ public class PDBFile {
     }
 
     let function = functions[funcIndex]
-    let module = modules[function.moduleIndex]
 
-    let sourceLocation = lookup(address: address, in: module)
+    if let moduleIndex = function.moduleIndex {
+      let module = modules[moduleIndex]
+      let sourceLocation = lookup(address: address, in: module)
 
-    return SymbolLookup(rawName: function.rawName,
-                        name: function.name,
-                        offset: address - function.address,
-                        sourceLocation: sourceLocation)
+      return SymbolLookup(rawName: function.rawName,
+                          name: function.name,
+                          offset: address - function.address,
+                          sourceLocation: sourceLocation)
+    } else {
+      return SymbolLookup(rawName: function.rawName,
+                          name: function.name,
+                          offset: address - function.address)
+    }
   }
 }
