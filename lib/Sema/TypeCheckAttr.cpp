@@ -8235,6 +8235,8 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
                 .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else if (var->getAttrs().hasAttribute<LazyAttr>()) {
+            if(attr->isImplicit())
+              return;
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
                 .warnUntilLanguageMode(LanguageMode::v6)
                 .fixItInsertAfter(attr->getRange().End, "(unsafe)");
