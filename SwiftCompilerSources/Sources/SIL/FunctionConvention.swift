@@ -36,9 +36,17 @@ public struct FunctionConvention : CustomStringConvertible {
     self.hasLoweredAddresses = hasLoweredAddresses
   }
 
-  /// All results including the error.
+  /// All results including the error. Most callers want `formalResults`;
+  /// reach for this only when the error result should be processed alongside
+  /// the formal ones.
   public var results: Results {
     Results(bridged: SILFunctionType_getResultsWithError(functionType.bridged),
+      hasLoweredAddresses: hasLoweredAddresses)
+  }
+
+  /// The formal results, excluding the error result.
+  public var formalResults: Results {
+    Results(bridged: SILFunctionType_getResults(functionType.bridged),
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
