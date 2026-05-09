@@ -20,12 +20,14 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
 
 namespace swift {
 
 class NominalTypeDecl;
 
 struct AbstractTypeLayout {
+  std::string mangledName;
   uint64_t size;
   uint64_t alignment;
   uint64_t stride;
@@ -34,7 +36,7 @@ struct AbstractTypeLayout {
 };
 
 std::optional<AbstractTypeLayout>
-computeAbstractLayout(const NominalTypeDecl *decl);
+computeClangAbstractLayout(const NominalTypeDecl *decl);
 
 } // namespace swift
 

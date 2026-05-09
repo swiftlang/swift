@@ -21,6 +21,7 @@
 #include "SwiftDeclSynthesizer.h"
 #include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
@@ -11206,7 +11207,7 @@ static ClangDeclTraceFormatter TF;
 // MARK: - Abstract Layout Computation
 
 std::optional<AbstractTypeLayout>
-swift::computeAbstractLayout(const NominalTypeDecl *decl) {
+swift::computeClangAbstractLayout(const NominalTypeDecl *decl) {
   auto *clangDecl =
       dyn_cast_or_null<clang::RecordDecl>(decl->getClangDecl());
   if (!clangDecl)
@@ -11225,6 +11226,7 @@ swift::computeAbstractLayout(const NominalTypeDecl *decl) {
   const auto &recordLayout = clangCtx.getASTRecordLayout(clangDecl);
 
   AbstractTypeLayout result;
+  result.mangledName = Mangle::ASTMangler(ctx).mangleNominalType(decl);
   result.size = recordLayout.getSize().getQuantity();
   result.alignment = recordLayout.getAlignment().getQuantity();
   result.stride = llvm::alignTo(result.size, result.alignment);
