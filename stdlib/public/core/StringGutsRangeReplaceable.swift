@@ -10,6 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+@inline(__always)
+internal func _growStringCapacity(_ capacity: Int) -> Int {
+  // 1.625x growth for native String storage. Roughly matches NSString
+  return capacity &+ (capacity &>> 1) &+ (capacity &>> 3)
+}
+
 // COW helpers
 extension _StringGuts {
   internal var nativeCapacity: Int? {
@@ -109,13 +115,14 @@ extension _StringGuts {
     _internalInvariant(
       self.uniqueNativeCapacity == nil || self.uniqueNativeCapacity! < n)
 
-    // If unique and native, apply a 2x growth factor to avoid problematic
-    // performance when used in a loop. If one if those doesn't apply, we
-    // can just use the requested capacity (at least the current utf-8 count).
+    // If unique and native, apply a geometric growth factor to avoid
+    // problematic performance when used in a loop. If one of those doesn't
+    // apply, we can just use the requested capacity (at least the current
+    // utf-8 count).
     // TODO: Don't do this! Growth should only happen for append...
     let growthTarget: Int
     if let capacity = self.uniqueNativeCapacity {
-      growthTarget = Swift.max(n, capacity * 2)
+      growthTarget = Swift.max(n, _growStringCapacity(capacity))
     } else {
       growthTarget = Swift.max(n, self.utf8Count)
     }
@@ -186,7 +193,7 @@ extension _StringGuts {
       growthTarget = totalCount
     } else {
       growthTarget = Swift.max(
-        totalCount, _growArrayCapacity(nativeCapacity ?? 0))
+        totalCount, _growStringCapacity(nativeCapacity ?? 0))
     }
     self.grow(growthTarget) // NOTE: this already has exponential growth...
   }
