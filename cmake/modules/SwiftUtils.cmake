@@ -253,3 +253,36 @@ function(is_sdk_requested name result_var_name)
     endif()
   endif()
 endfunction()
+
+# Append Swift compilation-caching flags (driven by the SWIFT_CACHING_BUILD_*
+# cache variables) to the named list variable. Callers are responsible for
+# deciding whether caching applies to their target (e.g. checking
+# SWIFT_CACHING_BUILD and the relevant host/runtime guards).
+function(swift_append_caching_compile_flags result_var)
+  list(APPEND ${result_var}
+    "-explicit-module-build"
+    "-cache-compile-job"
+    "-cas-path" "${SWIFT_CACHING_BUILD_CAS_PATH}")
+  if(SWIFT_CACHING_BUILD_PLUGIN_PATH)
+    list(APPEND ${result_var}
+      "-cas-plugin-path" "${SWIFT_CACHING_BUILD_PLUGIN_PATH}")
+  endif()
+  if(SWIFT_CACHING_BUILD_PLUGIN_OPTIONS)
+    string(REPLACE ":" ";" _plugin_opts "${SWIFT_CACHING_BUILD_PLUGIN_OPTIONS}")
+    foreach(_opt IN LISTS _plugin_opts)
+      list(APPEND ${result_var} "-cas-plugin-option" "${_opt}")
+    endforeach()
+  endif()
+  if(SWIFT_CACHING_BUILD_PREFIX_MAP)
+    list(APPEND ${result_var}
+      "-scanner-prefix-map-sdk" "/^sdk"
+      "-scanner-prefix-map-toolchain" "/^toolchain"
+      "-scanner-prefix-map" "${SWIFT_CACHING_BUILD_SOURCE_ROOT}=/^src")
+  endif()
+  if(SWIFT_CACHING_BUILD_ENABLE_MCCAS)
+    list(APPEND ${result_var}
+      "-Xfrontend" "-cas-backend"
+      "-Xllvm" "-cas-friendly-debug-info")
+  endif()
+  set(${result_var} "${${result_var}}" PARENT_SCOPE)
+endfunction()

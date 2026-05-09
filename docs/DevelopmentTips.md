@@ -78,6 +78,37 @@ You can run some compiles to see if it is actually doing something by running `s
 
 One known issue with `sccache` is that you might occasionally get an "error: Connection to server timed out", even though you didn't stop the server. Simply re-running the build command usually works.
 
+### Use clang-cache and Swift compilation caching
+
+If your toolchain includes `clang-cache` (found next to the `clang` binary), you can use the `--enable-caching` flag for faster cached builds of both C/C++ and Swift code:
+
+```
+$ ./swift/utils/build-script MY_ARGS --enable-caching --bootstrapping=hosttools
+```
+
+This is incompatible with `--sccache`. You can set `export SWIFT_USE_CACHING=1` to always enable it.
+
+Additional options:
+
+- `--caching-cas-path PATH` — Custom CAS directory (default: `$BUILD_ROOT/cas`).
+- `--caching-depscan-socket PATH` — Custom depscan daemon socket (default: `/tmp/clang-scand`).
+- `--caching-plugin-path PATH` — Path to a CAS plugin library.
+- `--caching-plugin-option OPT` — Option for the CAS plugin (can be specified multiple times).
+- `--caching-prefix-map` — Enable prefix mapping for reproducible cached builds across machines.
+- `--caching-remote-service-path PATH` — Path to a remote caching service socket. Implies `--caching-prefix-map` and auto-infers the CAS plugin from the toolchain if not provided.
+
+**Incremental builds outside build-script:** When caching is enabled, the build script generates a ninja wrapper at `build/<subdir>/build-utils/ninja` that automatically invokes `cache-build-session`. Using `cmake --build` will pick up this wrapper automatically:
+
+```
+$ cmake --build <build-dir> --target swift-frontend
+```
+
+If you need to invoke ninja directly, use the wrapper instead of the system ninja:
+
+```
+$ <build-dir>/../build-utils/ninja -C <build-dir> bin/swift-frontend
+```
+
 ## Memory usage
 
 When building Swift, peak memory usage happens during the linking phases that produce llvm and swift executables. In case your build fails because a process ran out of RAM, you can use one or more of the following techniques to reduce the peak memory usage.

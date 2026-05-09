@@ -2895,6 +2895,8 @@ NOTE(nonsendable_function_type,none,
 NOTE(nonsendable_tuple_type,none,
      "a tuple type must be composed of 'Sendable' elements to conform to "
      "'Sendable'", ())
+NOTE(nonescapable_function_type,none,
+     "a function type can be marked '@escaping' to conform to 'Escapable'", ())
 NOTE(non_sendable_nominal,none,
      "%kind0 does not conform to the 'Sendable' protocol",
       (const ValueDecl *))

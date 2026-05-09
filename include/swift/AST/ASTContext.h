@@ -23,18 +23,12 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/ProtocolConformanceOptions.h"
-#include "swift/AST/SILOptions.h"
-#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BlockList.h"
-#include "swift/Basic/CASOptions.h"
-#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
-#include "swift/Serialization/SerializationOptions.h"
-#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -77,6 +71,7 @@ namespace swift {
   class AvailabilityRange;
   class BoundGenericType;
   class BuiltinTupleDecl;
+  class CASOptions;
   class ClangModuleLoader;
   class ClangNode;
   class ClangTypeConverter;
@@ -100,6 +95,7 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
+  class LangOptions;
   struct MacroDiscriminatorContext;
   class ModuleInterfaceChecker;
   class PatternBindingDecl;
@@ -107,13 +103,14 @@ namespace swift {
   class PluginLoader;
   class SourceFile;
   class SourceLoc;
+  class SerializationOptions;
+  class SILOptions;
   struct TemplateInstantiationError;
   class Type;
   class TypeVariableType;
   class TupleType;
   class FunctionType;
   class ArchetypeType;
-  class Identifier;
   class InheritedNameSet;
   class ModuleDecl;
   class PackageUnit;
@@ -142,6 +139,7 @@ namespace swift {
   class DiagnosticEngine;
   struct RawComment;
   class DocComment;
+  class SearchPathOptions;
   class SILBoxType;
   class SILTransform;
   class TypeAliasDecl;
@@ -163,6 +161,10 @@ namespace rewriting {
 
 namespace ide {
   class TypeCheckCompletionCallback;
+}
+
+namespace symbolgraphgen {
+  struct SymbolGraphOptions;
 }
 
 /// Lists the set of "known" Foundation entities that are used in the

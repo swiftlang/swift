@@ -277,28 +277,59 @@ extension String {
       initializingFrom: input, isASCII: isASCII)
     return storage.asString
   }
+  
+  internal static func _fromUTF16(
+    _ input: UnsafeBufferPointer<UInt16>,
+    repairing: Bool = true
+  ) -> (String, repairsMade: Bool)? {
+    if input.isEmpty { return ("", repairsMade: false) }
+    guard let (utf8Len, isASCII) = unsafe utf8Length(
+      of: input,
+      repairing: repairing
+    ) else {
+      return nil
+    }
+    var repairsMade = false
+    if utf8Len <= _SmallString.capacity {
+      let smol = unsafe _SmallString(initializingUTF8With: {
+        let (count, tmpRepairsMade) = unsafe transcodeUTF16ToUTF8(
+          UTF16CodeUnits: input,
+          intoKnownSufficientlyLarge: $0,
+          repairing: repairing
+        )
+        repairsMade = tmpRepairsMade
+        return count
+      })
+      return (String(_StringGuts(smol)), repairsMade: repairsMade)
+    }
+    let result = unsafe __StringStorage.create(
+      uninitializedCodeUnitCapacity: utf8Len,
+      precalculatedUTF16Count: input.count,
+      initializingUncheckedUTF8With: { buffer -> Int in
+        let (count, tmpRepairsMade) = unsafe transcodeUTF16ToUTF8(
+          UTF16CodeUnits: input,
+          intoKnownSufficientlyLarge: buffer,
+          repairing: repairing
+        )
+        repairsMade = tmpRepairsMade
+        return count
+      }
+    )
+    result._updateCountAndFlags(
+      newCount: result.count,
+      newIsASCII: isASCII,
+      precalculatedUTF16Count: input.count
+    )
+    return (result.asString, repairsMade: repairsMade)
+  }
 
   @usableFromInline
   internal static func _uncheckedFromUTF16(
     _ input: UnsafeBufferPointer<UInt16>
   ) -> String {
-    // TODO(String Performance): Attempt to form smol strings
-
-    // TODO(String performance): Skip intermediary array, transcode directly
-    // into a StringStorage space.
-    var contents: [UInt8] = []
-    contents.reserveCapacity(input.count)
-    let repaired = unsafe transcode(
-      input.makeIterator(),
-      from: UTF16.self,
-      to: UTF8.self,
-      stoppingOnError: false,
-      into: { contents.append($0) })
+    let (result, repaired) = unsafe _fromUTF16(input, repairing: true)!
     _internalInvariant(!repaired, "Error present")
-
-    return contents.withUnsafeBufferPointer {
-      unsafe String._uncheckedFromUTF8($0, precalculatedUTF16Count: input.count)
-    }
+    return result
   }
 
   @inline(never) // slow path
@@ -355,12 +386,31 @@ extension String {
     repair: Bool
   ) -> (String, repairsMade: Bool)?
   where Input.Element == Encoding.CodeUnit {
-    guard _fastPath(encoding == Unicode.ASCII.self) else {
-      let result = input.withContiguousStorageIfAvailable {
-        return unsafe _slowFromCodeUnits($0, encoding: encoding, repair: repair)
+    if encoding != Unicode.ASCII.self {
+      if encoding == Unicode.UTF16.self {
+        if let str = input.withContiguousStorageIfAvailable({ buffer in
+          unsafe _fromUTF16(
+            UnsafeRawBufferPointer(buffer).assumingMemoryBound(to: UInt16.self),
+            repairing: repair
+          )
+        }) {
+          return str
+        }
+#if !$Embedded
+        if let contigBytes = input as? _HasContiguousBytes,
+           contigBytes._providesContiguousBytesNoCopy {
+          if let str = contigBytes.withUnsafeBytes({ buffer in
+              unsafe _fromUTF16(
+                buffer.assumingMemoryBound(to: UInt16.self),
+                repairing: repair
+              )
+          }) {
+            return str
+          }
+        }
+#endif
       }
-      return result ?? _slowFromCodeUnits(
-        input, encoding: encoding, repair: repair)
+      return _slowFromCodeUnits(input, encoding: encoding, repair: repair)
     }
 
     // Helper to simplify early returns

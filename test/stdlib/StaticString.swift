@@ -73,9 +73,8 @@ StaticStringTestSuite.test("PointerRepresentation/NonASCII") {
   expectDebugPrinted("\"абв\"", str)
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
 StaticStringTestSuite.test("PointerRepresentation/unicodeScalar")
+  .require(.crashTesting)
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -87,7 +86,6 @@ StaticStringTestSuite.test("PointerRepresentation/unicodeScalar")
   expectCrashLater()
   strOpaque.unicodeScalar
 }
-#endif
 
 StaticStringTestSuite.test("UnicodeScalarRepresentation/ASCII") {
   // The type checker does not call the UnicodeScalar initializer even if
@@ -126,9 +124,8 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/NonASCII") {
   expectDebugPrinted("\"Ы\"", str)
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
 StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8Start")
+  .require(.crashTesting)
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -142,6 +139,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8Start")
 }
 
 StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8CodeUnitCount")
+  .require(.crashTesting)
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -153,7 +151,6 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8CodeUnitCount")
   expectCrashLater()
   strOpaque.utf8CodeUnitCount
 }
-#endif
 
 runAllTests()
 

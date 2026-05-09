@@ -501,7 +501,8 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
     });
   }
 
-  return buildGenericSignature(ctx, sig, {}, reqs, /*allowInverses=*/false)
+  return buildGenericSignature(ctx, sig, {}, reqs,
+                               DefaultRequirementOptions())
       .getCanonicalSignature();
 }
 

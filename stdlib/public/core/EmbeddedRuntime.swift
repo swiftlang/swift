@@ -352,6 +352,22 @@ public func swift_deallocBox(_ pointer: UnsafeMutableRawPointer) {
   )
 }
 
+/// Extracts the type metadata out of a heap object.
+@c
+public func swift_getObjectType(_ pointer: UnsafeMutableRawPointer) -> UnsafeRawPointer {
+  let object = unsafe pointer.bindMemory(to: HeapObject.self, capacity: 1)
+  return unsafe _swift_embedded_get_heap_object_metadata_pointer(object)
+}
+
+/// Determines whether two witness tables are the same.
+///
+/// The only way this can be true in Embedded Swift is if they refer to the same
+/// address in memory.
+@c
+public func swift_compareWitnessTables(_ lhs: UnsafeRawPointer, _ rhs: UnsafeRawPointer) -> Bool {
+  unsafe lhs == rhs
+}
+
 // MARK: - Error boxing (swift_allocError / swift_deallocError / swift_getErrorValue)
 
 /// Error box layout: [HeapObject header] [type ptr] [errorConformance ptr] [alignment padding] [value]

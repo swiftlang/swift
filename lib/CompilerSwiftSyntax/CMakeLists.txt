@@ -55,6 +55,7 @@ set(compiler_swiftsyntax_libs
 
 foreach(lib ${compiler_swiftsyntax_libs})
   target_compile_options(${lib} PRIVATE "SHELL:-module-link-name ${lib}")
+  _add_swift_caching_compile_options(${lib})
 endforeach()
 
 swift_install_in_component(TARGETS ${compiler_swiftsyntax_libs}

@@ -1536,10 +1536,51 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     return;
   }
 
+  // Check for instructions that are assignments to the memory location being
+  // analyzed. This is used to suppress diagnostics that would otherwise be
+  // produced when fully-assigning to a struct `self` in init where a `let`
+  // property has already been assigned, and for certain compatibility
+  // diagnostics when initializing structs across module boundaries.
+  auto isFullValueAssignment = [this](const SILInstruction *inst) -> bool {
+    SILValue addr;
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst))
+      addr = copyAddr->getDest();
+    else if (auto *moveAddr = dyn_cast<MarkUnresolvedMoveAddrInst>(inst))
+      addr = moveAddr->getDest();
+    else if (auto *assign = dyn_cast<AssignInst>(inst))
+      addr = assign->getDest();
+    else
+      return false;
+
+    if (auto *access = dyn_cast<BeginAccessInst>(addr))
+      addr = access->getSource();
+    if (auto *projection = dyn_cast<ProjectBoxInst>(addr))
+      addr = projection->getOperand();
+
+    return addr == TheMemory.getUninitializedValue();
+  };
+
+  auto isFullValueStructInitAssignment = [&](const DIMemoryUse &Use) -> bool {
+    if (TheMemory.isStructInitSelf() && isFullValueAssignment(Use.Inst)) {
+      ASSERT(
+          Use.FirstElement == 0 &&
+          Use.NumElements == TheMemory.getNumElements() &&
+          "expected full-value store to struct self to produce a use of every "
+          "element");
+      return true;
+    }
+
+    return false;
+  };
+
   // If this is a store to a 'let' property in an initializer, then we only
   // allow the assignment if the property was completely uninitialized.
-  // Overwrites are not permitted.
-  if (Use.Kind == DIUseKind::PartialStore || !isFullyUninitialized) {
+  // Overwrites of an initialized `let` property are not permitted. However,
+  // if we're performing a full-element store to `self` in a `struct`
+  // initializer, then the assignment is permitted, since this replaces the
+  // entire aggregate, and doesn't re-assign existing elements.
+  if ((Use.Kind == DIUseKind::PartialStore || !isFullyUninitialized) &&
+      !isFullValueStructInitAssignment(Use)) {
     for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
          i != e; ++i) {
       if (Liveness.get(i) == DIKind::No || !TheMemory.isElementLetProperty(i))
@@ -1570,25 +1611,6 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   // than DelegatingSelf for Swift 4 compatibility. We look for a problem case by
   // seeing if there are any assignments to individual fields that might be
   // initializations; that is, that they're not dominated by `self = other`.
-
-  auto isFullValueAssignment = [this](const SILInstruction *inst) -> bool {
-    SILValue addr;
-    if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst))
-      addr = copyAddr->getDest();
-    else if (auto *moveAddr = dyn_cast<MarkUnresolvedMoveAddrInst>(inst))
-      addr = moveAddr->getDest();
-    else if (auto *assign = dyn_cast<AssignInst>(inst))
-      addr = assign->getDest();
-    else
-      return false;
-
-    if (auto *access = dyn_cast<BeginAccessInst>(addr))
-      addr = access->getSource();
-    if (auto *projection = dyn_cast<ProjectBoxInst>(addr))
-      addr = projection->getOperand();
-
-    return addr == TheMemory.getUninitializedValue();
-  };
 
   if (!isFullyInitialized && WantsCrossModuleStructInitializerDiagnostic &&
       !isFullValueAssignment(Use.Inst)) {

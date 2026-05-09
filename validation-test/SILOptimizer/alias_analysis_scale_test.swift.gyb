@@ -1,0 +1,23 @@
+// RUN: %timer-scale-test --begin 50 --end 800 --superlinear-threshold 4 --trace --select SIL-processing.user -O %s
+
+// TODO: there are still compile time problems in CopyPropagation and OSSACanonicalizationOwned (inside SILCombine): rdar://176255056
+//       Once those problems are fixed the threshold should be closer to 1.
+
+// REQUIRES: asserts
+
+public class Entry {
+  private let a: String
+  private let b: String
+  init(_ a: String, _ b: String) {
+    self.a = a
+    self.b = b
+  }
+}
+
+public func test() -> [Entry] {
+  var list = [Entry]()
+%for i in range(0, N):
+  list.append(Entry("a", "b"))
+%end
+  return list
+}

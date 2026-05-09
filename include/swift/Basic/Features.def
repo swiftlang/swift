@@ -616,6 +616,10 @@ EXPERIMENTAL_FEATURE(BorrowingSequence, true)
 /// Turns some source breaking access control warnings into errors.
 EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 
+/// Allow stored properties of types from an internal bridging header in
+/// non-resilient modules. Layout will be encoded in the .swiftmodule.
+EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

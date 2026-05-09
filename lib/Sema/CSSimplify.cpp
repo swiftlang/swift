@@ -10524,7 +10524,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // For code completion include the result because we can partially match
     // against function types that only have one parameter with error type.
     if (decl->isInvalid() && !isForCodeCompletion()) {
-      result.markErrorAlreadyDiagnosed();
+      // Clang import failures emit notes rather than errors, so the error
+      // hasn't actually been emitted yet.
+      if (!decl->hasClangNode())
+        result.markErrorAlreadyDiagnosed();
       return;
     }
 
@@ -11030,7 +11033,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
         // If the result is invalid, skip it.
         if (cand->isInvalid()) {
-          result.markErrorAlreadyDiagnosed();
+          if (!cand->hasClangNode())
+            result.markErrorAlreadyDiagnosed();
           break;
         }
 

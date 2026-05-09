@@ -361,7 +361,7 @@ suite.test("RawSpan safe loading")
 }
 
 suite.test("RawSpan safe loading bounds underflow")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
 
   let array = ContiguousArray(repeating: UInt8.zero, count: 64)
@@ -372,7 +372,7 @@ suite.test("RawSpan safe loading bounds underflow")
 }
 
 suite.test("RawSpan safe loading bounds overflow")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
 
   let array = ContiguousArray(repeating: UInt8.zero, count: 64)
@@ -412,7 +412,7 @@ suite.test("RawSpan subscript")
 }
 
 suite.test("RawSpan subscript bounds underflow")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
   let array: ContiguousArray<UInt8> = [10, 20, 30, 40]
   let bytes = array.span.bytes
@@ -422,7 +422,7 @@ suite.test("RawSpan subscript bounds underflow")
 }
 
 suite.test("RawSpan subscript bounds overflow")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
   let array: ContiguousArray<UInt8> = [10, 20, 30, 40]
   let bytes = array.span.bytes

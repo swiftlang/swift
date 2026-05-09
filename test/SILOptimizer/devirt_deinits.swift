@@ -1,14 +1,13 @@
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -primary-file %s -parse-as-library -O -sil-verify-all -module-name=test -Xllvm -sil-disable-pass=function-signature-opts -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -disable-availability-checking -parse-as-library -O -sil-verify-all -module-name=test -Xllvm -sil-disable-pass=function-signature-opts -emit-sil | %FileCheck %s
 
 // Also do an end-to-end test and check if the compiled executable works as expected.
-// RUN: %target-run-simple-swift(-target %target-cpu-apple-macos14 -parse-as-library -O -Xllvm -sil-disable-pass=function-signature-opts) | %FileCheck -check-prefix CHECK-OUTPUT %s
+// RUN: %target-run-simple-swift(-parse-as-library -O -disable-availability-checking -Xllvm -sil-disable-pass=function-signature-opts) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 // Check if it works in embedded mode.
 // RUN: %target-run-simple-swift(-target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 // Run without the deinit-devirtualizer to verify that our CHECK-OUTPUT lines are correct.
-// TODO: currently disabled because of rdar://118449507
-// RUNx: %target-run-simple-swift(-target %target-cpu-apple-macos14 -Xllvm -sil-disable-pass=deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
+// RUN: %target-run-simple-swift(-disable-availability-checking -Xllvm -sil-disable-pass=deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 
 // REQUIRES: swift_in_compiler
@@ -22,6 +21,7 @@
 // REQUIRES: swift_feature_Embedded
 
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 @inline(never)
 func log(_ s: StaticString) {
@@ -157,6 +157,17 @@ func testDestroyArray(_ p: UnsafeMutableBufferPointer<S4>) {
   p.deinitialize()
 }
 
+// CHECK-LABEL: sil hidden [noinline] @$s4test0A11InlineArrayyys0bC0Vy$2_AA2S1VGnF :
+// CHECK:         [[D:%.*]] = function_ref @$s4test2S1VfD :
+// CHECK:         apply [[D]]
+// CHECK-NOT:     destroy
+// CHECK:       } // end sil function '$s4test0A11InlineArrayyys0bC0Vy$2_AA2S1VGnF'
+@inline(never)
+func testInlineArray(_ a: consuming InlineArray<3, S1>) {
+  log("### testInlineArray")
+}
+
+
 
 @main
 struct Main {
@@ -218,6 +229,14 @@ struct Main {
     log("### testDestroyArray")
     testDestroyArray(b)
     b.deallocate()
+    log("---")
+
+    // CHECK-OUTPUT-LABEL: ### testInlineArray
+    // CHECK-OUTPUT-NEXT:  deinit S1
+    // CHECK-OUTPUT-NEXT:  deinit S1
+    // CHECK-OUTPUT-NEXT:  deinit S1
+    // CHECK-OUTPUT-NEXT:  ---
+    testInlineArray([S1(), S1(), S1()])
     log("---")
   }
 }

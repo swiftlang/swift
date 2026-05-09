@@ -3680,17 +3680,17 @@ public:
   }
 };
 
-class WarnAttr : public DeclAttribute {
+class DiagnoseAttr : public DeclAttribute {
 public:
-  WarnAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior,
+  DiagnoseAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior,
            std::optional<StringRef> Reason, SourceLoc AtLoc, SourceRange Range,
            bool Implicit)
-      : DeclAttribute(DeclAttrKind::Warn, AtLoc, Range, Implicit),
+      : DeclAttribute(DeclAttrKind::Diagnose, AtLoc, Range, Implicit),
         DiagnosticBehavior(Behavior), DiagnosticGroupID(DiagnosticGroupID),
         Reason(Reason) {}
 
-  WarnAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior, bool Implicit)
-      : WarnAttr(DiagnosticGroupID, Behavior, std::nullopt, SourceLoc(),
+  DiagnoseAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior, bool Implicit)
+      : DiagnoseAttr(DiagnosticGroupID, Behavior, std::nullopt, SourceLoc(),
                  SourceRange(), Implicit) {}
 
   WarningGroupBehavior DiagnosticBehavior;
@@ -3698,15 +3698,15 @@ public:
   const std::optional<StringRef> Reason;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::Warn;
+    return DA->getKind() == DeclAttrKind::Diagnose;
   }
 
-  WarnAttr *clone(ASTContext &ctx) const {
-    return new (ctx) WarnAttr(DiagnosticGroupID, DiagnosticBehavior, Reason,
+  DiagnoseAttr *clone(ASTContext &ctx) const {
+    return new (ctx) DiagnoseAttr(DiagnosticGroupID, DiagnosticBehavior, Reason,
                               AtLoc, Range, isImplicit());
   }
 
-  bool isEquivalent(const WarnAttr *other,
+  bool isEquivalent(const DiagnoseAttr *other,
                     Decl *attachedTo) const {
     return Reason == other->Reason;
   }

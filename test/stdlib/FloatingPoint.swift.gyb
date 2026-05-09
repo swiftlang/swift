@@ -334,32 +334,37 @@ FloatingPoint.test("Float/Int16") {
   expectEqual(Int16.max, Int16(Float(Int16.max)))
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-FloatingPoint.test("Float/UInt32") {
+FloatingPoint.test("Float/UInt32")
+.require(.crashTesting)
+.code {
   expectEqual(UInt32.min, UInt32(Float(UInt32.min)))
   expectCrashLater()
   expectEqual(UInt32.max, UInt32(Float(UInt32.max)))
 }
 
-FloatingPoint.test("Float/Int32") {
+FloatingPoint.test("Float/Int32")
+.require(.crashTesting)
+.code {
   expectEqual(Int32.min, Int32(Float(Int32.min)))
   expectCrashLater()
   expectEqual(Int32.max, Int32(Float(Int32.max)))
 }
 
-FloatingPoint.test("Float/UInt64") {
+FloatingPoint.test("Float/UInt64")
+.require(.crashTesting)
+.code {
   expectEqual(UInt64.min, UInt64(Float(UInt64.min)))
   expectCrashLater()
   expectEqual(UInt64.max, UInt64(Float(UInt64.max)))
 }
 
-FloatingPoint.test("Float/Int64") {
+FloatingPoint.test("Float/Int64")
+.require(.crashTesting)
+.code {
   expectEqual(Int64.min, Int64(Float(Int64.min)))
   expectCrashLater()
   expectEqual(Int64.max, Int64(Float(Int64.max)))
 }
-#endif
 
 FloatingPoint.test("Double/ExpressibleByIntegerLiteral") {
   expectEqual(positiveOne(),  1.0 as Double)
@@ -425,20 +430,21 @@ FloatingPoint.test("Double/Int32") {
   expectEqual(Int32.max, Int32(Double(Int32.max)))
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-FloatingPoint.test("Double/UInt64") {
+FloatingPoint.test("Double/UInt64")
+.require(.crashTesting)
+.code {
   expectEqual(UInt64.min, UInt64(Double(UInt64.min)))
   expectCrashLater()
   expectEqual(UInt64.max, UInt64(Double(UInt64.max)))
 }
 
-FloatingPoint.test("Double/Int64") {
+FloatingPoint.test("Double/Int64")
+.require(.crashTesting)
+.code {
   expectEqual(Int64.min, Int64(Double(Int64.min)))
   expectCrashLater()
   expectEqual(Int64.max, Int64(Double(Int64.max)))
 }
-#endif
 
 FloatingPoint.test("Float/HashValueZero") {
   let zero: Float = getFloat32(0.0)
@@ -1184,14 +1190,14 @@ FloatingPoint.test("Float32/quietNaN") {
     expectTrue(f.isNaN && !f.isSignalingNaN)
     expectEqual(0x7fdf_ffff, f.bitPattern)
   }
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-  do {
-    // Payload overflow
-    expectCrashLater()
-    _ = Float32(nan: 0x20_0000, signaling: false)
-  }
-#endif
+}
+
+FloatingPoint.test("Float32/quietNaN overflow")
+.require(.crashTesting)
+.code {
+  // Payload overflow
+  expectCrashLater()
+  _ = Float32(nan: 0x20_0000, signaling: false)
 }
 
 FloatingPoint.test("Float64/quietNaN") {
@@ -1216,14 +1222,14 @@ FloatingPoint.test("Float64/quietNaN") {
     expectTrue(f.isNaN && !f.isSignalingNaN)
     expectEqual(0x7ffb_ffff_ffff_ffff, f.bitPattern)
   }
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-  do {
-    // Payload overflow
-    expectCrashLater()
-    _ = Float64(nan: 0x4_0000_0000_0000, signaling: false)
-  }
-#endif
+}
+
+FloatingPoint.test("Float64/quietNaN overflow")
+.require(.crashTesting)
+.code {
+  // Payload overflow
+  expectCrashLater()
+  _ = Float64(nan: 0x4_0000_0000_0000, signaling: false)
 }
 
 #if !os(Windows) && (arch(i386) || arch(x86_64))
@@ -1250,14 +1256,14 @@ FloatingPoint.test("Float80/quietNaN") {
     expectTrue(f.isNaN && !f.isSignalingNaN)
     expectEqual(Float80Bits(0x7fff, 0xdfff_ffff_ffff_ffff), f.bitPattern)
   }
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-  do {
-    // Payload overflow
-    expectCrashLater()
-    _ = Float80(nan: 0x2000_0000_0000_0000, signaling: false)
-  }
-#endif
+}
+
+FloatingPoint.test("Float80/quietNaN overflow")
+.require(.crashTesting)
+.code {
+  // Payload overflow
+  expectCrashLater()
+  _ = Float80(nan: 0x2000_0000_0000_0000, signaling: false)
 }
 
 #endif
@@ -1286,14 +1292,14 @@ FloatingPoint.test("Float32/signalingNaN") {
     expectTrue(f.isNaN && f.isSignalingNaN)
     expectEqual(0x7fbf_ffff, f.bitPattern)
   }
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-  do {
-    // payload overflow
-    expectCrashLater()
-    _ = Float32(nan: 0x20_0000, signaling: true)
-  }
-#endif
+}
+
+FloatingPoint.test("Float32/signalingNaN overflow")
+.require(.crashTesting)
+.code {
+  // payload overflow
+  expectCrashLater()
+  _ = Float32(nan: 0x20_0000, signaling: true)
 }
 
 FloatingPoint.test("Float64/signalingNaN") {
@@ -1318,14 +1324,14 @@ FloatingPoint.test("Float64/signalingNaN") {
     expectTrue(f.isNaN && f.isSignalingNaN)
     expectEqual(0x7ff7_ffff_ffff_ffff, f.bitPattern)
   }
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-  do {
-    // payload overflow
-    expectCrashLater()
-    _ = Float64(nan: 0x4_0000_0000_0000, signaling: true)
-  }
-#endif
+}
+
+FloatingPoint.test("Float64/signalingNaN overflow")
+.require(.crashTesting)
+.code {
+  // payload overflow
+  expectCrashLater()
+  _ = Float64(nan: 0x4_0000_0000_0000, signaling: true)
 }
 
 #endif
@@ -1354,14 +1360,14 @@ FloatingPoint.test("Float80/signalingNaN") {
     expectTrue(f.isNaN && f.isSignalingNaN)
     expectEqual(Float80Bits(0x7fff, 0xbfff_ffff_ffff_ffff), f.bitPattern)
   }
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-  do {
-    // payload overflow
-    expectCrashLater()
-    _ = Float80(nan: 0x2000_0000_0000_0000, signaling: true)
-  }
-#endif
+}
+
+FloatingPoint.test("Float80/signalingNaN overflow")
+.require(.crashTesting)
+.code {
+  // payload overflow
+  expectCrashLater()
+  _ = Float80(nan: 0x2000_0000_0000_0000, signaling: true)
 }
 
 #endif

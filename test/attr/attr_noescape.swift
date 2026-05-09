@@ -23,8 +23,8 @@ func takesVariadic(_ fns: () -> Int...) {
   doesEscape(fns[0]) // Okay - variadic-of-function parameters are escaping
 }
 
-func takesNoEscapeClosure(_ fn : () -> Int) { // expected-note 1 {{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
-  // expected-note@-1 6{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+func takesNoEscapeClosure(_ fn : () -> Int) {
+  // expected-note@-1 5{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   takesNoEscapeClosure { 4 }  // ok
 
   _ = fn()  // ok
@@ -36,15 +36,18 @@ func takesNoEscapeClosure(_ fn : () -> Int) { // expected-note 1 {{parameter 'fn
   takesGenericClosure(4, fn)       // ok
   takesGenericClosure(4) { fn() }  // ok.
 
-  _ = [fn] // expected-error {{using non-escaping parameter 'fn' in a context expecting an '@escaping' closure}}
+  _ = [fn] // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
   _ = [doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
-  _ = [1 : fn] // expected-error {{using non-escaping parameter 'fn' in a context expecting an '@escaping' closure}}
+  _ = [1 : fn] // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
   _ = [1 : doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
   _ = "\(doesEscape(fn))" // expected-error {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
   _ = "\(takesArray([fn]))" // expected-error {{using non-escaping parameter 'fn' in a context expecting an '@escaping' closure}}
 
   assignToGlobal(fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
   assignToGlobal((fn, fn)) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+  // expected-error@-1 {{type '() -> Int' cannot conform to 'Escapable'}}
+  // expected-note@-2 {{a function type can be marked '@escaping' to conform to 'Escapable'}}
+  // expected-note@-3 {{requirement from conditional conformance of '(() -> Int, () -> Int)' to 'Escapable'}}
 }
 
 class SomeClass {

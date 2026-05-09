@@ -1417,7 +1417,7 @@ public:
              // we see it
              || isa<MoveOnlyWrapperToCopyableAddrInst>(projectedAddr) ||
              isa<CopyableToMoveOnlyWrapperAddrInst>(projectedAddr) ||
-             isGuaranteedAddressReturn(projectedAddr));
+             isAddressReturn(projectedAddr));
     }
     return sourceAddr->get();
   }
@@ -2032,7 +2032,7 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
         && visitSingleValueUser(svi, dfs) == IgnoredUse) {
       return true;
     }
-    if (isGuaranteedAddressReturn(svi)) {
+    if (isAddressReturn(svi)) {
       pushUsers(svi, dfs);
     }
   }
@@ -2189,7 +2189,19 @@ visitApplyOperand(Operand *use, UniqueStorageUseVisitor &visitor,
     }
     return true;
   }
-  return (visitor.*visit)(use);
+  if (!(visitor.*visit)(use))
+    return false;
+
+  if (auto *applyInst = dyn_cast<ApplyInst>(user)) {
+    if (applyInst->hasGuaranteedResult()) {
+      for (auto *resultUse : applyInst->getUses()) {
+        if (!(visitor.*visit)(resultUse)) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
 }
 
 bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {

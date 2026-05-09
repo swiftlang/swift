@@ -3041,11 +3041,10 @@ public:
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    // Force requests that can emit diagnostics.
-    (void) OTD->getGenericSignature();
-
-    TypeChecker::checkDeclAttributes(OTD);
-    checkAccessControl(OTD);
+    // OpaqueTypeDecls don't appear as members of types or extensions, or
+    // directly within statements, so we will never see them directly in
+    // this walk.
+    ABORT("Shouldn't end up here");
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {

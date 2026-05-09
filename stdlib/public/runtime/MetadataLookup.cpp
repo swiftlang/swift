@@ -1055,9 +1055,9 @@ _findContextDescriptor(Demangle::NodePointer node,
 
 /// Function to check whether we're currently running on the given global
 /// actor.
-bool (* __ptrauth_swift_is_global_actor_function SWIFT_CC(swift)
+SWIFT_CC(swift) bool (* __ptrauth_swift_is_global_actor_function
         swift::_swift_task_isCurrentGlobalActorHook)(
-    const Metadata *, const WitnessTable *);
+    const Metadata *, const WitnessTable *, SWIFT_CONTEXT const Metadata *);
 
 void swift::_swift_registerConcurrencyRuntime(
     const ConcurrencyStandardTypeDescriptors *descriptors,

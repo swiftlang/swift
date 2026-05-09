@@ -204,6 +204,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.CompilerDebuggingOpts.DumpClangLookupTables |=
       Args.hasArg(OPT_dump_clang_lookup_tables);
 
+  Opts.CompilerDebuggingOpts.DumpAbstractLayout |=
+      Args.hasArg(OPT_dump_abstract_layout);
+
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);

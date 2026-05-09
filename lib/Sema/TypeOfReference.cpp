@@ -2736,7 +2736,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto bodyParamIsolation = FunctionTypeIsolation::forNonIsolated();
     if (CS.getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
-      bodyParamIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      bodyParamIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
     auto bodyClosure = FunctionType::get(arg, result,
@@ -2754,7 +2754,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto withoutEscapingIsolation = FunctionTypeIsolation::forNonIsolated();
     if (CS.getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
-      withoutEscapingIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      withoutEscapingIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
     return FunctionType::get(args, result,
@@ -2788,7 +2788,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto bodyParamIsolation = FunctionTypeIsolation::forNonIsolated();
     if (CS.getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
-      bodyParamIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      bodyParamIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
     auto bodyClosure = FunctionType::get(bodyArgs, result,
@@ -2806,7 +2806,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto openExistentialIsolation = FunctionTypeIsolation::forNonIsolated();
     if (CS.getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
-      openExistentialIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      openExistentialIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
     return FunctionType::get(args, result,

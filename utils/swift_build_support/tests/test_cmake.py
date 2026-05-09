@@ -57,6 +57,7 @@ class CMakeTestCase(unittest.TestCase):
                          export_compile_commands=False,
                          distcc=False,
                          sccache=False,
+                         enable_caching=False,
                          cmake_generator="Ninja",
                          cmake_c_launcher=None,
                          cmake_cxx_launcher=None,

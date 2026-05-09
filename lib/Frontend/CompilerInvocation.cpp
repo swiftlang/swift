@@ -2180,6 +2180,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       FrontendOptions::ActionType::TypecheckModuleFromInterface)
     Opts.EnableLazyTypecheck = false;
 
+  Opts.TypeCheckMacrosEagerly = Args.hasArg(OPT_eager_macro_checking);
+
   return HadError;
 }
 

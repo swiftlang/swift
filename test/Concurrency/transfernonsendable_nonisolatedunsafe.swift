@@ -948,7 +948,7 @@ func closureTests() async {
     nonisolated(unsafe) let x = NonSendableKlass()
     let y = NonSendableKlass()
     sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+      _ = x
       _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
@@ -1037,7 +1037,7 @@ func closureTests() async {
     var y = NonSendableKlass()
     y = NonSendableKlass()
     sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+      _ = x
       _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
@@ -1078,7 +1078,7 @@ func closureTests() async {
     nonisolated(unsafe) let x4a = NonSendableKlass()
     let x4b = NonSendableKlass()
     Task.detached {
-      _ = x4a; // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x4a' which is accessed later by code in the current task}}
+      _ = x4a;
       _ = x4b // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x4b' which is accessed later by code in the current task}}
     }
 
@@ -1094,6 +1094,58 @@ func closureTests() async {
   // not.
   func testNamedClosure() async {
     nonisolated(unsafe) let x = NonSendableKlass()
+    let y = {
+      _ = x
+    }
+    sendingClosure(y) // expected-warning {{sending 'y' risks causing data races}}
+    // expected-note @-1 {{'y' used after being passed as a 'sending' parameter}}
+    sendingClosure(y) // expected-note {{access can happen concurrently}}
+  }
+
+  // Named closure capturing nonisolated(unsafe) + non-sendable. The
+  // nonisolated(unsafe) capture should be skipped, and only the non-sendable
+  // capture should be diagnosed.
+  func testNamedClosureMixedCaptures() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    let z = NonSendableKlass()
+    let y = {
+      _ = x
+      _ = z
+    }
+    sendingClosure(y) // expected-warning {{sending 'y' risks causing data races}}
+    // expected-note @-1 {{'y' used after being passed as a 'sending' parameter; Later uses could race}}
+    sendingClosure(y) // expected-note {{access can happen concurrently}}
+  }
+
+  // Named closure capturing only nonisolated(unsafe) with a single send
+  // should produce no errors.
+  func testNamedClosureNonisolatedUnsafeSingleSend() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    let y = {
+      _ = x
+    }
+    sendingClosure(y)
+  }
+
+  // Task-isolated parameter + nonisolated(unsafe) capture. Each send of the
+  // closure triggers a SentNeverSendable error for ns (task-isolated), while
+  // x (nonisolated(unsafe)) is not diagnosed.
+  func testSendingClosureTaskIsolatedAndNonisolatedUnsafe(_ ns: NonSendableKlass) async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    sendingClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      _ = x
+      _ = ns // expected-note {{closure captures 'ns' which is accessible to code in the current task}}
+    }
+    sendingClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      _ = x
+      _ = ns // expected-note {{closure captures 'ns' which is accessible to code in the current task}}
+    }
+  }
+
+  // var version of testNamedClosure.
+  func testNamedClosureVar() async {
+    nonisolated(unsafe) var x = NonSendableKlass()
+    x = NonSendableKlass()
     let y = {
       _ = x
     }
