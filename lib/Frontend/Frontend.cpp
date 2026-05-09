@@ -16,8 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/Frontend.h"
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -37,6 +37,7 @@
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -1936,23 +1937,33 @@ void CompilerInstance::emitEndOfPipelineDebuggingOutput() {
 
   if (opts.DumpAbstractLayout) {
     auto &sf = getPrimaryOrMainSourceFile();
+
     for (auto *decl : sf.getTopLevelDecls()) {
-      auto *nominal = dyn_cast<NominalTypeDecl>(decl);
-      if (!nominal)
+      auto *structDecl = dyn_cast<StructDecl>(decl);
+      if (!structDecl)
         continue;
-      for (auto *field : nominal->getStoredProperties()) {
-        auto fieldType = field->getInterfaceType();
-        if (auto *fieldNominal = fieldType->getAnyNominal()) {
-          if (auto layout = computeAbstractLayout(fieldNominal)) {
-            llvm::outs() << fieldNominal->getName() << ":\n";
-            llvm::outs() << "  size: " << layout->size << "\n";
-            llvm::outs() << "  alignment: " << layout->alignment << "\n";
-            llvm::outs() << "  stride: " << layout->stride << "\n";
-            llvm::outs() << "  bitwiseCopyable: "
-                         << (layout->bitwiseCopyable ? "true" : "false") << "\n";
-            llvm::outs() << "  isOpaque: "
-                         << (layout->isOpaque ? "true" : "false") << "\n";
-          }
+      if (auto layout = computeAbstractStructLayout(
+              structDecl, Invocation.getIRGenOptions())) {
+        llvm::outs() << structDecl->getName() << ":\n";
+        llvm::outs() << "  size: " << layout->typeLayout.size << "\n";
+        llvm::outs() << "  alignment: " << layout->typeLayout.alignment << "\n";
+        llvm::outs() << "  stride: " << layout->typeLayout.stride << "\n";
+        llvm::outs() << "  bitwiseCopyable: "
+                     << (layout->typeLayout.bitwiseCopyable ? "true" : "false")
+                     << "\n";
+        llvm::outs() << "  isOpaque: "
+                     << (layout->typeLayout.isOpaque ? "true" : "false") << "\n";
+        llvm::outs() << "  fields:\n";
+        for (auto &field : layout->fields) {
+          llvm::outs() << "    " << field.name << ": "
+                       << field.typeLayout.mangledName
+                       << ", offset=" << field.offset
+                       << ", size=" << field.typeLayout.size
+                       << ", isOpaque="
+                       << (field.typeLayout.isOpaque ? "true" : "false")
+                       << ", bitwiseCopyable="
+                       << (field.typeLayout.bitwiseCopyable ? "true" : "false")
+                       << "\n";
         }
       }
     }
@@ -1981,4 +1992,66 @@ const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
+}
+
+std::optional<AbstractStructLayout>
+swift::computeAbstractStructLayout(const StructDecl *decl,
+                                   const IRGenOptions &irgenOpts) {
+  auto *mod = decl->getModuleContext();
+  IRABIDetailsProvider abiProvider(*mod, irgenOpts);
+
+  uint64_t currentOffset = 0;
+  uint64_t maxAlignment = 1;
+  bool allBitwiseCopyable = true;
+  bool anyOpaque = false;
+  AbstractStructLayout result;
+
+  for (auto *field : decl->getStoredProperties()) {
+    auto fieldType = field->getInterfaceType();
+    auto *fieldNominal = fieldType->getAnyNominal();
+    if (!fieldNominal)
+      return std::nullopt;
+
+    AbstractFieldLayout entry;
+    entry.offset = 0;
+    entry.name = field->getName().str();
+
+    if (auto clangLayout = computeClangAbstractLayout(fieldNominal)) {
+      entry.typeLayout = *clangLayout;
+      if (!clangLayout->bitwiseCopyable)
+        allBitwiseCopyable = false;
+      if (clangLayout->isOpaque)
+        anyOpaque = true;
+    } else if (auto sizeAlign = abiProvider.getTypeSizeAlignment(fieldNominal)) {
+      entry.typeLayout.mangledName =
+          Mangle::ASTMangler(fieldNominal->getASTContext())
+              .mangleNominalType(fieldNominal);
+      entry.typeLayout.size = (uint64_t)sizeAlign->size;
+      entry.typeLayout.alignment = (uint64_t)sizeAlign->alignment;
+      entry.typeLayout.stride = llvm::alignTo(sizeAlign->size, sizeAlign->alignment);
+      entry.typeLayout.bitwiseCopyable = fieldType->isBitwiseCopyable();
+      // Hiding fields of Swift types isn't currently supported, so the layout
+      // can never be opaque.
+      entry.typeLayout.isOpaque = false;
+      if (!entry.typeLayout.bitwiseCopyable)
+        allBitwiseCopyable = false;
+    } else {
+      return std::nullopt;
+    }
+
+    uint64_t fieldOffset = llvm::alignTo(currentOffset, entry.typeLayout.alignment);
+    entry.offset = fieldOffset;
+    result.fields.push_back(entry);
+
+    currentOffset = fieldOffset + entry.typeLayout.size;
+    maxAlignment = std::max(maxAlignment, entry.typeLayout.alignment);
+  }
+
+  result.typeLayout.size = llvm::alignTo(currentOffset, maxAlignment);
+  result.typeLayout.alignment = maxAlignment;
+  result.typeLayout.stride = llvm::alignTo(result.typeLayout.size, maxAlignment);
+  result.typeLayout.bitwiseCopyable = allBitwiseCopyable;
+  result.typeLayout.isOpaque = anyOpaque;
+
+  return result;
 }
