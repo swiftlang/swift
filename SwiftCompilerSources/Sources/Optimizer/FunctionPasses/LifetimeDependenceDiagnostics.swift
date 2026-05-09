@@ -72,21 +72,6 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
       markDep.settleToEscaping(context)
       continue
     }
-    if let apply = instruction as? FullApplySite, !apply.hasResultDependence {
-      // Handle ~Escapable results that do not have a lifetime dependence. This includes implicit initializers, calls to
-      // closures, and @_unsafeNonescapableResult.
-      apply.resultOrYields.forEach {
-        if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0, apply: apply, context) {
-          _ = analyze(dependence: lifetimeDep, context)
-        }
-      }
-      apply.indirectResultOperands.forEach {
-        if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0.value, apply: apply, context) {
-          _ = analyze(dependence: lifetimeDep, context)
-        }
-      }
-      continue
-    }
   }
 }
 
