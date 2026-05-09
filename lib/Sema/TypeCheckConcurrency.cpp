@@ -6527,7 +6527,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     case ActorIsolation::NonisolatedUnsafe:
       // Stored properties cannot be non-isolated, so don't infer it.
       if (auto var = dyn_cast<VarDecl>(value)) {
-        if (!var->isStatic() && var->hasStorage())
+        if (!var->isStatic() &&
+            (var->hasStorage() || var->getAttrs().hasAttribute<LazyAttr>()))
           return ActorIsolation::forUnspecified().withPreconcurrency(
               inferred.preconcurrency());
       }

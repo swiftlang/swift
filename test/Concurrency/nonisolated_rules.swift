@@ -79,6 +79,7 @@ public struct PublicNonSendable {
 nonisolated struct StructRemovesGlobalActor: GloballyIsolated {
   var x: NonSendable
   var y: Int = 1
+  lazy var w: Int = 0 // okay
 
   init(x: NonSendable) {
     self.x = x // okay
