@@ -521,6 +521,9 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
       // the local variable's address, then this fully kills operand liveness. The original value in operand's address
       // cannot be used in any way.
       visit(LocalVariableAccess(.store, operand))
+    case let iba as InitBorrowAddrInst:
+      assert(iba.borrow == operand.value)
+      visit(LocalVariableAccess(.store, operand))
     case let md as MarkDependenceAddrInst:
       assert(operand == md.addressOperand)
       visit(LocalVariableAccess(.dependenceDest, operand))
