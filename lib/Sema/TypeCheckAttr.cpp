@@ -5326,6 +5326,12 @@ void suggestAnyAppleOSAvailability(const Decl *D,
   if (!sf)
     return;
 
+  // Skip implicit declarations. Availability for these declarations is
+  // typically derived from other declarations and those other declarations are
+  // the ones that should adopt anyAppleOS.
+  if (D->isImplicit())
+    return;
+
   if (!diags.isDiagnosticGroupEnabled(sf,
                                       DiagGroupID::UseAnyAppleOSAvailability))
     return;
@@ -5336,11 +5342,24 @@ void suggestAnyAppleOSAvailability(const Decl *D,
       attrsByIntroVersion;
 
   for (const AvailableAttr *attr : attrs) {
-    auto semAttr = D->getSemanticAvailableAttr(attr);
-    if (!semAttr || !semAttr->isPlatformSpecific())
+    // Only consider @available attributes that could indicate an introduction.
+    if (attr->getKind() != AvailableAttr::Kind::Default)
       continue;
 
-    if (attr->getKind() != AvailableAttr::Kind::Default)
+    // Check whether the attributes have any fields besides 'introduced:' and
+    // skip if they do since we don't attempt to judge whether those fields
+    // match and could be consolidated.
+    // FIXME: This is conservative; attrs with matching fields could be merged.
+    if (attr->getRawDeprecated() || attr->getRawObsoleted() ||
+        !attr->getMessage().empty() || !attr->getRename().empty())
+      continue;
+
+    // @_spi_available attributes should not be considered.
+    if (attr->isSPI())
+      continue;
+
+    auto semAttr = D->getSemanticAvailableAttr(attr);
+    if (!semAttr || !semAttr->isPlatformSpecific())
       continue;
 
     auto platform = semAttr->getPlatform();
@@ -5367,34 +5386,26 @@ void suggestAnyAppleOSAvailability(const Decl *D,
     return;
 
   llvm::VersionTuple commonVersion;
-  llvm::SmallVector<const AvailableAttr *, 6> attrsToReplace;
-  for (auto &[version, attrList] : attrsByIntroVersion) {
+  llvm::SmallVector<const AvailableAttr *, 6> attrsForCommonVersion;
+  for (auto &[version, attrsForVersion] : attrsByIntroVersion) {
     // Prefer replacing the longest list of attributes.
-    if (attrList.size() < attrsToReplace.size())
+    if (attrsForVersion.size() < attrsForCommonVersion.size())
       continue;
 
     // If the lists have the same length, prefer the earlier version.
-    if (attrList.size() == attrsToReplace.size()) {
+    if (attrsForVersion.size() == attrsForCommonVersion.size()) {
       if (version > commonVersion)
         continue;
     }
 
     commonVersion = version;
-    attrsToReplace = attrList;
+    attrsForCommonVersion = attrsForVersion;
   }
 
+  auto attrsToReplace = llvm::SmallSetVector<const AvailableAttr *, 6>(
+      attrsForCommonVersion.begin(), attrsForCommonVersion.end());
   if (attrsToReplace.size() < 2)
     return;
-
-  // Check whether the attributes have any fields besides 'introduced:' and skip
-  // if they do since we don't attempt to judge whether those fields match and
-  // could be consolidated.
-  // FIXME: This is conservative; attrs with matching fields could be merged.
-  for (auto *attr : attrsToReplace) {
-    if (attr->getRawDeprecated() || attr->getRawObsoleted() ||
-        !attr->getMessage().empty() || !attr->getRename().empty())
-      return;
-  }
 
   auto diag = diags.diagnose(D->getLoc(), diag::availability_use_any_apple_os,
                              commonVersion);
@@ -5411,64 +5422,148 @@ void suggestAnyAppleOSAvailability(const Decl *D,
   }
 
   auto attrGroups = getAvailableAttrGroups(attrs);
-  if (attrGroups.empty()) {
-    // The attributes are all written in long-form.
-    // FIXME: Generate fix-its for this pattern if it is common enough.
-    return;
+
+  // When all replaceable attrs live in a single short-form group, use an
+  // inner-replacement fix-it (that just replaces the specs inside the parens)
+  // so the source range is as narrow as possible.
+  if (attrGroups.size() == 1) {
+    llvm::SmallDenseSet<const AvailableAttr *> remainingAttrsToReplace(
+        attrsToReplace.begin(), attrsToReplace.end());
+
+    llvm::SmallString<128> replacement;
+    llvm::raw_svector_ostream os(replacement);
+    os << "anyAppleOS " << commonVersion;
+
+    auto groupHead = attrGroups.front();
+
+    // Get the location of the @available attr's right paren.
+    SourceLoc groupEndLoc = groupHead->getEndLoc();
+
+    // Build up the fix-it contents and find the starting source loc for the
+    // availability specs.
+    SourceLoc groupStartLoc = groupHead->getDomainLoc();
+    for (auto *member = groupHead; member != nullptr;
+         member = member->getNextGroupedAvailableAttr()) {
+      // The attributes are enumerated in reverse, so the group's starting loc
+      // is the last domain loc we see.
+      groupStartLoc = member->getDomainLoc();
+      if (remainingAttrsToReplace.erase(member))
+        continue;
+      if (auto semAttr = D->getSemanticAvailableAttr(member)) {
+        os << ", " << platformString(semAttr->getPlatform());
+        if (auto v = member->getRawIntroduced())
+          os << " " << *v;
+      }
+    }
+    os << ", *";
+
+    if (remainingAttrsToReplace.empty()) {
+      // Make sure we have a valid source range in a single buffer. We might
+      // not if some attributes were expanded from an availability macro.
+      if (groupStartLoc.isInvalid() || groupEndLoc.isInvalid())
+        return;
+
+      auto startBuffer = ctx.SourceMgr.findBufferContainingLoc(groupStartLoc);
+      auto endBuffer = ctx.SourceMgr.findBufferContainingLoc(groupEndLoc);
+      if (startBuffer != endBuffer)
+        return;
+
+      diag.fixItReplaceChars(groupStartLoc, groupEndLoc, replacement);
+      return;
+    }
+
+    // Some replaceable attrs are outside the single group (e.g. long-form
+    // attrs mixed with a short-form group). Fall through to the general
+    // multi-attr fix-it below.
   }
 
-  if (attrGroups.size() > 1) {
-    // The attributes are written in multiple short-form groups.
-    return;
-  }
+  // The replaceable attrs span multiple separate @available
+  // attributes which could be long-form (`@available(iOS, introduced: 26)`),
+  // separate single-platform short-form (`@available(iOS 26, *)`), multiple
+  // groups, or a mix of those patterns.
+  //
+  // Replace the first attr in source with the consolidated anyAppleOS
+  // attribute and then remove the remaining attrs. Any non-replaced members of
+  // a partially- covered group are folded into the replacement text.
 
-  // The attributes include a single short-form. If they all belong
-  // to the same group we can emit a fix-it to update it.
-  llvm::SmallSet<const AvailableAttr *, 8> remainingAttrsToSkip;
-  for (auto *attr : attrsToReplace)
-    remainingAttrsToSkip.insert(attr);
+  // Map each group member to its group head (the first attr in the chain).
+  llvm::SmallDenseMap<const AvailableAttr *, const AvailableAttr *>
+      memberToGroupHead;
+  for (auto *head : attrGroups)
+    for (auto *m = head; m; m = m->getNextGroupedAvailableAttr())
+      memberToGroupHead[m] = head;
 
-  llvm::SmallString<128> replacement;
-  llvm::raw_svector_ostream os(replacement);
-  os << "anyAppleOS " << commonVersion;
+  // For each replaceable attr, find its group and collect any non-replaced
+  // members of the same group that must survive.
+  llvm::SmallDenseSet<const AvailableAttr *> groupHeadsToReplace;
+  llvm::SmallVector<const AvailableAttr *> groupMembersToKeep;
 
-  auto groupHead = attrGroups.front();
-
-  // Get the location of the @available attr's right paren.
-  SourceLoc groupEndLoc = groupHead->getEndLoc();
-
-  // Build up the fix-it contents and find the starting source loc for the
-  // availability specs.
-  SourceLoc groupStartLoc = groupHead->getDomainLoc();
-  for (auto *member = groupHead; member != nullptr;
-       member = member->getNextGroupedAvailableAttr()) {
-    // The attributes are enumerated in reverse, so the group's starting loc
-    // is the last domain loc we see.
-    groupStartLoc = member->getDomainLoc();
-    if (remainingAttrsToSkip.erase(member))
+  for (auto *attr : attrsToReplace) {
+    const AvailableAttr *head =
+        attr->isGroupMember() ? memberToGroupHead.lookup(attr) : attr;
+    if (!head)
+      return;
+    if (!groupHeadsToReplace.insert(head).second)
       continue;
-    if (auto semAttr = D->getSemanticAvailableAttr(member)) {
-      os << ", " << platformString(semAttr->getPlatform());
-      if (auto v = member->getRawIntroduced())
-        os << " " << *v;
+
+    if (head->isGroupMember()) {
+      for (auto *m = head; m; m = m->getNextGroupedAvailableAttr()) {
+        if (!attrsToReplace.contains(m))
+          groupMembersToKeep.push_back(m);
+      }
     }
   }
-  os << ", *";
 
-  // Only emit the fix-it if all of the attributes to replace were found in
-  // the group.
-  if (remainingAttrsToSkip.empty()) {
-    // Make sure we have a valid source range in a single buffer. We might not
-    // if some attributes were expanded from an availability macro.
-    if (groupStartLoc.isInvalid() || groupEndLoc.isInvalid())
+  if (groupHeadsToReplace.empty())
+    return;
+
+  // Validate that all source attrs have valid locations in a single buffer
+  // before sorting (isBeforeInBuffer requires valid locs in the same buffer).
+  // An invalid or cross-buffer location indicates an availability macro
+  // expansion.
+  std::optional<unsigned> primaryBuf;
+  for (auto *head : groupHeadsToReplace) {
+    auto range = head->getRangeWithAt();
+    if (range.Start.isInvalid() || range.End.isInvalid())
       return;
 
-    auto startBuffer = ctx.SourceMgr.findBufferContainingLoc(groupStartLoc);
-    auto endBuffer = ctx.SourceMgr.findBufferContainingLoc(groupEndLoc);
-    if (startBuffer != endBuffer)
+    auto buf = ctx.SourceMgr.findBufferContainingLoc(range.Start);
+    if (!primaryBuf) {
+      primaryBuf = buf;
+    } else if (buf != *primaryBuf) {
       return;
+    }
+  }
 
-    diag.fixItReplaceChars(groupStartLoc, groupEndLoc, replacement);
+  // Sort by source location so the primary attr is first.
+  llvm::SmallVector<const AvailableAttr *> sortedGroupHeadsToReplace(
+      groupHeadsToReplace.begin(), groupHeadsToReplace.end());
+  llvm::sort(sortedGroupHeadsToReplace,
+             [&](const AvailableAttr *a, const AvailableAttr *b) {
+               return ctx.SourceMgr.isBeforeInBuffer(a->getRangeWithAt().Start,
+                                                     b->getRangeWithAt().Start);
+             });
+
+  // Build: @available(anyAppleOS N[, kept members from all groups...], *)
+  llvm::SmallString<128> fullReplacement;
+  llvm::raw_svector_ostream fos(fullReplacement);
+  fos << "@available(anyAppleOS " << commonVersion;
+  for (auto *kept : groupMembersToKeep) {
+    auto semAttr = D->getSemanticAvailableAttr(kept);
+    if (!semAttr)
+      continue;
+    fos << ", " << semAttr->getDomain().getNameForAttributePrinting();
+    if (auto v = kept->getRawIntroduced())
+      fos << " " << *v;
+  }
+  fos << ", *)";
+
+  // Replace the primary attr and remove the rest.
+  diag.fixItReplace(sortedGroupHeadsToReplace.front()->getRangeWithAt(),
+                    fullReplacement);
+
+  for (auto *head : llvm::drop_begin(sortedGroupHeadsToReplace)) {
+    diag.fixItRemove(head->getRangeWithAt());
   }
 }
 

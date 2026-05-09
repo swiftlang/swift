@@ -21,7 +21,7 @@
       key.fixits: [
         {
           key.offset: 36,
-          key.length: 1,
+          key.length: 2,
           key.sourcetext: ""
         }
       ]
