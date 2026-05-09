@@ -846,6 +846,10 @@ bool BridgedFunction::hasIndirectErrorResult() const {
   return (SwiftInt)getFunction()->getLoweredFunctionType()->hasIndirectErrorResult();
 }
 
+bool BridgedFunction::hasErrorResult() const {
+  return (SwiftInt)getFunction()->getLoweredFunctionType()->hasErrorResult();
+}
+
 SwiftInt BridgedFunction::getNumSILArguments() const {
   return swift::SILFunctionConventions(getFunction()->getConventionsInContext()).getNumSILArguments();
 }

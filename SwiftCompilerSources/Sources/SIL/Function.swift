@@ -413,6 +413,8 @@ extension Function {
 
   public var hasIndirectErrorArgument: Bool { bridged.hasIndirectErrorResult() }
 
+  public var hasErrorResult: Bool { bridged.hasErrorResult() }
+
   /// The number of arguments which correspond to parameters (and not to indirect results).
   public var numParameterArguments: Int { convention.parameters.count }
 

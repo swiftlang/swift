@@ -437,6 +437,15 @@ private func specializeCallee(apply: ApplySite, context: FunctionPassContext)
     return nil
   }
 
+  // FIXME: PackSpecialization does not yet preserve the typed-throws error
+  // result when computing the new function signature, producing a
+  // multi-direct-result return that downstream passes can't lower (e.g.
+  // CSE/SILCombine then trip a `cast<>` assertion). Skip such callees
+  // until the pass is updated to carry the error result through.
+  if callee.hasErrorResult {
+    return nil
+  }
+
   let exploded = PackExplodedFunction(from: callee, context)
 
   return exploded
