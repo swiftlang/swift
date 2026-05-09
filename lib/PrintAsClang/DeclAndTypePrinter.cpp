@@ -1515,7 +1515,8 @@ private:
   }
 
   /// Print C or C++ trailing attributes for a function declaration.
-  void printFunctionClangAttributes(FuncDecl *FD, AnyFunctionType *funcTy) {
+  void printFunctionClangAttributes(FuncDecl *FD, AnyFunctionType *funcTy,
+                                    Type resultTy) {
     if (funcTy->getResult()->isUninhabited()) {
       if (funcTy->isThrowing())
         os << " SWIFT_NORETURN_EXCEPT_ERRORS";
@@ -1525,6 +1526,9 @@ private:
                !FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
       os << " SWIFT_WARN_UNUSED_RESULT";
     }
+    if (outputLang == OutputLanguageMode::Cxx)
+      DeclAndTypeClangFunctionPrinter::printCxxReturnsRetainedAttribute(
+          os, resultTy);
   }
 
   // Print out the function signature for a @_cdecl function.
@@ -1544,7 +1548,7 @@ private:
     os << "SWIFT_EXTERN ";
     printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
     os << " SWIFT_NOEXCEPT";
-    printFunctionClangAttributes(FD, funcTy);
+    printFunctionClangAttributes(FD, funcTy, resultTy);
     printAvailability(FD);
     os << ";\n";
   }
@@ -1751,7 +1755,7 @@ private:
         modifiers);
     assert(
         !result.isUnsupported()); // The C signature should be unsupported too.
-    printFunctionClangAttributes(FD, funcTy);
+    printFunctionClangAttributes(FD, funcTy, resultTy);
     printAvailability(FD);
     os << " {\n";
     funcPrinter.printCxxThunkBody(

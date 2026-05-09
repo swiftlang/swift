@@ -84,6 +84,10 @@ inline job_run_info job_run_begin(Job *job, SerialExecutorRef serialExecutor,
 
 inline void job_run_end(job_run_info info) {}
 
+inline void task_switch_executor(AsyncTask *task,
+                                 SerialExecutorRef serialExecutor,
+                                 TaskExecutorRef taskExecutor) {}
+
 } // namespace trace
 } // namespace concurrency
 } // namespace swift

@@ -5648,8 +5648,8 @@ public:
     printFoot();
   }
                          
-  void visitWarnAttr(WarnAttr *Attr, Label label) {
-    printCommon(Attr, "warn", label);
+  void visitDiagnoseAttr(DiagnoseAttr *Attr, Label label) {
+    printCommon(Attr, "diagnose", label);
     auto &diagGroupInfo = getDiagGroupInfoByID(Attr->DiagnosticGroupID);
     printFieldRaw([&](raw_ostream &out) { out << diagGroupInfo.name; },
                   Label::always("diagGroupID:"));
@@ -6201,6 +6201,7 @@ namespace {
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeLiteral(), "compileTimeLiteral");
       printFlag(paramFlags.isConstValue(), "constValue");
+      printFlag(paramFlags.isSending(), "sending");
       printFlag(getDumpString(paramFlags.getValueOwnership()));
     }
 
@@ -6691,6 +6692,17 @@ namespace {
 
       if (auto sendableTy = T->getSendableDependentType())
         printRec(sendableTy, Label::always("sendable_dep"));
+
+      if (T->hasLifetimeDependencies()) {
+        for (auto &dep : T->getLifetimeDependencies()) {
+          std::string str;
+          llvm::raw_string_ostream os(str);
+          StreamPrinter sp(os);
+          sp.printLifetimeDependence(dep, T->getParams(),
+                                     PrintOptions::forDebugging());
+          printFieldQuoted(str, Label::always("lifetime"));
+        }
+      }
 
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
                         Label::optional("clang_type_info"));

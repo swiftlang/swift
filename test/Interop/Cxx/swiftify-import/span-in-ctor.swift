@@ -3,7 +3,7 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -c -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -Xcc -std=c++20 -cxx-interoperability-mode=default %t/method.swift \
-// RUN:   -Rmacro-expansions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}method.h -suppress-notes
+// RUN:   -Rmacro-expansions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}method.h -suppress-notes -eager-macro-checking
 
 
 //--- Inputs/module.modulemap

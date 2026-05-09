@@ -2312,3 +2312,33 @@ bb1(%5 : @reborrow $Klass):
   return %9 : $()
 }
 
+struct Inner {
+  var value: Builtin.NativeObject
+}
+
+struct Outer {
+  var inner: Inner
+}
+
+sil @get_inner_addr : $@convention(thin) (@in_guaranteed Outer) -> @guaranteed_address Inner
+
+sil @use_inner : $@convention(thin) (@guaranteed Inner) -> ()
+
+// CHECK-LABEL: sil [ossa] @do_not_promote_load_from_guaranteed_address_result :
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'do_not_promote_load_from_guaranteed_address_result'
+sil [ossa] @do_not_promote_load_from_guaranteed_address_result : $@convention(thin) (@guaranteed Outer) -> () {
+bb0(%0 : @guaranteed $Outer):
+  %stack = alloc_stack $Outer
+  %sb = store_borrow %0 to %stack : $*Outer
+  %get_fn = function_ref @get_inner_addr : $@convention(thin) (@in_guaranteed Outer) -> @guaranteed_address Inner
+  %addr = apply %get_fn(%sb) : $@convention(thin) (@in_guaranteed Outer) -> @guaranteed_address Inner
+  %loaded = load [copy] %addr : $*Inner
+  end_borrow %sb : $*Outer
+  %use_fn = function_ref @use_inner : $@convention(thin) (@guaranteed Inner) -> ()
+  apply %use_fn(%loaded) : $@convention(thin) (@guaranteed Inner) -> ()
+  destroy_value %loaded : $Inner
+  dealloc_stack %stack : $*Outer
+  %ret = tuple ()
+  return %ret : $()
+}

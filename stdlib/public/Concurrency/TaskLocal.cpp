@@ -96,7 +96,7 @@ static void swift_task_localValuePushImpl(const HeapObject *key,
   if (auto storage = FallbackTaskLocalStorage::get()) {
     Local = storage;
   } else {
-    void *allocation = malloc(sizeof(TaskLocal::Storage));
+    void *allocation = swift_slowAlloc(sizeof(TaskLocal::Storage), alignof(TaskLocal::Storage) - 1);
     auto *freshStorage = new(allocation) TaskLocal::Storage();
 
     FallbackTaskLocalStorage::set(freshStorage);
@@ -140,7 +140,7 @@ static void swift_task_localValuePopImpl() {
       // We clean up eagerly, it may be that this non-swift-concurrency thread
       // never again will use task-locals, and as such we better remove the storage.
       FallbackTaskLocalStorage::set(nullptr);
-      free(Local);
+      swift_slowDealloc(Local, sizeof(TaskLocal::Storage), alignof(TaskLocal::Storage) - 1);
     }
     return;
   }
@@ -255,7 +255,7 @@ TaskLocal::MarkerItem *TaskLocal::MarkerItem::create(AsyncTask *task,
   // If we have a task, allocate from that task. If not, use malloc. This must
   // mirror the corresponding dealloc/free call in Item::destroy.
   if (task) allocation = _swift_task_alloc_specific(task, amountToAllocate);
-  else allocation = malloc(amountToAllocate);
+  else allocation = swift_slowAlloc(amountToAllocate, alignof(MarkerItem) - 1);
   return new (allocation) MarkerItem(next, kind);
 }
 
@@ -268,7 +268,7 @@ TaskLocal::ValueItem *TaskLocal::ValueItem::create(AsyncTask *task,
 
   size_t amountToAllocate = ValueItem::itemSize(valueType);
   void *allocation = task ? _swift_task_alloc_specific(task, amountToAllocate)
-                          : malloc(amountToAllocate);
+                          : swift_slowAlloc(amountToAllocate, alignof(ValueItem) - 1);
   return ::new (allocation) ValueItem(next, key, valueType, inTaskGroupBody);
 }
 
@@ -285,6 +285,7 @@ void TaskLocal::ValueItem::copyTo(AsyncTask *target) {
   target->_private().Local.head = item;
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 // =============================================================================
 // ==== checks -----------------------------------------------------------------
 
@@ -373,6 +374,7 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
   free(message);
   abort();
 }
+#endif
 
 // =============================================================================
 // ==== destroy ----------------------------------------------------------------
@@ -395,9 +397,9 @@ bool TaskLocal::Item::destroy(AsyncTask *task) {
   }
 
   // if task is available, we must have used the task allocator to allocate this item,
-  // so we must deallocate it using the same. Otherwise, we must have used malloc.
+  // so we must deallocate it using the same. Otherwise, we must have used swift_slowAlloc.
   if (task) _swift_task_dealloc_specific(task, this);
-  else free(this);
+  else swift_slowDealloc(this, 0, alignof(TaskLocal::Item) - 1);
 
   return stop;
 }

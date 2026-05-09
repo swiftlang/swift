@@ -3214,6 +3214,10 @@ BridgedType BridgedContext::getBuiltinIntegerType(SwiftInt bitWidth) const {
   return swift::SILType::getBuiltinIntegerType(bitWidth, context->getModule()->getASTContext());
 }
 
+BridgedType BridgedContext::getBuiltinWordType() const {
+  return swift::SILType::getBuiltinWordType(context->getModule()->getASTContext());
+}
+
 BridgedASTType BridgedContext::getTupleType(BridgedArrayRef elementTypes) const {
   llvm::SmallVector<swift::TupleTypeElt, 8> elements;
   for (auto bridgedElmtTy :  elementTypes.unbridged<BridgedASTType>()) {

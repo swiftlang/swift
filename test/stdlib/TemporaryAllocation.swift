@@ -7,29 +7,34 @@ import SwiftShims
 var TemporaryAllocationTestSuite = TestSuite("TemporaryAllocation")
 
 func isStackAllocated(_ pointer: UnsafeRawPointer) -> Bool? {
-    var stackBegin: UInt = 0
-    var stackEnd: UInt = 0
-    if unsafe _swift_stdlib_getCurrentStackBounds(&stackBegin, &stackEnd) {
-        let pointerValue = UInt(bitPattern: pointer)
-        return pointerValue >= stackBegin && pointerValue < stackEnd
-    }
+  guard #available(SwiftStdlib 5.6, *)
+  else {
     return nil
+  }
+
+  var stackBegin: UInt = 0
+  var stackEnd: UInt = 0
+  if unsafe _swift_stdlib_getCurrentStackBounds(&stackBegin, &stackEnd) {
+    let pointerValue = UInt(bitPattern: pointer)
+    return pointerValue >= stackBegin && pointerValue < stackEnd
+  }
+  return nil
 }
 
 func expectStackAllocated(_ pointer: UnsafeRawPointer) {
-    if let stackAllocated = unsafe isStackAllocated(pointer) {
-        expectTrue(stackAllocated)
-    } else {
-        // Could not read stack bounds. Skip.
-    }
+  if let stackAllocated = unsafe isStackAllocated(pointer) {
+    expectTrue(stackAllocated)
+  } else {
+    // Could not read stack bounds. Skip.
+  }
 }
 
 func expectNotStackAllocated(_ pointer: UnsafeRawPointer) {
-    if let stackAllocated = unsafe isStackAllocated(pointer) {
-        expectFalse(stackAllocated)
-    } else {
-        // Could not read stack bounds. Skip.
-    }
+  if let stackAllocated = unsafe isStackAllocated(pointer) {
+    expectFalse(stackAllocated)
+  } else {
+    // Could not read stack bounds. Skip.
+  }
 }
 
 // MARK: Untyped buffers
@@ -74,7 +79,8 @@ TemporaryAllocationTestSuite.test("untypedEmptyAllocationIsStackAllocated") {
 }
 
 TemporaryAllocationTestSuite.test("crashOnNegativeByteCount")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI.")).code {
+.require(.crashTesting)
+.code {
   expectCrash {
     let byteCount = Int.random(in: -2 ..< -1)
     withUnsafeTemporaryAllocation(byteCount: byteCount, alignment: 1) { _ in }
@@ -82,7 +88,8 @@ TemporaryAllocationTestSuite.test("crashOnNegativeByteCount")
 }
 
 TemporaryAllocationTestSuite.test("crashOnNegativeAlignment")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI.")).code {
+.require(.crashTesting)
+.code {
   expectCrash {
     let alignment = Int.random(in: -2 ..< -1)
     withUnsafeTemporaryAllocation(byteCount: 16, alignment: alignment) { _ in }
@@ -176,7 +183,8 @@ TemporaryAllocationTestSuite.test("voidSpanIsStackAllocated") {
 }
 
 TemporaryAllocationTestSuite.test("crashOnNegativeValueCount")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI.")).code {
+.require(.crashTesting)
+.code {
   expectCrash {
     let capacity = Int.random(in: -2 ..< -1)
     withUnsafeTemporaryAllocation(of: Int.self, capacity: capacity) { _ in }
@@ -184,7 +192,8 @@ TemporaryAllocationTestSuite.test("crashOnNegativeValueCount")
 }
 
 TemporaryAllocationTestSuite.test("spanCrashOnNegativeValueCount")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI.")).code {
+.require(.crashTesting)
+.code {
   expectCrash {
     let capacity = Int.random(in: -2 ..< -1)
     withTemporaryAllocation(of: Int.self, capacity: capacity) { _ in }
@@ -294,7 +303,8 @@ TemporaryAllocationTestSuite.test("rawSpanAppendAndByteCount") {
 }
 
 TemporaryAllocationTestSuite.test("rawSpanCrashOnNegativeByteCount")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI.")).code {
+.require(.crashTesting)
+.code {
   expectCrash {
     let byteCount = Int.random(in: -2 ..< -1)
     withTemporaryAllocation(byteCount: byteCount, alignment: 1) { _ in }
@@ -302,7 +312,8 @@ TemporaryAllocationTestSuite.test("rawSpanCrashOnNegativeByteCount")
 }
 
 TemporaryAllocationTestSuite.test("rawSpanCrashOnNegativeAlignment")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI.")).code {
+.require(.crashTesting)
+.code {
   expectCrash {
     let alignment = Int.random(in: -2 ..< -1)
     withTemporaryAllocation(byteCount: 16, alignment: alignment) { _ in }

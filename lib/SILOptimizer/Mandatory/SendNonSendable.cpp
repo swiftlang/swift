@@ -44,7 +44,13 @@
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "swift/Sema/Concurrency.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+
+STATISTIC(NumRequireLivenessProcess,
+          "# of calls to RequireLiveness::process");
+STATISTIC(NumRequireLivenessInstScans,
+          "# of instructions scanned inside RequireLiveness block loops");
 
 using namespace swift;
 using namespace swift::siloptimizer;
@@ -526,6 +532,7 @@ void RequireLiveness::processNonDefBlock(SILBasicBlock *block) {
 
 template <typename Collection>
 void RequireLiveness::process(Collection requireInstList) {
+  ++NumRequireLivenessProcess;
   REGIONBASEDISOLATION_LOG(
       llvm::dbgs() << "==> Performing Require Liveness for: " << *sendingInst);
 
@@ -570,6 +577,7 @@ void RequireLiveness::process(Collection requireInstList) {
   while (auto *requireBlock = initializingWorklist.pop()) {
     auto blockState = blockLivenessInfo.get(requireBlock);
     for (auto &inst : *requireBlock) {
+      ++NumRequireLivenessInstScans;
       if (!allRequires.contains(&inst))
         continue;
       REGIONBASEDISOLATION_LOG(llvm::dbgs() << "        Mapping Block bb"
@@ -757,6 +765,19 @@ struct DiagnosticEvaluator final
     return {};
   }
 
+  /// If \p element's representative is an indirect out parameter, return
+  /// that parameter.
+  SILValue getSendingIndirectOutParameter(Element element) const {
+    auto rep = info->getValueMap().getRepresentativeValue(element);
+    if (!rep)
+      return {};
+    if (auto value = dyn_cast_or_null<SILFunctionArgument>(rep.maybeGetValue());
+        value && value->getArgumentConvention().isIndirectOutParameter() &&
+        value->isSending())
+      return value;
+    return {};
+  }
+  
   SILValue getInOutSendingParameter(Element elt) const {
     auto rep = info->getValueMap().getRepresentativeValue(elt);
     if (!rep)
@@ -1288,6 +1309,11 @@ bool UseAfterSendDiagnosticInferrer::initForSendingPartialApply(
   for (auto &sendingPAIOp : sendingPAI->getArgumentOperands()) {
     auto trackableValue = valueMap.getTrackableValue(sendingPAIOp.get());
     if (trackableValue.value.isSendable())
+      continue;
+    // Skip nonisolated(unsafe) captures -- the user has opted out of isolation
+    // checking for these values, so they should not be diagnosed as
+    // non-Sendable captures of a sending closure.
+    if (trackableValue.value.getIsolationRegionInfo().isUnsafeNonIsolated())
       continue;
     nonSendableOps.push_back(&sendingPAIOp);
   }
@@ -2182,6 +2208,8 @@ bool SentNeverSendableDiagnosticEmitter::initForSendingPartialApply(
     // value... then we are done. This is a 'correct' error value to emit.
     auto trackableValue = valueMap.getTrackableValue(sendingPAIOp.get());
     if (trackableValue.value.isSendable())
+      continue;
+    if (trackableValue.value.getIsolationRegionInfo().isUnsafeNonIsolated())
       continue;
 
     auto rep = trackableValue.value.getRepresentative().maybeGetValue();

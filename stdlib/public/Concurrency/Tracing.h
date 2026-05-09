@@ -119,6 +119,13 @@ job_run_info job_run_begin(Job *job, SerialExecutorRef serialExecutor,
 
 void job_run_end(job_run_info info);
 
+// Emitted when a task switches executors without suspending (i.e., the
+// surrounding job_run interval continues, but the active executor has
+// changed). Lets trace consumers see executor hops that happen inside a
+// single job_run interval.
+void task_switch_executor(AsyncTask *task, SerialExecutorRef serialExecutor,
+                          TaskExecutorRef taskExecutor);
+
 } // namespace trace
 } // namespace concurrency
 } // namespace swift

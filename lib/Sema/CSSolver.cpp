@@ -97,6 +97,7 @@ Solution ConstraintSystem::finalize() {
   }
 
   // Copy over the resolved overloads.
+  solution.overloadChoices.reserve(ResolvedOverloads.size());
   solution.overloadChoices.insert(ResolvedOverloads.begin(),
                                   ResolvedOverloads.end());
 
@@ -145,6 +146,7 @@ Solution ConstraintSystem::finalize() {
   }
 
   // Remember all of the argument/parameter matching choices we made.
+  solution.argumentMatchingChoices.reserve(argumentMatchingChoices.size());
   for (auto &argumentMatch : argumentMatchingChoices) {
     auto inserted = solution.argumentMatchingChoices.insert(argumentMatch);
     assert(inserted.second || inserted.first->second == argumentMatch.second);
@@ -194,9 +196,11 @@ Solution ConstraintSystem::finalize() {
   solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
                                        DefaultedConstraints.end());
 
+  solution.nodeTypes.reserve(NodeTypes.size());
   for (auto &nodeType : NodeTypes) {
     solution.nodeTypes.insert(nodeType);
   }
+  solution.keyPathComponentTypes.reserve(KeyPathComponentTypes.size());
   for (auto &keyPathComponentType : KeyPathComponentTypes) {
     solution.keyPathComponentTypes.insert(keyPathComponentType);
   }

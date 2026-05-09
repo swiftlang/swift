@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -enable-experimental-feature Lifetimes -O -disable-llvm-optzns -disable-availability-checking -emit-ir -module-name main %s | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all -enable-experimental-feature Lifetimes -O -disable-llvm-optzns -disable-availability-checking -emit-ir -module-name main %s | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all -enable-experimental-feature Lifetimes -disable-llvm-optzns -disable-availability-checking -emit-ir -verify -module-name main %s
 
 // REQUIRES: swift_feature_Lifetimes
 

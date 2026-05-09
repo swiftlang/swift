@@ -156,7 +156,7 @@ extension Executor {
   @available(StdlibDeploymentTarget 6.3, *)
   internal var isMainExecutor: Bool {
     #if os(WASI) || !$Embedded
-    return self is MainExecutor
+    return self is any MainExecutor
     #else
     return false
     #endif

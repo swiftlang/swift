@@ -281,7 +281,7 @@ function(setup_lit_args ARGS_VAR_OUT tested_sdk test_results_dir resource_dir_ov
   endif()
 
   execute_process(COMMAND
-      $<TARGET_FILE:Python3::Interpreter> "-c" "import psutil"
+      "${Python3_EXECUTABLE}" "-c" "import psutil"
       RESULT_VARIABLE python_psutil_status
       TIMEOUT 1 # second
       ERROR_QUIET)

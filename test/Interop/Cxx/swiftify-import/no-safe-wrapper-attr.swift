@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default %t/test.swift -emit-module \
-// RUN:   -verify -Rmacro-expansions -verify-additional-file %t%{fs-sep}test.h -suppress-notes
+// RUN:   -verify -Rmacro-expansions -verify-additional-file %t%{fs-sep}test.h -suppress-notes -eager-macro-checking
 
 //--- test.h
 #define __counted_by(x) __attribute__((__counted_by__(x)))

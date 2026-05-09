@@ -138,3 +138,13 @@ func fail_smuggle_ne(oNE: inout NE2, f: (NE2) -> NE2) {
   oNE = f(ne)
   // expected-note @+1 {{this use causes the lifetime-dependent value to escape}}
 }
+
+@_lifetime(copy body)
+func copyClosureNE2(body: () -> NE2) -> NE2 {
+  body()
+}
+
+@_lifetime(borrow body)
+func borrowClosureNE2(body: () -> NE2) -> NE2 {
+  body()
+}

@@ -1033,6 +1033,10 @@ namespace swift {
     /// eagerly typechecking source files after parsing.
     bool EnableLazyTypecheck = false;
 
+    /// Enables eager type-checking of declarations in macro expansions.
+    /// For testing purposes.
+    bool TypeCheckMacrosEagerly = false;
+
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;
 

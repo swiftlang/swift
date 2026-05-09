@@ -74,6 +74,7 @@ class SwiftTestCase(unittest.TestCase):
             build_swift_private_stdlib=True,
             swift_tools_ld64_lto_codegen_only_for_supporting_targets=False,
             build_stdlib_docs=False,
+            enable_caching=False,
             enable_new_runtime_build=False,
             darwin_test_deployment_version_osx="10.9",
             darwin_test_deployment_version_ios="15.0",

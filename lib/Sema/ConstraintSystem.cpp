@@ -31,6 +31,7 @@
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeTransform.h"
 #include "swift/AST/Types.h"
@@ -2061,6 +2062,10 @@ SolutionResult ConstraintSystem::salvage() {
 
     // Solve the system.
     solveImpl(viable);
+
+    // We have to keep solverState around for diagnoseAmbiguityWithFixes(),
+    // but we should not record any more changes from this point on.
+    state.Trail.close();
 
     // If we hit a threshold, we're done.
     if (isTooComplex(viable))

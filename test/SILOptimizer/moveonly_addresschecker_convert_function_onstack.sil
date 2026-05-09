@@ -1,0 +1,85 @@
+// RUN: %target-sil-opt -sil-print-types -module-name moveonly -sil-move-only-address-checker -enable-sil-verify-all %s | %FileCheck %s
+
+// Regression test for a crash in
+// `CopiedLoadBorrowEliminationVisitor::visitUse` (in
+// `MoveOnlyAddressCheckerUtils.cpp`). A noncopyable `load_borrow`
+// captured by an on-stack `partial_apply` whose result flows through a
+// `convert_function` (to strip `@Sendable` from a
+// `@MainActor`-isolated noescape async closure) hit
+// `llvm_unreachable("We should never hit this")` because the
+// `ForwardingConsume`/`DestroyingConsume` special-case only recognized
+// a direct `destroy_value` of the partial_apply, not one reached via
+// `convert_function`.
+//
+// The checker should now look through `convert_function` and recognize
+// that the lifetime-ending use still closes the on-stack PA's borrow
+// scope, not consumes the captured noncopyable.
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+public class NonSendableKlass {}
+
+public struct NoncopyableStructNonsendable : ~Copyable {
+  var k: NonSendableKlass
+}
+
+sil @asyncMainActorClosureBody : $@convention(thin) @Sendable @async (@guaranteed NoncopyableStructNonsendable) -> ()
+sil @nonescapingAsyncConsumer : $@convention(thin) (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
+
+// The checker previously crashed while processing this function. With the
+// fix, the mark is recognized as a valid borrowed init and stripped; the
+// partial_apply + convert_function + destroy chain is preserved.
+//
+// CHECK-LABEL: sil [ossa] @convertFunctionDestroyOfOnStackPA : $@convention(thin) (@guaranteed { let NoncopyableStructNonsendable }) -> () {
+// CHECK: [[PROJ:%.*]] = project_box
+// CHECK: [[LB:%.*]] = load_borrow [[PROJ]]
+// CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] [on_stack] {{%.*}}([[LB]])
+// CHECK: [[CVT:%.*]] = convert_function [[PAI]]
+// CHECK: apply {{%.*}}([[CVT]])
+// CHECK: destroy_value [[CVT]]
+// CHECK: end_borrow [[LB]]
+// CHECK: } // end sil function 'convertFunctionDestroyOfOnStackPA'
+sil [ossa] @convertFunctionDestroyOfOnStackPA : $@convention(thin) (@guaranteed { let NoncopyableStructNonsendable }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ let NoncopyableStructNonsendable }):
+  %1 = project_box %0, 0
+  %2 = function_ref @asyncMainActorClosureBody : $@convention(thin) @Sendable @async (@guaranteed NoncopyableStructNonsendable) -> ()
+  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*NoncopyableStructNonsendable
+  %4 = load_borrow %3 : $*NoncopyableStructNonsendable
+  %5 = partial_apply [callee_guaranteed] [on_stack] %2(%4) : $@convention(thin) @Sendable @async (@guaranteed NoncopyableStructNonsendable) -> ()
+  %6 = convert_function %5 to $@noescape @async @callee_guaranteed () -> ()
+  %7 = function_ref @nonescapingAsyncConsumer : $@convention(thin) (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
+  destroy_value %6 : $@noescape @async @callee_guaranteed () -> ()
+  end_borrow %4 : $NoncopyableStructNonsendable
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// Chained convert_functions between the on-stack partial_apply and its
+// destroy also need to be walked through.
+//
+// CHECK-LABEL: sil [ossa] @chainedConvertFunctionDestroyOfOnStackPA : $@convention(thin) (@guaranteed { let NoncopyableStructNonsendable }) -> () {
+// CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+// CHECK: [[CVT1:%.*]] = convert_function [[PAI]]
+// CHECK: [[CVT2:%.*]] = convert_function [[CVT1]]
+// CHECK: destroy_value [[CVT2]]
+// CHECK: } // end sil function 'chainedConvertFunctionDestroyOfOnStackPA'
+sil [ossa] @chainedConvertFunctionDestroyOfOnStackPA : $@convention(thin) (@guaranteed { let NoncopyableStructNonsendable }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ let NoncopyableStructNonsendable }):
+  %1 = project_box %0, 0
+  %2 = function_ref @asyncMainActorClosureBody : $@convention(thin) @Sendable @async (@guaranteed NoncopyableStructNonsendable) -> ()
+  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*NoncopyableStructNonsendable
+  %4 = load_borrow %3 : $*NoncopyableStructNonsendable
+  %5 = partial_apply [callee_guaranteed] [on_stack] %2(%4) : $@convention(thin) @Sendable @async (@guaranteed NoncopyableStructNonsendable) -> ()
+  %6 = convert_function %5 to $@noescape @Sendable @async @callee_guaranteed () -> ()
+  %7 = convert_function %6 to $@noescape @async @callee_guaranteed () -> ()
+  %8 = function_ref @nonescapingAsyncConsumer : $@convention(thin) (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
+  destroy_value %7 : $@noescape @async @callee_guaranteed () -> ()
+  end_borrow %4 : $NoncopyableStructNonsendable
+  %10 = tuple ()
+  return %10 : $()
+}

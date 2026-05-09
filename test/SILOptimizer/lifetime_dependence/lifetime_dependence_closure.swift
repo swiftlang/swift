@@ -207,3 +207,30 @@ do {
   // expected-note@-5{{it depends on a closure capture; this is not yet supported}}
   // expected-note@-6{{this use causes the lifetime-dependent value to escape}}
 }
+
+// ~Escapable function types
+@_lifetime(borrow body)
+func borrowClosureNE(body: /* @_lifetime(captures) */ () -> NE) -> NE {
+  body()
+}
+
+func callBorrowClosureNE(ne: NE) -> NE {
+  // expected-error@-1{{lifetime-dependent variable 'ne' escapes its scope}}
+  // expected-note@-2{{it depends on the lifetime of argument 'ne'}}
+  let neo = borrowClosureNE { ne }
+  // expected-error@-1{{lifetime-dependent variable 'neo' escapes its scope}}
+  // expected-note@-2{{this use causes the lifetime-dependent value to escape}}
+  // expected-note@-3{{it depends on the lifetime of this parent value}}
+
+  return neo // expected-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+@_lifetime(copy body)
+func copyClosureNE(body: () -> NE) -> NE {
+  body()
+}
+
+func callCopyClosureNE(ne: NE) -> NE {
+  let neo = copyClosureNE { ne }
+  return neo
+}

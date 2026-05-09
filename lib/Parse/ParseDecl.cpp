@@ -3252,7 +3252,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
-  case DeclAttrKind::Warn: {
+  case DeclAttrKind::Diagnose: {
     if (!consumeIfAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -3267,13 +3267,13 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
     auto DiagGroupID = getDiagGroupIDByName(ParsedCategoryIdentifier);
     if (!DiagGroupID) {
-      diagnose(Loc, diag::attr_warn_unknown_diagnostic_group_identifier,
+      diagnose(Loc, diag::attr_diagnose_unknown_diagnostic_group_identifier,
                ParsedCategoryIdentifier);
       DiscardAttribute = true;
     }
 
     if (!consumeIf(tok::comma)) {
-      diagnose(Tok, diag::attr_expected_comma, "@warn", false);
+      diagnose(Tok, diag::attr_expected_comma, AttrName, false);
       return makeParserSuccess();
     }
 
@@ -3288,7 +3288,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       diagnose(Loc, diag::attr_expected_colon_after_label, AsLabel.str());
       return makeParserSuccess();
     }
-    // Map the behavior identifier to WarnAttr::Behavior
+    // Map the behavior identifier to DiagnoseAttr::Behavior
     StringRef ParsedBehaviorIdentifier = Tok.getText();
     if (!consumeIf(tok::identifier)) {
       diagnose(Loc, diag::attr_expected_option_identifier, AttrName);
@@ -3302,7 +3302,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
             .Case("ignored", WarningGroupBehavior::Ignored)
             .Default(std::nullopt);
     if (!BehaviorSpecifier) {
-      diagnose(Loc, diag::attr_warn_expected_known_behavior,
+      diagnose(Loc, diag::attr_diagnose_expected_known_behavior,
                ParsedBehaviorIdentifier);
       DiscardAttribute = true;
     }
@@ -3339,7 +3339,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) WarnAttr(*DiagGroupID, *BehaviorSpecifier,
+      Attributes.add(new (Context) DiagnoseAttr(*DiagGroupID, *BehaviorSpecifier,
                                             ReasonString, AtLoc, AttrRange,
                                             /*Implicit=*/false));
     break;
@@ -4474,6 +4474,10 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   checkInvalidAttrName("_section", "section", DeclAttrKind::Section,
                        diag::attr_renamed_warning);
   checkInvalidAttrName("_used", "used", DeclAttrKind::Used,
+                       diag::attr_renamed_warning);
+
+  // Historical name for @diagnose.
+  checkInvalidAttrName("warn", "diagnose", DeclAttrKind::Diagnose,
                        diag::attr_renamed_warning);
 
   // Historical name for 'nonisolated'.

@@ -1306,3 +1306,6 @@ Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss4Span
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$1.0$26.0$_$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvg$
 Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivg
 Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvg
+
+// Cross-encoding strcmp for Foundation
+Added: __swift_unicodeBuffersEqual_nonNormalizing

@@ -1,0 +1,225 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -loadable-address | %FileCheck %s
+
+import Swift
+
+public struct BigArc { var a, b, c, d, e: AnyObject }
+
+public struct BiggerArc { var bigArc: BigArc }
+
+sil @makeBigArc : $@convention(thin) () -> BigArc
+sil @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+
+// In test1, `%1` is a `BigArc` that will already become indirected because
+// it is the result of a function call that will become an indirect return.
+// `make_borrow` of the value becomes `make_borrow_addr` of the value's
+// lowered memory address.
+
+// CHECK-LABEL: sil @test1
+// CHECK:        apply {{%.*}}([[OUT:%[0-9]+]])
+// CHECK:        make_addr_borrow [[OUT]]
+sil @test1 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @makeBigArc : $@convention(thin) () -> BigArc
+  %1 = apply %0() : $@convention(thin) () -> BigArc
+  %2 = make_borrow %1
+  %3 = struct $Ref<BigArc> (%2)
+  %4 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+// In test2, `%4` is a `BigArc` that is `load`-ed from a memory location.
+// `make_borrow` of the load becomes `make_borrow_addr` of the loaded address.
+
+// CHECK-LABEL: sil @test2
+// CHECK:        apply {{%.*}}([[OUT:%[0-9]+]])
+// CHECK:        copy_addr [take] [[OUT]] to [init] [[LOCAL:%[0-9]+]]
+// CHECK:        make_addr_borrow [[LOCAL]]
+sil @test2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $BigArc
+  %1 = function_ref @makeBigArc : $@convention(thin) () -> BigArc
+  %2 = apply %1() : $@convention(thin) () -> BigArc
+  store %2 to %0
+  %4 = load %0
+  %5 = make_borrow %4
+  %6 = struct $Ref<BigArc> (%5)
+  %7 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  destroy_addr %0
+  dealloc_stack %0
+  %11 = tuple ()
+  return %11
+}
+
+
+// In test2ossa, `%4` is a `BigArc` that is `load_borrow`-ed from a memory location.
+// `make_borrow` of the load becomes `make_borrow_addr` of the loaded address.
+
+// CHECK-LABEL: sil [ossa] @test2ossa
+// CHECK:        apply {{%.*}}([[OUT:%[0-9]+]])
+// CHECK:        copy_addr [take] [[OUT]] to [init] [[LOCAL:%[0-9]+]]
+// CHECK:        make_addr_borrow [[LOCAL]]
+sil [ossa] @test2ossa : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $BigArc
+  %1 = function_ref @makeBigArc : $@convention(thin) () -> BigArc
+  %2 = apply %1() : $@convention(thin) () -> BigArc
+  store %2 to [init] %0
+  %4 = load_borrow %0
+  %5 = make_borrow %4
+  %6 = struct $Ref<BigArc> (%5)
+  %7 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  end_borrow %4
+  destroy_addr %0
+  dealloc_stack %0
+  %12 = tuple ()
+  return %12
+}
+
+// In test3, `%5` is a `BigArc` that is formed locally and doesn't directly
+// pass through any function boundaries. `make_borrow` of the local value
+// becomes `make_addr_borrow` of a temporary allocation.
+
+// CHECK-LABEL: sil @test3
+// CHECK:         [[BIGARC:%.*]] = struct $BigArc
+// CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         store [[BIGARC]] to [[BUF]]
+// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF]]
+// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
+// CHECK:         apply {{.*}}([[S_BORROW]])
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         release_value [[BIGARC]]
+sil @test3 : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  retain_value %0
+  retain_value %0
+  retain_value %0
+  retain_value %0
+
+  %5 = struct $BigArc(%0, %0, %0, %0, %0)
+  %6 = make_borrow %5
+  %7 = struct $Ref<BigArc> (%6)
+  %8 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  release_value %5
+  %11 = tuple ()
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @test3ossa
+// CHECK:         [[BIGARC:%.*]] = struct $BigArc
+// CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         [[BUF_BORROW:%.*]] = store_borrow [[BIGARC]] to [[BUF]]
+// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF_BORROW]]
+// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
+// CHECK:         apply {{.*}}([[S_BORROW]])
+// CHECK:         end_borrow [[BUF_BORROW]]
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         destroy_value [[BIGARC]]
+sil [ossa] @test3ossa : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = copy_value %0
+  %2 = copy_value %0
+  %3 = copy_value %0
+  %4 = copy_value %0
+
+  %5 = struct $BigArc(%0, %1, %2, %3, %4)
+  %6 = make_borrow %5
+  %7 = struct $Ref<BigArc> (%6)
+  %8 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  destroy_value %5
+  %11 = tuple ()
+  return %11
+}
+
+// In test4, `%1` is a `BigArc` that is projected from a `BiggerArc` that
+// is passed in by value and will be turned into an indirect parameter by
+// the pass.
+
+// CHECK-LABEL: sil @test4
+// CHECK:       bb0([[PARAM:%.*]] : $*BiggerArc):
+// CHECK:         [[BIGARC_ADDR:%.*]] = struct_element_addr [[PARAM]]
+// CHECK:         [[BORROW:%.*]] = make_addr_borrow [[BIGARC_ADDR]]
+sil @test4 : $@convention(thin) (@guaranteed BiggerArc) -> () {
+bb0(%0 : $BiggerArc):
+  %1 = struct_extract %0, #BiggerArc.bigArc
+  %2 = make_borrow %1
+  %3 = struct $Ref<BigArc> (%2)
+  %4 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+// In test5, `%7` is a `BigArc` that is projected from a `BiggerArc` that
+// is formed locally.
+
+// CHECK-LABEL: sil @test5
+// CHECK:         [[BIGARC:%.*]] = struct_extract {{%.*}}, #BiggerArc.bigArc
+// CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         store [[BIGARC]] to [[BUF]]
+// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF]]
+// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
+// CHECK:         apply {{.*}}([[S_BORROW]])
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         release_value [[BIGARC]]
+sil @test5 : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  retain_value %0
+  retain_value %0
+  retain_value %0
+  retain_value %0
+
+  %5 = struct $BigArc(%0, %0, %0, %0, %0)
+  %6 = struct $BiggerArc(%5)
+
+  %7 = struct_extract %6, #BiggerArc.bigArc
+  %8 = make_borrow %7
+  %9 = struct $Ref<BigArc> (%8)
+  %10 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %11 = apply %10(%9) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  release_value %7
+  %13 = tuple ()
+  return %13
+}
+
+// CHECK-LABEL: sil [ossa] @test5ossa
+// CHECK:         [[BIGGER_ARC:%.*]] = struct $BiggerArc
+// CHECK:         [[BIGGER_ARC_BORROW:%.*]] = begin_borrow [[BIGGER_ARC]]
+// CHECK:         [[BIGARC:%.*]] = struct_extract [[BIGGER_ARC_BORROW]], #BiggerArc.bigArc
+// CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         [[BUF_BORROW:%.*]] = store_borrow [[BIGARC]] to [[BUF]]
+// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF_BORROW]]
+// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
+// CHECK:         apply {{.*}}([[S_BORROW]])
+// CHECK:         end_borrow [[BUF_BORROW]]
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         end_borrow [[BIGGER_ARC_BORROW]]
+// CHECK:         destroy_value [[BIGGER_ARC]]
+sil [ossa] @test5ossa : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = copy_value %0
+  %2 = copy_value %0
+  %3 = copy_value %0
+  %4 = copy_value %0
+
+  %5 = struct $BigArc(%0, %1, %2, %3, %4)
+  %6 = struct $BiggerArc(%5)
+
+  %7 = begin_borrow %6
+  %8 = struct_extract %7, #BiggerArc.bigArc
+  %9 = make_borrow %8
+  %10 = struct $Ref<BigArc> (%9)
+  %11 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  end_borrow %7
+  destroy_value %6
+  %15 = tuple ()
+  return %15
+}
+
+

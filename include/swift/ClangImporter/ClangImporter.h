@@ -736,7 +736,7 @@ bool isCompletionHandlerParamName(StringRef paramName);
 namespace importer {
 /// Returns true if the given C/C++ reference type uses "immortal"
 /// retain/release functions.
-bool hasImmortalAttrs(const clang::RecordDecl *decl);
+bool hasAnyImmortalAttr(const clang::RecordDecl *decl);
 
 struct ReturnOwnershipInfo {
   ReturnOwnershipInfo(const clang::NamedDecl *decl);

@@ -135,6 +135,16 @@ PackConformance *PackConformance::getAssociatedConformance(
     Type assocType, ProtocolDecl *protocol) const {
   SmallVector<Type, 4> packElements;
   SmallVector<ProtocolConformanceRef, 4> packConformances;
+  auto &ctx = Protocol->getASTContext();
+
+  // If any pattern's associated conformance lookup fails (e.g. the underlying
+  // conformance is invalid because of a prior diagnostic), fall back to
+  // ErrorType for the corresponding pack element rather than feeding a null
+  // Type into `PackType::get`.
+  auto getAssocType = [&](ProtocolConformanceRef assocConformance) -> Type {
+    return assocConformance ? assocConformance.getType()
+                            : ErrorType::get(ctx);
+  };
 
   auto conformances = getPatternConformances();
   for (unsigned i : indices(conformances)) {
@@ -145,20 +155,18 @@ PackConformance *PackConformance::getAssociatedConformance(
         conformances[i].getAssociatedConformance(assocType, protocol);
       packConformances.push_back(assocConformancePattern);
 
-      auto assocTypePattern = assocConformancePattern.getType();
       packElements.push_back(PackExpansionType::get(
-          assocTypePattern, packExpansion->getCountType()));
+          getAssocType(assocConformancePattern), packExpansion->getCountType()));
     } else {
       auto assocConformanceScalar =
         conformances[i].getAssociatedConformance(assocType, protocol);
       packConformances.push_back(assocConformanceScalar);
 
-      auto assocTypeScalar = assocConformanceScalar.getType();
-      packElements.push_back(assocTypeScalar);
+      packElements.push_back(getAssocType(assocConformanceScalar));
     }
   }
 
-  auto conformingType = PackType::get(Protocol->getASTContext(), packElements);
+  auto conformingType = PackType::get(ctx, packElements);
   return PackConformance::get(conformingType, protocol, packConformances);
 }
 

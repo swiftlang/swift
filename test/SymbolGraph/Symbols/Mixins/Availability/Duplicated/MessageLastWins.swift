@@ -13,13 +13,13 @@ public func foo() {}
 // CHECK-LABEL: "precise": "s:15MessageLastWins3fooyyF",
 // CHECK: "availability": [
 // CHECK-NEXT:   {
-// CHECK-NEXT:     "domain": "macOS",
-// CHECK-NEXT:     "message": "second",
+// CHECK-NEXT:     "domain": "iOS",
+// CHECK-NEXT:     "message": "iOS",
 // CHECK-NEXT:     "isUnconditionallyDeprecated": true
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
-// CHECK-NEXT:     "domain": "iOS",
-// CHECK-NEXT:     "message": "iOS",
+// CHECK-NEXT:     "domain": "macOS",
+// CHECK-NEXT:     "message": "second",
 // CHECK-NEXT:     "isUnconditionallyDeprecated": true
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]

@@ -572,6 +572,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case is DeallocStackInst, is InjectEnumAddrInst, is FixLifetimeInst, is EndBorrowInst, is EndAccessInst,
          is IsUniqueInst, is DebugValueInst:
       return .continueWalk
+    case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
+      return .continueWalk
     case let uac as UncheckedAddrCastInst:
       if uac.type != uac.fromAddress.type {
         // It's dangerous to continue walking over an `unchecked_addr_cast` which casts between two different types.
@@ -655,7 +657,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         if !indirectResultEscapes(of: beginApply, path: path) {
           return .continueWalk
         }
-      } else if !apply.isAddressable(operand: argOp) {
+      } else if !apply.isAddressable(operand: argOp) &&
+                !hasAddressResult(apply) {
         // The result does not depend on the argument's address.
         return .continueWalk
       }
@@ -697,6 +700,12 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       }
     }
     return .continueWalk
+  }
+
+  private func hasAddressResult(_ apply: ApplySite) -> Bool {
+    guard let fas = apply as? FullApplySite else { return false }
+    let convention = fas.functionConvention
+    return convention.hasAddressResult
   }
 
   private mutating func indirectResultEscapes(of beginApply: BeginApplyInst, path: Path) -> Bool {

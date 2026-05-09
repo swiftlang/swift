@@ -19,7 +19,7 @@ SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest,
               GenericSignatureWithError (const GenericSignatureImpl *,
                                          SmallVector<GenericTypeParamType *, 2>,
                                          SmallVector<Requirement, 2>,
-                                         bool),
+                                         DefaultRequirementOptions),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ApplyAccessNoteRequest,
               evaluator::SideEffect(ValueDecl *), SeparatelyCached, NoLocationInfo)
@@ -201,7 +201,7 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                          WhereClauseOwner,
                                          SmallVector<Requirement, 2>,
                                          SmallVector<TypeBase *, 2>,
-                                         SourceLoc, ExtensionDecl *, bool),
+                                         SourceLoc, ExtensionDecl *, DefaultRequirementOptions),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DistributedModuleIsAvailableRequest,
               bool(const ValueDecl *), Cached, NoLocationInfo)

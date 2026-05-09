@@ -2106,6 +2106,10 @@ static bool performCompileStepsPostSILGen(
     ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs, int &ReturnValue,
     FrontendObserver *observer, ArrayRef<const char *> CommandLineArgs,
     ArrayRef<PrimarySpecificPaths> auxPSPs) {
+
+  FrontendStatsTracer tracer(SM->getASTContext().Stats,
+                             "SIL-and-LLVM-processing");
+
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;

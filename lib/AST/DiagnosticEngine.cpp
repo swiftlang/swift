@@ -270,14 +270,27 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
   // the token we want to remove.
   auto &SM = Engine->SourceMgr;
   auto charRange = toCharSourceRange(SM, R);
+  auto charAfter = extractCharAfter(SM, charRange.getEnd());
 
-  // If we're removing something (e.g. a keyword), do a bit of extra work to
-  // make sure that we leave the code in a good place, without extraneous white
-  // space around its hole.  Specifically, check to see there is whitespace
-  // before and after the end of range.  If so, nuke the space afterward to keep
-  // things consistent.
-  if (extractCharAfter(SM, charRange.getEnd()) == ' ' &&
-      isspace(extractCharBefore(SM, charRange.getStart()))) {
+  // If we're removing something (e.g. a keyword or an attribute), do a bit of
+  // extra work to make sure that we leave the code in a good place, without
+  // extraneous white space around its hole:
+  //
+  //  - If there's a newline immediately following the range, check whether the
+  //    content of the line leading up to the range is all whitespace. Remove
+  //    the entire line if so.
+  //  - If there is a space before and after the end of range, nuke the
+  //    space afterward to keep things consistent.
+  if (charAfter == '\n' || charAfter == '\r') {
+    auto lineStartLoc = Lexer::getLocForStartOfLine(SM, charRange.getStart());
+    auto lineStart = SM.extractText(
+        toCharSourceRange(SM, lineStartLoc, charRange.getStart()));
+    if (lineStart.ltrim().empty()) {
+      charRange = CharSourceRange(
+          lineStartLoc, lineStart.size() + charRange.getByteLength() + 1);
+    }
+  } else if (charAfter == ' ' &&
+             isspace(extractCharBefore(SM, charRange.getStart()))) {
     charRange = CharSourceRange(charRange.getStart(),
                                 charRange.getByteLength()+1);
   }
