@@ -1653,15 +1653,27 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   // A hop/check is only needed in the thunk if it is global-actor isolated.
   // Native, instance-isolated async methods will hop in the prologue.
   if (isolation && isolation->isGlobalActor()) {
-    if (F.isAsync()) {
-      // Hop to the actor for the method's actor constraint.
-      // Note that, since an async native-to-foreign thunk only ever runs in a
-      // task purpose-built for running the Swift async code triggering the
-      // completion handler, there is no need for us to hop back to the existing
-      // executor, since the task will end after we invoke the completion handler.
-      emitPrologGlobalActorHop(loc, isolation->getGlobalActor());
-    } else {
-      emitPreconditionCheckExpectedExecutor(loc, *isolation, std::nullopt);
+    // For an isolated `deinit`, the native `__deallocating_deinit` already
+    // performs the hop via `swift_task_deinitOnExecutor`. The @objc thunk
+    // must not assert or hop, because ObjC `release` can run from any
+    // thread; dropping the last reference from a non-isolated context would
+    // otherwise crash in `_checkExpectedExecutor`.
+    bool isIsolatingDeinitThunk = false;
+    if (thunk.hasDecl()) {
+      if (auto *dd = dyn_cast<DestructorDecl>(thunk.getDecl()))
+        isIsolatingDeinitThunk = needsIsolatingDestructor(dd);
+    }
+    if (!isIsolatingDeinitThunk) {
+      if (F.isAsync()) {
+        // Hop to the actor for the method's actor constraint.
+        // Note that, since an async native-to-foreign thunk only ever runs in a
+        // task purpose-built for running the Swift async code triggering the
+        // completion handler, there is no need for us to hop back to the existing
+        // executor, since the task will end after we invoke the completion handler.
+        emitPrologGlobalActorHop(loc, isolation->getGlobalActor());
+      } else {
+        emitPreconditionCheckExpectedExecutor(loc, *isolation, std::nullopt);
+      }
     }
   }
 
