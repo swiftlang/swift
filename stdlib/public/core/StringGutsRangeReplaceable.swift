@@ -12,7 +12,7 @@
 
 @inline(__always)
 internal func _growStringCapacity(_ capacity: Int) -> Int {
-  // 13/8 ≈ 1.625x growth for native String storage. Roughly matches NSString
+  // 1.625x growth for native String storage. Roughly matches NSString
   return capacity &+ (capacity &>> 1) &+ (capacity &>> 3)
 }
 
