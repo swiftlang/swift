@@ -101,6 +101,14 @@ extension AddressUseVisitor {
     case let pai as PartialApplyInst where !pai.mayEscape:
       return dependentAddressUse(of: operand, dependentValue: pai)
 
+    case let iba as InitBorrowAddrInst where iba.borrow == operand.value:
+      // Initialize the Builtin.Borrow with operand.
+      return leafAddressUse(of: operand)
+
+    case let iba as InitBorrowAddrInst where iba.referent == operand.value:
+      // Store a new Builtin.Borrow value that depends on 'referent'.
+      return dependentAddressUse(of: operand, dependentAddress: iba.borrow)
+
     case let pai as PartialApplyInst where pai.mayEscape:
       return escapingAddressUse(of: operand)
 
