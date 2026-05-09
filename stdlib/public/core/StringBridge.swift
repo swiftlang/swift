@@ -292,7 +292,7 @@ internal func _cocoaStringCopyBytes(
   defer {
     remainingRange = cocoaRemainingRange.location ..< cocoaRemainingRange.location + cocoaRemainingRange.length
   }
-  return unsafe withUnsafeMutablePointer(
+  return withUnsafeMutablePointer(
     to: &cocoaRemainingRange
   ) { remainingPtr in
     return unsafe _NSStringCopyBytes(

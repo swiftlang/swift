@@ -674,8 +674,8 @@ fileprivate func isEqual(
   if lhs.byteCount != rhs.byteCount {
     return false
   }
-  return unsafe lhs.withUnsafeBytes { lhsBuffer in
-    return unsafe rhs.withUnsafeBytes { rhsBuffer in
+  return lhs.withUnsafeBytes { lhsBuffer in
+    return rhs.withUnsafeBytes { rhsBuffer in
       return unsafe 0 == _swift_stdlib_memcmp(
         lhsBuffer.baseAddress.unsafelyUnwrapped,
         rhsBuffer.baseAddress.unsafelyUnwrapped,
