@@ -5472,9 +5472,9 @@ SILFunctionType::SILFunctionType(
 
   if (!ext.getLifetimeDependencies().empty()) {
     NumLifetimeDependencies = ext.getLifetimeDependencies().size();
-    memcpy(getMutableLifetimeDependenceInfo().data(),
-           ext.getLifetimeDependencies().data(),
-           NumLifetimeDependencies * sizeof(LifetimeDependenceInfo));
+    auto src = ext.getLifetimeDependencies();
+    std::uninitialized_copy(src.begin(), src.end(),
+                            getMutableLifetimeDependenceInfo().begin());
   }
 #ifndef NDEBUG
   if (ext.getRepresentation() == Representation::WitnessMethod)
