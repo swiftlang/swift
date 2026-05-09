@@ -13,6 +13,8 @@
 #define DEBUG_TYPE "definite-init"
 
 #include "DIMemoryUseCollector.h"
+#include "llvm/ADT/Statistic.h"
+
 #include "swift/AST/Expr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
@@ -27,6 +29,9 @@
 
 using namespace swift;
 using namespace ownership;
+
+STATISTIC(NumStructEltBaseScans,
+          "# of stored-property scans computing struct element base indices");
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -778,6 +783,7 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
     if (SEAI->getField() == VD)
       break;
 
+    ++NumStructEltBaseScans;
     auto expansionContext = TypeExpansionContext(*SEAI->getFunction());
     auto FieldType = SEAI->getOperand()->getType().getFieldType(VD, Module, expansionContext);
     BaseEltNo += getElementCountRec(expansionContext, Module, FieldType, false);

@@ -526,3 +526,17 @@ class TestStaticClassProperty {
 
   static let staticSpan = staticArray.span
 }
+
+// =============================================================================
+// Builtin.Borrow
+// =============================================================================
+
+// rdar://176564359 ([nonescapable] support Builtin.makeBorrow in lifetime diagnostics)
+struct TestBuiltinBorrowInit<T: ~Copyable & ~Escapable>: ~Escapable {
+  private let ref: Builtin.Borrow<T>
+
+  @_lifetime(borrow target)
+  init(_ target: borrowing T) {
+    self.ref = Builtin.makeBorrow(target)
+  }
+}
