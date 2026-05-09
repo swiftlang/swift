@@ -15,9 +15,17 @@
 
 import Builtin
 
-struct NotEscapable: ~Escapable {}
+struct NotEscapable: ~Escapable {
+  let p: UnsafeRawPointer?
+}
 
-public struct NE: ~Escapable {}
+public struct NE: ~Escapable {
+  let p: UnsafeRawPointer?
+}
+
+func getLocalPointer() -> UnsafeRawPointer? {
+  return nil
+}
 
 // Lifetime dependence semantics by example.
 public struct Span<T>: ~Escapable {
@@ -263,7 +271,7 @@ struct Container<T> {
 // Dependence on an empty initialized value should be scoped to variable decl.
 @_lifetime(copy x)
 func f(x: NotEscapable) -> NotEscapable {
-  let local = NotEscapable() // expected-error {{lifetime-dependent variable 'local' escapes its scope}}
+  let local = NotEscapable(p: getLocalPointer()) // expected-error {{lifetime-dependent variable 'local' escapes its scope}}
   // expected-note @-1{{it depends on the lifetime of this parent value}}
   return local // expected-note {{this use causes the lifetime-dependent value to escape}}
 }
@@ -621,9 +629,7 @@ func testNoEscapClosureCaptureHasEscaped(spanArg: Span<Int>, array: consuming [I
   let escapedSpan = {
     spanBox = array.span() // expected-error{{lifetime-dependent value escapes its scope}}
     // expected-note@-1{{this use causes the lifetime-dependent value to escape}}
-    return closure() // expected-error{{lifetime-dependent value escapes its scope}}
-    // expected-note@-1{{it depends on the lifetime of this parent value}}
-    // expected-note@-2{{this use causes the lifetime-dependent value to escape}}
+    return closure()
   }()
   _ = consume array
   _ = escapedSpan
