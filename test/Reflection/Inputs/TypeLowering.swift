@@ -89,6 +89,10 @@ public protocol P1 {}
 public protocol P2 : P1 {}
 public protocol P3 {}
 
+public protocol PP<T> {
+  associatedtype T
+}
+
 public protocol CP1 : class {}
 public protocol CP2 : CP1 {}
 public protocol CP3 : C {}

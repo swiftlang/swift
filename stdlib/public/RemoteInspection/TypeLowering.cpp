@@ -2610,6 +2610,8 @@ public:
 
     if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
       builder.addProtocolComposition(PC);
+    } else if (auto *CET = dyn_cast<ConstrainedExistentialTypeRef>(TR)) {
+      builder.addProtocolComposition(CET->getBase());
     } else {
       TC.setError("invalid existential metatype", EM);
       return nullptr;
