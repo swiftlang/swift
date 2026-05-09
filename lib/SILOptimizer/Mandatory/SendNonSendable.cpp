@@ -44,7 +44,13 @@
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "swift/Sema/Concurrency.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+
+STATISTIC(NumRequireLivenessProcess,
+          "# of calls to RequireLiveness::process");
+STATISTIC(NumRequireLivenessInstScans,
+          "# of instructions scanned inside RequireLiveness block loops");
 
 using namespace swift;
 using namespace swift::siloptimizer;
@@ -526,6 +532,7 @@ void RequireLiveness::processNonDefBlock(SILBasicBlock *block) {
 
 template <typename Collection>
 void RequireLiveness::process(Collection requireInstList) {
+  ++NumRequireLivenessProcess;
   REGIONBASEDISOLATION_LOG(
       llvm::dbgs() << "==> Performing Require Liveness for: " << *sendingInst);
 
@@ -570,6 +577,7 @@ void RequireLiveness::process(Collection requireInstList) {
   while (auto *requireBlock = initializingWorklist.pop()) {
     auto blockState = blockLivenessInfo.get(requireBlock);
     for (auto &inst : *requireBlock) {
+      ++NumRequireLivenessInstScans;
       if (!allRequires.contains(&inst))
         continue;
       REGIONBASEDISOLATION_LOG(llvm::dbgs() << "        Mapping Block bb"

@@ -1,5 +1,18 @@
-// RUN: %scale-test --invert-result --begin 1 --end 10 --step 1 --select NumInstScansDuringLivenessQueries -Xfrontend=-emit-sil %s
+// RUN: %scale-test --invert-result --begin 10 --end 100 --step 10 --select NumInstScansDuringLivenessQueries -Xfrontend=-emit-sil %s
 // REQUIRES: asserts
+
+// Test that DefiniteInitialization does not scale quadratically in the number
+// of stored properties in a class initializer.
+//
+// The pattern:
+//   - A class with N stored Int properties
+//   - An init() that assigns each property once, in order
+//   - DI calls getLivenessAtInst() once per assignment (N times)
+//   - getLivenessAtInst() scans backwards through all preceding instructions
+//     in the block to find prior writes; the i-th assignment scans past the
+//     i-1 preceding assignments before reaching the alloc_ref → O(N²) total
+//
+// This test uses --invert-result to document the *known-bad* quadratic scaling.
 
 class C${N} {
 % for i in range(N):
