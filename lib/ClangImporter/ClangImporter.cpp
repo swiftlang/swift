@@ -7834,6 +7834,11 @@ bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
   return false;
 }
 
+bool ClangImporter::isCxxMoveOnlyType(const clang::CXXRecordDecl *decl) {
+  return importer::getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) ==
+         CxxValueSemanticsKind::MoveOnly;
+}
+
 bool ClangImporter::isUnsafeCXXMethod(const FuncDecl *func) {
   if (!func->hasClangNode())
     return false;

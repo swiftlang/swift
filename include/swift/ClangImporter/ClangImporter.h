@@ -657,6 +657,8 @@ public:
 
   bool isCXXMethodMutating(const clang::CXXMethodDecl *method) override;
 
+  bool isCxxMoveOnlyType(const clang::CXXRecordDecl *decl) override;
+
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;

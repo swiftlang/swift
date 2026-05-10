@@ -3853,12 +3853,41 @@ getIndirectCParameterConvention(const clang::ParmVarDecl *param) {
 /// directly, deduce the convention for it.
 ///
 /// Generally, whether the parameter is +1 is handled before this.
-static ParameterConvention getDirectCParameterConvention(clang::QualType type) {
+static ParameterConvention
+getDirectCParameterConvention(clang::QualType type,
+                              ClangModuleLoader *clangModuleLoader) {
   if (auto *cxxRecord = type->getAsCXXRecordDecl()) {
     // Directly passed non-trivially destroyed C++ record is consumed by the
     // callee.
     if (!cxxRecord->hasTrivialDestructor())
       return ParameterConvention::Direct_Owned;
+    // A move-only C++ record passed by value is semantically consumed: C++
+    // would require move-construction at the call site, and Swift's
+    // no-implicit-copy rules should apply. Mirror pure-Swift noncopyable
+    // by-value parameters, which are always @owned regardless of triviality.
+    //
+    // FIXME: C/C++ types annotated with a Swift `destroy:` attribute are
+    // classified as move-only but rely on a non-consuming by-value
+    // convention here so that their synthesized `deinit` (which forwards
+    // `self` to the destroy function) does not trip the "self cannot be
+    // consumed during 'deinit'" diagnostic. Skip the flip for those; ideally
+    // the deinit synthesizer would mark that call site specially so we can
+    // drop this exception.
+    if (clangModuleLoader && clangModuleLoader->isCxxMoveOnlyType(cxxRecord)) {
+      bool hasDestroyAttr = false;
+      if (cxxRecord->hasAttrs()) {
+        for (const clang::Attr *attr : cxxRecord->getAttrs()) {
+          if (auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+            if (swiftAttr->getAttribute().starts_with("destroy:")) {
+              hasDestroyAttr = true;
+              break;
+            }
+          }
+        }
+      }
+      if (!hasDestroyAttr)
+        return ParameterConvention::Direct_Owned;
+    }
   }
   return ParameterConvention::Direct_Unowned;
 }
@@ -3866,11 +3895,12 @@ static ParameterConvention getDirectCParameterConvention(clang::QualType type) {
 /// Given a C parameter declaration whose type is passed directly,
 /// deduce the convention for it.
 static ParameterConvention
-getDirectCParameterConvention(const clang::ParmVarDecl *param) {
+getDirectCParameterConvention(const clang::ParmVarDecl *param,
+                              ClangModuleLoader *clangModuleLoader) {
   if (param->hasAttr<clang::NSConsumedAttr>() ||
       param->hasAttr<clang::CFConsumedAttr>())
     return ParameterConvention::Direct_Owned;
-  return getDirectCParameterConvention(param->getType());
+  return getDirectCParameterConvention(param->getType(), clangModuleLoader);
 }
 
 // FIXME: that should be Direct_Guaranteed
@@ -3896,7 +3926,11 @@ public:
   ParameterConvention getDirectParameter(unsigned index,
                            const AbstractionPattern &type,
                            const TypeLowering &substTL) const override {
-    return getDirectCParameterConvention(Method->param_begin()[index]);
+    auto *cml = substTL.getLoweredType()
+                    .getASTType()
+                    ->getASTContext()
+                    .getClangModuleLoader();
+    return getDirectCParameterConvention(Method->param_begin()[index], cml);
   }
 
   ParameterConvention getPackParameter(unsigned index) const override {
@@ -4080,7 +4114,11 @@ public:
                            const TypeLowering &substTL) const override {
     if (cast<clang::FunctionProtoType>(FnType)->isParamConsumed(index))
       return ParameterConvention::Direct_Owned;
-    return getDirectCParameterConvention(getParamType(index));
+    auto *cml = substTL.getLoweredType()
+                    .getASTType()
+                    ->getASTContext()
+                    .getClangModuleLoader();
+    return getDirectCParameterConvention(getParamType(index), cml);
   }
 
   ParameterConvention getPackParameter(unsigned index) const override {
