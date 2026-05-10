@@ -175,13 +175,9 @@ internal func _expectEnd<C: Collection>(of s: C, is i: C.Index) {
     "invalid Collection: count differed in successive traversals")
 }
 
-@inlinable
+@inlinable @inline(__always)
 internal func _growArrayCapacity(_ capacity: Int) -> Int {
-  /* We calculate this in an unusual way because we want to minimize the number
-   of overflow checks, approximately match Cocoa's 1.6x growth factor, and round
-   up to the nearest integer rather than down.
-   */
-  return (capacity * 2) &- (capacity >> 1)
+  return capacity &+ (capacity &>> 1) &+ (capacity &>> 3)
 }
 
 @_alwaysEmitIntoClient
