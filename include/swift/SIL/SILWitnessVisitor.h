@@ -109,7 +109,8 @@ public:
     // Visit the witnesses for the ABI members of a protocol, including those
     // introduced by freestanding declaration macro expansions.
     for (Decl *member : protocol->getABIMembers()) {
-      ASTVisitor<T>::visit(member);
+      if (member->isAvailableDuringLowering())
+        ASTVisitor<T>::visit(member);
     }
   }
 
@@ -151,6 +152,19 @@ public:
     assert(!isa<AccessorDecl>(func));
     if (!func->requiresNewWitnessTableEntry())
       return;
+
+    // Unreachable functions (with custom availability) should not generate
+    // witness entries
+    // FIXME: cannot use func->isUnreachableAtRuntime() here rdar://170184865
+    for (auto *attr : func->getAttrs().getAttributes<AvailableAttr>()) {
+      if (auto domain = attr->getDomainOrIdentifier().getAsDomain()) {
+        if (domain->isCustom() &&
+            domain->getCustomDomain()->getKind() ==
+                CustomAvailabilityDomain::Kind::Disabled) {
+          return;
+        }
+      }
+    }
 
     asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
     addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
